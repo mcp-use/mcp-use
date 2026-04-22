@@ -5,8 +5,14 @@ import path from "node:path";
 export interface McpConfig {
   apiKey?: string;
   apiUrl?: string;
+  orgId?: string;
+  orgName?: string;
+  orgSlug?: string;
+  /** @deprecated Use orgId. Read for backward compat with old config files. */
   profileId?: string;
+  /** @deprecated Use orgName. */
   profileName?: string;
+  /** @deprecated Use orgSlug. */
   profileSlug?: string;
 }
 
@@ -35,24 +41,30 @@ async function ensureConfigDir(): Promise<void> {
 }
 
 /**
- * Read config from disk
+ * Read config from disk, migrating legacy `profile*` keys to `org*`.
  */
 export async function readConfig(): Promise<McpConfig> {
   try {
     const content = await fs.readFile(CONFIG_FILE, "utf-8");
-    return JSON.parse(content);
+    const raw = JSON.parse(content) as McpConfig;
+    return {
+      ...raw,
+      orgId: raw.orgId ?? raw.profileId,
+      orgName: raw.orgName ?? raw.profileName,
+      orgSlug: raw.orgSlug ?? raw.profileSlug,
+    };
   } catch (error) {
-    // Return empty config if file doesn't exist
     return {};
   }
 }
 
 /**
- * Write config to disk
+ * Write config to disk. Persists only the new `org*` keys and removes legacy `profile*` keys.
  */
 export async function writeConfig(config: McpConfig): Promise<void> {
   await ensureConfigDir();
-  await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
+  const { profileId: _a, profileName: _b, profileSlug: _c, ...clean } = config;
+  await fs.writeFile(CONFIG_FILE, JSON.stringify(clean, null, 2), "utf-8");
 }
 
 /**
@@ -91,17 +103,27 @@ export async function isLoggedIn(): Promise<boolean> {
 }
 
 /**
- * Get the stored profile (organization) ID from config
+ * Get the stored organization ID from config
  */
-export async function getProfileId(): Promise<string | null> {
+export async function getOrgId(): Promise<string | null> {
   const config = await readConfig();
-  return config.profileId || null;
+  return config.orgId || null;
 }
 
 /**
  * Get web URL (for browser-based auth)
- * This is the frontend URL where /auth/cli lives
+ * This is the frontend URL where /device verification page lives
  */
 export async function getWebUrl(): Promise<string> {
   return DEFAULT_WEB_URL;
+}
+
+/**
+ * Derive the auth base URL from the API URL.
+ * Better Auth endpoints live at /api/auth/*, not under /api/v1/.
+ * e.g. "http://localhost:8000/api/v1" -> "http://localhost:8000"
+ */
+export async function getAuthBaseUrl(): Promise<string> {
+  const apiUrl = await getApiUrl();
+  return apiUrl.replace(/\/api\/v1$/, "");
 }

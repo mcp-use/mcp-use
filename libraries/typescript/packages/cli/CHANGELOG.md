@@ -1,5 +1,341 @@
 # @mcp-use/cli
 
+## 3.0.2
+
+### Patch Changes
+
+- e9c4bd0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+- e9c4bd0: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - mcp-use@1.24.2
+  - @mcp-use/inspector@2.2.0
+
+## 3.0.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies [028cd3c]
+  - @mcp-use/inspector@2.2.0-canary.7
+  - mcp-use@1.24.2-canary.7
+
+## 3.0.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies [baa93e6]
+  - @mcp-use/inspector@2.2.0-canary.6
+  - mcp-use@1.24.2-canary.6
+
+## 3.0.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bd58d95]
+- Updated dependencies [1b64075]
+  - mcp-use@1.24.2-canary.5
+  - @mcp-use/inspector@2.2.0-canary.5
+
+## 3.0.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [d9ac208]
+  - @mcp-use/inspector@2.2.0-canary.4
+  - mcp-use@1.24.2-canary.4
+
+## 3.0.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa86071]
+  - mcp-use@1.24.2-canary.3
+  - @mcp-use/inspector@2.2.0-canary.3
+
+## 3.0.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [ee5abf8]
+  - @mcp-use/inspector@2.2.0-canary.2
+  - mcp-use@1.24.2-canary.2
+
+## 3.0.2-canary.1
+
+### Patch Changes
+
+- 8f8a8e0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+  - mcp-use@1.24.2-canary.1
+  - @mcp-use/inspector@2.1.1-canary.1
+
+## 3.0.2-canary.0
+
+### Patch Changes
+
+- 5f0c888: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+  - mcp-use@1.24.2-canary.0
+  - @mcp-use/inspector@2.1.1-canary.0
+
+## 3.0.1
+
+### Patch Changes
+
+- 30be19e: refactor(cli): enhance deploy command with GitHub authorization handling
+- Updated dependencies [30be19e]
+- Updated dependencies [30be19e]
+- Updated dependencies [30be19e]
+  - mcp-use@1.24.1
+  - @mcp-use/inspector@2.1.0
+
+## 3.0.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d85fb4f]
+  - @mcp-use/inspector@2.1.0-canary.3
+  - mcp-use@1.24.1-canary.3
+
+## 3.0.1-canary.2
+
+### Patch Changes
+
+- 744db4d: refactor(cli): enhance deploy command with GitHub authorization handling
+  - mcp-use@1.24.1-canary.2
+  - @mcp-use/inspector@2.1.0-canary.2
+
+## 3.0.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9fed740]
+  - mcp-use@1.24.1-canary.1
+  - @mcp-use/inspector@2.1.0-canary.1
+
+## 3.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [27bd31c]
+  - @mcp-use/inspector@2.1.0-canary.0
+  - mcp-use@1.24.1-canary.0
+
+## 3.0.0
+
+### Major Changes
+
+- 4070f26: Moved to device flow authentication.
+- 4070f26: cli: refactor cli to use new manufact apis
+
+### Patch Changes
+
+- 4070f26: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+  - mcp-use@1.24.0
+  - @mcp-use/inspector@2.0.0
+
+## 3.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bba147b]
+  - mcp-use@1.24.0-canary.5
+  - @mcp-use/inspector@2.0.0-canary.5
+
+## 3.0.0-canary.4
+
+### Major Changes
+
+- 2bfcf48: cli: refactor cli to use new manufact apis
+
+### Patch Changes
+
+- Updated dependencies [1718d68]
+  - mcp-use@1.24.0-canary.4
+  - @mcp-use/inspector@2.0.0-canary.4
+
+## 3.0.0-canary.3
+
+### Major Changes
+
+- c51a656: Moved to device flow authentication.
+
+### Patch Changes
+
+- c51a656: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - mcp-use@1.24.0-canary.3
+  - @mcp-use/inspector@2.0.0-canary.3
+
+## 2.21.5-canary.2
+
+### Patch Changes
+
+- Updated dependencies [9478920]
+- Updated dependencies [b0e2492]
+  - mcp-use@1.24.0-canary.2
+  - @mcp-use/inspector@2.0.0-canary.2
+
+## 2.21.5-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4525a5d]
+  - mcp-use@1.24.0-canary.1
+  - @mcp-use/inspector@2.0.0-canary.1
+
+## 2.21.5-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c77a998]
+  - mcp-use@1.24.0-canary.0
+  - @mcp-use/inspector@2.0.0-canary.0
+
+## 2.21.4
+
+### Patch Changes
+
+- Updated dependencies [6d7fd2e]
+  - mcp-use@1.23.1
+  - @mcp-use/inspector@1.0.1
+
+## 2.21.4-canary.0
+
+### Patch Changes
+
+- Updated dependencies [b3680f9]
+  - mcp-use@1.23.1-canary.0
+  - @mcp-use/inspector@1.0.1-canary.0
+
+## 2.21.3
+
+### Patch Changes
+
+- 6d7c4df: Updated dependency `vite` to `^8.0.5`.
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- 6d7c4df: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+  - mcp-use@1.23.0
+  - @mcp-use/inspector@1.0.0
+
+## 2.21.3-canary.10
+
+### Patch Changes
+
+- Updated dependencies [5749a4b]
+  - @mcp-use/inspector@1.0.0-canary.10
+  - mcp-use@1.23.0-canary.10
+
+## 2.21.3-canary.9
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [1118308]
+  - mcp-use@1.23.0-canary.9
+  - @mcp-use/inspector@1.0.0-canary.9
+
+## 2.21.3-canary.8
+
+### Patch Changes
+
+- Updated dependencies [9ec2039]
+- Updated dependencies [ebc6c9f]
+  - @mcp-use/inspector@1.0.0-canary.8
+  - mcp-use@1.23.0-canary.8
+
+## 2.21.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [10ab350]
+  - mcp-use@1.23.0-canary.7
+  - @mcp-use/inspector@1.0.0-canary.7
+
+## 2.21.3-canary.6
+
+### Patch Changes
+
+- Updated dependencies [47b8052]
+  - mcp-use@1.23.0-canary.6
+  - @mcp-use/inspector@1.0.0-canary.6
+
+## 2.21.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [7be81db]
+  - @mcp-use/inspector@0.27.0-canary.5
+  - mcp-use@1.22.4-canary.5
+
+## 2.21.3-canary.4
+
+### Patch Changes
+
+- Updated dependencies [36334a0]
+  - @mcp-use/inspector@0.26.2-canary.4
+  - mcp-use@1.22.4-canary.4
+
+## 2.21.3-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - @mcp-use/inspector@0.26.2-canary.3
+  - mcp-use@1.22.4-canary.3
+
+## 2.21.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [d09532e]
+  - @mcp-use/inspector@0.26.2-canary.2
+  - mcp-use@1.22.4-canary.2
+
+## 2.21.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [62f95c2]
+  - @mcp-use/inspector@0.26.2-canary.1
+  - mcp-use@1.22.4-canary.1
+
+## 2.21.3-canary.0
+
+### Patch Changes
+
+- cca2612: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [cca2612]
+  - mcp-use@1.22.4-canary.0
+  - @mcp-use/inspector@0.26.2-canary.0
+
 ## 2.21.2
 
 ### Patch Changes

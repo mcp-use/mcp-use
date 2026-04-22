@@ -1,5 +1,401 @@
 # mcp-use
 
+## 1.24.2
+
+### Patch Changes
+
+- e9c4bd0: fix(landing): add deeplink to manufact inspector
+- e9c4bd0: ThemeProvider: gate color-scheme on opt-in prop to fix transparent iframe backgrounds.
+
+  Setting `color-scheme` to an explicit value ("dark"/"light") on the iframe document root causes browsers to paint an opaque canvas behind the iframe when the widget and host documents use different schemes, making `background-color: transparent` ineffective.
+
+  `McpUseProvider` now accepts a `colorScheme?: boolean` prop (default `false`). When `false`, `ThemeProvider` clears any previously set `color-scheme` inline style, preserving iframe transparency. When `true`, the previous behavior is restored (useful for widgets that need native dark scrollbars or CSS `light-dark()`).
+
+  Theme class (`dark`/`light`) and `data-theme` attribute are unaffected.
+
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - @mcp-use/inspector@2.2.0
+  - @mcp-use/cli@3.0.2
+
+## 1.24.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies [028cd3c]
+  - @mcp-use/inspector@2.2.0-canary.7
+  - @mcp-use/cli@3.0.2-canary.7
+
+## 1.24.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies [baa93e6]
+  - @mcp-use/inspector@2.2.0-canary.6
+  - @mcp-use/cli@3.0.2-canary.6
+
+## 1.24.2-canary.5
+
+### Patch Changes
+
+- bd58d95: fix(landing): add deeplink to manufact inspector
+- Updated dependencies [1b64075]
+  - @mcp-use/inspector@2.2.0-canary.5
+  - @mcp-use/cli@3.0.2-canary.5
+
+## 1.24.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [d9ac208]
+  - @mcp-use/inspector@2.2.0-canary.4
+  - @mcp-use/cli@3.0.2-canary.4
+
+## 1.24.2-canary.3
+
+### Patch Changes
+
+- aa86071: ThemeProvider: gate color-scheme on opt-in prop to fix transparent iframe backgrounds.
+
+  Setting `color-scheme` to an explicit value ("dark"/"light") on the iframe document root causes browsers to paint an opaque canvas behind the iframe when the widget and host documents use different schemes, making `background-color: transparent` ineffective.
+
+  `McpUseProvider` now accepts a `colorScheme?: boolean` prop (default `false`). When `false`, `ThemeProvider` clears any previously set `color-scheme` inline style, preserving iframe transparency. When `true`, the previous behavior is restored (useful for widgets that need native dark scrollbars or CSS `light-dark()`).
+
+  Theme class (`dark`/`light`) and `data-theme` attribute are unaffected.
+  - @mcp-use/cli@3.0.2-canary.3
+  - @mcp-use/inspector@2.2.0-canary.3
+
+## 1.24.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [ee5abf8]
+  - @mcp-use/inspector@2.2.0-canary.2
+  - @mcp-use/cli@3.0.2-canary.2
+
+## 1.24.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [8f8a8e0]
+  - @mcp-use/cli@3.0.2-canary.1
+  - @mcp-use/inspector@2.1.1-canary.1
+
+## 1.24.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [5f0c888]
+  - @mcp-use/cli@3.0.2-canary.0
+  - @mcp-use/inspector@2.1.1-canary.0
+
+## 1.24.1
+
+### Patch Changes
+
+- 30be19e: Fix inspector "Protected resource does not match" error when switching from Via Proxy to Direct connection. The `window.fetch` interceptor installed by `BrowserOAuthClientProvider` is now correctly restored when `useMcp` unmounts, preventing the stale proxy interceptor from interfering with subsequent direct OAuth flows.
+- Updated dependencies [30be19e]
+- Updated dependencies [30be19e]
+- Updated dependencies [30be19e]
+  - @mcp-use/inspector@2.1.0
+  - @mcp-use/cli@3.0.1
+
+## 1.24.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [d85fb4f]
+  - @mcp-use/inspector@2.1.0-canary.3
+  - @mcp-use/cli@3.0.1-canary.3
+
+## 1.24.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [744db4d]
+  - @mcp-use/cli@3.0.1-canary.2
+  - @mcp-use/inspector@2.1.0-canary.2
+
+## 1.24.1-canary.1
+
+### Patch Changes
+
+- 9fed740: Fix inspector "Protected resource does not match" error when switching from Via Proxy to Direct connection. The `window.fetch` interceptor installed by `BrowserOAuthClientProvider` is now correctly restored when `useMcp` unmounts, preventing the stale proxy interceptor from interfering with subsequent direct OAuth flows.
+  - @mcp-use/cli@3.0.1-canary.1
+  - @mcp-use/inspector@2.1.0-canary.1
+
+## 1.24.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [27bd31c]
+  - @mcp-use/inspector@2.1.0-canary.0
+  - @mcp-use/cli@3.0.1-canary.0
+
+## 1.24.0
+
+### Minor Changes
+
+- 4070f26: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+- 4070f26: Add scopes customization to oauth providers
+
+### Patch Changes
+
+- 4070f26: Fix deployment flow through cli and github connection
+- 4070f26: Add missing fields to CustomProviderConfig to match documentation: `userInfoEndpoint`, `jwksUrl`, `clientId`, `clientSecret`, `mode`, `scopesSupported`, and `audience`. Add `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` as optional methods on the `OAuthProvider` interface. Replace unsafe `(provider as any).config?.clientId` cast in routes with type-safe `provider.getClientId?.()`.
+- 4070f26: Fix Google provider rejecting tool schemas with `propertyNames` keyword.
+
+  `z.record()` causes `@langchain/core` to emit a `propertyNames` field in the JSON Schema output for constrained or enum key types, which Google's Generative AI API rejects. Switching to `z.object({}).catchall()` produces identical runtime behavior while serializing cleanly without `propertyNames`.
+
+- 4070f26: chore(mcp-use): switch several logers to debug from info
+- 4070f26: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+  - @mcp-use/inspector@2.0.0
+  - @mcp-use/cli@3.0.0
+
+## 1.24.0-canary.5
+
+### Patch Changes
+
+- bba147b: Fix deployment flow through cli and github connection
+  - @mcp-use/cli@3.0.0-canary.5
+  - @mcp-use/inspector@2.0.0-canary.5
+
+## 1.24.0-canary.4
+
+### Minor Changes
+
+- 1718d68: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+### Patch Changes
+
+- Updated dependencies [1718d68]
+- Updated dependencies [2bfcf48]
+  - @mcp-use/inspector@2.0.0-canary.4
+  - @mcp-use/cli@3.0.0-canary.4
+
+## 1.24.0-canary.3
+
+### Patch Changes
+
+- c51a656: chore(mcp-use): switch several logers to debug from info
+- c51a656: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - @mcp-use/cli@3.0.0-canary.3
+  - @mcp-use/inspector@2.0.0-canary.3
+
+## 1.24.0-canary.2
+
+### Patch Changes
+
+- 9478920: Fix Google provider rejecting tool schemas with `propertyNames` keyword.
+
+  `z.record()` causes `@langchain/core` to emit a `propertyNames` field in the JSON Schema output for constrained or enum key types, which Google's Generative AI API rejects. Switching to `z.object({}).catchall()` produces identical runtime behavior while serializing cleanly without `propertyNames`.
+
+- Updated dependencies [b0e2492]
+  - @mcp-use/inspector@2.0.0-canary.2
+  - @mcp-use/cli@2.21.5-canary.2
+
+## 1.24.0-canary.1
+
+### Patch Changes
+
+- 4525a5d: Add missing fields to CustomProviderConfig to match documentation: `userInfoEndpoint`, `jwksUrl`, `clientId`, `clientSecret`, `mode`, `scopesSupported`, and `audience`. Add `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` as optional methods on the `OAuthProvider` interface. Replace unsafe `(provider as any).config?.clientId` cast in routes with type-safe `provider.getClientId?.()`.
+  - @mcp-use/cli@2.21.5-canary.1
+  - @mcp-use/inspector@2.0.0-canary.1
+
+## 1.24.0-canary.0
+
+### Minor Changes
+
+- c77a998: Add scopes customization to oauth providers
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.5-canary.0
+- @mcp-use/inspector@2.0.0-canary.0
+
+## 1.23.1
+
+### Patch Changes
+
+- 6d7fd2e: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [6d7fd2e]
+  - @mcp-use/inspector@1.0.1
+  - @mcp-use/cli@2.21.4
+
+## 1.23.1-canary.0
+
+### Patch Changes
+
+- b3680f9: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [b3680f9]
+  - @mcp-use/inspector@1.0.1-canary.0
+  - @mcp-use/cli@2.21.4-canary.0
+
+## 1.23.0
+
+### Minor Changes
+
+- 6d7c4df: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+- 6d7c4df: adds Better Auth oauth provider
+
+### Patch Changes
+
+- 6d7c4df: Updated dependency `@hono/node-server` to `^1.19.13`.
+- 6d7c4df: Updated dependency `hono` to `^4.12.12`.
+- 6d7c4df: Updated dependency `vite` to `^8.0.5`.
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- 6d7c4df: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+  - @mcp-use/inspector@1.0.0
+  - @mcp-use/cli@2.21.3
+
+## 1.23.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [5749a4b]
+  - @mcp-use/inspector@1.0.0-canary.10
+  - @mcp-use/cli@2.21.3-canary.10
+
+## 1.23.0-canary.9
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [1118308]
+  - @mcp-use/cli@2.21.3-canary.9
+  - @mcp-use/inspector@1.0.0-canary.9
+
+## 1.23.0-canary.8
+
+### Patch Changes
+
+- 9ec2039: Updated dependency `@hono/node-server` to `^1.19.13`.
+- Updated dependencies [9ec2039]
+- Updated dependencies [ebc6c9f]
+  - @mcp-use/inspector@1.0.0-canary.8
+  - @mcp-use/cli@2.21.3-canary.8
+
+## 1.23.0-canary.7
+
+### Minor Changes
+
+- 10ab350: adds Better Auth oauth provider
+
+### Patch Changes
+
+- @mcp-use/cli@2.21.3-canary.7
+- @mcp-use/inspector@1.0.0-canary.7
+
+## 1.23.0-canary.6
+
+### Minor Changes
+
+- 47b8052: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+### Patch Changes
+
+- Updated dependencies [47b8052]
+  - @mcp-use/inspector@1.0.0-canary.6
+  - @mcp-use/cli@2.21.3-canary.6
+
+## 1.22.4-canary.5
+
+### Patch Changes
+
+- Updated dependencies [7be81db]
+  - @mcp-use/inspector@0.27.0-canary.5
+  - @mcp-use/cli@2.21.3-canary.5
+
+## 1.22.4-canary.4
+
+### Patch Changes
+
+- Updated dependencies [36334a0]
+  - @mcp-use/inspector@0.26.2-canary.4
+  - @mcp-use/cli@2.21.3-canary.4
+
+## 1.22.4-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - @mcp-use/cli@2.21.3-canary.3
+  - @mcp-use/inspector@0.26.2-canary.3
+
+## 1.22.4-canary.2
+
+### Patch Changes
+
+- d09532e: Updated dependency `hono` to `^4.12.12`.
+- Updated dependencies [d09532e]
+  - @mcp-use/inspector@0.26.2-canary.2
+  - @mcp-use/cli@2.21.3-canary.2
+
+## 1.22.4-canary.1
+
+### Patch Changes
+
+- Updated dependencies [62f95c2]
+  - @mcp-use/inspector@0.26.2-canary.1
+  - @mcp-use/cli@2.21.3-canary.1
+
+## 1.22.4-canary.0
+
+### Patch Changes
+
+- cca2612: fix(mcp-use): correct handling of paths on windows
+- Updated dependencies [cca2612]
+  - @mcp-use/cli@2.21.3-canary.0
+  - @mcp-use/inspector@0.26.2-canary.0
+
 ## 1.22.3
 
 ### Patch Changes

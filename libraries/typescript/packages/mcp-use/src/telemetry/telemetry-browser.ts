@@ -233,7 +233,7 @@ export class Telemetry {
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
       );
     } else {
-      logger.info(
+      logger.debug(
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false in localStorage to disable."
       );
 

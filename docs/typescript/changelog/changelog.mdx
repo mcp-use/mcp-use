@@ -6,6 +6,92 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.24.2" description="April 2026">
+  ## Landing deeplinks, `colorScheme` & Inspector 2.2
+  Patch release adding optional `colorScheme` on `McpUseProvider`, a server landing deeplink to the hosted inspector, stronger deploy behavior in `@mcp-use/cli`, cloud server environment-variable commands, and Inspector 2.2 (see inspector changelog).
+
+- **New**: `colorScheme` on `McpUseProvider` (default `false`) — when `false`, `ThemeProvider` does not set `color-scheme` on the document root so transparent iframe backgrounds stay transparent; opt in with `true` for native scrollbars / `light-dark()` in widgets
+- **Fix**: Server landing routes include a deeplink to open the MCP server in the hosted manufact inspector
+- **New** (@mcp-use/cli): `mcp-use servers env` subcommands to list, create, update, and delete environment variables on cloud servers (`#1372`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy` surfaces failures from mutating git commands (init, commit, push), normalizes the default branch to `main` before push, verifies a commit exists, and shell-quotes commit messages (`#1354`)
+- **Update** (@mcp-use/cli): Deploy treats HTTP 401 as an invalid or expired API session and prompts re-authentication instead of misreporting GitHub App connection state (`#1356`)
+- **Enhancement** (@mcp-use/inspector): Hosted chat configuration, copy/export chat, inspector LLM stack without LangChain, OAuth popup close page, and related UX (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v2.2.0
+- **Update**: Updated @mcp-use/cli to v3.0.2
+</Update>
+
+<Update label="v1.24.1" description="April 2026">
+  ## OAuth fetch cleanup when switching transports
+  Patch release fixing OAuth in the embedded inspector when switching from Via Proxy to Direct — `BrowserOAuthClientProvider` restores `window.fetch` when `useMcp` unmounts so a stale proxy interceptor cannot break direct flows.
+
+- **Fix**: Restore the `window.fetch` interceptor installed by `BrowserOAuthClientProvider` when `useMcp` unmounts — resolves "Protected resource does not match" after switching from Via Proxy to Direct
+- **Fix** (@mcp-use/inspector): Same fetch lifecycle in the inspector client (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v2.1.0
+- **Update**: Updated @mcp-use/cli to v3.0.1
+</Update>
+
+<Update label="v1.24.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.24.0&title=OAuth%20scopes%2C%20telemetry%2C%20CLI%203%20%26%20device%20flow&date=2026-04&lang=typescript" alt="Release 1.24.0" />
+  </Frame>
+  ## OAuth scopes, telemetry & CLI 3
+  Minor release for `mcp-use` with OAuth scope customization, telemetry, sub-path OAuth routing, and a Generative-AI JSON Schema fix; major `@mcp-use/cli` release with device-flow auth and manufact API alignment; Inspector 2.0 (see inspector changelog).
+
+- **New**: Configurable OAuth scopes — `scopesSupported` on shared OAuth config and built-in providers
+- **Fix**: `CustomProviderConfig` matches documented fields (`jwksUrl`, `scopesSupported`, `userInfoEndpoint`, `clientId`, `clientSecret`, `mode`, `audience`); optional `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` on `OAuthProvider`; OAuth routes use those accessors instead of unsafe casts
+- **New**: Telemetry support with browser and Node implementations and related dependency updates
+- **New**: `defaultCallbackUrl` on `McpClientProvider` so OAuth redirect URLs stay correct when the UI is mounted under a path basename (for example embedded inspector at `/inspector`)
+- **Fix**: Google provider tool schemas — use `z.object({}).catchall()` instead of `z.record()` so emitted JSON Schema omits `propertyNames`, which Google's API rejects
+- **Fix**: Windows path handling in server and tooling code paths
+- **Enhancement**: Several internal log lines moved from info to debug to reduce noise in normal operation
+- **Fix** (@mcp-use/inspector): OAuth callback URL when the inspector basename is `/inspector`; thinking indicator after streamed assistant messages; tab persistence across refresh (see inspector changelog)
+- **New** (@mcp-use/cli): Device-flow authentication for login and session refresh against the cloud
+- **Update** (@mcp-use/cli): CLI refactored to new manufact cloud APIs across deploy, auth, organization, and server commands
+- **Fix** (@mcp-use/cli): Deployment flow when linking GitHub repositories (`#1331`)
+- **Update**: Updated @mcp-use/inspector to v2.0.0
+- **Update**: Updated @mcp-use/cli to v3.0.0
+</Update>
+
+<Update label="v1.23.1" description="April 2026">
+  ## Embedded inspector without LangChain
+  Patch release fixing embedded inspector when the agent graph is not installed, and clearer diagnostics when mounting the inspector UI fails.
+
+- **Fix**: Export `telFetch` from `mcp-use/telemetry/tel-fetch` (tsup build) so inspector server code does not import the root `mcp-use` entry, which eagerly loads the agent stack — fixes embedded inspector when `langchain` is not installed
+- **Fix**: Log inspector UI mount failures in development or when `MCP_USE_DEBUG` is set (production remains quiet)
+- **Fix** (@mcp-use/inspector): `telFetch` import uses the telemetry subpath (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v1.0.1
+- **Update**: Updated @mcp-use/cli to v2.21.4
+</Update>
+
+<Update label="v1.23.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.23.0&title=Better%20Auth%2C%20Server%20Metadata%20%26%20Inspector%201.0&date=2026-04&lang=typescript" alt="Release 1.23.0" />
+  </Frame>
+  ## Better Auth, server metadata & Inspector 1.0
+  Minor release adding a Better Auth OAuth provider, metadata-only client updates, dependency hardening, and a major Inspector release.
+
+- **New**: Better Auth OAuth provider for MCP servers — see authentication docs and `examples/server/oauth/better-auth`
+- **New**: `updateServerMetadata()` on `McpClientProvider` updates display metadata without reconnecting; connection-affecting changes still use `updateServer()`
+- **Fix**: Windows-compatible ESM import paths for dev and tooling
+- **Enhancement** (@mcp-use/inspector): Stream protocol in chat, `disabledTools`, editable server aliases with shared display-name resolution, tab persistence and URL sync, tool-invocation serialization and screenshots (see inspector changelog)
+- **Update**: Vite 8.0.5, Hono 4.12.12, `@hono/node-server` 1.19.13 across the TypeScript workspace
+- **Fix**: Tighter `pnpm` overrides and lockfile refresh for `pnpm audit`; `lodash` override in the mcp-apps scaffold template for standalone installs
+- **Documentation**: `updateServerMetadata` in the `useMcpClient` API reference; authentication overview links to the Better Auth guide
+- **Update**: Updated @mcp-use/inspector to v1.0.0
+- **Update**: Updated @mcp-use/cli to v2.21.3
+- **Update**: Updated create-mcp-use-app to v0.14.8
+</Update>
+
+<Update label="v1.22.3" description="March 2026">
+  ## Inspector dependency & bundling alignment
+  Patch release adjusting how `@mcp-use/inspector` depends on `mcp-use` so bundling and shared types both work.
+
+- **Fix** (@mcp-use/inspector): Restore `mcp-use` as both a `dependency` and `peerDependency` — needed to bundle non-React subpaths (`mcp-use/auth`, `mcp-use/browser`) with transitive deps (e.g. LangChain), while `peerDependency` keeps `mcp-use`/`react` types aligned with the host app
+- **Update**: Updated @mcp-use/inspector to v0.26.1
+- **Update**: Updated @mcp-use/cli to v2.21.2
+- **Update**: Updated create-mcp-use-app to v0.14.7
+</Update>
+
 <Update label="v1.22.2" description="March 2026">
   ## Type Compatibility & Peer Dependency Alignment
   Patch release focused on pnpm peer-variant type compatibility, inspector dependency alignment, and template dependency cleanup.

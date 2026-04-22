@@ -491,60 +491,6 @@
                 ]
               },
               {
-                "group": "MCP Agent",
-                "icon": "brain",
-                "pages": [
-                  "typescript/agent/index",
-                  "typescript/agent/agent-configuration",
-                  {
-                    "group": "Core Concepts",
-                    "icon": "box",
-                    "pages": [
-                      "typescript/agent/llm-integration",
-                      "typescript/agent/memory-management",
-                      "typescript/agent/server-manager",
-                      "typescript/agent/structured-output",
-                      "typescript/agent/streaming"
-                    ]
-                  },
-                  "typescript/agent/observability"
-                ]
-              },
-              {
-                "group": "MCP Client",
-                "icon": "router",
-                "pages": [
-                  "typescript/client/index",
-                  "typescript/client/client-configuration",
-                  "typescript/client/environments",
-                  {
-                    "group": "Core Components",
-                    "icon": "box",
-                    "pages": [
-                      "typescript/client/tools",
-                      "typescript/client/resources",
-                      "typescript/client/prompts"
-                    ]
-                  },
-                  {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
-                    "pages": [
-                      "typescript/client/cli",
-                      "typescript/client/server-manager",
-                      "typescript/client/sampling",
-                      "typescript/client/elicitation",
-                      "typescript/client/completion",
-                      "typescript/client/notifications",
-                      "typescript/client/logging"
-                    ]
-                  },
-                  "typescript/client/authentication",
-                  "typescript/client/usemcp",
-                  "typescript/client/code-mode"
-                ]
-              },
-              {
                 "group": "MCP Server",
                 "icon": "server",
                 "pages": [
@@ -620,8 +566,10 @@
                         "group": "OAuth Providers",
                         "icon": "plug",
                         "pages": [
-                          "typescript/server/authentication/providers/workos",
-                          "typescript/server/authentication/providers/supabase"
+                          "typescript/server/authentication/providers/auth0",
+                          "typescript/server/authentication/providers/better-auth",
+                          "typescript/server/authentication/providers/supabase",
+                          "typescript/server/authentication/providers/workos"
                         ]
                       }
                     ]
@@ -635,6 +583,60 @@
                       "typescript/server/deployment/google"
                     ]
                   }
+                ]
+              },
+              {
+                "group": "MCP Client",
+                "icon": "router",
+                "pages": [
+                  "typescript/client/index",
+                  "typescript/client/client-configuration",
+                  "typescript/client/environments",
+                  {
+                    "group": "Core Components",
+                    "icon": "box",
+                    "pages": [
+                      "typescript/client/tools",
+                      "typescript/client/resources",
+                      "typescript/client/prompts"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/client/cli",
+                      "typescript/client/server-manager",
+                      "typescript/client/sampling",
+                      "typescript/client/elicitation",
+                      "typescript/client/completion",
+                      "typescript/client/notifications",
+                      "typescript/client/logging"
+                    ]
+                  },
+                  "typescript/client/authentication",
+                  "typescript/client/usemcp",
+                  "typescript/client/code-mode"
+                ]
+              },
+              {
+                "group": "MCP Agent",
+                "icon": "brain",
+                "pages": [
+                  "typescript/agent/index",
+                  "typescript/agent/agent-configuration",
+                  {
+                    "group": "Core Concepts",
+                    "icon": "box",
+                    "pages": [
+                      "typescript/agent/llm-integration",
+                      "typescript/agent/memory-management",
+                      "typescript/agent/server-manager",
+                      "typescript/agent/structured-output",
+                      "typescript/agent/streaming"
+                    ]
+                  },
+                  "typescript/agent/observability"
                 ]
               },
               {

@@ -179,6 +179,12 @@ function ServerStatus({ serverId }) {
 
 ```typescript
 interface McpClientProviderProps {
+  // Default OAuth callback URL for all servers (can be overridden per-server via callbackUrl)
+  // Useful when your app is mounted at a sub-path — e.g. set to "/myapp/oauth/callback"
+  // so the OAuth redirect lands on the correct route.
+  // Defaults to /oauth/callback on the current origin.
+  defaultCallbackUrl?: string;
+
   // Default proxy configuration for all servers (can be overridden per-server)
   defaultProxyConfig?: {
     proxyAddress?: string;
@@ -347,7 +353,20 @@ addServer("linear", {
 
 ### OAuth Callback Page
 
-Create an OAuth callback route to handle OAuth redirects:
+Create an OAuth callback route to handle OAuth redirects.
+
+By default, `McpClientProvider` expects the callback at `/oauth/callback` on the current origin. If your app is mounted at a sub-path, set `defaultCallbackUrl` to match your actual route:
+
+```typescript
+// App mounted at /myapp — callback route is /myapp/oauth/callback
+<McpClientProvider
+  defaultCallbackUrl={`${window.location.origin}/myapp/oauth/callback`}
+>
+  <MyApp />
+</McpClientProvider>
+```
+
+Per-server `callbackUrl` in `addServer()` takes precedence over the provider default.
 
 ```typescript
 // app/oauth/callback/page.tsx (Next.js App Router)
@@ -741,6 +760,7 @@ const {
   addServer,
   removeServer,
   updateServer,
+  updateServerMetadata,
   getServer,
   storageLoaded,
 } = useMcpClient();
@@ -752,7 +772,10 @@ addServer("my-server", {
   headers: { Authorization: "Bearer key" },
 });
 
-// Update a server's configuration (disconnects and reconnects)
+// Update a server's display name without reconnecting
+await updateServerMetadata("my-server", { name: "Production API" });
+
+// Update connection-affecting configuration (disconnects and reconnects)
 await updateServer("my-server", {
   headers: { Authorization: "Bearer new-key" },
 });

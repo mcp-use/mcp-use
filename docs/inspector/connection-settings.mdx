@@ -42,6 +42,16 @@ The inspector can automatically try both connection types if one fails. Enable t
   both connection types will fail the same way.
 </Note>
 
+## Server display names
+
+Each saved connection can have a **display name** (alias) shown in the dashboard, server list, header, command palette, and server picker. Edit it from the connection settings form.
+
+Changing **only** the display name updates labels in the UI **without** disconnecting or clearing tokens. Use this when you want clearer names for multiple servers that share similar URLs. Connection-affecting fields (URL, headers, OAuth, transport) still trigger a reconnect when you save.
+
+## URL and tabs
+
+The inspector keeps the active **tab** in the page URL (`?tab=…`). Switching tabs updates the query string so a refresh or shared link restores the same view.
+
 ## Advanced Configuration
 
 ### Request Timeout
@@ -72,7 +82,6 @@ The inspector supports OAuth 2.0 authentication for MCP servers that require it.
 2. Enter your OAuth credentials:
 
    - **Client ID**: Your OAuth application client ID
-   - **Redirect URL**: The callback URL (defaults to `/inspector/oauth/callback`)
    - **Scope**: Space-separated list of OAuth scopes
 
 3. Click **Save** to store the configuration
@@ -164,7 +173,6 @@ Export your connection configuration as JSON:
   "maxTotalTimeout": 60000,
   "oauth": {
     "clientId": "your-client-id",
-    "redirectUrl": "http://localhost:8080/inspector/oauth/callback",
     "scope": "read write"
   }
 }

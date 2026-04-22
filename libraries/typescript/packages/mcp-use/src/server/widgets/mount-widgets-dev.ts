@@ -184,12 +184,12 @@ export async function mountWidgetsDev(
     const reactPluginPath = userProjectRequire.resolve("@vitejs/plugin-react");
     const tailwindPath = userProjectRequire.resolve("@tailwindcss/vite");
 
-    // Now import using the resolved paths
-    const viteModule = await import(vitePath);
+    // Now import using the resolved paths (use pathToFileURL for Windows compatibility)
+    const viteModule = await import(pathToFileURL(vitePath).href);
     createServer = viteModule.createServer;
-    const reactModule = await import(reactPluginPath);
+    const reactModule = await import(pathToFileURL(reactPluginPath).href);
     react = reactModule.default;
-    const tailwindModule = await import(tailwindPath);
+    const tailwindModule = await import(pathToFileURL(tailwindPath).href);
     tailwindcss = tailwindModule.default;
   } catch (error) {
     throw new Error(
@@ -248,7 +248,7 @@ export async function mountWidgetsDev(
     const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${widget.entry}'
+import Component from '${widget.entry.replace(/\\/g, "/")}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
@@ -489,7 +489,7 @@ if (container && Component) {
         const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${entryPath}'
+import Component from '${entryPath.replace(/\\/g, "/")}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {

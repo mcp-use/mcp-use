@@ -1,3 +1,4 @@
+import { MCPChatConfiguredEvent, Telemetry } from "@/client/telemetry";
 import { useCallback, useEffect, useState } from "react";
 import type { AuthConfig, LLMConfig } from "./types";
 import { DEFAULT_MODELS } from "./types";
@@ -172,6 +173,20 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
     // Dispatch custom event to notify other components
     window.dispatchEvent(new CustomEvent("llm-config-updated"));
+
+    // Track chat configuration (no API key)
+    try {
+      Telemetry.getInstance()
+        .capture(
+          new MCPChatConfiguredEvent({
+            provider: tempProvider,
+            model: tempModel,
+          })
+        )
+        .catch(() => {});
+    } catch {
+      // ignore telemetry errors
+    }
 
     setConfigDialogOpen(false);
   }, [

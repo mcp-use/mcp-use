@@ -52,8 +52,27 @@ app.use(
 // Register all API routes
 registerInspectorRoutes(app);
 
-// Register static file serving with dev proxy support (must be last as it includes catch-all route)
-registerStaticRoutesWithDevProxy(app);
+// OAuth popup self-close page — used as the `callbackURL` passed to
+// better-auth's /api/auth/sign-in/social. Better-auth redirects the OAuth
+// popup here once the session cookie is set; this page closes itself
+// (and postMessages the opener) instead of loading the full inspector
+// inside the popup. Must be registered BEFORE the catch-all below, which
+// otherwise serves the inspector's index.html for every /inspector/* path.
+const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Signed in</title><meta name="robots" content="noindex"><style>html,body{margin:0;height:100%;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#4b5563;background:#fff}</style></head>
+<body><div>Signed in. You can close this window.</div>
+<script>try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"manufact:oauth-complete"},"*")}catch(e){}try{window.close()}catch(e){}</script>
+</body></html>`;
+app.get("/inspector/oauth-popup-closed.html", (c) =>
+  c.html(OAUTH_POPUP_CLOSED_HTML)
+);
+
+// Register static file serving with dev proxy support (must be last as it includes catch-all route).
+// `MANUFACT_CHAT_URL` is read at runtime so the hosted-chat URL can be set on
+// the deploy environment (Railway, etc.) without rebuilding the npm package.
+registerStaticRoutesWithDevProxy(app, undefined, {
+  manufactChatUrl: process.env.MANUFACT_CHAT_URL,
+});
 
 /**
  * Start the MCP Inspector HTTP server and return its listening port and fetch handler.

@@ -8,8 +8,18 @@ import {
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
-import { MCPCommandPaletteOpenEvent, Telemetry } from "@/client/telemetry";
-import { useMcpClient } from "mcp-use/react";
+import {
+  MCPCommandPaletteOpenEvent,
+  MCPTabNavigationEvent,
+  MCPSessionDurationEvent,
+  Telemetry,
+} from "@/client/telemetry";
+import {
+  getStoredConnectionConfig,
+  isAliasOnlyConnectionUpdate,
+  type EditableConnectionConfig,
+} from "@/client/utils/connectionUpdates";
+import { useMcpClient, type McpServer } from "mcp-use/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -40,6 +50,7 @@ export function Layout({ children }: LayoutProps) {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServerMetadata,
     updateServer,
     storageLoaded: configLoaded,
   } = useMcpClient();
@@ -81,6 +92,20 @@ export function Layout({ children }: LayoutProps) {
       }
     },
     [updateServer]
+  );
+
+  const updateConnectionMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      try {
+        await updateServerMetadata(id, metadata);
+      } catch (error) {
+        console.error(
+          `[Layout] Failed to update connection metadata for ${id}:`,
+          error
+        );
+      }
+    },
+    [updateServerMetadata]
   );
   const {
     selectedServerId,
@@ -153,6 +178,71 @@ export function Layout({ children }: LayoutProps) {
     }
   }, [location.search, setActiveTab]);
 
+  // Tab navigation telemetry
+  const previousTabRef = useRef<string | null>(null);
+
+  // Session duration tracking
+  const sessionStartRef = useRef<number>(Date.now());
+  const tabsVisitedRef = useRef<Set<string>>(new Set());
+  const toolsExecutedRef = useRef<number>(0);
+
+  useEffect(() => {
+    const handler = () => {
+      toolsExecutedRef.current++;
+    };
+    window.addEventListener("mcp-tool-executed", handler);
+    return () => window.removeEventListener("mcp-tool-executed", handler);
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        const durationSeconds = Math.round(
+          (Date.now() - sessionStartRef.current) / 1000
+        );
+        Telemetry.getInstance()
+          .capture(
+            new MCPSessionDurationEvent({
+              durationSeconds,
+              tabsVisited: tabsVisitedRef.current.size,
+              toolsExecuted: toolsExecutedRef.current,
+            })
+          )
+          .catch(() => {});
+      } catch {
+        // ignore telemetry errors
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, []);
+
+  // Sync the URL ?tab= param whenever the active tab changes
+  const handleTabChange = useCallback(
+    (tab: TabType) => {
+      try {
+        Telemetry.getInstance()
+          .capture(
+            new MCPTabNavigationEvent({
+              tab,
+              previousTab: previousTabRef.current,
+            })
+          )
+          .catch(() => {});
+      } catch {
+        // ignore telemetry errors
+      }
+      previousTabRef.current = tab;
+      tabsVisitedRef.current.add(tab);
+
+      setActiveTab(tab);
+      const params = new URLSearchParams(location.search);
+      params.set("tab", tab);
+      navigate(`/?${params.toString()}`, { replace: true });
+    },
+    [setActiveTab, navigate, location.search]
+  );
+
   // Listen for custom navigation events from toast (for sampling and elicitation requests)
   useEffect(() => {
     const handleNavigateToSampling = (event: globalThis.Event) => {
@@ -190,7 +280,7 @@ export function Layout({ children }: LayoutProps) {
         navigateToItem(selectedServerId, "tools", toolName);
       } else if (selectedServerId) {
         // If no toolName, just switch to tools tab
-        setActiveTab("tools");
+        handleTabChange("tools");
       }
     };
 
@@ -218,7 +308,7 @@ export function Layout({ children }: LayoutProps) {
         handleNavigateToToolResult
       );
     };
-  }, [selectedServerId, setActiveTab, navigateToItem]);
+  }, [selectedServerId, handleTabChange, navigateToItem]);
 
   // Refs for search inputs in tabs
   const toolsSearchRef = useRef<{
@@ -287,16 +377,16 @@ export function Layout({ children }: LayoutProps) {
   );
 
   const handleUpdateConnection = useCallback(
-    (config: {
-      url: string;
-      name?: string;
-      transportType: "http" | "sse";
-      proxyConfig?: {
-        proxyAddress?: string;
-        customHeaders?: Record<string, string>;
-      };
-    }) => {
+    (config: EditableConnectionConfig) => {
       if (!editingConnectionId) return;
+
+      const currentConnection =
+        getStoredConnectionConfig<EditableConnectionConfig>(
+          editingConnectionId
+        ) ||
+        connections.find(
+          (connection: McpServer) => connection.id === editingConnectionId
+        );
 
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
@@ -307,6 +397,13 @@ export function Layout({ children }: LayoutProps) {
           config.proxyConfig,
           config.transportType
         );
+      } else if (
+        currentConnection &&
+        isAliasOnlyConnectionUpdate(currentConnection, config)
+      ) {
+        updateConnectionMetadata(editingConnectionId, {
+          name: config.name || config.url,
+        });
       } else {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
@@ -323,8 +420,10 @@ export function Layout({ children }: LayoutProps) {
     },
     [
       editingConnectionId,
+      connections,
       removeConnection,
       addConnection,
+      updateConnectionMetadata,
       updateConnectionConfig,
     ]
   );
@@ -379,7 +478,7 @@ export function Layout({ children }: LayoutProps) {
     } else {
       console.warn("[Layout] No serverId, just updating tab to:", tab);
       // No serverId provided, just update the tab for the current server
-      setActiveTab(tab);
+      handleTabChange(tab);
     }
   };
 
@@ -593,22 +692,22 @@ export function Layout({ children }: LayoutProps) {
     onCommandPalette: () => handleCommandPaletteOpen("keyboard"),
     onToolsTab: () => {
       if (selectedServer) {
-        setActiveTab("tools");
+        handleTabChange("tools");
       }
     },
     onPromptsTab: () => {
       if (selectedServer) {
-        setActiveTab("prompts");
+        handleTabChange("prompts");
       }
     },
     onResourcesTab: () => {
       if (selectedServer) {
-        setActiveTab("resources");
+        handleTabChange("resources");
       }
     },
     onChatTab: () => {
       if (selectedServer) {
-        setActiveTab("chat");
+        handleTabChange("chat");
       }
     },
     onHome: () => {
@@ -680,7 +779,7 @@ export function Layout({ children }: LayoutProps) {
             selectedServer={selectedServer}
             activeTab={activeTab}
             onServerSelect={handleServerSelect}
-            onTabChange={setActiveTab}
+            onTabChange={handleTabChange}
             onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
             onOpenConnectionOptions={handleOpenConnectionOptions}
             embedded={isEmbedded}

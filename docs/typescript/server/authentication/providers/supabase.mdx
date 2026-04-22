@@ -92,6 +92,10 @@ const server = new MCPServer({
     // JWT verification
     verifyJwt: process.env.NODE_ENV === 'production',
     
+    // Override supported scopes (advertised in OAuth metadata)
+    // Default: [] (Supabase does not define default scopes)
+    scopesSupported: ['openid', 'profile', 'email'],
+    
     // Custom user info extraction
     getUserInfo: (payload) => ({
       userId: payload.sub,

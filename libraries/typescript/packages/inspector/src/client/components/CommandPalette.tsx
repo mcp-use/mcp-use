@@ -30,6 +30,7 @@ import {
 } from "@/client/utils/mcpClientUtils";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { toast } from "sonner";
+import { getServerDisplayName } from "@/client/utils/serverNames";
 import { McpUseLogo } from "./McpUseLogo";
 import { ServerIcon } from "./ServerIcon";
 import { VSCodeIcon } from "./ui/client-icons";
@@ -342,7 +343,7 @@ export function CommandPalette({
   // Create server selection items
   const serverItems: CommandItem[] = connections.map((connection) => ({
     id: `server-${connection.id}`,
-    name: connection.name,
+    name: getServerDisplayName(connection),
     description: `Connected server (${connection.state})`,
     type: "global",
     category: "Connected Servers",

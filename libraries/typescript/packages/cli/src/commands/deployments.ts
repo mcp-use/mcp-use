@@ -1,12 +1,10 @@
 import chalk from "chalk";
 import { Command } from "commander";
 import { McpUseAPI } from "../utils/api.js";
+import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { isLoggedIn } from "../utils/config.js";
 import { formatRelativeTime } from "../utils/format.js";
 
-/**
- * Prompt user for confirmation
- */
 async function prompt(question: string): Promise<boolean> {
   const readline = await import("node:readline");
   const rl = readline.createInterface({
@@ -23,9 +21,6 @@ async function prompt(question: string): Promise<boolean> {
   });
 }
 
-/**
- * Get status color based on deployment status
- */
 function getStatusColor(status: string): (text: string) => string {
   switch (status) {
     case "running":
@@ -41,16 +36,10 @@ function getStatusColor(status: string): (text: string) => string {
   }
 }
 
-/**
- * Format deployment ID for display (show full ID)
- */
 function formatId(id: string): string {
   return id;
 }
 
-/**
- * List deployments command
- */
 async function listDeploymentsCommand(): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -66,7 +55,6 @@ async function listDeploymentsCommand(): Promise<void> {
     const api = await McpUseAPI.create();
     const deployments = await api.listDeployments();
 
-    // Sort deployments by created date (newest first)
     const sortedDeployments = [...deployments].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -86,25 +74,23 @@ async function listDeploymentsCommand(): Promise<void> {
       chalk.cyan.bold(`\n📦 Deployments (${sortedDeployments.length})\n`)
     );
 
-    // Print table header
     console.log(
       chalk.white.bold(
-        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"STATUS".padEnd(12)} ${"DOMAIN".padEnd(35)} ${"CREATED"}`
+        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"STATUS".padEnd(12)} ${"MCP URL".padEnd(45)} ${"CREATED"}`
       )
     );
-    console.log(chalk.gray("─".repeat(130)));
+    console.log(chalk.gray("─".repeat(140)));
 
-    // Print each deployment
     for (const deployment of sortedDeployments) {
       const id = formatId(deployment.id).padEnd(40);
       const name = deployment.name.substring(0, 24).padEnd(25);
       const statusColor = getStatusColor(deployment.status);
       const status = statusColor(deployment.status.padEnd(12));
-      const domain = (deployment.domain || "-").substring(0, 34).padEnd(35);
+      const mcpUrl = (deployment.mcpUrl || "-").substring(0, 44).padEnd(45);
       const created = formatRelativeTime(deployment.createdAt);
 
       console.log(
-        `${chalk.gray(id)} ${name} ${status} ${chalk.cyan(domain)} ${chalk.gray(created)}`
+        `${chalk.gray(id)} ${name} ${status} ${chalk.cyan(mcpUrl)} ${chalk.gray(created)}`
       );
     }
 
@@ -118,9 +104,6 @@ async function listDeploymentsCommand(): Promise<void> {
   }
 }
 
-/**
- * Get deployment details command
- */
 async function getDeploymentCommand(deploymentId: string): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -146,38 +129,32 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
       chalk.white("Status:        ") + statusColor(deployment.status)
     );
 
-    if (deployment.domain) {
+    if (deployment.serverId) {
       console.log(
-        chalk.white("Domain:        ") +
-          chalk.cyan(`https://${deployment.domain}`)
-      );
-    }
-    if (deployment.customDomain) {
-      console.log(
-        chalk.white("Custom Domain: ") +
-          chalk.cyan(`https://${deployment.customDomain}`)
+        chalk.white("Server ID:     ") + chalk.gray(deployment.serverId)
       );
     }
 
-    console.log(
-      chalk.white("Source:        ") + chalk.gray(deployment.source.type)
-    );
+    const mcpUrl = getMcpServerUrl(deployment);
+    if (mcpUrl) {
+      console.log(chalk.white("MCP URL:       ") + chalk.cyan(mcpUrl));
+    }
 
-    if (deployment.source.type === "github") {
+    if (deployment.gitBranch) {
       console.log(
-        chalk.white("Repository:    ") + chalk.gray(deployment.source.repo)
+        chalk.white("Branch:        ") + chalk.gray(deployment.gitBranch)
       );
+    }
+    if (deployment.gitCommitSha) {
       console.log(
-        chalk.white("Branch:        ") +
-          chalk.gray(deployment.source.branch || "main")
+        chalk.white("Commit:        ") +
+          chalk.gray(deployment.gitCommitSha.substring(0, 7))
       );
     }
 
-    console.log(chalk.white("Port:          ") + chalk.gray(deployment.port));
-    console.log(
-      chalk.white("Runtime:       ") +
-        chalk.gray(deployment.source.runtime || "node")
-    );
+    if (deployment.port) {
+      console.log(chalk.white("Port:          ") + chalk.gray(deployment.port));
+    }
 
     if (deployment.provider) {
       console.log(
@@ -194,26 +171,6 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
         chalk.gray(formatRelativeTime(deployment.updatedAt))
     );
 
-    // Show environment variables if any
-    if (
-      deployment.source.env &&
-      Object.keys(deployment.source.env).length > 0
-    ) {
-      console.log(chalk.white("\nEnvironment Variables:"));
-      for (const [key, value] of Object.entries(deployment.source.env)) {
-        // Mask sensitive values
-        const displayValue =
-          key.toLowerCase().includes("key") ||
-          key.toLowerCase().includes("secret") ||
-          key.toLowerCase().includes("password") ||
-          key.toLowerCase().includes("token")
-            ? "***"
-            : value;
-        console.log(chalk.gray(`  ${key}=`) + chalk.white(displayValue));
-      }
-    }
-
-    // Show error if failed
     if (deployment.status === "failed" && deployment.error) {
       console.log(chalk.red("\nError:"));
       console.log(chalk.red(`  ${deployment.error}`));
@@ -229,9 +186,6 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
   }
 }
 
-/**
- * Restart deployment command
- */
 async function restartDeploymentCommand(
   deploymentId: string,
   options: { follow?: boolean }
@@ -248,60 +202,74 @@ async function restartDeploymentCommand(
     }
 
     const api = await McpUseAPI.create();
-
-    // Get deployment info first
     const deployment = await api.getDeployment(deploymentId);
+
+    if (!deployment.serverId) {
+      console.log(
+        chalk.red("✗ Cannot restart: deployment has no linked server.")
+      );
+      process.exit(1);
+    }
+
     console.log(
       chalk.cyan.bold(`\n🔄 Restarting deployment: ${deployment.name}\n`)
     );
 
-    const redeployedDeployment = await api.redeployDeployment(deploymentId);
-    console.log(
-      chalk.green("✓ Restart initiated: ") + chalk.gray(redeployedDeployment.id)
-    );
+    const newDep = await api.createDeployment({
+      serverId: deployment.serverId,
+      trigger: "redeploy",
+    });
+
+    console.log(chalk.green("✓ Restart initiated: ") + chalk.gray(newDep.id));
 
     if (options.follow) {
-      console.log(chalk.gray("\nFollowing deployment logs...\n"));
+      console.log(chalk.gray("\nFollowing build logs...\n"));
 
-      // Stream logs
-      try {
-        for await (const log of api.streamDeploymentLogs(
-          redeployedDeployment.id
-        )) {
-          try {
-            const logData = JSON.parse(log);
-            if (logData.line) {
-              const levelColor =
-                logData.level === "error"
-                  ? chalk.red
-                  : logData.level === "warn"
-                    ? chalk.yellow
-                    : chalk.gray;
-              const stepPrefix = logData.step
-                ? chalk.cyan(`[${logData.step}]`) + " "
-                : "";
-              console.log(stepPrefix + levelColor(logData.line));
+      let offset = 0;
+      let terminal = false;
+      while (!terminal) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const resp = await api.getDeploymentBuildLogs(newDep.id, offset);
+          if (resp.logs.length > 0) {
+            const lines = resp.logs.split("\n").filter((l) => l.trim());
+            for (const line of lines) {
+              try {
+                const logData = JSON.parse(line);
+                if (logData.line) {
+                  const levelColor =
+                    logData.level === "error"
+                      ? chalk.red
+                      : logData.level === "warn"
+                        ? chalk.yellow
+                        : chalk.gray;
+                  const stepPrefix = logData.step
+                    ? chalk.cyan(`[${logData.step}]`) + " "
+                    : "";
+                  console.log(stepPrefix + levelColor(logData.line));
+                }
+              } catch {
+                console.log(chalk.gray(line));
+              }
             }
-          } catch {
-            // Not JSON, print as-is
-            console.log(chalk.gray(log));
+            offset = resp.offset;
           }
+          if (
+            resp.status === "running" ||
+            resp.status === "failed" ||
+            resp.status === "stopped"
+          ) {
+            terminal = true;
+          }
+        } catch {
+          // Build logs not ready yet
         }
-      } catch (error) {
-        // Stream ended or error
-        console.log(
-          chalk.gray(
-            "\nLog stream ended. Use " +
-              chalk.white(`mcp-use deployments get ${deploymentId}`) +
-              " to check status."
-          )
-        );
       }
     } else {
       console.log(
         chalk.gray(
           "\nCheck status with: " +
-            chalk.white(`mcp-use deployments get ${deploymentId}`)
+            chalk.white(`mcp-use deployments get ${newDep.id}`)
         )
       );
     }
@@ -316,9 +284,6 @@ async function restartDeploymentCommand(
   }
 }
 
-/**
- * Delete deployment command
- */
 async function deleteDeploymentCommand(
   deploymentId: string,
   options: { yes?: boolean }
@@ -335,11 +300,8 @@ async function deleteDeploymentCommand(
     }
 
     const api = await McpUseAPI.create();
-
-    // Get deployment info first
     const deployment = await api.getDeployment(deploymentId);
 
-    // Confirm deletion unless --yes flag is provided
     if (!options.yes) {
       console.log(
         chalk.yellow(
@@ -347,7 +309,9 @@ async function deleteDeploymentCommand(
         )
       );
       console.log(chalk.gray(`   ID: ${deployment.id}`));
-      console.log(chalk.gray(`   Domain: ${deployment.domain || "none"}\n`));
+      if (deployment.mcpUrl) {
+        console.log(chalk.gray(`   URL: ${deployment.mcpUrl}\n`));
+      }
 
       const confirmed = await prompt(
         chalk.white("Are you sure you want to delete this deployment? (y/N): ")
@@ -372,9 +336,6 @@ async function deleteDeploymentCommand(
   }
 }
 
-/**
- * Get deployment logs command
- */
 async function logsCommand(
   deploymentId: string,
   options: { build?: boolean; follow?: boolean }
@@ -393,49 +354,59 @@ async function logsCommand(
     const api = await McpUseAPI.create();
 
     if (options.follow) {
-      console.log(chalk.gray("Streaming logs...\n"));
+      console.log(chalk.gray("Following build logs...\n"));
 
-      // Stream logs in real-time
-      try {
-        for await (const log of api.streamDeploymentLogs(deploymentId)) {
-          try {
-            const logData = JSON.parse(log);
-            if (logData.line) {
-              const levelColor =
-                logData.level === "error"
-                  ? chalk.red
-                  : logData.level === "warn"
-                    ? chalk.yellow
-                    : chalk.gray;
-              const stepPrefix = logData.step
-                ? chalk.cyan(`[${logData.step}]`) + " "
-                : "";
-              console.log(stepPrefix + levelColor(logData.line));
+      let offset = 0;
+      let terminal = false;
+      while (!terminal) {
+        await new Promise((r) => setTimeout(r, 2000));
+        try {
+          const resp = await api.getDeploymentBuildLogs(deploymentId, offset);
+          if (resp.logs.length > 0) {
+            const lines = resp.logs.split("\n").filter((l) => l.trim());
+            for (const line of lines) {
+              try {
+                const logData = JSON.parse(line);
+                if (logData.line) {
+                  const levelColor =
+                    logData.level === "error"
+                      ? chalk.red
+                      : logData.level === "warn"
+                        ? chalk.yellow
+                        : chalk.gray;
+                  const stepPrefix = logData.step
+                    ? chalk.cyan(`[${logData.step}]`) + " "
+                    : "";
+                  console.log(stepPrefix + levelColor(logData.line));
+                }
+              } catch {
+                console.log(chalk.gray(line));
+              }
             }
-          } catch {
-            // Not JSON, print as-is
-            console.log(chalk.gray(log));
+            offset = resp.offset;
           }
+          if (
+            resp.status === "running" ||
+            resp.status === "failed" ||
+            resp.status === "stopped"
+          ) {
+            terminal = true;
+          }
+        } catch {
+          // Build logs not ready yet
         }
-      } catch (error) {
-        console.log(chalk.gray("\nLog stream ended."));
       }
-    } else {
-      // Get static logs
-      const logs = options.build
-        ? await api.getDeploymentBuildLogs(deploymentId)
-        : await api.getDeploymentLogs(deploymentId);
+    } else if (options.build) {
+      const resp = await api.getDeploymentBuildLogs(deploymentId);
+      const logs = resp.logs;
 
       if (!logs || logs.trim() === "") {
         console.log(
-          chalk.yellow(
-            `No ${options.build ? "build " : ""}logs available for this deployment.`
-          )
+          chalk.yellow("No build logs available for this deployment.")
         );
         return;
       }
 
-      // Parse and display logs
       const logLines = logs.split("\n").filter((l) => l.trim());
       for (const line of logLines) {
         try {
@@ -453,7 +424,34 @@ async function logsCommand(
             console.log(stepPrefix + levelColor(logData.line));
           }
         } catch {
-          // Not JSON, print as-is
+          console.log(chalk.gray(line));
+        }
+      }
+    } else {
+      const logs = await api.getDeploymentLogs(deploymentId);
+
+      if (!logs || logs.trim() === "") {
+        console.log(chalk.yellow("No logs available for this deployment."));
+        return;
+      }
+
+      const logLines = logs.split("\n").filter((l) => l.trim());
+      for (const line of logLines) {
+        try {
+          const logData = JSON.parse(line);
+          if (logData.line) {
+            const levelColor =
+              logData.level === "error"
+                ? chalk.red
+                : logData.level === "warn"
+                  ? chalk.yellow
+                  : chalk.gray;
+            const stepPrefix = logData.step
+              ? chalk.cyan(`[${logData.step}]`) + " "
+              : "";
+            console.log(stepPrefix + levelColor(logData.line));
+          }
+        } catch {
           console.log(chalk.gray(line));
         }
       }
@@ -469,183 +467,6 @@ async function logsCommand(
   }
 }
 
-/**
- * List environment variables command
- */
-async function listEnvCommand(deploymentId: string): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-    const deployment = await api.getDeployment(deploymentId);
-
-    console.log(
-      chalk.cyan.bold(`\n🔐 Environment Variables: ${deployment.name}\n`)
-    );
-
-    if (
-      !deployment.source.env ||
-      Object.keys(deployment.source.env).length === 0
-    ) {
-      console.log(chalk.yellow("No environment variables set."));
-      console.log();
-      return;
-    }
-
-    for (const [key, value] of Object.entries(deployment.source.env)) {
-      // Mask sensitive values
-      const displayValue =
-        key.toLowerCase().includes("key") ||
-        key.toLowerCase().includes("secret") ||
-        key.toLowerCase().includes("password") ||
-        key.toLowerCase().includes("token")
-          ? "***"
-          : value;
-      console.log(
-        chalk.white(key) + chalk.gray("=") + chalk.cyan(displayValue)
-      );
-    }
-
-    console.log();
-  } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to list environment variables:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
-  }
-}
-
-/**
- * Set environment variables command
- */
-async function setEnvCommand(
-  deploymentId: string,
-  envPairs: string[]
-): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    // Parse KEY=VALUE pairs
-    const env: Record<string, string> = {};
-    for (const pair of envPairs) {
-      const [key, ...valueParts] = pair.split("=");
-      if (!key || valueParts.length === 0) {
-        console.log(chalk.red(`✗ Invalid format: ${pair}. Expected KEY=VALUE`));
-        process.exit(1);
-      }
-      env[key.trim()] = valueParts.join("=").trim();
-    }
-
-    const api = await McpUseAPI.create();
-
-    // Get current deployment to merge env vars
-    const deployment = await api.getDeployment(deploymentId);
-    const currentEnv = deployment.source.env || {};
-    const mergedEnv = { ...currentEnv, ...env };
-
-    const updated = await api.updateDeployment(deploymentId, {
-      env: mergedEnv,
-    });
-
-    console.log(
-      chalk.green.bold(`\n✓ Environment variables updated: ${updated.name}\n`)
-    );
-
-    // Show updated values
-    for (const key of Object.keys(env)) {
-      const displayValue =
-        key.toLowerCase().includes("key") ||
-        key.toLowerCase().includes("secret") ||
-        key.toLowerCase().includes("password") ||
-        key.toLowerCase().includes("token")
-          ? "***"
-          : env[key];
-      console.log(
-        chalk.white(key) + chalk.gray("=") + chalk.cyan(displayValue)
-      );
-    }
-
-    console.log();
-  } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to set environment variables:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
-  }
-}
-
-/**
- * Unset environment variables command
- */
-async function unsetEnvCommand(
-  deploymentId: string,
-  keys: string[]
-): Promise<void> {
-  try {
-    if (!(await isLoggedIn())) {
-      console.log(chalk.red("✗ You are not logged in."));
-      console.log(
-        chalk.gray(
-          "Run " + chalk.white("npx mcp-use login") + " to get started."
-        )
-      );
-      process.exit(1);
-    }
-
-    const api = await McpUseAPI.create();
-
-    // Get current deployment
-    const deployment = await api.getDeployment(deploymentId);
-    const currentEnv = { ...(deployment.source.env || {}) };
-
-    // Remove specified keys
-    for (const key of keys) {
-      delete currentEnv[key];
-    }
-
-    const updated = await api.updateDeployment(deploymentId, {
-      env: currentEnv,
-    });
-
-    console.log(
-      chalk.green.bold(`\n✓ Environment variables removed: ${updated.name}\n`)
-    );
-
-    for (const key of keys) {
-      console.log(chalk.gray(`  ${key}`));
-    }
-
-    console.log();
-  } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to unset environment variables:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
-  }
-}
-
-/**
- * Stop deployment command
- */
 async function stopDeploymentCommand(deploymentId: string): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -659,11 +480,9 @@ async function stopDeploymentCommand(deploymentId: string): Promise<void> {
     }
 
     const api = await McpUseAPI.create();
-    const updated = await api.updateDeployment(deploymentId, {
-      status: "stopped",
-    });
+    await api.stopDeployment(deploymentId);
 
-    console.log(chalk.green.bold(`\n✓ Deployment stopped: ${updated.name}\n`));
+    console.log(chalk.green.bold(`\n✓ Deployment stopped\n`));
   } catch (error) {
     console.error(
       chalk.red.bold("\n✗ Failed to stop deployment:"),
@@ -673,9 +492,6 @@ async function stopDeploymentCommand(deploymentId: string): Promise<void> {
   }
 }
 
-/**
- * Start deployment command
- */
 async function startDeploymentCommand(deploymentId: string): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -688,12 +504,11 @@ async function startDeploymentCommand(deploymentId: string): Promise<void> {
       process.exit(1);
     }
 
-    const api = await McpUseAPI.create();
-    const updated = await api.updateDeployment(deploymentId, {
-      status: "running",
-    });
-
-    console.log(chalk.green.bold(`\n✓ Deployment started: ${updated.name}\n`));
+    console.log(
+      chalk.yellow(
+        "⚠️  Start is not supported in this version. Use `mcp-use deployments restart` to redeploy."
+      )
+    );
   } catch (error) {
     console.error(
       chalk.red.bold("\n✗ Failed to start deployment:"),
@@ -703,37 +518,32 @@ async function startDeploymentCommand(deploymentId: string): Promise<void> {
   }
 }
 
-/**
- * Create deployments command group
- */
 export function createDeploymentsCommand(): Command {
   const deploymentsCommand = new Command("deployments").description(
     "Manage cloud deployments"
   );
 
-  // List deployments
   deploymentsCommand
     .command("list")
     .alias("ls")
     .description("List all deployments")
     .action(listDeploymentsCommand);
 
-  // Get deployment
   deploymentsCommand
     .command("get")
     .argument("<deployment-id>", "Deployment ID")
     .description("Get deployment details")
     .action(getDeploymentCommand);
 
-  // Restart deployment
   deploymentsCommand
     .command("restart")
     .argument("<deployment-id>", "Deployment ID")
-    .option("-f, --follow", "Follow deployment logs")
-    .description("Restart a deployment")
+    .option("-f, --follow", "Follow build logs")
+    .description(
+      "Restart a deployment (triggers a new deployment on the same server)"
+    )
     .action(restartDeploymentCommand);
 
-  // Delete deployment
   deploymentsCommand
     .command("delete")
     .alias("rm")
@@ -742,48 +552,20 @@ export function createDeploymentsCommand(): Command {
     .description("Delete a deployment")
     .action(deleteDeploymentCommand);
 
-  // Logs command
   deploymentsCommand
     .command("logs")
     .argument("<deployment-id>", "Deployment ID")
     .option("-b, --build", "Show build logs instead of runtime logs")
-    .option("-f, --follow", "Stream logs in real-time")
+    .option("-f, --follow", "Follow build logs in real-time")
     .description("View deployment logs")
     .action(logsCommand);
 
-  // Environment variables commands
-  const envCommand = deploymentsCommand
-    .command("env")
-    .description("Manage environment variables");
-
-  envCommand
-    .command("list")
-    .argument("<deployment-id>", "Deployment ID")
-    .description("List environment variables")
-    .action(listEnvCommand);
-
-  envCommand
-    .command("set")
-    .argument("<deployment-id>", "Deployment ID")
-    .argument("<pairs...>", "Environment variables in KEY=VALUE format")
-    .description("Set environment variables")
-    .action(setEnvCommand);
-
-  envCommand
-    .command("unset")
-    .argument("<deployment-id>", "Deployment ID")
-    .argument("<keys...>", "Environment variable keys to remove")
-    .description("Unset environment variables")
-    .action(unsetEnvCommand);
-
-  // Stop deployment
   deploymentsCommand
     .command("stop")
     .argument("<deployment-id>", "Deployment ID")
     .description("Stop a deployment")
     .action(stopDeploymentCommand);
 
-  // Start deployment
   deploymentsCommand
     .command("start")
     .argument("<deployment-id>", "Deployment ID")

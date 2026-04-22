@@ -1,17 +1,28 @@
-import { getApiKey, getApiUrl, getProfileId } from "./config.js";
+import { getApiKey, getApiUrl, getAuthBaseUrl, getOrgId } from "./config.js";
 
-export interface APIKeyCreateRequest {
-  name: string;
+export class GitHubAuthRequiredError extends Error {
+  readonly authorizeUrl: string;
+  constructor(message: string, authorizeUrl: string) {
+    super(message);
+    this.name = "GitHubAuthRequiredError";
+    this.authorizeUrl = authorizeUrl;
+  }
 }
 
-export interface APIKeyCreateResponse {
-  api_key: string;
-  name: string;
+/** Thrown when the API returns 401 (invalid or expired API key for this backend). */
+export class ApiUnauthorizedError extends Error {
+  readonly status = 401 as const;
+  constructor(
+    message = "Your session has expired or your API key is invalid."
+  ) {
+    super(message);
+    this.name = "ApiUnauthorizedError";
+  }
 }
 
-export interface ProfileInfo {
+export interface OrgInfo {
   id: string;
-  profile_name: string;
+  name: string;
   slug: string | null;
   role: string;
 }
@@ -20,107 +31,150 @@ export interface AuthTestResponse {
   message: string;
   user_id: string;
   email: string;
-  profiles: ProfileInfo[];
+  orgs: OrgInfo[];
+  default_org_id: string | null;
+}
+
+/** Wire format returned by GET /test-auth (cli-compat route). */
+interface AuthTestWireResponse {
+  message: string;
+  user_id: string;
+  email: string;
+  profiles: Array<{
+    id: string;
+    profile_name: string;
+    slug: string | null;
+    role: string;
+  }>;
   default_profile_id: string | null;
 }
 
-export interface GitHubSource {
+// ── Server creation ────────────────────────────────────────────────
+
+export interface CreateServerBody {
   type: "github";
-  repo: string;
+  organizationId: string;
+  installationId: string;
+  name: string;
+  repoFullName: string;
   branch?: string;
   rootDir?: string;
-  startCommand?: string;
-  runtime?: "node" | "python";
   port?: number;
-  env?: Record<string, string>;
   buildCommand?: string;
-  baseImage?: string;
-  githubCheckRunId?: number;
+  startCommand?: string;
+  env?: Record<string, string>;
+  description?: string;
+  tags?: string[];
+  region?: string;
 }
 
-export interface UploadSource {
-  type: "upload";
-  startCommand?: string;
-  runtime?: "node" | "python";
-  port?: number;
-  env?: Record<string, string>;
-  buildCommand?: string;
-  baseImage?: string;
+export interface CreateServerResponse {
+  server: { id: string; slug: string | null };
+  deploymentId: string | null;
 }
 
-export type DeploymentSource = GitHubSource | UploadSource;
+/** Connected GitHub repository (subset of OpenAPI server payload). */
+export interface CloudServerConnectedRepository {
+  id: string;
+  repoFullName: string;
+  productionBranch: string;
+  isActive: boolean;
+  userId: string;
+  githubInstallationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export interface CreateDeploymentRequest {
-  name: string;
-  source: DeploymentSource;
-  customDomain?: string;
-  healthCheckPath?: string;
-  serverId?: string;
+/** Server record from `GET /servers` or `GET /servers/{id}` (fields used by CLI). */
+export interface CloudServer {
+  id: string;
+  slug: string | null;
+  organizationId: string;
+  userId: string | null;
+  connectedRepositoryId: string;
+  connectedRepository?: CloudServerConnectedRepository;
+  name: string | null;
+  description: string | null;
+  tags?: string[];
+  config?: unknown;
+  createdAt: string;
+  updatedAt: string;
+  displayPreferences?: { icon?: string; color?: string };
+  status: string;
+  latestDeploymentStatus: string | null;
+  activeDeploymentId: string | null;
+  previousDeploymentId: string | null;
+  region: string;
+  providerRegion?: string;
+  runProvider?: string;
+  buildProvider?: string;
+  /** Public MCP endpoint when provisioned (preferred over synthesizing from id/slug). */
+  mcpUrl?: string | null;
+  domains?: unknown[];
+  deployments?: unknown[];
+  _count?: { deployments?: number };
+}
+
+// ── Deployments ────────────────────────────────────────────────────
+
+export interface CreateDeploymentInput {
+  serverId: string;
+  name?: string;
+  branch?: string;
+  commitSha?: string;
+  commitMessage?: string;
+  trigger?: "manual" | "webhook" | "redeploy" | "rollback";
+  prNumber?: number;
+}
+
+export interface CreateDeploymentResponse {
+  id: string;
 }
 
 export interface Deployment {
   id: string;
   userId: string;
   name: string;
-  source: DeploymentSource;
-  domain?: string;
-  customDomain?: string;
-  port: number;
+  source: unknown;
+  status: "pending" | "building" | "running" | "stopped" | "failed";
+  port: number | null;
+  healthCheckPath: string | null;
+  provider: string;
+  appName: string;
+  error: string | null;
+  gitCommitSha: string | null;
+  gitBranch: string | null;
+  gitCommitMessage: string | null;
+  isProductionDeployment: boolean | null;
+  deploymentTrigger: string | null;
+  serverId: string | null;
   createdAt: string;
   updatedAt: string;
-  status: "pending" | "building" | "running" | "stopped" | "failed";
-  healthCheckPath?: string;
-  provider?: string;
-  appName?: string;
-  error?: string;
-  buildLogs?: string;
-  buildStartedAt?: string;
-  buildCompletedAt?: string;
-  gitCommitSha?: string;
-  gitBranch?: string;
-  gitCommitMessage?: string;
-  serverId?: string;
-  serverSlug?: string; // Computed field from backend
+  buildStartedAt: string | null;
+  buildCompletedAt: string | null;
+  archivedAt: string | null;
+  mcpUrl?: string;
 }
 
-export interface UpdateDeploymentRequest {
-  name?: string;
-  customDomain?: string;
-  env?: Record<string, string>;
-  status?: "running" | "stopped";
-}
-export interface RedeploymentConfig {
-  buildCommand?: string;
-  startCommand?: string;
-  port?: number;
-  env?: Record<string, string>;
-  rootDir?: string;
+export interface BuildLogsResponse {
+  logs: string;
+  offset: number;
+  totalLength: number;
+  status: string;
 }
 
-export interface DeploymentListResponse {
-  deployments: Deployment[];
-  total: number;
-}
-
-export interface LogsResponse {
-  success: boolean;
-  data: {
-    logs: string;
-  };
-}
+// ── GitHub ──────────────────────────────────────────────────────────
 
 export interface GitHubInstallation {
   id: string;
   installation_id: string;
+  account_login: string;
+  account_type: string;
 }
 
 export interface GitHubConnectionStatus {
   is_connected: boolean;
   installations?: GitHubInstallation[];
-}
-
-export interface GitHubAppNameResponse {
-  app_name: string;
 }
 
 export interface GitHubRepo {
@@ -131,12 +185,6 @@ export interface GitHubRepo {
   owner: {
     login: string;
   };
-  branches?: Array<{
-    name: string;
-    commit: {
-      sha: string;
-    };
-  }>;
 }
 
 export interface GitHubReposResponse {
@@ -148,40 +196,58 @@ export interface GitHubReposResponse {
   repos: GitHubRepo[];
 }
 
-/**
- * API client for Manufact cloud
- */
+// ── Env Variables ───────────────────────────────────────────────────
+
+export type EnvEnvironment = "production" | "preview" | "development";
+
+export interface EnvVariable {
+  id: string;
+  serverId: string;
+  key: string;
+  value: string;
+  environments: EnvEnvironment[];
+  sensitive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEnvVariableBody {
+  key: string;
+  value: string;
+  environments?: EnvEnvironment[];
+  sensitive?: boolean;
+}
+
+export interface UpdateEnvVariableBody {
+  value?: string;
+  environments?: EnvEnvironment[];
+  sensitive?: boolean;
+}
+
+// ── API client ─────────────────────────────────────────────────────
+
 export class McpUseAPI {
   private baseUrl: string;
   private apiKey: string | undefined;
-  private profileId: string | undefined;
+  private orgId: string | undefined;
 
-  constructor(baseUrl?: string, apiKey?: string, profileId?: string) {
+  constructor(baseUrl?: string, apiKey?: string, orgId?: string) {
     this.baseUrl = baseUrl || "";
     this.apiKey = apiKey;
-    this.profileId = profileId;
+    this.orgId = orgId;
   }
 
-  /**
-   * Initialize API client with config
-   */
   static async create(): Promise<McpUseAPI> {
     const baseUrl = await getApiUrl();
     const apiKey = await getApiKey();
-    const profileId = await getProfileId();
-    return new McpUseAPI(baseUrl, apiKey ?? undefined, profileId ?? undefined);
+    const orgId = await getOrgId();
+    return new McpUseAPI(baseUrl, apiKey ?? undefined, orgId ?? undefined);
   }
 
-  /**
-   * Override the profile ID for this API client instance (e.g. from --org flag)
-   */
-  setProfileId(profileId: string): void {
-    this.profileId = profileId;
+  setOrgId(orgId: string): void {
+    this.orgId = orgId;
   }
 
-  /**
-   * Make authenticated request
-   */
   private async request<T>(
     endpoint: string,
     options: {
@@ -201,11 +267,10 @@ export class McpUseAPI {
       headers["x-api-key"] = this.apiKey;
     }
 
-    if (this.profileId) {
-      headers["x-profile-id"] = this.profileId;
+    if (this.orgId) {
+      headers["x-profile-id"] = this.orgId;
     }
 
-    // Add timeout support (default 30 seconds)
     const timeout = options.timeout || 30000;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -219,38 +284,52 @@ export class McpUseAPI {
 
       clearTimeout(timeoutId);
 
+      if (response.status === 401) {
+        throw new ApiUnauthorizedError();
+      }
+
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`API request failed: ${response.status} ${error}`);
+        const errorText = await response.text();
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed.code === "GITHUB_AUTH_REQUIRED" && parsed.authorizeUrl) {
+            throw new GitHubAuthRequiredError(
+              parsed.error || "GitHub authorization required",
+              parsed.authorizeUrl
+            );
+          }
+        } catch (e) {
+          if (e instanceof GitHubAuthRequiredError) throw e;
+        }
+        throw new Error(`API request failed: ${response.status} ${errorText}`);
       }
 
       return response.json() as Promise<T>;
     } catch (error: any) {
       clearTimeout(timeoutId);
       if (error.name === "AbortError") {
-        throw new Error(
-          `Request timeout after ${timeout / 1000}s. Try using --follow flag to stream logs instead.`
-        );
+        throw new Error(`Request timeout after ${timeout / 1000}s.`);
       }
       throw error;
     }
   }
 
   /**
-   * Create API key using JWT token
+   * Create a persistent API key using a Better Auth access token.
    */
-  async createApiKey(
-    jwtToken: string,
+  async createApiKeyWithAccessToken(
+    accessToken: string,
     name: string = "CLI"
-  ): Promise<APIKeyCreateResponse> {
-    const url = `${this.baseUrl}/api-key`;
+  ): Promise<{ key: string }> {
+    const authBase = await getAuthBaseUrl();
+    const url = `${authBase}/api/auth/api-key/create`;
     const response = await fetch(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${jwtToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, prefix: "mcp_" }),
     });
 
     if (!response.ok) {
@@ -258,316 +337,309 @@ export class McpUseAPI {
       throw new Error(`Failed to create API key: ${response.status} ${error}`);
     }
 
-    return response.json() as Promise<APIKeyCreateResponse>;
+    return response.json() as Promise<{ key: string }>;
   }
 
-  /**
-   * Test authentication
-   */
+  // ── Auth ────────────────────────────────────────────────────────
+
   async testAuth(): Promise<AuthTestResponse> {
-    return this.request<AuthTestResponse>("/test-auth");
+    const wire = await this.request<AuthTestWireResponse>("/test-auth");
+    return {
+      message: wire.message,
+      user_id: wire.user_id,
+      email: wire.email,
+      default_org_id: wire.default_profile_id,
+      orgs: (wire.profiles ?? []).map((p) => ({
+        id: p.id,
+        name: p.profile_name,
+        slug: p.slug,
+        role: p.role,
+      })),
+    };
   }
 
-  /**
-   * Set the user's default profile (organization) on the server
-   */
-  async setDefaultProfile(profileId: string): Promise<void> {
-    await this.request(`/profiles/${profileId}/set-default`, {
+  async setDefaultOrg(orgId: string): Promise<void> {
+    await this.request(`/organizations/${orgId}/set-default`, {
       method: "POST",
     });
   }
 
-  /**
-   * Create deployment
-   */
+  // ── Organization ID resolution ──────────────────────────────────
+
+  async resolveOrganizationId(): Promise<string> {
+    if (this.orgId) return this.orgId;
+    const auth = await this.testAuth();
+    const id = auth.default_org_id;
+    if (!id) {
+      throw new Error(
+        "No organization set. Run `mcp-use org switch` or use --org to specify one."
+      );
+    }
+    return id;
+  }
+
+  // ── Servers ─────────────────────────────────────────────────────
+
+  async createServer(body: CreateServerBody): Promise<CreateServerResponse> {
+    return this.request<CreateServerResponse>("/servers", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  async listServers(params?: {
+    organizationId?: string;
+    limit?: number;
+    skip?: number;
+    sort?: string;
+  }): Promise<CloudServer[]> {
+    const search = new URLSearchParams();
+    if (params?.organizationId) {
+      search.set("organizationId", params.organizationId);
+    }
+    if (params?.limit != null) {
+      search.set("limit", String(params.limit));
+    }
+    if (params?.skip != null) {
+      search.set("skip", String(params.skip));
+    }
+    if (params?.sort) {
+      search.set("sort", params.sort);
+    }
+    const q = search.toString();
+    return this.request<CloudServer[]>(`/servers${q ? `?${q}` : ""}`);
+  }
+
+  async getServer(idOrSlug: string): Promise<CloudServer> {
+    const path = encodeURIComponent(idOrSlug);
+    return this.request<CloudServer>(`/servers/${path}`);
+  }
+
+  async deleteServer(id: string): Promise<void> {
+    await this.request<{ success: boolean }>(
+      `/servers/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      }
+    );
+  }
+
+  // ── Env Variables ────────────────────────────────────────────────
+
+  async listEnvVariables(serverId: string): Promise<EnvVariable[]> {
+    return this.request<EnvVariable[]>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables`
+    );
+  }
+
+  async createEnvVariable(
+    serverId: string,
+    body: CreateEnvVariableBody
+  ): Promise<EnvVariable> {
+    return this.request<EnvVariable>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables`,
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  async updateEnvVariable(
+    serverId: string,
+    varId: string,
+    body: UpdateEnvVariableBody
+  ): Promise<EnvVariable> {
+    return this.request<EnvVariable>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(varId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
+  async deleteEnvVariable(serverId: string, varId: string): Promise<void> {
+    await this.request<{ success: boolean }>(
+      `/servers/${encodeURIComponent(serverId)}/env-variables/${encodeURIComponent(varId)}`,
+      { method: "DELETE" }
+    );
+  }
+
+  // ── Deployments ─────────────────────────────────────────────────
+
   async createDeployment(
-    request: CreateDeploymentRequest
-  ): Promise<Deployment> {
-    return this.request<Deployment>("/deployments", {
+    input: CreateDeploymentInput
+  ): Promise<CreateDeploymentResponse> {
+    return this.request<CreateDeploymentResponse>("/deployments", {
       method: "POST",
-      body: JSON.stringify(request),
+      body: JSON.stringify(input),
     });
   }
 
-  /**
-   * Get deployment by ID
-   */
   async getDeployment(deploymentId: string): Promise<Deployment> {
     return this.request<Deployment>(`/deployments/${deploymentId}`);
   }
 
-  /**
-   * Stream deployment logs
-   */
-  async *streamDeploymentLogs(
-    deploymentId: string
-  ): AsyncGenerator<string, void, unknown> {
-    const url = `${this.baseUrl}/deployments/${deploymentId}/logs/stream`;
-    const headers: Record<string, string> = {};
-
-    if (this.apiKey) {
-      headers["x-api-key"] = this.apiKey;
-    }
-    if (this.profileId) {
-      headers["x-profile-id"] = this.profileId;
-    }
-
-    const response = await fetch(url, { headers });
-
-    if (!response.ok) {
-      throw new Error(`Failed to stream logs: ${response.status}`);
-    }
-
-    if (!response.body) {
-      throw new Error("Response body is null");
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6);
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.log) {
-                yield parsed.log;
-              } else if (parsed.error) {
-                throw new Error(parsed.error);
-              }
-            } catch (e) {
-              // Skip invalid JSON
-            }
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-  }
-
-  /**
-   * Create deployment with source code upload
-   */
-  async createDeploymentWithUpload(
-    request: CreateDeploymentRequest,
-    filePath: string
-  ): Promise<Deployment> {
-    const { readFile } = await import("node:fs/promises");
-    const { basename } = await import("node:path");
-    const { stat } = await import("node:fs/promises");
-
-    // Check file size (2MB max)
-    const stats = await stat(filePath);
-    const maxSize = 2 * 1024 * 1024; // 2MB
-    if (stats.size > maxSize) {
-      throw new Error(
-        `File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`
-      );
-    }
-
-    const fileBuffer = await readFile(filePath);
-    const filename = basename(filePath);
-
-    // Build form data with deployment request and file
-    const formData = new FormData();
-    const blob = new Blob([fileBuffer], { type: "application/gzip" });
-    formData.append("source_file", blob, filename);
-    formData.append("name", request.name);
-    formData.append("source_type", "upload");
-
-    if (request.source.type === "upload") {
-      formData.append("runtime", request.source.runtime || "node");
-      formData.append("port", String(request.source.port || 3000));
-      if (request.source.startCommand) {
-        formData.append("startCommand", request.source.startCommand);
-      }
-      if (request.source.buildCommand) {
-        formData.append("buildCommand", request.source.buildCommand);
-      }
-      if (request.source.env && Object.keys(request.source.env).length > 0) {
-        formData.append("env", JSON.stringify(request.source.env));
-      }
-    }
-
-    if (request.customDomain) {
-      formData.append("customDomain", request.customDomain);
-    }
-    if (request.healthCheckPath) {
-      formData.append("healthCheckPath", request.healthCheckPath);
-    }
-
-    const url = `${this.baseUrl}/deployments`;
-    const headers: Record<string, string> = {};
-
-    if (this.apiKey) {
-      headers["x-api-key"] = this.apiKey;
-    }
-    if (this.profileId) {
-      headers["x-profile-id"] = this.profileId;
-    }
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Deployment failed: ${error}`);
-    }
-
-    return response.json() as Promise<Deployment>;
-  }
-
-  /**
-   * List all deployments
-   */
   async listDeployments(): Promise<Deployment[]> {
-    const response = await this.request<DeploymentListResponse>("/deployments");
-    return response.deployments;
+    return this.request<Deployment[]>("/deployments");
   }
 
-  /**
-   * Delete deployment
-   */
   async deleteDeployment(deploymentId: string): Promise<void> {
     await this.request(`/deployments/${deploymentId}`, {
       method: "DELETE",
     });
   }
 
-  /**
-   * Update deployment
-   */
-  async updateDeployment(
-    deploymentId: string,
-    updates: UpdateDeploymentRequest
-  ): Promise<Deployment> {
-    return this.request<Deployment>(`/deployments/${deploymentId}`, {
-      method: "PATCH",
-      body: JSON.stringify(updates),
+  async stopDeployment(deploymentId: string): Promise<void> {
+    await this.request(`/deployments/${deploymentId}/stop`, {
+      method: "POST",
     });
   }
 
-  /**
-   * Redeploy deployment
-   *
-   * @param deploymentId - The deployment ID to redeploy
-   * @param configOrFilePath - Either a RedeploymentConfig object with updated settings,
-   *                           or a file path string for source code upload
-   */
-  async redeployDeployment(
+  async getDeploymentLogs(
     deploymentId: string,
-    configOrFilePath?: RedeploymentConfig | string
-  ): Promise<Deployment> {
-    // If it's a string, treat it as a file path (backward compatibility)
-    if (typeof configOrFilePath === "string") {
-      const filePath = configOrFilePath;
+    lines: number = 500
+  ): Promise<string> {
+    const resp = await this.request<{ logs: string }>(
+      `/deployments/${deploymentId}/logs?lines=${lines}`,
+      { timeout: 60000 }
+    );
+    return resp.logs;
+  }
 
-      // Redeploy with file upload (for local source)
-      const { readFile } = await import("node:fs/promises");
-      const { basename } = await import("node:path");
-      const { stat } = await import("node:fs/promises");
+  async getDeploymentBuildLogs(
+    deploymentId: string,
+    offset: number = 0
+  ): Promise<BuildLogsResponse> {
+    return this.request<BuildLogsResponse>(
+      `/deployments/${deploymentId}/build-logs?offset=${offset}`,
+      { timeout: 60000 }
+    );
+  }
 
-      // Check file size
-      const stats = await stat(filePath);
-      const maxSize = 2 * 1024 * 1024;
-      if (stats.size > maxSize) {
-        throw new Error(
-          `File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds maximum of 2MB`
-        );
-      }
+  // ── GitHub ──────────────────────────────────────────────────────
 
-      const fileBuffer = await readFile(filePath);
-      const formData = new FormData();
-      const blob = new Blob([fileBuffer], { type: "application/gzip" });
-      formData.append("source_file", blob, basename(filePath));
+  async getGitHubConnectionStatus(): Promise<GitHubConnectionStatus> {
+    const orgId = await this.resolveOrganizationId();
+    const resp = await this.request<{
+      installations: Array<{
+        id: string;
+        installationId: string;
+        account: {
+          login: string;
+          avatar_url: string | null;
+          type: string;
+        } | null;
+      }>;
+    }>(`/github/installations?organizationId=${orgId}`);
+    return {
+      is_connected: resp.installations.length > 0,
+      installations: resp.installations.map((i) => ({
+        id: i.id,
+        installation_id: i.installationId,
+        account_login: i.account?.login ?? "",
+        account_type: i.account?.type ?? "User",
+      })),
+    };
+  }
 
-      const headers: Record<string, string> = {};
-      if (this.apiKey) headers["x-api-key"] = this.apiKey;
-      if (this.profileId) headers["x-profile-id"] = this.profileId;
+  async getGitHubRepos(_refresh?: boolean): Promise<GitHubReposResponse> {
+    const orgId = await this.resolveOrganizationId();
+    const installResp = await this.request<{
+      installations: Array<{
+        id: string;
+        installationId: string;
+        account: {
+          login: string;
+          avatar_url: string | null;
+          type: string;
+        } | null;
+      }>;
+    }>(`/github/installations?organizationId=${orgId}`);
 
-      const response = await fetch(
-        `${this.baseUrl}/deployments/${deploymentId}/redeploy`,
-        {
-          method: "POST",
-          headers,
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Redeploy failed: ${error}`);
-      }
-      return response.json();
+    if (installResp.installations.length === 0) {
+      return { user: { login: "", id: 0, avatar_url: "" }, repos: [] };
     }
 
-    // If it's a config object or undefined, use JSON body
-    const config = configOrFilePath as RedeploymentConfig | undefined;
+    const inst = installResp.installations[0];
+    const reposResp = await this.request<{
+      repos: Array<{
+        id: number;
+        name: string;
+        fullName: string;
+        private: boolean;
+        ownerAvatarUrl: string | null;
+      }>;
+    }>(`/github/installations/${inst.installationId}/repos`);
 
-    return this.request<Deployment>(`/deployments/${deploymentId}/redeploy`, {
+    return {
+      user: {
+        login: inst.account?.login ?? "",
+        id: 0,
+        avatar_url: inst.account?.avatar_url ?? "",
+      },
+      repos: reposResp.repos.map((r) => ({
+        id: r.id,
+        name: r.name,
+        full_name: r.fullName,
+        private: r.private,
+        owner: { login: r.fullName.split("/")[0] ?? "" },
+      })),
+    };
+  }
+
+  async getGitHubAppName(): Promise<string> {
+    if (process.env.MCP_GITHUB_APP_NAME) return process.env.MCP_GITHUB_APP_NAME;
+    if (this.baseUrl.includes("localhost")) return "mcp-use-local";
+    if (this.baseUrl.includes(".dev.")) return "mcp-use-dev";
+    return "mcp-use";
+  }
+
+  /**
+   * Returns the GitHub numeric installation ID (not the DB UUID) for the org.
+   * Used for building direct installation settings URLs.
+   */
+  async getGitHubInstallationId(): Promise<string | null> {
+    const status = await this.getGitHubConnectionStatus();
+    return status.installations?.[0]?.installation_id ?? null;
+  }
+
+  async createGitHubRepo(opts: {
+    installationId: string;
+    name: string;
+    private?: boolean;
+    org?: string;
+  }): Promise<{ fullName: string; cloneUrl: string; htmlUrl: string }> {
+    return this.request<{
+      fullName: string;
+      cloneUrl: string;
+      htmlUrl: string;
+    }>(`/github/installations/${opts.installationId}/repos`, {
       method: "POST",
-      body: config ? JSON.stringify(config) : undefined,
+      body: JSON.stringify({
+        name: opts.name,
+        private: opts.private ?? true,
+        org: opts.org,
+      }),
     });
   }
 
-  /**
-   * Get deployment logs
-   */
-  async getDeploymentLogs(deploymentId: string): Promise<string> {
-    const response = await this.request<LogsResponse>(
-      `/deployments/${deploymentId}/logs`,
-      { timeout: 60000 } // 60 second timeout for logs
+  async getGitHubOAuthUrl(): Promise<{ url: string; state: string }> {
+    return this.request<{ url: string; state: string }>(
+      "/github/oauth/authorize"
     );
-    return response.data.logs;
   }
 
-  /**
-   * Get deployment build logs
-   */
-  async getDeploymentBuildLogs(deploymentId: string): Promise<string> {
-    const response = await this.request<LogsResponse>(
-      `/deployments/${deploymentId}/logs/build`,
-      { timeout: 60000 } // 60 second timeout for logs
-    );
-    return response.data.logs;
-  }
-
-  /**
-   * Get GitHub connection status
-   */
-  async getGitHubConnectionStatus(): Promise<GitHubConnectionStatus> {
-    return this.request<GitHubConnectionStatus>("/github/connection");
-  }
-
-  /**
-   * Get GitHub app name
-   */
-  async getGitHubAppName(): Promise<string> {
-    const response =
-      await this.request<GitHubAppNameResponse>("/github/appname");
-    return response.app_name;
-  }
-
-  /**
-   * Get accessible GitHub repositories
-   */
-  async getGitHubRepos(refresh: boolean = false): Promise<GitHubReposResponse> {
-    return this.request<GitHubReposResponse>(
-      `/github/repos${refresh ? "?refresh=true" : ""}`
+  async exchangeGitHubOAuthToken(
+    code: string
+  ): Promise<{ success: boolean; installationsUpdated: number }> {
+    return this.request<{ success: boolean; installationsUpdated: number }>(
+      "/github/oauth/token",
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }
     );
   }
 }

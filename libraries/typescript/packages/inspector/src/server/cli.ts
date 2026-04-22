@@ -6,6 +6,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
+import type { InspectorMode } from "./shared-static.js";
 import { registerStaticRoutes } from "./shared-static.js";
 import { setServerPort } from "./tunnel.js";
 import { findAvailablePort, isValidUrl } from "./utils.js";
@@ -80,8 +81,22 @@ app.use("/inspector/api/proxy/*", logger());
 
 registerInspectorRoutes(app, { autoConnectUrl: mcpUrl });
 
-// Register static file serving (must be last as it includes catch-all route)
-registerStaticRoutes(app);
+// Detect the deployment mode. The same CLI binary powers both local standalone
+// usage (`npx @mcp-use/inspector`) and the cloud-hosted Railway deployment at
+// inspector.mcpus.com — Railway sets RAILWAY_ENVIRONMENT_NAME, so we use that
+// as the primary cloud signal, with an explicit MCP_INSPECTOR_MODE override
+// for other hosted environments.
+const inspectorMode: InspectorMode =
+  (process.env.MCP_INSPECTOR_MODE as InspectorMode | undefined) ??
+  (process.env.RAILWAY_ENVIRONMENT_NAME ? "cloud" : "standalone");
+
+// Register static file serving (must be last as it includes catch-all route).
+// Runtime env vars here override what was baked in at `vite build` time — this
+// lets a single pre-built npm tarball be configured per deploy.
+registerStaticRoutes(app, undefined, {
+  inspectorMode,
+  manufactChatUrl: process.env.MANUFACT_CHAT_URL,
+});
 
 // Start the server with automatic port selection
 async function startServer() {

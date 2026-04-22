@@ -1,9 +1,11 @@
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
+import { runToolLoop } from "@/llm/toolLoop";
+import type { ProviderTool } from "@/llm/types";
 import type { McpServer } from "mcp-use/react";
 import { useCallback, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
-  convertMessagesToLangChain,
+  convertMessagesToProvider,
   convertPromptResultsToMessages,
 } from "./conversion";
 import type { LLMConfig, Message, MessageAttachment } from "./types";
@@ -26,6 +28,9 @@ interface UseChatMessagesClientSideProps {
   disabledTools?: Set<string>;
 }
 
+const SYSTEM_PROMPT =
+  "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.";
+
 export function useChatMessagesClientSide({
   connection,
   llmConfig,
@@ -38,9 +43,6 @@ export function useChatMessagesClientSide({
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const agentRef = useRef<any>(null);
-  const llmRef = useRef<any>(null);
-  const lastDisabledToolsRef = useRef<string>("");
 
   const sendMessage = useCallback(
     async (
@@ -49,7 +51,6 @@ export function useChatMessagesClientSide({
       extraAttachments?: MessageAttachment[]
     ) => {
       const allAttachments = [...attachments, ...(extraAttachments ?? [])];
-      // Can send if there's text, prompt results, or attachments
       const hasContent =
         userInput.trim() ||
         promptResults.length > 0 ||
@@ -61,7 +62,6 @@ export function useChatMessagesClientSide({
       const promptResultsMessages =
         convertPromptResultsToMessages(promptResults);
 
-      // Create user message (always needed for externalHistory)
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         role: "user",
@@ -70,8 +70,6 @@ export function useChatMessagesClientSide({
         attachments: allAttachments.length > 0 ? allAttachments : undefined,
       };
 
-      // Only add user message to UI if there's actual user input or user-uploaded attachments
-      // Don't show it when only using prompt results (they create their own messages)
       const userMessages: Message[] = [...promptResultsMessages];
       if (userInput.trim() || allAttachments.length > 0) {
         userMessages.push(userMessage);
@@ -79,19 +77,13 @@ export function useChatMessagesClientSide({
 
       setMessages((prev) => [...prev, ...userMessages]);
       setIsLoading(true);
-
-      // Clear attachments after sending
       setAttachments([]);
 
-      // Create abort controller for cancellation
       abortControllerRef.current = new AbortController();
-
-      // Track telemetry
       const startTime = Date.now();
       let toolCallsCount = 0;
 
       try {
-        // Create assistant message that will be updated with streaming content
         const assistantMessageId = `assistant-${Date.now()}`;
         let currentTextPart = "";
         const parts: Array<{
@@ -106,16 +98,15 @@ export function useChatMessagesClientSide({
           };
         }> = [];
 
-        // Accumulated partial JSON strings per tool call index (for streaming tool args)
+        // Per-tool-call accumulated JSON for partial-args rendering.
         const toolCallArgBuffers = new Map<
-          number,
+          string,
           { name: string; accumulatedJson: string }
         >();
 
-        // Throttled yield: allows React to flush re-renders during streaming
-        // Without this, React batches all setMessages calls and the UI never sees intermediate states
+        // Throttled yield: allows React to flush re-renders during streaming.
         let lastYieldTime = 0;
-        const YIELD_INTERVAL_MS = 80; // yield every 80ms for ~12fps updates
+        const YIELD_INTERVAL_MS = 80;
         const maybeYield = async () => {
           const now = Date.now();
           if (now - lastYieldTime >= YIELD_INTERVAL_MS) {
@@ -124,7 +115,6 @@ export function useChatMessagesClientSide({
           }
         };
 
-        // Add empty assistant message to start
         setMessages((prev) => [
           ...prev,
           {
@@ -136,509 +126,267 @@ export function useChatMessagesClientSide({
           },
         ]);
 
-        // Create LLM instance from config (reuse if config hasn't changed)
-        if (
-          !llmRef.current ||
-          llmRef.current.provider !== llmConfig.provider ||
-          llmRef.current.model !== llmConfig.model ||
-          llmRef.current.apiKey !== llmConfig.apiKey
-        ) {
-          let llm: any;
-          if (llmConfig.provider === "openai") {
-            const { ChatOpenAI } = await import("@langchain/openai");
-            llm = new ChatOpenAI({
-              model: llmConfig.model,
-              apiKey: llmConfig.apiKey,
-            });
-          } else if (llmConfig.provider === "anthropic") {
-            const { ChatAnthropic } = await import("@langchain/anthropic");
-            llm = new ChatAnthropic({
-              model: llmConfig.model,
-              apiKey: llmConfig.apiKey,
-            });
-          } else if (llmConfig.provider === "google") {
-            const { ChatGoogleGenerativeAI } =
-              await import("@langchain/google-genai");
-            llm = new ChatGoogleGenerativeAI({
-              model: llmConfig.model,
-              apiKey: llmConfig.apiKey,
-            });
-          } else {
-            throw new Error(`Unsupported LLM provider: ${llmConfig.provider}`);
-          }
+        // Discover + filter tools from the live MCP connection.
+        const allTools = connection.tools ?? [];
+        const toolList: ProviderTool[] = allTools
+          .filter((t) => !disabledTools?.has(t.name))
+          .map((t) => ({
+            name: t.name,
+            description: t.description,
+            inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
+              type: "object",
+            },
+          }));
 
-          llmRef.current = {
-            instance: llm,
-            provider: llmConfig.provider,
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-          };
-        }
-
-        // Create or reuse agent — recreate when LLM or disabled tools change
-        const disallowedToolsArr = disabledTools
-          ? [...disabledTools].sort()
-          : [];
-        const disallowedToolsKey = disallowedToolsArr.join(",");
-        const needsNewAgent =
-          !agentRef.current ||
-          agentRef.current.llm !== llmRef.current.instance ||
-          lastDisabledToolsRef.current !== disallowedToolsKey;
-
-        if (needsNewAgent) {
-          const { MCPAgent } = await import("mcp-use/browser");
-
-          agentRef.current = new MCPAgent({
-            llm: llmRef.current.instance,
-            client: (connection.client ?? undefined) as any,
-            memoryEnabled: false,
-            exposeResourcesAsTools: false,
-            exposePromptsAsTools: false,
-            disallowedTools:
-              disallowedToolsArr.length > 0 ? disallowedToolsArr : undefined,
-            systemPrompt:
-              "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
-          });
-          await agentRef.current.initialize();
-          lastDisabledToolsRef.current = disallowedToolsKey;
-        }
-
-        // Build widget state context messages (per SEP-1865 ui/update-model-context)
+        // Build the provider-neutral message stream (system + history + widget
+        // state context + optional multimodal user turn).
         const widgetContextMessages: Message[] = [];
         if (widgetModelContexts && widgetModelContexts.size > 0) {
-          const parts: string[] = [];
+          const widgetParts: string[] = [];
           for (const [, ctx] of widgetModelContexts) {
             if (!ctx) continue;
             if (ctx.content?.length) {
-              parts.push(ctx.content.map((c) => c.text).join("\n"));
+              widgetParts.push(ctx.content.map((c) => c.text).join("\n"));
             } else if (ctx.structuredContent) {
-              parts.push(JSON.stringify(ctx.structuredContent));
+              widgetParts.push(JSON.stringify(ctx.structuredContent));
             }
           }
-          if (parts.length > 0) {
+          if (widgetParts.length > 0) {
             widgetContextMessages.push({
               id: `widget-context-${Date.now()}`,
               role: "user",
-              content: `[Current Widget State]\n${parts.join("\n")}`,
+              content: `[Current Widget State]\n${widgetParts.join("\n")}`,
               timestamp: Date.now(),
             });
           }
         }
 
-        // Stream events from agent.
-        // For text-only messages, streamEvents() appends userInput internally as a
-        // new HumanMessage(query), so we exclude userMessage from externalHistory to
-        // avoid duplication.
-        // For messages with image attachments, we must include the full multimodal
-        // userMessage in externalHistory so the LLM can see the images. In that case
-        // we pass "" as the query so streamEvents() doesn't add a duplicate plain-text
-        // message on top of the image-bearing message already in history.
         const hasImageAttachments = (userMessage.attachments?.length ?? 0) > 0;
-        const externalHistory = convertMessagesToLangChain([
+        const historyMessages = [
           ...messages,
           ...promptResultsMessages,
           ...widgetContextMessages,
-          ...(hasImageAttachments ? [userMessage] : []),
-        ]);
-        const effectiveInput = hasImageAttachments ? "" : userInput;
+          ...(userInput.trim() || hasImageAttachments ? [userMessage] : []),
+        ];
 
-        for await (const event of agentRef.current.streamEvents(
-          effectiveInput,
-          10, // maxSteps
-          false, // manageConnector - don't manage, already connected
-          externalHistory, // externalHistory - keep history external to include prompt results AND new message
-          undefined, // outputSchema
-          abortControllerRef.current?.signal // pass abort signal to enable immediate cancellation
-        )) {
-          // Check for abort (defensive - signal is also passed to LangChain)
-          if (abortControllerRef.current?.signal.aborted) {
-            break;
-          }
+        const providerMessages = convertMessagesToProvider(historyMessages);
+        providerMessages.unshift({
+          role: "system",
+          content: SYSTEM_PROMPT,
+        });
 
-          // Handle text streaming and tool call argument streaming
-          if (event.event === "on_chat_model_stream") {
-            const chunk = event.data?.chunk;
-
-            // Handle text tokens
-            if (chunk?.text) {
-              const text = chunk.text;
-              if (typeof text === "string" && text.length > 0) {
-                currentTextPart += text;
-
-                // Update or add text part
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === "text") {
-                  lastPart.text = currentTextPart;
-                } else {
-                  parts.push({
-                    type: "text",
-                    text: currentTextPart,
-                  });
-                }
-
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, parts: [...parts] }
-                      : msg
-                  )
-                );
+        // Helper: best-effort parse of accumulated tool-args JSON so the UI
+        // can render the tool input progressively before the call completes.
+        const tryParseArgs = (
+          raw: string
+        ): Record<string, unknown> | undefined => {
+          try {
+            return JSON.parse(raw);
+          } catch {
+            // Try to close unclosed strings/brackets/braces.
+            const strategies: Array<() => unknown> = [
+              () => {
+                let r = raw;
+                const quotes = (r.match(/(?<!\\)"/g) || []).length;
+                if (quotes % 2 !== 0) r += '"';
+                const ob =
+                  (r.match(/{/g) || []).length - (r.match(/}/g) || []).length;
+                const oq =
+                  (r.match(/\[/g) || []).length - (r.match(/]/g) || []).length;
+                for (let i = 0; i < oq; i++) r += "]";
+                for (let i = 0; i < ob; i++) r += "}";
+                return JSON.parse(r);
+              },
+              () => {
+                let r = raw;
+                r = r.replace(/,\s*"[^"]*"?\s*:\s*("([^"\\]|\\.)*)?$/, "");
+                r = r.replace(/,\s*"[^"]*$/, "");
+                const quotes = (r.match(/(?<!\\)"/g) || []).length;
+                if (quotes % 2 !== 0) r += '"';
+                const ob =
+                  (r.match(/{/g) || []).length - (r.match(/}/g) || []).length;
+                const oq =
+                  (r.match(/\[/g) || []).length - (r.match(/]/g) || []).length;
+                for (let i = 0; i < oq; i++) r += "]";
+                for (let i = 0; i < ob; i++) r += "}";
+                return JSON.parse(r);
+              },
+            ];
+            for (const strat of strategies) {
+              try {
+                return strat() as Record<string, unknown>;
+              } catch {
+                // next
               }
             }
+            return undefined;
+          }
+        };
 
-            // Handle streaming tool call argument chunks
-            // LangChain AIMessageChunk may expose tool call data in several places:
-            // - tool_call_chunks (standard LangChain AIMessageChunk property)
-            // - kwargs.tool_call_chunks (serialized format)
-            // - lc_kwargs.tool_call_chunks (LC serialization format)
-            // - additional_kwargs.tool_calls (OpenAI raw format)
-            // - tool_calls (accumulated tool calls on the chunk)
-            const toolCallChunks =
-              chunk?.tool_call_chunks ||
-              chunk?.kwargs?.tool_call_chunks ||
-              chunk?.lc_kwargs?.tool_call_chunks ||
-              chunk?.additional_kwargs?.tool_calls ||
-              chunk?.tool_calls;
+        const commitMessageParts = () => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, parts: [...parts] }
+                : msg
+            )
+          );
+        };
+
+        const maybeFetchAppsSdkResource = async (toolPart: {
+          type: "text" | "tool-invocation";
+          toolInvocation?: {
+            toolName: string;
+            args: Record<string, unknown>;
+            result?: any;
+            state?: "pending" | "streaming" | "result" | "error";
+          };
+        }) => {
+          const result = toolPart.toolInvocation?.result;
+          const appsSdkUri = result?._meta?.["openai/outputTemplate"];
+          if (!appsSdkUri || typeof appsSdkUri !== "string" || !readResource)
+            return;
+          try {
+            const resourceData = await readResource(appsSdkUri);
             if (
-              toolCallChunks &&
-              Array.isArray(toolCallChunks) &&
-              toolCallChunks.length > 0
+              resourceData?.contents &&
+              Array.isArray(resourceData.contents)
             ) {
-              // Finalize any pending text part before tool streaming begins
-              if (currentTextPart) {
-                currentTextPart = "";
-              }
+              const mcpResources = resourceData.contents.map(
+                (content: any) => ({ type: "resource", resource: content })
+              );
+              toolPart.toolInvocation!.result = {
+                ...result,
+                content: [...(result.content || []), ...mcpResources],
+                structuredContent: result?.structuredContent || null,
+              };
+            }
+          } catch (error) {
+            console.error("Failed to fetch Apps SDK resource:", error);
+          }
+        };
 
-              for (const tc of toolCallChunks) {
-                const idx = tc.index ?? 0;
-                const name = tc.name || "";
-                const argsFragment = tc.args || "";
+        for await (const ev of runToolLoop({
+          config: {
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+            apiKey: llmConfig.apiKey,
+            temperature: llmConfig.temperature,
+          },
+          messages: providerMessages,
+          tools: toolList,
+          callTool: async (name, args) => {
+            return await connection.callTool(name, args, {
+              signal: abortControllerRef.current?.signal,
+            });
+          },
+          maxSteps: 10,
+          signal: abortControllerRef.current?.signal,
+        })) {
+          if (abortControllerRef.current?.signal.aborted) break;
 
-                // Accumulate partial JSON for this tool call index
-                let buffer = toolCallArgBuffers.get(idx);
-                if (!buffer) {
-                  buffer = { name: name || "unknown", accumulatedJson: "" };
-                  toolCallArgBuffers.set(idx, buffer);
-                }
-                if (name && buffer.name === "unknown") {
-                  buffer.name = name;
-                }
-
-                // Best-effort parse the accumulated partial JSON
-                let partialArgs: Record<string, unknown> | undefined;
-
-                // If args is already an object (e.g. from chunk.tool_calls), use directly
-                if (typeof argsFragment === "object" && argsFragment !== null) {
-                  partialArgs = argsFragment as Record<string, unknown>;
-                } else if (typeof argsFragment === "string" && argsFragment) {
-                  // Accumulate JSON string fragments (from tool_call_chunks)
-                  buffer.accumulatedJson += argsFragment;
-
-                  try {
-                    partialArgs = JSON.parse(buffer.accumulatedJson);
-                  } catch {
-                    // Best-effort recovery: try to close the JSON gracefully
-                    // Strategy: strip the last incomplete key-value pair, close open strings/brackets/braces
-                    const strategies = [
-                      // Strategy 1 (preferred): Close unclosed strings and braces
-                      // This PRESERVES the last key-value even if incomplete (e.g. streaming "code" field)
-                      () => {
-                        let r = buffer.accumulatedJson;
-                        const quotes = (r.match(/(?<!\\)"/g) || []).length;
-                        if (quotes % 2 !== 0) r += '"';
-                        const ob =
-                          (r.match(/{/g) || []).length -
-                          (r.match(/}/g) || []).length;
-                        const oq =
-                          (r.match(/\[/g) || []).length -
-                          (r.match(/]/g) || []).length;
-                        for (let i = 0; i < oq; i++) r += "]";
-                        for (let i = 0; i < ob; i++) r += "}";
-                        return JSON.parse(r);
-                      },
-                      // Strategy 2 (fallback): Strip last incomplete key-value, close braces
-                      () => {
-                        let r = buffer.accumulatedJson;
-                        r = r.replace(
-                          /,\s*"[^"]*"?\s*:\s*("([^"\\]|\\.)*)?$/,
-                          ""
-                        );
-                        r = r.replace(/,\s*"[^"]*$/, "");
-                        const quotes = (r.match(/(?<!\\)"/g) || []).length;
-                        if (quotes % 2 !== 0) r += '"';
-                        const ob =
-                          (r.match(/{/g) || []).length -
-                          (r.match(/}/g) || []).length;
-                        const oq =
-                          (r.match(/\[/g) || []).length -
-                          (r.match(/]/g) || []).length;
-                        for (let i = 0; i < oq; i++) r += "]";
-                        for (let i = 0; i < ob; i++) r += "}";
-                        return JSON.parse(r);
-                      },
-                    ];
-                    for (const strategy of strategies) {
-                      try {
-                        partialArgs = strategy();
-                        break;
-                      } catch {
-                        // Try next strategy
-                      }
-                    }
-                  }
-                }
-
-                if (partialArgs) {
-                  // Find or create the streaming tool-invocation part
-                  const toolPart = parts.find(
-                    (p) =>
-                      p.type === "tool-invocation" &&
-                      p.toolInvocation?.state === "streaming" &&
-                      p.toolInvocation?.toolName === buffer!.name
+          if (ev.type === "text-delta") {
+            currentTextPart += ev.delta;
+            const lastPart = parts[parts.length - 1];
+            if (lastPart && lastPart.type === "text") {
+              lastPart.text = currentTextPart;
+            } else {
+              parts.push({ type: "text", text: currentTextPart });
+            }
+            commitMessageParts();
+          } else if (ev.type === "tool-call-start") {
+            if (currentTextPart) currentTextPart = "";
+            toolCallArgBuffers.set(ev.toolCallId, {
+              name: ev.toolName,
+              accumulatedJson: "",
+            });
+            parts.push({
+              type: "tool-invocation",
+              toolInvocation: {
+                toolName: ev.toolName,
+                args: {},
+                state: "streaming",
+                partialArgs: {},
+              },
+            });
+            commitMessageParts();
+          } else if (ev.type === "tool-call-args-delta") {
+            const buf = toolCallArgBuffers.get(ev.toolCallId);
+            if (buf) {
+              buf.accumulatedJson += ev.argsDelta;
+              const partial = tryParseArgs(buf.accumulatedJson);
+              if (partial) {
+                const toolPart = parts.find(
+                  (p) =>
+                    p.type === "tool-invocation" &&
+                    p.toolInvocation?.state === "streaming" &&
+                    p.toolInvocation?.toolName === buf.name
+                );
+                if (toolPart && toolPart.toolInvocation) {
+                  const prev = toolPart.toolInvocation.partialArgs;
+                  const prevKeys = prev ? Object.keys(prev) : [];
+                  const newKeys = Object.keys(partial);
+                  const prevTotal = prevKeys.reduce(
+                    (s, k) => s + String(prev![k] ?? "").length,
+                    0
                   );
-
-                  if (toolPart && toolPart.toolInvocation) {
-                    // Only update if the new parse is better (more keys or longer
-                    // string values). This prevents flickering when the JSON recovery
-                    // alternates between strategies that include/exclude trailing keys.
-                    const prev = toolPart.toolInvocation.partialArgs;
-                    const prevKeys = prev ? Object.keys(prev) : [];
-                    const newKeys = Object.keys(partialArgs);
-                    const prevTotal = prevKeys.reduce(
-                      (s, k) => s + String(prev![k] ?? "").length,
-                      0
-                    );
-                    const newTotal = newKeys.reduce(
-                      (s, k) => s + String(partialArgs[k] ?? "").length,
-                      0
-                    );
-                    if (
-                      newKeys.length > prevKeys.length ||
-                      newTotal >= prevTotal
-                    ) {
-                      toolPart.toolInvocation.partialArgs = partialArgs;
-                    }
-                  } else {
-                    parts.push({
-                      type: "tool-invocation",
-                      toolInvocation: {
-                        toolName: buffer.name,
-                        args: {},
-                        state: "streaming",
-                        partialArgs,
-                      },
-                    });
-                  }
-
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, parts: [...parts] }
-                        : msg
-                    )
+                  const newTotal = newKeys.reduce(
+                    (s, k) => s + String(partial[k] ?? "").length,
+                    0
                   );
-
-                  // Yield to event loop so React can flush the streaming update
+                  if (
+                    newKeys.length > prevKeys.length ||
+                    newTotal >= prevTotal
+                  ) {
+                    toolPart.toolInvocation.partialArgs = partial;
+                  }
+                  commitMessageParts();
                   await maybeYield();
                 }
               }
             }
-          }
-          // Handle tool start
-          else if (event.event === "on_tool_start") {
-            if (currentTextPart) {
-              currentTextPart = "";
-            }
-
-            // Extract args from event data - check multiple possible locations
-            let args = {};
-            if (event.data?.input) {
-              args = event.data.input;
-            } else if (event.data?.tool_input) {
-              args = event.data.tool_input;
-            } else if (event.data) {
-              // Sometimes the args are directly in data
-              args = event.data;
-            }
-
-            console.log("[useChatMessagesClientSide] on_tool_start:", {
-              toolName: event.name,
-              eventData: event.data,
-              extractedArgs: args,
-            });
-            // Count tool calls for telemetry
+          } else if (ev.type === "tool-call-ready") {
             toolCallsCount++;
-
-            // Check if we already have a streaming part for this tool (from tool_call_chunks)
+            if (currentTextPart) currentTextPart = "";
             const streamingPart = parts.find(
               (p) =>
                 p.type === "tool-invocation" &&
                 p.toolInvocation?.state === "streaming" &&
-                p.toolInvocation?.toolName === (event.name || "unknown")
+                p.toolInvocation?.toolName === ev.toolName
             );
-
             if (streamingPart && streamingPart.toolInvocation) {
-              // Transition from streaming to pending with complete args
-              streamingPart.toolInvocation.args = args;
+              streamingPart.toolInvocation.args = ev.args;
               streamingPart.toolInvocation.state = "pending";
-              // Keep partialArgs around - the widget iframe may still be loading
-              // and needs them when it becomes ready. They'll be ignored once
-              // the full toolInput is sent via sendToolInput.
             } else {
               parts.push({
                 type: "tool-invocation",
                 toolInvocation: {
-                  toolName: event.name || "unknown",
-                  args,
+                  toolName: ev.toolName,
+                  args: ev.args,
                   state: "pending",
                 },
               });
             }
-
-            // Clear tool call arg buffers for this tool
-            toolCallArgBuffers.clear();
-
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMessageId
-                  ? { ...msg, parts: [...parts] }
-                  : msg
-              )
-            );
-          }
-          // Handle tool end
-          else if (event.event === "on_tool_end") {
+            commitMessageParts();
+          } else if (ev.type === "tool-result") {
             const toolPart = parts.find(
               (p) =>
                 p.type === "tool-invocation" &&
-                p.toolInvocation?.toolName === event.name &&
+                p.toolInvocation?.toolName === ev.toolName &&
                 !p.toolInvocation?.result
             );
-
-            console.log("[useChatMessagesClientSide] on_tool_end event:", {
-              toolName: event.name,
-              hasToolPart: !!toolPart,
-              output: event.data?.output,
-            });
-
             if (toolPart && toolPart.toolInvocation) {
-              let result = event.data?.output;
-
-              // Unwrap LangChain ToolMessage wrapper: kwargs.content contains the actual output
-              if (
-                result?.kwargs?.content &&
-                typeof result.kwargs.content === "string"
-              ) {
-                try {
-                  result = JSON.parse(result.kwargs.content);
-                } catch (error) {
-                  console.warn(
-                    "[useChatMessagesClientSide] Failed to parse kwargs.content:",
-                    error
-                  );
-                  result = result.kwargs.content;
-                }
-              }
-              // Fallback: try parsing result.content if it's a string
-              else if (result?.content && typeof result.content === "string") {
-                try {
-                  result = JSON.parse(result.content);
-                } catch (error) {
-                  result = result.content;
-                }
-              }
-
-              // Store the unwrapped result
-              toolPart.toolInvocation.result = result;
-              // Check if result indicates an error
-              toolPart.toolInvocation.state = result?.isError
-                ? "error"
-                : "result";
-
-              // Check result's _meta field for Apps SDK component
-              const appsSdkUri = result?._meta?.["openai/outputTemplate"];
-
-              console.log("[useChatMessagesClientSide] Tool result:", {
-                toolName: event.name,
-                hasMeta: !!result?._meta,
-                hasStructuredContent: !!result?.structuredContent,
-                appsSdkUri,
-              });
-
-              if (
-                appsSdkUri &&
-                typeof appsSdkUri === "string" &&
-                readResource
-              ) {
-                // Fetch the resource now (await instead of IIFE)
-                console.log(
-                  "[useChatMessagesClientSide] Detected Apps SDK component, fetching resource:",
-                  appsSdkUri
-                );
-                try {
-                  // Use the readResource function passed from the inspector connection
-                  const resourceData = await readResource(appsSdkUri);
-
-                  console.log(
-                    "[useChatMessagesClientSide] Resource fetched:",
-                    resourceData
-                  );
-
-                  // Extract structured content from result
-                  const structuredContent = result?.structuredContent || null;
-
-                  // Add the fetched resource contents to the result's content array
-                  if (
-                    resourceData?.contents &&
-                    Array.isArray(resourceData.contents)
-                  ) {
-                    // Convert resource contents to MCP resource format
-                    const mcpResources = resourceData.contents.map(
-                      (content: any) => ({
-                        type: "resource",
-                        resource: content,
-                      })
-                    );
-
-                    console.log(
-                      "[useChatMessagesClientSide] Created MCP resources:",
-                      mcpResources
-                    );
-
-                    // Update the tool result with the fetched resources
-                    const updatedResult = {
-                      ...result,
-                      content: [...(result.content || []), ...mcpResources],
-                      structuredContent,
-                    };
-
-                    toolPart.toolInvocation.result = updatedResult;
-                    console.log(
-                      "[useChatMessagesClientSide] Updated result with resources"
-                    );
-                  } else {
-                    console.warn(
-                      "[useChatMessagesClientSide] No contents in resourceData:",
-                      resourceData
-                    );
-                  }
-                } catch (error) {
-                  console.error("Failed to fetch Apps SDK resource:", error);
-                }
-              }
-
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessageId
-                    ? { ...msg, parts: [...parts] }
-                    : msg
-                )
-              );
+              toolPart.toolInvocation.result = ev.result;
+              toolPart.toolInvocation.state =
+                ev.isError || (ev.result as any)?.isError ? "error" : "result";
+              await maybeFetchAppsSdkResource(toolPart);
+              commitMessageParts();
             }
+          } else if (ev.type === "error") {
+            throw new Error(ev.message);
           }
         }
 
-        // If aborted, mark any pending tool calls as cancelled
         if (abortControllerRef.current?.signal.aborted) {
           for (const part of parts) {
             if (
@@ -651,20 +399,14 @@ export function useChatMessagesClientSide({
           }
         }
 
-        // Final update
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMessageId
-              ? {
-                  ...msg,
-                  parts: [...parts],
-                  content: "",
-                }
+              ? { ...msg, parts: [...parts], content: "" }
               : msg
           )
         );
 
-        // Track successful chat message
         if (llmConfig) {
           const telemetry = Telemetry.getInstance();
           telemetry
@@ -685,18 +427,14 @@ export function useChatMessagesClientSide({
             });
         }
       } catch (error) {
-        // Don't show AbortError - user initiated cancellation
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
-
         console.error("Client-side agent error:", error);
 
-        // Extract detailed error message
         let errorDetail = "Unknown error occurred";
         if (error instanceof Error) {
           errorDetail = error.message;
-          // Check if error has HTTP status info
           const errorAny = error as any;
           if (errorAny.status) {
             errorDetail = `HTTP ${errorAny.status}: ${errorDetail}`;
@@ -710,7 +448,6 @@ export function useChatMessagesClientSide({
           }
         }
 
-        // Track failed chat message
         if (llmConfig) {
           const telemetry = Telemetry.getInstance();
           telemetry
@@ -752,14 +489,12 @@ export function useChatMessagesClientSide({
       readResource,
       attachments,
       disabledTools,
+      widgetModelContexts,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
-    if (agentRef.current) {
-      agentRef.current.clearConversationHistory();
-    }
   }, []);
 
   const stop = useCallback(() => {
@@ -774,13 +509,10 @@ export function useChatMessagesClientSide({
 
       setAttachments((prev) => {
         const newAttachments = [...prev, attachment];
-
-        // Check total size
         if (!isValidTotalSize(newAttachments)) {
           alert("Total attachment size exceeds 20MB limit");
           return prev;
         }
-
         return newAttachments;
       });
     } catch (error) {

@@ -6,6 +6,78 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v2.2.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.2.0&title=Hosted%20chat%2C%20LLM%20providers%20%26%20chat%20export&date=2026-04&lang=inspector" alt="Release 2.2.0" />
+  </Frame>
+  ## Hosted chat runtime, LLM providers & chat export
+  Minor release paired with `mcp-use` v1.24.2: first-party inspector LLM streaming (no LangChain on the chat path), copy/export chat, runtime hosted-chat URL, hosted free-tier chat, and cloud env tooling via the CLI (`#1372`).
+
+- **New**: First-party LLM providers for inspector chat (Anthropic, OpenAI, Google) with shared message formatting, SSE streaming, and tool loops — the inspector no longer depends on LangChain for chat (`#1372`)
+- **New**: "Copy Chat" and "Export Chat" in the chat header — markdown to clipboard; download as JSON or Markdown with tool calls in order (`#1324`)
+- **New**: Free tier chat on the hosted inspector (`#1368`)
+- **New**: Hosted chat URL from runtime config — inspector server reads `MANUFACT_CHAT_URL` and injects `window.__MANUFACT_CHAT_URL__`; `InspectorProvider` prefers that value and falls back to `VITE_MANUFACT_CHAT_URL` for local dev (`#1370`)
+- **Fix**: OAuth login popup — drop `noopener` and redirect `callbackURL` to `/inspector/oauth-popup-closed.html` so the popup self-closes instead of loading the full inspector (`#1370`)
+- **Update**: Updated mcp-use to v1.24.2
+</Update>
+
+<Update label="v2.1.0" description="April 2026">
+  ## Navbar, theme & debug controls
+  Minor release with MCP Apps debug theme toggle and navbar/settings UX improvements; dependency bump to `mcp-use` v1.24.1.
+
+- **New**: Theme toggle button in MCP Apps debug controls toolbar
+- **Enhancement**: Navbar — chat tab first with label and separator; `alwaysExpanded` on tab triggers so the active label stays visible when collapsed; Deploy links to manufact.com/signup with inspector referrer; tunnel control between Add to Client and Deploy with updated styling and mobile visibility; theme toggle, command palette, and GitHub under a settings dropdown; "Report a Bug" prefills a GitHub issue with the inspector label
+- **Update**: Updated mcp-use to v1.24.1
+</Update>
+
+<Update label="v2.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.0.0&title=Subpath%20OAuth%2C%20chat%20UX%20%26%20tab%20persistence&date=2026-04&lang=inspector" alt="Release 2.0.0" />
+  </Frame>
+  ## Subpath OAuth, chat UX & tab persistence
+  Major release paired with `mcp-use` v1.24.0: correct OAuth redirects when the inspector is served under `/inspector`, clearer chat streaming UI, and restored tab state after reload.
+
+- **Fix**: `McpClientProvider` receives `defaultCallbackUrl` so OAuth redirects target `/inspector/oauth/callback` (matches React Router `basename`); removes the authentication dialog "Redirect URL" field that was not wired to the live connection
+- **Fix**: Hide the thinking indicator when the assistant message already has rendered parts so the spinner does not linger after streaming completes
+- **Enhancement**: Persist the active inspector tab across page refresh
+- **Update**: Updated mcp-use to v1.24.0
+</Update>
+
+<Update label="v1.0.1" description="April 2026">
+  ## Embedded inspector without LangChain
+  Patch release fixing server routes that imported `telFetch` from the root `mcp-use` package.
+
+- **Fix**: Import `telFetch` from `mcp-use/telemetry/tel-fetch` so shared routes do not load the root entry (which eagerly pulls the agent graph); resolves embedded inspector failures when `langchain` is not installed
+- **Update**: Updated mcp-use to v1.23.1
+</Update>
+
+<Update label="v1.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.0.0&title=Stream%20Protocol%2C%20Aliases%20%26%20Chat%20Tooling&date=2026-04&lang=inspector" alt="Release 1.0.0" />
+  </Frame>
+  ## Stream protocol, aliases & chat tooling
+  Major release with MCP stream support in chat, connection UX improvements, and dependency hardening.
+
+- **New**: MCP data stream protocol support in `ChatTab` and `useChatMessages`
+- **Enhancement**: `disabledTools` prop on `ChatTab` and `useChatMessages` for finer tool control
+- **New**: Editable MCP server aliases in connection settings; `updateServerMetadata()` from `McpClientProvider` updates display names without a full reconnect; shared `getServerDisplayName` across dashboard tiles, server dropdown, header actions, command palette, server info modal, and server icon
+- **Fix**: Alias-only edits no longer trigger a full reconnect; IME composition no longer submits the connection form when pressing Enter mid-composition
+- **Enhancement**: Persist tabs on refresh; sync URL `tab` query param when switching tabs so state survives reload
+- **Enhancement**: Tool-invocation serialization, screenshots, and message list refs for integrations such as manufact.build
+- **Update**: Removed unused `transportType` / `setTransportType` props from `ConnectionSettingsForm`
+- **Fix**: Tighter `pnpm` overrides and lockfile refresh for `pnpm audit`; `lodash` override in the mcp-apps scaffold template for standalone installs
+- **Update**: Vite 8.0.5, Hono 4.12.12, `@hono/node-server` 1.19.13
+- **Update**: Updated mcp-use to v1.23.0
+</Update>
+
+<Update label="v0.26.1" description="March 2026">
+  ## Dependency & bundling alignment
+  Patch release aligning how `@mcp-use/inspector` packages `mcp-use` for bundling and shared types.
+
+- **Fix**: Restore `mcp-use` as both a `dependency` and `peerDependency` — tsup bundles non-React subpaths with transitive deps; `peerDependency` preserves shared `mcp-use`/`react` types with the host app
+- **Update**: Updated mcp-use to v1.22.3
+</Update>
+
 <Update label="v0.26.0" description="March 2026">
   ## Peer Dependency Alignment & MCP UI v7
   Minor release aligning inspector dependency strategy for shared type safety and upgrading MCP UI client rendering internals.

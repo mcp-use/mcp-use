@@ -1,5 +1,409 @@
 # @mcp-use/inspector
 
+## 2.2.0
+
+### Minor Changes
+
+- e9c4bd0: feat(inspector): allow free tier chat on hosted inspector
+- e9c4bd0: Added "Copy Chat" and "Export Chat" buttons to the MCP Inspector chat header. Both actions include tool calls inline in the order they occurred. Copy writes markdown to the clipboard; Export downloads as JSON or Markdown.
+- e9c4bd0: fix(inspector): remove `@langchain/*` hard dependencies and drop `MCPAgent` usage
+
+  Closes [mcp-use/mcp-use#1371](https://github.com/mcp-use/mcp-use/issues/1371).
+
+  `@mcp-use/inspector` no longer depends on `@langchain/core`, `@langchain/openai`, `@langchain/anthropic`, or `@langchain/google-genai`. The chat, sampling, and props-generation paths now call the OpenAI, Anthropic, and Google REST APIs directly and run their own MCP tool-calling loop instead of going through `MCPAgent`. Consumers of `mcp-use` (which transitively installs the inspector) no longer need langchain in their `node_modules` and Next.js / Vite / other bundlers no longer fail at runtime with `Cannot find package 'langchain'`.
+
+  Preserved behavior:
+  - SSE wire format of the inspector's `/inspector/api/chat/stream` endpoint is unchanged (`message` / `text` / `tool-call` / `tool-result` / `done` / `error` events with identical field shapes), so existing clients — including remote consumers and the Vercel AI SDK `data-stream` parser in `useChatMessages` — keep working.
+  - Tool execution, multimodal image attachments, streaming partial-args rendering, OpenAI Apps SDK `openai/outputTemplate` resource hydration, cancellation via `AbortSignal`, prompts, elicitation, and widget `ui/update-model-context` injection all behave the same as before.
+
+  Provider notes:
+  - Gemini does not stream partial tool-call arguments incrementally (the provider only emits fully-formed `functionCall.args`), so the progressive partial-args animation only updates once per tool call for the `google` provider. Final behavior is identical.
+  - MCP tool schemas are automatically sanitized before being sent to Gemini to strip keywords it rejects (`$schema`, `additionalProperties`, `$ref`, etc.).
+  - A new regression test in `mcp-use/tests/inspector-no-langchain.test.ts` fails if any `@langchain/*`, `langchain`, or `MCPAgent` reference re-enters the inspector's `package.json` or built `dist/**`.
+
+### Patch Changes
+
+- e9c4bd0: fix(inspector): read `MANUFACT_CHAT_URL` in the standalone server entrypoint
+
+  The runtime hosted-chat URL injection was wired up in `cli.ts` (used by the published `mcp-inspect` bin and by Railway) but the same plumbing in `server.ts` (used by `pnpm start` / the dev server) was dropped during a merge. As a result, running the inspector via `node dist/server/server.js` with `MANUFACT_CHAT_URL` set did not inject `window.__MANUFACT_CHAT_URL__` into the served HTML.
+
+  This change restores parity between the two entrypoints so both honour the env var at process start.
+
+- e9c4bd0: feat(inspector): configure hosted chat URL at runtime via `MANUFACT_CHAT_URL`
+
+  The hosted chat endpoint (`chatApiUrl`) previously had to be baked into the client bundle at `vite build` time via `VITE_MANUFACT_CHAT_URL`. This prevented the same pre-built npm tarball from being configured per deploy (Railway, CDN, self-hosted) without a rebuild.
+
+  The inspector server now reads `MANUFACT_CHAT_URL` at runtime and injects `window.__MANUFACT_CHAT_URL__` into the served HTML. `InspectorProvider` prefers the runtime value and falls back to `VITE_MANUFACT_CHAT_URL` for local Vite dev, so existing build-time flows keep working.
+
+  Also drops `noopener` from the LoginModal OAuth popup and redirects the OAuth `callbackURL` to a new `/inspector/oauth-popup-closed.html` page so the popup self-closes cleanly instead of briefly loading the full inspector inside it.
+
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - mcp-use@1.24.2
+
+## 2.2.0-canary.7
+
+### Patch Changes
+
+- 028cd3c: fix(inspector): read `MANUFACT_CHAT_URL` in the standalone server entrypoint
+
+  The runtime hosted-chat URL injection was wired up in `cli.ts` (used by the published `mcp-inspect` bin and by Railway) but the same plumbing in `server.ts` (used by `pnpm start` / the dev server) was dropped during a merge. As a result, running the inspector via `node dist/server/server.js` with `MANUFACT_CHAT_URL` set did not inject `window.__MANUFACT_CHAT_URL__` into the served HTML.
+
+  This change restores parity between the two entrypoints so both honour the env var at process start.
+  - mcp-use@1.24.2-canary.7
+
+## 2.2.0-canary.6
+
+### Minor Changes
+
+- baa93e6: fix(inspector): remove `@langchain/*` hard dependencies and drop `MCPAgent` usage
+
+  Closes [mcp-use/mcp-use#1371](https://github.com/mcp-use/mcp-use/issues/1371).
+
+  `@mcp-use/inspector` no longer depends on `@langchain/core`, `@langchain/openai`, `@langchain/anthropic`, or `@langchain/google-genai`. The chat, sampling, and props-generation paths now call the OpenAI, Anthropic, and Google REST APIs directly and run their own MCP tool-calling loop instead of going through `MCPAgent`. Consumers of `mcp-use` (which transitively installs the inspector) no longer need langchain in their `node_modules` and Next.js / Vite / other bundlers no longer fail at runtime with `Cannot find package 'langchain'`.
+
+  Preserved behavior:
+  - SSE wire format of the inspector's `/inspector/api/chat/stream` endpoint is unchanged (`message` / `text` / `tool-call` / `tool-result` / `done` / `error` events with identical field shapes), so existing clients — including remote consumers and the Vercel AI SDK `data-stream` parser in `useChatMessages` — keep working.
+  - Tool execution, multimodal image attachments, streaming partial-args rendering, OpenAI Apps SDK `openai/outputTemplate` resource hydration, cancellation via `AbortSignal`, prompts, elicitation, and widget `ui/update-model-context` injection all behave the same as before.
+
+  Provider notes:
+  - Gemini does not stream partial tool-call arguments incrementally (the provider only emits fully-formed `functionCall.args`), so the progressive partial-args animation only updates once per tool call for the `google` provider. Final behavior is identical.
+  - MCP tool schemas are automatically sanitized before being sent to Gemini to strip keywords it rejects (`$schema`, `additionalProperties`, `$ref`, etc.).
+  - A new regression test in `mcp-use/tests/inspector-no-langchain.test.ts` fails if any `@langchain/*`, `langchain`, or `MCPAgent` reference re-enters the inspector's `package.json` or built `dist/**`.
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.6
+
+## 2.2.0-canary.5
+
+### Patch Changes
+
+- 1b64075: feat(inspector): configure hosted chat URL at runtime via `MANUFACT_CHAT_URL`
+
+  The hosted chat endpoint (`chatApiUrl`) previously had to be baked into the client bundle at `vite build` time via `VITE_MANUFACT_CHAT_URL`. This prevented the same pre-built npm tarball from being configured per deploy (Railway, CDN, self-hosted) without a rebuild.
+
+  The inspector server now reads `MANUFACT_CHAT_URL` at runtime and injects `window.__MANUFACT_CHAT_URL__` into the served HTML. `InspectorProvider` prefers the runtime value and falls back to `VITE_MANUFACT_CHAT_URL` for local Vite dev, so existing build-time flows keep working.
+
+  Also drops `noopener` from the LoginModal OAuth popup and redirects the OAuth `callbackURL` to a new `/inspector/oauth-popup-closed.html` page so the popup self-closes cleanly instead of briefly loading the full inspector inside it.
+
+- Updated dependencies [bd58d95]
+  - mcp-use@1.24.2-canary.5
+
+## 2.2.0-canary.4
+
+### Minor Changes
+
+- d9ac208: feat(inspector): allow free tier chat on hosted inspector
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.4
+
+## 2.2.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa86071]
+  - mcp-use@1.24.2-canary.3
+
+## 2.2.0-canary.2
+
+### Minor Changes
+
+- ee5abf8: Added "Copy Chat" and "Export Chat" buttons to the MCP Inspector chat header. Both actions include tool calls inline in the order they occurred. Copy writes markdown to the clipboard; Export downloads as JSON or Markdown.
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.2
+
+## 2.1.1-canary.1
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.1
+
+## 2.1.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.24.2-canary.0
+
+## 2.1.0
+
+### Minor Changes
+
+- 30be19e: Add theme toggle button to MCP Apps debug controls toolbar
+- 30be19e: Inspector navbar UX improvements
+  - Chat tab moved to first position, always shows label even when collapsed, with visual separator
+  - Active tab label stays visible when navbar is collapsed (new `alwaysExpanded` prop on TabsTrigger)
+  - Deploy button added linking to manufact.com/signup with inspector referrer
+  - Tunnel button repositioned between Add to Client and Deploy, restyled with violet theme, now visible in mobile layout
+  - Theme toggle, command palette, and GitHub consolidated into a settings dropdown menu
+  - "Report a Bug" menu item added, pre-fills GitHub issue with inspector label
+
+### Patch Changes
+
+- Updated dependencies [30be19e]
+  - mcp-use@1.24.1
+
+## 2.1.0-canary.3
+
+### Patch Changes
+
+- d85fb4f: Add theme toggle button to MCP Apps debug controls toolbar
+  - mcp-use@1.24.1-canary.3
+
+## 2.1.0-canary.2
+
+### Patch Changes
+
+- mcp-use@1.24.1-canary.2
+
+## 2.1.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [9fed740]
+  - mcp-use@1.24.1-canary.1
+
+## 2.1.0-canary.0
+
+### Minor Changes
+
+- 27bd31c: Inspector navbar UX improvements
+  - Chat tab moved to first position, always shows label even when collapsed, with visual separator
+  - Active tab label stays visible when navbar is collapsed (new `alwaysExpanded` prop on TabsTrigger)
+  - Deploy button added linking to manufact.com/signup with inspector referrer
+  - Tunnel button repositioned between Add to Client and Deploy, restyled with violet theme, now visible in mobile layout
+  - Theme toggle, command palette, and GitHub consolidated into a settings dropdown menu
+  - "Report a Bug" menu item added, pre-fills GitHub issue with inspector label
+
+### Patch Changes
+
+- mcp-use@1.24.1-canary.0
+
+## 2.0.0
+
+### Patch Changes
+
+- 4070f26: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+- 4070f26: Fix thinking indicator persisting after assistant stream completes
+- 4070f26: feat(inspector): persist tabs on refresh
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+- Updated dependencies [4070f26]
+  - mcp-use@1.24.0
+
+## 2.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bba147b]
+  - mcp-use@1.24.0-canary.5
+
+## 2.0.0-canary.4
+
+### Patch Changes
+
+- 1718d68: Fix OAuth callback URL for inspector mounted at a sub-path
+
+  **mcp-use:** Add `defaultCallbackUrl` prop to `McpClientProvider` so apps mounted at a sub-path (e.g. `/inspector`) can declare the correct OAuth redirect URL once at the provider level instead of passing it to every `addServer` call.
+
+  **inspector:** Pass `defaultCallbackUrl` pointing to `/inspector/oauth/callback`, which is where the React Router (with `basename="/inspector"`) mounts the `OAuthCallback` component. Previously the callback URL defaulted to `/oauth/callback`, causing a blank screen after OAuth because the route was never matched. The "Redirect URL" field has been removed from the authentication dialog — it was never wired to the actual connection and could not be set to a path the inspector would handle.
+
+- Updated dependencies [1718d68]
+  - mcp-use@1.24.0-canary.4
+
+## 2.0.0-canary.3
+
+### Patch Changes
+
+- c51a656: feat(inspector): persist tabs on refresh
+- Updated dependencies [c51a656]
+- Updated dependencies [c51a656]
+  - mcp-use@1.24.0-canary.3
+
+## 2.0.0-canary.2
+
+### Patch Changes
+
+- b0e2492: Fix thinking indicator persisting after assistant stream completes
+- Updated dependencies [9478920]
+  - mcp-use@1.24.0-canary.2
+
+## 2.0.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4525a5d]
+  - mcp-use@1.24.0-canary.1
+
+## 2.0.0-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c77a998]
+  - mcp-use@1.24.0-canary.0
+
+## 1.0.1
+
+### Patch Changes
+
+- 6d7fd2e: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [6d7fd2e]
+  - mcp-use@1.23.1
+
+## 1.0.1-canary.0
+
+### Patch Changes
+
+- b3680f9: Fix embedded inspector failing when `langchain` is not installed: export `telFetch` from `mcp-use/telemetry/tel-fetch` so inspector server code does not load the root `mcp-use` entry (which eagerly pulls the agent graph). Log inspector mount failures in development or when `MCP_USE_DEBUG` is set.
+- Updated dependencies [b3680f9]
+  - mcp-use@1.23.1-canary.0
+
+## 1.0.0
+
+### Minor Changes
+
+- 6d7c4df: Feat(inspector): add support for data stream protocol
+
+### Patch Changes
+
+- 6d7c4df: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+- 6d7c4df: Fix (inspector): add disabled tools prop to the inspector chat.
+- 6d7c4df: Updated dependency `@hono/node-server` to `^1.19.13`.
+- 6d7c4df: Updated dependency `hono` to `^4.12.12`.
+- 6d7c4df: Updated dependency `vite` to `^8.0.5`.
+- 6d7c4df: chore(inspector): ability to reference messages in the list for integration with manufact.build
+- 6d7c4df: fix(inspector): stable grainy backgrounds, mesh connect backdrop, and dependency cleanup
+  - Use inline SVG noise data URLs on `RandomGradientBackground` (avoids blocked remote `noise.svg` requests).
+  - Add `@paper-design/shaders-react` mesh gradient behind the dashboard connect panel with a fine grain overlay, persisted play/stop control (shader motion), tooltip, and outline-only icon button.
+  - Remove unused packages (`@mcp-ui/client`, top-level `langchain`, `vite-express`, `@tailwindcss/cli`) and redundant ESLint/LangChain devDependencies; declare `tsup` for builds and add `pnpm run check-deps` via Knip (`knip.json`).
+
+- 6d7c4df: feat(inspector): persist tabs on refresh
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+- Updated dependencies [6d7c4df]
+  - mcp-use@1.23.0
+
+## 1.0.0-canary.10
+
+### Patch Changes
+
+- 5749a4b: fix(inspector): stable grainy backgrounds, mesh connect backdrop, and dependency cleanup
+  - Use inline SVG noise data URLs on `RandomGradientBackground` (avoids blocked remote `noise.svg` requests).
+  - Add `@paper-design/shaders-react` mesh gradient behind the dashboard connect panel with a fine grain overlay, persisted play/stop control (shader motion), tooltip, and outline-only icon button.
+  - Remove unused packages (`@mcp-ui/client`, top-level `langchain`, `vite-express`, `@tailwindcss/cli`) and redundant ESLint/LangChain devDependencies; declare `tsup` for builds and add `pnpm run check-deps` via Knip (`knip.json`).
+  - mcp-use@1.23.0-canary.10
+
+## 1.0.0-canary.9
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+- Updated dependencies [1118308]
+  - mcp-use@1.23.0-canary.9
+
+## 1.0.0-canary.8
+
+### Patch Changes
+
+- 9ec2039: Updated dependency `@hono/node-server` to `^1.19.13`.
+- ebc6c9f: chore(inspector): ability to reference messages in the list for integration with manufact.build
+- Updated dependencies [9ec2039]
+  - mcp-use@1.23.0-canary.8
+
+## 1.0.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [10ab350]
+  - mcp-use@1.23.0-canary.7
+
+## 1.0.0-canary.6
+
+### Patch Changes
+
+- 47b8052: Add `updateServerMetadata()` to `McpClientProvider` for metadata-only updates that do not trigger a reconnection.
+
+  `updateServer()` continues to disconnect and remount the connection for any connection-affecting change (URL, headers, proxy, transport). `updateServerMetadata(id, { name })` updates the configured display name in place without touching the live connection.
+
+  The Inspector uses this new path to let users set editable server aliases in the connection settings dialog. Alias-only edits no longer cause a full reconnect. All Inspector surfaces (dashboard tiles, server dropdown, header export actions, command palette, server info modal, server icon) now resolve the display name through a shared `getServerDisplayName` utility that prefers user-set aliases over server-reported metadata.
+
+  Also fixes an IME composition issue where pressing `Enter` during Chinese/Japanese/Korean input could accidentally submit the connection form.
+
+- Updated dependencies [47b8052]
+  - mcp-use@1.23.0-canary.6
+
+## 0.27.0-canary.5
+
+### Minor Changes
+
+- 7be81db: Feat(inspector): add support for data stream protocol
+
+### Patch Changes
+
+- mcp-use@1.22.4-canary.5
+
+## 0.26.2-canary.4
+
+### Patch Changes
+
+- 36334a0: Fix (inspector): add disabled tools prop to the inspector chat.
+  - mcp-use@1.22.4-canary.4
+
+## 0.26.2-canary.3
+
+### Patch Changes
+
+- 02c26cc: Updated dependency `vite` to `^8.0.5`.
+- Updated dependencies [02c26cc]
+  - mcp-use@1.22.4-canary.3
+
+## 0.26.2-canary.2
+
+### Patch Changes
+
+- d09532e: Updated dependency `hono` to `^4.12.12`.
+- Updated dependencies [d09532e]
+  - mcp-use@1.22.4-canary.2
+
+## 0.26.2-canary.1
+
+### Patch Changes
+
+- 62f95c2: feat(inspector): persist tabs on refresh
+  - mcp-use@1.22.4-canary.1
+
+## 0.26.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [cca2612]
+  - mcp-use@1.22.4-canary.0
+
 ## 0.26.1
 
 ### Patch Changes

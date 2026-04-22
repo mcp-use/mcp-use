@@ -11,12 +11,25 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/client/components/ui/dropdown-menu";
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
 import {
   ArrowUpRight,
   Bell,
+  Bug,
   Check,
   CheckSquare,
   ChevronDown,
@@ -30,8 +43,13 @@ import {
   Loader2,
   MessageCircle,
   MessageSquare,
+  Monitor,
+  Moon,
   Plus,
+  Rocket,
+  Settings,
   Square,
+  SunDim,
   Wrench,
 } from "lucide-react";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
@@ -39,12 +57,19 @@ import type { McpServer } from "mcp-use/react";
 import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
+import { HostedUserMenu } from "@/client/components/HostedUserMenu";
+import { getServerDisplayName } from "@/client/utils/serverNames";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import { useTheme } from "@/client/context/ThemeContext";
+import {
+  MCPTunnelActionEvent,
+  MCPDeployClickEvent,
+  Telemetry,
+} from "@/client/telemetry";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
 import { ServerDropdown } from "./ServerDropdown";
-import { ThemeToggle } from "./ThemeToggle";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -61,14 +86,15 @@ interface LayoutHeaderProps {
 }
 
 const tabs = [
+  { id: "chat", label: "Chat", icon: MessageCircle, alwaysExpanded: true },
+  { id: "separator" },
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "prompts", label: "Prompts", icon: MessageSquare },
   { id: "resources", label: "Resources", icon: FolderOpen },
   { id: "sampling", label: "Sampling", icon: Hash },
   { id: "elicitation", label: "Elicitation", icon: CheckSquare },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "chat", label: "Chat", icon: MessageCircle },
-];
+] as const;
 
 function getTabCount(tabId: string, server: MCPConnection): number {
   if (tabId === "tools") {
@@ -329,6 +355,7 @@ function TunnelBadge({
     }
     setTunnelPhaseMessage(TUNNEL_PHASE.starting);
     setIsTunnelStarting(true);
+    let success = false;
     try {
       const res = await fetch("/inspector/api/dev/start-tunnel", {
         method: "POST",
@@ -341,15 +368,24 @@ function TunnelBadge({
       }
       // Server is restarting — poll until the new instance with tunnel is up
       await pollAndReconnect(true);
+      success = true;
     } catch {
       toast.error("Failed to start tunnel");
       setIsTunnelStarting(false);
+    }
+    try {
+      Telemetry.getInstance()
+        .capture(new MCPTunnelActionEvent({ action: "start", success }))
+        .catch(() => {});
+    } catch {
+      // ignore telemetry errors
     }
   };
 
   const handleStopTunnel = async () => {
     setTunnelPhaseMessage(TUNNEL_PHASE.stopping);
     setIsTunnelStarting(true);
+    let success = false;
     try {
       const res = await fetch("/inspector/api/dev/stop-tunnel", {
         method: "POST",
@@ -364,9 +400,23 @@ function TunnelBadge({
       setPopoverOpen(false);
       // Server is restarting — poll until the new instance without tunnel is up
       await pollAndReconnect(false);
+      success = true;
     } catch {
       toast.error("Failed to stop tunnel");
       setIsTunnelStarting(false);
+    }
+    try {
+      Telemetry.getInstance()
+        .capture(
+          new MCPTunnelActionEvent({
+            action: "stop",
+            success,
+            tunnelUrl: tunnelUrl,
+          })
+        )
+        .catch(() => {});
+    } catch {
+      // ignore telemetry errors
     }
   };
 
@@ -374,10 +424,10 @@ function TunnelBadge({
     return (
       <button
         disabled
-        className="flex items-center gap-2 h-9 px-3 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-full opacity-75 cursor-wait"
+        className="flex items-center gap-2 h-9 px-3 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded-full opacity-75 cursor-wait"
       >
-        <Loader2 className="size-4 text-zinc-500 dark:text-zinc-400 animate-spin" />
-        <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300 hidden lg:inline">
+        <Loader2 className="size-4 text-violet-500 dark:text-violet-400 animate-spin" />
+        <span className="text-sm font-medium text-violet-600 dark:text-violet-300 hidden lg:inline">
           Start Tunnel <span className="tabular-nums">{waitTicks}s</span>
         </span>
       </button>
@@ -402,16 +452,16 @@ function TunnelBadge({
         className={cn(
           "flex items-center gap-2 h-9 px-3 border rounded-full transition-colors",
           canStart && !loadingDev
-            ? "bg-zinc-100 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer"
-            : "bg-zinc-100/60 dark:bg-zinc-800/60 border-zinc-200 dark:border-zinc-700 cursor-not-allowed opacity-70"
+            ? "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/50 cursor-pointer"
+            : "bg-violet-50/60 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800 cursor-not-allowed opacity-70"
         )}
       >
         {loadingDev ? (
-          <Loader2 className="size-4 text-zinc-500 dark:text-zinc-400 animate-spin" />
+          <Loader2 className="size-4 text-violet-500 dark:text-violet-400 animate-spin" />
         ) : (
-          <ChevronsLeftRightEllipsis className="size-4 text-zinc-500 dark:text-zinc-400" />
+          <ChevronsLeftRightEllipsis className="size-4 text-violet-500 dark:text-violet-400" />
         )}
-        <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300 hidden lg:inline">
+        <span className="text-sm font-medium text-violet-600 dark:text-violet-300 hidden lg:inline">
           Start Tunnel
         </span>
       </button>
@@ -538,6 +588,7 @@ export function LayoutHeader({
     setIsTunnelStarting,
     embeddedConfig,
   } = useInspector();
+  const { theme, setTheme } = useTheme();
   const showTunnelBadge =
     !!selectedServer &&
     (isLocalhostServerUrl(selectedServer.url) ||
@@ -548,6 +599,7 @@ export function LayoutHeader({
   const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
 
   const [collapsed, setCollapsed] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // In single-tab mode, hide the entire header
   if (embeddedConfig.singleTab) {
@@ -556,7 +608,11 @@ export function LayoutHeader({
 
   // Filter tabs based on visibleTabs config
   const filteredTabs = embeddedConfig.visibleTabs
-    ? tabs.filter((t) => embeddedConfig.visibleTabs!.includes(t.id as TabType))
+    ? tabs.filter(
+        (t) =>
+          t.id === "separator" ||
+          embeddedConfig.visibleTabs!.includes(t.id as TabType)
+      )
     : tabs;
 
   const handleCopy = async () => {
@@ -604,11 +660,7 @@ export function LayoutHeader({
             <div className="flex-1 flex justify-end items-center gap-2">
               {selectedServer &&
                 (() => {
-                  // Extract display name the same way ServerDropdown does
-                  const displayName =
-                    selectedServer.serverInfo?.title ||
-                    selectedServer.serverInfo?.name ||
-                    selectedServer.name;
+                  const displayName = getServerDisplayName(selectedServer);
                   return (
                     <>
                       <AddToClientDropdown
@@ -694,25 +746,116 @@ export function LayoutHeader({
                     </>
                   );
                 })()}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" asChild>
+              {/* Tunnel Badge - Mobile */}
+              {showTunnelBadge && (
+                <TunnelBadge
+                  tunnelUrl={tunnelUrl}
+                  isTunnelStarting={isTunnelStarting}
+                  setTunnelUrl={setTunnelUrl}
+                  setIsTunnelStarting={setIsTunnelStarting}
+                  copied={copied}
+                  setCopied={setCopied}
+                  handleCopy={handleCopy}
+                />
+              )}
+              <Button
+                asChild
+                size="sm"
+                className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3"
+              >
+                <a
+                  href={
+                    isLoggedIn
+                      ? "https://manufact.com/cloud?ref=mcp-use-inspector"
+                      : "https://manufact.com/signup?ref=mcp-use-inspector"
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => {
+                    try {
+                      Telemetry.getInstance()
+                        .capture(
+                          new MCPDeployClickEvent({
+                            referrer: "mcp-use-inspector",
+                          })
+                        )
+                        .catch(() => {});
+                    } catch {
+                      // ignore telemetry errors
+                    }
+                  }}
+                >
+                  <Rocket className="size-4" />
+                </a>
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"
+                    aria-label="Settings"
+                  >
+                    <Settings className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      {theme === "light" ? (
+                        <SunDim className="size-4 mr-2" />
+                      ) : theme === "dark" ? (
+                        <Moon className="size-4 mr-2" />
+                      ) : (
+                        <Monitor className="size-4 mr-2" />
+                      )}
+                      Theme
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuRadioGroup
+                        value={theme}
+                        onValueChange={(v) =>
+                          setTheme(v as "light" | "dark" | "system")
+                        }
+                      >
+                        <DropdownMenuRadioItem value="light">
+                          <SunDim className="size-4 mr-2" />
+                          Light
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="dark">
+                          <Moon className="size-4 mr-2" />
+                          Dark
+                        </DropdownMenuRadioItem>
+                        <DropdownMenuRadioItem value="system">
+                          <Monitor className="size-4 mr-2" />
+                          System
+                        </DropdownMenuRadioItem>
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
                     <a
                       href="https://github.com/mcp-use/mcp-use"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2"
-                      aria-label="GitHub"
                     >
-                      <GithubIcon className="h-4 w-4" />
+                      <GithubIcon className="h-4 w-4 mr-2" />
+                      GitHub
                     </a>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Give us a star ⭐</p>
-                </TooltipContent>
-              </Tooltip>
-              <ThemeToggle />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a
+                      href="https://github.com/mcp-use/mcp-use/issues/new?labels=inspector&template=bug_report.md&title=%5BInspector%5D+"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Bug className="size-4 mr-2" />
+                      Report a Bug
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -728,6 +871,14 @@ export function LayoutHeader({
             >
               <TabsList className="w-full justify-center">
                 {filteredTabs.map((tab) => {
+                  if (tab.id === "separator") {
+                    return (
+                      <div
+                        key="separator"
+                        className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
+                      />
+                    );
+                  }
                   const count = getTabCount(tab.id, selectedServer);
                   const showDot = shouldShowDot(tab.id, count, collapsed);
 
@@ -738,6 +889,9 @@ export function LayoutHeader({
                       data-testid={`tab-${tab.id}`}
                       icon={tab.icon}
                       showDot={showDot}
+                      alwaysExpanded={
+                        "alwaysExpanded" in tab && tab.alwaysExpanded
+                      }
                       className={cn(
                         "[&>svg]:mr-0 flex-1 flex-row gap-2 relative",
                         collapsed && "pl-2"
@@ -790,6 +944,14 @@ export function LayoutHeader({
               >
                 <TabsList className="overflow-x-auto" collapsible>
                   {filteredTabs.map((tab) => {
+                    if (tab.id === "separator") {
+                      return (
+                        <div
+                          key="separator"
+                          className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
+                        />
+                      );
+                    }
                     const count = getTabCount(tab.id, selectedServer);
                     const tooltipText =
                       count > 0 ? `${tab.label} (${count})` : tab.label;
@@ -797,10 +959,14 @@ export function LayoutHeader({
 
                     return (
                       <TabsTrigger
+                        key={tab.id}
                         value={tab.id}
                         data-testid={`tab-${tab.id}`}
                         icon={tab.icon}
                         showDot={showDot}
+                        alwaysExpanded={
+                          "alwaysExpanded" in tab && tab.alwaysExpanded
+                        }
                         className={cn(
                           "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
                           collapsed && "pl-4"
@@ -838,25 +1004,9 @@ export function LayoutHeader({
         {/* Right side: Tunnel Badge + Add to Client + Theme Toggle + Command Palette + GitHub Button + Logo - Hidden in embedded mode */}
         {!embedded && (
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-            {/* Tunnel Badge */}
-            {showTunnelBadge && (
-              <TunnelBadge
-                tunnelUrl={tunnelUrl}
-                isTunnelStarting={isTunnelStarting}
-                setTunnelUrl={setTunnelUrl}
-                setIsTunnelStarting={setIsTunnelStarting}
-                copied={copied}
-                setCopied={setCopied}
-                handleCopy={handleCopy}
-              />
-            )}
             {selectedServer &&
               (() => {
-                // Extract display name the same way ServerDropdown does
-                const displayName =
-                  selectedServer.serverInfo?.title ||
-                  selectedServer.serverInfo?.name ||
-                  selectedServer.name;
+                const displayName = getServerDisplayName(selectedServer);
                 return (
                   <>
                     <AddToClientDropdown
@@ -942,45 +1092,151 @@ export function LayoutHeader({
                   </>
                 );
               })()}
-            <ThemeToggle />
-            <Tooltip>
-              <TooltipTrigger asChild>
+            {/* Tunnel Badge */}
+            {showTunnelBadge && (
+              <TunnelBadge
+                tunnelUrl={tunnelUrl}
+                isTunnelStarting={isTunnelStarting}
+                setTunnelUrl={setTunnelUrl}
+                setIsTunnelStarting={setIsTunnelStarting}
+                copied={copied}
+                setCopied={setCopied}
+                handleCopy={handleCopy}
+              />
+            )}
+            <Button
+              asChild
+              className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4"
+            >
+              <a
+                href={
+                  isLoggedIn
+                    ? "https://manufact.com/cloud?ref=mcp-use-inspector"
+                    : "https://manufact.com/signup?ref=mcp-use-inspector"
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  try {
+                    Telemetry.getInstance()
+                      .capture(
+                        new MCPDeployClickEvent({
+                          referrer: "mcp-use-inspector",
+                        })
+                      )
+                      .catch(() => {});
+                  } catch {
+                    // ignore telemetry errors
+                  }
+                }}
+              >
+                <Rocket className="size-4" />
+                <span className="hidden sm:inline">Deploy</span>
+              </a>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full px-1 -mx-3 flex gap-1"
+                  size="sm"
+                  className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"
+                  aria-label="Settings"
+                >
+                  <Settings className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
                   onClick={onCommandPaletteOpen}
                   data-testid="command-palette-trigger-button"
                 >
-                  <Command className="size-4" />
-                  <span className="text-base font-mono hidden sm:inline">
-                    K
+                  <Command className="size-4 mr-2" />
+                  Command Palette
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {"\u2318"}K
                   </span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Command Palette</p>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="sm" asChild>
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    {theme === "light" ? (
+                      <SunDim className="size-4 mr-2" />
+                    ) : theme === "dark" ? (
+                      <Moon className="size-4 mr-2" />
+                    ) : (
+                      <Monitor className="size-4 mr-2" />
+                    )}
+                    Theme
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuRadioGroup
+                      value={theme}
+                      onValueChange={(v) =>
+                        setTheme(v as "light" | "dark" | "system")
+                      }
+                    >
+                      <DropdownMenuRadioItem value="light">
+                        <SunDim className="size-4 mr-2" />
+                        Light
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="dark">
+                        <Moon className="size-4 mr-2" />
+                        Dark
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="system">
+                        <Monitor className="size-4 mr-2" />
+                        System
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
                   <a
                     href="https://github.com/mcp-use/mcp-use"
-                    className="flex items-center gap-2"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <GithubIcon className="h-4 w-4" />
-                    <span className="hidden xl:inline">Github</span>
+                    <GithubIcon className="h-4 w-4 mr-2" />
+                    GitHub
                   </a>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Give us a star ⭐</p>
-              </TooltipContent>
-            </Tooltip>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a
+                    href="https://github.com/mcp-use/mcp-use/issues/new?labels=inspector&template=bug_report.md&title=%5BInspector%5D+"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Bug className="size-4 mr-2" />
+                    Report a Bug
+                  </a>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-            <LogoAnimated state="expanded" />
+            {/* In hosted mode: avatar left, logo right.
+                Logo is always visible at ≥1400px; at narrower widths it falls
+                back as a placeholder only when the user is unauthenticated. */}
+            {embeddedConfig.chatApiUrl ? (
+              <div className="flex items-center gap-2">
+                {/* Avatar (or nothing when unauthenticated — logo handles branding) */}
+                <HostedUserMenu
+                  chatApiUrl={embeddedConfig.chatApiUrl}
+                  onUserResolved={(u) => setIsLoggedIn(!!u)}
+                  fallback={
+                    /* Narrow screens only: show logo as fallback when not authed */
+                    <span className="[@media(min-width:1400px)]:hidden">
+                      <LogoAnimated state="expanded" />
+                    </span>
+                  }
+                />
+                {/* Logo: always visible at ≥1400px (rightmost) */}
+                <span className="hidden [@media(min-width:1400px)]:block">
+                  <LogoAnimated state="expanded" />
+                </span>
+              </div>
+            ) : (
+              <LogoAnimated state="expanded" />
+            )}
           </div>
         )}
       </div>
