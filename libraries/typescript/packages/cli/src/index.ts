@@ -327,6 +327,13 @@ async function findServerFile(projectPath: string): Promise<string> {
   throw new Error("No server file found");
 }
 
+function isBunRuntime(): boolean {
+  return (
+    typeof (globalThis as any).Bun !== "undefined" ||
+    typeof (process.versions as any).bun === "string"
+  );
+}
+
 async function generateToolRegistryTypesForServer(
   projectPath: string,
   serverFileRelative: string
@@ -338,6 +345,23 @@ async function generateToolRegistryTypesForServer(
 
   if (!serverFileExists) {
     throw new Error(`Server file not found: ${serverFile}`);
+  }
+
+  // `tsx/esm/api` uses Node's custom loader hooks, which bun doesn't
+  // implement. Under bun we can't generate the registry types at build
+  // time; skip with a clear note so the build continues.
+  if (isBunRuntime()) {
+    console.log(
+      chalk.yellow(
+        "⚠ Skipping tool registry type generation under bun runtime (requires Node.js loader hooks)."
+      )
+    );
+    console.log(
+      chalk.gray(
+        "  Run `mcp-use generate-types` with node to refresh .mcp-use/tool-registry.d.ts."
+      )
+    );
+    return false;
   }
 
   const previousHmrMode = (globalThis as any).__mcpUseHmrMode;
@@ -1135,16 +1159,30 @@ program
 
       if (sourceServerFile) {
         console.log(chalk.gray("Generating tool registry types..."));
-        const typeGenOk = await generateToolRegistryTypesForServer(
-          projectPath,
-          sourceServerFile
-        );
-        if (typeGenOk) {
-          console.log(chalk.green("✓ Tool registry types generated"));
-        } else {
+        // Type generation is a dev convenience (regenerates
+        // .mcp-use/tool-registry.d.ts). Keep it non-fatal during build so
+        // a runtime without the right loader hooks (e.g. bun alpine) or
+        // an unrelated import-time error in the server file can't block
+        // the Docker build.
+        try {
+          const typeGenOk = await generateToolRegistryTypesForServer(
+            projectPath,
+            sourceServerFile
+          );
+          if (typeGenOk) {
+            console.log(chalk.green("✓ Tool registry types generated"));
+          } else {
+            console.log(
+              chalk.yellow(
+                "⚠ Tool registry type generation had errors (non-blocking)"
+              )
+            );
+          }
+        } catch (err) {
           console.log(
             chalk.yellow(
-              "⚠ Tool registry type generation had errors (non-blocking)"
+              "⚠ Tool registry type generation failed (non-blocking): " +
+                (err instanceof Error ? err.message : String(err))
             )
           );
         }
@@ -1161,22 +1199,21 @@ program
       // prevent npx from auto-installing the unrelated `tsc@2.0.4` package.
       if (options.typecheck !== false) {
         console.log(chalk.gray("Type checking..."));
+        // Use the current runtime binary (`process.execPath`) rather than
+        // hardcoding "node". Alpine images built on `oven/bun:alpine`
+        // don't ship a `node` binary, and bun runs tsc fine.
+        const tscBin = path.join(
+          projectPath,
+          "node_modules",
+          "typescript",
+          "bin",
+          "tsc"
+        );
+        const tscArgs = isBunRuntime()
+          ? [tscBin, "--noEmit"]
+          : ["--max-old-space-size=4096", tscBin, "--noEmit"];
         try {
-          await runCommand(
-            "node",
-            [
-              "--max-old-space-size=4096",
-              path.join(
-                projectPath,
-                "node_modules",
-                "typescript",
-                "bin",
-                "tsc"
-              ),
-              "--noEmit",
-            ],
-            projectPath
-          ).promise;
+          await runCommand(process.execPath, tscArgs, projectPath).promise;
           console.log(chalk.green("✓ Type check passed!"));
         } catch {
           console.error(
