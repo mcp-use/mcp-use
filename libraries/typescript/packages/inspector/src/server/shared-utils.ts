@@ -568,7 +568,7 @@ export interface WidgetData {
     };
   };
   // MCP Apps (SEP-1865) support
-  protocol?: "mcp-apps" | "chatgpt-app";
+  protocol?: "mcp-apps";
   toolName?: string;
   mimeType?: string;
   mcpAppsCsp?: {

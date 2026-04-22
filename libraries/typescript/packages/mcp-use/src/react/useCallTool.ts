@@ -190,23 +190,13 @@ export function useCallTool(name: string): any {
     try {
       let raw: any;
 
-      // Detect provider and call tool
-      if (typeof window !== "undefined") {
-        if (window.openai?.callTool) {
-          // OpenAI Apps SDK
-          raw = await window.openai.callTool(
-            name,
-            args as Record<string, unknown>
-          );
-        } else if (window !== window.parent) {
-          // MCP Apps bridge
-          const bridge = getMcpAppsBridge();
-          raw = await bridge.callTool(name, args as Record<string, unknown>);
-        } else {
-          throw new Error("No tool calling interface available");
-        }
+      // Call via MCP Apps bridge
+      if (typeof window !== "undefined" && window !== window.parent) {
+        // MCP Apps bridge
+        const bridge = getMcpAppsBridge();
+        raw = await bridge.callTool(name, args as Record<string, unknown>);
       } else {
-        throw new Error("useCallTool can only be used in browser environment");
+        throw new Error("MCP Apps bridge is not available");
       }
 
       const normalized = normalizeCallToolResponse(raw);

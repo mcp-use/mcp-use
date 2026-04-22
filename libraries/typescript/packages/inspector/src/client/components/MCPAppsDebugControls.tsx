@@ -66,8 +66,6 @@ interface MCPAppsDebugControlsProps {
   onPropsChange?: (props: Record<string, string> | null) => void;
   /** When set, auto-opens the props popover with a hint listing these required prop names */
   requiredProps?: string[];
-  // Dual-protocol support
-  protocol?: "apps-sdk" | "mcp-apps";
   onUpdateGlobals?: (updates: {
     displayMode?: "inline" | "pip" | "fullscreen";
     theme?: "light" | "dark";
@@ -227,7 +225,7 @@ function buildAgentCspPrompt(
   if (suggestedFix) {
     lines.push("**Apply this CSP config to fix the violations:**");
     lines.push(
-      'Add these domains to the widget\'s CSP metadata (appsSdkMetadata["openai/widgetCSP"] or resource _meta.ui.csp). Use camelCase for MCP Apps (connectDomains, resourceDomains) or snake_case for OpenAI format (connect_domains, resource_domains).'
+      "Add these domains to the widget's CSP metadata (resource _meta.ui.csp). Use camelCase keys: connectDomains, resourceDomains."
     );
     lines.push("");
     lines.push("```json");
@@ -264,7 +262,6 @@ export function MCPAppsDebugControls({
   resource,
   onPropsChange,
   requiredProps,
-  protocol = "mcp-apps",
   onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
   const { playground, updatePlaygroundSettings, widgets, clearCspViolations } =
@@ -288,7 +285,6 @@ export function MCPAppsDebugControls({
       : "";
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
-  const isAppsSdk = protocol === "apps-sdk";
 
   // Props management
   const {
@@ -492,15 +488,6 @@ export function MCPAppsDebugControls({
                     updatePlaygroundSettings({
                       deviceType: device.value as any,
                     });
-                    // Update Apps SDK userAgent.device.type
-                    if (isAppsSdk && onUpdateGlobals) {
-                      onUpdateGlobals({
-                        userAgent: {
-                          device: { type: device.value },
-                          capabilities: playground.capabilities,
-                        },
-                      });
-                    }
                     setDeviceDialogOpen(false);
                   }}
                 >
@@ -552,10 +539,6 @@ export function MCPAppsDebugControls({
                     data-testid={`debugger-locale-option-${locale.value}`}
                     onSelect={() => {
                       updatePlaygroundSettings({ locale: locale.value });
-                      // Update Apps SDK locale
-                      if (isAppsSdk && onUpdateGlobals) {
-                        onUpdateGlobals({ locale: locale.value });
-                      }
                       setLocaleDialogOpen(false);
                     }}
                   >
@@ -568,9 +551,8 @@ export function MCPAppsDebugControls({
         </DialogContent>
       </Dialog>
 
-      {/* Timezone - only for MCP Apps (not supported by Apps SDK) */}
-      {!isAppsSdk && (
-        <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
+      {/* Timezone */}
+      <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
           <Tooltip>
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
@@ -619,9 +601,8 @@ export function MCPAppsDebugControls({
             </Command>
           </DialogContent>
         </Dialog>
-      )}
 
-      {/* CSP Mode — shown for both MCP Apps and Apps SDK */}
+      {/* CSP Mode */}
       <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -935,15 +916,6 @@ export function MCPAppsDebugControls({
               updatePlaygroundSettings({
                 capabilities: newCapabilities,
               });
-              // Update Apps SDK userAgent.capabilities
-              if (isAppsSdk && onUpdateGlobals) {
-                onUpdateGlobals({
-                  userAgent: {
-                    device: { type: playground.deviceType },
-                    capabilities: newCapabilities,
-                  },
-                });
-              }
             }}
           >
             <Pointer
@@ -980,15 +952,6 @@ export function MCPAppsDebugControls({
               updatePlaygroundSettings({
                 capabilities: newCapabilities,
               });
-              // Update Apps SDK userAgent.capabilities
-              if (isAppsSdk && onUpdateGlobals) {
-                onUpdateGlobals({
-                  userAgent: {
-                    device: { type: playground.deviceType },
-                    capabilities: newCapabilities,
-                  },
-                });
-              }
             }}
           >
             <MousePointer2
@@ -1027,10 +990,6 @@ export function MCPAppsDebugControls({
               value={playground.safeAreaInsets}
               onChange={(insets) => {
                 updatePlaygroundSettings({ safeAreaInsets: insets });
-                // Update Apps SDK safeArea
-                if (isAppsSdk && onUpdateGlobals) {
-                  onUpdateGlobals({ safeArea: { insets } });
-                }
               }}
             />
           </div>

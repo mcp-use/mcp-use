@@ -1,7 +1,7 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { Wrench } from "lucide-react";
 import { ListItem } from "@/client/components/shared";
-import { McpIcon, OpenAIIcon } from "@/client/components/ui/client-icons";
+import { McpIcon } from "@/client/components/ui/client-icons";
 import { Badge } from "@/client/components/ui/badge";
 import {
   Tooltip,
@@ -58,7 +58,6 @@ export function ToolsList({
         );
         const hasWidgetIcons =
           protocol === "mcp-apps" ||
-          protocol === "chatgpt-app" ||
           protocol === "both";
         const metadata =
           hasWidgetIcons || paramsBadge ? (
@@ -72,18 +71,6 @@ export function ToolsList({
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>MCP-APP</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-              {(protocol === "chatgpt-app" || protocol === "both") && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <OpenAIIcon className="h-3.5 w-3.5" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Apps SDK</p>
                   </TooltipContent>
                 </Tooltip>
               )}

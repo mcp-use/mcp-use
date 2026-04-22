@@ -20,7 +20,6 @@ import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
-import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { Spinner } from "../ui/spinner";
 
@@ -29,7 +28,7 @@ export interface ResourceResult {
   result?: ReadResourceResult | { error?: string; isError?: boolean };
   error?: string;
   timestamp: number;
-  // Resource metadata from definition (includes openai/outputTemplate in annotations)
+  // Resource metadata from definition
   resourceAnnotations?: Record<string, unknown>;
 }
 
@@ -114,53 +113,6 @@ export function ResourceResultDisplay({
   // 1. Resource annotations from the resource list (resourceAnnotations)
   // 2. _meta field in the resource contents when read
   let openaiAnnotations: string[] = [];
-  let openaiOutputTemplate: string | undefined;
-
-  // Check resource annotations first
-  if (result?.resourceAnnotations) {
-    openaiAnnotations = Object.keys(result.resourceAnnotations).filter((key) =>
-      key.startsWith("openai/")
-    );
-    openaiOutputTemplate = result.resourceAnnotations[
-      "openai/outputTemplate"
-    ] as string;
-  }
-
-  // Also check _meta in contents (this is where OpenAI metadata often appears)
-  if (
-    result?.result &&
-    "contents" in result.result &&
-    Array.isArray(result.result.contents) &&
-    result.result.contents[0]?._meta
-  ) {
-    const contentMeta = result.result.contents[0]._meta;
-    const metaKeys = Object.keys(contentMeta).filter((key) =>
-      key.startsWith("openai/")
-    );
-    if (metaKeys.length > 0) {
-      openaiAnnotations = [...openaiAnnotations, ...metaKeys];
-    }
-    // If we don't have outputTemplate yet, check in _meta
-    if (!openaiOutputTemplate && contentMeta["openai/outputTemplate"]) {
-      openaiOutputTemplate = contentMeta["openai/outputTemplate"] as string;
-    }
-    // For resources, the URI itself might be the widget location
-    if (
-      !openaiOutputTemplate &&
-      result.uri &&
-      result.uri.startsWith("ui://widget/")
-    ) {
-      openaiOutputTemplate = result.uri;
-    }
-  }
-
-  const hasOpenAIComponent = !!(
-    openaiAnnotations.length > 0 &&
-    openaiOutputTemplate &&
-    typeof openaiOutputTemplate === "string" &&
-    serverId &&
-    readResource
-  );
 
   // Extract complete metadata from result contents for props configuration
   const contentMetadata =
@@ -328,7 +280,7 @@ export function ResourceResultDisplay({
           )}
         </div>
         <div className="flex items-center gap-1">
-          {(hasMcpAppsResource || hasMcpUIResources || hasOpenAIComponent) && (
+          {(hasMcpAppsResource || hasMcpUIResources) && (
             <Button
               variant="ghost"
               size="sm"
@@ -344,9 +296,7 @@ export function ResourceResultDisplay({
               )}
               {previewMode
                 ? "JSON"
-                : hasOpenAIComponent
-                  ? "Component"
-                  : "Preview"}
+                : "Preview"}
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onCopy}>
@@ -433,51 +383,6 @@ export function ResourceResultDisplay({
                   <JSONDisplay
                     data={result.result}
                     filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-apps-${Date.now()}.json`}
-                  />
-                </div>
-              );
-            }
-          }
-
-          // Priority 2: Handle OpenAI Apps SDK components
-          if (
-            hasOpenAIComponent &&
-            serverId &&
-            readResource &&
-            openaiOutputTemplate
-          ) {
-            if (previewMode) {
-              // OpenAI Apps SDK Component mode
-              return (
-                <div className="flex-1 h-full relative">
-                  {needsProps ? (
-                    <div className="flex items-center justify-center w-full h-full min-h-[200px] rounded-xl border-2 border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800/50 m-4">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center px-6">
-                        This widget requires props, set or generate them in the
-                        props debugger
-                      </p>
-                    </div>
-                  ) : (
-                    <OpenAIComponentRenderer
-                      componentUrl={openaiOutputTemplate}
-                      toolName={result.uri}
-                      toolArgs={{}}
-                      toolResult={result.result}
-                      serverId={serverId}
-                      readResource={readResource}
-                      className="w-full h-full relative flex p-4"
-                      customProps={activeProps || undefined}
-                    />
-                  )}
-                </div>
-              );
-            } else {
-              // JSON mode for Apps SDK resources
-              return (
-                <div className="px-4 pt-4" data-testid="resource-result-json">
-                  <JSONDisplay
-                    data={result.result}
-                    filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
                   />
                 </div>
               );

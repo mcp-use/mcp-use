@@ -31,8 +31,7 @@ interface McpUseProviderProps {
   viewControls?: boolean | "pip" | "fullscreen";
   /**
    * Automatically notify host about container height changes for auto-sizing
-   * Supports both ChatGPT Apps SDK (window.openai) and MCP Apps (postMessage bridge)
-   * Uses ResizeObserver to monitor the children container
+   * Uses MCP Apps (postMessage bridge) and ResizeObserver to monitor the children container
    * @default false
    */
   autoSize?: boolean;
@@ -69,30 +68,13 @@ export function McpUseProvider({
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationInProgressRef = useRef<boolean>(false);
 
-  // Notify host about height changes (dual-protocol support)
+  // Notify host about height changes via MCP Apps bridge
   const notifyHeight = useCallback((height: number) => {
     if (typeof window === "undefined") return;
 
     notificationInProgressRef.current = true;
 
-    // Try ChatGPT Apps SDK first
-    if (window.openai?.notifyIntrinsicHeight) {
-      window.openai
-        .notifyIntrinsicHeight(height)
-        .then(() => {
-          notificationInProgressRef.current = false;
-        })
-        .catch((error) => {
-          notificationInProgressRef.current = false;
-          console.error(
-            "[McpUseProvider] Failed to notify intrinsic height (ChatGPT):",
-            error
-          );
-        });
-      return;
-    }
-
-    // Fall back to MCP Apps bridge
+    // Use MCP Apps bridge
     // Always try to send - the bridge will handle if not connected yet
     try {
       const bridge = getMcpAppsBridge();

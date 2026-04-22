@@ -17,7 +17,7 @@ import {
   useState,
 } from "react";
 
-export type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
+export type WidgetProtocol = "mcp-apps" | "mcp-ui";
 
 export interface CspViolation {
   directive: string;
@@ -63,7 +63,7 @@ export interface PlaygroundSettings {
   locale: string;
   timeZone: string;
   // Protocol selection for dual-protocol tools
-  selectedProtocol: "mcp-apps" | "chatgpt-app" | null; // null = use default (MCP Apps priority)
+  selectedProtocol: "mcp-apps" | null; // null = use default
 }
 
 interface WidgetDebugState {

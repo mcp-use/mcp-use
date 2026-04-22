@@ -7,13 +7,12 @@
 
 export type WidgetProtocol =
   | "mcp-apps"
-  | "chatgpt-app"
   | "mcp-ui"
-  | "both" // Tool supports both MCP Apps and ChatGPT Apps SDK
+  | "both"
   | null;
 
 /**
- * Detect if a tool supports BOTH MCP Apps and ChatGPT Apps SDK
+ * Detect if a tool supports BOTH MCP Apps protocols (kept for API compatibility)
  *
  * @param toolMeta - Tool metadata from tool definition (_meta field)
  * @returns True if tool has both protocols
@@ -22,11 +21,7 @@ export function hasBothProtocols(toolMeta?: Record<string, any>): boolean {
   const hasMcpApps =
     toolMeta?.ui?.resourceUri && typeof toolMeta.ui.resourceUri === "string";
 
-  const hasChatGptApp =
-    toolMeta?.["openai/outputTemplate"] &&
-    typeof toolMeta["openai/outputTemplate"] === "string";
-
-  return hasMcpApps && hasChatGptApp;
+  return !!hasMcpApps;
 }
 
 /**
@@ -40,13 +35,7 @@ export function detectWidgetProtocol(
   toolMeta?: Record<string, any>,
   toolResult?: any
 ): WidgetProtocol {
-  // Priority 0: Check for both protocols first
-  if (hasBothProtocols(toolMeta)) {
-    return "both";
-  }
-
   // Priority 1: MCP Apps (SEP-1865)
-  // Check for ui.resourceUri in tool metadata
   if (
     toolMeta?.ui?.resourceUri &&
     typeof toolMeta.ui.resourceUri === "string"
@@ -54,17 +43,7 @@ export function detectWidgetProtocol(
     return "mcp-apps";
   }
 
-  // Priority 2: ChatGPT Apps SDK
-  // Check for openai/outputTemplate in tool metadata
-  if (
-    toolMeta?.["openai/outputTemplate"] &&
-    typeof toolMeta["openai/outputTemplate"] === "string"
-  ) {
-    return "chatgpt-app";
-  }
-
-  // Priority 3: MCP-UI (inline ui:// resource)
-  // Check for ui:// resources in result content that are NOT MCP Apps or ChatGPT Apps
+  // Priority 2: MCP-UI (inline ui:// resource)
   if (hasInlineUIResource(toolResult)) {
     return "mcp-ui";
   }
@@ -97,11 +76,8 @@ function hasInlineUIResource(toolResult?: any): boolean {
       return false;
     }
 
-    // Exclude MCP Apps and ChatGPT Apps
-    if (
-      mimeType === "text/html+skybridge" ||
-      mimeType === "text/html;profile=mcp-app"
-    ) {
+    // Exclude MCP Apps
+    if (mimeType === "text/html;profile=mcp-app") {
       return false;
     }
 
@@ -123,17 +99,12 @@ export function extractWidgetResourceUri(
     return toolMeta?.ui?.resourceUri || null;
   }
 
-  if (protocol === "chatgpt-app") {
-    return toolMeta?.["openai/outputTemplate"] || null;
-  }
-
   if (protocol === "mcp-ui") {
     // Find the first ui:// resource in content
     const resource = toolResult?.content?.find(
       (item: any) =>
         item.type === "resource" &&
         item.resource?.uri?.startsWith("ui://") &&
-        item.resource?.mimeType !== "text/html+skybridge" &&
         item.resource?.mimeType !== "text/html;profile=mcp-app"
     );
     return resource?.resource?.uri || null;
@@ -150,14 +121,11 @@ export function extractWidgetResourceUri(
  * @returns The resource URI or null
  */
 export function getResourceUriForProtocol(
-  protocol: "mcp-apps" | "chatgpt-app",
+  protocol: "mcp-apps",
   toolMeta?: Record<string, any>
 ): string | null {
   if (protocol === "mcp-apps") {
     return toolMeta?.ui?.resourceUri || null;
-  }
-  if (protocol === "chatgpt-app") {
-    return toolMeta?.["openai/outputTemplate"] || null;
   }
   return null;
 }

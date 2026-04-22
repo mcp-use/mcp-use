@@ -3,11 +3,8 @@ import type { MessageContentBlock } from "mcp-use/react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
-  getResourceUriForProtocol,
-  hasBothProtocols,
 } from "../../utils/widget-detection";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
-import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { Spinner } from "../ui/spinner";
 import { MCPUIResource } from "./MCPUIResource";
 
@@ -45,7 +42,7 @@ interface ToolResultRendererProps {
 }
 
 /**
- * Renders tool results - handles both OpenAI Apps SDK components and MCP-UI resources
+ * Renders tool results - handles MCP Apps components
  */
 export function ToolResultRenderer({
   toolName,
@@ -59,7 +56,6 @@ export function ToolResultRenderer({
   partialToolArgs,
   cancelled,
 }: ToolResultRendererProps) {
-  const { playground } = useWidgetDebug();
   const [resourceData, setResourceData] = useState<any>(null);
   const fetchedUriRef = useRef<string | null>(null);
 
@@ -96,26 +92,10 @@ export function ToolResultRenderer({
   );
 
   // Detect if tool supports both protocols
-  const supportsBothProtocols = useMemo(
-    () => hasBothProtocols(toolMeta),
-    [toolMetaJson]
-  );
+  const supportsBothProtocols = false;
 
-  // Determine active protocol based on toggle state
-  const activeProtocol = useMemo(() => {
-    if (!widgetProtocol) return null;
-
-    if (widgetProtocol === "both") {
-      // User has selected a protocol via toggle
-      if (playground.selectedProtocol) {
-        return playground.selectedProtocol;
-      }
-      // Default to MCP Apps when both exist (same as current priority)
-      return "mcp-apps";
-    }
-
-    return widgetProtocol;
-  }, [widgetProtocol, playground.selectedProtocol]);
+  // Determine active protocol
+  const activeProtocol = widgetProtocol;
 
   // Check if this is an MCP Apps tool
   const isMcpAppsTool = useMemo(
@@ -123,74 +103,20 @@ export function ToolResultRenderer({
     [activeProtocol]
   );
 
-  // Check if this is an OpenAI Apps SDK tool
-  const isAppsSdkTool = useMemo(
-    () => activeProtocol === "chatgpt-app",
-    [activeProtocol]
-  );
-
-  // Check if the result content has the Apps SDK resource embedded
-  const hasAppsSdkComponent = useMemo(
-    () =>
-      !!(
-        parsedResult?.content &&
-        Array.isArray(parsedResult.content) &&
-        parsedResult.content.some(
-          (item: any) =>
-            item.type === "resource" &&
-            item.resource?.uri?.startsWith("ui://") &&
-            item.resource?.mimeType === "text/html+skybridge"
-        )
-      ),
-    [parsedResult]
-  );
-
-  // Extract resource data when component is detected
-  const extractedResource = useMemo(() => {
-    if (hasAppsSdkComponent) {
-      const resourceItem = parsedResult.content.find(
-        (item: any) =>
-          item.type === "resource" &&
-          item.resource?.uri?.startsWith("ui://") &&
-          item.resource?.mimeType === "text/html+skybridge"
-      );
-      return resourceItem?.resource || null;
-    }
-    return null;
-  }, [hasAppsSdkComponent, parsedResult]);
-
   // Memoize toolArgs and parsedResult to prevent unnecessary re-renders in child renderers
-  // (same pattern as ToolResultDisplay - stabilizes refs so effects don't re-run on parent re-renders)
   const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
   const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
 
-  // Calculate resource URI outside of effect for stable dependency
+  // Calculate resource URI for MCP Apps
   const resourceUri = useMemo(() => {
-    if (supportsBothProtocols && activeProtocol) {
-      return getResourceUriForProtocol(activeProtocol as any, toolMeta);
-    } else if (isMcpAppsTool) {
+    if (isMcpAppsTool) {
       return toolMeta?.ui?.resourceUri || null;
-    } else if (isAppsSdkTool) {
-      return toolMeta?.["openai/outputTemplate"] || null;
     }
     return null;
-  }, [
-    supportsBothProtocols,
-    activeProtocol,
-    isMcpAppsTool,
-    isAppsSdkTool,
-    toolMetaJson,
-  ]);
+  }, [isMcpAppsTool, toolMetaJson]);
 
-  // Fetch resource for Apps SDK tools (when not embedded in result)
+  // Fetch resource for MCP Apps tools
   useEffect(() => {
-    // If resource is already embedded, use it
-    if (extractedResource) {
-      setResourceData(extractedResource);
-      fetchedUriRef.current = extractedResource.uri || null;
-      return;
-    }
-
     // If we've already fetched this URI, skip
     if (resourceUri && fetchedUriRef.current === resourceUri) {
       return;
@@ -223,14 +149,7 @@ export function ToolResultRenderer({
           fetchedUriRef.current = null;
         });
     }
-  }, [extractedResource, resourceUri, activeProtocol, readResource]);
-
-  const invokingText = toolMeta?.["openai/toolInvocation/invoking"] as
-    | string
-    | undefined;
-  const invokedText = toolMeta?.["openai/toolInvocation/invoked"] as
-    | string
-    | undefined;
+  }, [resourceUri, activeProtocol, readResource]);
 
   // Render toggle when both protocols are supported
   if (supportsBothProtocols && resourceData && serverId && readResource) {
@@ -253,22 +172,6 @@ export function ToolResultRenderer({
             onSendFollowUp={onSendFollowUp}
             serverBaseUrl={serverBaseUrl}
             cancelled={cancelled}
-          />
-        )}
-
-        {activeProtocol === "chatgpt-app" && (
-          <OpenAIComponentRenderer
-            componentUrl={resourceData.uri}
-            toolName={toolName}
-            toolArgs={memoizedToolArgs}
-            toolResult={memoizedResult}
-            serverId={serverId}
-            readResource={readResource}
-            noWrapper={true}
-            showConsole={false}
-            invoking={invokingText}
-            invoked={invokedText}
-            serverBaseUrl={serverBaseUrl}
           />
         )}
       </div>
@@ -302,34 +205,8 @@ export function ToolResultRenderer({
     );
   }
 
-  // Render OpenAI Apps SDK component (Priority 2)
-  // Render immediately if we have resourceUri from metadata, even if resourceData is still loading
-  if (
-    (isAppsSdkTool || hasAppsSdkComponent) &&
-    resourceUri &&
-    serverId &&
-    readResource
-  ) {
-    return (
-      <OpenAIComponentRenderer
-        componentUrl={resourceData?.uri || resourceUri}
-        toolName={toolName}
-        toolArgs={memoizedToolArgs}
-        toolResult={memoizedResult}
-        serverId={serverId}
-        readResource={readResource}
-        noWrapper={true}
-        className="my-4"
-        showConsole={false}
-        invoking={invokingText}
-        invoked={invokedText}
-        serverBaseUrl={serverBaseUrl}
-      />
-    );
-  }
-
   // Show loading state only if we don't have enough info to render
-  if ((isMcpAppsTool || isAppsSdkTool || hasAppsSdkComponent) && !resourceUri) {
+  if (isMcpAppsTool && !resourceUri) {
     return (
       <div className="flex items-center justify-center w-full h-[200px] rounded border">
         <Spinner className="size-5" />
@@ -337,10 +214,10 @@ export function ToolResultRenderer({
     );
   }
 
-  // Show error if MCP Apps or Apps SDK tool but missing serverId or readResource
-  if ((isMcpAppsTool || isAppsSdkTool) && (!serverId || !readResource)) {
+  // Show error if MCP Apps tool but missing serverId or readResource
+  if (isMcpAppsTool && (!serverId || !readResource)) {
     console.error(
-      "[ToolResultRenderer] Apps SDK tool but missing serverId or readResource:",
+      "[ToolResultRenderer] MCP Apps tool but missing serverId or readResource:",
       {
         toolName,
         hasServerId: !!serverId,
@@ -357,14 +234,13 @@ export function ToolResultRenderer({
     );
   }
 
-  // Extract and render MCP-UI resources (non-Apps SDK)
+  // Extract and render MCP-UI resources
   const mcpUIResources: any[] = [];
   if (parsedResult?.content && Array.isArray(parsedResult.content)) {
     for (const item of parsedResult.content) {
       if (
         item.type === "resource" &&
-        item.resource?.uri?.startsWith("ui://") &&
-        item.resource?.mimeType !== "text/html+skybridge" // Not Apps SDK
+        item.resource?.uri?.startsWith("ui://")
       ) {
         mcpUIResources.push(item.resource);
       }
@@ -387,8 +263,7 @@ export function ToolResultRenderer({
   // Debug: Log when we're not rendering anything
   console.log("[ToolResultRenderer] Not rendering (no UI resources found):", {
     toolName,
-    isAppsSdkTool,
-    hasAppsSdkComponent,
+    isMcpAppsTool,
     hasResourceData: !!resourceData,
     contentLength: parsedResult?.content?.length,
   });
