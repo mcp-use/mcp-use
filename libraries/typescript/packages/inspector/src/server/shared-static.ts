@@ -180,7 +180,7 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     />
     <meta
       property="og:image"
-      content="https://inspector.mcp-use.com/inspector/inspector-cover.png"
+      content="https://inspector-cdn.mcp-use.com/inspector-cover.png"
     />
     <meta property="og:image:alt" content="mcp-use MCP Inspector — test and debug MCP servers" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -193,7 +193,7 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     />
     <meta
       name="twitter:image"
-      content="https://inspector.mcp-use.com/inspector/inspector-cover.png"
+      content="https://inspector-cdn.mcp-use.com/inspector-cover.png"
     />
     <meta name="twitter:image:alt" content="mcp-use MCP Inspector — test and debug MCP servers" />
     <script>window.__INSPECTOR_VERSION__ = ${JSON.stringify(INSPECTOR_VERSION)};</script>
@@ -242,23 +242,6 @@ export function registerStaticRoutes(
         ? runtimeConfig.proxyUrl
         : "/inspector/api/proxy",
   };
-
-  // Serve the Open Graph social image from disk. Registered before the SPA /
-  // CDN-shell wildcards so it takes precedence, and registered in both modes
-  // because public/ files ship inside the npm package regardless of USE_CDN.
-  const coverDistPath = join(
-    clientDistPath || getClientDistPath(),
-    "inspector-cover.png"
-  );
-  app.get("/inspector/inspector-cover.png", (c) => {
-    if (existsSync(coverDistPath)) {
-      const content = readFileSync(coverDistPath);
-      c.header("Content-Type", "image/png");
-      c.header("Cache-Control", "public, max-age=86400");
-      return c.body(content);
-    }
-    return c.notFound();
-  });
 
   if (USE_CDN) {
     const serveShell = (c: any) =>
