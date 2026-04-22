@@ -184,36 +184,37 @@ export async function loginCommand(options?: {
     }
 
     if (await isLoggedIn()) {
-      const alreadyLoggedInMessage =
-        "You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account.";
+      let needsReauth = false;
       try {
-        const existingApi = await McpUseAPI.create();
-        await existingApi.testAuth();
-        if (!options?.silent) {
-          console.log(chalk.yellow(alreadyLoggedInMessage));
-        }
-        return;
+        await (await McpUseAPI.create()).testAuth();
       } catch (e) {
+        // Only a 401 means the stored key is actually bad. Network/disk
+        // errors get the benefit of the doubt so offline users aren't
+        // bounced into re-auth when we can't verify.
         if (e instanceof ApiUnauthorizedError) {
-          // Stored key is invalid/expired — clear it and re-auth.
-          if (!options?.silent) {
-            console.log(
-              chalk.yellow(
-                "⚠️  Stored credentials are invalid or expired. Re-authenticating..."
-              )
-            );
-          }
-          await deleteConfig();
-          // fall through to device-code flow below
-        } else {
-          // Network/other error: don't force the user through re-auth when we
-          // can't actually verify the stored key is bad.
-          if (!options?.silent) {
-            console.log(chalk.yellow(alreadyLoggedInMessage));
-          }
-          return;
+          needsReauth = true;
         }
       }
+
+      if (!needsReauth) {
+        if (!options?.silent) {
+          console.log(
+            chalk.yellow(
+              "You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account."
+            )
+          );
+        }
+        return;
+      }
+
+      if (!options?.silent) {
+        console.log(
+          chalk.yellow(
+            "⚠️  Stored credentials are invalid or expired. Re-authenticating..."
+          )
+        );
+      }
+      await deleteConfig();
     }
 
     console.log(chalk.cyan.bold("Logging in to mcp-use cloud...\n"));

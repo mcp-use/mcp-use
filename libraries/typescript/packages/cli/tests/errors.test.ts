@@ -2,21 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiUnauthorizedError } from "../src/utils/api.js";
 import { handleCommandError } from "../src/utils/errors.js";
 
-// Mock chalk so output is plain strings. Use a Proxy so arbitrary chain
-// accesses (chalk.red.bold.white, etc.) resolve without blowing the stack.
+// Mock chalk so output is plain strings. Covers the exact chains used by
+// handleCommandError (chalk.red, chalk.red.bold, chalk.gray, chalk.white).
 vi.mock("chalk", () => {
-  const makeChain = (): any => {
-    const fn = (s: string) => s;
-    return new Proxy(fn, {
-      get: (target, prop) => {
-        if (prop === "apply" || prop === "call" || prop === "bind") {
-          return (target as any)[prop].bind(target);
-        }
-        return makeChain();
-      },
-    });
-  };
-  return { default: makeChain() };
+  const id = (s: string) => s;
+  const red: any = Object.assign((s: string) => s, { bold: id });
+  return { default: { red, gray: id, white: id } };
 });
 
 describe("handleCommandError", () => {

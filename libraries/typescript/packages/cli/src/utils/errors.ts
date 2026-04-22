@@ -2,8 +2,8 @@ import chalk from "chalk";
 import { ApiUnauthorizedError } from "./api.js";
 
 /**
- * Print a friendly error and exit. Treats `ApiUnauthorizedError` (401) as a
- * "please re-authenticate" hint instead of surfacing the raw API response.
+ * Treats `ApiUnauthorizedError` (401) as a "please re-authenticate" hint
+ * instead of surfacing the raw API response.
  */
 export function handleCommandError(error: unknown, context: string): never {
   if (error instanceof ApiUnauthorizedError) {
