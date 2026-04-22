@@ -9,12 +9,28 @@ import {
   McpClientProvider,
   type McpServer,
 } from "mcp-use/react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
-import { InspectorProvider } from "./context/InspectorContext";
+import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+
+/**
+ * Syncs the active tab from InspectorContext into a ref readable by
+ * McpClientProvider callbacks defined outside the InspectorProvider tree.
+ */
+function InspectorTabSync({
+  activeTabRef,
+}: {
+  activeTabRef: React.MutableRefObject<string>;
+}) {
+  const { activeTab } = useInspector();
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+  }, [activeTab, activeTabRef]);
+  return null;
+}
 
 /**
  * Root React component that configures application providers, routing, and toast-based handlers for sampling and elicitation requests in the inspector UI.
@@ -24,6 +40,8 @@ import { WidgetDebugProvider } from "./context/WidgetDebugContext";
  * @returns The app's React element tree.
  */
 function App() {
+  const activeTabRef = useRef<string>("tools");
+
   // Check if embedded mode is active from URL params
   const urlParams = new URLSearchParams(window.location.search);
   const isEmbedded = urlParams.get("embedded") === "true";
@@ -122,6 +140,11 @@ function App() {
             _approve,
             reject
           ) => {
+            // When the chat tab is active, elicitation is rendered inline — no toast needed.
+            if (activeTabRef.current === "chat") {
+              return;
+            }
+
             const mode = request.request.mode || "form";
             const message = request.request.message;
             const url =
@@ -161,6 +184,7 @@ function App() {
           }}
         >
           <InspectorProvider>
+            <InspectorTabSync activeTabRef={activeTabRef} />
             <Router basename="/inspector">
               <Routes>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
