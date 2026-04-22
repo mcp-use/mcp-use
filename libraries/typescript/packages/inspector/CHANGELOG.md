@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 3.0.0-canary.8
+
+### Minor Changes
+
+- a0500f4: Elicitation requests triggered from the Chat tab now appear inline in the chat thread instead of routing users to a separate Elicitation tab via a toast. When triggered from the Tools tab, the existing toast behaviour is preserved. The Elicitation tab remains available as a fallback/audit view.
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.8
+
 ## 3.0.0-canary.7
 
 ### Patch Changes
