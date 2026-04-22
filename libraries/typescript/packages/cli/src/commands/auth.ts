@@ -9,7 +9,7 @@ import {
   readConfig,
   writeConfig,
 } from "../utils/config.js";
-import type { OrgInfo } from "../utils/api.js";
+import type { AuthTestResponse, OrgInfo } from "../utils/api.js";
 
 const DEVICE_CLIENT_ID = "mcp-use-cli";
 const DEVICE_POLL_TIMEOUT = 1800000; // 30 minutes
@@ -258,10 +258,19 @@ export async function loginCommand(options?: {
 
     console.log(chalk.green.bold("\n✓ Successfully logged in!"));
 
+    let authInfo: AuthTestResponse | null = null;
     try {
       const freshApi = await McpUseAPI.create();
-      const authInfo = await freshApi.testAuth();
+      authInfo = await freshApi.testAuth();
+    } catch {
+      console.log(
+        chalk.gray(
+          `\n  Your API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
+        )
+      );
+    }
 
+    if (authInfo) {
       console.log(chalk.cyan.bold("\nCurrent user:\n"));
       console.log(chalk.white("  Email:   ") + chalk.cyan(authInfo.email));
       console.log(chalk.white("  User ID: ") + chalk.gray(authInfo.user_id));
@@ -310,12 +319,6 @@ export async function loginCommand(options?: {
           );
         }
       }
-    } catch {
-      console.log(
-        chalk.gray(
-          `\n  Your API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
-        )
-      );
     }
 
     console.log(
