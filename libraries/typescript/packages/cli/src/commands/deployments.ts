@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { isLoggedIn } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 import { formatRelativeTime } from "../utils/format.js";
 
 async function prompt(question: string): Promise<boolean> {
@@ -96,11 +97,7 @@ async function listDeploymentsCommand(): Promise<void> {
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to list deployments:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to list deployments");
   }
 }
 
@@ -178,11 +175,7 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to get deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to get deployment");
   }
 }
 
@@ -276,11 +269,7 @@ async function restartDeploymentCommand(
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to restart deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to restart deployment");
   }
 }
 
@@ -328,11 +317,7 @@ async function deleteDeploymentCommand(
       chalk.green.bold(`\n✓ Deployment deleted: ${deployment.name}\n`)
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to delete deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to delete deployment");
   }
 }
 
@@ -459,11 +444,7 @@ async function logsCommand(
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to get logs:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to get logs");
   }
 }
 
@@ -484,11 +465,7 @@ async function stopDeploymentCommand(deploymentId: string): Promise<void> {
 
     console.log(chalk.green.bold(`\n✓ Deployment stopped\n`));
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to stop deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to stop deployment");
   }
 }
 
@@ -510,11 +487,7 @@ async function startDeploymentCommand(deploymentId: string): Promise<void> {
       )
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to start deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to start deployment");
   }
 }
 

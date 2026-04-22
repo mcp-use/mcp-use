@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import open from "open";
-import { McpUseAPI } from "../utils/api.js";
+import { ApiUnauthorizedError, McpUseAPI } from "../utils/api.js";
 import {
   deleteConfig,
   getApiKey,
@@ -9,6 +9,7 @@ import {
   readConfig,
   writeConfig,
 } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 import type { OrgInfo } from "../utils/api.js";
 
 const DEVICE_CLIENT_ID = "mcp-use-cli";
@@ -183,14 +184,36 @@ export async function loginCommand(options?: {
     }
 
     if (await isLoggedIn()) {
-      if (!options?.silent) {
-        console.log(
-          chalk.yellow(
-            "You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account."
-          )
-        );
+      const alreadyLoggedInMessage =
+        "You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account.";
+      try {
+        const existingApi = await McpUseAPI.create();
+        await existingApi.testAuth();
+        if (!options?.silent) {
+          console.log(chalk.yellow(alreadyLoggedInMessage));
+        }
+        return;
+      } catch (e) {
+        if (e instanceof ApiUnauthorizedError) {
+          // Stored key is invalid/expired — clear it and re-auth.
+          if (!options?.silent) {
+            console.log(
+              chalk.yellow(
+                "⚠️  Stored credentials are invalid or expired. Re-authenticating..."
+              )
+            );
+          }
+          await deleteConfig();
+          // fall through to device-code flow below
+        } else {
+          // Network/other error: don't force the user through re-auth when we
+          // can't actually verify the stored key is bad.
+          if (!options?.silent) {
+            console.log(chalk.yellow(alreadyLoggedInMessage));
+          }
+          return;
+        }
       }
-      return;
     }
 
     console.log(chalk.cyan.bold("Logging in to mcp-use cloud...\n"));
@@ -384,20 +407,7 @@ export async function whoamiCommand(): Promise<void> {
         );
       }
     }
-  } catch (error: any) {
-    if (error?.status === 401) {
-      console.error(
-        chalk.red("\nYour session has expired or your API key is invalid.")
-      );
-      console.log(
-        chalk.gray(`Run ${chalk.white("mcp-use login")} to re-authenticate.\n`)
-      );
-    } else {
-      console.error(
-        chalk.red.bold("\n✗ Failed to get user info:"),
-        chalk.red(error instanceof Error ? error.message : "Unknown error")
-      );
-    }
-    process.exit(1);
+  } catch (error) {
+    handleCommandError(error, "Failed to get user info");
   }
 }
