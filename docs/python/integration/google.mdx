@@ -49,7 +49,7 @@ uv pip install google-genai
         Next, instantiate the `GoogleMCPAdapter`. This adapter will be responsible for converting MCP constructs into a format Google can understand.
 
         ```python
-        from mcp_use.adapters import GoogleMCPAdapter
+        from mcp_use.agents.adapters import GoogleMCPAdapter
 
         # Creates the adapter for Google's format
         adapter = GoogleMCPAdapter()
@@ -208,7 +208,7 @@ from google import genai
 from google.genai import types
 
 from mcp_use import MCPClient
-from mcp_use.adapters import GoogleMCPAdapter
+from mcp_use.agents.adapters import GoogleMCPAdapter
 
 # This example demonstrates how to use our integration
 # adapters to use MCP tools and convert to the right format.
