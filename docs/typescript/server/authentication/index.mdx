@@ -91,26 +91,13 @@ Clients register and authenticate directly with the provider.
 - [WorkOS](/typescript/server/authentication/providers/workos) — Enterprise SSO via WorkOS AuthKit
 - [Supabase](/typescript/server/authentication/providers/supabase) — Authentication for Supabase projects
 - [Keycloak](/typescript/server/authentication/providers/keycloak) — Enterprise SSO with realm roles
-- [Custom Provider](/typescript/server/authentication/providers/custom) — Any provider with a custom `verifyToken` function
+- [Custom Provider](/typescript/server/authentication/providers/custom) — Any DCR-capable provider with a custom `verifyToken` function
 
 ### OAuth Proxy
 
-Use `oauthProxy` for providers that don't support remote client registration: Google, GitHub, Okta, Azure AD, or any provider where you register an application in a dashboard and receive a fixed `clientId`/`clientSecret`.
+For providers that don't support remote client registration — Google, GitHub, Okta, Azure AD, or any provider where you register an application in a dashboard and receive a fixed `clientId`/`clientSecret` — use `oauthProxy`:
 
-```typescript
-import { oauthProxy, jwksVerifier } from 'mcp-use/server'
-
-oauthProxy({
-  authEndpoint: '...',
-  tokenEndpoint: '...',
-  issuer: '...',
-  clientId: process.env.CLIENT_ID!,
-  clientSecret: process.env.CLIENT_SECRET,
-  verifyToken: jwksVerifier({ jwksUrl: '...', issuer: '...' }),
-})
-```
-
-The `jwksVerifier` helper handles JWT signature verification, issuer checking, and optional audience validation (when `audience` is passed) against a remote JWKS endpoint. For non-JWT providers (e.g. GitHub opaque tokens), pass a custom `verifyToken` function instead.
+- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) — Bridge non-DCR providers with pre-registered client credentials, including ready-to-copy configs for Google, Okta, Azure AD, Auth0, and GitHub.
 
 ## How it works
 

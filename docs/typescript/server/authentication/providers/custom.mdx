@@ -1,37 +1,39 @@
 ---
 title: "Custom Provider"
-description: "Use any OAuth provider with your MCP server"
+description: "Use any OAuth provider that supports Dynamic Client Registration with your MCP server"
 icon: "code"
 ---
 
-For providers that support Dynamic Client Registration (DCR), use `oauthCustomProvider`. For providers that don't support DCR (Google, GitHub, Okta, Azure AD), use [`oauthProxy`](/typescript/server/authentication/index#oauth-proxy) instead.
+Use `oauthCustomProvider` when your identity provider supports Dynamic Client Registration (DCR) and advertises a `registration_endpoint` in its OAuth metadata. Clients will discover the endpoints and register themselves directly with the upstream — your server only verifies the resulting tokens.
 
-## Custom Provider (DCR)
+<Note>
+  If your provider **doesn't** support DCR — Google, GitHub, Okta, Azure AD, or any provider where you register an app in a dashboard and receive a fixed `clientId`/`clientSecret` — use [`oauthProxy`](/typescript/server/authentication/providers/oauth-proxy) instead.
+</Note>
 
-Use `oauthCustomProvider` when your identity provider supports DCR and advertises a `registration_endpoint` in its OAuth metadata. Clients will discover the endpoints and register themselves directly with the upstream.
+## Quick start
 
 ```typescript
-import { MCPServer, oauthCustomProvider } from 'mcp-use/server'
-import { jwtVerify, createRemoteJWKSet } from 'jose'
+import { MCPServer, oauthCustomProvider } from "mcp-use/server";
+import { jwtVerify, createRemoteJWKSet } from "jose";
 
 const JWKS = createRemoteJWKSet(
-  new URL('https://auth.example.com/.well-known/jwks.json')
-)
+  new URL("https://auth.example.com/.well-known/jwks.json"),
+);
 
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
+  name: "my-server",
+  version: "1.0.0",
   oauth: oauthCustomProvider({
-    issuer: 'https://auth.example.com',
-    authEndpoint: 'https://auth.example.com/oauth/authorize',
-    tokenEndpoint: 'https://auth.example.com/oauth/token',
+    issuer: "https://auth.example.com",
+    authEndpoint: "https://auth.example.com/oauth/authorize",
+    tokenEndpoint: "https://auth.example.com/oauth/token",
 
     async verifyToken(token: string) {
       const result = await jwtVerify(token, JWKS, {
-        issuer: 'https://auth.example.com',
-        audience: 'your-audience',
-      })
-      return { payload: result.payload as Record<string, unknown> }
+        issuer: "https://auth.example.com",
+        audience: "your-audience",
+      });
+      return { payload: result.payload as Record<string, unknown> };
     },
 
     getUserInfo(payload) {
@@ -40,44 +42,44 @@ const server = new MCPServer({
         email: payload.email as string | undefined,
         name: payload.name as string | undefined,
         roles: (payload.roles as string[]) || [],
-      }
-    }
-  })
-})
+      };
+    },
+  }),
+});
 
-await server.listen(3000)
+await server.listen(3000);
 ```
 
-### All configuration options
+## All configuration options
 
 ```typescript
 oauthCustomProvider({
   // Required: OAuth endpoints
-  issuer: 'https://auth.example.com',
-  authEndpoint: 'https://auth.example.com/oauth/authorize',
-  tokenEndpoint: 'https://auth.example.com/oauth/token',
+  issuer: "https://auth.example.com",
+  authEndpoint: "https://auth.example.com/oauth/authorize",
+  tokenEndpoint: "https://auth.example.com/oauth/token",
 
   // Required: Token verification — must return { payload: Record<string, unknown> }
   async verifyToken(token: string) {
-    const { payload } = await jwtVerify(token, JWKS, { issuer: '...' })
-    return { payload: payload as Record<string, unknown> }
+    const { payload } = await jwtVerify(token, JWKS, { issuer: "..." });
+    return { payload: payload as Record<string, unknown> };
   },
 
   // Optional: JWKS endpoint advertised in discovery metadata
-  jwksUrl: 'https://auth.example.com/.well-known/jwks.json',
+  jwksUrl: "https://auth.example.com/.well-known/jwks.json",
 
   // Optional: User info endpoint URL
-  userInfoEndpoint: 'https://auth.example.com/userinfo',
+  userInfoEndpoint: "https://auth.example.com/userinfo",
 
   // Optional: Override advertised scopes
-  scopesSupported: ['openid', 'profile', 'email'],
+  scopesSupported: ["openid", "profile", "email"],
 
   // Optional: Override advertised grant types
   // Default: ['authorization_code', 'refresh_token']
-  grantTypesSupported: ['authorization_code', 'refresh_token'],
+  grantTypesSupported: ["authorization_code", "refresh_token"],
 
   // Optional: Audience for JWT verification
-  audience: 'your-api-identifier',
+  audience: "your-api-identifier",
 
   // Optional: Custom user info extraction
   getUserInfo(payload) {
@@ -85,115 +87,9 @@ oauthCustomProvider({
       userId: payload.sub as string,
       email: payload.email as string | undefined,
       name: payload.name as string | undefined,
-    }
-  }
-})
-```
-
-## OAuth Proxy (non-DCR providers)
-
-Use `oauthProxy` for providers that don't support DCR — Google, GitHub, Okta, Azure AD, and any provider where you register an app in a dashboard and receive a fixed `clientId`/`clientSecret`.
-
-<Note>
-  Any `verifyToken` function you write — including those returned by `jwksVerifier` — **must resolve to `{ payload: Record<string, unknown> }`** or throw on an invalid token. The proxy surfaces `payload` to `getUserInfo` and to `ctx.auth`.
-</Note>
-
-```typescript
-import { MCPServer, oauthProxy, jwksVerifier } from 'mcp-use/server'
-```
-
-### Google
-
-```typescript
-oauth: oauthProxy({
-  authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://oauth2.googleapis.com/token',
-  issuer: 'https://accounts.google.com',
-  clientId: process.env.GOOGLE_CLIENT_ID!,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  scopes: ['openid', 'email', 'profile'],
-  extraAuthorizeParams: { access_type: 'offline' },
-  verifyToken: jwksVerifier({
-    jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
-    issuer: 'https://accounts.google.com',
-    audience: process.env.GOOGLE_CLIENT_ID!,
-  }),
-})
-```
-
-### Okta
-
-```typescript
-const oktaDomain = process.env.OKTA_DOMAIN!
-
-oauth: oauthProxy({
-  authEndpoint: `${oktaDomain}/oauth2/default/v1/authorize`,
-  tokenEndpoint: `${oktaDomain}/oauth2/default/v1/token`,
-  issuer: `${oktaDomain}/oauth2/default`,
-  clientId: process.env.OKTA_CLIENT_ID!,
-  clientSecret: process.env.OKTA_CLIENT_SECRET,
-  scopes: ['openid', 'email', 'profile'],
-  verifyToken: jwksVerifier({
-    jwksUrl: `${oktaDomain}/oauth2/default/v1/keys`,
-    issuer: `${oktaDomain}/oauth2/default`,
-  }),
-})
-```
-
-### Azure AD (Microsoft Entra ID)
-
-```typescript
-const tenantId = process.env.AZURE_TENANT_ID!
-const base = `https://login.microsoftonline.com/${tenantId}/v2.0`
-
-oauth: oauthProxy({
-  authEndpoint: `${base}/oauth2/v2.0/authorize`,
-  tokenEndpoint: `${base}/oauth2/v2.0/token`,
-  issuer: base,
-  clientId: process.env.AZURE_CLIENT_ID!,
-  clientSecret: process.env.AZURE_CLIENT_SECRET,
-  scopes: ['openid', 'profile', 'email'],
-  verifyToken: jwksVerifier({
-    jwksUrl: 'https://login.microsoftonline.com/common/discovery/v2.0/keys',
-    issuer: base,
-    audience: process.env.AZURE_CLIENT_ID!,
-  }),
-})
-```
-
-### GitHub (opaque tokens)
-
-GitHub uses non-JWT opaque tokens. Use a custom `verifyToken` function that calls the GitHub API instead of `jwksVerifier`:
-
-```typescript
-oauth: oauthProxy({
-  authEndpoint: 'https://github.com/login/oauth/authorize',
-  tokenEndpoint: 'https://github.com/login/oauth/access_token',
-  issuer: 'https://github.com',
-  clientId: process.env.GITHUB_CLIENT_ID!,
-  clientSecret: process.env.GITHUB_CLIENT_SECRET!,
-  scopes: ['read:user', 'user:email'],
-
-  // GitHub uses opaque tokens — validate by calling the API
-  async verifyToken(token: string) {
-    const res = await fetch('https://api.github.com/user', {
-      headers: { Authorization: `Bearer ${token}`, 'User-Agent': 'my-mcp-server' }
-    })
-    if (!res.ok) throw new Error('Invalid GitHub token')
-    const user = await res.json()
-    return { payload: { sub: String(user.id), ...user } }
+    };
   },
-
-  getUserInfo(payload) {
-    return {
-      userId: payload.sub as string,
-      username: payload.login as string | undefined,
-      name: payload.name as string | undefined,
-      email: payload.email as string | undefined,
-      picture: payload.avatar_url as string | undefined,
-    }
-  }
-})
+});
 ```
 
 ## Accessing user info in tools
@@ -201,16 +97,16 @@ oauth: oauthProxy({
 ```typescript
 server.tool(
   {
-    name: 'get-user-info',
-    description: 'Get authenticated user info',
+    name: "get-user-info",
+    description: "Get authenticated user info",
   },
   async (_args, ctx) => ({
     userId: ctx.auth.user.userId,
     email: ctx.auth.user.email,
     name: ctx.auth.user.name,
     scopes: ctx.auth.scopes,
-  })
-)
+  }),
+);
 ```
 
 ## Resources
@@ -221,4 +117,5 @@ server.tool(
 
 ## Next Steps
 
+- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) — For providers without DCR support
 - [User Context](/typescript/server/authentication/user-context) — Access user information in tools
