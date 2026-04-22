@@ -10,6 +10,7 @@
   "changesets": [
     "cli-validate-token-on-login",
     "cool-happy-fair",
+    "create-mcp-use-app-skip-deprecated-skills",
     "deploy-org-flag-linked-override",
     "deployments-list-org-column",
     "fix-oauth-basepath-url",
