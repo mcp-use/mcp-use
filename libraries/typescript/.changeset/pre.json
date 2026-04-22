@@ -17,6 +17,7 @@
     "inline-elicitation-chat",
     "inspector-og-tags",
     "login-org-flag",
-    "next-js-drop-in"
+    "next-js-drop-in",
+    "oauth-refactor"
   ]
 }
