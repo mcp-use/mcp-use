@@ -83,27 +83,35 @@ Load these before diving into tools/resources/widgets sections.
 ---
 
 ### 🔐 Adding Authentication?
-**When:** Protecting your server with OAuth (WorkOS, Supabase, Better Auth, or custom)
+**When:** Protecting your server with OAuth (Auth0, Better Auth, WorkOS, Supabase, Keycloak, or any other provider)
 
 - **[overview.md](references/authentication/overview.md)**
-  - When: First time adding auth, understanding `ctx.auth`, or choosing a provider
-  - Covers: `oauth` config, user context shape, provider comparison, common mistakes
+  - When: First time adding auth, understanding `ctx.auth`, or choosing a provider / integration mode
+  - Covers: Remote auth vs OAuth proxy, `oauth` config, `ctx.auth` shape, provider comparison, common mistakes
 
-- **[workos.md](references/authentication/workos.md)**
-  - When: Using WorkOS AuthKit for authentication
-  - Covers: Setup, env vars, DCR vs pre-registered, roles/permissions, WorkOS API calls
-
-- **[supabase.md](references/authentication/supabase.md)**
-  - When: Using Supabase for authentication
-  - Covers: Setup, env vars, HS256 vs ES256, RLS-aware API calls
+- **[auth0.md](references/authentication/auth0.md)**
+  - When: Using Auth0 — DCR (Early Access) or a standard Regular Web App via `oauthProxy`
+  - Covers: Setup for both modes, `extraAuthorizeParams.audience`, permissions via `rfc9068_profile_authz`
 
 - **[better-auth.md](references/authentication/better-auth.md)**
   - When: Using Better Auth with the `@better-auth/oauth-provider` plugin (self-hosted OAuth 2.1)
   - Covers: `oauthBetterAuthProvider`, auth URL / metadata routes, login and consent flows
 
+- **[workos.md](references/authentication/workos.md)**
+  - When: Using WorkOS AuthKit (DCR only)
+  - Covers: Setup, env vars, roles/permissions, multi-tenant org filtering, WorkOS API calls
+
+- **[supabase.md](references/authentication/supabase.md)**
+  - When: Using Supabase's OAuth 2.1 server
+  - Covers: Setup, publishable keys, ES256 vs HS256, hosting the consent UI, RLS-aware SDK calls
+
+- **[keycloak.md](references/authentication/keycloak.md)**
+  - When: Using Keycloak via native DCR
+  - Covers: DCR trusted hosts + web origins, audience enforcement, realm vs resource roles, userinfo
+
 - **[custom.md](references/authentication/custom.md)**
-  - When: Using any other identity provider (GitHub, Okta, Azure AD, Google, etc.)
-  - Covers: Custom verification, user info extraction, provider examples
+  - When: Any other provider — DCR-capable via `oauthCustomProvider`, or pre-registered (Google, GitHub, Okta, Azure AD) via `oauthProxy`
+  - Covers: `oauthCustomProvider`, `oauthProxy` + `jwksVerifier`, provider examples, opaque-token verification
 
 ---
 

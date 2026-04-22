@@ -1,16 +1,18 @@
 # Authentication
 
-Adding OAuth authentication to your MCP server.
+Adding OAuth 2.0/2.1 authentication to your MCP server.
 
-**Use for:** Protecting tools behind user authentication, accessing user identity in tool handlers, integrating with identity providers (WorkOS, Supabase, etc.)
+**Use for:** Protecting tools behind user authentication, accessing user identity in tool handlers, integrating with identity providers (Auth0, Better Auth, WorkOS, Supabase, Keycloak, Google, GitHub, Okta, Azure AD, and more).
 
-> **Recommended providers:** WorkOS and Supabase have been fully tested with the MCP Inspector and support Dynamic Client Registration (DCR) out of the box. Start with one of those if possible. Better Auth is a self-hosted option that turns your MCP server into the OAuth 2.1 authorization server — more setup, but no external auth service required. The custom provider (`oauthCustomProvider`) works for any OIDC-compliant provider, but requires the provider to either support DCR or the user to supply a pre-registered `client_id` — most providers (e.g., Asana, Google, Okta) do not support DCR, which means the MCP Inspector cannot self-register and the OAuth flow will stall silently.
+> **Two integration modes.** Pick by whether your identity provider supports Dynamic Client Registration (DCR):
+> - **Remote auth** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthKeycloakProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`) — clients register and authenticate directly with the upstream provider; your server only verifies the resulting bearer token. Requires DCR on the upstream.
+> - **OAuth proxy** (`oauthProxy` + `jwksVerifier`) — your server holds pre-registered client credentials and mediates the token exchange. Use this for Google, GitHub, Okta, Azure AD, or any provider where you register the app in a dashboard and receive a fixed `clientId` / `clientSecret`.
 
 ---
 
 ## How It Works
 
-Pass an OAuth provider to the `oauth` option on `MCPServer`. Everything else is automatic:
+Pass an OAuth provider to the `oauth` option on `MCPServer`:
 
 ```typescript
 import { MCPServer } from "mcp-use/server";
@@ -24,9 +26,9 @@ const server = new MCPServer({
 
 This single property:
 - Protects all `/mcp/*` routes with bearer token authentication
-- Verifies JWTs using the provider's JWKS endpoint
-- Sets up OAuth discovery endpoints (`/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`)
-- Sets up `/authorize` and `/token` proxy endpoints for browser clients
+- Verifies tokens on every request (JWT + JWKS by default)
+- Sets up OAuth discovery endpoints (`/.well-known/oauth-authorization-server`, `/.well-known/openid-configuration`, `/.well-known/oauth-protected-resource`)
+- In proxy mode, also sets up `/register`, `/authorize`, and `/token` endpoints that mediate the upstream flow
 - Populates `ctx.auth` in all tool/resource/prompt handlers
 
 ---
@@ -57,7 +59,7 @@ ctx.auth.user            // UserInfo object (see below)
 ctx.auth.accessToken     // Raw bearer token string
 ctx.auth.scopes          // string[] — parsed from JWT `scope` claim
 ctx.auth.permissions     // string[] — parsed from JWT `permissions` claim
-ctx.auth.payload         // Raw JWT payload (all claims)
+ctx.auth.payload         // Raw JWT payload (all claims, Record<string, unknown>)
 ```
 
 ### `ctx.auth.user` (UserInfo)
@@ -75,18 +77,16 @@ All providers populate these base fields:
 | `roles` | `string[]?` | User roles |
 | `permissions` | `string[]?` | User permissions |
 
-Providers may add extra fields (e.g., WorkOS adds `organization_id`, Supabase adds `aal`). Access them via `ctx.auth.user.organization_id` or `ctx.auth.payload` for raw claims.
+Providers may add extra fields (e.g., WorkOS adds `organization_id`, Keycloak adds `username`, Supabase adds `aal`). Access them via `ctx.auth.user.organization_id` or `ctx.auth.payload` for raw claims.
 
 ### `ctx.auth.payload` (Raw Claims)
 
-**Type:** `Record<string, unknown>` — all values are `unknown` and require explicit casts.
+**Type:** `Record<string, unknown>` — values require explicit casts. Applies to **all providers** since `verifyToken` always returns `{ payload: Record<string, unknown> }`.
 
-This applies to **all providers** (WorkOS, Supabase, Auth0, Custom, etc.) since every provider's `verifyToken` returns `Record<string, unknown>`.
-
-**Prefer typed accessors** (`ctx.auth.user.*`, `ctx.auth.scopes`, `ctx.auth.permissions`) over raw payload access. If your provider has non-standard claims, map them into typed `ctx.auth.user` fields via the `getUserInfo` option rather than casting in every tool handler:
+**Prefer typed accessors** (`ctx.auth.user.*`, `ctx.auth.scopes`, `ctx.auth.permissions`) over raw payload access. If your provider has non-standard claims, map them into typed `ctx.auth.user` fields via `getUserInfo` rather than casting in every tool handler:
 
 ```typescript
-// ✅ Preferred: map claims once in getUserInfo (custom provider example)
+// ✅ Preferred: map claims once in getUserInfo
 oauth: oauthCustomProvider({
   // ...endpoints and verifyToken...
   getUserInfo: (payload) => ({
@@ -109,11 +109,10 @@ async (_args, ctx) => {
 }
 ```
 
-If you must read raw claims (e.g., for debugging or provider-specific fields not in `UserInfo`), cast explicitly:
+If you must read raw claims (debugging or one-off provider-specific fields), cast explicitly:
 
 ```typescript
 const exp = ctx.auth.payload.exp as number | undefined;
-const iat = ctx.auth.payload.iat as number | undefined;
 const customField = ctx.auth.payload.my_field as string;
 ```
 
@@ -121,25 +120,39 @@ const customField = ctx.auth.payload.my_field as string;
 
 ## Zero-Config Setup
 
-All built-in providers support zero-config via environment variables. Call the factory with no arguments and it reads from `MCP_USE_OAUTH_*` env vars:
+All built-in remote-auth providers support zero-config via environment variables. Call the factory with no arguments and it reads from `MCP_USE_OAUTH_*` env vars:
 
 ```typescript
+oauth: oauthAuth0Provider()     // reads MCP_USE_OAUTH_AUTH0_*
 oauth: oauthWorkOSProvider()    // reads MCP_USE_OAUTH_WORKOS_*
 oauth: oauthSupabaseProvider()  // reads MCP_USE_OAUTH_SUPABASE_*
+oauth: oauthKeycloakProvider()  // reads MCP_USE_OAUTH_KEYCLOAK_*
 ```
 
 Or pass config explicitly to override env vars. See each provider's guide for available options.
+
+`oauthProxy` and `oauthCustomProvider` have no zero-config mode — all endpoints must be passed explicitly.
 
 ---
 
 ## Available Providers
 
-| Provider | Factory Function | Required Env Vars | Guide |
-|----------|-----------------|-------------------|-------|
-| **WorkOS** | `oauthWorkOSProvider()` | `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` | [workos.md](workos.md) |
-| **Supabase** | `oauthSupabaseProvider()` | `MCP_USE_OAUTH_SUPABASE_PROJECT_ID` | [supabase.md](supabase.md) |
-| **Better Auth** | `oauthBetterAuthProvider({authURL})` | `BETTER_AUTH_SECRET` | [better-auth.md](better-auth.md) |
-| **Custom** | `oauthCustomProvider({...})` | None (all passed via config) | [custom.md](custom.md) |
+### Remote auth (DCR)
+
+| Provider | Factory | Required Config | Guide |
+|----------|---------|-----------------|-------|
+| **Auth0** | `oauthAuth0Provider()` | `domain`, `audience` (env: `MCP_USE_OAUTH_AUTH0_DOMAIN`, `MCP_USE_OAUTH_AUTH0_AUDIENCE`) | [auth0.md](auth0.md) |
+| **Better Auth** | `oauthBetterAuthProvider({ authURL })` | `BETTER_AUTH_SECRET` | [better-auth.md](better-auth.md) |
+| **WorkOS** | `oauthWorkOSProvider()` | `subdomain` (env: `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`) | [workos.md](workos.md) |
+| **Supabase** | `oauthSupabaseProvider()` | `projectId` (env: `MCP_USE_OAUTH_SUPABASE_PROJECT_ID`) | [supabase.md](supabase.md) |
+| **Keycloak** | `oauthKeycloakProvider()` | `serverUrl`, `realm` (env: `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL`, `MCP_USE_OAUTH_KEYCLOAK_REALM`) | [keycloak.md](keycloak.md) |
+| **Custom (DCR)** | `oauthCustomProvider({ ... })` | `issuer`, endpoints, `verifyToken` | [custom.md](custom.md) |
+
+### OAuth proxy (non-DCR)
+
+| Use for | Factory | Guide |
+|---------|---------|-------|
+| Google, GitHub, Okta, Azure AD, Auth0 (non-EA), any pre-registered app | `oauthProxy({ ... })` + `jwksVerifier({ ... })` | [custom.md](custom.md#oauth-proxy-non-dcr-providers) |
 
 ---
 
@@ -166,22 +179,28 @@ server.tool(
 );
 ```
 
+Provider-specific examples (Supabase, Keycloak, Auth0, etc.) live in each provider's guide.
+
 ---
 
 ## Common Mistakes
 
 - **Wrong `ctx.auth` shape** — User info is nested: `ctx.auth.user.email`, not `ctx.auth.email`
-- **Hardcoding provider credentials** — Use env vars or pass config; never commit secrets
-- **Skipping JWT verification in production** — `verifyJwt: false` / `skipVerification: true` are for development only
+- **Using `oauthCustomProvider` for non-DCR providers** — For Google, GitHub, Okta, Azure AD, etc., use `oauthProxy` + `jwksVerifier` instead. `oauthCustomProvider` only works with providers that advertise a `registration_endpoint`.
+- **Custom `verifyToken` returning the wrong shape** — It must resolve to `{ payload: Record<string, unknown> }` or throw. The proxy surfaces `payload` to `getUserInfo` and to `ctx.auth`.
+- **Hardcoding provider credentials** — Use env vars; never commit secrets
+- **Skipping JWT verification in production** — `verifyJwt: false` is development only
 - **Throwing errors instead of returning `error()`** — Use the `error()` response helper for auth-related failures
 
 ---
 
 ## Next Steps
 
+- **Auth0 setup** → [auth0.md](auth0.md)
+- **Better Auth setup** → [better-auth.md](better-auth.md)
 - **WorkOS setup** → [workos.md](workos.md)
 - **Supabase setup** → [supabase.md](supabase.md)
-- **Better Auth setup** → [better-auth.md](better-auth.md)
-- **Custom provider** → [custom.md](custom.md)
+- **Keycloak setup** → [keycloak.md](keycloak.md)
+- **Custom provider / OAuth proxy** → [custom.md](custom.md)
 - **Build tools** → [../server/tools.md](../server/tools.md)
 - **See examples** → [../patterns/common-patterns.md](../patterns/common-patterns.md)
