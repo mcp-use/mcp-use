@@ -6,12 +6,7 @@
  */
 
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type {
-  OAuthProvider,
-  UserInfo,
-  Auth0OAuthConfig,
-  OAuthMode,
-} from "./types.js";
+import type { OAuthProvider, UserInfo, Auth0OAuthConfig } from "./types.js";
 
 export class Auth0OAuthProvider implements OAuthProvider {
   private config: Auth0OAuthConfig;
@@ -112,9 +107,5 @@ export class Auth0OAuthProvider implements OAuthProvider {
 
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token"];
-  }
-
-  getMode(): OAuthMode {
-    return "direct";
   }
 }

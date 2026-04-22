@@ -2,15 +2,15 @@
 
 Setting up a self-hosted OAuth 2.1 authorization server with Better Auth.
 
-**Learn more:** [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider) · [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
+**Learn more:** [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
 
-> **Note:** This covers the `@better-auth/oauth-provider` plugin approach. The older Better Auth MCP plugin is deprecated. For legacy users, Better Auth provides a [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters).
+> Covers the `@better-auth/oauth-provider` plugin. The older Better Auth MCP plugin is deprecated — for legacy users, see the [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters).
 
 ---
 
 ## How It Works
 
-Unlike WorkOS or Supabase, Better Auth runs *inside* your MCP server — your server is the OAuth 2.1 authorization server. Better Auth handles the full OAuth flow (authorization, token issuance, JWKS); mcp-use only verifies the resulting JWTs.
+Unlike WorkOS, Auth0, or Supabase, Better Auth runs **inside** your MCP server — your server *is* the OAuth 2.1 authorization server. Better Auth handles the full OAuth flow (authorization, token issuance, JWKS); mcp-use only verifies the resulting JWTs.
 
 This means:
 - No external auth service required
@@ -72,21 +72,19 @@ export const auth = betterAuth({
 });
 ```
 
-### 2. Generate and Migrate the Database
+### 2. Generate and migrate the database
 
 ```bash
 npx auth@latest generate
 npx auth@latest migrate
 ```
 
-### 3. Configure the MCP Server (`server.ts`)
+### 3. Configure the MCP server (`server.ts`)
 
-The server needs three things beyond the standard `MCPServer` setup:
+You need three things beyond the standard `MCPServer` setup:
 1. Mount Better Auth routes (`/api/auth/**`)
 2. Mount OAuth discovery endpoints with CORS headers (required for browser clients)
 3. Mount login and consent pages
-
-See the [GitHub example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth) or the [docs](https://mcp-use.com/docs/typescript/server/authentication/providers/better-auth) for the full server.ts code. The key parts:
 
 ```typescript
 import { MCPServer, oauthBetterAuthProvider } from "mcp-use/server";
@@ -107,8 +105,11 @@ const server = new MCPServer({
 // Mount Better Auth routes
 server.app.on(["GET", "POST"], "/api/auth/**", (c) => auth.handler(c.req.raw));
 
-// OAuth discovery endpoints — CORS headers required for browser clients (MCP Inspector)
-const corsHeaders = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET" };
+// OAuth discovery endpoints — CORS headers are required for browser clients (MCP Inspector)
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET",
+};
 const authServerMetadataHandler = oauthProviderAuthServerMetadata(auth, { headers: corsHeaders });
 server.app.get("/.well-known/oauth-authorization-server", (c) => authServerMetadataHandler(c.req.raw));
 server.app.get("/.well-known/oauth-authorization-server/api/auth", (c) => authServerMetadataHandler(c.req.raw));
@@ -117,24 +118,25 @@ const openIdConfigHandler = oauthProviderOpenIdConfigMetadata(auth, { headers: c
 server.app.get("/.well-known/openid-configuration", (c) => openIdConfigHandler(c.req.raw));
 server.app.get("/.well-known/openid-configuration/api/auth", (c) => openIdConfigHandler(c.req.raw));
 
-server.listen({ port: 3000 });
+await server.listen(3000);
 ```
 
-### 4. Add Login and Consent Pages
+### 4. Add login and consent pages
 
-Better Auth requires a `/sign-in` page and a `/consent` page mounted on the Hono app. Key details:
+Better Auth requires a `/sign-in` page and a `/consent` page mounted on the Hono app.
 
-- **Sign-in page:** POST to `/api/auth/sign-in/social` with the provider name and `callbackURL: '/api/auth/oauth2/authorize' + queryString` (preserve the OAuth query params)
-- **Consent page:** POST to `/api/auth/oauth2/consent` with `{ accept: boolean, oauth_query: window.location.search.slice(1) }`
-- Both must use `credentials: 'include'` on fetch calls
+- **Sign-in page:** POST to `/api/auth/sign-in/social` with the provider name and `callbackURL: '/api/auth/oauth2/authorize' + queryString` (preserve the OAuth query params).
+- **Consent page:** POST to `/api/auth/oauth2/consent` with `{ accept: boolean, oauth_query: window.location.search.slice(1) }`.
+- Both must use `credentials: 'include'` on fetch calls.
 
-See the [GitHub example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth) for complete login/consent page implementations.
+See the [runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth) for complete HTML/JS.
 
 ---
 
 ## Environment Variables
 
 ```bash
+# Better Auth secret (used for signing cookies and tokens)
 BETTER_AUTH_SECRET=your-secret-change-in-production
 
 # Social provider credentials (GitHub shown — swap for any supported provider)
@@ -152,26 +154,52 @@ Better Auth supports many social providers (GitHub, Google, Discord, etc.). See 
 ```typescript
 oauthBetterAuthProvider({
   authURL: "https://yourapp.com/api/auth",  // Required: full URL including basePath
-  verifyJwt: false,                          // Optional: skip JWT verification (dev only)
-  getUserInfo: (payload) => ({ ... }),        // Optional: custom JWT claim extraction
+  verifyJwt: process.env.NODE_ENV === "production",  // default: true
+  scopesSupported: ["openid", "profile", "email", "offline_access"],  // override advertised scopes
+  getUserInfo: (payload) => ({
+    userId: payload.sub as string,
+    email: payload.email as string,
+    name: payload.name as string,
+    roles: (payload.roles as string[]) || [],
+    permissions: (payload.permissions as string[]) || [],
+  }),
 })
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `authURL` | `string` | — | Better Auth base URL including `/api/auth` path |
-| `verifyJwt` | `boolean?` | `true` | Set `false` to skip JWT verification (development only) |
-| `getUserInfo` | `function?` | built-in | Custom function to extract user info from JWT payload |
+| `authURL` | `string` | env var | Better Auth base URL including `/api/auth` path |
+| `verifyJwt` | `boolean?` | `true` | Set `false` to skip JWT verification (**development only**) |
+| `scopesSupported` | `string[]?` | `["openid", "profile", "email", "offline_access"]` | Override advertised scopes |
+| `getUserInfo` | `function?` | built-in | Custom extraction of user info from JWT payload |
+
+---
+
+## Accessing user info in tools
+
+```typescript
+server.tool(
+  { name: "get-user-info", description: "Get information about the authenticated user" },
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+      scopes: ctx.auth.scopes,
+      permissions: ctx.auth.permissions,
+    })
+);
+```
 
 ---
 
 ## Common Mistakes
 
-- **Missing `validAudiences`** — Must include your MCP endpoint (e.g., `http://localhost:3000/mcp`) or JWT verification will fail with audience mismatch
-- **Missing CORS headers on discovery endpoints** — Browser clients like MCP Inspector require `Access-Control-Allow-Origin: *` on `/.well-known/*` routes
-- **Skipping `jwt()` plugin** — Required for token signing; omitting it breaks token issuance
-- **Wrong `authURL`** — `oauthBetterAuthProvider({ authURL })` must include the full basePath (e.g., `/api/auth`), not just the host
-- **Missing `credentials: 'include'`** — Login and consent page fetch calls must include cookies or the session will be lost
+- **Missing `validAudiences`** — Must include your MCP endpoint (e.g. `http://localhost:3000/mcp`) or JWT verification will fail with an audience mismatch.
+- **Missing CORS headers on discovery endpoints** — Browser clients like MCP Inspector require `Access-Control-Allow-Origin: *` on `/.well-known/*` routes.
+- **Skipping `jwt()` plugin** — Required for token signing; omitting it breaks token issuance.
+- **Wrong `authURL`** — `oauthBetterAuthProvider({ authURL })` must include the full basePath (e.g. `/api/auth`), not just the host.
+- **Missing `credentials: 'include'`** — Login and consent page fetch calls must include cookies or the session will be lost.
 
 ---
 
@@ -180,4 +208,5 @@ oauthBetterAuthProvider({
 - **Auth overview** → [overview.md](overview.md)
 - **WorkOS setup** → [workos.md](workos.md)
 - **Supabase setup** → [supabase.md](supabase.md)
+- **Keycloak setup** → [keycloak.md](keycloak.md)
 - **Build tools** → [../server/tools.md](../server/tools.md)

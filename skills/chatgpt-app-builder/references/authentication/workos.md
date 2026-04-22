@@ -1,8 +1,8 @@
 # WorkOS Authentication
 
-Setting up OAuth with WorkOS AuthKit.
+Setting up OAuth with WorkOS AuthKit. DCR mode only — MCP clients register themselves directly with WorkOS; the MCP server just verifies the resulting tokens.
 
-**Learn more:** [WorkOS MCP docs](https://workos.com/docs/authkit/mcp) · [WorkOS AuthKit](https://workos.com/docs/authkit)
+**Learn more:** [WorkOS AuthKit MCP docs](https://workos.com/docs/authkit/mcp) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
 
 ---
 
@@ -36,7 +36,16 @@ With a `.env` file:
 MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app
 ```
 
-That's it. JWT verification, OAuth discovery, and token proxying are handled automatically.
+That's it. JWT verification, OAuth discovery, and `.well-known` passthrough are handled automatically.
+
+---
+
+## Setup
+
+1. Sign up at the [WorkOS Dashboard](https://dashboard.workos.com/) and create a project.
+2. **Connect → Configuration** — enable **Dynamic Client Registration**.
+3. **Configuration → Redirects** — add your MCP client redirect URI (e.g. `http://localhost:3000/callback`).
+4. Copy the full AuthKit domain from **Domains → AuthKit Domain** (e.g. `your-company.authkit.app` — including `.authkit.app`, not just `your-company`).
 
 ---
 
@@ -44,15 +53,9 @@ That's it. JWT verification, OAuth discovery, and token proxying are handled aut
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` | Yes | Your full AuthKit domain (e.g., `my-company.authkit.app`) |
-| `MCP_USE_OAUTH_WORKOS_CLIENT_ID` | No | Pre-registered OAuth client ID. Omit for DCR mode |
-| `MCP_USE_OAUTH_WORKOS_API_KEY` | No | WorkOS API key for making WorkOS API calls |
+| `MCP_USE_OAUTH_WORKOS_SUBDOMAIN` | Yes | Full AuthKit domain (e.g. `my-company.authkit.app`) |
 
-### Finding Your Subdomain
-
-WorkOS Dashboard → **Domains** tab → **AuthKit Domain**
-
-Use the **full AuthKit domain** including `.authkit.app`. For example, if your AuthKit domain is `my-company.authkit.app`, set the value to `my-company.authkit.app` (not just `my-company`).
+> If you also need to call the WorkOS Management API from a tool handler, store the API key in any env var you like (e.g. `WORKOS_API_KEY`) and read it inside the tool. It's **not** part of the OAuth provider config anymore.
 
 ---
 
@@ -69,40 +72,16 @@ Explicit config (overrides env vars):
 ```typescript
 oauth: oauthWorkOSProvider({
   subdomain: "my-company.authkit.app",
-  clientId: "client_01KB5DRXBDDY1VGCBKY108SKJW",  // optional
-  apiKey: "sk_test_...",                             // optional
-  verifyJwt: false,                                  // development only
+  verifyJwt: process.env.NODE_ENV === "production",  // default: true
+  scopesSupported: ["email", "offline_access", "openid", "profile"],  // override advertised scopes
 })
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `subdomain` | `string` | env var | Full AuthKit domain (e.g., `my-company.authkit.app`) |
-| `clientId` | `string?` | env var | Pre-registered client ID. Omit for DCR |
-| `apiKey` | `string?` | env var | WorkOS API key |
-| `verifyJwt` | `boolean?` | `true` | Set `false` to skip JWT verification (development only) |
-
----
-
-## Dynamic Client Registration (DCR)
-
-DCR lets MCP clients register themselves automatically with WorkOS. This is the recommended mode for MCP servers.
-
-> **Testing with the MCP Inspector:** Use DCR mode (do **not** set `MCP_USE_OAUTH_WORKOS_CLIENT_ID`). The Inspector relies on DCR to self-register — without it, the OAuth flow will stall because the Inspector has no pre-configured `client_id`.
-
-**Setup:**
-1. Don't set `MCP_USE_OAUTH_WORKOS_CLIENT_ID`
-2. Enable DCR in WorkOS Dashboard → **Connect** → **Configuration**
-
-MCP clients (like the Inspector) will register themselves on first connection.
-
-### Pre-registered Client (Alternative)
-
-If you need a specific OAuth client instead of DCR:
-
-1. Create an OAuth application in WorkOS Dashboard → **Connect** → **OAuth Applications**
-2. Set `MCP_USE_OAUTH_WORKOS_CLIENT_ID` to the client ID
-3. Configure redirect URIs in the dashboard to match your MCP client
+| `verifyJwt` | `boolean?` | `true` | Set `false` to skip JWT verification (**development only**) |
+| `scopesSupported` | `string[]?` | `["email", "offline_access", "openid", "profile"]` | Override advertised scopes |
 
 ---
 
@@ -117,11 +96,10 @@ WorkOS populates these fields on `ctx.auth.user`:
 | `name` | `string?` | `name` claim |
 | `username` | `string?` | `preferred_username` claim |
 | `picture` | `string?` | `picture` claim |
-| `roles` | `string[]` | `roles` claim |
-| `permissions` | `string[]` | `permissions` claim |
-| `scopes` | `string[]` | Parsed from `scope` claim |
+| `roles` | `string[]?` | `roles` claim |
+| `permissions` | `string[]?` | `permissions` claim |
 | `email_verified` | `boolean?` | `email_verified` claim |
-| `organization_id` | `string?` | `org_id` claim |
+| `organization_id` | `string?` | `org_id` claim — multi-tenant org ID |
 | `sid` | `string?` | Session ID |
 
 ### Role-Based Access
@@ -140,21 +118,40 @@ server.tool(
 );
 ```
 
+### Multi-Tenant Filtering
+
+Scope queries to the authenticated user's organization:
+
+```typescript
+server.tool(
+  { name: "get-documents", description: "Get documents for the authenticated org" },
+  async (_args, ctx) => {
+    // Custom claims come back as `unknown` — narrow before use
+    const orgId = ctx.auth.user.organization_id as string | undefined;
+    if (!orgId) return error("Organization context required");
+
+    const documents = await db.documents.findMany({
+      where: { organizationId: orgId },
+    });
+
+    return object(documents);
+  }
+);
+```
+
 ---
 
 ## Making WorkOS API Calls
 
-Use the WorkOS API key (not the user's access token) for WorkOS management API calls:
+Use a WorkOS API key (not the user's access token) for management API calls:
 
 ```typescript
-const WORKOS_API_KEY = process.env.MCP_USE_OAUTH_WORKOS_API_KEY;
+const WORKOS_API_KEY = process.env.WORKOS_API_KEY;
 
 server.tool(
   { name: "get-workos-user", description: "Fetch user profile from WorkOS" },
   async (_args, ctx) => {
-    if (!WORKOS_API_KEY) {
-      return error("WorkOS API key not configured");
-    }
+    if (!WORKOS_API_KEY) return error("WorkOS API key not configured");
 
     const res = await fetch(
       `https://api.workos.com/user_management/users/${ctx.auth.user.userId}`,
@@ -166,10 +163,7 @@ server.tool(
       }
     );
 
-    if (!res.ok) {
-      return error(`WorkOS API failed: ${res.status} ${res.statusText}`);
-    }
-
+    if (!res.ok) return error(`WorkOS API failed: ${res.status}`);
     return object(await res.json());
   }
 );
@@ -183,11 +177,8 @@ server.tool(
 # Required: Full AuthKit domain (WorkOS Dashboard → Domains → AuthKit Domain)
 MCP_USE_OAUTH_WORKOS_SUBDOMAIN=my-company.authkit.app
 
-# Optional: Pre-registered OAuth client ID (omit for DCR mode)
-# MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_01KB5DRXBDDY1VGCBKY108SKJW
-
-# Optional: WorkOS API key for management API calls
-MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
+# Optional: WorkOS API key if you call the Management API from tools
+WORKOS_API_KEY=sk_test_...
 ```
 
 ---
@@ -196,21 +187,16 @@ MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
 
 ### Redirect URI Mismatch
 
-If you get a redirect URI error during the OAuth flow, add your client's callback URL to WorkOS:
+If you get a redirect URI error during OAuth, add your client's callback URL to WorkOS:
 
-1. Go to WorkOS Dashboard → **Developer** → **Redirects** tab
-2. Click **Edit redirect URIs**
-3. Add the redirect URI your MCP client expects
+1. WorkOS Dashboard → **Developer** → **Redirects**
+2. Click **Edit redirect URIs** and add the one the client expects (e.g. `http://localhost:3000/oauth/callback`).
 
-For example, if testing locally with the MCP Inspector on port 3000:
+Changes may take a few minutes to propagate.
 
-```
-http://localhost:3000/oauth/callback
-```
+### DCR Not Registering
 
-The exact URI depends on your client and port — check the error message for the expected value.
-
-> **Note:** Changes to redirect URIs in WorkOS may take a few minutes to take effect.
+If the MCP Inspector stalls at the registration step, double-check that **Dynamic Client Registration** is enabled in WorkOS Dashboard → **Connect → Configuration**. Without DCR enabled, there's no pre-configured `client_id` for the Inspector to use.
 
 ---
 
@@ -218,4 +204,5 @@ The exact URI depends on your client and port — check the error message for th
 
 - **Auth overview** → [overview.md](overview.md)
 - **Supabase setup** → [supabase.md](supabase.md)
+- **Auth0 setup** → [auth0.md](auth0.md)
 - **Build tools** → [../server/tools.md](../server/tools.md)
