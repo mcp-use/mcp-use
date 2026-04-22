@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.0.3-canary.0
+
+### Patch Changes
+
+- 52a98f9: fix: auto-discover available port in `mcp-use start` when default port is in use
+  - mcp-use@1.24.3-canary.0
+  - @mcp-use/inspector@2.2.1-canary.0
+
 ## 3.0.2
 
 ### Patch Changes
