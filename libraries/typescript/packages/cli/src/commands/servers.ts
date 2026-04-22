@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrlForCloudServer } from "../utils/cloud-urls.js";
 import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 import { formatRelativeTime } from "../utils/format.js";
 import { resolveOrgFromOption } from "./auth.js";
 import { createEnvCommand } from "./env.js";
@@ -133,11 +134,7 @@ async function listServersCommand(options: {
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to list servers:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to list servers");
   }
 }
 
@@ -257,11 +254,7 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to get server:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to get server");
   }
 }
 
@@ -320,11 +313,7 @@ async function deleteServerCommand(
       )
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to delete server:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to delete server");
   }
 }
 

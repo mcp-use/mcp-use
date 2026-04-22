@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import open from "open";
-import { McpUseAPI } from "../utils/api.js";
+import { ApiUnauthorizedError, McpUseAPI } from "../utils/api.js";
 import {
   deleteConfig,
   getApiKey,
@@ -9,6 +9,7 @@ import {
   readConfig,
   writeConfig,
 } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 import type { AuthTestResponse, OrgInfo } from "../utils/api.js";
 
 const DEVICE_CLIENT_ID = "mcp-use-cli";
@@ -203,14 +204,37 @@ export async function loginCommand(options?: {
     }
 
     if (await isLoggedIn()) {
+      let needsReauth = false;
+      try {
+        await (await McpUseAPI.create()).testAuth();
+      } catch (e) {
+        // Only a 401 means the stored key is actually bad. Network/disk
+        // errors get the benefit of the doubt so offline users aren't
+        // bounced into re-auth when we can't verify.
+        if (e instanceof ApiUnauthorizedError) {
+          needsReauth = true;
+        }
+      }
+
+      if (!needsReauth) {
+        if (!options?.silent) {
+          console.log(
+            chalk.yellow(
+              "You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account."
+            )
+          );
+        }
+        return;
+      }
+
       if (!options?.silent) {
         console.log(
           chalk.yellow(
-            "You are already logged in. Run 'npx mcp-use logout' first if you want to login with a different account."
+            "⚠️  Stored credentials are invalid or expired. Re-authenticating..."
           )
         );
       }
-      return;
+      await deleteConfig();
     }
 
     console.log(chalk.cyan.bold("Logging in to mcp-use cloud...\n"));
@@ -418,20 +442,7 @@ export async function whoamiCommand(): Promise<void> {
         );
       }
     }
-  } catch (error: any) {
-    if (error?.status === 401) {
-      console.error(
-        chalk.red("\nYour session has expired or your API key is invalid.")
-      );
-      console.log(
-        chalk.gray(`Run ${chalk.white("mcp-use login")} to re-authenticate.\n`)
-      );
-    } else {
-      console.error(
-        chalk.red.bold("\n✗ Failed to get user info:"),
-        chalk.red(error instanceof Error ? error.message : "Unknown error")
-      );
-    }
-    process.exit(1);
+  } catch (error) {
+    handleCommandError(error, "Failed to get user info");
   }
 }

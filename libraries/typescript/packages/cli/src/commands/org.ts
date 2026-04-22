@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import { McpUseAPI } from "../utils/api.js";
 import { isLoggedIn, readConfig, writeConfig } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 import { promptOrgSelection } from "./auth.js";
 
 async function ensureLoggedIn(): Promise<boolean> {
@@ -50,11 +51,7 @@ export async function orgListCommand(): Promise<void> {
       );
     }
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to list organizations:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to list organizations");
   }
 }
 
@@ -114,11 +111,7 @@ export async function orgSwitchCommand(): Promise<void> {
         slug
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to switch organization:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to switch organization");
   }
 }
 
@@ -149,10 +142,6 @@ export async function orgCurrentCommand(): Promise<void> {
         slug
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to get organization:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to get organization");
   }
 }

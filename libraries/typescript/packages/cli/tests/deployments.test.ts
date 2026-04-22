@@ -24,6 +24,15 @@ vi.mock("../src/utils/api.js", () => {
         return mockApiInstance;
       }
     },
+    ApiUnauthorizedError: class ApiUnauthorizedError extends Error {
+      readonly status = 401 as const;
+      constructor(
+        message = "Your session has expired or your API key is invalid."
+      ) {
+        super(message);
+        this.name = "ApiUnauthorizedError";
+      }
+    },
   };
 });
 

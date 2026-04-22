@@ -3,6 +3,7 @@ import { Command } from "commander";
 import type { EnvEnvironment, EnvVariable } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
 import { isLoggedIn } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 
 const ALL_ENVS: EnvEnvironment[] = ["production", "preview", "development"];
 
@@ -67,22 +68,26 @@ async function listEnvCommand(options: {
   server: string;
   showValues?: boolean;
 }): Promise<void> {
-  await requireLogin();
+  try {
+    await requireLogin();
 
-  const api = await McpUseAPI.create();
-  const vars = await api.listEnvVariables(options.server);
+    const api = await McpUseAPI.create();
+    const vars = await api.listEnvVariables(options.server);
 
-  if (vars.length === 0) {
-    console.log(
-      chalk.yellow("\nNo environment variables set for this server.\n")
-    );
-    return;
-  }
+    if (vars.length === 0) {
+      console.log(
+        chalk.yellow("\nNo environment variables set for this server.\n")
+      );
+      return;
+    }
 
-  console.log(chalk.cyan.bold(`\nEnvironment Variables (${vars.length})\n`));
-  for (const v of vars) {
-    printEnvVar(v, options.showValues);
-    console.log();
+    console.log(chalk.cyan.bold(`\nEnvironment Variables (${vars.length})\n`));
+    for (const v of vars) {
+      printEnvVar(v, options.showValues);
+      console.log();
+    }
+  } catch (error) {
+    handleCommandError(error, "Failed to list environment variables");
   }
 }
 
@@ -90,87 +95,101 @@ async function addEnvCommand(
   assignment: string,
   options: { server: string; env?: string; sensitive?: boolean }
 ): Promise<void> {
-  await requireLogin();
+  try {
+    await requireLogin();
 
-  const eqIdx = assignment.indexOf("=");
-  if (eqIdx === -1) {
-    console.error(
-      chalk.red(
-        "✗ Expected KEY=VALUE format, e.g. mcp-use servers env add API_KEY=abc123"
-      )
+    const eqIdx = assignment.indexOf("=");
+    if (eqIdx === -1) {
+      console.error(
+        chalk.red(
+          "✗ Expected KEY=VALUE format, e.g. mcp-use servers env add API_KEY=abc123"
+        )
+      );
+      process.exit(1);
+    }
+
+    const key = assignment.substring(0, eqIdx).trim();
+    const value = assignment.substring(eqIdx + 1);
+
+    if (!key) {
+      console.error(chalk.red("✗ Key must not be empty."));
+      process.exit(1);
+    }
+
+    const environments = options.env
+      ? parseEnvironments(options.env)
+      : ALL_ENVS;
+
+    const api = await McpUseAPI.create();
+    const created = await api.createEnvVariable(options.server, {
+      key,
+      value,
+      environments,
+      sensitive: options.sensitive ?? false,
+    });
+
+    console.log(
+      chalk.green(`\n✓ Environment variable "${created.key}" added.\n`)
     );
-    process.exit(1);
+    printEnvVar(created, true);
+    console.log();
+  } catch (error) {
+    handleCommandError(error, "Failed to add environment variable");
   }
-
-  const key = assignment.substring(0, eqIdx).trim();
-  const value = assignment.substring(eqIdx + 1);
-
-  if (!key) {
-    console.error(chalk.red("✗ Key must not be empty."));
-    process.exit(1);
-  }
-
-  const environments = options.env ? parseEnvironments(options.env) : ALL_ENVS;
-
-  const api = await McpUseAPI.create();
-  const created = await api.createEnvVariable(options.server, {
-    key,
-    value,
-    environments,
-    sensitive: options.sensitive ?? false,
-  });
-
-  console.log(
-    chalk.green(`\n✓ Environment variable "${created.key}" added.\n`)
-  );
-  printEnvVar(created, true);
-  console.log();
 }
 
 async function updateEnvCommand(
   varId: string,
   options: { server: string; value?: string; env?: string; sensitive?: boolean }
 ): Promise<void> {
-  await requireLogin();
+  try {
+    await requireLogin();
 
-  if (!options.value && !options.env && options.sensitive === undefined) {
-    console.error(
-      chalk.red(
-        "✗ Nothing to update. Provide at least one of --value, --env, --sensitive."
-      )
+    if (!options.value && !options.env && options.sensitive === undefined) {
+      console.error(
+        chalk.red(
+          "✗ Nothing to update. Provide at least one of --value, --env, --sensitive."
+        )
+      );
+      process.exit(1);
+    }
+
+    const body: {
+      value?: string;
+      environments?: EnvEnvironment[];
+      sensitive?: boolean;
+    } = {};
+    if (options.value !== undefined) body.value = options.value;
+    if (options.env) body.environments = parseEnvironments(options.env);
+    if (options.sensitive !== undefined) body.sensitive = options.sensitive;
+
+    const api = await McpUseAPI.create();
+    const updated = await api.updateEnvVariable(options.server, varId, body);
+
+    console.log(
+      chalk.green(`\n✓ Environment variable "${updated.key}" updated.\n`)
     );
-    process.exit(1);
+    printEnvVar(updated, !!options.value);
+    console.log();
+  } catch (error) {
+    handleCommandError(error, "Failed to update environment variable");
   }
-
-  const body: {
-    value?: string;
-    environments?: EnvEnvironment[];
-    sensitive?: boolean;
-  } = {};
-  if (options.value !== undefined) body.value = options.value;
-  if (options.env) body.environments = parseEnvironments(options.env);
-  if (options.sensitive !== undefined) body.sensitive = options.sensitive;
-
-  const api = await McpUseAPI.create();
-  const updated = await api.updateEnvVariable(options.server, varId, body);
-
-  console.log(
-    chalk.green(`\n✓ Environment variable "${updated.key}" updated.\n`)
-  );
-  printEnvVar(updated, !!options.value);
-  console.log();
 }
 
 async function removeEnvCommand(
   varId: string,
   options: { server: string }
 ): Promise<void> {
-  await requireLogin();
+  try {
+    await requireLogin();
 
-  const api = await McpUseAPI.create();
-  await api.deleteEnvVariable(options.server, varId);
+    const api = await McpUseAPI.create();
+    await api.deleteEnvVariable(options.server, varId);
 
-  console.log(chalk.green(`\n✓ Environment variable ${varId} removed.\n`));
+    console.log(chalk.green(`\n✓ Environment variable ${varId} removed.\n`));
+  } catch (error) {
+    handleCommandError(error, "Failed to remove environment variable");
+  }
 }
 
 export function createEnvCommand(): Command {
