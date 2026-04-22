@@ -12,6 +12,7 @@
     "cool-happy-fair",
     "deploy-org-flag-linked-override",
     "deployments-list-org-column",
+    "fix-oauth-basepath-url",
     "inspector-og-tags",
     "login-org-flag",
     "next-js-drop-in"
