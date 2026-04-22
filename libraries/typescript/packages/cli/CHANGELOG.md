@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 3.1.0-canary.1
+
+### Minor Changes
+
+- 468af39: Add ORG column to `deployments list` output so users can see which organization each deployment belongs to.
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.1
+- @mcp-use/inspector@2.2.1-canary.1
+
 ## 3.0.3-canary.0
 
 ### Patch Changes

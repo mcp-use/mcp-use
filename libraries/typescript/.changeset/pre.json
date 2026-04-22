@@ -8,6 +8,7 @@
     "mcp-use": "1.24.2"
   },
   "changesets": [
-    "cool-happy-fair"
+    "cool-happy-fair",
+    "deployments-list-org-column"
   ]
 }
