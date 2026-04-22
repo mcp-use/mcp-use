@@ -54,7 +54,35 @@ async function listDeploymentsCommand(): Promise<void> {
     }
 
     const api = await McpUseAPI.create();
-    const deployments = await api.listDeployments();
+    const [deployments, authResult] = await Promise.all([
+      api.listDeployments(),
+      api.testAuth(),
+    ]);
+
+    const orgMap = new Map(authResult.orgs.map((o) => [o.id, o.name]));
+
+    const uniqueServerIds = [
+      ...new Set(
+        deployments
+          .map((d) => d.serverId)
+          .filter((id): id is string => id != null)
+      ),
+    ];
+
+    const serverResults = await Promise.allSettled(
+      uniqueServerIds.map((id) => api.getServer(id))
+    );
+
+    const serverOrgMap = new Map<string, string>();
+    for (let i = 0; i < uniqueServerIds.length; i++) {
+      const result = serverResults[i];
+      if (result.status === "fulfilled") {
+        const orgName =
+          orgMap.get(result.value.organizationId) ??
+          result.value.organizationId.substring(0, 19);
+        serverOrgMap.set(uniqueServerIds[i], orgName);
+      }
+    }
 
     const sortedDeployments = [...deployments].sort(
       (a, b) =>
@@ -77,21 +105,25 @@ async function listDeploymentsCommand(): Promise<void> {
 
     console.log(
       chalk.white.bold(
-        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"STATUS".padEnd(12)} ${"MCP URL".padEnd(45)} ${"CREATED"}`
+        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"ORG".padEnd(20)} ${"STATUS".padEnd(12)} ${"MCP URL".padEnd(45)} ${"CREATED"}`
       )
     );
-    console.log(chalk.gray("─".repeat(140)));
+    console.log(chalk.gray("─".repeat(155)));
 
     for (const deployment of sortedDeployments) {
       const id = formatId(deployment.id).padEnd(40);
       const name = deployment.name.substring(0, 24).padEnd(25);
+      const orgName = deployment.serverId
+        ? (serverOrgMap.get(deployment.serverId) ?? "-")
+        : "-";
+      const org = orgName.substring(0, 19).padEnd(20);
       const statusColor = getStatusColor(deployment.status);
       const status = statusColor(deployment.status.padEnd(12));
       const mcpUrl = (deployment.mcpUrl || "-").substring(0, 44).padEnd(45);
       const created = formatRelativeTime(deployment.createdAt);
 
       console.log(
-        `${chalk.gray(id)} ${name} ${status} ${chalk.cyan(mcpUrl)} ${chalk.gray(created)}`
+        `${chalk.gray(id)} ${name} ${chalk.magenta(org)} ${status} ${chalk.cyan(mcpUrl)} ${chalk.gray(created)}`
       );
     }
 

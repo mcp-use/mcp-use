@@ -125,6 +125,9 @@ Deploy your MCP server to production via [manufact.com](https://manufact.com):
 # Login to Manufact cloud
 mcp-use login
 
+# Non-interactive login (for agents / CI) — picks an org without prompting
+mcp-use login --org <slug|id|name>
+
 # Check authentication status
 mcp-use whoami
 

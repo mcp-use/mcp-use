@@ -10,7 +10,7 @@ import {
   writeConfig,
 } from "../utils/config.js";
 import { handleCommandError } from "../utils/errors.js";
-import type { OrgInfo } from "../utils/api.js";
+import type { AuthTestResponse, OrgInfo } from "../utils/api.js";
 
 const DEVICE_CLIENT_ID = "mcp-use-cli";
 const DEVICE_POLL_TIMEOUT = 1800000; // 30 minutes
@@ -105,6 +105,25 @@ async function pollForDeviceToken(
 }
 
 /**
+ * Resolve an org identifier (slug, id, or case-insensitive name) against a list.
+ * Returns null if no match.
+ */
+export function resolveOrgFromOption(
+  orgs: OrgInfo[],
+  identifier: string
+): OrgInfo | null {
+  const needle = identifier.trim();
+  if (!needle) return null;
+  const lower = needle.toLowerCase();
+  return (
+    orgs.find(
+      (o) =>
+        o.slug === needle || o.id === needle || o.name.toLowerCase() === lower
+    ) ?? null
+  );
+}
+
+/**
  * Prompt user to pick an organization from a numbered list.
  */
 export async function promptOrgSelection(
@@ -161,6 +180,7 @@ export async function promptOrgSelection(
 export async function loginCommand(options?: {
   silent?: boolean;
   apiKey?: string;
+  org?: string;
 }): Promise<void> {
   try {
     const directKey = options?.apiKey || process.env.MCP_USE_API_KEY;
@@ -262,10 +282,19 @@ export async function loginCommand(options?: {
 
     console.log(chalk.green.bold("\n✓ Successfully logged in!"));
 
+    let authInfo: AuthTestResponse | null = null;
     try {
       const freshApi = await McpUseAPI.create();
-      const authInfo = await freshApi.testAuth();
+      authInfo = await freshApi.testAuth();
+    } catch {
+      console.log(
+        chalk.gray(
+          `\n  Your API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
+        )
+      );
+    }
 
+    if (authInfo) {
       console.log(chalk.cyan.bold("\nCurrent user:\n"));
       console.log(chalk.white("  Email:   ") + chalk.cyan(authInfo.email));
       console.log(chalk.white("  User ID: ") + chalk.gray(authInfo.user_id));
@@ -280,8 +309,19 @@ export async function loginCommand(options?: {
       if (orgs.length > 0) {
         let selectedOrg: OrgInfo | null = null;
 
-        if (orgs.length === 1) {
+        if (options?.org) {
+          selectedOrg = resolveOrgFromOption(orgs, options.org);
+          if (!selectedOrg) {
+            throw new Error(
+              `Organization "${options.org}" not found. Run 'npx mcp-use org list' after logging in to see available organizations.`
+            );
+          }
+        } else if (orgs.length === 1) {
           selectedOrg = orgs[0];
+        } else if (!process.stdin.isTTY) {
+          throw new Error(
+            "Multiple organizations available and no TTY for interactive selection. Re-run with --org <slug|id|name> to pick one non-interactively."
+          );
         } else {
           selectedOrg = await promptOrgSelection(orgs, authInfo.default_org_id);
         }
@@ -303,12 +343,6 @@ export async function loginCommand(options?: {
           );
         }
       }
-    } catch {
-      console.log(
-        chalk.gray(
-          `\n  Your API key has been saved to ${chalk.white("~/.mcp-use/config.json")}`
-        )
-      );
     }
 
     console.log(

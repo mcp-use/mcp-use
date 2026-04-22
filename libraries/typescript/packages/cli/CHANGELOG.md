@@ -1,5 +1,51 @@
 # @mcp-use/cli
 
+## 3.1.0-canary.3
+
+### Minor Changes
+
+- 3b79a17: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+### Patch Changes
+
+- Updated dependencies [3b79a17]
+  - mcp-use@1.25.0-canary.3
+  - @mcp-use/inspector@3.0.0-canary.3
+
+## 3.1.0-canary.2
+
+### Minor Changes
+
+- e9bb402: `mcp-use login`: add `--org <slug|id|name>` flag for non-interactive org selection. Previously, when a user had multiple organizations, login would prompt on stdin after the browser auth completed — leaving agent harnesses blocked because they cannot write to the running process's stdin. With `--org`, login picks the org up-front and skips the prompt. If login is run without a TTY and no `--org` is supplied, it now fails fast with a message pointing at the flag rather than hanging. Matches the resolver already used by `mcp-use deploy --org`.
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.2
+- @mcp-use/inspector@2.2.1-canary.2
+
+## 3.1.0-canary.1
+
+### Minor Changes
+
+- 468af39: Add ORG column to `deployments list` output so users can see which organization each deployment belongs to.
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.1
+- @mcp-use/inspector@2.2.1-canary.1
+
+## 3.0.3-canary.0
+
+### Patch Changes
+
+- 52a98f9: fix: auto-discover available port in `mcp-use start` when default port is in use
+  - mcp-use@1.24.3-canary.0
+  - @mcp-use/inspector@2.2.1-canary.0
+
 ## 3.0.2
 
 ### Patch Changes

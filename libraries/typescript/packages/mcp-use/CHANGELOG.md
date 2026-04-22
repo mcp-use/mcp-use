@@ -1,5 +1,45 @@
 # mcp-use
 
+## 1.25.0-canary.3
+
+### Minor Changes
+
+- 3b79a17: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+### Patch Changes
+
+- Updated dependencies [3b79a17]
+  - @mcp-use/cli@3.1.0-canary.3
+  - @mcp-use/inspector@3.0.0-canary.3
+
+## 1.24.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e9bb402]
+  - @mcp-use/cli@3.1.0-canary.2
+  - @mcp-use/inspector@2.2.1-canary.2
+
+## 1.24.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [468af39]
+  - @mcp-use/cli@3.1.0-canary.1
+  - @mcp-use/inspector@2.2.1-canary.1
+
+## 1.24.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [52a98f9]
+  - @mcp-use/cli@3.0.3-canary.0
+  - @mcp-use/inspector@2.2.1-canary.0
+
 ## 1.24.2
 
 ### Patch Changes

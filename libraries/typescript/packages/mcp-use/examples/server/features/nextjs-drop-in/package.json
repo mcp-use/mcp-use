@@ -1,0 +1,32 @@
+{
+  "name": "nextjs-drop-in-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Next.js app with a drop-in MCP server under src/mcp/",
+  "scripts": {
+    "next:dev": "next dev",
+    "next:build": "next build",
+    "next:start": "next start",
+    "dev": "mcp-use dev --mcp-dir src/mcp",
+    "build": "mcp-use build --mcp-dir src/mcp",
+    "start": "mcp-use start --mcp-dir src/mcp"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.2.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "tailwindcss": "^4.2.0",
+    "mcp-use": "workspace:*",
+    "next": "^15.5.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "vite": "^8.0.5",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}
