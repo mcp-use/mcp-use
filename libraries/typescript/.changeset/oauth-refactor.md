@@ -1,5 +1,5 @@
 ---
-"mcp-use": major
+"mcp-use": minor
 ---
 
 Refactor OAuth providers to use DCR-direct flow by default
