@@ -8,6 +8,7 @@
     "mcp-use": "1.24.2"
   },
   "changesets": [
+    "cli-validate-token-on-login",
     "cool-happy-fair",
     "deploy-org-flag-linked-override",
     "deployments-list-org-column",
