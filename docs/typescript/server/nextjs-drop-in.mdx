@@ -1,0 +1,258 @@
+---
+title: Next.js Drop-In
+description: Run an MCP server inside an existing Next.js app, sharing tsconfig paths, components, and env files.
+icon: "layers"
+---
+
+The Next.js drop-in lets you colocate an MCP server inside an existing Next.js
+app — same repo, same `@/*` aliases, same shared components, same `.env` files
+— without spinning up a separate project. Your Next.js routes keep working, and
+a single `mcp-use dev` (or `build` / `start`) runs the MCP server beside them.
+
+## Quick Start
+
+Inside an existing Next.js app (App Router, `src/` layout):
+
+<Steps>
+  <Step title="Add the MCP server">
+    Create an `src/mcp/` folder with a server entry:
+
+    ```typescript src/mcp/index.ts
+    import { MCPServer, text } from "mcp-use/server";
+    import z from "zod";
+    import { getCurrentUser } from "@/lib/auth";
+
+    const server = new MCPServer({
+      name: "my-app-mcp",
+      version: "1.0.0",
+    });
+
+    server.tool(
+      {
+        name: "whoami",
+        description: "Return the currently signed-in user",
+      },
+      async () => text(JSON.stringify(await getCurrentUser()))
+    );
+
+    await server.listen();
+    ```
+
+  </Step>
+  <Step title="Add scripts to package.json">
+    ```json package.json
+    {
+      "scripts": {
+        "dev": "next dev",
+        "mcp:dev": "mcp-use dev --mcp-dir src/mcp",
+        "mcp:build": "mcp-use build --mcp-dir src/mcp",
+        "mcp:start": "mcp-use start --mcp-dir src/mcp"
+      },
+      "dependencies": {
+        "mcp-use": "^1",
+        "next": "^15",
+        "react": "^19",
+        "react-dom": "^19"
+      }
+    }
+    ```
+
+  </Step>
+  <Step title="Run it">
+    ```bash
+    pnpm mcp:dev
+    ```
+
+    The MCP server comes up on `http://localhost:3000/mcp` with HMR, and
+    imports like `@/lib/auth` resolve through your Next.js app's `tsconfig.json`.
+
+  </Step>
+</Steps>
+
+## Project Layout
+
+The convention for a drop-in:
+
+```
+my-next-app/
+├── package.json
+├── tsconfig.json            # "@/*": ["./src/*"]
+├── next.config.js
+├── src/
+│   ├── app/                 # Next.js routes — untouched
+│   ├── components/          # Shared React components (used by pages AND widgets)
+│   ├── lib/                 # Shared server code (imported by tools)
+│   └── mcp/
+│       ├── index.ts         # MCP server entry
+│       └── resources/       # Widgets (React components rendered in MCP clients)
+│           └── my-widget/
+│               └── widget.tsx
+```
+
+`src/mcp/index.ts` is auto-discovered when you pass `--mcp-dir src/mcp`. You
+can override the entry with `--entry src/mcp/server.ts`.
+
+Widgets in `src/mcp/resources/` are picked up by `mcp-use build` / `dev`
+automatically — they can `import "@/components/..."` and those aliases resolve
+through your app's `tsconfig.json`.
+
+## How It Works
+
+Three problems come up when you run an MCP server inside a Next.js project,
+and the drop-in solves each automatically:
+
+### 1. Path aliases (`@/lib/...`)
+
+When your tool imports `@/lib/auth`, that alias is defined in the host app's
+`tsconfig.json`. The CLI registers `tsx` with the project's tsconfig, so
+transitive imports like `@/lib/auth` resolve through the same paths config
+Next.js uses.
+
+### 2. Next.js server-runtime modules
+
+A helper like `src/lib/auth.ts` typically contains:
+
+```typescript
+import "server-only";
+import { headers, cookies } from "next/headers";
+```
+
+These modules are designed to throw or do nothing outside a Next.js request
+context. When the CLI detects `next` in your `package.json`, it installs
+runtime shims that replace the following specifiers with inert stand-ins:
+
+| Module            | Stub behavior                                                        |
+| ----------------- | -------------------------------------------------------------------- |
+| `server-only`     | No-op (the import itself is the whole side effect in the real pkg). |
+| `client-only`     | No-op.                                                               |
+| `next/cache`      | `revalidatePath`/`revalidateTag` no-op, `unstable_cache` returns fn. |
+| `next/headers`    | `headers()` returns empty `Headers`, `cookies()` returns empty store. |
+| `next/navigation` | `redirect()`/`notFound()` still throw, so callers fail loudly.       |
+| `next/server`     | Minimal `NextResponse`/`NextRequest` stubs.                          |
+
+Shims run on both the ESM side (via a Node `module.register()` loader) and the
+CJS side (via a `Module._resolveFilename` patch), so `require("server-only")`
+and `import "server-only"` both route to the stub. No user configuration
+needed.
+
+### 3. Environment variables
+
+The CLI mirrors Next.js's env-file cascade into `process.env` before your
+server boots:
+
+```
+.env → .env.development → .env.local → .env.development.local
+```
+
+Later files override earlier ones. So `DATABASE_URL` from `.env.local` shows
+up the same way Next.js sees it.
+
+## Widgets inside a Next.js app
+
+Widgets run in a browser iframe and **cannot** use server APIs, even though
+they live inside the Next.js tree. The drop-in enforces this at build time —
+if a widget (or a module it transitively imports) pulls in `server-only`,
+`next/headers`, etc., the build fails with an actionable error:
+
+```
+Widget "user-card" imports "next/headers" (imported from src/components/navbar.tsx),
+which is a Next.js server-only module. Widgets run in a browser iframe and
+cannot use server APIs.
+
+To fix:
+  • Remove the import from the widget (or from any module the widget
+    transitively imports)
+  • If the widget needs data from next/headers, read it inside an MCP tool
+    and pass the result through the widget's props
+```
+
+The right pattern is to fetch server data inside the MCP tool and pass it to
+the widget via props:
+
+```typescript src/mcp/index.ts
+import { MCPServer, widget } from "mcp-use/server";
+import { getCurrentUser } from "@/lib/auth"; // uses next/headers — fine here
+
+server.tool(
+  {
+    name: "show-profile",
+    widget: { name: "profile-card" },
+  },
+  async () =>
+    widget({
+      props: { user: await getCurrentUser() },
+      message: "Profile rendered",
+    })
+);
+```
+
+Tailwind automatically scans `<project>/src/` when it exists, so widgets that
+import shared components pick up the same design tokens your app uses.
+
+## CLI Flags
+
+These work on `dev`, `build`, and `start`:
+
+| Flag                  | Description                                                                      |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `--mcp-dir <dir>`     | Folder holding the MCP entry + `resources/` (e.g. `src/mcp`).                    |
+| `--entry <file>`      | Explicit entry file, relative to project root. Overrides `--mcp-dir` discovery. |
+| `--widgets-dir <dir>` | Widgets directory (defaults to `<mcp-dir>/resources`).                           |
+
+Entry file discovery in `--mcp-dir` mode tries, in order:
+`<dir>/index.ts`, `<dir>/index.tsx`, `<dir>/server.ts`, `<dir>/server.tsx`.
+
+## Build semantics
+
+`mcp-use build --mcp-dir` is intentionally **lighter** than the standalone
+build:
+
+- **No esbuild transpile step.** The host Next.js app owns its build; trying
+  to transpile every `.ts`/`.tsx` in a Next project blows up on files like
+  `tailwind.config.ts` and RSC-only files. The manifest records the `.ts`
+  source path and `mcp-use start` runs it through `tsx` directly.
+- **No `tsc --noEmit` typecheck.** `next build` already does this for you.
+- Widget builds still run — they produce static assets in
+  `dist/resources/widgets/<name>/`.
+
+## Running alongside Next.js
+
+The MCP server and `next dev` are two separate processes. Give them different
+ports:
+
+```json package.json
+{
+  "scripts": {
+    "dev": "next dev",
+    "mcp:dev": "mcp-use dev --mcp-dir src/mcp --port 3001"
+  }
+}
+```
+
+Or run them together with [concurrently](https://www.npmjs.com/package/concurrently):
+
+```json
+{
+  "scripts": {
+    "dev:all": "concurrently \"next dev\" \"mcp-use dev --mcp-dir src/mcp --port 3001\""
+  }
+}
+```
+
+## Requirements
+
+- Next.js 13+ (App Router or Pages Router — the shims cover both).
+- A project-root `tsconfig.json` with your `@/*` paths. The drop-in picks these
+  up via Vite's `resolve.tsconfigPaths` (for widgets) and `tsx`'s tsconfig
+  support (for the server).
+- `tailwindcss` in your `dependencies` if you use it in widgets (`@tailwindcss/vite`
+  alone is not enough — the widget pipeline needs `tailwindcss` directly
+  resolvable from the project).
+
+## Example
+
+A complete working example lives in the repo:
+[examples/server/features/nextjs-drop-in](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/nextjs-drop-in).
+It demonstrates `@/*` aliases, `server-only` + `next/headers` via a shared
+`src/lib/server-data.ts`, and a widget that reuses a shared
+`@/components/card` component.

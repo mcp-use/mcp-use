@@ -1,0 +1,11 @@
+{
+  "$comment": "Single source of truth for the Next.js server-runtime modules we shim in the MCP server context (and reject in widget builds). Loaded by next-shims-cjs.cjs (CommonJS require) and next-shims-loader.mjs (ESM import assertions). When adding a new specifier, also add its stub to next-shims-noop.cjs and its data-URL stub to next-shims-loader.mjs.",
+  "shimmedModules": [
+    "server-only",
+    "client-only",
+    "next/cache",
+    "next/headers",
+    "next/navigation",
+    "next/server"
+  ]
+}

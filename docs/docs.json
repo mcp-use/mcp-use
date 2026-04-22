@@ -553,7 +553,8 @@
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
                       "typescript/server/notifications",
-                      "typescript/server/logging"
+                      "typescript/server/logging",
+                      "typescript/server/nextjs-drop-in"
                     ]
                   },
                   {

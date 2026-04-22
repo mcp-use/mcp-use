@@ -1,0 +1,11 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/index.ts",
+    "src/shims/next-shims-register.mjs",
+    "src/shims/next-shims-loader.mjs",
+    "src/shims/next-shims-cjs.cjs",
+    "src/shims/next-shims-noop.cjs"
+  ],
+  "project": ["src/**/*.{ts,mjs,cjs}"]
+}
