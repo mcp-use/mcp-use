@@ -1080,10 +1080,10 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
-        onCopyChat={handleCopyChat}
-        onExportChat={handleExportChat}
         hideConfigButton={isManaged && !freeTierInfo}
         freeTierInfo={freeTierInfo}
+        onCopyChat={handleCopyChat}
+        onExportChat={handleExportChat}
         clearButtonLabel={clearButtonLabel}
         hideTitle={hideTitle}
         clearButtonHideIcon={clearButtonHideIcon}
