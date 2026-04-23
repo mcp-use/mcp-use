@@ -316,9 +316,9 @@ export function useWidget<
     hasMcpUseParams: boolean;
   } => {
     // check if it has mcpUseParams
-    const sp = new URLSearchParams(searchString);
-    if (sp.has("mcpUseParams")) {
-      const parsed = JSON.parse(sp.get("mcpUseParams") as string) as {
+    const searchParams = new URLSearchParams(searchString);
+    if (searchParams.has("mcpUseParams")) {
+      const parsed = JSON.parse(searchParams.get("mcpUseParams") as string) as {
         toolInput: TProps;
         toolOutput: TOutput;
         toolId: string;
