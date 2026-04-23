@@ -61,7 +61,8 @@ export function Layout({ children }: LayoutProps) {
       url: string,
       name?: string,
       proxyConfig?: any,
-      transportType?: "http" | "sse"
+      transportType?: "http" | "sse",
+      oauth?: { clientId?: string; clientSecret?: string; scope?: string }
     ) => {
       addServer(url, {
         url,
@@ -78,6 +79,7 @@ export function Layout({ children }: LayoutProps) {
             },
           },
         },
+        ...(oauth ? { oauth } : {}),
       });
     },
     [addServer]
@@ -395,7 +397,8 @@ export function Layout({ children }: LayoutProps) {
           config.url,
           config.name,
           config.proxyConfig,
-          config.transportType
+          config.transportType,
+          config.oauth
         );
       } else if (
         currentConnection &&
@@ -410,6 +413,7 @@ export function Layout({ children }: LayoutProps) {
           name: config.name,
           proxyConfig: config.proxyConfig,
           transportType: config.transportType,
+          oauth: config.oauth,
         });
       }
 

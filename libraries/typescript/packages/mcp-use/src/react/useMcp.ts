@@ -111,7 +111,26 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     samplingCallback: samplingCallbackOption,
     onElicitation: onElicitationOption,
     elicitationCallback: elicitationCallbackOption,
+    oauth: oauthOptions,
   } = options;
+
+  // Pre-registered OAuth client settings: surface as a stable
+  // OAuthClientInformation so the SDK skips Dynamic Client Registration.
+  // When clientSecret is also supplied, the SDK auto-selects
+  // client_secret_basic / client_secret_post for token-endpoint auth.
+  const oauthClientId = oauthOptions?.clientId?.trim() || undefined;
+  const oauthClientSecret = oauthOptions?.clientSecret?.trim() || undefined;
+  const oauthScope = oauthOptions?.scope?.trim() || undefined;
+  const staticClientInfo = useMemo(
+    () =>
+      oauthClientId
+        ? {
+            client_id: oauthClientId,
+            ...(oauthClientSecret ? { client_secret: oauthClientSecret } : {}),
+          }
+        : undefined,
+    [oauthClientId, oauthClientSecret]
+  );
 
   // Create a per-instance logger so multiple useMcp instances don't clobber each other's log level.
   // Each instance gets its own named logger keyed by URL (or a fallback).
@@ -612,6 +631,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         gatewayUrl,
         onPopupWindow,
         installFetchInterceptor: true,
+        staticClientInfo,
+        scope: oauthScope,
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
@@ -1241,6 +1262,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.version,
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
+    staticClientInfo,
+    oauthScope,
     headers,
     transportType,
     preventAutoAuth,
@@ -1436,6 +1459,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             gatewayUrl,
             onPopupWindow,
             installFetchInterceptor: !gatewayUrl,
+            staticClientInfo,
+            scope: oauthScope,
           });
 
         if (oauthProxyUrl && !gatewayUrl) {
@@ -1514,6 +1539,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.name,
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
+    staticClientInfo,
+    oauthScope,
     callbackUrl,
     mergedClientInfo,
     providedAuthProvider,
@@ -2008,6 +2035,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         gatewayUrl,
         onPopupWindow,
         installFetchInterceptor: true,
+        staticClientInfo,
+        scope: oauthScope,
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
@@ -2062,6 +2091,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.version,
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
+    staticClientInfo,
+    oauthScope,
     useRedirectFlow,
     mergedClientInfo,
     effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL

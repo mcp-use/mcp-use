@@ -66,6 +66,7 @@ export function ServerConnectionModal({
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState("");
 
   // Prefill form when connection changes
@@ -129,6 +130,15 @@ export function ServerConnectionModal({
         })
       );
       setCustomHeaders(headerArray);
+
+      const storedOauth =
+        storedConfig?.oauth ||
+        (connectionWithConfig as {
+          oauth?: { clientId?: string; clientSecret?: string; scope?: string };
+        }).oauth;
+      setClientId(storedOauth?.clientId || "");
+      setClientSecret(storedOauth?.clientSecret || "");
+      setScope(storedOauth?.scope || "");
     }
   }, [connection, open]);
 
@@ -196,11 +206,26 @@ export function ServerConnectionModal({
     // Always use HTTP transport (SSE is deprecated)
     const actualTransportType = "http";
 
+    const trimmedClientId = clientId.trim();
+    const trimmedClientSecret = clientSecret.trim();
+    const trimmedScope = scope.trim();
+    const oauth =
+      trimmedClientId || trimmedScope
+        ? {
+            ...(trimmedClientId ? { clientId: trimmedClientId } : {}),
+            ...(trimmedClientId && trimmedClientSecret
+              ? { clientSecret: trimmedClientSecret }
+              : {}),
+            ...(trimmedScope ? { scope: trimmedScope } : {}),
+          }
+        : undefined;
+
     onConnect({
       url: normalizedUrl,
       name: alias.trim() || normalizedUrl,
       transportType: actualTransportType,
       proxyConfig,
+      ...(oauth ? { oauth } : {}),
     });
 
     onOpenChange(false);
@@ -231,6 +256,8 @@ export function ServerConnectionModal({
           setProxyAddress={setProxyAddress}
           clientId={clientId}
           setClientId={setClientId}
+          clientSecret={clientSecret}
+          setClientSecret={setClientSecret}
           scope={scope}
           setScope={setScope}
           onConnect={handleConnect}

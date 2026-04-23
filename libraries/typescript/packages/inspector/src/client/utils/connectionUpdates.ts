@@ -9,6 +9,11 @@ interface ConnectionLike {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
+  oauth?: {
+    clientId?: string;
+    clientSecret?: string;
+    scope?: string;
+  };
 }
 
 export interface EditableConnectionConfig {
@@ -22,6 +27,11 @@ export interface EditableConnectionConfig {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
+  oauth?: {
+    clientId?: string;
+    clientSecret?: string;
+    scope?: string;
+  };
 }
 
 export function getStoredConnectionConfig<T>(id: string): T | null {
@@ -64,6 +74,9 @@ function normalizeConnection(
   transportType: "http" | "sse";
   proxyAddress: string;
   headers: Record<string, string>;
+  oauthClientId: string;
+  oauthClientSecret: string;
+  oauthScope: string;
 } {
   const normalizedUrl = connection.url?.trim() || "";
 
@@ -73,6 +86,9 @@ function normalizeConnection(
     transportType: connection.transportType || "http",
     proxyAddress: connection.proxyConfig?.proxyAddress?.trim() || "",
     headers: getComparableHeaders(connection),
+    oauthClientId: connection.oauth?.clientId?.trim() || "",
+    oauthClientSecret: connection.oauth?.clientSecret?.trim() || "",
+    oauthScope: connection.oauth?.scope?.trim() || "",
   };
 }
 
@@ -89,6 +105,9 @@ export function isAliasOnlyConnectionUpdate(
     currentConnection.proxyAddress === nextConnection.proxyAddress &&
     JSON.stringify(currentConnection.headers) ===
       JSON.stringify(nextConnection.headers) &&
+    currentConnection.oauthClientId === nextConnection.oauthClientId &&
+    currentConnection.oauthClientSecret === nextConnection.oauthClientSecret &&
+    currentConnection.oauthScope === nextConnection.oauthScope &&
     currentConnection.name !== nextConnection.name
   );
 }
