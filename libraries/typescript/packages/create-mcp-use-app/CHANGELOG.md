@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.9
+
+### Patch Changes
+
+- 1bdec92: Only copy the `mcp-apps-builder` skill into new projects; skip the deprecated `mcp-builder` and `chatgpt-app-builder` skills during setup.
+
 ## 0.14.9-canary.0
 
 ### Patch Changes

@@ -1,5 +1,42 @@
 # mcp-use
 
+## 1.25.0
+
+### Minor Changes
+
+- 1bdec92: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+- 1bdec92: Refactor OAuth providers to use DCR-direct flow by default
+
+  **Breaking Changes (mcp-use):**
+  - Removed proxy mode from built-in OAuth providers (Auth0, WorkOS, Supabase, Keycloak, Better Auth)
+  - Built-in providers now only support DCR-direct flow: clients communicate directly with upstream authorization servers
+  - `verifyToken` is now an explicit required function for custom providers
+  - Provider configurations no longer accept `clientId`/`clientSecret` - use the new `oauthProxy` helper for providers that don't support DCR
+
+  **New Features:**
+  - Added `oauthProxy` helper for creating proxy-mode OAuth providers (useful for Google, GitHub, etc.)
+  - Added `jwksVerifier` helper function for easy JWKS-based token verification in custom providers
+  - Added Auth0 OAuth proxy example demonstrating the new proxy pattern
+
+### Patch Changes
+
+- 1bdec92: Fix OAuth authorize redirect stripping URL path when auth server uses basePath. The `authenticate()` function now preserves the pathname component (e.g. `/api/auth`) instead of reducing the URL to just the origin.
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+  - @mcp-use/cli@3.1.0
+  - @mcp-use/inspector@3.0.0
+
 ## 1.25.0-canary.9
 
 ### Minor Changes
