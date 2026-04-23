@@ -15,6 +15,9 @@ LangChain adapter for MCP tools.
 
 This module provides utilities to convert MCP tools to LangChain tools.
 
+Uses StructuredTool.from_function() to avoid Pydantic deepcopy issues with
+connector objects that contain asyncio primitives (Issue #734).
+
 ## LangChainAdapter
 
 <div>
@@ -23,6 +26,11 @@ This module provides utilities to convert MCP tools to LangChain tools.
 <div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> LangChainAdapter</div>
 
 Adapter for converting MCP tools to LangChain tools.
+
+    This adapter uses StructuredTool.from_function() which captures connectors
+    via closures instead of storing them as Pydantic model fields. This avoids
+    issues with deepcopy of asyncio objects (Event, Task, Future) that cannot
+    be pickled.
 
 </div>
 </RandomGradientBackground>

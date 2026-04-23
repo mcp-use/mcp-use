@@ -105,7 +105,7 @@ class TestLangChainAdapterToolExecution:
 
         assert langchain_tool is not None
 
-        result = await langchain_tool._arun()
+        result = await langchain_tool.ainvoke({})
 
         connector.call_tool.assert_awaited_once_with("failing_tool", {})
         assert result["error"] == "RuntimeError"
