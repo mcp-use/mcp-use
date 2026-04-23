@@ -1,3 +1,9 @@
+export interface OAuthStaticConfig {
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
+}
+
 interface ConnectionLike {
   url?: string;
   name?: string;
@@ -9,11 +15,7 @@ interface ConnectionLike {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
-  oauth?: {
-    clientId?: string;
-    clientSecret?: string;
-    scope?: string;
-  };
+  oauth?: OAuthStaticConfig;
 }
 
 export interface EditableConnectionConfig {
@@ -27,10 +29,30 @@ export interface EditableConnectionConfig {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
-  oauth?: {
-    clientId?: string;
-    clientSecret?: string;
-    scope?: string;
+  oauth?: OAuthStaticConfig;
+}
+
+/**
+ * Build an OAuth static-client config from raw form inputs, trimming whitespace
+ * and dropping empty fields. clientSecret is only kept when clientId is also set
+ * — a secret without a client_id has no meaning. Returns `undefined` when
+ * neither a client_id nor a scope is provided.
+ */
+export function buildOAuthStaticConfig(
+  clientId: string,
+  clientSecret: string,
+  scope: string
+): OAuthStaticConfig | undefined {
+  const trimmedClientId = clientId.trim();
+  const trimmedClientSecret = clientSecret.trim();
+  const trimmedScope = scope.trim();
+  if (!trimmedClientId && !trimmedScope) return undefined;
+  return {
+    ...(trimmedClientId ? { clientId: trimmedClientId } : {}),
+    ...(trimmedClientId && trimmedClientSecret
+      ? { clientSecret: trimmedClientSecret }
+      : {}),
+    ...(trimmedScope ? { scope: trimmedScope } : {}),
   };
 }
 

@@ -1,4 +1,8 @@
 import type { McpServer } from "mcp-use/react";
+import {
+  buildOAuthStaticConfig,
+  type OAuthStaticConfig,
+} from "@/client/utils/connectionUpdates";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -10,6 +14,7 @@ type MCPConnectionWithConfig = MCPConnection & {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
+  oauth?: OAuthStaticConfig;
 };
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { useEffect, useState } from "react";
@@ -35,6 +40,7 @@ interface ServerConnectionModalProps {
       proxyAddress?: string;
       headers?: Record<string, string>;
     };
+    oauth?: OAuthStaticConfig;
   }) => void;
 }
 
@@ -131,11 +137,7 @@ export function ServerConnectionModal({
       );
       setCustomHeaders(headerArray);
 
-      const storedOauth =
-        storedConfig?.oauth ||
-        (connectionWithConfig as {
-          oauth?: { clientId?: string; clientSecret?: string; scope?: string };
-        }).oauth;
+      const storedOauth = storedConfig?.oauth ?? connectionWithConfig.oauth;
       setClientId(storedOauth?.clientId || "");
       setClientSecret(storedOauth?.clientSecret || "");
       setScope(storedOauth?.scope || "");
@@ -206,19 +208,7 @@ export function ServerConnectionModal({
     // Always use HTTP transport (SSE is deprecated)
     const actualTransportType = "http";
 
-    const trimmedClientId = clientId.trim();
-    const trimmedClientSecret = clientSecret.trim();
-    const trimmedScope = scope.trim();
-    const oauth =
-      trimmedClientId || trimmedScope
-        ? {
-            ...(trimmedClientId ? { clientId: trimmedClientId } : {}),
-            ...(trimmedClientId && trimmedClientSecret
-              ? { clientSecret: trimmedClientSecret }
-              : {}),
-            ...(trimmedScope ? { scope: trimmedScope } : {}),
-          }
-        : undefined;
+    const oauth = buildOAuthStaticConfig(clientId, clientSecret, scope);
 
     onConnect({
       url: normalizedUrl,

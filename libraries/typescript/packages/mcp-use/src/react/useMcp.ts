@@ -114,10 +114,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauth: oauthOptions,
   } = options;
 
-  // Pre-registered OAuth client settings: surface as a stable
-  // OAuthClientInformation so the SDK skips Dynamic Client Registration.
-  // When clientSecret is also supplied, the SDK auto-selects
-  // client_secret_basic / client_secret_post for token-endpoint auth.
   const oauthClientId = oauthOptions?.clientId?.trim() || undefined;
   const oauthClientSecret = oauthOptions?.clientSecret?.trim() || undefined;
   const oauthScope = oauthOptions?.scope?.trim() || undefined;

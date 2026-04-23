@@ -440,7 +440,6 @@ export function ConnectionSettingsForm({
                 />
               </div>
 
-              {/* Client Secret */}
               <div className="space-y-2">
                 <Label className="text-sm">Client Secret</Label>
                 <Input

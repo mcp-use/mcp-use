@@ -18,6 +18,7 @@ import {
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
   type EditableConnectionConfig,
+  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 import { useMcpClient, type McpServer } from "mcp-use/react";
 import type { ReactNode } from "react";
@@ -62,7 +63,7 @@ export function Layout({ children }: LayoutProps) {
       name?: string,
       proxyConfig?: any,
       transportType?: "http" | "sse",
-      oauth?: { clientId?: string; clientSecret?: string; scope?: string }
+      oauth?: OAuthStaticConfig
     ) => {
       addServer(url, {
         url,

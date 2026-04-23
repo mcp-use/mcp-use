@@ -39,9 +39,11 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import {
+  buildOAuthStaticConfig,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
   type EditableConnectionConfig,
+  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 import {
   getConfiguredServerAlias,
@@ -148,7 +150,7 @@ export function InspectorDashboard() {
       name?: string,
       proxyConfig?: any,
       transportType?: "http" | "sse",
-      oauth?: { clientId?: string; clientSecret?: string; scope?: string }
+      oauth?: OAuthStaticConfig
     ) => {
       addServer(url, {
         url,
@@ -171,7 +173,7 @@ export function InspectorDashboard() {
           headers?: Record<string, string>;
         };
         transportType?: "http" | "sse";
-        oauth?: { clientId?: string; clientSecret?: string; scope?: string };
+        oauth?: OAuthStaticConfig;
       }
     ) => {
       // Check if already updating this connection
@@ -412,19 +414,7 @@ export function InspectorDashboard() {
           }
         : undefined;
 
-    const trimmedClientId = clientId.trim();
-    const trimmedClientSecret = clientSecret.trim();
-    const trimmedScope = scope.trim();
-    const oauthConfig =
-      trimmedClientId || trimmedScope
-        ? {
-            ...(trimmedClientId ? { clientId: trimmedClientId } : {}),
-            ...(trimmedClientId && trimmedClientSecret
-              ? { clientSecret: trimmedClientSecret }
-              : {}),
-            ...(trimmedScope ? { scope: trimmedScope } : {}),
-          }
-        : undefined;
+    const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
 
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
