@@ -110,7 +110,7 @@ export class MCPServerConnectionEvent implements BaseTelemetryEvent {
 
 export interface MCPChatMessageEventData {
   serverId?: string;
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "anthropic" | "google" | "ollama";
   model: string;
   messageCount: number;
   toolCallsCount?: number;

@@ -8,9 +8,10 @@ import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
 import type { ProviderMessage, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "anthropic" | "google" | "ollama";
   model: string;
   apiKey: string;
+  baseUrl?: string;
   temperature?: number;
 }
 
@@ -181,6 +182,7 @@ export async function* handleChatRequestStream(requestBody: {
         provider: llmConfig.provider,
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
+        baseUrl: llmConfig.baseUrl,
         temperature: llmConfig.temperature,
       },
       messages: providerMessages,
@@ -341,6 +343,7 @@ export async function handleChatRequest(requestBody: {
         provider: llmConfig.provider,
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
+        baseUrl: llmConfig.baseUrl,
         temperature: llmConfig.temperature,
       },
       messages: providerMessages,

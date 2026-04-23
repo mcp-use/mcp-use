@@ -1,7 +1,13 @@
 import { MCPChatConfiguredEvent, Telemetry } from "@/client/telemetry";
 import { useCallback, useEffect, useState } from "react";
+import type { ProviderName } from "@/llm/types";
 import type { AuthConfig, LLMConfig } from "./types";
-import { DEFAULT_MODELS } from "./types";
+import {
+  DEFAULT_MODELS,
+  getDefaultBaseUrl,
+  providerRequiresApiKey,
+  providerSupportsBaseUrl,
+} from "./types";
 import { hashString } from "./utils";
 
 interface UseConfigProps {
@@ -14,11 +20,10 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
 
   // LLM Config form state
-  const [tempProvider, setTempProvider] = useState<
-    "openai" | "anthropic" | "google"
-  >("openai");
+  const [tempProvider, setTempProvider] = useState<ProviderName>("openai");
   const [tempApiKey, setTempApiKey] = useState("");
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
+  const [tempBaseUrl, setTempBaseUrl] = useState(getDefaultBaseUrl("openai"));
 
   // Load API keys per provider from localStorage
   const getApiKeys = useCallback((): Record<string, string> => {
@@ -39,6 +44,23 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     localStorage.setItem("mcp-inspector-api-keys", JSON.stringify(apiKeys));
   }, []);
 
+  const getBaseUrls = useCallback((): Record<string, string> => {
+    const saved = localStorage.getItem("mcp-inspector-base-urls");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (error) {
+        console.error("Failed to load base URLs:", error);
+        return {};
+      }
+    }
+    return {};
+  }, []);
+
+  const saveBaseUrls = useCallback((baseUrls: Record<string, string>) => {
+    localStorage.setItem("mcp-inspector-base-urls", JSON.stringify(baseUrls));
+  }, []);
+
   // Auth Config form state
   const [tempAuthType, setTempAuthType] = useState<
     "none" | "basic" | "bearer" | "oauth"
@@ -52,6 +74,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     const loadConfig = () => {
       const saved = localStorage.getItem("mcp-inspector-llm-config");
       const apiKeys = getApiKeys();
+      const baseUrls = getBaseUrls();
       if (saved) {
         try {
           const config = JSON.parse(saved);
@@ -60,6 +83,11 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
           // Load API key for the provider from provider-specific storage
           setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
           setTempModel(config.model);
+          setTempBaseUrl(
+            baseUrls[config.provider] ||
+              config.baseUrl ||
+              getDefaultBaseUrl(config.provider)
+          );
         } catch (error) {
           console.error("Failed to load LLM config:", error);
         }
@@ -78,7 +106,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     const handleStorageChange = (e: StorageEvent) => {
       if (
         e.key === "mcp-inspector-llm-config" ||
-        e.key === "mcp-inspector-api-keys"
+        e.key === "mcp-inspector-api-keys" ||
+        e.key === "mcp-inspector-base-urls"
       ) {
         loadConfig();
       }
@@ -90,7 +119,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
       window.removeEventListener("llm-config-updated", handleConfigUpdate);
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, [getApiKeys]);
+  }, [getApiKeys, getBaseUrls]);
 
   // Load auth config from localStorage on mount
   useEffect(() => {
@@ -130,11 +159,13 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempModel(DEFAULT_MODELS[tempProvider]);
     // Load API key for the selected provider
     const apiKeys = getApiKeys();
+    const baseUrls = getBaseUrls();
     setTempApiKey(apiKeys[tempProvider] || "");
-  }, [tempProvider, getApiKeys]);
+    setTempBaseUrl(baseUrls[tempProvider] || getDefaultBaseUrl(tempProvider));
+  }, [tempProvider, getApiKeys, getBaseUrls]);
 
   const saveLLMConfig = useCallback(() => {
-    if (!tempApiKey.trim()) {
+    if (providerRequiresApiKey(tempProvider) && !tempApiKey.trim()) {
       return;
     }
 
@@ -143,10 +174,19 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     apiKeys[tempProvider] = tempApiKey;
     saveApiKeys(apiKeys);
 
+    if (providerSupportsBaseUrl(tempProvider)) {
+      const baseUrls = getBaseUrls();
+      baseUrls[tempProvider] = tempBaseUrl.trim();
+      saveBaseUrls(baseUrls);
+    }
+
     const newLlmConfig: LLMConfig = {
       provider: tempProvider,
-      apiKey: tempApiKey,
-      model: tempModel,
+      apiKey: tempApiKey.trim(),
+      model: tempModel.trim(),
+      ...(providerSupportsBaseUrl(tempProvider)
+        ? { baseUrl: tempBaseUrl.trim() || getDefaultBaseUrl(tempProvider) }
+        : {}),
     };
 
     const newAuthConfig: AuthConfig = {
@@ -193,12 +233,15 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     tempProvider,
     tempApiKey,
     tempModel,
+    tempBaseUrl,
     tempAuthType,
     tempUsername,
     tempPassword,
     tempToken,
     getApiKeys,
+    getBaseUrls,
     saveApiKeys,
+    saveBaseUrls,
   ]);
 
   const clearConfig = useCallback(() => {
@@ -208,14 +251,16 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     const apiKeys = getApiKeys();
     delete apiKeys[tempProvider];
     saveApiKeys(apiKeys);
+    const baseUrls = getBaseUrls();
     setTempApiKey("");
+    setTempBaseUrl(baseUrls[tempProvider] || getDefaultBaseUrl(tempProvider));
     setTempUsername("");
     setTempPassword("");
     setTempToken("");
     setTempAuthType("none");
     localStorage.removeItem("mcp-inspector-llm-config");
     localStorage.removeItem("mcp-inspector-auth-config");
-  }, [tempProvider, getApiKeys, saveApiKeys]);
+  }, [tempProvider, getApiKeys, saveApiKeys, getBaseUrls]);
 
   return {
     llmConfig,
@@ -228,6 +273,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempApiKey,
     tempModel,
     setTempModel,
+    tempBaseUrl,
+    setTempBaseUrl,
     tempAuthType,
     saveLLMConfig,
     clearConfig,
