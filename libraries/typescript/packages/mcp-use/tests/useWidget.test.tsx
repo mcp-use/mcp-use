@@ -4,7 +4,9 @@ import TestRenderer, { act } from "react-test-renderer";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useWidget } from "../src/react/useWidget";
 
-type HookResult = ReturnType<typeof useWidget<Record<string, unknown>, unknown>>;
+type HookResult = ReturnType<
+  typeof useWidget<Record<string, unknown>, unknown>
+>;
 
 // Tiny harness that renders nothing visible but captures the hook's return value
 // on every render so tests can assert against it.
@@ -18,9 +20,7 @@ function renderHook() {
   let latest: HookResult | undefined;
   let renderer: TestRenderer.ReactTestRenderer | undefined;
   act(() => {
-    renderer = TestRenderer.create(
-      <Harness onResult={(r) => (latest = r)} />
-    );
+    renderer = TestRenderer.create(<Harness onResult={(r) => (latest = r)} />);
   });
   return {
     get result() {
