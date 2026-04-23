@@ -1,5 +1,33 @@
 # @mcp-use/cli
 
+## 3.1.0
+
+### Minor Changes
+
+- 1bdec92: Add ORG column to `deployments list` output so users can see which organization each deployment belongs to.
+- 1bdec92: `mcp-use login`: add `--org <slug|id|name>` flag for non-interactive org selection. Previously, when a user had multiple organizations, login would prompt on stdin after the browser auth completed — leaving agent harnesses blocked because they cannot write to the running process's stdin. With `--org`, login picks the org up-front and skips the prompt. If login is run without a TTY and no `--org` is supplied, it now fails fast with a message pointing at the flag rather than hanging. Matches the resolver already used by `mcp-use deploy --org`.
+- 1bdec92: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+### Patch Changes
+
+- 1bdec92: `mcp-use login` now validates the stored API key against the backend before short-circuiting with "You are already logged in." If the key is expired or revoked, login detects the 401, clears the stale config, and drops into the device-auth flow automatically. Network or other non-401 errors preserve the old "already logged in" behavior so users don't get bounced into re-auth just because they're offline.
+
+  Every command that hits the authenticated API (`whoami`, `org`, `servers`, `deployments`, `env`) now funnels errors through a shared `handleCommandError` helper. On a 401 the user sees a friendly "session expired — run `npx mcp-use login` to re-authenticate" hint instead of a raw `API request failed: 401 …` dump. The `deploy` command's existing richer re-auth flow is unchanged.
+
+- 1bdec92: fix: auto-discover available port in `mcp-use start` when default port is in use
+- 1bdec92: `mcp-use deploy --org <org>`: respect the flag when a project is already linked to a server in a different organization. Previously, the existing `.mcp-use/project.json` link was followed unconditionally, silently ignoring `--org` and redeploying to the linked (wrong-org) server. Now the CLI verifies the linked server's organization matches the requested one and, if not, warns and creates a new server in the specified org.
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+  - mcp-use@1.25.0
+  - @mcp-use/inspector@3.0.0
+
 ## 3.1.0-canary.9
 
 ### Patch Changes

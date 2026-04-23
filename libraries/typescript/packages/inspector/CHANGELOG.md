@@ -1,5 +1,19 @@
 # @mcp-use/inspector
 
+## 3.0.0
+
+### Minor Changes
+
+- 1bdec92: Elicitation requests triggered from the Chat tab now appear inline in the chat thread instead of routing users to a separate Elicitation tab via a toast. When triggered from the Tools tab, the existing toast behaviour is preserved. The Elicitation tab remains available as a fallback/audit view.
+
+### Patch Changes
+
+- 1bdec92: Add Open Graph and Twitter Card meta tags (title, description, image, site) plus `<meta name="description">` to the inspector HTML, so links to the hosted inspector render rich previews on Slack, X/Twitter, LinkedIn, Discord, and other platforms. Ships a branded `inspector-cover.png` in `public/` and serves it from `/inspector/inspector-cover.png` in both the default and CDN-shell paths.
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+  - mcp-use@1.25.0
+
 ## 3.0.0-canary.9
 
 ### Patch Changes
