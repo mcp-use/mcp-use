@@ -69,6 +69,7 @@ export function Layout({ children }: LayoutProps) {
         proxyConfig,
         transportType,
         preventAutoAuth: true,
+        useRedirectFlow: true, // Same-tab OAuth flow (issue #1384)
         clientOptions: {
           capabilities: {
             extensions: {
