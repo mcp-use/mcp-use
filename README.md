@@ -6,6 +6,8 @@
       <source media="(prefers-color-scheme: light)" srcset="./static/logo_black.svg">
       <img alt="mcp use logo" src="./static/logo_black.svg" width="60%" >
     </picture>
+[![AgentRank](https://agentrank-ai.com/api/badge/tool/mcp-use--mcp-use)](https://agentrank-ai.com/tool/mcp-use--mcp-use/)
+
   </a>
 </div>
 &nbsp;
