@@ -4,6 +4,33 @@ import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust pa
 import type { StoredState } from "./types.js"; // Adjust path, ensure definition includes providerOptions
 
 /**
+ * Ensure the return URL includes an `autoConnect` query parameter so the
+ * inspector's `useAutoConnect` hook can automatically reconnect after the
+ * OAuth redirect flow.  Without this, landing on the page without
+ * `?autoConnect=` causes the connection to hang (#1389).
+ */
+function ensureAutoConnectParam(
+  returnUrl: string,
+  providerOptions?: { serverUrl?: string; connectionUrl?: string }
+): string {
+  try {
+    const url = new URL(returnUrl);
+    if (url.searchParams.has("autoConnect")) {
+      return returnUrl; // already present, don't override
+    }
+    const connectUrl =
+      providerOptions?.connectionUrl || providerOptions?.serverUrl;
+    if (connectUrl) {
+      url.searchParams.set("autoConnect", connectUrl);
+      return url.toString();
+    }
+  } catch {
+    // If URL parsing fails, return as-is
+  }
+  return returnUrl;
+}
+
+/**
  * Handles the OAuth callback using the SDK's auth() function.
  * Assumes it's running on the page specified as the callbackUrl.
  */
@@ -246,11 +273,17 @@ export async function onMcpAuthorization() {
 
       if (isRedirectFlow && storedStateData.returnUrl) {
         // Redirect flow: navigate back to the original page
+        // Ensure the returnUrl has the autoConnect param so the inspector
+        // reconnects automatically after the OAuth redirect (#1389)
+        const returnUrl = ensureAutoConnectParam(
+          storedStateData.returnUrl,
+          storedStateData.providerOptions
+        );
         console.log(
-          `${logPrefix} Redirect flow complete. Returning to: ${storedStateData.returnUrl}`
+          `${logPrefix} Redirect flow complete. Returning to: ${returnUrl}`
         );
         localStorage.removeItem(stateKey);
-        window.location.href = storedStateData.returnUrl;
+        window.location.href = returnUrl;
       } else if (window.opener && !window.opener.closed) {
         // Popup flow: notify opener and close
         console.log(`${logPrefix} Popup flow complete. Notifying opener...`);
@@ -263,11 +296,15 @@ export async function onMcpAuthorization() {
       } else if (storedStateData.returnUrl) {
         // Fallback for popup flow when popup was blocked and user clicked link manually
         // Use the stored returnUrl to navigate back to the original page
+        const returnUrl = ensureAutoConnectParam(
+          storedStateData.returnUrl,
+          storedStateData.providerOptions
+        );
         console.log(
-          `${logPrefix} Popup flow without opener. Returning to: ${storedStateData.returnUrl}`
+          `${logPrefix} Popup flow without opener. Returning to: ${returnUrl}`
         );
         localStorage.removeItem(stateKey);
-        window.location.href = storedStateData.returnUrl;
+        window.location.href = returnUrl;
       } else {
         // Last resort fallback: no opener and no return URL, redirect to root
         console.warn(
