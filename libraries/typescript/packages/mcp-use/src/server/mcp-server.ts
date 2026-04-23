@@ -3900,7 +3900,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     await mountWidgets(this as any, {
       baseRoute: "/mcp-use/widgets",
-      resourcesDir: "resources",
+      // Only forward `resourcesDir` when the env var is set. That lets
+      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
+      // (via `--mcp-dir src/mcp`) without forcing the user to configure
+      // anything in their server file. When the env var is unset,
+      // `mountWidgets` applies its own default (`"resources"`).
+      ...(process.env.MCP_USE_WIDGETS_DIR
+        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
+        : {}),
     });
     await this.mountMcp();
 
@@ -4023,7 +4030,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     console.log("[MCP] Mounting widgets");
     await mountWidgets(this as any, {
       baseRoute: "/mcp-use/widgets",
-      resourcesDir: "resources",
+      // Only forward `resourcesDir` when the env var is set. That lets
+      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
+      // (via `--mcp-dir src/mcp`) without forcing the user to configure
+      // anything in their server file. When the env var is unset,
+      // `mountWidgets` applies its own default (`"resources"`).
+      ...(process.env.MCP_USE_WIDGETS_DIR
+        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
+        : {}),
     });
     console.log("[MCP] Mounted widgets");
     await this.mountMcp();

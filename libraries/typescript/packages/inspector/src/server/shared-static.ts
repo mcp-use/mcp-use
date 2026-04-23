@@ -166,6 +166,36 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     />
     <link rel="stylesheet" href="${CDN_CSS_URL}" />
     <title>Inspector | mcp-use</title>
+    <meta
+      name="description"
+      content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="mcp-use" />
+    <meta property="og:url" content="https://inspector.mcp-use.com" />
+    <meta property="og:title" content="MCP Inspector — Test &amp; Debug MCP Servers | mcp-use" />
+    <meta
+      property="og:description"
+      content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser."
+    />
+    <meta
+      property="og:image"
+      content="https://inspector-cdn.mcp-use.com/inspector-cover.png"
+    />
+    <meta property="og:image:alt" content="mcp-use MCP Inspector — test and debug MCP servers" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@mcpuse" />
+    <meta name="twitter:creator" content="@mcpuse" />
+    <meta name="twitter:title" content="MCP Inspector — Test &amp; Debug MCP Servers | mcp-use" />
+    <meta
+      name="twitter:description"
+      content="Free, open-source MCP Inspector by mcp-use. Connect to any MCP server, test tools, prompts, and resources, inspect RPC logs, and debug MCP apps — all in your browser."
+    />
+    <meta
+      name="twitter:image"
+      content="https://inspector-cdn.mcp-use.com/inspector-cover.png"
+    />
+    <meta name="twitter:image:alt" content="mcp-use MCP Inspector — test and debug MCP servers" />
     <script>window.__INSPECTOR_VERSION__ = ${JSON.stringify(INSPECTOR_VERSION)};</script>
     ${runtimeScripts}
   </head>

@@ -1,5 +1,73 @@
 # @mcp-use/inspector
 
+## 3.0.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [6406d28]
+  - mcp-use@1.25.0-canary.9
+
+## 3.0.0-canary.8
+
+### Minor Changes
+
+- a0500f4: Elicitation requests triggered from the Chat tab now appear inline in the chat thread instead of routing users to a separate Elicitation tab via a toast. When triggered from the Tools tab, the existing toast behaviour is preserved. The Elicitation tab remains available as a fallback/audit view.
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.8
+
+## 3.0.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [25dbaa5]
+  - mcp-use@1.25.0-canary.7
+
+## 3.0.0-canary.6
+
+### Patch Changes
+
+- 2304ff0: Add Open Graph and Twitter Card meta tags (title, description, image, site) plus `<meta name="description">` to the inspector HTML, so links to the hosted inspector render rich previews on Slack, X/Twitter, LinkedIn, Discord, and other platforms. Ships a branded `inspector-cover.png` in `public/` and serves it from `/inspector/inspector-cover.png` in both the default and CDN-shell paths.
+  - mcp-use@1.25.0-canary.6
+
+## 3.0.0-canary.5
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.5
+
+## 3.0.0-canary.4
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.4
+
+## 3.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3b79a17]
+  - mcp-use@1.25.0-canary.3
+
+## 2.2.1-canary.2
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.2
+
+## 2.2.1-canary.1
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.1
+
+## 2.2.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.0
+
 ## 2.2.0
 
 ### Minor Changes

@@ -2,9 +2,10 @@
  * Better Auth OAuth Provider
  *
  * Implements OAuth authentication for Better Auth instances using the
- * OAuth Provider plugin. Uses "direct" mode where MCP clients communicate
- * directly with Better Auth for OAuth flows (registration, authorization,
- * token exchange). The MCP server only verifies tokens issued by Better Auth.
+ * OAuth Provider plugin. MCP clients discover Better Auth's OAuth
+ * endpoints via `.well-known` passthrough and communicate directly with
+ * Better Auth for registration, authorization, and token exchange. The
+ * MCP server only verifies tokens issued by Better Auth.
  *
  * Learn more: https://better-auth.com/docs/plugins/oauth-provider
  */
@@ -14,7 +15,6 @@ import type {
   OAuthProvider,
   UserInfo,
   BetterAuthOAuthConfig,
-  OAuthMode,
 } from "./types.js";
 
 export class BetterAuthOAuthProvider implements OAuthProvider {
@@ -118,19 +118,5 @@ export class BetterAuthOAuthProvider implements OAuthProvider {
 
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "client_credentials", "refresh_token"];
-  }
-
-  getMode(): OAuthMode {
-    // Direct mode: clients communicate directly with Better Auth
-    // The MCP server only verifies tokens and provides metadata
-    return "direct";
-  }
-
-  getRegistrationEndpoint(): string | undefined {
-    // Only provide registration endpoint when NOT using a pre-registered client
-    if (this.config.clientId) {
-      return undefined; // No DCR when using pre-registered client
-    }
-    return `${this.authURL}/oauth2/register`;
   }
 }
