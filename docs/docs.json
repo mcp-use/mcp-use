@@ -316,6 +316,8 @@
                     "group": "Auth",
                     "icon": "key",
                     "pages": [
+                      "python/api-reference/mcp_use_client_auth_api_key",
+                      "python/api-reference/mcp_use_client_auth_basic",
                       "python/api-reference/mcp_use_client_auth_bearer",
                       "python/api-reference/mcp_use_client_auth_oauth",
                       "python/api-reference/mcp_use_client_auth_oauth_callback"
