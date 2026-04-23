@@ -115,7 +115,8 @@ interface MCPChatMessageEventData {
     | "openai-compatible"
     | "anthropic"
     | "google"
-    | "openrouter";
+    | "openrouter"
+    | "ollama";
   model: string;
   messageCount: number;
   toolCallsCount?: number;

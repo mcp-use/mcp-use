@@ -33,6 +33,14 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
+import type { ProviderName } from "@/llm/types";
+import {
+  getDefaultBaseUrl,
+  providerRequiresApiKey,
+  providerSupportsBaseUrl,
+} from "./types";
+import { getProviderLabel, ProviderIcon } from "./providerMeta";
+import { buildOllamaApiUrl } from "@/llm/providers/ollamaUtils";
 
 interface ModelOption {
   id: string;
@@ -46,12 +54,6 @@ interface CachedModels {
 
 const MODELS_CACHE_KEY = "mcp-inspector-models-cache";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
-// OpenRouter doesn't ship a logo on our provider CDN yet, so inline the
-// official mark as a data URL with a neutral gray fill. We'll move this to
-// the CDN alongside the other provider icons in a follow-up.
-const OPENROUTER_ICON_SVG = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="#94A3B8" stroke="#94A3B8"><g><path fill="none" d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path fill="none" d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></g></svg>`;
-export const OPENROUTER_ICON_URL = `data:image/svg+xml,${encodeURIComponent(OPENROUTER_ICON_SVG)}`;
 
 // Helper functions for models cache
 function getModelsCache(): Record<string, CachedModels> {
@@ -100,29 +102,23 @@ function getCachedModels(provider: string): ModelOption[] | null {
   return null;
 }
 
+function getModelsCacheKey(provider: ProviderName, baseUrl?: string): string {
+  return provider === "ollama" && baseUrl
+    ? `${provider}:${baseUrl.trim().toLowerCase()}`
+    : provider;
+}
+
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider:
-    | "openai"
-    | "openai-compatible"
-    | "anthropic"
-    | "google"
-    | "openrouter";
+  tempProvider: ProviderName;
   tempModel: string;
   tempApiKey: string;
-  tempBaseUrl?: string;
-  onProviderChange: (
-    provider:
-      | "openai"
-      | "openai-compatible"
-      | "anthropic"
-      | "google"
-      | "openrouter"
-  ) => void;
+  tempBaseUrl: string;
+  onProviderChange: (provider: ProviderName) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
-  onBaseUrlChange?: (baseUrl: string) => void;
+  onBaseUrlChange: (baseUrl: string) => void;
   onSave: () => void;
   onClear?: () => void;
   showClearButton?: boolean;
@@ -250,13 +246,35 @@ async function fetchOpenRouterModels(apiKey: string): Promise<ModelOption[]> {
   }));
 }
 
+async function fetchOllamaModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ModelOption[]> {
+  const response = await fetch(buildOllamaApiUrl(baseUrl, "/api/tags"), {
+    headers: {
+      ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Ollama models: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return (data.models || []).map(
+    (model: { model?: string; name?: string }) => ({
+      id: model.model || model.name || "",
+    })
+  );
+}
+
 export function ConfigurationDialog({
   open,
   onOpenChange,
   tempProvider,
   tempModel,
   tempApiKey,
-  tempBaseUrl = "",
+  tempBaseUrl,
   onProviderChange,
   onModelChange,
   onApiKeyChange,
@@ -272,27 +290,27 @@ export function ConfigurationDialog({
   const [modelError, setModelError] = useState<string | null>(null);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const modelsCacheKey = getModelsCacheKey(tempProvider, tempBaseUrl);
 
   // Fetch models when API key / base URL is set and provider is selected
   useEffect(() => {
-    const hasCredential =
-      tempProvider === "openai-compatible"
-        ? !!tempBaseUrl.trim()
-        : !!tempApiKey.trim();
-    if (!open || !hasCredential) {
+    const needsApiKey = providerRequiresApiKey(tempProvider);
+    const needsBaseUrl = providerSupportsBaseUrl(tempProvider);
+
+    if (
+      !open ||
+      !tempProvider ||
+      (needsApiKey && !tempApiKey.trim()) ||
+      (needsBaseUrl && !tempBaseUrl.trim())
+    ) {
       setModels([]);
       setModelError(null);
       return;
     }
 
     const loadModels = async () => {
-      const cacheKey =
-        tempProvider === "openai-compatible"
-          ? `${tempProvider}:${tempBaseUrl}`
-          : tempProvider;
-
       // Check cache first
-      const cachedModels = getCachedModels(cacheKey);
+      const cachedModels = getCachedModels(modelsCacheKey);
       if (cachedModels) {
         setModels(cachedModels);
         setModelError(null);
@@ -318,10 +336,12 @@ export function ConfigurationDialog({
           fetchedModels = await fetchGoogleModels(tempApiKey);
         } else if (tempProvider === "openrouter") {
           fetchedModels = await fetchOpenRouterModels(tempApiKey);
+        } else if (tempProvider === "ollama") {
+          fetchedModels = await fetchOllamaModels(tempBaseUrl, tempApiKey);
         }
 
         // Cache the fetched models
-        setModelsCache(cacheKey, fetchedModels);
+        setModelsCache(modelsCacheKey, fetchedModels);
         setModels(fetchedModels);
       } catch (error) {
         setModelError(
@@ -338,7 +358,7 @@ export function ConfigurationDialog({
     // Debounce the API call
     const timeoutId = setTimeout(loadModels, 500);
     return () => clearTimeout(timeoutId);
-  }, [tempApiKey, tempProvider, tempBaseUrl, open]);
+  }, [tempApiKey, tempBaseUrl, tempProvider, open, modelsCacheKey]);
 
   // Reset model when provider changes
   useEffect(() => {
@@ -347,12 +367,30 @@ export function ConfigurationDialog({
     }
   }, [tempProvider, open, onModelChange]);
 
-  const getProviderIcon = (provider: string) => {
-    if (provider === "openrouter") {
-      return OPENROUTER_ICON_URL;
-    }
-    return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
-  };
+  const showBaseUrlField = providerSupportsBaseUrl(tempProvider);
+  const apiKeyOptional = !providerRequiresApiKey(tempProvider);
+  const showModelSection =
+    open &&
+    (!providerRequiresApiKey(tempProvider) || !!tempApiKey.trim()) &&
+    (!showBaseUrlField || !!tempBaseUrl.trim());
+  const apiKeyLabel = apiKeyOptional ? "API Key (optional)" : "API Key";
+  const apiKeyPlaceholder = apiKeyOptional
+    ? tempProvider === "ollama"
+      ? "Leave empty for local Ollama"
+      : "Enter your API key (optional)"
+    : "Enter your API key";
+  const baseUrlPlaceholder =
+    tempProvider === "openai-compatible"
+      ? "http://localhost:11434/v1"
+      : getDefaultBaseUrl(tempProvider);
+  const baseUrlHelp =
+    tempProvider === "openai-compatible"
+      ? "Base URL of your OpenAI-compatible API. Local servers must have CORS enabled."
+      : `Defaults to ${getDefaultBaseUrl(tempProvider)}. You can also use a proxied or remote Ollama host here.`;
+  const apiKeyHelp =
+    tempProvider === "ollama"
+      ? "Optional for local Ollama. Stored locally and never sent to our servers."
+      : "Your API key is stored locally and never sent to our servers.";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -402,65 +440,65 @@ export function ConfigurationDialog({
               <SelectContent>
                 <SelectItem value="openai">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("openai")}
-                      alt="OpenAI"
-                      className="w-4 h-4"
-                    />
-                    <span>OpenAI</span>
+                    <ProviderIcon provider="openai" />
+                    <span>{getProviderLabel("openai")}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="anthropic">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("anthropic")}
-                      alt="Anthropic"
-                      className="w-4 h-4"
-                    />
-                    <span>Anthropic</span>
+                    <ProviderIcon provider="anthropic" />
+                    <span>{getProviderLabel("anthropic")}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="google">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("google")}
-                      alt="Google"
-                      className="w-4 h-4"
-                    />
-                    <span>Google</span>
+                    <ProviderIcon provider="google" />
+                    <span>{getProviderLabel("google")}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="ollama">
+                  <div className="flex items-center gap-2">
+                    <ProviderIcon provider="ollama" />
+                    <span>{getProviderLabel("ollama")}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="openrouter">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("openrouter")}
-                      alt="OpenRouter"
-                      className="w-4 h-4"
-                    />
-                    <span>OpenRouter</span>
+                    <ProviderIcon provider="openrouter" />
+                    <span>{getProviderLabel("openrouter")}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="openai-compatible">
                   <div className="flex items-center gap-2">
-                    <span>OpenAI Compatible</span>
+                    <ProviderIcon provider="openai-compatible" />
+                    <span>{getProviderLabel("openai-compatible")}</span>
                   </div>
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {showBaseUrlField && (
+            <div className="space-y-2">
+              <Label>Base URL</Label>
+              <Input
+                value={tempBaseUrl}
+                onChange={(e) => onBaseUrlChange(e.target.value)}
+                placeholder={baseUrlPlaceholder}
+                data-testid="chat-config-base-url-input"
+              />
+              <p className="text-xs text-muted-foreground">{baseUrlHelp}</p>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label>API Key</Label>
+            <Label>{apiKeyLabel}</Label>
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
                 value={tempApiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder={
-                  tempProvider === "openai-compatible"
-                    ? "Enter your API key (optional)"
-                    : "Enter your API key"
-                }
+                placeholder={apiKeyPlaceholder}
                 className="pr-10"
                 data-testid="chat-config-api-key-input"
               />
@@ -478,30 +516,10 @@ export function ConfigurationDialog({
                 )}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Your API key is stored locally and never sent to our servers
-            </p>
+            <p className="text-xs text-muted-foreground">{apiKeyHelp}</p>
           </div>
 
-          {tempProvider === "openai-compatible" && (
-            <div className="space-y-2">
-              <Label>Base URL</Label>
-              <Input
-                value={tempBaseUrl}
-                onChange={(e) => onBaseUrlChange?.(e.target.value)}
-                placeholder="http://localhost:11434/v1"
-                data-testid="chat-config-base-url-input"
-              />
-              <p className="text-xs text-muted-foreground">
-                Base URL of your OpenAI-compatible API. Local servers must have
-                CORS enabled.
-              </p>
-            </div>
-          )}
-
-          {(tempProvider === "openai-compatible"
-            ? !!tempBaseUrl.trim()
-            : !!tempApiKey.trim()) && (
+          {showModelSection && (
             <div className="space-y-2">
               <Label>Model</Label>
               {isLoadingModels ? (
@@ -590,9 +608,9 @@ export function ConfigurationDialog({
             <Button
               onClick={onSave}
               disabled={
-                tempProvider === "openai-compatible"
-                  ? !tempBaseUrl.trim() || !tempModel.trim()
-                  : !tempApiKey.trim() || !tempModel.trim()
+                (providerRequiresApiKey(tempProvider) && !tempApiKey.trim()) ||
+                (showBaseUrlField && !tempBaseUrl.trim()) ||
+                !tempModel.trim()
               }
               className={showClearButton ? "ml-auto" : ""}
               data-testid="chat-config-save-button"

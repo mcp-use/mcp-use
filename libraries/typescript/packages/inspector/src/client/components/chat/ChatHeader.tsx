@@ -8,16 +8,15 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Copy, Download, SquarePen } from "lucide-react";
-import {
-  ConfigurationDialog,
-  OPENROUTER_ICON_URL,
-} from "./ConfigurationDialog";
+import { ConfigurationDialog } from "./ConfigurationDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
+import type { ProviderName } from "@/llm/types";
+import { ProviderIcon } from "./providerMeta";
 
 interface ChatHeaderProps {
   llmConfig: LLMConfig | null;
@@ -28,26 +27,14 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider:
-    | "openai"
-    | "openai-compatible"
-    | "anthropic"
-    | "google"
-    | "openrouter";
+  tempProvider: ProviderName;
   tempModel: string;
   tempApiKey: string;
-  tempBaseUrl?: string;
-  onProviderChange: (
-    provider:
-      | "openai"
-      | "openai-compatible"
-      | "anthropic"
-      | "google"
-      | "openrouter"
-  ) => void;
+  tempBaseUrl: string;
+  onProviderChange: (provider: ProviderName) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
-  onBaseUrlChange?: (baseUrl: string) => void;
+  onBaseUrlChange: (baseUrl: string) => void;
   onSaveConfig: () => void;
   onClearConfig: () => void;
   /** When true, hides the API key config badge/button and dialog. */
@@ -114,17 +101,7 @@ export function ChatHeader({
                 className="hidden sm:flex ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
                 onClick={() => onConfigDialogOpenChange(true)}
               >
-                {llmConfig.provider !== "openai-compatible" && (
-                  <img
-                    src={
-                      llmConfig.provider === "openrouter"
-                        ? OPENROUTER_ICON_URL
-                        : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
-                    }
-                    alt={llmConfig.provider}
-                    className="w-4 h-4 mr-0"
-                  />
-                )}
+                <ProviderIcon provider={llmConfig.provider} className="mr-0" />
                 {llmConfig.provider}/{llmConfig.model}
               </Badge>
             </TooltipTrigger>
@@ -147,17 +124,7 @@ export function ChatHeader({
                 className="p-2 sm:hidden"
                 onClick={() => onConfigDialogOpenChange(true)}
               >
-                {llmConfig.provider !== "openai-compatible" && (
-                  <img
-                    src={
-                      llmConfig.provider === "openrouter"
-                        ? OPENROUTER_ICON_URL
-                        : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
-                    }
-                    alt={llmConfig.provider}
-                    className="w-4 h-4"
-                  />
-                )}
+                <ProviderIcon provider={llmConfig.provider} />
               </Button>
             </TooltipTrigger>
             <TooltipContent>

@@ -13,7 +13,8 @@ interface LLMConfig {
     | "openai-compatible"
     | "anthropic"
     | "google"
-    | "openrouter";
+    | "openrouter"
+    | "ollama";
   model: string;
   apiKey: string;
   temperature?: number;
