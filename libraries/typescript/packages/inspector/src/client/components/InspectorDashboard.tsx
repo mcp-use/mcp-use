@@ -155,7 +155,7 @@ export function InspectorDashboard() {
         proxyConfig,
         transportType,
         preventAutoAuth: true,
-        useRedirectFlow: true, // Same-tab OAuth flow (issue #1384)
+        useRedirectFlow: true,
       });
     },
     [addServer]
@@ -416,7 +416,7 @@ export function InspectorDashboard() {
       name: alias.trim() || normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
-      useRedirectFlow: true, // Use full-page same-tab redirect so OAuth callback returns to this tab (issue #1384)
+      useRedirectFlow: true,
       clientOptions: {
         capabilities: {
           extensions: {
