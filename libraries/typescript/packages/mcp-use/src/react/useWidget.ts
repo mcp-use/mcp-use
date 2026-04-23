@@ -309,20 +309,27 @@ export function useWidget<
   const searchString =
     typeof window !== "undefined" ? window.location.search : "";
 
-  const urlParams = useMemo(() => {
+  const urlParams = useMemo((): {
+    toolInput: TProps | undefined;
+    toolOutput: TOutput | undefined;
+    toolId: string;
+    hasMcpUseParams: boolean;
+  } => {
     // check if it has mcpUseParams
-    const urlParams = new URLSearchParams(searchString);
-    if (urlParams.has("mcpUseParams")) {
-      return JSON.parse(urlParams.get("mcpUseParams") as string) as {
+    const sp = new URLSearchParams(searchString);
+    if (sp.has("mcpUseParams")) {
+      const parsed = JSON.parse(sp.get("mcpUseParams") as string) as {
         toolInput: TProps;
         toolOutput: TOutput;
         toolId: string;
       };
+      return { ...parsed, hasMcpUseParams: true };
     }
     return {
-      toolInput: {} as TProps,
-      toolOutput: {} as TOutput,
+      toolInput: undefined,
+      toolOutput: undefined,
       toolId: "",
+      hasMcpUseParams: false,
     };
   }, [searchString]);
 
@@ -738,7 +745,9 @@ export function useWidget<
       // Tool is pending until the host delivers either toolOutput (structuredContent)
       // or toolResponseMetadata (_meta). Checking both mirrors how MCP Apps works and
       // avoids staying stuck when the server omits _meta from the tool result.
-      return openaiToolOutput === null && toolResponseMetadata === null;
+      // `useOpenAiGlobal` returns `undefined` before the host has populated the key,
+      // so treat `undefined` the same as `null` here.
+      return openaiToolOutput == null && toolResponseMetadata == null;
     }
     if (provider === "mcp-apps") {
       // In MCP Apps, widget is pending until we receive tool-result notification
@@ -757,7 +766,12 @@ export function useWidget<
       ) {
         return true;
       }
-      return toolOutput === null || toolOutput === undefined;
+      // Standalone (non-iframe) without `mcpUseParams` has no way to deliver a
+      // tool result — stay pending rather than rendering with empty props.
+      if (!urlParams.hasMcpUseParams) {
+        return true;
+      }
+      return toolOutput == null;
     }
     return false;
   }, [
@@ -767,6 +781,7 @@ export function useWidget<
     mcpAppsToolOutput,
     toolOutput,
     urlParams.toolId,
+    urlParams.hasMcpUseParams,
   ]);
 
   // Partial/streaming tool input (available during LLM argument generation)
