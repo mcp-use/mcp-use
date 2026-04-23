@@ -378,6 +378,25 @@ export function useAutoConnect({
       return;
     }
 
+    // Check for auth errors from OAuth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const authError = urlParams.get("auth_error");
+    const authErrorDescription = urlParams.get("auth_error_description");
+
+    if (authError) {
+      const errorMessage = authErrorDescription
+        ? `Authentication failed: ${authError}: ${authErrorDescription}`
+        : `Authentication failed: ${authError}`;
+      toast.error(errorMessage);
+
+      // Clean up error params from URL
+      urlParams.delete("auth_error");
+      urlParams.delete("auth_error_description");
+      const newSearch = urlParams.toString();
+      const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}`;
+      window.history.replaceState({}, "", newUrl);
+    }
+
     const trySessionReconnect = (): boolean => {
       if (typeof sessionStorage === "undefined") return false;
       try {
