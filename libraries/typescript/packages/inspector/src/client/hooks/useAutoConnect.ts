@@ -417,6 +417,8 @@ export function useAutoConnect({
       }
     };
 
+    const urlParams = new URLSearchParams(window.location.search);
+
     // In embedded mode, we don't need to wait for storage to load
     // Proceed immediately with autoConnect
     if (embedded) {
@@ -424,7 +426,6 @@ export function useAutoConnect({
         setConfigLoaded(true);
         return;
       }
-      const urlParams = new URLSearchParams(window.location.search);
       let queryAutoConnectParam = urlParams.get("autoConnect");
 
       // URLSearchParams.get() automatically decodes, but handle double-encoding if present
@@ -468,7 +469,6 @@ export function useAutoConnect({
     }
 
     // Check for autoConnect query parameter first
-    const urlParams = new URLSearchParams(window.location.search);
     let queryAutoConnectParam = urlParams.get("autoConnect");
 
     // URLSearchParams.get() automatically decodes, but handle double-encoding if present
