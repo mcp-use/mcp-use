@@ -111,7 +111,10 @@ export async function onMcpAuthorization() {
         const returnUrl = new URL(storedStateData.returnUrl);
         returnUrl.searchParams.set("auth_error", error);
         if (errorDescription) {
-          returnUrl.searchParams.set("auth_error_description", errorDescription);
+          returnUrl.searchParams.set(
+            "auth_error_description",
+            errorDescription
+          );
         }
         window.location.href = returnUrl.toString();
         return; // Exit early, redirect is in progress
@@ -138,7 +141,10 @@ export async function onMcpAuthorization() {
         const returnUrl = new URL(storedStateData.returnUrl);
         returnUrl.searchParams.set("auth_error", error);
         if (errorDescription) {
-          returnUrl.searchParams.set("auth_error_description", errorDescription);
+          returnUrl.searchParams.set(
+            "auth_error_description",
+            errorDescription
+          );
         }
         window.location.href = returnUrl.toString();
         return; // Exit early
