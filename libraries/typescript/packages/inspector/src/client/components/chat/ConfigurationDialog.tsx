@@ -40,7 +40,9 @@ import {
   providerSupportsBaseUrl,
 } from "./types";
 import { getProviderLabel, ProviderIcon } from "./providerMeta";
-import { buildOllamaApiUrl } from "@/llm/providers/ollamaUtils";
+import { buildLmStudioApiUrl } from "@/llm/providers/lmstudio/utils";
+import { fetchLocalProvider } from "@/llm/providers/localProviderFetch";
+import { buildOllamaApiUrl } from "@/llm/providers/ollama/utils";
 
 interface ModelOption {
   id: string;
@@ -103,7 +105,7 @@ function getCachedModels(provider: string): ModelOption[] | null {
 }
 
 function getModelsCacheKey(provider: ProviderName, baseUrl?: string): string {
-  return provider === "ollama" && baseUrl
+  return (provider === "ollama" || provider === "lmstudio") && baseUrl
     ? `${provider}:${baseUrl.trim().toLowerCase()}`
     : provider;
 }
@@ -194,11 +196,14 @@ async function fetchOllamaModels(
   baseUrl: string,
   apiKey: string
 ): Promise<ModelOption[]> {
-  const response = await fetch(buildOllamaApiUrl(baseUrl, "/api/tags"), {
-    headers: {
-      ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
-    },
-  });
+  const response = await fetchLocalProvider(
+    buildOllamaApiUrl(baseUrl, "/api/tags"),
+    {
+      headers: {
+        ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
+      },
+    }
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to fetch Ollama models: ${response.statusText}`);
@@ -208,6 +213,32 @@ async function fetchOllamaModels(
   return (data.models || []).map(
     (model: { model?: string; name?: string }) => ({
       id: model.model || model.name || "",
+    })
+  );
+}
+
+async function fetchLmStudioModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ModelOption[]> {
+  const response = await fetchLocalProvider(
+    buildLmStudioApiUrl(baseUrl, "/v1/models"),
+    {
+      headers: {
+        ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch LM Studio models: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return (data.data || []).map(
+    (model: { id: string; name?: string; owned_by?: string }) => ({
+      id: model.id,
+      displayName: model.name || model.id || model.owned_by,
     })
   );
 }
@@ -273,6 +304,8 @@ export function ConfigurationDialog({
           fetchedModels = await fetchAnthropicModels(tempApiKey);
         } else if (tempProvider === "google") {
           fetchedModels = await fetchGoogleModels(tempApiKey);
+        } else if (tempProvider === "lmstudio") {
+          fetchedModels = await fetchLmStudioModels(tempBaseUrl, tempApiKey);
         } else if (tempProvider === "ollama") {
           fetchedModels = await fetchOllamaModels(tempBaseUrl, tempApiKey);
         }
@@ -310,11 +343,15 @@ export function ConfigurationDialog({
     (!providerRequiresApiKey(tempProvider) || !!tempApiKey.trim()) &&
     (!showBaseUrlField || !!tempBaseUrl.trim());
   const apiKeyLabel =
-    tempProvider === "ollama" ? "API Key (optional)" : "API Key";
+    tempProvider === "ollama" || tempProvider === "lmstudio"
+      ? "API Key (optional)"
+      : "API Key";
   const apiKeyPlaceholder =
     tempProvider === "ollama"
       ? "Leave empty for local Ollama"
-      : "Enter your API key";
+      : tempProvider === "lmstudio"
+        ? "Leave empty for local LM Studio"
+        : "Enter your API key";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -386,6 +423,12 @@ export function ConfigurationDialog({
                     <span>{getProviderLabel("ollama")}</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="lmstudio">
+                  <div className="flex items-center gap-2">
+                    <ProviderIcon provider="lmstudio" />
+                    <span>{getProviderLabel("lmstudio")}</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -401,7 +444,9 @@ export function ConfigurationDialog({
               />
               <p className="text-xs text-muted-foreground">
                 Defaults to {getDefaultBaseUrl(tempProvider)}. You can also use
-                a proxied or remote Ollama host here.
+                {tempProvider === "ollama"
+                  ? " a proxied or remote Ollama host here."
+                  : " a proxied or remote LM Studio host here."}
               </p>
             </div>
           )}
@@ -434,7 +479,9 @@ export function ConfigurationDialog({
             <p className="text-xs text-muted-foreground">
               {tempProvider === "ollama"
                 ? "Optional for local Ollama. Stored locally and never sent to our servers."
-                : "Your API key is stored locally and never sent to our servers."}
+                : tempProvider === "lmstudio"
+                  ? "Optional for local LM Studio. Stored locally and never sent to our servers."
+                  : "Your API key is stored locally and never sent to our servers."}
             </p>
           </div>
 

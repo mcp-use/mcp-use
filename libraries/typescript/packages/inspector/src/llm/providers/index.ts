@@ -6,6 +6,7 @@ import type {
 } from "../types";
 import * as anthropic from "./anthropic";
 import * as google from "./google";
+import * as lmstudio from "./lmstudio";
 import * as ollama from "./ollama";
 import * as openai from "./openai";
 
@@ -31,6 +32,8 @@ export function streamChat(
       return anthropic.streamChat(params);
     case "google":
       return google.streamChat(params);
+    case "lmstudio":
+      return lmstudio.streamChat(params);
     case "ollama":
       return ollama.streamChat(params);
     default:
@@ -46,6 +49,8 @@ export function chat(params: ChatParams): Promise<ChatResult> {
       return anthropic.chat(params);
     case "google":
       return google.chat(params);
+    case "lmstudio":
+      return lmstudio.chat(params);
     case "ollama":
       return ollama.chat(params);
     default:

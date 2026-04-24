@@ -1,13 +1,14 @@
-import { parseDataUrl } from "../messageFormat";
-import { parseNDJSON } from "../ndjson";
+import { parseDataUrl } from "@/llm/messageFormat";
+import { parseNDJSON } from "@/llm/ndjson";
 import type {
   ContentPart,
   LlmStreamEvent,
   ProviderConfig,
   ProviderMessage,
   ProviderTool,
-} from "../types";
-import { buildOllamaApiUrl } from "./ollamaUtils";
+} from "../../types";
+import { fetchLocalProvider } from "../localProviderFetch";
+import { buildOllamaApiUrl } from "./utils";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -175,12 +176,15 @@ export async function* streamChat(
   params: ChatParams
 ): AsyncGenerator<LlmStreamEvent, void, unknown> {
   const { config, signal } = params;
-  const res = await fetch(buildOllamaApiUrl(config.baseUrl, "/api/chat"), {
-    method: "POST",
-    headers: buildHeaders(config),
-    body: JSON.stringify(buildBody(params, true)),
-    signal,
-  });
+  const res = await fetchLocalProvider(
+    buildOllamaApiUrl(config.baseUrl, "/api/chat"),
+    {
+      method: "POST",
+      headers: buildHeaders(config),
+      body: JSON.stringify(buildBody(params, true)),
+      signal,
+    }
+  );
 
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "");
@@ -255,12 +259,15 @@ export async function chat(params: ChatParams): Promise<{
   toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
 }> {
   const { config, signal } = params;
-  const res = await fetch(buildOllamaApiUrl(config.baseUrl, "/api/chat"), {
-    method: "POST",
-    headers: buildHeaders(config),
-    body: JSON.stringify(buildBody(params, false)),
-    signal,
-  });
+  const res = await fetchLocalProvider(
+    buildOllamaApiUrl(config.baseUrl, "/api/chat"),
+    {
+      method: "POST",
+      headers: buildHeaders(config),
+      body: JSON.stringify(buildBody(params, false)),
+      signal,
+    }
+  );
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");

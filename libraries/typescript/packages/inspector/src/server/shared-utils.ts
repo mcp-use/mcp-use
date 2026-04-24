@@ -8,7 +8,7 @@ import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
 import type { ProviderMessage, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
-  provider: "openai" | "anthropic" | "google" | "ollama";
+  provider: "openai" | "anthropic" | "google" | "ollama" | "lmstudio";
   model: string;
   apiKey: string;
   baseUrl?: string;

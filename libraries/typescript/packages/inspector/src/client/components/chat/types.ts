@@ -76,18 +76,20 @@ export const DEFAULT_MODELS: Record<ProviderName, string> = {
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
   ollama: "qwen3",
+  lmstudio: "local-model",
 };
 
 export const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
   ollama: "http://localhost:11434",
+  lmstudio: "http://localhost:1234/v1",
 };
 
 export function providerRequiresApiKey(provider: ProviderName): boolean {
-  return provider !== "ollama";
+  return provider !== "ollama" && provider !== "lmstudio";
 }
 
 export function providerSupportsBaseUrl(provider: ProviderName): boolean {
-  return provider === "ollama";
+  return provider === "ollama" || provider === "lmstudio";
 }
 
 export function getDefaultBaseUrl(provider: ProviderName): string {
