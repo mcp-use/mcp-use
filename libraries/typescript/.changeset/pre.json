@@ -9,6 +9,7 @@
   },
   "changesets": [
     "fix-chat-free-tier-leak-1903",
+    "fix-cli-bun-runtime-build",
     "fix-oauth-double-tab-1384"
   ]
 }
