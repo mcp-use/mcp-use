@@ -49,6 +49,7 @@ import {
 } from "@/client/utils/serverNames";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
+import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
@@ -1053,7 +1054,28 @@ export function InspectorDashboard() {
                         >
                           <a
                             href={connection.authUrl}
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Store connection config so trySessionReconnect() can
+                              // resume after an OAuth redirect (when ?autoConnect is absent).
+                              try {
+                                sessionStorage.setItem(
+                                  INSPECTOR_RECONNECT_STORAGE_KEY,
+                                  JSON.stringify({
+                                    url: connection.url,
+                                    name:
+                                      connection.name ||
+                                      "Auto-connected Server",
+                                    transportType:
+                                      (connection as any).transportType ||
+                                      "http",
+                                    connectionType: "Direct",
+                                  })
+                                );
+                              } catch {
+                                /* sessionStorage unavailable — best-effort */
+                              }
+                            }}
                           >
                             Authenticate
                           </a>
