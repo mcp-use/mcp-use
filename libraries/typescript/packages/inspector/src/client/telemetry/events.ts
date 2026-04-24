@@ -116,7 +116,8 @@ interface MCPChatMessageEventData {
     | "anthropic"
     | "google"
     | "openrouter"
-    | "ollama";
+    | "ollama"
+    | "lmstudio";
   model: string;
   messageCount: number;
   toolCallsCount?: number;

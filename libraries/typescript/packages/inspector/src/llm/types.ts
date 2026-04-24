@@ -14,7 +14,8 @@ export type ProviderName =
   | "anthropic"
   | "google"
   | "openrouter"
-  | "ollama";
+  | "ollama"
+  | "lmstudio";
 
 export interface ProviderConfig {
   provider: ProviderName;

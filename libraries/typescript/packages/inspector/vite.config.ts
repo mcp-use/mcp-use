@@ -82,6 +82,7 @@ export default defineConfig({
         __dirname,
         "./src/client/stubs/posthog-node.js"
       ),
+      "posthog-js": path.resolve(__dirname, "./src/client/stubs/posthog-js.js"),
       "@scarf/scarf": path.resolve(
         __dirname,
         "./src/client/stubs/@scarf/scarf.js"
@@ -135,6 +136,7 @@ export default defineConfig({
     ],
     exclude: [
       "posthog-node",
+      "posthog-js",
       "tar", // Node.js file system package
       "path-scurry", // Node.js path utilities
     ], // Exclude Node.js-only packages
