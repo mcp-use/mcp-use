@@ -57,6 +57,8 @@ export interface ChatTabProps {
   /** Externally-managed LLM config. When provided, bypasses localStorage-based config
    *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
   managedLlmConfig?: import("./chat/types").LLMConfig;
+  /** Opt in to the Manufact free-tier sign-in / upgrade UI. Default: false. */
+  enableFreeTierUpgrade?: boolean;
   /** Label for the clear/new-chat button. Default: "New Chat". */
   clearButtonLabel?: string;
   /** When true, hides the "Chat" title in the header. Default: false. */
@@ -116,6 +118,7 @@ export function ChatTab({
   waitForChatApiUrl,
   initialMessages,
   managedLlmConfig,
+  enableFreeTierUpgrade = false,
   clearButtonLabel,
   hideTitle,
   hideModelBadge,
@@ -265,10 +268,10 @@ export function ChatTab({
     setShowLoginModal(true);
   }, [setConfigDialogOpen]);
 
-  // Free-tier info is shown whenever the chat is in hosted-managed mode.
-  const freeTierInfo = isManaged
-    ? { onLoginClick: handleOpenLogin }
-    : undefined;
+  const freeTierInfo =
+    isManaged && enableFreeTierUpgrade
+      ? { onLoginClick: handleOpenLogin }
+      : undefined;
 
   const {
     filteredPrompts,
