@@ -475,3 +475,93 @@ Thanks to all our amazing contributors!
   <br/>
   <sub>San Francisco | Zürich</sub>
 </div>
+
+## FAQ
+
+### What is mcp-use?
+
+mcp-use is a fullstack MCP (Model Context Protocol) framework that lets you build:
+- **MCP Servers** — expose tools, resources, and prompts for AI agents
+- **MCP Apps** — interactive widgets that work across Claude, ChatGPT, and other MCP clients
+- **MCP Clients** — connect to any MCP server from your Python or TypeScript applications
+
+### How do I choose between TypeScript and Python SDK?
+
+| Feature | TypeScript | Python |
+|---------|-----------|--------|
+| MCP Server | ✅ Full support | ✅ Full support |
+| MCP Client | ✅ Full support | ✅ Full support |
+| MCP Apps (Widgets) | ✅ React components | ❌ Not yet |
+| Inspector | ✅ Built-in | ❌ Use TS inspector |
+
+Choose **TypeScript** if you need MCP Apps/widgets or want to use the Inspector. Choose **Python** for backend services and data processing pipelines.
+
+### How do I debug my MCP Server?
+
+Use the built-in Inspector:
+```bash
+# TypeScript
+npx mcp-use-inspector
+
+# Or start your server and visit
+# http://localhost:3000/inspector
+```
+
+The Inspector lets you test tools, view resources, and debug prompts without writing client code.
+
+### Can I use mcp-use with existing MCP servers?
+
+Yes! mcp-use clients can connect to any MCP-compliant server:
+```python
+# Python client connecting to an external server
+server = MCPServer(
+    name="external",
+    transport=StreamableHttpServerTransport(
+        url="https://your-mcp-server.com/mcp"
+    )
+)
+```
+
+### How do I deploy an MCP Server to production?
+
+Options include:
+1. **Manufact MCP Cloud** — Connect your GitHub repo for automatic deployments with observability
+2. **Self-hosted** — Deploy to any cloud provider (AWS, GCP, Azure, etc.)
+3. **Serverless** — Use AWS Lambda, Cloudflare Workers, or Vercel Edge Functions
+
+### What LLM providers are supported?
+
+mcp-use is LLM-agnostic. Use any provider that supports the MCP protocol:
+- OpenAI (GPT-4, GPT-4o)
+- Anthropic (Claude)
+- Google (Gemini)
+- Local models via Ollama, vLLM, or LM Studio
+- Any OpenAI-compatible API
+
+### How do I handle authentication?
+
+mcp-use supports multiple authentication methods:
+- **API Keys** — Pass via environment variables or config
+- **OAuth 2.0** — Built-in support for OAuth flows
+- **Custom** — Implement your own auth middleware
+
+### Can I use mcp-use with Claude Desktop or Cursor?
+
+Yes! mcp-use servers are fully compatible with any MCP client:
+```json
+// Claude Desktop config
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["./dist/index.js"]
+    }
+  }
+}
+```
+
+### Where can I get help?
+
+- **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)
+- **Documentation**: [mcp-use.com/docs](https://mcp-use.com/docs)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/mcp-use/mcp-use/issues)
