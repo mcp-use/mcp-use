@@ -1,5 +1,26 @@
 # @mcp-use/inspector
 
+## 3.0.1-canary.0
+
+### Patch Changes
+
+- c864134: fix(inspector): hide Manufact free-tier "Model & usage" dialog when host app embeds `ChatTab` with its own session (MCP-1903)
+
+  The cloud dashboard chat was leaking the hosted inspector's free-tier sign-in / bring-your-own-key modal (plus the "anthropic/server-managed" model badge) even though it passed `hideModelBadge={true}` and already had its own authenticated session and model selector.
+
+  `ChatTab` was auto-deriving `freeTierInfo` from `isManaged` (i.e., the mere presence of `managedLlmConfig`), and both the badge and `ConfigurationDialog` treated `freeTierInfo` as an override that forces the UI back on regardless of `hideModelBadge` / `hideConfigButton`.
+
+  Free-tier upgrade UI is now opt-in via a new `enableFreeTierUpgrade?: boolean` prop on `ChatTab` (default `false`), plumbed through `EmbeddedConfig.chatEnableFreeTierUpgrade`. The hosted inspector (`inspector.manufact.com`) auto-seeds it to `true`; host apps that embed `ChatTab` directly (e.g. the cloud dashboard) leave it off and their hide-\* props are respected.
+
+- a59476b: fix(inspector): OAuth flow no longer leaves two tabs open (#1384)
+
+  Previously, connecting to an OAuth-protected MCP server from the inspector opened the authorization page in a new tab, and after the user authorized the app the callback redirected back to the inspector inside that second tab — leaving the user with two inspector tabs.
+
+  The inspector now uses the same-tab redirect flow (`useRedirectFlow: true`) combined with `preventAutoAuth: true`, so the OAuth authorization page opens in the current tab and the callback navigates the same tab back to the original inspector URL. The user ends up with a single tab.
+
+  The `Authenticate` anchor no longer sets `target="_blank"` / `rel="noopener noreferrer"` — clicking it now navigates the current tab directly to the stored auth URL. All connection entry points in the inspector (`handleAddConnection`, the `Layout` adapter, and the `InspectorDashboard` adapter used by `handleUpdateConnection` on URL edits, as well as `useAutoConnect`) propagate the same flags so the single-tab behavior is consistent across manual connect, URL edits, and auto-connect from shared config.
+  - mcp-use@1.25.1-canary.0
+
 ## 3.0.0
 
 ### Minor Changes
