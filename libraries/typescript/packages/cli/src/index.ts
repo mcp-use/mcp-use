@@ -337,7 +337,7 @@ function isBunRuntime(): boolean {
 async function generateToolRegistryTypesForServer(
   projectPath: string,
   serverFileRelative: string
-): Promise<boolean> {
+): Promise<"ok" | "failed" | "skipped"> {
   const serverFile = path.join(projectPath, serverFileRelative);
   const serverFileExists = await access(serverFile)
     .then(() => true)
@@ -361,7 +361,7 @@ async function generateToolRegistryTypesForServer(
         "  Run `mcp-use generate-types` with node to refresh .mcp-use/tool-registry.d.ts."
       )
     );
-    return false;
+    return "skipped";
   }
 
   const previousHmrMode = (globalThis as any).__mcpUseHmrMode;
@@ -398,7 +398,7 @@ async function generateToolRegistryTypesForServer(
       server.registrations.tools,
       projectPath
     );
-    return success;
+    return success ? "ok" : "failed";
   } finally {
     (globalThis as any).__mcpUseHmrMode = previousHmrMode ?? false;
   }
@@ -1165,19 +1165,20 @@ program
         // an unrelated import-time error in the server file can't block
         // the Docker build.
         try {
-          const typeGenOk = await generateToolRegistryTypesForServer(
+          const typeGenResult = await generateToolRegistryTypesForServer(
             projectPath,
             sourceServerFile
           );
-          if (typeGenOk) {
+          if (typeGenResult === "ok") {
             console.log(chalk.green("✓ Tool registry types generated"));
-          } else {
+          } else if (typeGenResult === "failed") {
             console.log(
               chalk.yellow(
                 "⚠ Tool registry type generation had errors (non-blocking)"
               )
             );
           }
+          // "skipped" already logged its own warning inside the function.
         } catch (err) {
           console.log(
             chalk.yellow(
@@ -2607,17 +2608,18 @@ program
 
     try {
       console.log(chalk.blue("Generating tool registry types..."));
-      const success = await generateToolRegistryTypesForServer(
+      const result = await generateToolRegistryTypesForServer(
         projectPath,
         options.server
       );
-      if (success) {
+      if (result === "ok") {
         console.log(
           chalk.green("✓ Tool registry types generated successfully")
         );
-      } else {
+      } else if (result === "failed") {
         console.log(chalk.yellow("⚠ Tool registry type generation had errors"));
       }
+      // "skipped" already logged its own warning inside the function.
       process.exit(0);
     } catch (error) {
       console.error(
