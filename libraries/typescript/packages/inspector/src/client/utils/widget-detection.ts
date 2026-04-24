@@ -12,16 +12,17 @@ export type WidgetProtocol =
   | null;
 
 /**
- * Detect if a tool supports BOTH MCP Apps protocols (kept for API compatibility)
+ * Detect if a tool has MCP Apps protocol support.
+ * Kept for API compatibility — with only one protocol remaining this always
+ * returns the same value as checking for mcp-apps directly.
  *
  * @param toolMeta - Tool metadata from tool definition (_meta field)
- * @returns True if tool has both protocols
+ * @returns True if tool has mcp-apps protocol
  */
 export function hasBothProtocols(toolMeta?: Record<string, any>): boolean {
-  const hasMcpApps =
-    toolMeta?.ui?.resourceUri && typeof toolMeta.ui.resourceUri === "string";
-
-  return !!hasMcpApps;
+  return !!(
+    toolMeta?.ui?.resourceUri && typeof toolMeta.ui.resourceUri === "string"
+  );
 }
 
 /**
