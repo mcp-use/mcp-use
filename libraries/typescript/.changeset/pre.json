@@ -10,6 +10,7 @@
   "changesets": [
     "fix-chat-free-tier-leak-1903",
     "fix-cli-bun-runtime-build",
-    "fix-oauth-double-tab-1384"
+    "fix-oauth-double-tab-1384",
+    "mcp-1741-widget-overlays-the-header"
   ]
 }

@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 3.0.1-canary.2
+
+### Patch Changes
+
+- dfe35fa: Fix MCP App widget overlaying the chat header. Removed the explicit `z-20`/`z-10` stacking context from the sandboxed iframe wrappers in `MCPAppsRenderer` and `OpenAIComponentRenderer` so widgets scroll beneath the chat header instead of painting over it.
+  - mcp-use@1.25.1-canary.2
+
 ## 3.0.1-canary.1
 
 ### Patch Changes
