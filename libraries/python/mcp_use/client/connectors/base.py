@@ -197,9 +197,15 @@ class BaseConnector(ABC):
             logger.debug("Not connected to MCP implementation")
             return
 
+        # Mark as disconnected before awaiting cleanup so that any re-entrant
+        # call (e.g. an AsyncExitStack teardown firing while _cleanup_resources
+        # is suspended) sees _connected == False and returns early instead of
+        # tearing down the same resources twice. The second teardown is what
+        # raises ``ValueError: I/O operation on closed pipe`` on Windows.
+        self._connected = False
+
         logger.debug("Disconnecting from MCP implementation")
         await self._cleanup_resources()
-        self._connected = False
         logger.debug("Disconnected from MCP implementation")
 
     async def _cleanup_resources(self) -> None:
