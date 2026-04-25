@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from mcp_use.agents.mcpagent import MCPAgent
 from mcp_use.client import MCPClient
-from mcp_use.connectors.base import BaseConnector
+from mcp_use.client.connectors.base import BaseConnector
 
 
 class TestMCPAgentInitialization:

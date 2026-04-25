@@ -15,11 +15,11 @@ from .logging import MCP_USE_DEBUG, Logger, logger  # isort: skip
 from .agents import observability  # noqa: E402
 from .agents.mcpagent import MCPAgent
 from .client import MCPClient
-from .client.prompts import CODE_MODE_AGENT_PROMPT
 from .client.config import load_config_file
 from .client.connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
-from .server import MCPServer
+from .client.prompts import CODE_MODE_AGENT_PROMPT
 from .client.session import MCPSession
+from .server import MCPServer
 
 __version__ = version("mcp-use")
 

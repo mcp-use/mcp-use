@@ -194,7 +194,7 @@ class TestConnectorCreation(unittest.TestCase):
         }
 
         # Use patch to avoid the actual E2B SDK import check
-        with patch("mcp_use.connectors.sandbox.AsyncSandbox", create=True):
+        with patch("mcp_use.client.connectors.sandbox.AsyncSandbox", create=True):
             connector = create_connector_from_config(server_config, sandbox=True, sandbox_options=options)
 
             self.assertIsInstance(connector, SandboxConnector)

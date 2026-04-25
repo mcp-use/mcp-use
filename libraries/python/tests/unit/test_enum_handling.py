@@ -9,7 +9,7 @@ from unittest.mock import Mock
 from jsonschema_pydantic import jsonschema_to_pydantic
 from pydantic import BaseModel, ValidationError
 
-from mcp_use.adapters.langchain_adapter import LangChainAdapter
+from mcp_use.agents.adapters.langchain_adapter import LangChainAdapter
 
 
 class TestEnumHandling(unittest.TestCase):

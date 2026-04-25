@@ -2,6 +2,7 @@
 Unit tests for the HttpConnector class.
 """
 
+import pytest
 import unittest
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import ANY, AsyncMock, MagicMock, call, patch
@@ -375,7 +376,8 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         mock_tools = [MagicMock(spec=Tool)]
         self.connector._tools = mock_tools
 
-        tools = self.connector.tools
+        with pytest.deprecated_call():
+            tools = self.connector.tools
 
         self.assertEqual(tools, mock_tools)
 
@@ -384,7 +386,48 @@ class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
         self.connector._tools = None
 
         with self.assertRaises(RuntimeError) as context:
-            _ = self.connector.tools
+            with pytest.deprecated_call():
+                _ = self.connector.tools
+
+        self.assertEqual(str(context.exception), "MCP client is not initialized")
+
+    def test_resources_property_initialized(self, _):
+        """Test the resources property when initialized."""
+        mock_resources = [MagicMock(spec=Resource)]
+        self.connector._resources = mock_resources
+
+        with pytest.deprecated_call():
+            resources = self.connector.resources
+
+        self.assertEqual(resources, mock_resources)
+
+    def test_resources_property_not_initialized(self, _):
+        """Test the resources property when not initialized."""
+        self.connector._resources = None
+
+        with self.assertRaises(RuntimeError) as context:
+            with pytest.deprecated_call():
+                _ = self.connector.resources
+
+        self.assertEqual(str(context.exception), "MCP client is not initialized")
+
+    def test_prompts_property_initialized(self, _):
+        """Test the prompts property when initialized."""
+        mock_prompts = [MagicMock(spec=Prompt)]
+        self.connector._prompts = mock_prompts
+
+        with pytest.deprecated_call():
+            prompts = self.connector.prompts
+
+        self.assertEqual(prompts, mock_prompts)
+
+    def test_prompts_property_not_initialized(self, _):
+        """Test the prompts property when not initialized."""
+        self.connector._prompts = None
+
+        with self.assertRaises(RuntimeError) as context:
+            with pytest.deprecated_call():
+                _ = self.connector.prompts
 
         self.assertEqual(str(context.exception), "MCP client is not initialized")
 

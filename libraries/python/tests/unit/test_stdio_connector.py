@@ -244,8 +244,9 @@ class TestStdioConnectorOperations:
         mock_tools = [Mock(spec=Tool)]
         connector._tools = mock_tools
 
-        # Get tools
-        tools = connector.tools
+        # Get tools (deprecated property)
+        with pytest.deprecated_call():
+            tools = connector.tools
 
         assert tools == mock_tools
 
@@ -254,9 +255,54 @@ class TestStdioConnectorOperations:
         connector = StdioConnector()
         connector._tools = None
 
-        # Expect RuntimeError
+        # Expect RuntimeError and DeprecationWarning
         with pytest.raises(RuntimeError, match="MCP client is not initialized"):
-            _ = connector.tools
+            with pytest.deprecated_call():
+                _ = connector.tools
+
+    def test_resources_property(self):
+        """Test the resources property."""
+        connector = StdioConnector()
+        mock_resources = [Mock()]
+        connector._resources = mock_resources
+
+        # Get resources (deprecated property)
+        with pytest.deprecated_call():
+            resources = connector.resources
+
+        assert resources == mock_resources
+
+    def test_resources_property_not_initialized(self):
+        """Test the resources property when not initialized."""
+        connector = StdioConnector()
+        connector._resources = None
+
+        # Expect RuntimeError and DeprecationWarning
+        with pytest.raises(RuntimeError, match="MCP client is not initialized"):
+            with pytest.deprecated_call():
+                _ = connector.resources
+
+    def test_prompts_property(self):
+        """Test the prompts property."""
+        connector = StdioConnector()
+        mock_prompts = [Mock()]
+        connector._prompts = mock_prompts
+
+        # Get prompts (deprecated property)
+        with pytest.deprecated_call():
+            prompts = connector.prompts
+
+        assert prompts == mock_prompts
+
+    def test_prompts_property_not_initialized(self):
+        """Test the prompts property when not initialized."""
+        connector = StdioConnector()
+        connector._prompts = None
+
+        # Expect RuntimeError and DeprecationWarning
+        with pytest.raises(RuntimeError, match="MCP client is not initialized"):
+            with pytest.deprecated_call():
+                _ = connector.prompts
 
     @pytest.mark.asyncio
     async def test_call_tool(self):
