@@ -124,15 +124,27 @@ describe("renderArgs", () => {
     expect(renderArgs({ method: "tools/list" })).toBe(null);
   });
 
-  it("truncates string values over 100 characters", () => {
-    const long = "x".repeat(250);
+  it("preserves long string values up to the total-length cap", () => {
+    // A 300-char URL-like value should print intact — no per-string truncation.
+    const url = "https://example.com/" + "a".repeat(300);
     const out = renderArgs({
       method: "tools/call",
-      params: { name: "t", arguments: { blob: long } },
+      params: { name: "t", arguments: { url } },
     });
-    expect(out).toContain("xxx...");
-    // 100 x's + "..." + quotes + key wrapper
-    expect(out!.length).toBeLessThan(long.length + 20);
+    expect(out).toContain(url);
+    expect(out).not.toContain("...<truncated>");
+  });
+
+  it("caps the overall rendered args length", () => {
+    const huge = "x".repeat(5000);
+    const out = renderArgs({
+      method: "tools/call",
+      params: { name: "t", arguments: { blob: huge } },
+    });
+    expect(out).not.toBeNull();
+    expect(out!.endsWith("...<truncated>")).toBe(true);
+    // Cap is 2000 chars + suffix.
+    expect(out!.length).toBeLessThanOrEqual(2000 + "...<truncated>".length);
   });
 
   it("caps nested-object depth", () => {

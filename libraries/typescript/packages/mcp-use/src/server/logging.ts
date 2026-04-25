@@ -7,8 +7,10 @@ import { getEnv } from "./utils/runtime.js";
 const MAX_INLINE_LENGTH = 160;
 /** Cap error messages so a huge error body can't blow up the log line. */
 const MAX_ERROR_MESSAGE_LENGTH = 200;
-/** Truncate individual string values inside rendered args. */
-const MAX_ARG_STRING_LENGTH = 100;
+/** Cap the full rendered args JSON so one huge payload can't blow up the log line. */
+const MAX_ARGS_TOTAL_LENGTH = 2000;
+/** Truncate individual long strings in DEBUG-mode body dumps. */
+const MAX_DEBUG_STRING_LENGTH = 100;
 /** Stop descending into nested args past this depth. */
 const MAX_ARG_DEPTH = 3;
 
@@ -30,8 +32,8 @@ function isDebugMode(): boolean {
  */
 function formatForLogging(obj: any): string {
   function truncate(val: any): any {
-    if (typeof val === "string" && val.length > MAX_ARG_STRING_LENGTH) {
-      return val.slice(0, MAX_ARG_STRING_LENGTH) + "...";
+    if (typeof val === "string" && val.length > MAX_DEBUG_STRING_LENGTH) {
+      return val.slice(0, MAX_DEBUG_STRING_LENGTH) + "...";
     } else if (Array.isArray(val)) {
       return val.map(truncate);
     } else if (val && typeof val === "object") {
@@ -53,23 +55,22 @@ function formatForLogging(obj: any): string {
 }
 
 /**
- * Deeply truncate long strings and cap recursion for compact single-line arg rendering.
+ * Cap recursion depth for compact single-line arg rendering. Individual string values
+ * are left intact — total output length is capped in `renderArgs` instead, so short
+ * values (URLs, ids, messages) print whole and only genuinely huge payloads get clipped.
  */
-function truncateCompact(val: any, depth = 0): any {
-  if (typeof val === "string" && val.length > MAX_ARG_STRING_LENGTH) {
-    return val.slice(0, MAX_ARG_STRING_LENGTH) + "...";
-  }
+function capDepth(val: any, depth = 0): any {
   if (depth >= MAX_ARG_DEPTH) {
     if (Array.isArray(val)) return val.length === 0 ? [] : ["..."];
     if (val && typeof val === "object") return "{...}";
     return val;
   }
-  if (Array.isArray(val)) return val.map((v) => truncateCompact(v, depth + 1));
+  if (Array.isArray(val)) return val.map((v) => capDepth(v, depth + 1));
   if (val && typeof val === "object") {
     const result: Record<string, any> = {};
     for (const key in val) {
       if (Object.prototype.hasOwnProperty.call(val, key)) {
-        result[key] = truncateCompact(val[key], depth + 1);
+        result[key] = capDepth(val[key], depth + 1);
       }
     }
     return result;
@@ -124,11 +125,16 @@ export function renderArgs(body: any): string | null {
   ) {
     return null;
   }
+  let rendered: string;
   try {
-    return JSON.stringify(truncateCompact(args));
+    rendered = JSON.stringify(capDepth(args));
   } catch {
     return null;
   }
+  if (rendered.length > MAX_ARGS_TOTAL_LENGTH) {
+    return rendered.slice(0, MAX_ARGS_TOTAL_LENGTH) + "...<truncated>";
+  }
+  return rendered;
 }
 
 export type Outcome =
@@ -306,7 +312,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const durationMs = Math.round(performance.now() - startMs);
 
   const statusCode = c.res.status;
-  const isMcpPost = method === "POST" && url.includes("/mcp");
+  const isMcpPost = method === "POST" && pathname === "/mcp";
 
   // Peek response body for outcome detection (POST /mcp only — always JSON, never SSE).
   // Safe to .text() because GET /mcp (SSE) is already filtered out above.
@@ -377,7 +383,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     const durationRendered = chalk.dim(`(${durationMs}ms)`);
 
     if (args !== null && argsOnNewLine) {
-      line = `${head} ${outcomeRendered} ${durationRendered}\n    args: ${args}`;
+      line = `${head} ${outcomeRendered} ${durationRendered}\n    args=${args}`;
     } else if (args !== null) {
       line = `${head} args=${args} ${outcomeRendered} ${durationRendered}`;
     } else {
