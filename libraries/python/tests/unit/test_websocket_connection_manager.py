@@ -3,7 +3,7 @@
 
 import pytest
 
-from mcp_use.task_managers.websocket import WebSocketConnectionManager
+from mcp_use.client.task_managers.websocket import WebSocketConnectionManager
 
 
 class TestWebSocketConnectionManager:

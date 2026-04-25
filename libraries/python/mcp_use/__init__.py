@@ -16,10 +16,10 @@ from .agents import observability  # noqa: E402
 from .agents.mcpagent import MCPAgent
 from .client import MCPClient
 from .client.prompts import CODE_MODE_AGENT_PROMPT
-from .config import load_config_file
-from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
+from .client.config import load_config_file
+from .client.connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
 from .server import MCPServer
-from .session import MCPSession
+from .client.session import MCPSession
 
 __version__ = version("mcp-use")
 
