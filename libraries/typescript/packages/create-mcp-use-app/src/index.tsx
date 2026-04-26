@@ -18,7 +18,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
@@ -547,61 +547,92 @@ program
           process.exit(1);
         }
 
-        // Security: Validate project name doesn't contain path traversal
-        if (
-          sanitizedProjectName.includes("..") ||
-          sanitizedProjectName.includes("/") ||
-          sanitizedProjectName.includes("\\")
-        ) {
-          console.error(
-            chalk.red('❌ Project name cannot contain path separators or ".."')
-          );
-          console.error(
-            chalk.yellow('   Use simple names like "my-mcp-server"')
-          );
-          process.exit(1);
-        }
+        // Handle "." — use current directory
+        const useCurrentDir = sanitizedProjectName === ".";
+        const projectPath = useCurrentDir
+          ? process.cwd()
+          : resolve(process.cwd(), sanitizedProjectName);
+        const displayName = useCurrentDir
+          ? basename(process.cwd())
+          : sanitizedProjectName;
 
-        // Validate against common protected directory names
-        const protectedNames = [
-          "node_modules",
-          ".git",
-          ".env",
-          "package.json",
-          "src",
-          "dist",
-        ];
-        if (protectedNames.includes(sanitizedProjectName.toLowerCase())) {
-          console.error(
-            chalk.red(`❌ Cannot use protected name "${sanitizedProjectName}"`)
-          );
-          console.error(
-            chalk.yellow("   Please choose a different project name")
-          );
-          process.exit(1);
+        if (useCurrentDir) {
+          // Allow "." only when the current directory is empty
+          const entries = readdirSync(projectPath);
+          if (entries.length > 0) {
+            console.error(
+              chalk.red(
+                "❌ Current directory is not empty!"
+              )
+            );
+            console.error(
+              chalk.yellow(
+                '   Use "." only in an empty directory, or provide a project name'
+              )
+            );
+            process.exit(1);
+          }
+        } else {
+          // Security: Validate project name doesn't contain path traversal
+          if (
+            sanitizedProjectName.includes("..") ||
+            sanitizedProjectName.includes("/") ||
+            sanitizedProjectName.includes("\\")
+          ) {
+            console.error(
+              chalk.red(
+                '❌ Project name cannot contain path separators or ".."'
+              )
+            );
+            console.error(
+              chalk.yellow('   Use simple names like "my-mcp-server"')
+            );
+            process.exit(1);
+          }
+
+          // Validate against common protected directory names
+          const protectedNames = [
+            "node_modules",
+            ".git",
+            ".env",
+            "package.json",
+            "src",
+            "dist",
+          ];
+          if (protectedNames.includes(sanitizedProjectName.toLowerCase())) {
+            console.error(
+              chalk.red(
+                `❌ Cannot use protected name "${sanitizedProjectName}"`
+              )
+            );
+            console.error(
+              chalk.yellow("   Please choose a different project name")
+            );
+            process.exit(1);
+          }
+
+          // Check if directory already exists
+          if (existsSync(projectPath)) {
+            console.error(
+              chalk.red(
+                `❌ Directory "${sanitizedProjectName}" already exists!`
+              )
+            );
+            console.error(
+              chalk.yellow(
+                "   Please choose a different name or remove the existing directory"
+              )
+            );
+            process.exit(1);
+          }
+
+          // Create project directory
+          mkdirSync(projectPath, { recursive: true });
         }
 
         console.log(
-          chalk.cyan(`🚀 Creating MCP server "${sanitizedProjectName}"...`)
+          chalk.cyan(`🚀 Creating MCP server "${displayName}"...`)
         );
-
-        const projectPath = resolve(process.cwd(), sanitizedProjectName);
-
-        // Check if directory already exists
-        if (existsSync(projectPath)) {
-          console.error(
-            chalk.red(`❌ Directory "${sanitizedProjectName}" already exists!`)
-          );
-          console.error(
-            chalk.yellow(
-              "   Please choose a different name or remove the existing directory"
-            )
-          );
-          process.exit(1);
-        }
-
-        // Create project directory
-        mkdirSync(projectPath, { recursive: true });
 
         // Validate template name
         const validatedTemplate = validateTemplateName(selectedTemplate);
@@ -619,10 +650,10 @@ program
         );
 
         // Update package.json with project name
-        updatePackageJson(projectPath, sanitizedProjectName);
+        updatePackageJson(projectPath, displayName);
 
         // Update index.ts with project name
-        updateIndexTs(projectPath, sanitizedProjectName);
+        updateIndexTs(projectPath, displayName);
 
         // Non-interactive defaults when template is specified via flag
         // Enables usage in CI/tests without blocking prompts
@@ -753,7 +784,7 @@ program
         }
         console.log("");
         console.log(chalk.bold("📁 Project structure:"));
-        console.log(`   ${sanitizedProjectName}/`);
+        console.log(`   ${useCurrentDir ? "." : displayName}/`);
         if (skillsInstalled) {
           console.log("   ├── .agent/skills/");
           console.log("   ├── .claude/skills/");
@@ -790,7 +821,7 @@ program
         }
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
-        console.log(chalk.cyan(`   cd ${sanitizedProjectName}`));
+        console.log(chalk.cyan(`   cd ${useCurrentDir ? "." : displayName}`));
         if (!shouldInstall) {
           console.log(
             chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`)
@@ -1306,17 +1337,28 @@ function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
       setError("Project name is required");
       return;
     }
-    if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
-      setError(
-        "Project name can only contain letters, numbers, hyphens, and underscores"
-      );
-      return;
-    }
-    if (existsSync(join(process.cwd(), trimmed))) {
-      setError(
-        `Directory "${trimmed}" already exists! Please choose a different name.`
-      );
-      return;
+    if (trimmed === ".") {
+      // Allow "." — use current directory if it's empty
+      const entries = readdirSync(process.cwd());
+      if (entries.length > 0) {
+        setError(
+          'Current directory is not empty. Use "." only in an empty directory.'
+        );
+        return;
+      }
+    } else {
+      if (!/^[a-zA-Z0-9-_]+$/.test(trimmed)) {
+        setError(
+          "Project name can only contain letters, numbers, hyphens, and underscores"
+        );
+        return;
+      }
+      if (existsSync(join(process.cwd(), trimmed))) {
+        setError(
+          `Directory "${trimmed}" already exists! Please choose a different name.`
+        );
+        return;
+      }
     }
 
     onSubmit(trimmed);
