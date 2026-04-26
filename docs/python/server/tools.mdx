@@ -300,3 +300,83 @@ def divide(
         raise ValueError("Cannot divide by zero")
     return a / b
 ```
+
+### How errors reach the client
+
+Whether the failure is a tool-raised exception or a Pydantic validation error
+on the arguments, `MCPServer` always returns a regular MCP response — **not** a
+JSON-RPC transport error. The response is a `CallToolResult` with `isError`
+set to `true` and a single `TextContent` block whose text follows the pattern
+`"Error executing tool {name}: {message}"`.
+
+```json
+{
+  "isError": true,
+  "content": [
+    { "type": "text", "text": "Error executing tool divide: Cannot divide by zero" }
+  ]
+}
+```
+
+This means an LLM client always sees the failure as tool output it can read
+and react to (for example by retrying with corrected arguments), rather than
+as a connection-level error that aborts the call.
+
+### Argument validation errors
+
+When a client invokes a tool with arguments that don't match the tool's
+`inputSchema` — a missing required field, a wrong type, an unexpected enum
+value — Pydantic raises `ValidationError` **before your tool function runs**.
+`MCPServer` catches the `ValidationError`, wraps it with the same
+`"Error executing tool {name}: ..."` prefix, and returns it as an
+`isError: true` response.
+
+For example, calling the `search` tool below with no arguments:
+
+```python
+@server.tool()
+def search(
+    query: Annotated[str, Field(description="The search query")],
+) -> list[str]:
+    """Search the index."""
+    return [...]
+```
+
+Produces this `CallToolResult`:
+
+```text
+isError: true
+content[0].text:
+  Error executing tool search: 1 validation error for searchArguments
+  query
+    Field required [type=missing, input_value={}, input_type=dict]
+      For further information visit https://errors.pydantic.dev/2.13/v/missing
+```
+
+The full Pydantic error message — including field name, error type, and the
+input value — is preserved verbatim after the prefix, so the client (or the
+LLM driving it) has enough context to correct the call.
+
+<Note>
+Argument validation errors and exceptions raised inside your tool function
+are surfaced through the **same** path: both end up as
+`CallToolResult(isError=true)` with the `"Error executing tool {name}: ..."`
+prefix. The client cannot distinguish them at the protocol level — only by
+inspecting the message body.
+</Note>
+
+### Pairing with the agent-side `tool_error_middleware`
+
+On the client/agent side, mcp-use ships a built-in
+[`tool_error_middleware`](/docs/python/agent/agent-configuration) that catches
+these `isError: true` responses and feeds the error message back to the LLM so
+it can retry the tool call with corrected arguments. The server-side behavior
+documented above is what makes that retry loop work — because the validation
+failure is encoded as tool output (not a transport error), the agent
+middleware can inspect it, format it, and hand it back to the model on the
+next turn.
+
+If you build a custom client without that middleware, treat any
+`CallToolResult` with `isError: true` as a tool-level failure: read
+`content[0].text` for the human-readable message, and either surface it to
+the user or feed it back to your LLM yourself.
