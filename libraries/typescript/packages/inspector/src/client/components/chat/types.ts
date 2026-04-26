@@ -72,5 +72,5 @@ export const DEFAULT_MODELS = {
   openai: "gpt-4o",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
-  openrouter: "anthropic/claude-3.5-sonnet",
+  openrouter: "openai/gpt-4o-mini",
 };
