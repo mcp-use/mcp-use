@@ -560,11 +560,7 @@ program
           // Allow "." only when the current directory is empty
           const entries = readdirSync(projectPath);
           if (entries.length > 0) {
-            console.error(
-              chalk.red(
-                "❌ Current directory is not empty!"
-              )
-            );
+            console.error(chalk.red("❌ Current directory is not empty!"));
             console.error(
               chalk.yellow(
                 '   Use "." only in an empty directory, or provide a project name'
@@ -630,9 +626,7 @@ program
           mkdirSync(projectPath, { recursive: true });
         }
 
-        console.log(
-          chalk.cyan(`🚀 Creating MCP server "${displayName}"...`)
-        );
+        console.log(chalk.cyan(`🚀 Creating MCP server "${displayName}"...`));
 
         // Validate template name
         const validatedTemplate = validateTemplateName(selectedTemplate);
