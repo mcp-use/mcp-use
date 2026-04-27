@@ -1,5 +1,210 @@
 # @mcp-use/cli
 
+## 3.1.0
+
+### Minor Changes
+
+- 1bdec92: Add ORG column to `deployments list` output so users can see which organization each deployment belongs to.
+- 1bdec92: `mcp-use login`: add `--org <slug|id|name>` flag for non-interactive org selection. Previously, when a user had multiple organizations, login would prompt on stdin after the browser auth completed — leaving agent harnesses blocked because they cannot write to the running process's stdin. With `--org`, login picks the org up-front and skips the prompt. If login is run without a TTY and no `--org` is supplied, it now fails fast with a message pointing at the flag rather than hanging. Matches the resolver already used by `mcp-use deploy --org`.
+- 1bdec92: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+### Patch Changes
+
+- 1bdec92: `mcp-use login` now validates the stored API key against the backend before short-circuiting with "You are already logged in." If the key is expired or revoked, login detects the 401, clears the stale config, and drops into the device-auth flow automatically. Network or other non-401 errors preserve the old "already logged in" behavior so users don't get bounced into re-auth just because they're offline.
+
+  Every command that hits the authenticated API (`whoami`, `org`, `servers`, `deployments`, `env`) now funnels errors through a shared `handleCommandError` helper. On a 401 the user sees a friendly "session expired — run `npx mcp-use login` to re-authenticate" hint instead of a raw `API request failed: 401 …` dump. The `deploy` command's existing richer re-auth flow is unchanged.
+
+- 1bdec92: fix: auto-discover available port in `mcp-use start` when default port is in use
+- 1bdec92: `mcp-use deploy --org <org>`: respect the flag when a project is already linked to a server in a different organization. Previously, the existing `.mcp-use/project.json` link was followed unconditionally, silently ignoring `--org` and redeploying to the linked (wrong-org) server. Now the CLI verifies the linked server's organization matches the requested one and, if not, warns and creates a new server in the specified org.
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+  - mcp-use@1.25.0
+  - @mcp-use/inspector@3.0.0
+
+## 3.1.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [6406d28]
+  - mcp-use@1.25.0-canary.9
+  - @mcp-use/inspector@3.0.0-canary.9
+
+## 3.1.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [a0500f4]
+  - @mcp-use/inspector@3.0.0-canary.8
+  - mcp-use@1.25.0-canary.8
+
+## 3.1.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [25dbaa5]
+  - mcp-use@1.25.0-canary.7
+  - @mcp-use/inspector@3.0.0-canary.7
+
+## 3.1.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [2304ff0]
+  - @mcp-use/inspector@3.0.0-canary.6
+  - mcp-use@1.25.0-canary.6
+
+## 3.1.0-canary.5
+
+### Patch Changes
+
+- 9805a50: `mcp-use login` now validates the stored API key against the backend before short-circuiting with "You are already logged in." If the key is expired or revoked, login detects the 401, clears the stale config, and drops into the device-auth flow automatically. Network or other non-401 errors preserve the old "already logged in" behavior so users don't get bounced into re-auth just because they're offline.
+
+  Every command that hits the authenticated API (`whoami`, `org`, `servers`, `deployments`, `env`) now funnels errors through a shared `handleCommandError` helper. On a 401 the user sees a friendly "session expired — run `npx mcp-use login` to re-authenticate" hint instead of a raw `API request failed: 401 …` dump. The `deploy` command's existing richer re-auth flow is unchanged.
+  - mcp-use@1.25.0-canary.5
+  - @mcp-use/inspector@3.0.0-canary.5
+
+## 3.1.0-canary.4
+
+### Patch Changes
+
+- 4470adc: `mcp-use deploy --org <org>`: respect the flag when a project is already linked to a server in a different organization. Previously, the existing `.mcp-use/project.json` link was followed unconditionally, silently ignoring `--org` and redeploying to the linked (wrong-org) server. Now the CLI verifies the linked server's organization matches the requested one and, if not, warns and creates a new server in the specified org.
+  - mcp-use@1.25.0-canary.4
+  - @mcp-use/inspector@3.0.0-canary.4
+
+## 3.1.0-canary.3
+
+### Minor Changes
+
+- 3b79a17: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+### Patch Changes
+
+- Updated dependencies [3b79a17]
+  - mcp-use@1.25.0-canary.3
+  - @mcp-use/inspector@3.0.0-canary.3
+
+## 3.1.0-canary.2
+
+### Minor Changes
+
+- e9bb402: `mcp-use login`: add `--org <slug|id|name>` flag for non-interactive org selection. Previously, when a user had multiple organizations, login would prompt on stdin after the browser auth completed — leaving agent harnesses blocked because they cannot write to the running process's stdin. With `--org`, login picks the org up-front and skips the prompt. If login is run without a TTY and no `--org` is supplied, it now fails fast with a message pointing at the flag rather than hanging. Matches the resolver already used by `mcp-use deploy --org`.
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.2
+- @mcp-use/inspector@2.2.1-canary.2
+
+## 3.1.0-canary.1
+
+### Minor Changes
+
+- 468af39: Add ORG column to `deployments list` output so users can see which organization each deployment belongs to.
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.1
+- @mcp-use/inspector@2.2.1-canary.1
+
+## 3.0.3-canary.0
+
+### Patch Changes
+
+- 52a98f9: fix: auto-discover available port in `mcp-use start` when default port is in use
+  - mcp-use@1.24.3-canary.0
+  - @mcp-use/inspector@2.2.1-canary.0
+
+## 3.0.2
+
+### Patch Changes
+
+- e9c4bd0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+- e9c4bd0: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+- Updated dependencies [e9c4bd0]
+  - mcp-use@1.24.2
+  - @mcp-use/inspector@2.2.0
+
+## 3.0.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies [028cd3c]
+  - @mcp-use/inspector@2.2.0-canary.7
+  - mcp-use@1.24.2-canary.7
+
+## 3.0.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies [baa93e6]
+  - @mcp-use/inspector@2.2.0-canary.6
+  - mcp-use@1.24.2-canary.6
+
+## 3.0.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [bd58d95]
+- Updated dependencies [1b64075]
+  - mcp-use@1.24.2-canary.5
+  - @mcp-use/inspector@2.2.0-canary.5
+
+## 3.0.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [d9ac208]
+  - @mcp-use/inspector@2.2.0-canary.4
+  - mcp-use@1.24.2-canary.4
+
+## 3.0.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [aa86071]
+  - mcp-use@1.24.2-canary.3
+  - @mcp-use/inspector@2.2.0-canary.3
+
+## 3.0.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [ee5abf8]
+  - @mcp-use/inspector@2.2.0-canary.2
+  - mcp-use@1.24.2-canary.2
+
+## 3.0.2-canary.1
+
+### Patch Changes
+
+- 8f8a8e0: Deploy: HTTP 401 is treated as an invalid or expired API key for the current backend—short re-authenticate prompt instead of the GitHub App "not connected" flow. Runs `testAuth` after org resolution (including when org is read from disk). GitHub connection checks and install polling recover via the same re-auth path on 401.
+  - mcp-use@1.24.2-canary.1
+  - @mcp-use/inspector@2.1.1-canary.1
+
+## 3.0.2-canary.0
+
+### Patch Changes
+
+- 5f0c888: Deploy: `git init` / `commit` / `push` no longer fail silently—mutating git commands throw with stderr, the first branch is normalized to `main` before push, and `git rev-parse HEAD` verifies a commit exists. `mcp-use deploy` catches these errors and prints hints for missing `user.name`/`user.email` and for rejected/non-fast-forward pushes. Commit messages are shell-quoted.
+  - mcp-use@1.24.2-canary.0
+  - @mcp-use/inspector@2.1.1-canary.0
+
 ## 3.0.1
 
 ### Patch Changes

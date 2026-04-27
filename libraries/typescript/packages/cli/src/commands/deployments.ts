@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { isLoggedIn } from "../utils/config.js";
+import { handleCommandError } from "../utils/errors.js";
 import { formatRelativeTime } from "../utils/format.js";
 
 async function prompt(question: string): Promise<boolean> {
@@ -53,7 +54,35 @@ async function listDeploymentsCommand(): Promise<void> {
     }
 
     const api = await McpUseAPI.create();
-    const deployments = await api.listDeployments();
+    const [deployments, authResult] = await Promise.all([
+      api.listDeployments(),
+      api.testAuth(),
+    ]);
+
+    const orgMap = new Map(authResult.orgs.map((o) => [o.id, o.name]));
+
+    const uniqueServerIds = [
+      ...new Set(
+        deployments
+          .map((d) => d.serverId)
+          .filter((id): id is string => id != null)
+      ),
+    ];
+
+    const serverResults = await Promise.allSettled(
+      uniqueServerIds.map((id) => api.getServer(id))
+    );
+
+    const serverOrgMap = new Map<string, string>();
+    for (let i = 0; i < uniqueServerIds.length; i++) {
+      const result = serverResults[i];
+      if (result.status === "fulfilled") {
+        const orgName =
+          orgMap.get(result.value.organizationId) ??
+          result.value.organizationId.substring(0, 19);
+        serverOrgMap.set(uniqueServerIds[i], orgName);
+      }
+    }
 
     const sortedDeployments = [...deployments].sort(
       (a, b) =>
@@ -76,31 +105,31 @@ async function listDeploymentsCommand(): Promise<void> {
 
     console.log(
       chalk.white.bold(
-        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"STATUS".padEnd(12)} ${"MCP URL".padEnd(45)} ${"CREATED"}`
+        `${"ID".padEnd(40)} ${"NAME".padEnd(25)} ${"ORG".padEnd(20)} ${"STATUS".padEnd(12)} ${"MCP URL".padEnd(45)} ${"CREATED"}`
       )
     );
-    console.log(chalk.gray("─".repeat(140)));
+    console.log(chalk.gray("─".repeat(155)));
 
     for (const deployment of sortedDeployments) {
       const id = formatId(deployment.id).padEnd(40);
       const name = deployment.name.substring(0, 24).padEnd(25);
+      const orgName = deployment.serverId
+        ? (serverOrgMap.get(deployment.serverId) ?? "-")
+        : "-";
+      const org = orgName.substring(0, 19).padEnd(20);
       const statusColor = getStatusColor(deployment.status);
       const status = statusColor(deployment.status.padEnd(12));
       const mcpUrl = (deployment.mcpUrl || "-").substring(0, 44).padEnd(45);
       const created = formatRelativeTime(deployment.createdAt);
 
       console.log(
-        `${chalk.gray(id)} ${name} ${status} ${chalk.cyan(mcpUrl)} ${chalk.gray(created)}`
+        `${chalk.gray(id)} ${name} ${chalk.magenta(org)} ${status} ${chalk.cyan(mcpUrl)} ${chalk.gray(created)}`
       );
     }
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to list deployments:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to list deployments");
   }
 }
 
@@ -178,11 +207,7 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to get deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to get deployment");
   }
 }
 
@@ -276,11 +301,7 @@ async function restartDeploymentCommand(
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to restart deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to restart deployment");
   }
 }
 
@@ -328,11 +349,7 @@ async function deleteDeploymentCommand(
       chalk.green.bold(`\n✓ Deployment deleted: ${deployment.name}\n`)
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to delete deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to delete deployment");
   }
 }
 
@@ -459,11 +476,7 @@ async function logsCommand(
 
     console.log();
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to get logs:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to get logs");
   }
 }
 
@@ -484,11 +497,7 @@ async function stopDeploymentCommand(deploymentId: string): Promise<void> {
 
     console.log(chalk.green.bold(`\n✓ Deployment stopped\n`));
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to stop deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to stop deployment");
   }
 }
 
@@ -510,11 +519,7 @@ async function startDeploymentCommand(deploymentId: string): Promise<void> {
       )
     );
   } catch (error) {
-    console.error(
-      chalk.red.bold("\n✗ Failed to start deployment:"),
-      chalk.red(error instanceof Error ? error.message : "Unknown error")
-    );
-    process.exit(1);
+    handleCommandError(error, "Failed to start deployment");
   }
 }
 

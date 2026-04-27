@@ -570,7 +570,8 @@
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
                       "typescript/server/notifications",
-                      "typescript/server/logging"
+                      "typescript/server/logging",
+                      "typescript/server/nextjs-drop-in"
                     ]
                   },
                   {
@@ -588,6 +589,7 @@
                           "typescript/server/authentication/providers/keycloak",
                           "typescript/server/authentication/providers/supabase",
                           "typescript/server/authentication/providers/workos",
+                          "typescript/server/authentication/providers/oauth-proxy",
                           "typescript/server/authentication/providers/custom"
                         ]
                       }

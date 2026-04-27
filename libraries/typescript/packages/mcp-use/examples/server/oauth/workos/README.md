@@ -60,10 +60,6 @@ Dynamic Client Registration settings screenshot: [WorkOS AuthKit MCP docs](https
 
 ### 3. Set Environment Variables
 
-WorkOS supports **two OAuth modes**. Choose the one that fits your use case:
-
-#### Option A: Dynamic Client Registration (DCR) - **Recommended for MCP**
-
 Create a `.env` file with these variables:
 
 ```bash
@@ -71,42 +67,15 @@ Create a `.env` file with these variables:
 MCP_USE_OAUTH_WORKOS_SUBDOMAIN=imaginative-palm-54-staging.authkit.app
 
 # Your WorkOS API Key (for making API calls to WorkOS) - OPTIONAL
-MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
+WORKOS_API_KEY=sk_test_...
 ```
 
 **How it works:**
 
-- MCP clients (like Claude Desktop, MCP Inspector) register themselves automatically
+- MCP clients (like Claude Desktop, MCP Inspector) register themselves automatically via Dynamic Client Registration
 - No pre-configuration needed in WorkOS Dashboard
 - Each client gets its own `client_id`
 - **Must enable DCR** in WorkOS Dashboard → Connect → Configuration
-
-#### Option B: Pre-registered OAuth Client - **For custom setups**
-
-Create a `.env` file with these variables:
-
-```bash
-# Your AuthKit subdomain - REQUIRED
-MCP_USE_OAUTH_WORKOS_SUBDOMAIN=imaginative-palm-54-staging.authkit.app
-
-# Your pre-registered OAuth client ID - REQUIRED for this mode
-MCP_USE_OAUTH_WORKOS_CLIENT_ID=client_01KB5DRXBDDY1VGCBKY108SKJW
-
-# Your WorkOS API Key - OPTIONAL
-MCP_USE_OAUTH_WORKOS_API_KEY=sk_test_...
-```
-
-**How it works:**
-
-- MCP server proxies OAuth requests and injects your `client_id`
-- Must create OAuth Application in WorkOS Dashboard → Connect → OAuth Applications
-- Configure redirect URIs to match your MCP client (e.g., `http://localhost:*/callback`)
-- Works with standard MCP clients without them needing to know the `client_id`
-
-**Which mode to choose?**
-
-- Use **DCR** (Option A) for most cases - it's simpler and more flexible
-- Use **Pre-registered Client** (Option B) if you need tighter control over OAuth clients or have enterprise requirements
 
 ### 4. Install Dependencies
 
@@ -131,7 +100,7 @@ pnpm start
 
 ## How OAuth Works with MCP
 
-This example implements WorkOS's **direct mode** OAuth flow, where MCP clients communicate directly with WorkOS for authentication. Your MCP server only verifies tokens—it doesn't proxy OAuth requests.
+This example uses WorkOS's DCR-based OAuth flow. MCP clients communicate directly with WorkOS for all OAuth operations (registration, authorization, token exchange). Your MCP server only verifies tokens—it doesn't proxy OAuth requests.
 
 ```
 ┌─────────────┐          ┌─────────────┐          ┌─────────────┐
@@ -295,28 +264,12 @@ CMD ["npm", "start"]
 ### Environment Variables for Production
 
 ```bash
-WORKOS_CLIENT_ID=client_...
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app
 WORKOS_API_KEY=sk_live_...  # Use production key
-WORKOS_SUBDOMAIN=your-company.authkit.app
 NODE_ENV=production
 ```
 
 ## Troubleshooting
-
-### WorkOS `application_not_found` Error
-
-**Symptom**: Authentication redirects to WorkOS error page with `error=application_not_found`
-
-**Most Common Cause**: `MCP_USE_OAUTH_WORKOS_CLIENT_ID` environment variable is set.
-
-**Solution**:
-
-1. Remove `MCP_USE_OAUTH_WORKOS_CLIENT_ID` from your environment variables
-2. Remove `WORKOS_CLIENT_ID` if you have it set
-3. Restart your MCP server
-4. Retry the OAuth flow
-
-**Why this happens**: With Dynamic Client Registration, MCP clients create their own OAuth client and get a `client_id` from WorkOS dynamically. If you set a static `client_id` via environment variable, it won't match the dynamically registered client, causing WorkOS to return "application not found".
 
 ### CORS Errors During Registration
 

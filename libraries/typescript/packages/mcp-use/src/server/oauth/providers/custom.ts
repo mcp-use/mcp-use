@@ -5,12 +5,7 @@
  * JWT verification logic and user info extraction.
  */
 
-import type {
-  OAuthProvider,
-  UserInfo,
-  CustomOAuthConfig,
-  OAuthMode,
-} from "./types.js";
+import type { OAuthProvider, UserInfo, CustomOAuthConfig } from "./types.js";
 
 export class CustomOAuthProvider implements OAuthProvider {
   private config: CustomOAuthConfig;
@@ -81,16 +76,8 @@ export class CustomOAuthProvider implements OAuthProvider {
     );
   }
 
-  getMode(): OAuthMode {
-    return this.config.mode ?? "proxy";
-  }
-
   getUserInfoEndpoint(): string | undefined {
     return this.config.userInfoEndpoint;
-  }
-
-  getClientId(): string | undefined {
-    return this.config.clientId;
   }
 
   getAudience(): string | undefined {

@@ -52,6 +52,13 @@ interface ChatLandingFormProps {
   quickQuestions?: string[];
   /** Called when a quick question is selected. */
   onQuickQuestionSelect?: (question: string) => void;
+  /**
+   * When set (hosted-managed mode), renders a "Manufact free tier" pill below
+   * the input instead of the provider/model badge. Ignores `hideModelBadge`.
+   */
+  freeTierInfo?: {
+    onLoginClick: () => void;
+  };
 }
 
 export function ChatLandingForm({
@@ -84,6 +91,7 @@ export function ChatLandingForm({
   hideServerUrl,
   quickQuestions = [],
   onQuickQuestionSelect,
+  freeTierInfo,
 }: ChatLandingFormProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -181,7 +189,7 @@ export function ChatLandingForm({
               ))}
             </div>
           )}
-          {llmConfig && !hideModelBadge && (
+          {llmConfig && (!hideModelBadge || freeTierInfo) && (
             <div className="flex justify-center mt-4">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -199,7 +207,9 @@ export function ChatLandingForm({
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Change API Key</p>
+                  <p>
+                    {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </div>
