@@ -71,8 +71,7 @@
     "install:npm": "npm install",
     "lint:yarn": "yarn eslint . --fix",
     "lint:npm": "npm run lint:fix",
-    "lint:pnpm": "pnpm lint:fix",
-    "check-deps": "pnpm --dir ../.. exec knip --dependencies --no-progress --no-exit-code --workspace packages/inspector"
+    "lint:pnpm": "pnpm lint:fix"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
