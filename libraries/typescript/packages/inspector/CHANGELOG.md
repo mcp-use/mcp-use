@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 3.0.1-canary.6
+
+### Patch Changes
+
+- 47b446e: fix(inspector): store connection config in sessionStorage before OAuth redirect so auto-reconnect works without ?autoConnect param
+  - mcp-use@1.25.1-canary.6
+
 ## 3.0.1-canary.5
 
 ### Patch Changes

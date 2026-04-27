@@ -14,6 +14,7 @@
     "fix-oauth-double-tab-1384",
     "fix-oauth-error-redirect",
     "mcp-1733-esbuild-bundle",
-    "mcp-1741-widget-overlays-the-header"
+    "mcp-1741-widget-overlays-the-header",
+    "oauth-reconnect-session-storage"
   ]
 }
