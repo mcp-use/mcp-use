@@ -4,20 +4,34 @@
 // Known safe entries that may exist in a directory without considering it "non-empty"
 // Mirrors create-next-app behavior for common init artifacts
 export const SAFE_DIR_ENTRIES = new Set([
-  ".git",
-  ".gitignore",
+  ".claude",
+  ".cursor",
   ".DS_Store",
+  ".git",
+  ".gitattributes",
+  ".gitignore",
+  ".gitlab-ci.yml",
+  ".hg",
+  ".hgcheck",
+  ".hgignore",
   ".idea",
+  ".npmignore",
+  ".travis.yml",
   ".vscode",
+  ".zed",
   "LICENSE",
   "Thumbs.db",
+  "docs",
+  "mkdocs.yml",
+  "npm-debug.log",
+  "yarn-debug.log",
+  "yarn-error.log",
+  "yarnrc.yml",
+  ".yarn",
 ]);
 
 export function isSafeEntry(name: string): boolean {
-  if (SAFE_DIR_ENTRIES.has(name)) return true;
-  // README with any extension (README, README.md, README.txt, etc.)
-  if (/^README(\.[a-z]+)?$/i.test(name)) return true;
-  return false;
+  return SAFE_DIR_ENTRIES.has(name);
 }
 
 // Sanitize a raw directory name into a valid npm package name

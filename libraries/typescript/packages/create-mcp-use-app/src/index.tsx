@@ -27,8 +27,6 @@ import React, { useState } from "react";
 import { extract } from "tar";
 import { isSafeEntry, sanitizePackageName } from "./utils.js";
 
-export { sanitizePackageName } from "./utils.js";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -561,15 +559,22 @@ program
           : sanitizedProjectName;
 
         if (useCurrentDir) {
-          // Allow "." when the directory contains only safe entries
-          // (.git, .gitignore, LICENSE, README*, .DS_Store, .idea, .vscode, Thumbs.db)
+          // Allow "." when the directory contains only safe entries (see SAFE_DIR_ENTRIES)
           const entries = readdirSync(projectPath);
           const unsafeEntries = entries.filter((entry) => !isSafeEntry(entry));
           if (unsafeEntries.length > 0) {
-            console.error(chalk.red("❌ Current directory is not empty!"));
+            console.error(
+              chalk.red(
+                "❌ Cannot initialize here — these entries would clash with the template:"
+              )
+            );
+            for (const entry of unsafeEntries.sort()) {
+              console.error(chalk.red(`   • ${entry}`));
+            }
+            console.error("");
             console.error(
               chalk.yellow(
-                '   Use "." only in an empty directory (or one with only .git, LICENSE, README, etc.), or provide a project name'
+                "   Remove these files, or pass a project name to scaffold into a new subdirectory instead."
               )
             );
             process.exit(1);
@@ -826,8 +831,6 @@ program
         console.log(chalk.bold("🚀 To get started:"));
         if (!useCurrentDir) {
           console.log(chalk.cyan(`   cd ${displayName}`));
-        } else {
-          console.log(chalk.gray("   # already in the project directory"));
         }
         if (!shouldInstall) {
           console.log(
@@ -1349,8 +1352,12 @@ function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
       const entries = readdirSync(process.cwd());
       const unsafeEntries = entries.filter((entry) => !isSafeEntry(entry));
       if (unsafeEntries.length > 0) {
+        const list = unsafeEntries
+          .sort()
+          .map((entry) => `   • ${entry}`)
+          .join("\n");
         setError(
-          'Current directory is not empty. Use "." only in a directory with no project files (safe: .git, LICENSE, README, etc.).'
+          `Cannot initialize here — these entries would clash with the template:\n${list}\n\nRemove these files, or pick a project name to scaffold into a subdirectory.`
         );
         return;
       }

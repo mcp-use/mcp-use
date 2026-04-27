@@ -47,35 +47,46 @@ describe("sanitizePackageName", () => {
 });
 
 describe("isSafeEntry", () => {
-  it("recognizes .git as safe", () => {
+  it("recognizes git artifacts as safe", () => {
     expect(isSafeEntry(".git")).toBe(true);
-  });
-
-  it("recognizes .gitignore as safe", () => {
     expect(isSafeEntry(".gitignore")).toBe(true);
+    expect(isSafeEntry(".gitattributes")).toBe(true);
+    expect(isSafeEntry(".gitlab-ci.yml")).toBe(true);
   });
 
-  it("recognizes LICENSE as safe", () => {
-    expect(isSafeEntry("LICENSE")).toBe(true);
+  it("recognizes mercurial artifacts as safe", () => {
+    expect(isSafeEntry(".hg")).toBe(true);
+    expect(isSafeEntry(".hgcheck")).toBe(true);
+    expect(isSafeEntry(".hgignore")).toBe(true);
   });
 
-  it("recognizes README and README.md as safe", () => {
-    expect(isSafeEntry("README")).toBe(true);
-    expect(isSafeEntry("README.md")).toBe(true);
-    expect(isSafeEntry("README.txt")).toBe(true);
-  });
-
-  it("recognizes .DS_Store as safe", () => {
-    expect(isSafeEntry(".DS_Store")).toBe(true);
-  });
-
-  it("recognizes IDE directories as safe", () => {
+  it("recognizes editor and AI tool directories as safe", () => {
     expect(isSafeEntry(".idea")).toBe(true);
     expect(isSafeEntry(".vscode")).toBe(true);
+    expect(isSafeEntry(".zed")).toBe(true);
+    expect(isSafeEntry(".claude")).toBe(true);
+    expect(isSafeEntry(".cursor")).toBe(true);
   });
 
-  it("recognizes Thumbs.db as safe", () => {
+  it("recognizes OS-generated files as safe", () => {
+    expect(isSafeEntry(".DS_Store")).toBe(true);
     expect(isSafeEntry("Thumbs.db")).toBe(true);
+  });
+
+  it("recognizes CI / package manager artifacts as safe", () => {
+    expect(isSafeEntry(".travis.yml")).toBe(true);
+    expect(isSafeEntry(".npmignore")).toBe(true);
+    expect(isSafeEntry("yarnrc.yml")).toBe(true);
+    expect(isSafeEntry(".yarn")).toBe(true);
+    expect(isSafeEntry("npm-debug.log")).toBe(true);
+    expect(isSafeEntry("yarn-debug.log")).toBe(true);
+    expect(isSafeEntry("yarn-error.log")).toBe(true);
+  });
+
+  it("recognizes docs artifacts as safe", () => {
+    expect(isSafeEntry("LICENSE")).toBe(true);
+    expect(isSafeEntry("docs")).toBe(true);
+    expect(isSafeEntry("mkdocs.yml")).toBe(true);
   });
 
   it("rejects project files as unsafe", () => {
@@ -83,5 +94,15 @@ describe("isSafeEntry", () => {
     expect(isSafeEntry("index.ts")).toBe(false);
     expect(isSafeEntry("node_modules")).toBe(false);
     expect(isSafeEntry("src")).toBe(false);
+  });
+
+  it("rejects README (not on the allow list)", () => {
+    expect(isSafeEntry("README")).toBe(false);
+    expect(isSafeEntry("README.md")).toBe(false);
+  });
+
+  it("is case-sensitive", () => {
+    expect(isSafeEntry("license")).toBe(false);
+    expect(isSafeEntry(".DS_STORE")).toBe(false);
   });
 });
