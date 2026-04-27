@@ -12,6 +12,7 @@
     "fix-cli-bun-runtime-build",
     "fix-embed-landing-model-badge-mcp-1913",
     "fix-oauth-double-tab-1384",
+    "mcp-1733-esbuild-bundle",
     "mcp-1741-widget-overlays-the-header"
   ]
 }

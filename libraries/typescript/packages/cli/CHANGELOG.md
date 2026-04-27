@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 3.1.1-canary.4
+
+### Patch Changes
+
+- 37a217c: fix(build): bundle each TypeScript entry with esbuild so extensionless relative imports resolve under plain Node ESM
+
+  `mcp-use build` now runs esbuild with `bundle: true` and `packages: "external"`. Relative imports between a user's source files are resolved at build time; third-party packages (`mcp-use`, `react`, `zod`, etc.) stay as external imports that Node resolves from `node_modules`. Users can keep writing idiomatic TypeScript imports without `.js` suffixes and `mcp-use start` no longer hits `ERR_MODULE_NOT_FOUND`.
+  - mcp-use@1.25.1-canary.4
+  - @mcp-use/inspector@3.0.1-canary.4
+
 ## 3.1.1-canary.3
 
 ### Patch Changes
