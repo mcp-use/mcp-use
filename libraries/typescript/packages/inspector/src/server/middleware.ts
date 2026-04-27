@@ -61,11 +61,9 @@ export function mountInspector(
   // copy loaded twice by Node, or bundler dedup quirks), `instanceof`
   // returns false even for a real Hono app, and the Express-compat path
   // below runs against a Hono `Context`, crashing on `req.headers.host`.
-  // Express apps don't expose `.fetch`, so this check is unambiguous in
-  // practice for the documented input set.
-  const looksLikeHono =
-    app instanceof Hono || typeof (app as any)?.fetch === "function";
-  if (looksLikeHono) {
+  // Every Hono instance exposes `.fetch`, and Express apps don't, so the
+  // duck-type check alone covers both shapes unambiguously.
+  if (typeof (app as any)?.fetch === "function") {
     registerInspectorRoutes(app as Hono, config);
     registerStaticRoutes(app as Hono, clientDistPath, runtimeConfig);
     return;
