@@ -29,6 +29,7 @@ permissions:
 # 3. TypeScript Tests (runs if libraries/typescript/** changed)
 #    ├─ typescript-lint: ESLint checks
 #    ├─ typescript-build: Build all packages
+#    ├─ typescript-knip: Unused code/deps report (warning-only — never fails CI)
 #    ├─ typescript/mcp-use: Unit tests + agent integration tests (requires API keys)
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
@@ -693,6 +694,41 @@ jobs:
           MCP_USE_LANGFUSE: true
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter mcp-use --if-present test:integration:agent
+
+  typescript-knip:
+    needs: typescript-lint
+    name: typescript-knip (warning-only)
+    runs-on: ubuntu-latest
+    # Surface unused-code findings without failing the build. Tighten to
+    # `pnpm knip` (without --no-exit-code) once the baseline is cleaned up.
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Run Knip (warning-only)
+        run: |
+          {
+            echo "## Knip Findings"
+            echo ""
+            echo "_Reported as warnings — tighten to fail CI once the baseline is clean._"
+            echo ""
+            echo '```'
+            pnpm exec knip --no-exit-code --no-progress
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   typescript-test-inspector:
     needs: typescript-lint
