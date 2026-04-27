@@ -6,6 +6,33 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.25.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.25.0&title=OAuth%20DCR-direct%2C%20Next.js%20drop-in%20%26%20CLI%203.1&date=2026-04&lang=typescript" alt="Release 1.25.0" />
+  </Frame>
+  ## OAuth DCR-direct, Next.js drop-in & CLI 3.1
+  Minor release refactoring built-in OAuth providers to DCR-direct by default, adding a Next.js MCP drop-in via `--mcp-dir`, CLI 3.1 with better org and session handling, and Inspector 3.0 (see inspector changelog).
+
+- **New**: `oauthProxy` helper for building proxy-mode providers (Google, GitHub, or any upstream authorization server that does not support Dynamic Client Registration) — complements the new DCR-direct default (`#1321`)
+- **New**: `jwksVerifier` helper for JWKS-based token verification inside custom providers (`#1321`)
+- **New**: Auth0 OAuth proxy example under `examples/server/oauth/auth0-proxy` demonstrating the new proxy pattern
+- **Update**: Built-in providers (Auth0, WorkOS, Supabase, Keycloak, Better Auth) now only support DCR-direct — clients talk to upstream authorization servers directly, and provider configurations no longer accept `clientId` / `clientSecret` (`#1321`)
+- **Update**: `verifyToken` is now a required function on custom providers (`#1321`)
+- **Fix**: OAuth `authenticate()` preserves the pathname component (for example `/api/auth`) when the authorization server uses a `basePath`, instead of collapsing the URL to its origin (`#1360`)
+- **New**: Next.js drop-in — `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`), share `@/*` aliases, Tailwind, and the app's component library; the CLI auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected, loads the Next.js env cascade in the MCP server process, and widget builds fail fast when a widget transitively imports a server-only module (`#1332`)
+- **New** (@mcp-use/cli): `mcp-use login --org <slug|id|name>` for non-interactive org selection; login fails fast without a TTY and no `--org` instead of hanging on stdin (`#1379`)
+- **New** (@mcp-use/cli): ORG column in `mcp-use deployments list` output (`#1378`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy --org <org>` now respects the flag when `.mcp-use/project.json` links to a server in a different org — CLI warns and creates a new server in the requested org instead of silently redeploying to the linked one (`#1380`)
+- **Fix** (@mcp-use/cli): `mcp-use login` validates the stored API key against the backend before short-circuiting with "already logged in"; expired or revoked keys drop into device-auth automatically, and authenticated commands (`whoami`, `org`, `servers`, `deployments`, `env`) funnel 401s through a shared handler with a "session expired — run `npx mcp-use login`" hint (`#1383`)
+- **Fix** (@mcp-use/cli): `mcp-use start` auto-discovers an available port when the default port is in use (`#1377`)
+- **Enhancement** (@mcp-use/inspector): Inline elicitation in the chat thread, Open Graph and Twitter Card meta tags on the hosted inspector (see inspector changelog)
+- **Enhancement** (create-mcp-use-app): Only copy the `mcp-apps-builder` skill into new projects; skip the deprecated `mcp-builder` and `chatgpt-app-builder` skills (`#1375`)
+- **Documentation**: New `oauth-proxy` provider guide and refactored provider pages (Auth0, WorkOS, Supabase, Keycloak, Better Auth, custom); new Next.js drop-in guide; updated CLI reference
+- **Update**: Updated @mcp-use/inspector to v3.0.0
+- **Update**: Updated @mcp-use/cli to v3.1.0
+- **Update**: Updated create-mcp-use-app to v0.14.9
+</Update>
+
 <Update label="v1.24.2" description="April 2026">
   ## Landing deeplinks, `colorScheme` & Inspector 2.2
   Patch release adding optional `colorScheme` on `McpUseProvider`, a server landing deeplink to the hosted inspector, stronger deploy behavior in `@mcp-use/cli`, cloud server environment-variable commands, and Inspector 2.2 (see inspector changelog).

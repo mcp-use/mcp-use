@@ -25,7 +25,11 @@ import {
 } from "../utils/git.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
-import { loginCommand, promptOrgSelection } from "./auth.js";
+import {
+  loginCommand,
+  promptOrgSelection,
+  resolveOrgFromOption,
+} from "./auth.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -690,18 +694,17 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     // ── Step 2: Org resolution ────────────────────────────────────
     let resolvedOrgId: string | undefined;
+    let resolvedOrgName: string | undefined;
+    let resolvedOrgSlug: string | undefined;
 
     if (options.org) {
       const authInfo = await api.testAuth();
-      const match = (authInfo.orgs ?? []).find(
-        (o) =>
-          o.slug === options.org ||
-          o.id === options.org ||
-          o.name.toLowerCase() === options.org!.toLowerCase()
-      );
+      const match = resolveOrgFromOption(authInfo.orgs ?? [], options.org);
       if (match) {
         api.setOrgId(match.id);
         resolvedOrgId = match.id;
+        resolvedOrgName = match.name;
+        resolvedOrgSlug = match.slug ?? undefined;
         const slug = match.slug ? chalk.gray(` (${match.slug})`) : "";
         console.log(
           chalk.gray("Organization: ") + chalk.cyan(match.name) + slug
@@ -741,6 +744,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         }
         api.setOrgId(selectedOrg.id);
         resolvedOrgId = selectedOrg.id;
+        resolvedOrgName = selectedOrg.name;
+        resolvedOrgSlug = selectedOrg.slug ?? undefined;
         await writeConfig({
           ...config,
           orgId: selectedOrg.id,
@@ -752,6 +757,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         );
       } else {
         resolvedOrgId = config.orgId;
+        resolvedOrgName = config.orgName;
+        resolvedOrgSlug = config.orgSlug;
         api.setOrgId(config.orgId);
         if (config.orgName) {
           const slug = config.orgSlug ? chalk.gray(` (${config.orgSlug})`) : "";
@@ -1201,6 +1208,27 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     // ── Step 6: Deploy ────────────────────────────────────────────
     const existingLink = !options.new ? await getProjectLink(cwd) : null;
     let serverId = existingLink?.serverId;
+
+    // When --org is specified, verify the linked server belongs to that org.
+    // If not, ignore the link and create a new server in the specified org.
+    if (serverId && resolvedOrgId) {
+      try {
+        const linkedServer = await api.getServer(serverId);
+        if (linkedServer.organizationId !== resolvedOrgId) {
+          const target = resolvedOrgName
+            ? `${resolvedOrgName}${resolvedOrgSlug ? ` (${resolvedOrgSlug})` : ""}`
+            : resolvedOrgId;
+          console.log(
+            chalk.yellow(
+              `⚠️  Linked server belongs to a different organization. Creating a new server in ${target}...\n`
+            )
+          );
+          serverId = undefined;
+        }
+      } catch {
+        // If we can't fetch the server, let the existing flow handle it
+      }
+    }
 
     if (existingLink && serverId) {
       try {

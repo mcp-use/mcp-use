@@ -50,6 +50,20 @@ npx @mcp-use/inspector --port 9000
 
 **Port Range:** Must be between 1 and 65535
 
+### `--no-open`
+
+Prevent the inspector from automatically opening a browser tab when it starts. Useful in CI/CD pipelines, headless environments, or when you prefer to open the URL manually.
+
+```bash
+npx @mcp-use/inspector --no-open
+```
+
+You can combine it with other flags:
+
+```bash
+npx @mcp-use/inspector --url http://localhost:3000/mcp --port 9000 --no-open
+```
+
 ### `--help, -h`
 
 Display help information and available options.
@@ -157,7 +171,7 @@ npx @mcp-use/inspector --url localhost:3000/mcp
 
 ### Browser Doesn't Open
 
-If the browser doesn't open automatically, check the terminal output for the inspector URL and open it manually.
+If the browser doesn't open automatically, check the terminal output for the inspector URL and open it manually. If you passed `--no-open`, this is expected behavior.
 
 ## Related Documentation
 

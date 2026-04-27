@@ -24,6 +24,15 @@ vi.mock("../src/utils/api.js", () => {
         return mockApiInstance;
       }
     },
+    ApiUnauthorizedError: class ApiUnauthorizedError extends Error {
+      readonly status = 401 as const;
+      constructor(
+        message = "Your session has expired or your API key is invalid."
+      ) {
+        super(message);
+        this.name = "ApiUnauthorizedError";
+      }
+    },
   };
 });
 
@@ -773,5 +782,99 @@ describe("Error Handling", () => {
       : apiError;
 
     expect(userMessage).toBe("Deployment not found");
+  });
+});
+
+describe("--org flag org-mismatch check", () => {
+  it("should skip linked server when it belongs to a different org", async () => {
+    const linkedServerId = "server_abc";
+    const resolvedOrgId = "org_target";
+    const linkedServer = { organizationId: "org_other" };
+
+    const api = { getServer: vi.fn().mockResolvedValue(linkedServer) };
+
+    let serverId: string | undefined = linkedServerId;
+
+    if (serverId && resolvedOrgId) {
+      try {
+        const s = await api.getServer(serverId);
+        if (s.organizationId !== resolvedOrgId) {
+          serverId = undefined;
+        }
+      } catch {
+        // keep serverId
+      }
+    }
+
+    expect(api.getServer).toHaveBeenCalledWith(linkedServerId);
+    expect(serverId).toBeUndefined();
+  });
+
+  it("should keep linked server when it belongs to the same org", async () => {
+    const linkedServerId = "server_abc";
+    const resolvedOrgId = "org_target";
+    const linkedServer = { organizationId: "org_target" };
+
+    const api = { getServer: vi.fn().mockResolvedValue(linkedServer) };
+
+    let serverId: string | undefined = linkedServerId;
+
+    if (serverId && resolvedOrgId) {
+      try {
+        const s = await api.getServer(serverId);
+        if (s.organizationId !== resolvedOrgId) {
+          serverId = undefined;
+        }
+      } catch {
+        // keep serverId
+      }
+    }
+
+    expect(serverId).toBe(linkedServerId);
+  });
+
+  it("should keep linked server when no --org flag is provided", async () => {
+    const linkedServerId = "server_abc";
+    const resolvedOrgId: string | undefined = undefined;
+
+    const api = { getServer: vi.fn() };
+
+    let serverId: string | undefined = linkedServerId;
+
+    if (serverId && resolvedOrgId) {
+      try {
+        const s = await api.getServer(serverId);
+        if (s.organizationId !== resolvedOrgId) {
+          serverId = undefined;
+        }
+      } catch {
+        // keep serverId
+      }
+    }
+
+    expect(api.getServer).not.toHaveBeenCalled();
+    expect(serverId).toBe(linkedServerId);
+  });
+
+  it("should keep linked server when getServer throws (let existing flow handle it)", async () => {
+    const linkedServerId = "server_abc";
+    const resolvedOrgId = "org_target";
+
+    const api = { getServer: vi.fn().mockRejectedValue(new Error("500")) };
+
+    let serverId: string | undefined = linkedServerId;
+
+    if (serverId && resolvedOrgId) {
+      try {
+        const s = await api.getServer(serverId);
+        if (s.organizationId !== resolvedOrgId) {
+          serverId = undefined;
+        }
+      } catch {
+        // keep serverId
+      }
+    }
+
+    expect(serverId).toBe(linkedServerId);
   });
 });

@@ -1,160 +1,144 @@
 ---
 title: "Supabase Provider"
-description: "Configure Supabase OAuth authentication"
+description: "Configure Supabase OAuth 2.1 server authentication for your MCP server"
 icon: "/images/icons/supabase.svg"
 ---
 
+Supabase's [OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server/getting-started) hosts `/authorize`, `/token`, `/register`, and `.well-known` discovery on your Supabase project — the MCP server only verifies the resulting JWTs. **You host the consent UI**: Supabase redirects the browser to a URL you configure, and your route uses the Supabase JS SDK to load the authorization details, render sign-in + consent, and submit the decision back to Supabase.
+
+<Note>
+  This provider targets Supabase's OAuth 2.1 server (see [MCP authentication guide](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)). It's a different feature than Supabase Auth's social logins — enable it explicitly in the dashboard under **Authentication → OAuth Server**.
+</Note>
+
+## Host the consent UI
+
+Supabase redirects the browser to the consent screen URL you configure in the dashboard (e.g. `/auth/consent?authorization_id=<uuid>`). Your route signs the user in, loads the authorization details with the Supabase JS SDK, and submits the approve/deny decision back to Supabase — mcp-use is not involved in this step.
+
+Follow Supabase's [OAuth Server — Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started) for the canonical implementation. For a wired-up reference, see the [runnable mcp-use + Supabase example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase).
+
 ## Setup
 
-### 1. Create Supabase Project
+### 1. Create a Supabase project
 
-1. Go to [Supabase Dashboard](https://app.supabase.com/)
-2. Create a new project or select existing one
-3. Note your **Project ID** and **API URL**
+Go to the [Supabase Dashboard](https://app.supabase.com/) and create or select a project. Copy the **Project ID** from **Project Settings → General**.
 
-### 2. Get JWT Secret (HS256 Only)
+### 2. Enable the OAuth Server
 
-For HS256 tokens (legacy):
+In **Authentication → OAuth Server**, enable the OAuth 2.1 server and set the **consent screen URL** to the route your MCP server will host:
 
-1. Go to **Project Settings** → **API**
-2. Copy the **JWT Secret** under "JWT Settings"
-
-For ES256 tokens (new):
-- No JWT secret needed, JWKS is used automatically
-
-### 3. Configure Authentication
-
-1. Go to **Authentication** → **Providers**
-2. Enable desired authentication providers (Email, Google, GitHub, etc.)
-3. Configure redirect URLs
-
-## Configuration
-
-### Basic Configuration (ES256)
-
-For new Supabase projects using ES256 tokens:
-
-```typescript
-import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server'
-
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-    // ES256 tokens use JWKS automatically
-  })
-})
-
-server.listen(3000)
+```
+http://localhost:3000/auth/consent
 ```
 
-### Configuration with HS256 (Legacy)
+Supabase will redirect users here with `?authorization_id=<uuid>` after `/authorize`.
 
-For projects still using HS256 tokens:
+### 3. Enable a sign-in method
 
-```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
-  })
-})
-```
+Users must be signed in before they can consent. Pick one in **Authentication → Sign In / Providers**:
 
-### Environment Variables
+- **Anonymous sign-ins** — one-click guest sessions, ideal for demos
+- **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.) — for real apps
+
+### 4. Environment variables
 
 ```bash
-# .env
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_ANON_KEY=eyJhbGci...
-MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret  # Only for HS256
+
+# Publishable key (sb_publishable_...) from Project Settings → API Keys.
+# Used by the consent UI and by tools calling Supabase REST/APIs.
+MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-### Full Configuration Options
+<Note>
+  New Supabase projects issue `sb_publishable_...` keys. If your project still uses the legacy `anon` JWT key, it will continue to work here — but prefer publishable keys going forward.
+</Note>
+
+## Configure the MCP server
 
 ```typescript
+// server.ts
+import { MCPServer, oauthSupabaseProvider } from "mcp-use/server";
+
 const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    // Required
-    projectId: 'your-project-id',
-    
-    // Required for HS256 tokens (legacy)
-    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
-    
-    // Optional: Supabase URL (defaults to supabase.co)
-    supabaseUrl: 'https://your-project-id.supabase.co',
-    
-    // OAuth mode: 'proxy' (default) or 'direct'
-    mode: 'proxy',
-    
-    // JWT verification
-    verifyJwt: process.env.NODE_ENV === 'production',
-    
-    // Override supported scopes (advertised in OAuth metadata)
-    // Default: [] (Supabase does not define default scopes)
-    scopesSupported: ['openid', 'profile', 'email'],
-    
-    // Custom user info extraction
-    getUserInfo: (payload) => ({
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.user_metadata?.name,
-      roles: payload.app_metadata?.roles || [],
-      permissions: payload.app_metadata?.permissions || [],
-    })
-  })
-})
+  name: "my-server",
+  version: "1.0.0",
+  oauth: oauthSupabaseProvider(), // reads MCP_USE_OAUTH_SUPABASE_PROJECT_ID
+});
+
+await server.listen(3000);
 ```
 
-## Token Types
-
-### ES256 (Recommended)
-
-New Supabase projects use ES256 tokens with JWKS:
+## Configuration options
 
 ```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!
-    // No jwtSecret needed - uses JWKS automatically
-  })
-})
+oauthSupabaseProvider({
+  // Required (or set MCP_USE_OAUTH_SUPABASE_PROJECT_ID)
+  projectId: "your-project-id",
+
+  // Skip JWT verification — development only
+  verifyJwt: process.env.NODE_ENV === "production",
+
+  // Override advertised scopes
+  scopesSupported: ["openid", "profile", "email"],
+});
 ```
 
-**Benefits:**
-- More secure (asymmetric encryption)
-- No shared secret to manage
-- Automatic key rotation support
+<Tip>
+  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint — the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
+</Tip>
 
-### HS256 (Legacy)
-
-Older projects may still use HS256:
+## Accessing user info in tools
 
 ```typescript
-const server = new MCPServer({
-  oauth: oauthSupabaseProvider({
-    projectId: process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID!,
-    jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET!
-  })
-})
+server.tool(
+  {
+    name: "get-user-info",
+    description: "Get authenticated user info",
+  },
+  async (_args, ctx) => ({
+    userId: ctx.auth.user.userId,
+    email: ctx.auth.user.email,
+    name: ctx.auth.user.name,
+    scopes: ctx.auth.scopes,
+  }),
+);
 ```
 
-**Check your token type:**
-1. Go to Supabase Dashboard → **Project Settings** → **API**
-2. Look for "JWT Algorithm" in JWT Settings
-3. If it says "HS256", you need the JWT secret
-4. If it says "ES256", omit the JWT secret
+You can also call Supabase from within a tool using the user's access token. Create a Supabase client scoped to the request so RLS policies see the caller as the authenticated user:
+
+```typescript
+import { createClient } from "@supabase/supabase-js";
+
+server.tool(
+  {
+    name: "list-notes",
+    description: "Fetch the user's notes",
+  },
+  async (_args, ctx) => {
+    const supabase = createClient(
+      `https://${process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID}.supabase.co`,
+      process.env.MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        global: { headers: { Authorization: `Bearer ${ctx.auth.accessToken}` } },
+      },
+    );
+
+    const { data, error } = await supabase.from("notes").select();
+    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+
+    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+  },
+);
+```
 
 ## Resources
 
-- [GitHub Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
-- [Supabase Documentation](https://supabase.com/docs)
-- [Supabase Auth](https://supabase.com/docs/guides/auth)
+- [Runnable mcp-use + Supabase example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
+- [Supabase OAuth Server — Getting Started](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
+- [Supabase OAuth Server — MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context) - Access user information
-
+- [User Context](/typescript/server/authentication/user-context) — Access user information in tools

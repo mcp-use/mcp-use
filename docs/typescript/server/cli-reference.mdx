@@ -48,12 +48,21 @@ mcp-use dev [options]
 
 **Options:**
 
-| Option              | Description                  | Default           |
-| ------------------- | ---------------------------- | ----------------- |
-| `-p, --path <path>` | Project directory            | Current directory |
-| `--port <port>`     | Server port                  | 3000              |
-| `--no-open`         | Don't auto-open inspector    | false             |
-| `--no-hmr`          | Disable Hot Module Reloading | false             |
+| Option                    | Description                                                        | Default           |
+| ------------------------- | ------------------------------------------------------------------ | ----------------- |
+| `-p, --path <path>`       | Project directory                                                  | Current directory |
+| `--port <port>`           | Server port                                                        | 3000              |
+| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)          | -                 |
+| `--entry <file>`          | Explicit server entry file                                         | Auto-detected     |
+| `--widgets-dir <dir>`     | Path to widgets directory                                          | `resources`       |
+| `--no-open`               | Don't auto-open inspector                                          | false             |
+| `--no-hmr`                | Disable Hot Module Reloading                                       | false             |
+
+<Tip>
+  Use `--mcp-dir` when your MCP server lives inside an existing project (e.g. a Next.js app).
+  With `--mcp-dir src/mcp`, the CLI looks for `src/mcp/index.ts` as the entry and
+  `src/mcp/resources/` as the widgets directory.
+</Tip>
 
 **Examples:**
 
@@ -72,6 +81,9 @@ mcp-use dev --no-hmr
 
 # Custom project path
 mcp-use dev -p ./my-server
+
+# MCP server inside a Next.js app
+mcp-use dev --mcp-dir src/mcp
 ```
 
 #### Hot Module Reloading (HMR)
@@ -112,10 +124,13 @@ mcp-use build [options]
 
 **Options:**
 
-| Option              | Description                | Default           |
-| ------------------- | -------------------------- | ----------------- |
-| `-p, --path <path>` | Project directory          | Current directory |
-| `--with-inspector`  | Include inspector in build | false             |
+| Option                    | Description                                                        | Default           |
+| ------------------------- | ------------------------------------------------------------------ | ----------------- |
+| `-p, --path <path>`       | Project directory                                                  | Current directory |
+| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)          | -                 |
+| `--entry <file>`          | Explicit server entry file                                         | Auto-detected     |
+| `--widgets-dir <dir>`     | Path to widgets directory                                          | `resources`       |
+| `--with-inspector`        | Include inspector in build                                         | false             |
 
 **Examples:**
 
@@ -128,6 +143,9 @@ mcp-use build --with-inspector
 
 # Build specific project
 mcp-use build -p ./my-server
+
+# Build MCP server inside a Next.js app
+mcp-use build --mcp-dir src/mcp
 ```
 
 <Tip>
@@ -147,11 +165,12 @@ mcp-use start [options]
 
 **Options:**
 
-| Option              | Description       | Default           |
-| ------------------- | ----------------- | ----------------- |
-| `-p, --path <path>` | Project directory | Current directory |
-| `--port <port>`     | Server port       | 3000              |
-| `--tunnel`          | Expose via tunnel | false             |
+| Option                    | Description                                                        | Default           |
+| ------------------------- | ------------------------------------------------------------------ | ----------------- |
+| `-p, --path <path>`       | Project directory                                                  | Current directory |
+| `--port <port>`           | Server port                                                        | 3000              |
+| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)          | -                 |
+| `--tunnel`                | Expose via tunnel                                                  | false             |
 
 **Examples:**
 
@@ -167,12 +186,17 @@ mcp-use start --tunnel
 
 # Start specific project
 mcp-use start -p ./my-server
+
+# Start MCP server inside a Next.js app
+mcp-use start --mcp-dir src/mcp
 ```
 
 <Note>
   The `start` command looks for the server entry point in the build manifest
   (`dist/mcp-use.json`). If not found, it falls back to checking
-  `dist/index.js`, `dist/server.js`, etc.
+  `dist/index.js`, `dist/server.js`, etc. When `--mcp-dir` is set, the
+  TypeScript source is run directly via `tsx` instead of expecting pre-built
+  `.js` files.
 </Note>
 
 ---
@@ -241,11 +265,17 @@ mcp-use login
 
 Starts an OAuth-style device code flow to authenticate with [Manufact Cloud](https://manufact.com). Opens a browser window to complete authentication.
 
+**Options:**
+
+- `--api-key <key>` — Skip the browser flow and save an API key directly. Intended for CI/CD.
+- `--org <slug|id|name>` — Pick an organization up-front and skip the post-login prompt. Use this when running in agent harnesses or non-TTY environments where the interactive selection cannot be answered.
+
 **What happens:**
 
 1. CLI generates a device code
 2. Opens browser to authentication page
 3. Stores session token in `~/.mcp-use/config.json`
+4. If you have more than one organization and `--org` was not supplied, CLI prompts you to pick one. Without a TTY, the command fails with a message pointing at `--org` rather than hanging.
 
 #### `whoami` - Check Authentication Status
 

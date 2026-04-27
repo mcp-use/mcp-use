@@ -1,5 +1,177 @@
 # mcp-use
 
+## 1.25.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f41869b]
+  - @mcp-use/inspector@3.0.1-canary.3
+  - @mcp-use/cli@3.1.1-canary.3
+
+## 1.25.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dfe35fa]
+  - @mcp-use/inspector@3.0.1-canary.2
+  - @mcp-use/cli@3.1.1-canary.2
+
+## 1.25.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [7f4e99d]
+  - @mcp-use/cli@3.1.1-canary.1
+  - @mcp-use/inspector@3.0.1-canary.1
+
+## 1.25.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c864134]
+- Updated dependencies [a59476b]
+  - @mcp-use/inspector@3.0.1-canary.0
+  - @mcp-use/cli@3.1.1-canary.0
+
+## 1.25.0
+
+### Minor Changes
+
+- 1bdec92: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+- 1bdec92: Refactor OAuth providers to use DCR-direct flow by default
+
+  **Breaking Changes (mcp-use):**
+  - Removed proxy mode from built-in OAuth providers (Auth0, WorkOS, Supabase, Keycloak, Better Auth)
+  - Built-in providers now only support DCR-direct flow: clients communicate directly with upstream authorization servers
+  - `verifyToken` is now an explicit required function for custom providers
+  - Provider configurations no longer accept `clientId`/`clientSecret` - use the new `oauthProxy` helper for providers that don't support DCR
+
+  **New Features:**
+  - Added `oauthProxy` helper for creating proxy-mode OAuth providers (useful for Google, GitHub, etc.)
+  - Added `jwksVerifier` helper function for easy JWKS-based token verification in custom providers
+  - Added Auth0 OAuth proxy example demonstrating the new proxy pattern
+
+### Patch Changes
+
+- 1bdec92: Fix OAuth authorize redirect stripping URL path when auth server uses basePath. The `authenticate()` function now preserves the pathname component (e.g. `/api/auth`) instead of reducing the URL to just the origin.
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+  - @mcp-use/cli@3.1.0
+  - @mcp-use/inspector@3.0.0
+
+## 1.25.0-canary.9
+
+### Minor Changes
+
+- 6406d28: Refactor OAuth providers to use DCR-direct flow by default
+
+  **Breaking Changes (mcp-use):**
+  - Removed proxy mode from built-in OAuth providers (Auth0, WorkOS, Supabase, Keycloak, Better Auth)
+  - Built-in providers now only support DCR-direct flow: clients communicate directly with upstream authorization servers
+  - `verifyToken` is now an explicit required function for custom providers
+  - Provider configurations no longer accept `clientId`/`clientSecret` - use the new `oauthProxy` helper for providers that don't support DCR
+
+  **New Features:**
+  - Added `oauthProxy` helper for creating proxy-mode OAuth providers (useful for Google, GitHub, etc.)
+  - Added `jwksVerifier` helper function for easy JWKS-based token verification in custom providers
+  - Added Auth0 OAuth proxy example demonstrating the new proxy pattern
+
+### Patch Changes
+
+- @mcp-use/cli@3.1.0-canary.9
+- @mcp-use/inspector@3.0.0-canary.9
+
+## 1.25.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [a0500f4]
+  - @mcp-use/inspector@3.0.0-canary.8
+  - @mcp-use/cli@3.1.0-canary.8
+
+## 1.25.0-canary.7
+
+### Patch Changes
+
+- 25dbaa5: Fix OAuth authorize redirect stripping URL path when auth server uses basePath. The `authenticate()` function now preserves the pathname component (e.g. `/api/auth`) instead of reducing the URL to just the origin.
+  - @mcp-use/cli@3.1.0-canary.7
+  - @mcp-use/inspector@3.0.0-canary.7
+
+## 1.25.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [2304ff0]
+  - @mcp-use/inspector@3.0.0-canary.6
+  - @mcp-use/cli@3.1.0-canary.6
+
+## 1.25.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [9805a50]
+  - @mcp-use/cli@3.1.0-canary.5
+  - @mcp-use/inspector@3.0.0-canary.5
+
+## 1.25.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [4470adc]
+  - @mcp-use/cli@3.1.0-canary.4
+  - @mcp-use/inspector@3.0.0-canary.4
+
+## 1.25.0-canary.3
+
+### Minor Changes
+
+- 3b79a17: feat(cli, mcp-use): Next.js drop-in support for MCP servers
+  - `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`) alongside its routes, sharing the same `@/*` aliases, Tailwind styles, and component library.
+  - Auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected in `package.json`, so tools transitively imported from the app don't blow up outside a Next runtime. Shim list is centralized in `next-shims-registry.json`.
+  - Loads Next.js env cascade (`.env`, `.env.development`, `.env.local`, `.env.development.local`) in the MCP server process.
+  - Widget builds fail fast with an actionable error when a widget (or a module it transitively imports) pulls in a Next.js server-only module — widgets run in a browser iframe, so the right fix is to read server data in an MCP tool and pass it through widget props.
+
+### Patch Changes
+
+- Updated dependencies [3b79a17]
+  - @mcp-use/cli@3.1.0-canary.3
+  - @mcp-use/inspector@3.0.0-canary.3
+
+## 1.24.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [e9bb402]
+  - @mcp-use/cli@3.1.0-canary.2
+  - @mcp-use/inspector@2.2.1-canary.2
+
+## 1.24.3-canary.1
+
+### Patch Changes
+
+- Updated dependencies [468af39]
+  - @mcp-use/cli@3.1.0-canary.1
+  - @mcp-use/inspector@2.2.1-canary.1
+
+## 1.24.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [52a98f9]
+  - @mcp-use/cli@3.0.3-canary.0
+  - @mcp-use/inspector@2.2.1-canary.0
+
 ## 1.24.2
 
 ### Patch Changes

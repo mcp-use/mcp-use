@@ -1,5 +1,134 @@
 # @mcp-use/inspector
 
+## 3.0.1-canary.3
+
+### Patch Changes
+
+- f41869b: fix(inspector): suppress duplicate model UI when embedded with `managedLlmConfig` + `hideModelBadge` (MCP-1913)
+
+  If the user had a bring-your-own-key config in `localStorage`, `effectiveClientSide` became true. The host can pass `managedLlmConfig` and `hideModelBadge` (e.g. cloud dashboard with `ServerChatHeader` + `LLMModelSelector`), but the inspector still showed its own `provider/model` UI: the landing pill below the input, and (in threaded view) `ChatHeader`'s absolute model badge — overlapping the dashboard title and model row.
+
+  When `managedLlmConfig` and `hideModelBadge` are both set, the inspector now suppresses that duplicate chrome in both landing and non-landing views. Standalone hosted behavior is unchanged when the host does not pass this embed pair.
+
+  Additionally, for `useClientSide={false}` + `managedLlmConfig` (host-owned chat stream), the chat path no longer auto-switches to client-side streaming when `localLlmConfig` exists in `localStorage` from a past standalone inspector session. The host’s `chatApiUrl` (e.g. org chat stream) is used unless the user explicitly opts into BYOK (`forceClientSide` via rate-limit / “use your own key”).
+  - mcp-use@1.25.1-canary.3
+
+## 3.0.1-canary.2
+
+### Patch Changes
+
+- dfe35fa: Fix MCP App widget overlaying the chat header. Removed the explicit `z-20`/`z-10` stacking context from the sandboxed iframe wrappers in `MCPAppsRenderer` and `OpenAIComponentRenderer` so widgets scroll beneath the chat header instead of painting over it.
+  - mcp-use@1.25.1-canary.2
+
+## 3.0.1-canary.1
+
+### Patch Changes
+
+- mcp-use@1.25.1-canary.1
+
+## 3.0.1-canary.0
+
+### Patch Changes
+
+- c864134: fix(inspector): hide Manufact free-tier "Model & usage" dialog when host app embeds `ChatTab` with its own session (MCP-1903)
+
+  The cloud dashboard chat was leaking the hosted inspector's free-tier sign-in / bring-your-own-key modal (plus the "anthropic/server-managed" model badge) even though it passed `hideModelBadge={true}` and already had its own authenticated session and model selector.
+
+  `ChatTab` was auto-deriving `freeTierInfo` from `isManaged` (i.e., the mere presence of `managedLlmConfig`), and both the badge and `ConfigurationDialog` treated `freeTierInfo` as an override that forces the UI back on regardless of `hideModelBadge` / `hideConfigButton`.
+
+  Free-tier upgrade UI is now opt-in via a new `enableFreeTierUpgrade?: boolean` prop on `ChatTab` (default `false`), plumbed through `EmbeddedConfig.chatEnableFreeTierUpgrade`. The hosted inspector (`inspector.manufact.com`) auto-seeds it to `true`; host apps that embed `ChatTab` directly (e.g. the cloud dashboard) leave it off and their hide-\* props are respected.
+
+- a59476b: fix(inspector): OAuth flow no longer leaves two tabs open (#1384)
+
+  Previously, connecting to an OAuth-protected MCP server from the inspector opened the authorization page in a new tab, and after the user authorized the app the callback redirected back to the inspector inside that second tab — leaving the user with two inspector tabs.
+
+  The inspector now uses the same-tab redirect flow (`useRedirectFlow: true`) combined with `preventAutoAuth: true`, so the OAuth authorization page opens in the current tab and the callback navigates the same tab back to the original inspector URL. The user ends up with a single tab.
+
+  The `Authenticate` anchor no longer sets `target="_blank"` / `rel="noopener noreferrer"` — clicking it now navigates the current tab directly to the stored auth URL. All connection entry points in the inspector (`handleAddConnection`, the `Layout` adapter, and the `InspectorDashboard` adapter used by `handleUpdateConnection` on URL edits, as well as `useAutoConnect`) propagate the same flags so the single-tab behavior is consistent across manual connect, URL edits, and auto-connect from shared config.
+  - mcp-use@1.25.1-canary.0
+
+## 3.0.0
+
+### Minor Changes
+
+- 1bdec92: Elicitation requests triggered from the Chat tab now appear inline in the chat thread instead of routing users to a separate Elicitation tab via a toast. When triggered from the Tools tab, the existing toast behaviour is preserved. The Elicitation tab remains available as a fallback/audit view.
+
+### Patch Changes
+
+- 1bdec92: Add Open Graph and Twitter Card meta tags (title, description, image, site) plus `<meta name="description">` to the inspector HTML, so links to the hosted inspector render rich previews on Slack, X/Twitter, LinkedIn, Discord, and other platforms. Ships a branded `inspector-cover.png` in `public/` and serves it from `/inspector/inspector-cover.png` in both the default and CDN-shell paths.
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+- Updated dependencies [1bdec92]
+  - mcp-use@1.25.0
+
+## 3.0.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [6406d28]
+  - mcp-use@1.25.0-canary.9
+
+## 3.0.0-canary.8
+
+### Minor Changes
+
+- a0500f4: Elicitation requests triggered from the Chat tab now appear inline in the chat thread instead of routing users to a separate Elicitation tab via a toast. When triggered from the Tools tab, the existing toast behaviour is preserved. The Elicitation tab remains available as a fallback/audit view.
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.8
+
+## 3.0.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [25dbaa5]
+  - mcp-use@1.25.0-canary.7
+
+## 3.0.0-canary.6
+
+### Patch Changes
+
+- 2304ff0: Add Open Graph and Twitter Card meta tags (title, description, image, site) plus `<meta name="description">` to the inspector HTML, so links to the hosted inspector render rich previews on Slack, X/Twitter, LinkedIn, Discord, and other platforms. Ships a branded `inspector-cover.png` in `public/` and serves it from `/inspector/inspector-cover.png` in both the default and CDN-shell paths.
+  - mcp-use@1.25.0-canary.6
+
+## 3.0.0-canary.5
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.5
+
+## 3.0.0-canary.4
+
+### Patch Changes
+
+- mcp-use@1.25.0-canary.4
+
+## 3.0.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [3b79a17]
+  - mcp-use@1.25.0-canary.3
+
+## 2.2.1-canary.2
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.2
+
+## 2.2.1-canary.1
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.1
+
+## 2.2.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.24.3-canary.0
+
 ## 2.2.0
 
 ### Minor Changes

@@ -6,10 +6,9 @@
  * - WorkOS MCP: https://workos.com/docs/authkit/mcp
  * - WorkOS AuthKit: https://workos.com/docs/authkit
  *
- * Environment variables (zero-config setup):
- * - MCP_USE_OAUTH_WORKOS_SUBDOMAIN (required)
- * - MCP_USE_OAUTH_WORKOS_CLIENT_ID (optional)
- * - MCP_USE_OAUTH_WORKOS_API_KEY (optional, but needed for API calls)
+ * Environment variables:
+ * - MCP_USE_OAUTH_WORKOS_SUBDOMAIN (required) — your AuthKit subdomain
+ * - WORKOS_API_KEY (optional, but needed for direct WorkOS API calls)
  */
 
 import { MCPServer, oauthWorkOSProvider, error, object } from "mcp-use/server";
@@ -17,12 +16,10 @@ import { MCPServer, oauthWorkOSProvider, error, object } from "mcp-use/server";
 declare const process: { env: Record<string, string> };
 
 // WorkOS API key for making API calls (not used for OAuth configuration)
-const WORKOS_API_KEY = process.env.MCP_USE_OAUTH_WORKOS_API_KEY;
+const WORKOS_API_KEY = process.env.WORKOS_API_KEY;
 
 if (!WORKOS_API_KEY) {
-  console.warn(
-    "Warning: MCP_USE_OAUTH_WORKOS_API_KEY not set. API calls will fail."
-  );
+  console.warn("Warning: WORKOS_API_KEY not set. API calls will fail.");
 }
 
 // Create MCP server with OAuth auto-configured from environment variables!

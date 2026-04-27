@@ -1,0 +1,20 @@
+{
+  "name": "auth0-proxy-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server example with Auth0 OAuth proxy authentication",
+  "license": "MIT",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
