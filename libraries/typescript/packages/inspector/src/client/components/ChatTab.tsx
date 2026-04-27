@@ -184,13 +184,21 @@ export function ChatTab({
   //  b) User clicks "Use your own API key" in LoginModal (shown on 429) →
   //     `handleUseApiKey` sets forceClientSide=true and opens ConfigurationDialog.
   //
-  // `effectiveClientSide` is the single source of truth used everywhere below
-  // instead of the raw `useClientSide` prop.
-  const [forceClientSide, setForceClientSide] = useState(
-    () => !!localLlmConfig
+  // Host embeds (e.g. cloud dashboard) pass `useClientSide={false}` + `managedLlmConfig`
+  // and set `chatApiUrl` to the org chat stream. They must not fall back to
+  // client-side streaming just because `localLlmConfig` exists from a past visit
+  // to the standalone inspector — that would use the wrong LLM (e.g. Gemini in
+  // localStorage) while the host shows a different model in the shell.
+  // `hostUsesServerManagedStream`: only `forceClientSide` (user explicitly
+  // chose BYOK) turns client-side back on.
+  const hostUsesServerManagedStream =
+    !useClientSide && managedLlmConfig != null;
+  const [forceClientSide, setForceClientSide] = useState(() =>
+    hostUsesServerManagedStream ? false : !!localLlmConfig
   );
-  const effectiveClientSide =
-    useClientSide || forceClientSide || !!localLlmConfig;
+  const effectiveClientSide = hostUsesServerManagedStream
+    ? forceClientSide
+    : useClientSide || forceClientSide || !!localLlmConfig;
 
   // When the user has opted into client-side mode (own API key), ignore the
   // externally-provided managed config — we want the config dialog, model
@@ -272,6 +280,17 @@ export function ChatTab({
     isManaged && enableFreeTierUpgrade
       ? { onLoginClick: handleOpenLogin }
       : undefined;
+
+  // Host embed (e.g. cloud dashboard) passes `managedLlmConfig` + `hideModelBadge`
+  // because it renders its own model row (`ServerChatHeader`). Suppress inspector
+  // model chrome on both landing and threaded views even when localStorage BYOK
+  // sets `effectiveClientSide` — otherwise ChatHeader's absolute model badge
+  // overlaps the dashboard controls (MCP-1913).
+  const suppressInspectorModelChrome =
+    Boolean(managedLlmConfig) && Boolean(hideModelBadge);
+
+  const hideModelBadgeOnLandingForm =
+    suppressInspectorModelChrome || (!!hideModelBadge && !effectiveClientSide);
 
   const {
     filteredPrompts,
@@ -1048,13 +1067,7 @@ export function ChatTab({
           onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
-          hideModelBadge={
-            // In hosted mode the host default is `hideModelBadge=true`, but
-            // once the user has supplied their own API key (client-side mode)
-            // we want the provider/model badge back so they can see and
-            // change what they're using.
-            hideModelBadge && !effectiveClientSide
-          }
+          hideModelBadge={hideModelBadgeOnLandingForm}
           hideServerUrl={hideServerUrl}
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
@@ -1083,7 +1096,9 @@ export function ChatTab({
         onApiKeyChange={setTempApiKey}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
-        hideConfigButton={isManaged && !freeTierInfo}
+        hideConfigButton={
+          (isManaged && !freeTierInfo) || suppressInspectorModelChrome
+        }
         freeTierInfo={freeTierInfo}
         onCopyChat={handleCopyChat}
         onExportChat={handleExportChat}
