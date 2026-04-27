@@ -25,6 +25,9 @@ import { fileURLToPath } from "node:url";
 import ora from "ora";
 import React, { useState } from "react";
 import { extract } from "tar";
+import { isSafeEntry, sanitizePackageName } from "./utils.js";
+
+export { sanitizePackageName } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -552,18 +555,21 @@ program
         const projectPath = useCurrentDir
           ? process.cwd()
           : resolve(process.cwd(), sanitizedProjectName);
+        // Raw basename for user-facing display; sanitized version for package.json
         const displayName = useCurrentDir
           ? basename(process.cwd())
           : sanitizedProjectName;
 
         if (useCurrentDir) {
-          // Allow "." only when the current directory is empty
+          // Allow "." when the directory contains only safe entries
+          // (.git, .gitignore, LICENSE, README*, .DS_Store, .idea, .vscode, Thumbs.db)
           const entries = readdirSync(projectPath);
-          if (entries.length > 0) {
+          const unsafeEntries = entries.filter((entry) => !isSafeEntry(entry));
+          if (unsafeEntries.length > 0) {
             console.error(chalk.red("❌ Current directory is not empty!"));
             console.error(
               chalk.yellow(
-                '   Use "." only in an empty directory, or provide a project name'
+                '   Use "." only in an empty directory (or one with only .git, LICENSE, README, etc.), or provide a project name'
               )
             );
             process.exit(1);
@@ -643,8 +649,11 @@ program
           options.canary
         );
 
-        // Update package.json with project name
-        updatePackageJson(projectPath, displayName);
+        // Update package.json with project name (sanitized for npm validity)
+        const packageName = useCurrentDir
+          ? sanitizePackageName(displayName)
+          : displayName;
+        updatePackageJson(projectPath, packageName);
 
         // Update index.ts with project name
         updateIndexTs(projectPath, displayName);
@@ -815,7 +824,11 @@ program
         }
         console.log("");
         console.log(chalk.bold("🚀 To get started:"));
-        console.log(chalk.cyan(`   cd ${useCurrentDir ? "." : displayName}`));
+        if (!useCurrentDir) {
+          console.log(chalk.cyan(`   cd ${displayName}`));
+        } else {
+          console.log(chalk.gray("   # already in the project directory"));
+        }
         if (!shouldInstall) {
           console.log(
             chalk.cyan(`   ${getInstallCommand(usedPackageManager)}`)
@@ -1332,11 +1345,12 @@ function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
       return;
     }
     if (trimmed === ".") {
-      // Allow "." — use current directory if it's empty
+      // Allow "." — use current directory if it contains only safe entries
       const entries = readdirSync(process.cwd());
-      if (entries.length > 0) {
+      const unsafeEntries = entries.filter((entry) => !isSafeEntry(entry));
+      if (unsafeEntries.length > 0) {
         setError(
-          'Current directory is not empty. Use "." only in an empty directory.'
+          'Current directory is not empty. Use "." only in a directory with no project files (safe: .git, LICENSE, README, etc.).'
         );
         return;
       }
