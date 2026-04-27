@@ -70,8 +70,7 @@ function App() {
     ? `${window.location.origin}${injectedProxyPath}`
     : undefined;
 
-  // Surface OAuth errors set by callback.ts. Lives at the App level so it runs
-  // regardless of route and after <Toaster /> has subscribed.
+  // App-level so it fires regardless of route, and after <Toaster /> mounts.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authError = params.get("auth_error");
