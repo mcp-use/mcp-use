@@ -38,6 +38,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly clientUri: string;
   readonly logoUri: string;
   readonly callbackUrl: string;
+  readonly scope?: string;
+  readonly staticClientInfo?: OAuthClientInformation;
   private preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
   private oauthProxyUrl?: string;
@@ -68,6 +70,15 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       useRedirectFlow?: boolean;
       oauthProxyUrl?: string;
       connectionUrl?: string; // MCP proxy URL that client connected to (for resource field rewriting)
+      /**
+       * Pre-registered OAuth client information. When set, the SDK skips
+       * Dynamic Client Registration and uses this client_id directly.
+       * Required for proxy-mode auth servers (e.g. Slack, WorkOS proxy)
+       * that strip `registration_endpoint` from metadata.
+       */
+      staticClientInfo?: OAuthClientInformation;
+      /** OAuth scope string forwarded to the SDK via clientMetadata.scope. */
+      scope?: string;
       onPopupWindow?: (
         url: string,
         features: string,
@@ -93,6 +104,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.useRedirectFlow = options.useRedirectFlow;
     this.oauthProxyUrl = options.oauthProxyUrl;
     this.connectionUrl = options.connectionUrl;
+    this.staticClientInfo = options.staticClientInfo;
+    this.scope = options.scope;
     this.onPopupWindow = options.onPopupWindow;
   }
 
@@ -279,11 +292,16 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       client_name: this.clientName,
       client_uri: this.clientUri,
       logo_uri: this.logoUri,
-      // scope: 'openid profile email mcp', // Example scopes, adjust as needed
+      ...(this.scope ? { scope: this.scope } : {}),
     };
   }
 
   async clientInformation(): Promise<OAuthClientInformation | undefined> {
+    // Pre-registered client info (proxy-mode servers like Slack/WorkOS proxy
+    // strip registration_endpoint, so DCR is not an option). When set, this
+    // bypasses any stored DCR result so a stale localStorage entry can't
+    // shadow the configured client_id.
+    if (this.staticClientInfo) return this.staticClientInfo;
     const key = this.getKey("client_info");
     const data = localStorage.getItem(key);
     if (!data) return undefined;
@@ -327,6 +345,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   async saveClientInformation(
     clientInformation: OAuthClientInformation /* | OAuthClientInformationFull */
   ): Promise<void> {
+    // When a pre-registered client_id is configured, never persist DCR results
+    // — the static client_id is the source of truth.
+    if (this.staticClientInfo) return;
     const key = this.getKey("client_info");
     // Cast needed if handling OAuthClientInformationFull specifically
     localStorage.setItem(key, JSON.stringify(clientInformation));
@@ -512,6 +533,12 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         // Include OAuth proxy settings so callback can bypass CORS for token exchange
         oauthProxyUrl: this.oauthProxyUrl,
         connectionUrl: this.connectionUrl,
+        // Forward pre-registered client info so the callback-side provider
+        // can return it from clientInformation() during token exchange.
+        ...(this.staticClientInfo
+          ? { staticClientInfo: this.staticClientInfo }
+          : {}),
+        ...(this.scope ? { scope: this.scope } : {}),
       },
       // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",

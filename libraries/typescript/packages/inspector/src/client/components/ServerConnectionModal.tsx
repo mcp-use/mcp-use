@@ -1,4 +1,8 @@
 import type { McpServer } from "mcp-use/react";
+import {
+  buildOAuthStaticConfig,
+  type OAuthStaticConfig,
+} from "@/client/utils/connectionUpdates";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -10,6 +14,7 @@ type MCPConnectionWithConfig = MCPConnection & {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
+  oauth?: OAuthStaticConfig;
 };
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { useEffect, useState } from "react";
@@ -35,6 +40,7 @@ interface ServerConnectionModalProps {
       proxyAddress?: string;
       headers?: Record<string, string>;
     };
+    oauth?: OAuthStaticConfig;
   }) => void;
 }
 
@@ -66,6 +72,7 @@ export function ServerConnectionModal({
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState("");
 
   // Prefill form when connection changes
@@ -129,6 +136,11 @@ export function ServerConnectionModal({
         })
       );
       setCustomHeaders(headerArray);
+
+      const storedOauth = storedConfig?.oauth ?? connectionWithConfig.oauth;
+      setClientId(storedOauth?.clientId || "");
+      setClientSecret(storedOauth?.clientSecret || "");
+      setScope(storedOauth?.scope || "");
     }
   }, [connection, open]);
 
@@ -196,11 +208,14 @@ export function ServerConnectionModal({
     // Always use HTTP transport (SSE is deprecated)
     const actualTransportType = "http";
 
+    const oauth = buildOAuthStaticConfig(clientId, clientSecret, scope);
+
     onConnect({
       url: normalizedUrl,
       name: alias.trim() || normalizedUrl,
       transportType: actualTransportType,
       proxyConfig,
+      ...(oauth ? { oauth } : {}),
     });
 
     onOpenChange(false);
@@ -231,6 +246,8 @@ export function ServerConnectionModal({
           setProxyAddress={setProxyAddress}
           clientId={clientId}
           setClientId={setClientId}
+          clientSecret={clientSecret}
+          setClientSecret={setClientSecret}
           scope={scope}
           setScope={setScope}
           onConnect={handleConnect}

@@ -1,3 +1,9 @@
+export interface OAuthStaticConfig {
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
+}
+
 interface ConnectionLike {
   url?: string;
   name?: string;
@@ -9,6 +15,7 @@ interface ConnectionLike {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
+  oauth?: OAuthStaticConfig;
 }
 
 export interface EditableConnectionConfig {
@@ -22,6 +29,31 @@ export interface EditableConnectionConfig {
   };
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
+  oauth?: OAuthStaticConfig;
+}
+
+/**
+ * Build an OAuth static-client config from raw form inputs, trimming whitespace
+ * and dropping empty fields. clientSecret is only kept when clientId is also set
+ * — a secret without a client_id has no meaning. Returns `undefined` when
+ * neither a client_id nor a scope is provided.
+ */
+export function buildOAuthStaticConfig(
+  clientId: string,
+  clientSecret: string,
+  scope: string
+): OAuthStaticConfig | undefined {
+  const trimmedClientId = clientId.trim();
+  const trimmedClientSecret = clientSecret.trim();
+  const trimmedScope = scope.trim();
+  if (!trimmedClientId && !trimmedScope) return undefined;
+  return {
+    ...(trimmedClientId ? { clientId: trimmedClientId } : {}),
+    ...(trimmedClientId && trimmedClientSecret
+      ? { clientSecret: trimmedClientSecret }
+      : {}),
+    ...(trimmedScope ? { scope: trimmedScope } : {}),
+  };
 }
 
 export function getStoredConnectionConfig<T>(id: string): T | null {
@@ -64,6 +96,9 @@ function normalizeConnection(
   transportType: "http" | "sse";
   proxyAddress: string;
   headers: Record<string, string>;
+  oauthClientId: string;
+  oauthClientSecret: string;
+  oauthScope: string;
 } {
   const normalizedUrl = connection.url?.trim() || "";
 
@@ -73,6 +108,9 @@ function normalizeConnection(
     transportType: connection.transportType || "http",
     proxyAddress: connection.proxyConfig?.proxyAddress?.trim() || "",
     headers: getComparableHeaders(connection),
+    oauthClientId: connection.oauth?.clientId?.trim() || "",
+    oauthClientSecret: connection.oauth?.clientSecret?.trim() || "",
+    oauthScope: connection.oauth?.scope?.trim() || "",
   };
 }
 
@@ -89,6 +127,9 @@ export function isAliasOnlyConnectionUpdate(
     currentConnection.proxyAddress === nextConnection.proxyAddress &&
     JSON.stringify(currentConnection.headers) ===
       JSON.stringify(nextConnection.headers) &&
+    currentConnection.oauthClientId === nextConnection.oauthClientId &&
+    currentConnection.oauthClientSecret === nextConnection.oauthClientSecret &&
+    currentConnection.oauthScope === nextConnection.oauthScope &&
     currentConnection.name !== nextConnection.name
   );
 }
