@@ -63,9 +63,9 @@ export function mountInspector(
   // below runs against a Hono `Context`, crashing on `req.headers.host`.
   // Every Hono instance exposes `.fetch`, and Express apps don't, so the
   // duck-type check alone covers both shapes unambiguously.
-  if (typeof (app as any)?.fetch === "function") {
-    registerInspectorRoutes(app as Hono, config);
-    registerStaticRoutes(app as Hono, clientDistPath, runtimeConfig);
+  if (isHonoApp(app)) {
+    registerInspectorRoutes(app, config);
+    registerStaticRoutes(app, clientDistPath, runtimeConfig);
     return;
   }
 
@@ -117,4 +117,8 @@ export function mountInspector(
       })
       .catch(next);
   });
+}
+
+function isHonoApp(app: Express | Hono): app is Hono {
+  return typeof (app as { fetch?: unknown }).fetch === "function";
 }
