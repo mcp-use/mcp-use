@@ -378,21 +378,6 @@ export function useAutoConnect({
       return;
     }
 
-    // Check for OAuth error parameters (set by callback.ts on auth failure)
-    const errorParams = new URLSearchParams(window.location.search);
-    const authError = errorParams.get("auth_error");
-    const authErrorDescription = errorParams.get("auth_error_description");
-    if (authError) {
-      const message = authErrorDescription || authError;
-      toast.error(`OAuth authentication failed: ${message}`);
-      // Clean up error params from URL
-      errorParams.delete("auth_error");
-      errorParams.delete("auth_error_description");
-      const cleanSearch = errorParams.toString();
-      const newUrl = `${window.location.pathname}${cleanSearch ? `?${cleanSearch}` : ""}`;
-      window.history.replaceState({}, "", newUrl);
-    }
-
     const trySessionReconnect = (): boolean => {
       if (typeof sessionStorage === "undefined") return false;
       try {

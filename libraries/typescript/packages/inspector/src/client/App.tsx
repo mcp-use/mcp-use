@@ -70,6 +70,27 @@ function App() {
     ? `${window.location.origin}${injectedProxyPath}`
     : undefined;
 
+  // Surface OAuth errors set by callback.ts. Lives at the App level so it runs
+  // regardless of route and after <Toaster /> has subscribed.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const authError = params.get("auth_error");
+    if (!authError) return;
+    const description = params.get("auth_error_description");
+    toast.error(`OAuth authentication failed: ${description || authError}`, {
+      duration: Infinity,
+      closeButton: true,
+    });
+    params.delete("auth_error");
+    params.delete("auth_error_description");
+    const search = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${search ? `?${search}` : ""}`
+    );
+  }, []);
+
   return (
     <ThemeProvider forcedTheme={forcedTheme || undefined}>
       <WidgetDebugProvider>
