@@ -95,32 +95,34 @@ export async function onMcpAuthorization() {
       );
     }
 
-    // --- Handle OAuth Errors (after state lookup so we can redirect properly) ---
+    // Handle OAuth errors after state lookup so we can use the recovered
+    // storedStateData to redirect back to the originating page with error
+    // params, instead of showing a raw error page.
     if (error) {
       console.log(
         `${logPrefix} OAuth error received: ${error} - ${errorDescription || "No description"}`
       );
       const isRedirectFlow = storedStateData.flowType === "redirect";
+      const hasOpener = window.opener && !window.opener.closed;
 
-      if (isRedirectFlow && storedStateData.returnUrl) {
-        // Redirect flow: navigate back with error parameters
-        console.log(
-          `${logPrefix} Redirect flow error. Returning to: ${storedStateData.returnUrl}`
-        );
-        localStorage.removeItem(stateKey);
-        const returnUrl = new URL(storedStateData.returnUrl);
-        returnUrl.searchParams.set("auth_error", error);
+      const redirectWithError = (target: string) => {
+        console.log(`${logPrefix} Returning to: ${target}`);
+        localStorage.removeItem(stateKey!);
+        const url = new URL(target);
+        url.searchParams.set("auth_error", error);
         if (errorDescription) {
-          returnUrl.searchParams.set(
-            "auth_error_description",
-            errorDescription
-          );
+          url.searchParams.set("auth_error_description", errorDescription);
         }
-        window.location.href = returnUrl.toString();
-        return; // Exit early, redirect is in progress
-      } else if (window.opener && !window.opener.closed) {
-        // Popup flow: notify opener and close
-        console.log(`${logPrefix} Popup flow error. Notifying opener...`);
+        window.location.href = url.toString();
+      };
+
+      // Prefer redirect when the originating flow was a full-page redirect, or
+      // when there is no opener to post back to.
+      if (storedStateData.returnUrl && (isRedirectFlow || !hasOpener)) {
+        redirectWithError(storedStateData.returnUrl);
+        return;
+      }
+      if (hasOpener) {
         window.opener.postMessage(
           {
             type: "mcp_auth_callback",
@@ -131,29 +133,11 @@ export async function onMcpAuthorization() {
         );
         localStorage.removeItem(stateKey);
         window.close();
-        return; // Exit early
-      } else if (storedStateData.returnUrl) {
-        // Fallback: use returnUrl even for popup flow
-        console.log(
-          `${logPrefix} Error without opener. Returning to: ${storedStateData.returnUrl}`
-        );
-        localStorage.removeItem(stateKey);
-        const returnUrl = new URL(storedStateData.returnUrl);
-        returnUrl.searchParams.set("auth_error", error);
-        if (errorDescription) {
-          returnUrl.searchParams.set(
-            "auth_error_description",
-            errorDescription
-          );
-        }
-        window.location.href = returnUrl.toString();
-        return; // Exit early
-      } else {
-        // No way to redirect, throw error to display it
-        throw new Error(
-          `OAuth error: ${error}${errorDescription ? ` - ${errorDescription}` : ""}`
-        );
+        return;
       }
+      throw new Error(
+        `OAuth error: ${error}${errorDescription ? ` - ${errorDescription}` : ""}`
+      );
     }
 
     if (!code) {

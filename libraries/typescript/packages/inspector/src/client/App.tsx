@@ -72,17 +72,18 @@ function App() {
 
   // App-level so it fires regardless of route, and after <Toaster /> mounts.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const authError = params.get("auth_error");
+    const authError = urlParams.get("auth_error");
     if (!authError) return;
-    const description = params.get("auth_error_description");
+    const description = urlParams.get("auth_error_description");
     toast.error(`OAuth authentication failed: ${description || authError}`, {
       duration: Infinity,
       closeButton: true,
     });
-    params.delete("auth_error");
-    params.delete("auth_error_description");
-    const search = params.toString();
+    // Clone before mutating so we don't disturb the params consumed above.
+    const cleaned = new URLSearchParams(urlParams);
+    cleaned.delete("auth_error");
+    cleaned.delete("auth_error_description");
+    const search = cleaned.toString();
     window.history.replaceState(
       {},
       "",
