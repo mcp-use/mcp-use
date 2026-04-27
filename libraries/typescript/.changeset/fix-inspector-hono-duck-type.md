@@ -4,7 +4,7 @@
 
 fix(inspector): detect Hono via duck-typing, not `instanceof`
 
-`mountInspector(app)` chose between a fast Hono-direct path and a slower Express-compat bridge based on `app instanceof Hono`. That check is unreliable across a published library boundary: when this package and the host (e.g. `mcp-use`) resolve different `Hono` constructors — common in monorepos where workspace deps hoist their own `hono`, when Node loads Hono's dual CJS+ESM builds from the same on-disk copy as two separate module records, or under bundler dedup — `instanceof` returns false even for a real Hono app. The Express bridge then runs against a Hono `Context` and crashes on every request trying to read `req.headers.host`:
+`mountInspector(app)` chose between a fast Hono-direct path and a slower Express-compat bridge based on `app instanceof Hono`. That check is unreliable across a published library boundary. When this package and the host (e.g. `mcp-use`) resolve different `Hono` constructors (common in monorepos where workspace deps hoist their own `hono`, when Node loads Hono's dual CJS+ESM builds from the same on-disk copy as two separate module records, or under bundler dedup), `instanceof` returns false even for a real Hono app. The Express bridge then runs against a Hono `Context` and crashes on every request trying to read `req.headers.host`:
 
 ```
 TypeError: Cannot read properties of undefined (reading 'host')

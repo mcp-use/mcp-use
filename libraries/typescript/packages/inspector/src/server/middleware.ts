@@ -56,9 +56,9 @@ export function mountInspector(
   //
   // Detect Hono via its `.fetch(Request) => Response` method rather than
   // `app instanceof Hono`. When this package and the host (e.g. `mcp-use`)
-  // resolve different `Hono` constructors — multiple `hono` copies hoisted
+  // resolve different `Hono` constructors (multiple `hono` copies hoisted
   // across a monorepo, the dual CJS/ESM builds shipped from a single on-disk
-  // copy loaded twice by Node, or bundler dedup quirks — `instanceof`
+  // copy loaded twice by Node, or bundler dedup quirks), `instanceof`
   // returns false even for a real Hono app, and the Express-compat path
   // below runs against a Hono `Context`, crashing on `req.headers.host`.
   // Express apps don't expose `.fetch`, so this check is unambiguous in
