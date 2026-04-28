@@ -221,6 +221,51 @@ class TestSandboxConnectorConnection:
         # Verify state
         assert connector._connected is False
 
+    @pytest.mark.asyncio
+    async def test_disconnect_called_twice_runs_cleanup_once(self, mock_sandbox_modules):
+        """Calling disconnect twice in a row must clean up resources only once."""
+        sandbox_options = SandboxOptions(api_key="test-api-key")
+        connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
+        connector._connected = True
+        connector._cleanup_resources = AsyncMock()
+
+        await connector.disconnect()
+        await connector.disconnect()
+
+        connector._cleanup_resources.assert_called_once()
+        assert connector._connected is False
+
+    @pytest.mark.asyncio
+    async def test_disconnect_reentrant_call_skips_second_cleanup(self, mock_sandbox_modules):
+        """A re-entrant disconnect during ``_cleanup_resources`` must not run cleanup twice.
+
+        Mirrors the regression test added in PR #1412 for ``BaseConnector``: while
+        the first ``disconnect`` is awaiting ``_cleanup_resources``, an
+        ``AsyncExitStack`` teardown (or another caller) invokes ``disconnect``
+        again. The guard at the top of ``disconnect`` must already see
+        ``_connected == False`` so the second call returns early instead of
+        re-running cleanup against an already-stopped sandbox.
+        """
+        sandbox_options = SandboxOptions(api_key="test-api-key")
+        connector = SandboxConnector("npx", ["test-command"], e2b_options=sandbox_options)
+        connector._connected = True
+
+        cleanup_call_count = 0
+
+        async def reentrant_cleanup():
+            nonlocal cleanup_call_count
+            cleanup_call_count += 1
+            # Simulate a concurrent/re-entrant disconnect firing while we
+            # are still inside the first call's cleanup await.
+            await connector.disconnect()
+
+        connector._cleanup_resources = reentrant_cleanup
+
+        await connector.disconnect()
+
+        assert cleanup_call_count == 1
+        assert connector._connected is False
+
 
 class TestSandboxConnectorCleanup:
     """Tests for SandboxConnector cleanup methods."""
