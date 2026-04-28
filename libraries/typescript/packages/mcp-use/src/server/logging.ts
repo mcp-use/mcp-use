@@ -9,31 +9,38 @@ const MAX_INLINE_LENGTH = 160;
 const MAX_ERROR_MESSAGE_LENGTH = 200;
 /** Cap the full rendered args JSON so one huge payload can't blow up the log line. */
 const MAX_ARGS_TOTAL_LENGTH = 2000;
-/** Truncate individual long strings in DEBUG-mode body dumps. */
-const MAX_DEBUG_STRING_LENGTH = 100;
+/** Truncate individual long strings in trace-mode body dumps. */
+const MAX_TRACE_STRING_LENGTH = 100;
 /** Stop descending into nested args past this depth. */
 const MAX_ARG_DEPTH = 3;
 
 /**
- * Check if DEBUG mode is enabled via environment variable
+ * Verbosity tier for the request logger:
+ * - `info`  — target, outcome, duration. Default. Hides args (which can carry PII/secrets).
+ * - `debug` — `info` + inline args for `tools/call` and `prompts/get`.
+ * - `trace` — `debug` + the verbose request/response header & body dump.
  */
-function isDebugMode(): boolean {
-  const debugEnv = getEnv("DEBUG");
-  return (
-    debugEnv !== undefined &&
-    debugEnv !== "" &&
-    debugEnv !== "0" &&
-    debugEnv.toLowerCase() !== "false"
-  );
+export type LogLevel = "info" | "debug" | "trace";
+
+/**
+ * Resolve the effective log level from environment via `MCP_LOG_LEVEL`
+ * (`info` | `debug` | `trace`, case-insensitive). Unset or unrecognized → `info`.
+ */
+export function getLogLevel(): LogLevel {
+  const explicit = getEnv("MCP_LOG_LEVEL")?.toLowerCase();
+  if (explicit === "info" || explicit === "debug" || explicit === "trace") {
+    return explicit;
+  }
+  return "info";
 }
 
 /**
- * Format an object for pretty-printed JSON logging (used by DEBUG-mode body dumps).
+ * Format an object for pretty-printed JSON logging (used by trace-mode body dumps).
  */
 function formatForLogging(obj: any): string {
   function truncate(val: any): any {
-    if (typeof val === "string" && val.length > MAX_DEBUG_STRING_LENGTH) {
-      return val.slice(0, MAX_DEBUG_STRING_LENGTH) + "...";
+    if (typeof val === "string" && val.length > MAX_TRACE_STRING_LENGTH) {
+      return val.slice(0, MAX_TRACE_STRING_LENGTH) + "...";
     } else if (Array.isArray(val)) {
       return val.map(truncate);
     } else if (val && typeof val === "object") {
@@ -241,10 +248,12 @@ function colorHttpStatus(statusCode: number): string {
 
 /**
  * Middleware that logs incoming HTTP requests with a timestamp, color-coded outcome,
- * duration, and (for POST /mcp) the JSON-RPC method + target + args + RPC-level error.
+ * duration, and (for POST /mcp) the JSON-RPC method + target + RPC-level error.
+ *
+ * Verbosity is controlled by `MCP_LOG_LEVEL` (or legacy `DEBUG`); see {@link getLogLevel}.
+ * `debug` adds inline args; `trace` also dumps full request/response headers + bodies.
  *
  * Skips logging for inspector telemetry, inspector UI/assets, and SSE endpoints.
- * When DEBUG is enabled, also logs request headers/body and response headers/body.
  *
  * @param c - Hono context for the current request/response
  * @param next - Next middleware function to invoke
@@ -253,7 +262,9 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const timestamp = new Date().toISOString().substring(11, 23);
   const method = c.req.method;
   const url = c.req.url;
-  const debugMode = isDebugMode();
+  const logLevel = getLogLevel();
+  const showArgs = logLevel === "debug" || logLevel === "trace";
+  const traceMode = logLevel === "trace";
 
   // Filter out noisy endpoints that create log spam
   const pathname = new URL(url).pathname;
@@ -285,7 +296,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   let requestBody: any = null;
   let requestHeaders: Record<string, string> = {};
 
-  if (debugMode) {
+  if (traceMode) {
     // Log request headers - c.req.header() without args returns all headers
     const allHeaders = c.req.header();
     if (allHeaders) {
@@ -342,7 +353,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
         ? (requestBody as any).method
         : undefined;
     const target = extractTarget(requestBody);
-    const args = renderArgs(requestBody);
+    const args = showArgs ? renderArgs(requestBody) : null;
     const outcome = detectOutcome(statusCode, responseText);
 
     const showSessionPrefix = sessionTag !== null && rpcMethod !== "initialize";
@@ -395,10 +406,10 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
 
   console.log(line);
 
-  // Debug mode: log detailed request/response information
-  if (debugMode) {
+  // Trace mode: log detailed request/response information
+  if (traceMode) {
     console.log("\n" + chalk.cyan("=".repeat(80)));
-    console.log(chalk.bold.cyan("[DEBUG] Request Details"));
+    console.log(chalk.bold.cyan("[TRACE] Request Details"));
     console.log(chalk.cyan("-".repeat(80)));
 
     // Request headers

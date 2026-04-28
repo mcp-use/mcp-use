@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   detectOutcome,
   extractTarget,
+  getLogLevel,
   renderArgs,
   type Outcome,
 } from "../src/server/logging.js";
@@ -255,6 +256,60 @@ describe("detectOutcome", () => {
     if (outcome.kind === "rpc-error") {
       expect(outcome.message.length).toBeLessThanOrEqual(204);
       expect(outcome.message.endsWith("...")).toBe(true);
+    }
+  });
+});
+
+describe("getLogLevel", () => {
+  const ENV_KEYS = ["MCP_LOG_LEVEL", "DEBUG"];
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    for (const k of ENV_KEYS) delete process.env[k];
+  });
+
+  afterEach(() => {
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  it("defaults to info when no env vars are set", () => {
+    expect(getLogLevel()).toBe("info");
+  });
+
+  it("respects explicit MCP_LOG_LEVEL=info", () => {
+    process.env.MCP_LOG_LEVEL = "info";
+    expect(getLogLevel()).toBe("info");
+  });
+
+  it("respects explicit MCP_LOG_LEVEL=debug", () => {
+    process.env.MCP_LOG_LEVEL = "debug";
+    expect(getLogLevel()).toBe("debug");
+  });
+
+  it("respects explicit MCP_LOG_LEVEL=trace", () => {
+    process.env.MCP_LOG_LEVEL = "trace";
+    expect(getLogLevel()).toBe("trace");
+  });
+
+  it("is case-insensitive for MCP_LOG_LEVEL", () => {
+    process.env.MCP_LOG_LEVEL = "DEBUG";
+    expect(getLogLevel()).toBe("debug");
+  });
+
+  it("falls back to info when MCP_LOG_LEVEL is unrecognized", () => {
+    process.env.MCP_LOG_LEVEL = "verbose";
+    expect(getLogLevel()).toBe("info");
+  });
+
+  it("DEBUG env var has no effect on log level", () => {
+    // DEBUG is no longer a control for the request logger; only MCP_LOG_LEVEL is.
+    for (const v of ["1", "true", "trace", "debug"]) {
+      process.env.DEBUG = v;
+      expect(getLogLevel()).toBe("info");
     }
   });
 });
