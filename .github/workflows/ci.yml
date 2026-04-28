@@ -251,7 +251,9 @@ jobs:
 
   python-transport-tests-report:
     needs: python-transport-tests
-    if: always() && github.event_name == 'pull_request' && needs.python-transport-tests.result != 'skipped'
+    # Fork PRs get a read-only GITHUB_TOKEN even with the permissions block above,
+    # so createComment 403s. Skip on forks; head_repo == base_repo means same-repo branch.
+    if: always() && github.event_name == 'pull_request' && needs.python-transport-tests.result != 'skipped' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -416,7 +418,8 @@ jobs:
 
   python-primitive-tests-report:
     needs: python-primitive-tests
-    if: always() && github.event_name == 'pull_request' && needs.python-primitive-tests.result != 'skipped'
+    # See python-transport-tests-report: skip on forks to avoid the read-only-token 403.
+    if: always() && github.event_name == 'pull_request' && needs.python-primitive-tests.result != 'skipped' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
