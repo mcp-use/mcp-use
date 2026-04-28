@@ -13,6 +13,8 @@ const MAX_ARGS_TOTAL_LENGTH = 2000;
 const MAX_TRACE_STRING_LENGTH = 100;
 /** Stop descending into nested args past this depth. */
 const MAX_ARG_DEPTH = 3;
+/** Cap how many bytes of a POST /mcp response we peek for outcome detection. JSON-RPC error envelopes are tiny; large tool results are truncated and treated as `OK`. */
+const MAX_RESPONSE_PEEK_BYTES = 64 * 1024;
 
 /**
  * Verbosity tier for the request logger:
@@ -23,13 +25,28 @@ const MAX_ARG_DEPTH = 3;
 export type LogLevel = "info" | "debug" | "trace";
 
 /**
- * Resolve the effective log level from environment via `MCP_LOG_LEVEL`
- * (`info` | `debug` | `trace`, case-insensitive). Unset or unrecognized → `info`.
+ * Resolve the effective log level from environment.
+ *
+ * Primary control is `MCP_LOG_LEVEL` (`info` | `debug` | `trace`, case-insensitive).
+ * As a legacy fallback, a truthy `DEBUG` env var maps to `trace` so existing setups
+ * that relied on `DEBUG=1` for the verbose body dump keep working. `MCP_LOG_LEVEL`
+ * always wins when set; new docs and examples should reference it.
+ *
+ * Unset / unrecognized → `info`.
  */
 export function getLogLevel(): LogLevel {
   const explicit = getEnv("MCP_LOG_LEVEL")?.toLowerCase();
   if (explicit === "info" || explicit === "debug" || explicit === "trace") {
     return explicit;
+  }
+  const debug = getEnv("DEBUG");
+  if (
+    debug !== undefined &&
+    debug !== "" &&
+    debug !== "0" &&
+    debug.toLowerCase() !== "false"
+  ) {
+    return "trace";
   }
   return "info";
 }
@@ -237,6 +254,47 @@ function renderOutcome(outcome: Outcome): string {
   }
 }
 
+/**
+ * Read up to `maxBytes` from a Response body, then cancel the stream. The returned
+ * text may be a UTF-8-decoded prefix of the full body; callers must tolerate
+ * truncated JSON (in which case `detectOutcome` falls back to `ok`). Reading from a
+ * cloned response is required so the original body remains intact for the client.
+ */
+async function peekResponseText(
+  response: Response,
+  maxBytes: number
+): Promise<string | null> {
+  if (!response.body) return null;
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < maxBytes) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  if (total === 0) return null;
+  const out = new Uint8Array(Math.min(total, maxBytes));
+  let offset = 0;
+  for (const chunk of chunks) {
+    if (offset >= out.length) break;
+    const space = out.length - offset;
+    if (chunk.length <= space) {
+      out.set(chunk, offset);
+      offset += chunk.length;
+    } else {
+      out.set(chunk.subarray(0, space), offset);
+      offset = out.length;
+    }
+  }
+  return new TextDecoder().decode(out);
+}
+
 function colorHttpStatus(statusCode: number): string {
   const text = String(statusCode);
   if (statusCode >= 200 && statusCode < 300) return chalk.green(text);
@@ -292,7 +350,11 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     return;
   }
 
-  // Get request body for logging
+  // Get request body for logging.
+  // Parsing is gated to POST /mcp (where we need it for the line composition) and
+  // trace mode (where the body dump applies to all routes). Other POST/PUT/PATCH
+  // requests skip the parse so we don't double-buffer their bodies on every request.
+  const isMcpPost = method === "POST" && pathname === "/mcp";
   let requestBody: any = null;
   let requestHeaders: Record<string, string> = {};
 
@@ -304,8 +366,7 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     }
   }
 
-  // Get request body (for MCP method logging or full debug logging)
-  if (method !== "GET" && method !== "HEAD") {
+  if ((isMcpPost || traceMode) && method !== "GET" && method !== "HEAD") {
     try {
       // Clone the request to avoid consuming the original body stream
       const clonedRequest = c.req.raw.clone();
@@ -323,15 +384,15 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const durationMs = Math.round(performance.now() - startMs);
 
   const statusCode = c.res.status;
-  const isMcpPost = method === "POST" && pathname === "/mcp";
 
   // Peek response body for outcome detection (POST /mcp only — always JSON, never SSE).
-  // Safe to .text() because GET /mcp (SSE) is already filtered out above.
+  // Capped at MAX_RESPONSE_PEEK_BYTES so a multi-MB tool result doesn't get fully
+  // buffered just to inspect `result.isError`; truncated JSON falls through to `ok`.
   let responseText: string | null = null;
   if (isMcpPost) {
     try {
       const cloned = c.res.clone();
-      responseText = await cloned.text().catch(() => null);
+      responseText = await peekResponseText(cloned, MAX_RESPONSE_PEEK_BYTES);
     } catch {
       // Ignore; outcome falls back to OK / HTTP status.
     }

@@ -305,11 +305,26 @@ describe("getLogLevel", () => {
     expect(getLogLevel()).toBe("info");
   });
 
-  it("DEBUG env var has no effect on log level", () => {
-    // DEBUG is no longer a control for the request logger; only MCP_LOG_LEVEL is.
-    for (const v of ["1", "true", "trace", "debug"]) {
+  it("falls back to trace when DEBUG is truthy and MCP_LOG_LEVEL is unset", () => {
+    for (const v of ["1", "true", "yes", "trace"]) {
+      process.env.DEBUG = v;
+      expect(getLogLevel()).toBe("trace");
+    }
+  });
+
+  it("treats falsy DEBUG values as unset", () => {
+    for (const v of ["", "0", "false", "FALSE"]) {
       process.env.DEBUG = v;
       expect(getLogLevel()).toBe("info");
     }
+  });
+
+  it("MCP_LOG_LEVEL takes precedence over DEBUG", () => {
+    process.env.DEBUG = "1";
+    process.env.MCP_LOG_LEVEL = "info";
+    expect(getLogLevel()).toBe("info");
+
+    process.env.MCP_LOG_LEVEL = "debug";
+    expect(getLogLevel()).toBe("debug");
   });
 });

@@ -8,5 +8,3 @@ Verbosity is tiered via the new `MCP_LOG_LEVEL` env var (`info` | `debug` | `tra
 - `info` (default) — target, outcome, duration. Args are hidden by default since they can carry PII or secrets.
 - `debug` — adds inline arguments for `tools/call` and `prompts/get`.
 - `trace` — adds the verbose request/response header & body dump.
-
-The previous `DEBUG=1` env var no longer controls the request logger; set `MCP_LOG_LEVEL=trace` instead to get the verbose body dump.
