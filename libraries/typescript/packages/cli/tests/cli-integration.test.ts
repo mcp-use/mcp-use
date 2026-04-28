@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import {
+  writeFileSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -227,6 +233,87 @@ describe("CLI Integration Tests", () => {
       expect(result.stderr).not.toContain("Unknown option");
     });
   });
+});
+
+describe("Build command — import resolution", () => {
+  let buildDir: string;
+
+  beforeAll(() => {
+    buildDir = mkdtempSync(join(tmpdir(), "mcp-cli-build-test-"));
+  });
+
+  afterAll(() => {
+    if (buildDir) {
+      rmSync(buildDir, { recursive: true, force: true });
+    }
+  });
+
+  // Regression test for MCP-1733. Validates both knobs of the esbuild
+  // config in transpileWithEsbuild: `bundle: true` resolves extensionless
+  // relative imports at build time, `packages: "external"` keeps third-party
+  // imports as runtime specifiers. Entry is named `main.ts` (not `index.ts`)
+  // so findServerFile doesn't match and the tool-registry type gen step is
+  // skipped — isolating the test to the esbuild change.
+  it(
+    "inlines extensionless relative imports and keeps bare package imports external",
+    async () => {
+      mkdirSync(join(buildDir, "src"), { recursive: true });
+      writeFileSync(
+        join(buildDir, "package.json"),
+        JSON.stringify({
+          name: "build-import-resolution-fixture",
+          version: "0.0.0",
+          type: "module",
+        })
+      );
+      writeFileSync(
+        join(buildDir, "tsconfig.json"),
+        JSON.stringify({
+          compilerOptions: {
+            target: "ES2022",
+            module: "ESNext",
+            moduleResolution: "bundler",
+            strict: true,
+            outDir: "./dist",
+            rootDir: "./src",
+            skipLibCheck: true,
+            esModuleInterop: true,
+          },
+          include: ["src/**/*.ts"],
+        })
+      );
+      writeFileSync(
+        join(buildDir, "src/utils.ts"),
+        `export function greet(name: string): string {
+  return \`hello from \${name}\`;
+}
+`
+      );
+      writeFileSync(
+        join(buildDir, "src/main.ts"),
+        `import { MCPServer } from "mcp-use";
+import { greet } from "./utils";
+
+export const server = MCPServer;
+export const message = greet("mcp-1733");
+`
+      );
+
+      const result = await runCLI(["build", "-p", buildDir, "--no-typecheck"]);
+      expect(result.exitCode).toBe(0);
+
+      const bundled = readFileSync(join(buildDir, "dist/main.js"), "utf8");
+
+      // Bare package import must survive to runtime (packages: "external").
+      expect(bundled).toMatch(/from\s+["']mcp-use["']/);
+
+      // Relative extensionless import must be inlined (bundle: true):
+      // the import itself is gone, and the utils body is present.
+      expect(bundled).not.toMatch(/from\s+["']\.\/utils["']/);
+      expect(bundled).toContain("hello from ");
+    },
+    TEST_TIMEOUT
+  );
 });
 
 describe("CLI with Mock Server", () => {

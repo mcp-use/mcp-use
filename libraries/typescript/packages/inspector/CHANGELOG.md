@@ -1,5 +1,96 @@
 # @mcp-use/inspector
 
+## 3.0.1-canary.8
+
+### Patch Changes
+
+- d62850e: fix(inspector): detect Hono via duck-typing, not `instanceof`
+
+  `mountInspector(app)` chose between a fast Hono-direct path and a slower Express-compat bridge based on `app instanceof Hono`. That check is unreliable across a published library boundary. When this package and the host (e.g. `mcp-use`) resolve different `Hono` constructors (common in monorepos where workspace deps hoist their own `hono`, when Node loads Hono's dual CJS+ESM builds from the same on-disk copy as two separate module records, or under bundler dedup), `instanceof` returns false even for a real Hono app. The Express bridge then runs against a Hono `Context` and crashes on every request trying to read `req.headers.host`:
+
+  ```
+  TypeError: Cannot read properties of undefined (reading 'host')
+      at .../@mcp-use/inspector/dist/server/chunk-*.js (mountInspector Express bridge)
+  ```
+
+  Switch to a duck-type check: Hono apps expose `.fetch(Request) => Response`; Express apps don't. The check is unambiguous for the documented input set and works regardless of which physical Hono module produced the app. Surfaces immediately in the new Next.js drop-in flow (`--mcp-dir`) because Next.js apps almost always pull in a second `hono` through other deps, but the underlying problem applies any time the host and inspector resolve Hono through different module records.
+  - mcp-use@1.25.1-canary.8
+
+## 3.0.1-canary.7
+
+### Patch Changes
+
+- Updated dependencies [dd0ec5f]
+  - mcp-use@1.25.1-canary.7
+
+## 3.0.1-canary.6
+
+### Patch Changes
+
+- 47b446e: fix(inspector): store connection config in sessionStorage before OAuth redirect so auto-reconnect works without ?autoConnect param
+  - mcp-use@1.25.1-canary.6
+
+## 3.0.1-canary.5
+
+### Patch Changes
+
+- c1ea21a: Fix OAuth error handling to redirect back to inspector instead of showing raw error page. When OAuth callback receives an error (e.g. user denies access), the callback now looks up the stored state first to retrieve the returnUrl, then redirects back to the inspector with error parameters instead of immediately throwing and displaying a raw error page with stack traces. The inspector surfaces these errors as a persistent App-level toast that fires regardless of the active route.
+- Updated dependencies [c1ea21a]
+  - mcp-use@1.25.1-canary.5
+
+## 3.0.1-canary.4
+
+### Patch Changes
+
+- mcp-use@1.25.1-canary.4
+
+## 3.0.1-canary.3
+
+### Patch Changes
+
+- f41869b: fix(inspector): suppress duplicate model UI when embedded with `managedLlmConfig` + `hideModelBadge` (MCP-1913)
+
+  If the user had a bring-your-own-key config in `localStorage`, `effectiveClientSide` became true. The host can pass `managedLlmConfig` and `hideModelBadge` (e.g. cloud dashboard with `ServerChatHeader` + `LLMModelSelector`), but the inspector still showed its own `provider/model` UI: the landing pill below the input, and (in threaded view) `ChatHeader`'s absolute model badge — overlapping the dashboard title and model row.
+
+  When `managedLlmConfig` and `hideModelBadge` are both set, the inspector now suppresses that duplicate chrome in both landing and non-landing views. Standalone hosted behavior is unchanged when the host does not pass this embed pair.
+
+  Additionally, for `useClientSide={false}` + `managedLlmConfig` (host-owned chat stream), the chat path no longer auto-switches to client-side streaming when `localLlmConfig` exists in `localStorage` from a past standalone inspector session. The host’s `chatApiUrl` (e.g. org chat stream) is used unless the user explicitly opts into BYOK (`forceClientSide` via rate-limit / “use your own key”).
+  - mcp-use@1.25.1-canary.3
+
+## 3.0.1-canary.2
+
+### Patch Changes
+
+- dfe35fa: Fix MCP App widget overlaying the chat header. Removed the explicit `z-20`/`z-10` stacking context from the sandboxed iframe wrappers in `MCPAppsRenderer` and `OpenAIComponentRenderer` so widgets scroll beneath the chat header instead of painting over it.
+  - mcp-use@1.25.1-canary.2
+
+## 3.0.1-canary.1
+
+### Patch Changes
+
+- mcp-use@1.25.1-canary.1
+
+## 3.0.1-canary.0
+
+### Patch Changes
+
+- c864134: fix(inspector): hide Manufact free-tier "Model & usage" dialog when host app embeds `ChatTab` with its own session (MCP-1903)
+
+  The cloud dashboard chat was leaking the hosted inspector's free-tier sign-in / bring-your-own-key modal (plus the "anthropic/server-managed" model badge) even though it passed `hideModelBadge={true}` and already had its own authenticated session and model selector.
+
+  `ChatTab` was auto-deriving `freeTierInfo` from `isManaged` (i.e., the mere presence of `managedLlmConfig`), and both the badge and `ConfigurationDialog` treated `freeTierInfo` as an override that forces the UI back on regardless of `hideModelBadge` / `hideConfigButton`.
+
+  Free-tier upgrade UI is now opt-in via a new `enableFreeTierUpgrade?: boolean` prop on `ChatTab` (default `false`), plumbed through `EmbeddedConfig.chatEnableFreeTierUpgrade`. The hosted inspector (`inspector.manufact.com`) auto-seeds it to `true`; host apps that embed `ChatTab` directly (e.g. the cloud dashboard) leave it off and their hide-\* props are respected.
+
+- a59476b: fix(inspector): OAuth flow no longer leaves two tabs open (#1384)
+
+  Previously, connecting to an OAuth-protected MCP server from the inspector opened the authorization page in a new tab, and after the user authorized the app the callback redirected back to the inspector inside that second tab — leaving the user with two inspector tabs.
+
+  The inspector now uses the same-tab redirect flow (`useRedirectFlow: true`) combined with `preventAutoAuth: true`, so the OAuth authorization page opens in the current tab and the callback navigates the same tab back to the original inspector URL. The user ends up with a single tab.
+
+  The `Authenticate` anchor no longer sets `target="_blank"` / `rel="noopener noreferrer"` — clicking it now navigates the current tab directly to the stored auth URL. All connection entry points in the inspector (`handleAddConnection`, the `Layout` adapter, and the `InspectorDashboard` adapter used by `handleUpdateConnection` on URL edits, as well as `useAutoConnect`) propagate the same flags so the single-tab behavior is consistent across manual connect, URL edits, and auto-connect from shared config.
+  - mcp-use@1.25.1-canary.0
+
 ## 3.0.0
 
 ### Minor Changes

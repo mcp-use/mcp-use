@@ -6,6 +6,21 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.25.1" description="April 2026">
+  ## OAuth error handling, Supabase endpoints & CLI bundling
+  Patch release fixing OAuth error redirects, Supabase OAuth 2.1 endpoints, CLI bundling for Node ESM, bun build compatibility, `create-mcp-use-app` dot-directory init, and Inspector 3.0.1 (see inspector changelog).
+
+- **Fix**: OAuth callback redirects back to the inspector with error parameters when authorization fails (user denies, server error) instead of surfacing a raw error page with stack traces; the inspector surfaces these as a persistent toast (`#1381`)
+- **Fix**: `SupabaseOAuthProvider` endpoint getters now return OAuth 2.1 paths (`/auth/v1/oauth/authorize`, `/auth/v1/oauth/token`) instead of the legacy `/auth/v1/authorize` and `/auth/v1/token` (`#1422`)
+- **Fix** (@mcp-use/cli): `mcp-use build` is non-fatal under the bun runtime — detects bun, skips `tsx/esm/api` type-generation with a warning, wraps the build in try/catch, and runs `tsc` via `process.execPath` instead of hardcoded `node` (`#1382`)
+- **Fix** (@mcp-use/cli): bundle each server entry with esbuild (`bundle: true`, `packages: "external"`) so extensionless relative TypeScript imports resolve under plain Node ESM without `ERR_MODULE_NOT_FOUND` (`#1357`)
+- **Fix** (create-mcp-use-app): allow `.` as project name to initialize in the current directory; errors if the directory is not empty (`#1413`)
+- **Enhancement** (@mcp-use/inspector): OAuth single-tab redirect, session-storage reconnect, Hono duck-type detection, widget z-index, free-tier embed UI, managed LLM embed chrome (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v3.0.1
+- **Update**: Updated @mcp-use/cli to v3.1.1
+- **Update**: Updated create-mcp-use-app to v0.14.10
+</Update>
+
 <Update label="v1.25.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.25.0&title=OAuth%20DCR-direct%2C%20Next.js%20drop-in%20%26%20CLI%203.1&date=2026-04&lang=typescript" alt="Release 1.25.0" />

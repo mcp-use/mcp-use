@@ -1,5 +1,83 @@
 # mcp-use
 
+## 1.25.1-canary.8
+
+### Patch Changes
+
+- Updated dependencies [d62850e]
+  - @mcp-use/inspector@3.0.1-canary.8
+  - @mcp-use/cli@3.1.1-canary.8
+
+## 1.25.1-canary.7
+
+### Patch Changes
+
+- dd0ec5f: Fix Supabase OAuth provider to use OAuth 2.1 server endpoints
+
+  `SupabaseOAuthProvider.getAuthEndpoint()` and `getTokenEndpoint()` now return `/auth/v1/oauth/authorize` and `/auth/v1/oauth/token` — the OAuth 2.1 server paths — instead of the legacy `/auth/v1/authorize` and `/auth/v1/token`. Metadata discovery and JWT verification were already correct, so most DCR-direct clients weren't affected, but any code path that consulted the provider's endpoint getters was pointed at the wrong URLs.
+
+  Also clarifies the Supabase provider docs: adds a `<Steps>` prerequisites block (enable OAuth Server, allow dynamic OAuth apps, set consent URL, pick a sign-in method) and notes that `MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY` is used by your consent UI and Supabase SDK calls — the provider itself only needs the project ID.
+  - @mcp-use/cli@3.1.1-canary.7
+  - @mcp-use/inspector@3.0.1-canary.7
+
+## 1.25.1-canary.6
+
+### Patch Changes
+
+- Updated dependencies [47b446e]
+  - @mcp-use/inspector@3.0.1-canary.6
+  - @mcp-use/cli@3.1.1-canary.6
+
+## 1.25.1-canary.5
+
+### Patch Changes
+
+- c1ea21a: Fix OAuth error handling to redirect back to inspector instead of showing raw error page. When OAuth callback receives an error (e.g. user denies access), the callback now looks up the stored state first to retrieve the returnUrl, then redirects back to the inspector with error parameters instead of immediately throwing and displaying a raw error page with stack traces. The inspector surfaces these errors as a persistent App-level toast that fires regardless of the active route.
+- Updated dependencies [c1ea21a]
+  - @mcp-use/inspector@3.0.1-canary.5
+  - @mcp-use/cli@3.1.1-canary.5
+
+## 1.25.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [37a217c]
+  - @mcp-use/cli@3.1.1-canary.4
+  - @mcp-use/inspector@3.0.1-canary.4
+
+## 1.25.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f41869b]
+  - @mcp-use/inspector@3.0.1-canary.3
+  - @mcp-use/cli@3.1.1-canary.3
+
+## 1.25.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dfe35fa]
+  - @mcp-use/inspector@3.0.1-canary.2
+  - @mcp-use/cli@3.1.1-canary.2
+
+## 1.25.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [7f4e99d]
+  - @mcp-use/cli@3.1.1-canary.1
+  - @mcp-use/inspector@3.0.1-canary.1
+
+## 1.25.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c864134]
+- Updated dependencies [a59476b]
+  - @mcp-use/inspector@3.0.1-canary.0
+  - @mcp-use/cli@3.1.1-canary.0
+
 ## 1.25.0
 
 ### Minor Changes

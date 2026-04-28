@@ -109,11 +109,11 @@ export class SupabaseOAuthProvider implements OAuthProvider {
   }
 
   getAuthEndpoint(): string {
-    return `${this.supabaseAuthUrl}/authorize`;
+    return `${this.supabaseAuthUrl}/oauth/authorize`;
   }
 
   getTokenEndpoint(): string {
-    return `${this.supabaseAuthUrl}/token`;
+    return `${this.supabaseAuthUrl}/oauth/token`;
   }
 
   getScopesSupported(): string[] {

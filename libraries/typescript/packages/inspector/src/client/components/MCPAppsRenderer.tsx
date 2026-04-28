@@ -1175,7 +1175,7 @@ function MCPAppsRendererBase({
                 displayMode === "fullscreen" && "w-full h-full rounded-none",
                 displayMode === "pip" && "w-full h-full",
                 displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
-                "overflow-hidden relative z-20",
+                "overflow-hidden",
                 prefersBorder && "border border-zinc-200 dark:border-zinc-700"
               )}
               style={iframeStyle}
