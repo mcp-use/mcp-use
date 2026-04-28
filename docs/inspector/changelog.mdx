@@ -6,6 +6,21 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v3.0.1" description="April 2026">
+  ## OAuth single-tab flow, embed fixes & Hono detection
+  Patch release fixing OAuth redirect flows, embedded `ChatTab` UI leaks, and Hono duck-type detection in `mountInspector`; paired with `mcp-use` v1.25.1.
+
+- **Fix**: OAuth authorization now opens in the current tab (`useRedirectFlow: true`, `preventAutoAuth: true`) and the callback navigates the same tab back — users no longer end up with two inspector tabs (`#1391`)
+- **Fix**: Store connection config in `sessionStorage` before OAuth redirect so auto-reconnect works after the callback without a `?autoConnect` param (`#1404`)
+- **Fix**: OAuth callback redirects back to the inspector with error parameters on failure (user denies, server error) instead of showing a raw error page; surfaced as a persistent app-level toast (`#1381`)
+- **Fix**: `mountInspector(app)` detects Hono via duck-typing (`.fetch(Request) => Response`) instead of `instanceof`, resolving crashes when the host and inspector resolve different Hono module records (`#1417`)
+- **Fix**: MCP App widget z-index — removed explicit `z-20`/`z-10` from sandboxed iframe wrappers so widgets scroll beneath the chat header instead of painting over it (`#1407`)
+- **Fix**: Free-tier upgrade UI (`Model & usage` dialog, model badge) is now opt-in via `enableFreeTierUpgrade` on `ChatTab` (default `false`) and is hidden for host-app embeds that manage their own session (`#1399`)
+- **Fix**: Suppress duplicate model chrome (landing pill, `ChatHeader` badge) when host passes `managedLlmConfig` + `hideModelBadge`; chat no longer auto-switches to client-side streaming when `localLlmConfig` exists in localStorage and the host owns the chat stream (`#1418`)
+- **Documentation**: `--no-open` CLI flag added to the inspector CLI reference (`#1397`)
+- **Update**: Updated mcp-use to v1.25.1
+</Update>
+
 <Update label="v3.0.0" description="April 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=3.0.0&title=Inline%20elicitation%20%26%20social%20meta%20tags&date=2026-04&lang=inspector" alt="Release 3.0.0" />
