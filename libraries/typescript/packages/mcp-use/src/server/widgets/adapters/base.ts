@@ -28,26 +28,23 @@ interface ExtractedMetadata {
  */
 export abstract class BaseProtocolAdapter implements ProtocolAdapter {
   abstract readonly mimeType: string;
-  abstract readonly protocol: "mcp-apps" | "apps-sdk";
+  abstract readonly protocol: "mcp-apps";
 
   /**
    * Transform a metadata key to protocol-specific format
-   * e.g., "prefersBorder" → "openai/widgetPrefersBorder" (Apps SDK)
-   *       "prefersBorder" → "prefersBorder" (MCP Apps)
+   * e.g., "prefersBorder" → "prefersBorder" (MCP Apps)
    */
   protected abstract transformMetadataKey(key: string): string;
 
   /**
    * Transform a CSP field name to protocol-specific format
-   * e.g., "connectDomains" → "connect_domains" (Apps SDK)
-   *       "connectDomains" → "connectDomains" (MCP Apps)
+   * e.g., "connectDomains" → "connectDomains" (MCP Apps)
    */
   protected abstract transformCSPField(field: string): string;
 
   /**
    * Wrap metadata for protocol-specific namespacing
-   * e.g., { csp: ... } → { "openai/widgetCSP": ... } (Apps SDK)
-   *       { csp: ... } → { ui: { csp: ... } } (MCP Apps)
+   * e.g., { csp: ... } → { ui: { csp: ... } } (MCP Apps)
    */
   protected abstract wrapResourceMetadata(
     meta: Record<string, unknown>
@@ -55,9 +52,8 @@ export abstract class BaseProtocolAdapter implements ProtocolAdapter {
 
   /**
    * Get protocol-specific metadata source field name
-   * e.g., "appsSdkMetadata" for Apps SDK, undefined for MCP Apps
    */
-  protected abstract getProtocolMetadataField(): "appsSdkMetadata" | undefined;
+  protected abstract getProtocolMetadataField(): undefined;
 
   /**
    * Build resource metadata using shared logic

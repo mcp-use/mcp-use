@@ -215,24 +215,17 @@ server.tool(
   },
   async () =>
     object({
-      feature: "MCP Apps Dual-Protocol Support",
+      feature: "MCP Apps Support",
       description:
-        "Single widget definition works with both ChatGPT and MCP Apps clients",
-      protocols: {
-        chatgpt: {
-          name: "OpenAI Apps SDK",
-          mimeType: "text/html+skybridge",
-          metadata: "openai/* prefixed keys (snake_case CSP)",
-        },
-        mcpApps: {
-          name: "MCP Apps Extension (SEP-1865)",
-          mimeType: "text/html;profile=mcp-app",
-          metadata: "_meta.ui.* namespace (camelCase CSP)",
-        },
+        "Widget definitions use the official MCP Apps Extension (SEP-1865) protocol",
+      protocol: {
+        name: "MCP Apps Extension (SEP-1865)",
+        mimeType: "text/html;profile=mcp-app",
+        metadata: "_meta.ui.* namespace (camelCase CSP)",
       },
       benefits: [
-        "Write once, run anywhere",
-        "Automatic protocol detection",
+        "Official MCP standard",
+        "Works with ChatGPT and MCP Apps clients",
         "Backward compatible with existing Apps SDK widgets",
         "Based on official MCP Apps Extension standard",
       ],

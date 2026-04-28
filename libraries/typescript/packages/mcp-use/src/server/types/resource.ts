@@ -17,79 +17,9 @@ export type UIResourceContent = {
   resource: {
     uri: string;
     mimeType: string;
-    _meta?: AppsSdkMetadata;
+    _meta?: Record<string, unknown>;
   } & ({ text: string; blob?: never } | { blob: string; text?: never });
 };
-
-/**
- * Apps SDK resource metadata fields
- *
- * These fields are set on the resource itself (in resource._meta).
- * They control how the widget is rendered and secured.
- *
- * @note Resource-level metadata for Apps SDK widgets
- * @see https://developers.openai.com/apps-sdk/build/mcp-server
- */
-export interface AppsSdkMetadata extends Record<string, unknown> {
-  /** Description of the widget for Apps SDK - helps the model understand what's displayed */
-  "openai/widgetDescription"?: string;
-
-  /** Content Security Policy for the widget */
-  "openai/widgetCSP"?: {
-    /** Domains the widget can connect to (for fetch, websocket, etc.) */
-    connect_domains?: string[];
-    /** Domains the widget can load resources from (scripts, styles, images, fonts) */
-    resource_domains?: string[];
-    /** Domains allowed for iframe embeds (optional - by default widgets cannot render subframes) */
-    frame_domains?: string[];
-    /** Domains that can receive openExternal redirects without the safe-link modal (optional) */
-    redirect_domains?: string[];
-  };
-
-  /** Whether the widget prefers a border in card layout */
-  "openai/widgetPrefersBorder"?: boolean;
-
-  /** Whether the widget can initiate tool calls (component-initiated tool access) */
-  "openai/widgetAccessible"?: boolean;
-
-  /** Custom subdomain for the widget (e.g., 'chatgpt.com' becomes 'chatgpt-com.web-sandbox.oaiusercontent.com') */
-  "openai/widgetDomain"?: string;
-
-  /** Locale for the widget (e.g., 'en-US', 'fr-FR') */
-  "openai/locale"?: string;
-
-  /** Status text while tool is invoking */
-  "openai/toolInvocation/invoking"?: string;
-
-  /** Status text after tool has invoked */
-  "openai/toolInvocation/invoked"?: string;
-}
-
-/**
- * Apps SDK tool metadata fields
- *
- * These fields are set on the tool itself (in tool._meta).
- * They connect the tool to its widget template and control invocation behavior.
- *
- * @note Tool-level metadata for Apps SDK integration
- * @see https://developers.openai.com/apps-sdk/build/mcp-server
- */
-export interface AppsSdkToolMetadata extends Record<string, unknown> {
-  /** URI of the output template resource that will render this tool's output */
-  "openai/outputTemplate"?: string;
-
-  /** Status text while tool is invoking */
-  "openai/toolInvocation/invoking"?: string;
-
-  /** Status text after tool has invoked */
-  "openai/toolInvocation/invoked"?: string;
-
-  /** Whether the widget can initiate tool calls */
-  "openai/widgetAccessible"?: boolean;
-
-  /** Whether this tool result can produce a widget */
-  "openai/resultCanProduceWidget"?: boolean;
-}
 
 /**
  * Enhanced Resource Context that provides access to request context and
@@ -556,8 +486,6 @@ export interface ExternalUrlUIResource extends BaseUIResourceDefinition {
   widget: string;
   /** Adapter configuration */
   adapters?: AdaptersConfig;
-  /** Apps SDK metadata fields */
-  appsSdkMetadata?: AppsSdkMetadata;
 }
 
 /**
@@ -569,8 +497,6 @@ export interface RawHtmlUIResource extends BaseUIResourceDefinition {
   htmlContent: string;
   /** Adapter configuration */
   adapters?: AdaptersConfig;
-  /** Apps SDK metadata fields */
-  appsSdkMetadata?: AppsSdkMetadata;
 }
 
 /**
@@ -584,28 +510,6 @@ export interface RemoteDomUIResource extends BaseUIResourceDefinition {
   framework?: RemoteDomFramework;
   /** Adapter configuration */
   adapters?: AdaptersConfig;
-  /** Apps SDK metadata fields */
-  appsSdkMetadata?: AppsSdkMetadata;
-}
-
-/**
- * Apps SDK UI resource - OpenAI Apps SDK compatible widget
- *
- * This type follows the official OpenAI Apps SDK pattern:
- * - Uses text/html+skybridge mime type
- * - Supports component HTML with embedded JS/CSS
- * - Tool returns structuredContent that gets injected as window.openai.toolOutput
- * - Supports CSP, widget domains, and other Apps SDK metadata
- *
- * @see https://developers.openai.com/apps-sdk/build/mcp-server
- * @see https://mcpui.dev/guide/apps-sdk
- */
-export interface AppsSdkUIResource extends BaseUIResourceDefinition {
-  type: "appsSdk";
-  /** HTML template content - the component that will be rendered */
-  htmlTemplate: string;
-  /** Apps SDK-specific metadata */
-  appsSdkMetadata?: AppsSdkMetadata;
 }
 
 /**
@@ -613,7 +517,6 @@ export interface AppsSdkUIResource extends BaseUIResourceDefinition {
  *
  * This type follows the official MCP Apps Extension pattern:
  * - Uses text/html;profile=mcp-app mime type
- * - Dual-protocol support: works with both ChatGPT and MCP Apps clients
  * - Unified metadata format that adapters transform to protocol-specific formats
  * - Supports MCP Apps CSP, widget preferences, and other metadata
  *
@@ -624,10 +527,8 @@ export interface McpAppsUIResource extends BaseUIResourceDefinition {
   type: "mcpApps";
   /** HTML template content - the component that will be rendered */
   htmlTemplate: string;
-  /** Unified metadata that works with both protocols (follows SEP-1865 + ChatGPT extensions) */
+  /** Unified metadata (follows SEP-1865) */
   metadata?: UnifiedWidgetMetadata;
-  /** Optional: Apps SDK-specific metadata for advanced ChatGPT features */
-  appsSdkMetadata?: AppsSdkMetadata;
 }
 
 /**
@@ -637,7 +538,6 @@ export type UIResourceDefinition =
   | ExternalUrlUIResource
   | RawHtmlUIResource
   | RemoteDomUIResource
-  | AppsSdkUIResource
   | McpAppsUIResource;
 
 export interface WidgetConfig {

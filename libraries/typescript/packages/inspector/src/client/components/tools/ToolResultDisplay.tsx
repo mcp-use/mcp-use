@@ -24,16 +24,12 @@ import React, {
 } from "react";
 import { toast } from "sonner";
 import type { MessageContentBlock } from "mcp-use/react";
-import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,
-  getResourceUriForProtocol,
-  hasBothProtocols,
 } from "../../utils/widget-detection";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
-import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
 import { Spinner } from "../ui/spinner";
@@ -45,19 +41,11 @@ export interface ToolResult {
   error?: string;
   timestamp: number;
   duration?: number;
-  // Tool metadata from definition (_meta field, includes openai/outputTemplate)
+  // Tool metadata from definition (_meta field)
   toolMeta?: Record<string, any>;
-  // For Apps SDK UI resources
-  appsSdkResource?: {
-    uri: string;
-    resourceData: any;
-    isLoading?: boolean;
-    error?: string;
-  };
 }
 
 type ViewMode =
-  | "chatgpt-app" // Component (Apps SDK)
   | "mcp-apps" // Component (MCP Apps)
   | "mcp-ui" // Component (MCP-UI)
   | "json"; // Raw JSON
@@ -459,7 +447,7 @@ export function ToolResultDisplay({
   }, [currentResult?.toolName]);
 
   // Memoize result.args and result.result to prevent unnecessary re-renders
-  // in OpenAIComponentRenderer when only relativeTime changes
+  // when only relativeTime changes
   // Use stable identifiers (timestamp, selectedIndex) instead of the objects themselves
   const memoizedArgs = useMemo(
     () => result?.args,
@@ -506,10 +494,7 @@ export function ToolResultDisplay({
     []
   );
 
-  // Get widget debug context for protocol selection
-  const { playground } = useWidgetDebug();
-
-  // Detect widget protocol (Priority: MCP Apps → ChatGPT Apps → MCP-UI)
+ (MCP Apps → MCP-UI)
   // IMPORTANT: These hooks must be called before any early returns
   const widgetProtocol = useMemo(
     () =>
@@ -517,63 +502,16 @@ export function ToolResultDisplay({
     [result]
   );
 
-  // Detect if tool supports both protocols
-  const supportsBothProtocols = useMemo(
-    () => (result ? hasBothProtocols(result.toolMeta) : false),
-    [result]
-  );
-
-  // Determine active protocol based on toggle state
-  const activeProtocol = useMemo(() => {
-    if (!widgetProtocol) return null;
-
-    if (widgetProtocol === "both") {
-      // User has selected a protocol via toggle
-      if (playground.selectedProtocol) {
-        return playground.selectedProtocol;
-      }
-      // Default to MCP Apps when both exist
-      return "mcp-apps";
-    }
-
-    return widgetProtocol;
-  }, [widgetProtocol, playground.selectedProtocol]);
-
   // Check for MCP Apps (SEP-1865) - BEFORE early return
   const mcpAppsResourceUri = useMemo(() => {
     if (!result) return null;
-    return supportsBothProtocols
-      ? getResourceUriForProtocol("mcp-apps", result.toolMeta)
-      : result.toolMeta?.ui?.resourceUri;
-  }, [result, supportsBothProtocols]);
+    return result.toolMeta?.ui?.resourceUri ?? null;
+  }, [result]);
 
   const hasMcpAppsResource = useMemo(
-    () =>
-      (activeProtocol === "mcp-apps" || supportsBothProtocols) &&
-      !!mcpAppsResourceUri,
-    [activeProtocol, supportsBothProtocols, mcpAppsResourceUri]
+    () => widgetProtocol === "mcp-apps" && !!mcpAppsResourceUri,
+    [widgetProtocol, mcpAppsResourceUri]
   );
-
-  // Check tool metadata for Apps SDK component (from tool definition) - BEFORE early return
-  const openaiOutputTemplate = useMemo(() => {
-    if (!result) return null;
-    return supportsBothProtocols
-      ? getResourceUriForProtocol("chatgpt-app", result.toolMeta)
-      : result.toolMeta?.["openai/outputTemplate"];
-  }, [result, supportsBothProtocols]);
-
-  const hasAppsSdkResource = useMemo(
-    () =>
-      !!(
-        (activeProtocol === "chatgpt-app" || supportsBothProtocols) &&
-        openaiOutputTemplate &&
-        typeof openaiOutputTemplate === "string" &&
-        result?.appsSdkResource
-      ),
-    [activeProtocol, supportsBothProtocols, openaiOutputTemplate, result]
-  );
-
-  const appsSdkUri = openaiOutputTemplate;
 
   // Check if result contains MCP UI resources - BEFORE early return
   const content = useMemo(() => result?.result?.content || [], [result]);
@@ -589,11 +527,10 @@ export function ToolResultDisplay({
 
   const activeUri = useMemo(
     () =>
-      appsSdkUri ||
       mcpAppsResourceUri ||
       mcpUIResources[0]?.resource?.uri ||
       null,
-    [appsSdkUri, mcpAppsResourceUri, mcpUIResources]
+    [mcpAppsResourceUri, mcpUIResources]
   );
 
   // Check if result has content or structuredContent (for formatted/raw toggle)
@@ -607,12 +544,10 @@ export function ToolResultDisplay({
     () =>
       !hasMcpAppsResource &&
       !hasMcpUIResources &&
-      !hasAppsSdkResource &&
       hasContentOrStructured,
     [
       hasMcpAppsResource,
       hasMcpUIResources,
-      hasAppsSdkResource,
       hasContentOrStructured,
     ]
   );
@@ -622,13 +557,8 @@ export function ToolResultDisplay({
     const views: Array<{ mode: ViewMode; label: string }> = [];
 
     // Check for MCP Apps (SEP-1865) - Add first as default
-    if (hasMcpAppsResource || (supportsBothProtocols && mcpAppsResourceUri)) {
+    if (hasMcpAppsResource) {
       views.push({ mode: "mcp-apps", label: "Component (MCP Apps)" });
-    }
-
-    // Check for ChatGPT Apps SDK - Add second
-    if (hasAppsSdkResource || (supportsBothProtocols && openaiOutputTemplate)) {
-      views.push({ mode: "chatgpt-app", label: "Component (Apps SDK)" });
     }
 
     // Check for MCP-UI
@@ -641,11 +571,8 @@ export function ToolResultDisplay({
 
     return views;
   }, [
-    hasAppsSdkResource,
     hasMcpAppsResource,
     hasMcpUIResources,
-    supportsBothProtocols,
-    openaiOutputTemplate,
     mcpAppsResourceUri,
   ]);
 
@@ -705,7 +632,6 @@ export function ToolResultDisplay({
             className={`sticky top-0 z-40 flex items-center gap-2 px-4 pt-2 backdrop-blur-xs bg-white/50 dark:bg-black/50 ${
               hasMcpAppsResource ||
               hasMcpUIResources ||
-              hasAppsSdkResource ||
               isNonUIResult
                 ? "border-b border-gray-200 dark:border-zinc-600 pb-2"
                 : ""
@@ -723,8 +649,7 @@ export function ToolResultDisplay({
             )}
 
             {/* Unified header for all widget types */}
-            {(hasAppsSdkResource ||
-              hasMcpAppsResource ||
+            {(hasMcpAppsResource ||
               hasMcpUIResources) && (
               <div className="flex items-center gap-4 sm:ml-4">
                 {/* Dynamic view mode buttons */}
@@ -791,7 +716,6 @@ export function ToolResultDisplay({
                 </Button>
               )}
               {(hasMcpAppsResource ||
-                hasAppsSdkResource ||
                 hasMcpUIResources) &&
                 onMaximize && (
                   <Button
@@ -884,69 +808,6 @@ export function ToolResultDisplay({
               }
 
               switch (viewMode) {
-                case "chatgpt-app": {
-                  // ChatGPT Apps SDK Component view
-                  if (!hasAppsSdkResource || !result.appsSdkResource) {
-                    return (
-                      <div className="px-4 pt-4">
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
-                          <p className="text-sm text-red-600 dark:text-red-400">
-                            Apps SDK resource not available
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const appsSdk = result.appsSdkResource;
-
-                  if (appsSdk.isLoading) {
-                    return (
-                      <div className="flex items-center justify-center w-full h-[200px]">
-                        <Spinner className="size-5" />
-                      </div>
-                    );
-                  }
-
-                  if (appsSdk.error) {
-                    return (
-                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3 mx-4">
-                        <p className="text-red-800 dark:text-red-300 font-medium">
-                          Resource Error:
-                        </p>
-                        <p className="text-red-700 dark:text-red-400 text-sm">
-                          {appsSdk.error}
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="flex-1">
-                      <OpenAIComponentRenderer
-                        key={`openai-${result.timestamp}`}
-                        componentUrl={appsSdk.uri}
-                        toolName={result.toolName}
-                        toolArgs={memoizedArgs}
-                        toolResult={memoizedResult}
-                        serverId={serverId}
-                        readResource={memoizedReadResource}
-                        className="w-full h-full relative p-4"
-                        invoking={
-                          result.toolMeta?.[
-                            "openai/toolInvocation/invoking"
-                          ] as string
-                        }
-                        invoked={
-                          result.toolMeta?.[
-                            "openai/toolInvocation/invoked"
-                          ] as string
-                        }
-                      />
-                    </div>
-                  );
-                }
-
                 case "mcp-apps": {
                   // MCP Apps (SEP-1865) Component view
                   if (!hasMcpAppsResource || !mcpAppsResourceUri) {
@@ -1127,8 +988,7 @@ export function ToolResultDisplay({
       </div>
 
       {activeUri &&
-        (viewMode === "chatgpt-app" ||
-          viewMode === "mcp-apps" ||
+        (viewMode === "mcp-apps" ||
           viewMode === "mcp-ui") && (
           <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
             <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">

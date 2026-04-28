@@ -45,14 +45,10 @@ export {
   ExternalUrlUIResource,
   RawHtmlUIResource,
   RemoteDomUIResource,
-  AppsSdkUIResource,
   McpAppsUIResource,
   WidgetConfig,
   WidgetManifest,
   DiscoverWidgetsOptions,
-  // Apps SDK types
-  AppsSdkMetadata,
-  AppsSdkToolMetadata,
 } from "./resource.js";
 
 // Tool types

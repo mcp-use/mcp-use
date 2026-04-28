@@ -23,10 +23,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "test-widget",
         description: "Test widget",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Test</div>",
-        appsSdkMetadata: {},
       };
 
       // Register widget definition
@@ -65,13 +64,11 @@ describe("Widget Data Flow", () => {
         {} as any
       );
 
-      // Per SEP-1865: outputTemplate is on tool definition, not on result
+      // Per SEP-1865: tool _meta has ui.resourceUri
       const toolReg = server.registrations.tools.get("get-weather");
-      const outputTemplate = (toolReg?.config as any)?._meta?.[
-        "openai/outputTemplate"
-      ];
-      expect(outputTemplate).toBeDefined();
-      expect(outputTemplate).toMatch(/ui:\/\/widget\/test-widget/);
+      const resourceUri = (toolReg?.config as any)?._meta?.ui?.resourceUri;
+      expect(resourceUri).toBeDefined();
+      expect(resourceUri).toMatch(/ui:\/\/widget\/test-widget/);
     });
   });
 
@@ -81,10 +78,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "table-widget",
         description: "Display table",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Table</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("table-widget", {
@@ -143,10 +139,8 @@ describe("Widget Data Flow", () => {
       expect((result as any).structuredContent.tableName).toBe("users");
 
       const toolReg = server.registrations.tools.get("get-table-data");
-      const outputTemplate = (toolReg?.config as any)?._meta?.[
-        "openai/outputTemplate"
-      ];
-      expect(outputTemplate).toMatch(/ui:\/\/widget\/table-widget/);
+      const resourceUri = (toolReg?.config as any)?._meta?.ui?.resourceUri;
+      expect(resourceUri).toMatch(/ui:\/\/widget\/table-widget/);
     });
   });
 
@@ -156,10 +150,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "items-widget",
         description: "Display items",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Items</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("items-widget", {
@@ -219,10 +212,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "search-widget",
         description: "Display search results",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Search</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("search-widget", {
@@ -287,10 +279,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "legacy-widget",
         description: "Legacy widget",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Legacy</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("legacy-widget", {
@@ -337,10 +328,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "priority-widget",
         description: "Priority widget",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Priority</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("priority-widget", {
@@ -386,10 +376,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "text-helper-widget",
         description: "Text helper widget",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Text</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("text-helper-widget", {
@@ -422,10 +411,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "object-helper-widget",
         description: "Object helper widget",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Object</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("object-helper-widget", {
@@ -464,10 +452,9 @@ describe("Widget Data Flow", () => {
       const mockWidgetDef = {
         name: "function-helper-widget",
         description: "Function helper widget",
-        type: "appsSdk" as const,
+        type: "mcpApps" as const,
         props: {},
         htmlTemplate: "<div>Function</div>",
-        appsSdkMetadata: {},
       };
 
       server.widgetDefinitions.set("function-helper-widget", {

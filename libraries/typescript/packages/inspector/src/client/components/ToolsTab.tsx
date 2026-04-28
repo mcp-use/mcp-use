@@ -696,10 +696,9 @@ export function ToolsTab({
       const toolMeta =
         (selectedTool as any)?._meta || (selectedTool as any)?.metadata;
 
-      // Check tool metadata for widget resources (MCP Apps or ChatGPT Apps)
+      // Check tool metadata for widget resources (MCP Apps)
       const mcpAppsResourceUri = toolMeta?.ui?.resourceUri;
-      const openaiOutputTemplate = toolMeta?.["openai/outputTemplate"];
-      const widgetResourceUri = mcpAppsResourceUri || openaiOutputTemplate;
+      const widgetResourceUri = mcpAppsResourceUri;
 
       // Pre-fetch widget resource if this is a widget tool (Issue #930 fix)
       // Batch into single setResults to avoid double render during pending state
@@ -719,11 +718,6 @@ export function ToolsTab({
           timestamp: startTime,
           duration: 0,
           toolMeta,
-          appsSdkResource: {
-            uri: widgetResourceUri,
-            resourceData: preFetchedResource,
-            isLoading: false,
-          },
         };
 
         setResults([pendingResultEntry]);
@@ -762,64 +756,7 @@ export function ToolsTab({
 
       // Widget resource was already fetched before tool execution (if applicable)
       // Now we just need to update the result with tool output
-      let appsSdkResource:
-        | {
-            uri: string;
-            resourceData: any;
-            isLoading?: boolean;
-            error?: string;
-          }
-        | undefined;
-
       if (widgetResourceUri && typeof widgetResourceUri === "string") {
-        // Use pre-fetched resource if available
-        let resourceData = preFetchedResource;
-
-        // If pre-fetch failed or didn't happen, fetch now as fallback
-        if (!resourceData) {
-          try {
-            resourceData = await readResource(widgetResourceUri);
-          } catch (fetchError) {
-            resourceData = null;
-          }
-        }
-
-        // Extract structured content from result
-        let structuredContent = null;
-        if (result?.structuredContent) {
-          structuredContent = result.structuredContent;
-        } else if (Array.isArray(result) && result[0]) {
-          const firstResult = result[0];
-          if (firstResult.output?.value?.structuredContent) {
-            structuredContent = firstResult.output.value.structuredContent;
-          } else if (firstResult.structuredContent) {
-            structuredContent = firstResult.structuredContent;
-          } else if (firstResult.output?.value) {
-            structuredContent = firstResult.output.value;
-          }
-        }
-
-        // Fallback to entire result
-        if (!structuredContent) {
-          structuredContent = result;
-        }
-
-        appsSdkResource = resourceData
-          ? {
-              uri: widgetResourceUri,
-              resourceData: {
-                ...resourceData,
-                structuredContent,
-              },
-              isLoading: false,
-            }
-          : {
-              uri: widgetResourceUri,
-              resourceData: null,
-              isLoading: false,
-              error: "Failed to fetch widget resource",
-            };
-
         // Update the result with the tool output
         setResults((prev) =>
           prev.map((r, idx) =>
@@ -828,8 +765,7 @@ export function ToolsTab({
                   ...r,
                   result,
                   duration,
-                  appsSdkResource,
-                  toolMeta: updatedToolMeta, // Include updated tool metadata for dual-protocol widget detection
+                  toolMeta: updatedToolMeta,
                 }
               : r
           )
@@ -882,8 +818,7 @@ export function ToolsTab({
         toolMeta,
       };
 
-      const hasWidgetResource =
-        toolMeta?.ui?.resourceUri || toolMeta?.["openai/outputTemplate"];
+      const hasWidgetResource = toolMeta?.ui?.resourceUri;
       if (hasWidgetResource) {
         setResults([errorResult]);
       } else {

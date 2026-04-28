@@ -706,7 +706,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               {
                 title: resourceReg.config.title,
                 description: resourceReg.config.description,
-                mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+                mimeType: resourceReg.config.mimeType || "text/html;profile=mcp-app",
               } as any,
               resourceReg.handler as any
             );
@@ -750,7 +750,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 description: resourceTemplateReg.config.description,
                 mimeType:
                   resourceTemplateReg.config.resourceTemplate.mimeType ||
-                  "text/html+skybridge",
+                  "text/html;profile=mcp-app",
               } as any,
               resourceTemplateReg.handler as any
             );
@@ -851,7 +851,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             {
               title: resourceReg.config.title,
               description: resourceReg.config.description,
-              mimeType: resourceReg.config.mimeType || "text/html+skybridge",
+              mimeType: resourceReg.config.mimeType || "text/html;profile=mcp-app",
             } as any,
             resourceReg.handler as any
           );
@@ -889,7 +889,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               description: resourceTemplateReg.config.description,
               mimeType:
                 resourceTemplateReg.config.resourceTemplate.mimeType ||
-                "text/html+skybridge",
+                "text/html;profile=mcp-app",
             } as any,
             resourceTemplateReg.handler as any
           );
@@ -1508,21 +1508,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           // Check if this is a widget tool
           const isWidgetTool = !!(config as any)?.widget;
 
-          // For widget tools, preserve dual-protocol metadata from the existing tool
+          // For widget tools, preserve protocol metadata from the existing tool
           // The new config from HMR only has basic metadata from server.tool() call
-          // We need to preserve ui/*, openai/widgetCSP, etc. from the initial registration
+          // We need to preserve ui/*, etc. from the initial registration
           const oldEntry = nativeServer._registeredTools?.[key];
           if (isWidgetTool && oldEntry?._meta) {
             const oldMeta = oldEntry._meta || {};
             const newMeta = enrichedConfig._meta || {};
 
-            // Deep merge: preserve dual-protocol metadata, update basic fields.
+            // Deep merge: preserve protocol metadata, update basic fields.
             // IMPORTANT: Mutate config._meta directly (not create a new object) so that
             // the change is reflected in syncPrimitive's updatedRegistrations map, which
             // holds a reference to the same config object. If we create a detached object,
             // syncPrimitive replaces this.registrations.tools and the enrichment is lost.
             const mergedMeta = {
-              ...oldMeta, // Keep all dual-protocol metadata
+              ...oldMeta, // Keep all protocol metadata
               ...newMeta, // Update with new basic metadata
               // Deep merge the ui object specifically to preserve both old and new fields
               ui: {
@@ -2093,7 +2093,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Patch tool _meta for tools with widget config that were registered
     // before widget definitions were synced. During HMR, server.tool() runs
     // on the new server where widgetDefinitions is empty, so it can only set
-    // Apps SDK metadata. Now that definitions are available, fill in MCP Apps
+    // basic metadata. Now that definitions are available, fill in MCP Apps
     // metadata for mcpApps widgets. We use Object.assign to MUTATE the
     // existing _meta object in place, because session-level _registeredTools
     // entries share the same _meta reference (see createToolEntry).
@@ -2108,19 +2108,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       const widgetType = widgetDef?.widgetType as string | undefined;
       if (widgetType !== "mcpApps") continue;
 
-      const outputTemplate = config._meta["openai/outputTemplate"];
-      if (!outputTemplate) continue;
+      // Build the output template URI from the widget name
+      const buildIdPart = this.buildId ? `-${this.buildId}` : "";
+      const outputTemplate = `ui://widget/${widgetName}${buildIdPart}.html`;
 
       const adapterDef = {
         type: "mcpApps" as const,
         name: widgetName,
         metadata: widgetDef?.metadata,
       };
-      const dualMeta = buildDualProtocolMetadata(
+      const mcpAppsMeta = buildDualProtocolMetadata(
         adapterDef as any,
         outputTemplate
       );
-      Object.assign(config._meta, dualMeta);
+      Object.assign(config._meta, mcpAppsMeta);
     }
 
     // Update tracking arrays
@@ -2485,7 +2486,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const buildIdPart = self.buildId ? `-${self.buildId}` : "";
         const outputTemplate = `ui://widget/${widgetName}${buildIdPart}.html`;
 
-        // Look up widget type to determine if dual-protocol metadata is needed
+        // Look up widget type to determine metadata format
         const widgetDef = self.widgetDefinitions.get(widgetName);
         const widgetType = widgetDef?.widgetType as string | undefined;
         if (widgetType === "mcpApps") {
@@ -2495,35 +2496,22 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             metadata: widgetDef?.metadata,
           };
 
-          // Build dual-protocol tool metadata. Per SEP-1865: tool _meta.ui
+          // Build MCP Apps tool metadata. Per SEP-1865: tool _meta.ui
           // only has resourceUri. CSP belongs on the resource, not the tool.
-          const dualMeta = buildDualProtocolMetadata(
+          const mcpAppsMeta = buildDualProtocolMetadata(
             adapterDef as any,
             outputTemplate,
             toolDefinition._meta
           );
 
           toolDefinition._meta = {
-            ...dualMeta,
-            "openai/toolInvocation/invoking":
-              widgetConfig.invoking ?? `Loading ${widgetName}...`,
-            "openai/toolInvocation/invoked":
-              widgetConfig.invoked ?? `${widgetName} ready`,
-            "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
-            "openai/resultCanProduceWidget":
-              widgetConfig.resultCanProduceWidget ?? true,
+            ...mcpAppsMeta,
           };
         } else {
+          // Widget definition not yet available (timing issue during HMR)
+          // Set basic metadata that will be enriched later when definitions sync
           toolDefinition._meta = {
             ...toolDefinition._meta,
-            "openai/outputTemplate": outputTemplate,
-            "openai/toolInvocation/invoking":
-              widgetConfig.invoking ?? `Loading ${widgetName}...`,
-            "openai/toolInvocation/invoked":
-              widgetConfig.invoked ?? `${widgetName} ready`,
-            "openai/widgetAccessible": widgetConfig.widgetAccessible ?? true,
-            "openai/resultCanProduceWidget":
-              widgetConfig.resultCanProduceWidget ?? true,
           };
         }
       }
@@ -2536,7 +2524,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         actualCallback = (async (params: any, ctx: any) => {
           const result = await originalCallback(params, ctx);
 
-          // Per OpenAI Apps SDK docs and SEP-1865: protocol fields belong on the
+          // Per SEP-1865: protocol fields belong on the
           // tool DEFINITION (tools/list), not on every tool call result.
           // The tool call result _meta is only for app-specific widget data.
           // We only fill in an empty text placeholder if needed.

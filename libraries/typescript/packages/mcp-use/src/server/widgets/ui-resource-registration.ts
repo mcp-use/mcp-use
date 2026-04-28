@@ -141,28 +141,27 @@ function enrichDefinitionWithServerOrigin(
  * - externalUrl: Legacy MCP-UI iframe-based widgets
  * - rawHtml: Legacy MCP-UI raw HTML content
  * - remoteDom: Legacy MCP-UI Remote DOM scripting
- * - appsSdk: OpenAI Apps SDK compatible widgets (text/html+skybridge)
+ * - mcpApps: Official MCP Apps Extension (SEP-1865) widgets
  *
  * @param server - MCPServer instance with registration methods
  * @param definition - Widget configuration object
  * @param definition.name - Unique identifier for the resource
- * @param definition.type - Type of UI resource (externalUrl, rawHtml, remoteDom, appsSdk)
+ * @param definition.type - Type of UI resource (externalUrl, rawHtml, remoteDom, mcpApps)
  * @param definition.title - Human-readable title for the widget
  * @param definition.description - Description of the widget's functionality
  * @param definition.props - Widget properties configuration with types and defaults
  * @param definition.size - Preferred iframe size [width, height] (e.g., ['900px', '600px'])
  * @param definition.annotations - Resource annotations for discovery
- * @param definition.appsSdkMetadata - Apps SDK specific metadata (CSP, widget description, etc.)
  *
  * @example
  * ```typescript
  * server.uiResource({
- *   type: 'appsSdk',
+ *   type: 'mcpApps',
  *   name: 'kanban-board',
  *   title: 'Kanban Board',
  *   description: 'Interactive task management board',
  *   htmlTemplate: '<div>...</div>',
- *   appsSdkMetadata: { ... }
+ *   metadata: { csp: { connectDomains: ['https://api.example.com'] } }
  * })
  * ```
  */
@@ -188,33 +187,27 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
   // Store minimal widget definition for use by tools with widget config.
   // Only store what's needed to build protocol metadata at tool-call time:
-  // - widgetType: to decide mcpApps vs appsSdk code path
-  // - metadata: CSP/domain config needed by protocol adapters
+  // - widgetType: to decide code path
+  // - metadata: CSP/domain config needed by protocol adapter
   // No mcp-use/* keys are stored — they don't belong on the wire.
-  if (
-    enrichedDefinition.type === "appsSdk" ||
-    enrichedDefinition.type === "mcpApps"
-  ) {
+  if (enrichedDefinition.type === "mcpApps") {
     server.widgetDefinitions.set(enrichedDefinition.name, {
       widgetType: enrichedDefinition.type,
-      metadata:
-        enrichedDefinition.type === "mcpApps"
-          ? enrichedDefinition.metadata
-          : undefined,
+      metadata: enrichedDefinition.metadata,
     } as Record<string, unknown>);
 
     // Update any existing tools that reference this widget
     // This fixes the timing issue where tools are registered before widgets are auto-discovered
-    if (enrichedDefinition.type === "mcpApps" && server.registrations?.tools) {
+    if (server.registrations?.tools) {
       for (const [, toolReg] of server.registrations.tools) {
         // Check if this tool has a widget config referencing our widget
         const widgetConfig = (toolReg.config as any).widget;
         if (widgetConfig?.name === enrichedDefinition.name) {
-          // Tool references this widget - update its metadata with dual-protocol support
+          // Tool references this widget - update its metadata
           const buildIdPart = getBuildIdPart(server.buildId);
           const outputTemplate = `ui://widget/${enrichedDefinition.name}${buildIdPart}.html`;
 
-          // Update tool metadata with dual-protocol support
+          // Update tool metadata
           toolReg.config._meta = buildDualProtocolMetadata(
             enrichedDefinition,
             outputTemplate,
@@ -245,26 +238,17 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       resourceUri = generateWidgetUri(enrichedDefinition.name, server.buildId);
       mimeType = "application/vnd.mcp-ui.remote-dom+javascript";
       break;
-    case "appsSdk":
-      resourceUri = generateWidgetUri(
-        enrichedDefinition.name,
-        server.buildId,
-        ".html"
-      );
-      mimeType = "text/html+skybridge";
-      break;
     case "mcpApps":
       resourceUri = generateWidgetUri(
         enrichedDefinition.name,
         server.buildId,
         ".html"
       );
-      // Default to MCP Apps MIME type, but we'll register with both protocols
       mimeType = "text/html;profile=mcp-app";
       break;
     default:
       throw new Error(
-        `Unsupported UI resource type. Must be one of: externalUrl, rawHtml, remoteDom, appsSdk, mcpApps`
+        `Unsupported UI resource type. Must be one of: externalUrl, rawHtml, remoteDom, mcpApps`
       );
   }
 
@@ -366,11 +350,8 @@ export function uiResourceRegistration<T extends UIResourceServer>(
       readCallback: resourceReadCallback,
     });
 
-    // For Apps SDK and MCP Apps, also register a resource template to handle dynamic URIs with random IDs
-    if (
-      enrichedDefinition.type === "appsSdk" ||
-      enrichedDefinition.type === "mcpApps"
-    ) {
+    // For MCP Apps, also register a resource template to handle dynamic URIs with random IDs
+    if (enrichedDefinition.type === "mcpApps") {
       // Build URI template with build ID if available
       const buildIdPart = server.buildId ? `-${server.buildId}` : "";
       const uriTemplate = `ui://widget/${enrichedDefinition.name}${buildIdPart}-{id}.html`;
@@ -439,33 +420,12 @@ export function uiResourceRegistration<T extends UIResourceServer>(
   // Note: Resources and resource templates are always registered regardless of exposeAsTool
   // because custom tools may reference them via the widget() helper
   if (exposeAsTool) {
-    // Build tool metadata using protocol adapters for dual-protocol support.
-    // Only include protocol-standard fields (ui.resourceUri, openai/*) — no mcp-use/* keys.
+    // Build tool metadata using protocol adapter.
+    // Only include protocol-standard fields (ui.resourceUri) — no mcp-use/* keys.
     const toolMetadata: Record<string, unknown> = {};
 
-    if (
-      enrichedDefinition.type === "appsSdk" &&
-      enrichedDefinition.appsSdkMetadata
-    ) {
-      // Apps SDK only: Add Apps SDK tool metadata
-      toolMetadata["openai/outputTemplate"] = resourceUri;
-
-      // Copy over tool-relevant metadata fields from appsSdkMetadata
-      const toolMetadataFields = [
-        "openai/toolInvocation/invoking",
-        "openai/toolInvocation/invoked",
-        "openai/widgetAccessible",
-        "openai/resultCanProduceWidget",
-      ] as const;
-
-      for (const field of toolMetadataFields) {
-        if (enrichedDefinition.appsSdkMetadata[field] !== undefined) {
-          toolMetadata[field] = enrichedDefinition.appsSdkMetadata[field];
-        }
-      }
-    } else if (enrichedDefinition.type === "mcpApps") {
-      // MCP Apps: Generate metadata for BOTH protocols using adapters
-      // Build dual-protocol metadata
+    if (enrichedDefinition.type === "mcpApps") {
+      // MCP Apps: Generate metadata using adapter
       Object.assign(
         toolMetadata,
         buildDualProtocolMetadata(enrichedDefinition, resourceUri, toolMetadata)
@@ -552,16 +512,11 @@ export function uiResourceRegistration<T extends UIResourceServer>(
 
     // Tool callback function (used for both new registration and updates)
     const toolCallback = async (params: Record<string, unknown>) => {
-      // For Apps SDK or MCP Apps, return clean tool result per Apps SDK spec.
-      // Per OpenAI Apps SDK: tool results contain structuredContent, content
-      // (text items), and optional _meta. The widget HTML is NOT in the result;
-      // the host fetches it via resources/read using openai/outputTemplate from
+      // For MCP Apps, return clean tool result per MCP Apps spec.
+      // The widget HTML is NOT in the result;
+      // the host fetches it via resources/read using the resourceUri from
       // the tool definition.
-      // See: https://developers.openai.com/apps-sdk/build/mcp-server
-      if (
-        enrichedDefinition.type === "appsSdk" ||
-        enrichedDefinition.type === "mcpApps"
-      ) {
+      if (enrichedDefinition.type === "mcpApps") {
         // Generate tool output (what the model sees)
         const toolOutputResult = enrichedDefinition.toolOutput
           ? typeof enrichedDefinition.toolOutput === "function"

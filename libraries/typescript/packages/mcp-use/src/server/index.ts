@@ -139,9 +139,8 @@ export {
   type UrlConfig,
 } from "./widgets/mcp-ui-adapter.js";
 
-// Protocol adapters for dual-protocol widget support
+// Protocol adapters for MCP Apps widget support
 export {
-  AppsSdkAdapter,
   McpAppsAdapter,
   type CSPConfig,
   type ProtocolAdapter,
@@ -193,7 +192,6 @@ export {
 export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
 
 export type {
-  AppsSdkUIResource,
   ClientCapabilityChecker,
   DiscoverWidgetsOptions,
   ExternalUrlUIResource,
