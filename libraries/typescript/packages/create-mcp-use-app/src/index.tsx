@@ -18,14 +18,19 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import ora from "ora";
 import React, { useState } from "react";
 import { extract } from "tar";
-import { isSafeEntry, sanitizePackageName } from "./utils.js";
+import {
+  deriveProjectInfo,
+  findUnsafeEntries,
+  updateIndexTs,
+  updatePackageJson,
+} from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -541,34 +546,24 @@ program
           selectedTemplate = "starter";
         }
 
-        // Validate project name
-        const sanitizedProjectName = projectName!.trim();
-        if (!sanitizedProjectName) {
+        const trimmedProjectName = projectName!.trim();
+        if (!trimmedProjectName) {
           console.error(chalk.red("❌ Project name cannot be empty"));
           process.exit(1);
         }
 
-        // Handle "." — use current directory
-        const useCurrentDir = sanitizedProjectName === ".";
-        const projectPath = useCurrentDir
-          ? process.cwd()
-          : resolve(process.cwd(), sanitizedProjectName);
-        // Raw basename for user-facing display; sanitized version for package.json
-        const displayName = useCurrentDir
-          ? basename(process.cwd())
-          : sanitizedProjectName;
+        const { useCurrentDir, projectPath, displayName, packageName } =
+          deriveProjectInfo(trimmedProjectName, process.cwd());
 
         if (useCurrentDir) {
-          // Allow "." when the directory contains only safe entries (see SAFE_DIR_ENTRIES)
-          const entries = readdirSync(projectPath);
-          const unsafeEntries = entries.filter((entry) => !isSafeEntry(entry));
+          const unsafeEntries = findUnsafeEntries(projectPath);
           if (unsafeEntries.length > 0) {
             console.error(
               chalk.red(
                 "❌ Cannot initialize here — these entries would clash with the template:"
               )
             );
-            for (const entry of unsafeEntries.sort()) {
+            for (const entry of unsafeEntries) {
               console.error(chalk.red(`   • ${entry}`));
             }
             console.error("");
@@ -582,9 +577,9 @@ program
         } else {
           // Security: Validate project name doesn't contain path traversal
           if (
-            sanitizedProjectName.includes("..") ||
-            sanitizedProjectName.includes("/") ||
-            sanitizedProjectName.includes("\\")
+            trimmedProjectName.includes("..") ||
+            trimmedProjectName.includes("/") ||
+            trimmedProjectName.includes("\\")
           ) {
             console.error(
               chalk.red(
@@ -606,11 +601,9 @@ program
             "src",
             "dist",
           ];
-          if (protectedNames.includes(sanitizedProjectName.toLowerCase())) {
+          if (protectedNames.includes(trimmedProjectName.toLowerCase())) {
             console.error(
-              chalk.red(
-                `❌ Cannot use protected name "${sanitizedProjectName}"`
-              )
+              chalk.red(`❌ Cannot use protected name "${trimmedProjectName}"`)
             );
             console.error(
               chalk.yellow("   Please choose a different project name")
@@ -621,9 +614,7 @@ program
           // Check if directory already exists
           if (existsSync(projectPath)) {
             console.error(
-              chalk.red(
-                `❌ Directory "${sanitizedProjectName}" already exists!`
-              )
+              chalk.red(`❌ Directory "${trimmedProjectName}" already exists!`)
             );
             console.error(
               chalk.yellow(
@@ -654,14 +645,10 @@ program
           options.canary
         );
 
-        // Update package.json with project name (sanitized for npm validity)
-        const packageName = useCurrentDir
-          ? sanitizePackageName(displayName)
-          : displayName;
+        // Templates inline {{PROJECT_NAME}} inside double-quoted string literals,
+        // so both files use the npm-safe packageName, not the raw displayName.
         updatePackageJson(projectPath, packageName);
-
-        // Update index.ts with project name
-        updateIndexTs(projectPath, displayName);
+        updateIndexTs(projectPath, packageName);
 
         // Non-interactive defaults when template is specified via flag
         // Enables usage in CI/tests without blocking prompts
@@ -1218,31 +1205,6 @@ function copyDirectoryWithProcessing(
   }
 }
 
-function updatePackageJson(projectPath: string, projectName: string) {
-  const packageJsonPath = join(projectPath, "package.json");
-  const packageJsonContent = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-
-  packageJsonContent.name = projectName;
-  packageJsonContent.description = `MCP server: ${projectName}`;
-
-  writeFileSync(packageJsonPath, JSON.stringify(packageJsonContent, null, 2));
-}
-
-function updateIndexTs(projectPath: string, projectName: string) {
-  const indexPath = join(projectPath, "index.ts");
-
-  if (!existsSync(indexPath)) {
-    return; // index.ts doesn't exist, skip
-  }
-
-  let content = readFileSync(indexPath, "utf-8");
-
-  // Replace {{PROJECT_NAME}} placeholders with actual project name
-  content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
-
-  writeFileSync(indexPath, content);
-}
-
 // Ink component for install dependencies prompt (Y/n)
 function InstallPrompt({
   packageManager,
@@ -1348,14 +1310,9 @@ function ProjectNameInput({ onSubmit }: { onSubmit: (name: string) => void }) {
       return;
     }
     if (trimmed === ".") {
-      // Allow "." — use current directory if it contains only safe entries
-      const entries = readdirSync(process.cwd());
-      const unsafeEntries = entries.filter((entry) => !isSafeEntry(entry));
+      const unsafeEntries = findUnsafeEntries(process.cwd());
       if (unsafeEntries.length > 0) {
-        const list = unsafeEntries
-          .sort()
-          .map((entry) => `   • ${entry}`)
-          .join("\n");
+        const list = unsafeEntries.map((entry) => `   • ${entry}`).join("\n");
         setError(
           `Cannot initialize here — these entries would clash with the template:\n${list}\n\nRemove these files, or pick a project name to scaffold into a subdirectory.`
         );
