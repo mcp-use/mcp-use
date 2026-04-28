@@ -12,6 +12,7 @@
     "fix-cli-bun-runtime-build",
     "fix-create-app-dot-directory",
     "fix-embed-landing-model-badge-mcp-1913",
+    "fix-inspector-hono-duck-type",
     "fix-oauth-double-tab-1384",
     "fix-oauth-error-redirect",
     "mcp-1733-esbuild-bundle",
