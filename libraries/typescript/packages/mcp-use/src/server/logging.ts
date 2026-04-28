@@ -433,7 +433,8 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     const tail = ` ${renderOutcome(outcome)} ${chalk.dim(`(${durationMs}ms)`)}`;
     const argsPart = args !== null ? ` args=${args}` : "";
     const argsOnNewLine =
-      args !== null && visibleLength(head + argsPart + tail) > MAX_INLINE_LENGTH;
+      args !== null &&
+      visibleLength(head + argsPart + tail) > MAX_INLINE_LENGTH;
 
     if (argsOnNewLine) {
       line = `${head}${tail}\n    args=${args}`;
