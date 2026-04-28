@@ -15,6 +15,13 @@ const MAX_TRACE_STRING_LENGTH = 100;
 const MAX_ARG_DEPTH = 3;
 /** Cap how many bytes of a POST /mcp response we peek for outcome detection. JSON-RPC error envelopes are tiny; large tool results are truncated and treated as `OK`. */
 const MAX_RESPONSE_PEEK_BYTES = 64 * 1024;
+/** Cap raw (non-JSON) trace-mode response body output. */
+const MAX_TRACE_BODY_LENGTH = 10000;
+
+const ANSI_PATTERN = /\x1B\[[0-9;]*m/g;
+function visibleLength(s: string): number {
+  return s.replace(ANSI_PATTERN, "").length;
+}
 
 /**
  * Verbosity tier for the request logger:
@@ -221,19 +228,6 @@ function truncateMessage(msg: string): string {
     : msg;
 }
 
-function plainOutcome(outcome: Outcome): string {
-  switch (outcome.kind) {
-    case "ok":
-      return "OK";
-    case "rpc-error":
-      return `ERROR${outcome.code !== null ? ` ${outcome.code}` : ""} ${outcome.message}`;
-    case "http":
-      return `HTTP ${outcome.status}`;
-    default:
-      return "";
-  }
-}
-
 function renderOutcome(outcome: Outcome): string {
   switch (outcome.kind) {
     case "ok":
@@ -249,8 +243,6 @@ function renderOutcome(outcome: Outcome): string {
         return chalk.yellow(text);
       return chalk.red(text);
     }
-    default:
-      return "";
   }
 }
 
@@ -319,13 +311,12 @@ function colorHttpStatus(statusCode: number): string {
 export async function requestLogger(c: Context, next: Next): Promise<void> {
   const timestamp = new Date().toISOString().substring(11, 23);
   const method = c.req.method;
-  const url = c.req.url;
   const logLevel = getLogLevel();
   const showArgs = logLevel === "debug" || logLevel === "trace";
   const traceMode = logLevel === "trace";
 
   // Filter out noisy endpoints that create log spam
-  const pathname = new URL(url).pathname;
+  const pathname = c.req.path;
   const noisyPaths = [
     "/inspector/api/tel/", // Telemetry endpoints (posthog, scarf)
     "/inspector/api/rpc/stream", // RPC stream (SSE)
@@ -359,7 +350,6 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   let requestHeaders: Record<string, string> = {};
 
   if (traceMode) {
-    // Log request headers - c.req.header() without args returns all headers
     const allHeaders = c.req.header();
     if (allHeaders) {
       requestHeaders = allHeaders;
@@ -367,15 +357,19 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   }
 
   if ((isMcpPost || traceMode) && method !== "GET" && method !== "HEAD") {
-    try {
-      // Clone the request to avoid consuming the original body stream
-      const clonedRequest = c.req.raw.clone();
-      requestBody = await clonedRequest.json().catch(() => {
-        // If JSON parsing fails, try to get as text
-        return clonedRequest.text().catch(() => null);
-      });
-    } catch {
-      // Ignore errors
+    // Read text first so a failed JSON.parse can fall back to the raw string —
+    // calling .json() then .text() on the same clone fails because .json()
+    // consumes the body stream even when parsing throws.
+    const text = await c.req.raw
+      .clone()
+      .text()
+      .catch(() => null);
+    if (text !== null && text.length > 0) {
+      try {
+        requestBody = JSON.parse(text);
+      } catch {
+        requestBody = text;
+      }
     }
   }
 
@@ -385,14 +379,18 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
 
   const statusCode = c.res.status;
 
-  // Peek response body for outcome detection (POST /mcp only — always JSON, never SSE).
-  // Capped at MAX_RESPONSE_PEEK_BYTES so a multi-MB tool result doesn't get fully
-  // buffered just to inspect `result.isError`; truncated JSON falls through to `ok`.
+  // Read response body for outcome detection (POST /mcp only — always JSON, never SSE).
+  // In info/debug mode, cap at MAX_RESPONSE_PEEK_BYTES so a multi-MB tool result
+  // doesn't get fully buffered just to inspect `result.isError`; truncated JSON falls
+  // through to `ok`. In trace mode we read the full body once and reuse it for the
+  // body dump below, avoiding a second clone.
   let responseText: string | null = null;
   if (isMcpPost) {
     try {
       const cloned = c.res.clone();
-      responseText = await peekResponseText(cloned, MAX_RESPONSE_PEEK_BYTES);
+      responseText = traceMode
+        ? await cloned.text().catch(() => null)
+        : await peekResponseText(cloned, MAX_RESPONSE_PEEK_BYTES);
     } catch {
       // Ignore; outcome falls back to OK / HTTP status.
     }
@@ -420,46 +418,27 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     const showSessionPrefix = sessionTag !== null && rpcMethod !== "initialize";
     const showSessionSuffix = sessionTag !== null && rpcMethod === "initialize";
 
-    // Plain (color-free) parts — used to decide whether args spill to a second line.
-    const sessionPrefixPlain = showSessionPrefix ? `sess=${sessionTag} ` : "";
-    const bracketPlain = rpcMethod
-      ? target
-        ? ` [${rpcMethod}: ${target}]`
-        : ` [${rpcMethod}]`
-      : "";
-    const sessionSuffixPlain = showSessionSuffix
-      ? ` → session=${sessionTag}`
-      : "";
-    const headPlain = `[${timestamp}] ${sessionPrefixPlain}${method} ${pathname}${bracketPlain}${sessionSuffixPlain}`;
-    const argsPlain = args ? ` args=${args}` : "";
-    const tailPlain = ` ${plainOutcome(outcome)} (${durationMs}ms)`;
-    const argsOnNewLine =
-      args !== null &&
-      headPlain.length + argsPlain.length + tailPlain.length >
-        MAX_INLINE_LENGTH;
-
-    // Rendered (colored) parts.
-    const sessionPrefixRendered = showSessionPrefix
+    const sessionPrefix = showSessionPrefix
       ? chalk.dim(`sess=${sessionTag}`) + " "
       : "";
-    const bracketRendered = rpcMethod
+    const bracket = rpcMethod
       ? target
         ? " " + chalk.bold(`[${rpcMethod}: ${target}]`)
         : " " + chalk.bold(`[${rpcMethod}]`)
       : "";
-    const sessionSuffixRendered = showSessionSuffix
+    const sessionSuffix = showSessionSuffix
       ? " " + chalk.dim(`→ session=${sessionTag}`)
       : "";
-    const head = `[${timestamp}] ${sessionPrefixRendered}${method} ${chalk.bold(pathname)}${bracketRendered}${sessionSuffixRendered}`;
-    const outcomeRendered = renderOutcome(outcome);
-    const durationRendered = chalk.dim(`(${durationMs}ms)`);
+    const head = `[${timestamp}] ${sessionPrefix}${method} ${chalk.bold(pathname)}${bracket}${sessionSuffix}`;
+    const tail = ` ${renderOutcome(outcome)} ${chalk.dim(`(${durationMs}ms)`)}`;
+    const argsPart = args !== null ? ` args=${args}` : "";
+    const argsOnNewLine =
+      args !== null && visibleLength(head + argsPart + tail) > MAX_INLINE_LENGTH;
 
-    if (args !== null && argsOnNewLine) {
-      line = `${head} ${outcomeRendered} ${durationRendered}\n    args=${args}`;
-    } else if (args !== null) {
-      line = `${head} args=${args} ${outcomeRendered} ${durationRendered}`;
+    if (argsOnNewLine) {
+      line = `${head}${tail}\n    args=${args}`;
     } else {
-      line = `${head} ${outcomeRendered} ${durationRendered}`;
+      line = `${head}${argsPart}${tail}`;
     }
   } else {
     line = `[${timestamp}] ${method} ${chalk.bold(pathname)} ${colorHttpStatus(statusCode)} ${chalk.dim(`(${durationMs}ms)`)}`;
@@ -467,29 +446,25 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
 
   console.log(line);
 
-  // Trace mode: log detailed request/response information
   if (traceMode) {
     console.log("\n" + chalk.cyan("=".repeat(80)));
     console.log(chalk.bold.cyan("[TRACE] Request Details"));
     console.log(chalk.cyan("-".repeat(80)));
 
-    // Request headers
     if (Object.keys(requestHeaders).length > 0) {
       console.log(chalk.yellow("Request Headers:"));
       console.log(formatForLogging(requestHeaders));
     }
 
-    // Request body
     if (requestBody !== null) {
       console.log(chalk.yellow("Request Body:"));
-      if (typeof requestBody === "string") {
-        console.log(requestBody);
-      } else {
-        console.log(formatForLogging(requestBody));
-      }
+      console.log(
+        typeof requestBody === "string"
+          ? requestBody
+          : formatForLogging(requestBody)
+      );
     }
 
-    // Response headers
     const responseHeaders: Record<string, string> = {};
     c.res.headers.forEach((value, key) => {
       responseHeaders[key] = value;
@@ -499,49 +474,31 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
       console.log(formatForLogging(responseHeaders));
     }
 
-    // Response body
-    try {
-      // Check if response has a body and can be cloned
-      // Clone the response to read the body without consuming the original stream
-      // This ensures the original response remains intact for the client
-      if (c.res.body !== null && c.res.body !== undefined) {
-        try {
-          const clonedResponse = c.res.clone();
-          const responseBody = await clonedResponse.text().catch(() => null);
-
-          if (responseBody !== null && responseBody.length > 0) {
-            console.log(chalk.yellow("Response Body:"));
-            // Try to parse as JSON for pretty printing
-            try {
-              const jsonBody = JSON.parse(responseBody);
-              console.log(formatForLogging(jsonBody));
-            } catch {
-              // Not JSON, print as text (truncate if too long)
-              const maxLength = 10000;
-              if (responseBody.length > maxLength) {
-                console.log(
-                  responseBody.substring(0, maxLength) +
-                    `\n... (truncated, ${responseBody.length - maxLength} more characters)`
-                );
-              } else {
-                console.log(responseBody);
-              }
-            }
-          } else {
-            console.log(chalk.yellow("Response Body:") + " (empty)");
-          }
-        } catch (cloneError) {
-          // If cloning fails (e.g., response already consumed), log that
+    // Reuse the response text already read above for MCP routes; for other
+    // traced routes, clone and read the body now.
+    let traceBody: string | null = responseText;
+    if (traceBody === null && c.res.body) {
+      traceBody = await c.res
+        .clone()
+        .text()
+        .catch(() => null);
+    }
+    console.log(chalk.yellow("Response Body:"));
+    if (traceBody === null || traceBody.length === 0) {
+      console.log("(empty)");
+    } else {
+      try {
+        console.log(formatForLogging(JSON.parse(traceBody)));
+      } catch {
+        if (traceBody.length > MAX_TRACE_BODY_LENGTH) {
           console.log(
-            chalk.yellow("Response Body:") + " (unable to clone/read)"
+            traceBody.slice(0, MAX_TRACE_BODY_LENGTH) +
+              `\n... (truncated, ${traceBody.length - MAX_TRACE_BODY_LENGTH} more characters)`
           );
+        } else {
+          console.log(traceBody);
         }
-      } else {
-        console.log(chalk.yellow("Response Body:") + " (no body)");
       }
-    } catch (error) {
-      // If we can't read the response body, log that
-      console.log(chalk.yellow("Response Body:") + " (unable to read)");
     }
 
     console.log(chalk.cyan("=".repeat(80)) + "\n");
