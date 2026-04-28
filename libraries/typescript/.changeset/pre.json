@@ -15,6 +15,7 @@
     "fix-oauth-error-redirect",
     "mcp-1733-esbuild-bundle",
     "mcp-1741-widget-overlays-the-header",
-    "oauth-reconnect-session-storage"
+    "oauth-reconnect-session-storage",
+    "supabase-oauth-2-1-endpoints"
   ]
 }
