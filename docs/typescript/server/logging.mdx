@@ -48,34 +48,63 @@ DEBUG=1 node server.js
 
 ### Verbose Debug Mode
 
-Full request/response logging with JSON-RPC details:
+Enable debug-level Logger output:
 
 ```bash
 DEBUG=2 node server.js
 ```
 
-**Output:**
+This raises the [built-in `Logger`](#built-in-logging-system) to `debug`, surfacing detailed lifecycle messages.
+
+<Note>
+  Full JSON-RPC request/response body dumps for `POST /mcp` are now controlled
+  separately by `MCP_LOG_LEVEL=trace` — see [Per-Request Log Verbosity](#per-request-log-verbosity) below.
+</Note>
+
+## Per-Request Log Verbosity
+
+The Hono middleware that logs every `POST /mcp` request emits a one-line summary by default. Verbosity is controlled by the `MCP_LOG_LEVEL` environment variable:
+
+| Level | Includes |
+| --- | --- |
+| `info` (default) | Target (tool/resource/prompt name or client info), session id, outcome (`OK` / `ERROR <code> <msg>` / `HTTP <code>`), duration |
+| `debug` | `info` + inline `args={...}` for `tools/call` and `prompts/get` |
+| `trace` | `debug` + full request/response header & body dump |
+
+Args are hidden by default because they may carry PII or secrets — opt in with `MCP_LOG_LEVEL=debug` when you actively need them.
+
+```bash
+# Default — no args, no body dump
+node server.js
+
+# Show inline args
+MCP_LOG_LEVEL=debug node server.js
+
+# Show full JSON-RPC request/response bodies
+MCP_LOG_LEVEL=trace node server.js
+```
+
+**Example output (default, `info`):**
 
 ```
-[MCP] Session initialized: abc123
-[MCP] → Request: {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "analyze-sentiment",
-    "arguments": { "text": "I love this!" }
-  }
-}
-[MCP] tools/call:analyze-sentiment completed in 234ms
-[MCP] ← Response: {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [{ "type": "text", "text": "Sentiment: positive" }]
-  }
-}
+[12:34:56.789] POST /mcp [initialize: Claude/0.8.3] → session=abc12de OK (12ms)
+[12:34:57.102] sess=abc12de POST /mcp [tools/call: create_invoice] OK (87ms)
+[12:34:57.540] sess=abc12de POST /mcp [tools/call: fetch_url] ERROR -32603 Invalid API key (1203ms)
 ```
+
+**Example output (`debug`):**
+
+```
+[12:34:57.102] sess=abc12de POST /mcp [tools/call: create_invoice] args={"amount":100,"currency":"USD"} OK (87ms)
+[12:34:57.540] sess=abc12de POST /mcp [tools/call: fetch_url] args={"url":"https://…"} ERROR -32603 Invalid API key (1203ms)
+```
+
+`trace` additionally prints the full request/response headers and bodies after each line.
+
+<Warning>
+  Prior versions surfaced the body dump whenever `DEBUG` was truthy. The body
+  dump now requires `MCP_LOG_LEVEL=trace` — `DEBUG` alone no longer enables it.
+</Warning>
 
 ## Built-in Logging System
 
