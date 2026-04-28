@@ -10,6 +10,7 @@
   "changesets": [
     "fix-chat-free-tier-leak-1903",
     "fix-cli-bun-runtime-build",
+    "fix-create-app-dot-directory",
     "fix-embed-landing-model-badge-mcp-1913",
     "fix-oauth-double-tab-1384",
     "fix-oauth-error-redirect",
