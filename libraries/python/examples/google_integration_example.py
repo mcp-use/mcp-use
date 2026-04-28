@@ -131,7 +131,7 @@ async def main():
         gemini.close()
     except Exception as e:
         print(f"Error: {e}")
-        raise e
+        raise
 
 
 if __name__ == "__main__":
