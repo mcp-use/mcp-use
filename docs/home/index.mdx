@@ -8,10 +8,10 @@ mode: "frame"
 > For the complete documentation index, see [llms.txt](https://manufact.com/docs/llms.txt).
 </div>
 
-import { RandomGradientBackground } from '/snippets/gradient.jsx'
 import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
 
 <div className="px-4 py-8 mt-24 lg:pb-24 max-w-5xl mx-auto">
+
 <div className="text-center">
 <img
   noZoom
@@ -27,48 +27,36 @@ import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
 />
 </div>
 
-
-<p className="max-w-xl mx-auto px-4 mt-4 text-center ">
-  <p className='text-xl'>
-  Full-Stack MCP Framework <br/>
-  </p>
-  <p className='mt-4'>
-  <b>mcp-use</b> provides everything you need to build with the <a href="https://modelcontextprotocol.io">Model Context Protocol</a>—from AI agents to servers, in both <b>Python</b> and <b>TypeScript</b>.
-  </p>
+<p className="max-w-2xl mx-auto px-4 mt-6 text-center">
+  <p className='text-xl'>The fullstack MCP framework</p>
+  <p className='mt-3'>Build <b>MCP Apps</b> for ChatGPT / Claude and <b>MCP Servers</b> for AI Agents — in <b>TypeScript</b> and <b>Python</b>.</p>
 </p>
 
-<div className="max-w-5xl mx-auto px-6 mt-12">
+<div className="mt-10 grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto text-center text-sm">
+  <div><b>Build</b><br/><span className="text-zinc-500">with the mcp-use SDK</span></div>
+  <div><b>Preview</b><br/><span className="text-zinc-500">with the MCP Inspector</span></div>
+  <div><b>Deploy</b><br/><span className="text-zinc-500">to production in one command</span></div>
 </div>
 
-<div className="px-6 lg:px-0 mt-12 lg:mt-12 grid sm:grid-cols-3 gap-x-6 gap-y-6">
-  <SimpleSplitCard
-    imgDark="https://cdn.mcp-use.com/docs/agent.jpg"
-    imgLight="https://cdn.mcp-use.com/docs/agent_white.png"
-    title="Agent"
-    description="Build tool-using AI agents."
-    leftHref="/python/agent/agent-configuration"
-    rightHref="/typescript/agent/agent-configuration"
-    leftLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
-    rightLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
-  />
-  <SimpleSplitCard
-    imgDark="https://cdn.mcp-use.com/docs/client.jpg"
-    imgLight="https://cdn.mcp-use.com/docs/client_white.png"
-    title="Client"
-    description="Connect to MCP servers programmatically."
-    leftHref="/python/client/client-configuration"
-    rightHref="/typescript/client/client-configuration"
-    leftLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
-    rightLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
-  />
+<div className="px-6 lg:px-0 mt-14 grid sm:grid-cols-2 gap-x-6 gap-y-6">
   <SimpleSplitCard
     imgDark="https://cdn.mcp-use.com/docs/server.jpg"
     imgLight="https://cdn.mcp-use.com/docs/server_white.png"
-    title="Server"
-    description="Build and run powerful MCP servers."
-    leftHref="/python/server/"
-    rightHref="/typescript/server/"
-    leftLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
+    title="Build an MCP Server"
+    description="Expose tools, resources, and prompts to any AI agent."
+    leftHref="/typescript/server/index"
+    rightHref="/python/server/index"
+    leftLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
+    rightLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
+  />
+  <SimpleSplitCard
+    imgDark="https://cdn.mcp-use.com/docs/agent.jpg"
+    imgLight="https://cdn.mcp-use.com/docs/agent_white.png"
+    title="Build an MCP App"
+    description="Interactive widgets that run in Claude, ChatGPT, and any MCP client."
+    leftHref="/typescript/server/mcp-apps"
+    rightHref="/typescript/server/mcp-apps"
+    leftLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
     rightLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
   />
 </div>
@@ -77,72 +65,208 @@ import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
 
 <div className="max-w-5xl mx-auto px-6">
 
-<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-6">What is mcp-use?</h2>
+## Quickstart
 
-mcp-use is a **full-stack open source framework** that enables developers to connect any Language Learning Model (LLM) to any MCP server. We refuse lock-in. We refuse walled gardens. We build with open standards, composable tools, and source you can read. mcp-use connects models to real capability—your data, your workflows, your servers—on your terms.
+<Tabs>
+  <Tab title="TypeScript">
+```bash
+npx create-mcp-use-app@latest
+```
 
-<p className="mt-4">
-Our mission is to provide the best developer experience across the MCP stack. Please explore the individual modules to understand what makes us special.
-</p>
+Or create a server manually:
 
-<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-16 mb-6">Features at a Glance</h2>
+```typescript
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+});
+
+server.tool({
+  name: "get_weather",
+  description: "Get weather for a city",
+  schema: z.object({ city: z.string() }),
+}, async ({ city }) => {
+  return text(`Temperature: 72°F, Condition: sunny, City: ${city}`);
+});
+
+await server.listen(3000);
+// Inspector at http://localhost:3000/inspector
+```
+
+<Card title="Full TypeScript Server Documentation" icon="arrow-right" href="/typescript/server/index" horizontal />
+  </Tab>
+  <Tab title="Python">
+```bash
+pip install mcp-use
+```
+
+```python
+from typing import Annotated
+from mcp.types import ToolAnnotations
+from pydantic import Field
+from mcp_use import MCPServer
+
+server = MCPServer(name="Weather Server", version="1.0.0")
+
+@server.tool(
+    name="get_weather",
+    description="Get current weather information for a location",
+    annotations=ToolAnnotations(readOnlyHint=True, openWorldHint=True),
+)
+async def get_weather(
+    city: Annotated[str, Field(description="City name")],
+) -> str:
+    return f"Temperature: 72°F, Condition: sunny, City: {city}"
+
+server.run(transport="streamable-http", port=8000)
+# Inspector at http://localhost:8000/inspector
+```
+
+<Card title="Full Python Server Documentation" icon="arrow-right" href="/python/server/index" horizontal />
+  </Tab>
+</Tabs>
+
+## MCP Apps
+
+MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients — write once, run everywhere.
+
+```typescript
+import { MCPServer, widget } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({ name: "weather-app", version: "1.0.0" });
+
+server.tool({
+  name: "get-weather",
+  description: "Get weather for a city",
+  schema: z.object({ city: z.string() }),
+  widget: "weather-display", // references resources/weather-display/widget.tsx
+}, async ({ city }) => {
+  return widget({
+    props: { city, temperature: 22, conditions: "Sunny" },
+    message: `Weather in ${city}: Sunny, 22°C`,
+  });
+});
+
+await server.listen(3000);
+```
+
+Widgets in `resources/` are **auto-discovered** — no manual registration needed.
+
+<CardGroup cols={2}>
+  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/server/mcp-apps">
+    Build widgets with React, auto-discovery, and client-side hooks.
+  </Card>
+  <Card title="ChatGPT Apps Flow" icon="message-square" href="/guides/chatgpt-apps-flow">
+    Step-by-step: ship an MCP App to ChatGPT.
+  </Card>
+</CardGroup>
+
+## Templates
+
+Ready-to-use MCP Apps and Servers you can deploy in one click or remix as your own.
 
 <CardGroup cols={3}>
-  <Card title="Agent" icon="bot">
-    <ul className="mt-4 space-y-2 text-zinc-400 text-sm">
-      <li>Connect any LLM</li>
-      <li>Get started in 6 lines of code</li>
-      <li>Supports any MCP server</li>
-    </ul>
+  <Card title="Chart Builder" icon="chart-column" href="https://github.com/mcp-use/mcp-chart-builder">
+    Natural-language chart generation.
   </Card>
-  <Card title="Client" icon="plug">
-    <ul className="mt-4 space-y-2 text-zinc-400 text-sm">
-      <li>Fully spec compliant</li>
-      <li>Supports all primitives: sampling, tools, resources, prompts, elicitation, logging, notifications</li>
-    </ul>
+  <Card title="Diagram Builder" icon="sitemap" href="https://github.com/mcp-use/mcp-diagram-builder">
+    Conversational diagramming.
   </Card>
-  <Card title="Server" icon="server">
-    <ul className="mt-4 space-y-2 text-zinc-400 text-sm">
-      <li>Fully spec compliant</li>
-      <li>Best-in-class developer experience</li>
-      <li>Built-in Inspector, openmcp.json, and docs</li>
-    </ul>
+  <Card title="Widget Gallery" icon="grid" href="https://github.com/mcp-use/mcp-widget-gallery">
+    Reference patterns for every widget type.
   </Card>
 </CardGroup>
 
-<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-16 mb-6">Supported MCP Servers</h2>
-
-<Info>
-mcp-use supports **any MCP server**, allowing you to connect to a wide range of server implementations for different use cases.
-</Info>
-
-<CardGroup cols={2}>
-  <Card title="Playwright" icon="globe" href="https://github.com/microsoft/playwright-python">
-    Web scraping and browser automation capabilities
-  </Card>
-  <Card title="Filesystem" icon="folder" href="https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem">
-    Safe file system operations and management
-  </Card>
-  <Card title="SQLite" icon="database" href="https://github.com/modelcontextprotocol/servers/tree/main/src/sqlite">
-    Database querying and management tools
-  </Card>
-  <Card title="GitHub" icon="github" href="https://github.com/modelcontextprotocol/servers/tree/main/src/github">
-    Repository management and GitHub API access
-  </Card>
-</CardGroup>
-
-<Card title="Awesome MCP Servers" icon="star" href="https://github.com/punkpeye/awesome-mcp-servers" horizontal>
-  Explore a comprehensive list of available MCP servers from the community - find servers for APIs, databases, cloud services, and more.
+<Card title="Browse all templates" icon="layout-template" href="/home/templates" horizontal>
+  Full gallery with demo URLs and one-click deploy buttons.
 </Card>
 
-<h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mt-16 mb-6">Community & Support</h2>
+## Inspector
+
+Test and debug your MCP servers interactively. The Inspector is **auto-included** in every server:
+
+```typescript
+server.listen(3000);
+// Inspector at http://localhost:3000/inspector
+```
+
+Or use the hosted inspector at [inspector.mcp-use.com](https://inspector.mcp-use.com), or standalone:
+
+```bash
+npx @mcp-use/inspector --url http://localhost:3000/mcp
+```
+
+<Card title="Inspector Documentation" icon="bug-play" href="/inspector/index" horizontal />
+
+## Deploy
+
+Ship to production in one command:
+
+```bash
+npx @mcp-use/cli login
+npx @mcp-use/cli deploy
+```
+
+Or connect a GitHub repo on [manufact.com](https://manufact.com) — production-ready with observability, metrics, logs, and branch deployments.
+
+## Also: MCP Agent & MCP Client
+
+mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP Agent** and **MCP Client** implementation.
+
+<AccordionGroup>
+  <Accordion title="MCP Agent — Build AI agents that use MCP servers" icon="brain">
+    Connect any LLM (OpenAI, Anthropic, Google, LangChain) to any MCP server.
+
+    ```python
+    from langchain_openai import ChatOpenAI
+    from mcp_use import MCPAgent, MCPClient
+
+    client = MCPClient.from_dict({ "mcpServers": { "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] } } })
+    agent = MCPAgent(llm=ChatOpenAI(model="gpt-4o"), client=client)
+    result = await agent.run("List all files in the directory")
+    ```
+
+    <CardGroup cols={2}>
+      <Card title="Python Agent" icon="/images/pythonlogo.svg" href="/python/agent/agent-configuration" />
+      <Card title="TypeScript Agent" icon="/images/typescriptlogo.svg" href="/typescript/agent/index" />
+    </CardGroup>
+  </Accordion>
+
+  <Accordion title="MCP Client — Connect to any MCP server programmatically" icon="router">
+    Fully spec-compliant: tools, resources, prompts, sampling, elicitation, logging, notifications.
+
+    ```typescript
+    import { MCPClient } from "mcp-use";
+    const client = new MCPClient({ mcpServers: { calculator: { command: "npx", args: ["-y", "@modelcontextprotocol/server-everything"] } } });
+    await client.createAllSessions();
+    const result = await client.getSession("calculator").callTool("add", { a: 5, b: 3 });
+    ```
+
+    <CardGroup cols={2}>
+      <Card title="Python Client" icon="/images/pythonlogo.svg" href="/python/client/client-configuration" />
+      <Card title="TypeScript Client" icon="/images/typescriptlogo.svg" href="/typescript/client/index" />
+    </CardGroup>
+  </Accordion>
+</AccordionGroup>
+
+## Learn More
 
 <CardGroup cols={2}>
- <Card title="Join our Discord" icon="discord" href="https://discord.gg/XkNkSkMz3V">
-    Chat with the community and get help from the team.
+  <Card title="MCP 101" icon="brain" href="/home/mcp101">
+    Principles of MCP: hosts, clients, servers, and the three primitives.
   </Card>
-  <Card title="GitHub Issues" icon="github" href="https://github.com/mcp-use/mcp-use/issues">
-    Report bugs, request features, or ask questions.
+  <Card title="Examples on GitHub" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/examples">
+    Runnable samples for Python and TypeScript.
+  </Card>
+  <Card title="Join the Discord" icon="discord" href="https://discord.gg/XkNkSkMz3V">
+    Chat with the community and the team.
+  </Card>
+  <Card title="Report an Issue" icon="github" href="https://github.com/mcp-use/mcp-use/issues">
+    Bugs, feature requests, and questions.
   </Card>
 </CardGroup>
 

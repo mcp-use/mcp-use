@@ -1,399 +1,88 @@
-# UIResource MCP Server
+# MCP Apps — Programmatic Widget Gallery
 
-[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fcreate-mcp-use-app%2Fsrc%2Ftemplates%2Fmcp-ui&branch=main&project-name=mcp-ui-template&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A20)
+[![Deploy to mcp-use](https://cdn.mcp-use.com/deploy.svg)](https://mcp-use.com/deploy/start?repository-url=https%3A%2F%2Fgithub.com%2Fmcp-use%2Fmcp-use%2Ftree%2Fmain%2Flibraries%2Ftypescript%2Fpackages%2Fmcp-use%2Fexamples%2Fserver%2Fui%2Fmcp-ui&branch=main&project-name=mcp-apps-gallery&build-command=npm+install&start-command=npm+run+build+%26%26+npm+run+start&port=3000&runtime=node&base-image=node%3A20)
 
-An MCP server with the new UIResource integration for simplified widget management and MCP-UI compatibility.
+Three widgets. No build step. Works in ChatGPT, Claude, and any MCP Apps client.
 
-## Features
+This example uses `server.uiResource({ type: "mcpApps", htmlTemplate })` — the **programmatic** path for widgets. You define HTML+JS inline, declare typed props, and the server auto-registers a tool + resource for each widget. Dual-protocol (ChatGPT Apps SDK + MCP Apps Extension) is automatic.
 
-- **🚀 UIResource Method**: Single method to register both tools and resources
-- **🎨 React Widgets**: Interactive UI components built with React
-- **🔄 Automatic Registration**: Tools and resources created automatically
-- **📦 Props to Parameters**: Widget props automatically become tool parameters
-- **🌐 MCP-UI Compatible**: Full compatibility with MCP-UI clients
-- **🛠️ TypeScript Support**: Complete type safety and IntelliSense
+## Widgets
 
-## What's New: UIResource
+| Widget | Props | What it shows |
+|---|---|---|
+| `welcome-card` | none | Static info card — simplest possible widget |
+| `quick-poll` | `question`, `options` | Client-side JS: vote buttons with live tally |
+| `task-card` | `title`, `status`, `priority`, `assignee`, ... | Data-driven card with typed props and conditional rendering |
 
-The `uiResource` method is a powerful new addition that simplifies widget registration:
-
-```typescript
-// Old way: Manual registration of tool and resource
-server.tool({
-  /* tool config */
-});
-server.resource({
-  /* resource config */
-});
-
-// New way: Single method does both!
-server.uiResource({
-  name: "kanban-board",
-  widget: "kanban-board",
-  title: "Kanban Board",
-  props: {
-    initialTasks: { type: "array", required: false },
-    theme: { type: "string", default: "light" },
-  },
-});
-```
-
-This automatically creates:
-
-- **Tool**: `kanban-board` - Accepts parameters and returns UIResource
-- **Resource**: `ui://widget/kanban-board` - Static access with defaults
-
-## Getting Started
-
-### Development
+## Run it
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server with hot reloading
-npm run dev
+npm run dev     # hot reload, Inspector at http://localhost:3000/inspector
+# or
+npm run build && npm run start
 ```
 
-This will start:
-
-- MCP server on port 3000
-- Widget serving at `/mcp-use/widgets/*`
-- Inspector UI at `/inspector`
-
-### Production
-
-```bash
-# Build the server and widgets
-npm run build
-
-# Run the built server
-npm start
-```
-
-## Basic Usage
-
-### Simple Widget Registration
+## Call the widgets
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+await client.callTool('welcome-card', {});
 
-const server = new MCPServer({
-  name: "my-server",
-  version: "1.0.0",
-  description: "Server with UIResource widgets",
+await client.callTool('quick-poll', {
+  question: 'Favorite framework?',
+  options: ['React', 'Vue', 'Svelte'],
 });
 
-// Register a widget - creates both tool and resource
-server.uiResource({
-  name: "my-widget",
-  widget: "my-widget",
-  title: "My Widget",
-  description: "An interactive widget",
+await client.callTool('task-card', {
+  title: 'Ship the release',
+  status: 'in-progress',
+  priority: 'high',
+  assignee: 'Alice',
 });
-
-server.listen(3000);
 ```
 
-### Widget with Props
+## Programmatic vs. React auto-discovery
+
+This example uses the **programmatic** `uiResource` pattern. Use it when:
+
+- The widget is small and doesn't need React components
+- You want zero build overhead
+- You want a single file with everything inline
+
+For full React widgets with auto-discovery, JSX, hot-reload, and Tailwind support, see [`../mcp-apps/`](../mcp-apps/) — it exports widgets via `widget.tsx` files in `resources/` that get built with the mcp-use CLI.
+
+## Anatomy of a widget
 
 ```typescript
 server.uiResource({
-  name: "data-chart",
-  widget: "chart",
-  title: "Data Chart",
-  description: "Interactive data visualization",
+  type: "mcpApps",              // dual-protocol (ChatGPT + MCP Apps)
+  name: "my-widget",            // tool & resource name
+  title: "Human-readable title",
+  description: "What the widget does",
   props: {
-    data: {
-      type: "array",
-      description: "Data points to display",
-      required: true,
-    },
-    chartType: {
-      type: "string",
-      description: "Type of chart (line/bar/pie)",
-      default: "line",
-    },
-    theme: {
-      type: "string",
-      description: "Visual theme",
-      default: "light",
-    },
+    count: { type: "number", required: true, description: "..." },
   },
-  size: ["800px", "400px"], // Preferred iframe size
-  annotations: {
-    audience: ["user", "assistant"],
-    priority: 0.8,
+  htmlTemplate: `<!DOCTYPE html>...`,  // parse props via URLSearchParams
+  metadata: {
+    prefersBorder: true,        // MCP Apps clients will render a border
+    widgetDescription: "...",   // ChatGPT uses this
   },
+  exposeAsTool: true,           // registers a tool with the same name
 });
 ```
 
-## Widget Development
+The widget receives props as a JSON-encoded `?props=...` query parameter. Parse it in your template:
 
-### 1. Create Your Widget Component
-
-```typescript
-// resources/my-widget.tsx
-import React, { useState, useEffect } from "react";
-import { createRoot } from "react-dom/client";
-
-interface MyWidgetProps {
-  initialData?: any;
-  theme?: "light" | "dark";
-}
-
-const MyWidget: React.FC<MyWidgetProps> = ({
-  initialData = [],
-  theme = "light",
-}) => {
-  const [data, setData] = useState(initialData);
-
-  // Load props from URL query parameters
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    const dataParam = params.get("initialData");
-    if (dataParam) {
-      try {
-        setData(JSON.parse(dataParam));
-      } catch (e) {
-        console.error("Error parsing data:", e);
-      }
-    }
-
-    const themeParam = params.get("theme");
-    if (themeParam) {
-      // Apply theme
-    }
-  }, []);
-
-  return <div className={`widget theme-${theme}`}>{/* Your widget UI */}</div>;
-};
-
-// Mount the widget
-const container = document.getElementById("widget-root");
-if (container) {
-  createRoot(container).render(<MyWidget />);
-}
+```html
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const props = JSON.parse(params.get('props') || '{}');
+  // use props.count, props.foo, ...
+</script>
 ```
 
-### 2. Register with UIResource
+## Learn more
 
-```typescript
-// src/server.ts
-server.uiResource({
-  name: "my-widget",
-  widget: "my-widget",
-  title: "My Custom Widget",
-  description: "A custom interactive widget",
-  props: {
-    initialData: {
-      type: "array",
-      description: "Initial data for the widget",
-      required: false,
-    },
-    theme: {
-      type: "string",
-      description: "Widget theme",
-      default: "light",
-    },
-  },
-  size: ["600px", "400px"],
-});
-```
-
-## How It Works
-
-### Tool Registration
-
-When you call `uiResource`, it automatically creates a tool:
-
-- Name: `[widget-name]`
-- Accepts all props as parameters
-- Returns both text description and UIResource object
-
-### Resource Registration
-
-Also creates a resource:
-
-- URI: `ui://widget/[widget-name]`
-- Returns UIResource with default prop values
-- Discoverable by MCP clients
-
-### Parameter Passing
-
-Tool parameters are automatically:
-
-1. Converted to URL query parameters
-2. Complex objects are JSON-stringified
-3. Passed to widget via iframe URL
-
-## Advanced Examples
-
-### Multiple Widgets
-
-```typescript
-const widgets = [
-  {
-    name: "todo-list",
-    widget: "todo-list",
-    title: "Todo List",
-    props: {
-      items: { type: "array", default: [] },
-    },
-  },
-  {
-    name: "calendar",
-    widget: "calendar",
-    title: "Calendar",
-    props: {
-      date: { type: "string", required: false },
-    },
-  },
-];
-
-// Register all widgets
-widgets.forEach((widget) => server.uiResource(widget));
-```
-
-### Mixed Registration
-
-```typescript
-// UIResource for widgets
-server.uiResource({
-  name: "dashboard",
-  widget: "dashboard",
-  title: "Analytics Dashboard",
-});
-
-// Traditional tool for actions
-server.tool({
-  name: "calculate",
-  description: "Perform calculations",
-  cb: async (params) => {
-    /* ... */
-  },
-});
-
-// Traditional resource for data
-server.resource({
-  name: "config",
-  uri: "config://app",
-  mimeType: "application/json",
-  readCallback: async () => {
-    /* ... */
-  },
-});
-```
-
-## API Reference
-
-### `server.uiResource(definition)`
-
-#### Parameters
-
-- `definition: UIResourceDefinition`
-  - `name: string` - Resource identifier
-  - `widget: string` - Widget directory name
-  - `title?: string` - Human-readable title
-  - `description?: string` - Widget description
-  - `props?: WidgetProps` - Widget properties configuration
-  - `size?: [string, string]` - Preferred iframe size
-  - `annotations?: ResourceAnnotations` - Discovery hints
-
-#### WidgetProps
-
-Each prop can have:
-
-- `type: 'string' | 'number' | 'boolean' | 'object' | 'array'`
-- `required?: boolean` - Whether the prop is required
-- `default?: any` - Default value if not provided
-- `description?: string` - Prop description
-
-## Testing Your Widgets
-
-### Via Inspector UI
-
-1. Start the server: `npm run dev`
-2. Open: `http://localhost:3000/inspector`
-3. Test tools and resources
-
-### Direct Browser Access
-
-Visit: `http://localhost:3000/mcp-use/widgets/[widget-name]`
-
-### Via MCP Client
-
-```typescript
-// Call as tool
-const result = await client.callTool('kanban-board', {
-  initialTasks: [...],
-  theme: 'dark'
-})
-
-// Access as resource
-const resource = await client.readResource('ui://widget/kanban-board')
-```
-
-## Benefits of UIResource
-
-✅ **Simplified API** - One method instead of two
-✅ **Automatic Wiring** - Props become tool inputs automatically
-✅ **Type Safety** - Full TypeScript support
-✅ **MCP-UI Compatible** - Works with all MCP-UI clients
-✅ **DRY Principle** - No duplicate UIResource creation
-✅ **Discoverable** - Both tools and resources are listed
-
-## Troubleshooting
-
-### Widget Not Loading
-
-- Ensure widget exists in `dist/resources/mcp-use/widgets/`
-- Check server console for errors
-- Verify widget is registered with `uiResource()`
-
-### Props Not Passed
-
-- Check URL parameters in browser DevTools
-- Ensure prop names match exactly
-- Complex objects must be JSON-stringified
-
-### Type Errors
-
-- Import types: `import type { UIResourceDefinition } from 'mcp-use/server'`
-- Ensure mcp-use is updated to latest version
-
-## Migration from Old Pattern
-
-If you have existing code using separate tool/resource:
-
-```typescript
-// Old pattern
-server.tool({ name: "show-widget" /* ... */ });
-server.resource({ uri: "ui://widget" /* ... */ });
-
-// New pattern - replace both with:
-server.uiResource({
-  name: "widget",
-  widget: "widget",
-  // ... consolidated configuration
-});
-```
-
-## Future Enhancements
-
-Coming soon:
-
-- Automatic widget discovery from filesystem
-- Widget manifests (widget.json)
-- Prop extraction from TypeScript interfaces
-- Build-time optimization
-
-## Learn More
-
-- [mcp-use Documentation](https://github.com/mcp-use/mcp-use)
-- [MCP Documentation](https://modelcontextprotocol.io)
-- [MCP-UI Documentation](https://github.com/idosal/mcp-ui)
-- [React Documentation](https://react.dev/)
-
-Happy widget building! 🚀
+- [MCP Apps docs](https://mcp-use.com/docs/typescript/server/mcp-apps) — full API reference
+- [Creating an MCP App](https://mcp-use.com/docs/typescript/server/creating-mcp-apps-server) — step-by-step guide
+- [Templates](https://github.com/mcp-use/mcp-use#templates) — ready-to-deploy example apps

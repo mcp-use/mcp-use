@@ -160,7 +160,7 @@ export default WeatherDisplay;
 
 Widgets in `resources/` are **auto-discovered** — no manual registration needed.
 
-Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/ui-widgets)
+Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/mcp-apps)
 
 ---
 ### Python

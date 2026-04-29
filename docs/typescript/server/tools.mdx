@@ -214,14 +214,14 @@ server.tool({
   - `message` - Optional text message override
 - The widget must exist in your `resources/` folder as a `.tsx` file or folder
 
-See [UI Widgets](./ui-widgets) for complete widget creation and registration documentation.
+See [UI Widgets](./mcp-apps) for complete widget creation and registration documentation.
 
 ## OpenAI Apps SDK Integration
 
 For ChatGPT and OpenAI compatible clients:
 
 <Tip>
-**Recommended Approach**: The recommended way to expose widgets to a model is to use the [widget helper in a custom tool](./ui-widgets#custom-tools-with-widgets) as shown above. Alternatively, you can set `exposeAsTool: true` in your widget's metadata to [auto-register it as a tool](./ui-widgets#automatic-widget-registration). The manual approach below is shown for reference.
+**Recommended Approach**: The recommended way to expose widgets to a model is to use the [widget helper in a custom tool](./mcp-apps#custom-tools-with-widgets) as shown above. Alternatively, you can set `exposeAsTool: true` in your widget's metadata to [auto-register it as a tool](./mcp-apps#automatic-widget-registration). The manual approach below is shown for reference.
 </Tip>
 
 ```typescript
@@ -464,5 +464,5 @@ Use the built-in inspector for interactive testing:
 
 - [Response Helpers](./response-helpers) - Utility functions for creating responses
 - [Resources Guide](./resources) - Managing static and dynamic content
-- [UI Widgets](./ui-widgets) - Creating interactive UI components
+- [UI Widgets](./mcp-apps) - Creating interactive UI components
 - [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) - Real-world tool implementations

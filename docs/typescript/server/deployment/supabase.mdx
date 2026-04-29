@@ -208,7 +208,7 @@ This creates a new function at `supabase/functions/mcp-server/`.
 
 ### 3. Adapt your MCP Server to use Deno (required for Supabase Edge Functions)
 
-Widgets in the resources folder are automatically registered. Additional widgets can be registered manually. (see [UI Widgets](/typescript/server/ui-widgets))
+Widgets in the resources folder are automatically registered. Additional widgets can be registered manually. (see [UI Widgets](/typescript/server/mcp-apps))
 
 <Note>
 **Complete Example**
@@ -336,7 +336,7 @@ supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-r
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
 
-**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/ui-widgets#apps-sdk-metadata) for examples.
+**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/mcp-apps#apps-sdk-metadata) for examples.
 </Note>
 
 ### 9. Deploy the Function
