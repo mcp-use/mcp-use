@@ -381,9 +381,13 @@ if (container && Component) {
   };
 
   // Create a plugin to ensure Vite watches the resources directory for HMR
-  let warmWidgetEntry:
-    | ((slugifiedName: string, reason: string) => Promise<void>)
-    | undefined;
+  const warmWidgetEntry: {
+    current: (slugifiedName: string, reason: string) => Promise<void>;
+  } = {
+    current: async () => {
+      // No-op until Vite server is fully initialised.
+    },
+  };
   const watchResourcesPlugin = {
     name: "watch-resources",
     configureServer(server: any) {
@@ -865,7 +869,7 @@ if (container && Component) {
 
               // Create temp files and register widget
               await createWidgetTempFiles(widgetName, filePath);
-              await warmWidgetEntry?.(widgetName, "watch-add-file");
+              await warmWidgetEntry.current(widgetName, "watch-add-file");
               await extractAndRegisterWidget(widgetName, filePath);
 
               console.log(`[WIDGETS] New widget added: ${widgetName}`);
@@ -907,7 +911,7 @@ if (container && Component) {
 
                 // Create temp files and register widget
                 await createWidgetTempFiles(widgetName, filePath);
-                await warmWidgetEntry?.(widgetName, "watch-add-folder");
+                await warmWidgetEntry.current(widgetName, "watch-add-folder");
                 await extractAndRegisterWidget(widgetName, filePath);
 
                 console.log(`[WIDGETS] New widget added: ${widgetName}`);
@@ -1256,7 +1260,7 @@ export default PostHog;
   // and can fetch optimized deps with a stale hash, manifesting as 504s on
   // `/.vite/deps/*` requests on first widget render.
   const warmedWidgetEntries = new Set<string>();
-  warmWidgetEntry = async (widgetName: string, _reason: string) => {
+  warmWidgetEntry.current = async (widgetName: string, _reason: string) => {
     const slugifiedName = slugifyWidgetName(widgetName);
     const entryUrl = `/${slugifiedName}/entry.tsx`;
     if (warmedWidgetEntries.has(entryUrl)) return;
@@ -1487,7 +1491,7 @@ export default PostHog;
 
     // Use the extracted helper to register the widget
     const slugifiedName = slugifyWidgetName(widget.name);
-    await warmWidgetEntry?.(widget.name, "initial-registration");
+    await warmWidgetEntry.current(widget.name, "initial-registration");
     await registerWidgetFromTemplate(
       widget.name,
       pathHelpers.join(tempDir, slugifiedName, "index.html"),
