@@ -13,6 +13,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
+import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createServersCommand } from "./commands/servers.js";
@@ -3071,6 +3072,10 @@ program.addCommand(createServersCommand());
 
 // Skills command
 program.addCommand(createSkillsCommand());
+
+// Screenshot command — pass the path to this CLI bin so auto-spawned dev
+// servers can re-invoke the same binary (works in both dev/tsx + bundled cjs).
+program.addCommand(createScreenshotCommand(process.argv[1] ?? __filename));
 
 // Generate types command
 program

@@ -3,6 +3,7 @@ import { InspectorDashboard } from "@/client/components/InspectorDashboard";
 import { Layout } from "@/client/components/Layout";
 import { OAuthCallback } from "@/client/components/OAuthCallback";
 import { SamplingRequestToast } from "@/client/components/sampling/SamplingRequestToast";
+import { ViewPreview } from "@/client/components/ViewPreview";
 import { Toaster } from "@/client/components/ui/sonner";
 import {
   LocalStorageProvider,
@@ -209,6 +210,7 @@ function App() {
             <Router basename="/inspector">
               <Routes>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
+                <Route path="/preview/:view" element={<ViewPreview />} />
                 <Route
                   path="/"
                   element={
