@@ -381,6 +381,9 @@ if (container && Component) {
   };
 
   // Create a plugin to ensure Vite watches the resources directory for HMR
+  let warmWidgetEntry:
+    | ((slugifiedName: string, reason: string) => Promise<void>)
+    | undefined;
   const watchResourcesPlugin = {
     name: "watch-resources",
     configureServer(server: any) {
@@ -862,6 +865,7 @@ if (container && Component) {
 
               // Create temp files and register widget
               await createWidgetTempFiles(widgetName, filePath);
+              await warmWidgetEntry?.(widgetName, "watch-add-file");
               await extractAndRegisterWidget(widgetName, filePath);
 
               console.log(`[WIDGETS] New widget added: ${widgetName}`);
@@ -903,6 +907,7 @@ if (container && Component) {
 
                 // Create temp files and register widget
                 await createWidgetTempFiles(widgetName, filePath);
+                await warmWidgetEntry?.(widgetName, "watch-add-folder");
                 await extractAndRegisterWidget(widgetName, filePath);
 
                 console.log(`[WIDGETS] New widget added: ${widgetName}`);
@@ -1246,6 +1251,31 @@ export default PostHog;
     },
   });
 
+  // Pre-bundle a widget's dependencies via Vite's optimizer before the inspector
+  // requests its assets. Without this, the browser races against `depsOptimizer`
+  // and can fetch optimized deps with a stale hash, manifesting as 504s on
+  // `/.vite/deps/*` requests on first widget render.
+  const warmedWidgetEntries = new Set<string>();
+  warmWidgetEntry = async (widgetName: string, _reason: string) => {
+    const slugifiedName = slugifyWidgetName(widgetName);
+    const entryUrl = `/${slugifiedName}/entry.tsx`;
+    if (warmedWidgetEntries.has(entryUrl)) return;
+
+    try {
+      if (typeof viteServer.warmupRequest === "function") {
+        await viteServer.warmupRequest(entryUrl);
+      } else {
+        await viteServer.transformRequest(entryUrl);
+      }
+      if (typeof viteServer.waitForRequestsIdle === "function") {
+        await viteServer.waitForRequestsIdle(entryUrl);
+      }
+      warmedWidgetEntries.add(entryUrl);
+    } catch (error) {
+      console.warn(`[WIDGETS] Failed to warm widget entry ${entryUrl}:`, error);
+    }
+  };
+
   // Set up WebSocket proxy for Vite HMR through the main HTTP server.
   // In middleware mode, Vite creates its own WebSocket on a random port (e.g., 24678).
   // Reverse proxies (ngrok, E2B) only forward traffic on the main port.
@@ -1457,6 +1487,7 @@ export default PostHog;
 
     // Use the extracted helper to register the widget
     const slugifiedName = slugifyWidgetName(widget.name);
+    await warmWidgetEntry?.(widget.name, "initial-registration");
     await registerWidgetFromTemplate(
       widget.name,
       pathHelpers.join(tempDir, slugifiedName, "index.html"),
