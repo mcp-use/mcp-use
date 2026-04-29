@@ -1,0 +1,22 @@
+{
+  "name": "lore-context-server-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Example MCP server that wraps the Lore Context REST API for persistent agent memory (search, write, get)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@mcp-use/cli": "workspace:*",
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
