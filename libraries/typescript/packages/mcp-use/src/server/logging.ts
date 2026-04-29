@@ -185,30 +185,58 @@ export function detectOutcome(
     return { kind: "http", status: statusCode };
   }
   if (!responseText) return { kind: "ok" };
-  let body: any;
-  try {
-    body = JSON.parse(responseText);
-  } catch {
-    return { kind: "ok" };
-  }
-  // JSON-RPC batch responses come back as arrays; the first error wins for display.
-  const items = Array.isArray(body) ? body : [body];
-  for (const item of items) {
+  // First error wins for display across batch/SSE responses.
+  for (const item of parseJsonRpcPayloads(responseText)) {
     if (!item || typeof item !== "object") continue;
-    if (item.error && typeof item.error === "object") {
+    const env = item as { error?: any; result?: any };
+    if (env.error && typeof env.error === "object") {
       return {
         kind: "rpc-error",
-        code: typeof item.error.code === "number" ? item.error.code : null,
-        message: truncateMessage(String(item.error.message ?? "unknown error")),
+        code: typeof env.error.code === "number" ? env.error.code : null,
+        message: truncateMessage(String(env.error.message ?? "unknown error")),
       };
     }
-    const result = item.result;
+    const result = env.result;
     if (result && typeof result === "object" && result.isError === true) {
       const msg = extractToolErrorMessage(result) ?? "tool reported error";
       return { kind: "rpc-error", code: null, message: truncateMessage(msg) };
     }
   }
   return { kind: "ok" };
+}
+
+/**
+ * Parse a POST /mcp response body into JSON-RPC envelopes. Handles three shapes:
+ * - Plain JSON object (`{...}`) — when the client sent `Accept: application/json`.
+ * - JSON-RPC batch array (`[{...}, ...]`).
+ * - SSE event stream (`event: message\ndata: {...}\n\n`) — the default when
+ *   clients accept `text/event-stream`, which official MCP clients do.
+ *
+ * Returns an empty array when nothing parseable is found; callers should fall
+ * through to `ok` in that case.
+ */
+function parseJsonRpcPayloads(text: string): unknown[] {
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(text);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch {
+      return [];
+    }
+  }
+  const out: unknown[] = [];
+  for (const line of text.split(/\r?\n/)) {
+    if (!line.startsWith("data:")) continue;
+    const payload = line.slice(5).trimStart();
+    if (!payload) continue;
+    try {
+      out.push(JSON.parse(payload));
+    } catch {
+      // Ignore malformed data lines — partial frames or non-JSON keepalives.
+    }
+  }
+  return out;
 }
 
 function extractToolErrorMessage(result: any): string | null {

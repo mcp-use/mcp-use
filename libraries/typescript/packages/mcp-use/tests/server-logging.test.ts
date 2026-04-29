@@ -242,6 +242,63 @@ describe("detectOutcome", () => {
     });
   });
 
+  it("detects ok in an SSE-wrapped response", () => {
+    const sse =
+      "event: message\n" +
+      `data: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { ok: true } })}\n\n`;
+    expect(detectOutcome(200, sse)).toEqual<Outcome>({ kind: "ok" });
+  });
+
+  it("detects rpc-error in an SSE-wrapped response", () => {
+    const sse =
+      "event: message\n" +
+      `data: ${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32603, message: "boom" },
+      })}\n\n`;
+    expect(detectOutcome(200, sse)).toEqual<Outcome>({
+      kind: "rpc-error",
+      code: -32603,
+      message: "boom",
+    });
+  });
+
+  it("detects tool-level isError in an SSE-wrapped response", () => {
+    const sse =
+      "event: message\n" +
+      `data: ${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          isError: true,
+          content: [{ type: "text", text: "cannot divide by zero" }],
+        },
+      })}\n\n`;
+    expect(detectOutcome(200, sse)).toEqual<Outcome>({
+      kind: "rpc-error",
+      code: null,
+      message: "cannot divide by zero",
+    });
+  });
+
+  it("scans multiple SSE events and surfaces the first error", () => {
+    const sse =
+      "event: message\n" +
+      `data: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { ok: true } })}\n\n` +
+      "event: message\n" +
+      `data: ${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 2,
+        error: { code: -32000, message: "later failure" },
+      })}\n\n`;
+    expect(detectOutcome(200, sse)).toEqual<Outcome>({
+      kind: "rpc-error",
+      code: -32000,
+      message: "later failure",
+    });
+  });
+
   it("truncates very long error messages", () => {
     const longMsg = "a".repeat(500);
     const outcome = detectOutcome(
