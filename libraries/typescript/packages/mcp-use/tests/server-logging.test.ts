@@ -1,12 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Hono } from "hono";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   detectOutcome,
   extractTarget,
   getLogLevel,
   renderArgs,
+  requestLogger,
   type Outcome,
 } from "../src/server/logging.js";
+
+const ANSI_PATTERN = /\x1B\[[0-9;]*m/g;
+const stripAnsi = (s: string) => s.replace(ANSI_PATTERN, "");
 
 describe("extractTarget", () => {
   it("returns client name/version for initialize", () => {
@@ -383,5 +388,334 @@ describe("getLogLevel", () => {
 
     process.env.MCP_LOG_LEVEL = "debug";
     expect(getLogLevel()).toBe("debug");
+  });
+});
+
+describe("requestLogger middleware", () => {
+  const ENV_KEYS = ["MCP_LOG_LEVEL", "DEBUG"];
+  const saved: Record<string, string | undefined> = {};
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    for (const k of ENV_KEYS) saved[k] = process.env[k];
+    for (const k of ENV_KEYS) delete process.env[k];
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    for (const k of ENV_KEYS) {
+      if (saved[k] === undefined) delete process.env[k];
+      else process.env[k] = saved[k];
+    }
+  });
+
+  function loggedLines(): string[] {
+    return logSpy.mock.calls.map((args) =>
+      args.map((a) => (typeof a === "string" ? a : String(a))).join(" ")
+    );
+  }
+
+  function firstPlainLine(): string {
+    const lines = loggedLines();
+    expect(lines.length).toBeGreaterThan(0);
+    return stripAnsi(lines[0]!);
+  }
+
+  function buildApp(handler: () => Response | Promise<Response>): Hono {
+    const app = new Hono();
+    app.use(requestLogger);
+    app.all("*", () => handler());
+    return app;
+  }
+
+  function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+    return new Response(JSON.stringify(body), {
+      status: 200,
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...((init.headers as Record<string, string> | undefined) ?? {}),
+      },
+    });
+  }
+
+  function postMcp(
+    app: Hono,
+    body: unknown,
+    headers: Record<string, string> = {}
+  ): Promise<Response> {
+    return app.request("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("uses → session= suffix on initialize, with target and OK outcome", async () => {
+    const sessionId = "session-abcdef-1234-uuid";
+    const app = buildApp(() =>
+      jsonResponse(
+        { jsonrpc: "2.0", id: 1, result: {} },
+        { headers: { "mcp-session-id": sessionId } }
+      )
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { clientInfo: { name: "Claude", version: "0.8.3" } },
+    });
+
+    const line = firstPlainLine();
+    expect(line).toContain("[initialize: Claude/0.8.3]");
+    expect(line).toContain(`→ session=${sessionId.slice(0, 7)}`);
+    expect(line).not.toMatch(/sess=/);
+    expect(line).toContain("OK");
+    expect(line).toMatch(/\(\d+ms\)/);
+  });
+
+  it("uses sess= prefix for established-session requests and renders the target", async () => {
+    const sessionId = "abcdef1-rest";
+    const app = buildApp(() =>
+      jsonResponse({ jsonrpc: "2.0", id: 2, result: { ok: true } })
+    );
+    await postMcp(
+      app,
+      {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: { name: "greet", arguments: { name: "Alice" } },
+      },
+      { "mcp-session-id": sessionId }
+    );
+
+    const line = firstPlainLine();
+    expect(line).toContain(`sess=${sessionId.slice(0, 7)}`);
+    expect(line).toContain("[tools/call: greet]");
+    expect(line).toContain("OK");
+    // info default — args are hidden
+    expect(line).not.toContain("args=");
+    // suffix only on initialize
+    expect(line).not.toContain("→ session=");
+  });
+
+  it("renders ERROR <code> <message> for JSON-RPC errors", async () => {
+    const app = buildApp(() =>
+      jsonResponse({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32603, message: "Invalid API key" },
+      })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "fetch_url", arguments: { url: "https://x" } },
+    });
+
+    const line = firstPlainLine();
+    expect(line).toContain("[tools/call: fetch_url]");
+    expect(line).toContain("ERROR -32603 Invalid API key");
+  });
+
+  it("detects tool-level isError responses with extracted message", async () => {
+    const app = buildApp(() =>
+      jsonResponse({
+        jsonrpc: "2.0",
+        id: 1,
+        result: {
+          isError: true,
+          content: [{ type: "text", text: "cannot divide by zero" }],
+        },
+      })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "divide", arguments: { a: 1, b: 0 } },
+    });
+
+    const line = firstPlainLine();
+    expect(line).toContain("[tools/call: divide]");
+    expect(line).toContain("ERROR cannot divide by zero");
+  });
+
+  it("detects rpc-error in SSE-wrapped responses", async () => {
+    const sse =
+      "event: message\n" +
+      `data: ${JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        error: { code: -32000, message: "boom" },
+      })}\n\n`;
+    const app = buildApp(
+      () =>
+        new Response(sse, {
+          status: 200,
+          headers: { "content-type": "text/event-stream" },
+        })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "x" },
+    });
+
+    const line = firstPlainLine();
+    expect(line).toContain("ERROR -32000 boom");
+  });
+
+  it("renders HTTP <status> for non-2xx /mcp responses", async () => {
+    const app = buildApp(
+      () => new Response("Bad Request", { status: 400 })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "x" },
+    });
+
+    const line = firstPlainLine();
+    expect(line).toContain("[tools/call: x]");
+    expect(line).toContain("HTTP 400");
+  });
+
+  it("includes inline args= at MCP_LOG_LEVEL=debug", async () => {
+    process.env.MCP_LOG_LEVEL = "debug";
+    const app = buildApp(() =>
+      jsonResponse({ jsonrpc: "2.0", id: 1, result: { ok: true } })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "greet", arguments: { name: "Alice", formal: true } },
+    });
+
+    const line = firstPlainLine();
+    expect(line).toContain('args={"name":"Alice","formal":true}');
+  });
+
+  it("spills args to a second indented line when the line exceeds 160 chars", async () => {
+    process.env.MCP_LOG_LEVEL = "debug";
+    const longUrl = "https://example.com/" + "a".repeat(200);
+    const app = buildApp(() =>
+      jsonResponse({ jsonrpc: "2.0", id: 1, result: { ok: true } })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "fetch", arguments: { url: longUrl } },
+    });
+
+    const line = stripAnsi(loggedLines()[0]!);
+    expect(line).toContain("\n    args=");
+    expect(line).toContain(longUrl);
+  });
+
+  it("prints the trace dump at MCP_LOG_LEVEL=trace", async () => {
+    process.env.MCP_LOG_LEVEL = "trace";
+    const app = buildApp(() =>
+      jsonResponse({ jsonrpc: "2.0", id: 1, result: { tools: [] } })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+    });
+
+    const all = loggedLines().map(stripAnsi).join("\n");
+    expect(all).toContain("[TRACE] Request Details");
+    expect(all).toContain("Request Headers:");
+    expect(all).toContain("Request Body:");
+    expect(all).toContain("Response Body:");
+    expect(all).toContain("=".repeat(80));
+  });
+
+  it("falls back to trace when DEBUG is truthy and MCP_LOG_LEVEL is unset", async () => {
+    process.env.DEBUG = "1";
+    const app = buildApp(() =>
+      jsonResponse({ jsonrpc: "2.0", id: 1, result: { ok: true } })
+    );
+    await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/list",
+    });
+
+    const all = loggedLines().map(stripAnsi).join("\n");
+    expect(all).toContain("[TRACE] Request Details");
+  });
+
+  it("renders a generic line for non-MCP routes", async () => {
+    const app = buildApp(
+      () =>
+        new Response("ok", {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        })
+    );
+    await app.request("/health", { method: "GET" });
+
+    const line = firstPlainLine();
+    expect(line).toMatch(/^\[\d{2}:\d{2}:\d{2}\.\d{3}\] GET \/health 200 \(\d+ms\)$/);
+  });
+
+  it("skips logging for GET /mcp", async () => {
+    const app = buildApp(() => new Response("", { status: 200 }));
+    const res = await app.request("/mcp", { method: "GET" });
+    expect(res.status).toBe(200);
+    expect(logSpy.mock.calls).toHaveLength(0);
+  });
+
+  it("skips logging for inspector telemetry endpoints", async () => {
+    const app = buildApp(() => new Response("", { status: 200 }));
+    await app.request("/inspector/api/tel/posthog", { method: "POST" });
+    expect(logSpy.mock.calls).toHaveLength(0);
+  });
+
+  it("does not consume the request body — handler still sees it", async () => {
+    const captured: { body?: unknown } = {};
+    const app = new Hono();
+    app.use(requestLogger);
+    app.post("/mcp", async (c) => {
+      captured.body = await c.req.json();
+      return jsonResponse({ jsonrpc: "2.0", id: 1, result: { ok: true } });
+    });
+
+    const requestBody = {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "x", arguments: { a: 1 } },
+    };
+    await postMcp(app, requestBody);
+
+    expect(captured.body).toEqual(requestBody);
+    expect(firstPlainLine()).toContain("[tools/call: x]");
+  });
+
+  it("does not consume the response body — caller still reads it", async () => {
+    const responsePayload = {
+      jsonrpc: "2.0",
+      id: 1,
+      result: { greeting: "hello" },
+    };
+    const app = buildApp(() => jsonResponse(responsePayload));
+    const res = await postMcp(app, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "tools/call",
+      params: { name: "greet" },
+    });
+
+    await expect(res.json()).resolves.toEqual(responsePayload);
   });
 });
