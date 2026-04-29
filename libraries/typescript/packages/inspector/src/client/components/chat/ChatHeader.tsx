@@ -25,10 +25,12 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: "openai" | "anthropic" | "google" | "openrouter";
   tempModel: string;
   tempApiKey: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  onProviderChange: (
+    provider: "openai" | "anthropic" | "google" | "openrouter"
+  ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
   onSaveConfig: () => void;
@@ -96,7 +98,11 @@ export function ChatHeader({
                 onClick={() => onConfigDialogOpenChange(true)}
               >
                 <img
-                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                  src={
+                    llmConfig.provider === "openrouter"
+                      ? "https://openrouter.ai/favicon.ico"
+                      : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                  }
                   alt={llmConfig.provider}
                   className="w-4 h-4 mr-0"
                 />
@@ -123,7 +129,11 @@ export function ChatHeader({
                 onClick={() => onConfigDialogOpenChange(true)}
               >
                 <img
-                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                  src={
+                    llmConfig.provider === "openrouter"
+                      ? "https://openrouter.ai/favicon.ico"
+                      : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                  }
                   alt={llmConfig.provider}
                   className="w-4 h-4"
                 />

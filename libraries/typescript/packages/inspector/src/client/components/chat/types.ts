@@ -32,7 +32,7 @@ export interface Message {
 }
 
 export interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "anthropic" | "google" | "openrouter";
   apiKey: string;
   model: string;
   temperature?: number;
@@ -72,4 +72,5 @@ export const DEFAULT_MODELS = {
   openai: "gpt-4o",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
+  openrouter: "openai/gpt-4o-mini",
 };

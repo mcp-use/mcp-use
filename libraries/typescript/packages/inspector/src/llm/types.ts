@@ -8,7 +8,7 @@
  * langchain to bundle their apps.
  */
 
-export type ProviderName = "openai" | "anthropic" | "google";
+export type ProviderName = "openai" | "anthropic" | "google" | "openrouter";
 
 export interface ProviderConfig {
   provider: ProviderName;

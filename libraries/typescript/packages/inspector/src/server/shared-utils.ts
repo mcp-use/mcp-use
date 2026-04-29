@@ -8,7 +8,7 @@ import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
 import type { ProviderMessage, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "anthropic" | "google" | "openrouter";
   model: string;
   apiKey: string;
   temperature?: number;

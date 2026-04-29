@@ -97,10 +97,12 @@ function getCachedModels(provider: string): ModelOption[] | null {
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: "openai" | "anthropic" | "google" | "openrouter";
   tempModel: string;
   tempApiKey: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  onProviderChange: (
+    provider: "openai" | "anthropic" | "google" | "openrouter"
+  ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
   onSave: () => void;
@@ -174,6 +176,25 @@ async function fetchGoogleModels(apiKey: string): Promise<ModelOption[]> {
   );
 }
 
+async function fetchOpenRouterModels(apiKey: string): Promise<ModelOption[]> {
+  const response = await fetch("https://openrouter.ai/api/v1/models", {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch OpenRouter models: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return data.data.map((model: { id: string; name?: string }) => ({
+    id: model.id,
+    displayName: model.name,
+  }));
+}
+
+
 export function ConfigurationDialog({
   open,
   onOpenChange,
@@ -224,6 +245,8 @@ export function ConfigurationDialog({
           fetchedModels = await fetchAnthropicModels(tempApiKey);
         } else if (tempProvider === "google") {
           fetchedModels = await fetchGoogleModels(tempApiKey);
+        } else if (tempProvider === "openrouter") {
+          fetchedModels = await fetchOpenRouterModels(tempApiKey);
         }
 
         // Cache the fetched models
@@ -254,6 +277,9 @@ export function ConfigurationDialog({
   }, [tempProvider, open, onModelChange]);
 
   const getProviderIcon = (provider: string) => {
+    if (provider === "openrouter") {
+      return "https://openrouter.ai/favicon.ico";
+    }
     return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
   };
 
@@ -331,6 +357,16 @@ export function ConfigurationDialog({
                       className="w-4 h-4"
                     />
                     <span>Google</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="openrouter">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={getProviderIcon("openrouter")}
+                      alt="OpenRouter"
+                      className="w-4 h-4"
+                    />
+                    <span>OpenRouter</span>
                   </div>
                 </SelectItem>
               </SelectContent>
