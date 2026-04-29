@@ -119,6 +119,22 @@ export async function waitForWidgetTools(
 }
 
 /**
+ * Navigate to the Prompts tab for the connected server
+ */
+export async function navigateToPrompts(page: Page) {
+  const { serverUrl } = getTestMatrix();
+  await page.getByTestId(`server-tile-${serverUrl}`).click();
+  await page
+    .getByRole("tab", { name: /Prompts/ })
+    .first()
+    .click();
+  await expect(page.getByRole("heading", { name: "Prompts" })).toBeVisible();
+  await expect(
+    page.getByTestId("prompt-item-test_prompt_with_arguments")
+  ).toBeVisible();
+}
+
+/**
  * Navigate to the Tools tab for the connected server
  */
 export async function navigateToTools(page: Page) {
