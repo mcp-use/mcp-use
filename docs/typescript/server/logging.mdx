@@ -6,54 +6,6 @@ icon: "scroll-text"
 
 mcp-use provides comprehensive logging for MCP servers, making it easy to understand server activity, debug issues, and monitor production deployments.
 
-## Log Levels
-
-The server provides different logging levels through environment variables:
-
-### Production Mode (Default)
-
-Clean, informative logs showing MCP operations:
-
-```bash
-node server.js
-```
-
-**Output:**
-
-```
-[MCP] Server mounted at /mcp (Streamable HTTP Transport)
-[MCP] Session initialized: abc123
-[MCP] tools/call:analyze-sentiment completed in 234ms
-[MCP] Session closed: abc123
-```
-
-### Debug Mode
-
-Enable debug mode for development and troubleshooting:
-
-```bash
-DEBUG=1 node server.js
-```
-
-**Output:**
-
-```
-[MCP] Server initialized: my-server v1.0.0
-[MCP] Registered tool: analyze-sentiment
-[MCP] Registered resource: config://app-settings
-[MCP] Session initialized: abc123
-[MCP] tools/call:analyze-sentiment started
-[MCP] tools/call:analyze-sentiment completed in 234ms
-```
-
-### Verbose Debug Mode
-
-Raise the [built-in `Logger`](#built-in-logging-system) to `debug` for detailed lifecycle messages:
-
-```bash
-DEBUG=2 node server.js
-```
-
 ## Per-Request Log Verbosity
 
 `MCP_LOG_LEVEL` controls how much detail the `POST /mcp` request log line includes:
