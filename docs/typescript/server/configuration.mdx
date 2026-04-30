@@ -76,7 +76,7 @@ The server reads the following environment variables at runtime:
 | `HOST` | Bind hostname | `localhost` |
 | `MCP_URL` | Full public base URL (for widget/asset URLs) | `http://{HOST}:{PORT}` |
 | `NODE_ENV` | `production` disables dev features (inspector, type generation) | — |
-| `DEBUG` | Enables verbose debug logging | — |
+| `MCP_DEBUG_LEVEL` | Request log verbosity: `info`, `debug`, or `trace` | `info` |
 | `CSP_URLS` | Comma-separated extra URLs added to widget CSP `resource_domains` | — |
 
 **OAuth providers** also read zero-config env vars — see the OAuth docs for the full list.
