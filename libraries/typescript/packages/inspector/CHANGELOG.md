@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [bdf9182]
+- Updated dependencies [bdf9182]
+  - mcp-use@1.26.0
+
 ## 4.0.0-canary.1
 
 ### Patch Changes

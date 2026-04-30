@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 3.1.2
+
+### Patch Changes
+
+- Updated dependencies [bdf9182]
+- Updated dependencies [bdf9182]
+  - mcp-use@1.26.0
+  - @mcp-use/inspector@4.0.0
+
 ## 3.1.2-canary.1
 
 ### Patch Changes
