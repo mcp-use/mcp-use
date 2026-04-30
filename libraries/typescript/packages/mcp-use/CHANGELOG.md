@@ -1,5 +1,29 @@
 # mcp-use
 
+## 1.26.0
+
+### Minor Changes
+
+- bdf9182: feat(server): add `MCP_DEBUG_LEVEL` env var with `info` / `debug` / `trace` levels for HTTP request logs
+
+  Replaces the previous all-or-nothing `DEBUG=1` behavior with three explicit verbosity levels:
+  - `info` (default): one compact line per request, e.g.
+    `[19:44:56] POST /mcp [tools/call: greet] OK (1ms)`. Initialize lines now include the client `name/version` and the new short session id (`→ session=92c4e0b`); subsequent requests are prefixed with `sess=<short>`. JSON-RPC and tool errors are extracted from the response body and shown inline (`ERROR cannot divide by zero`).
+  - `debug`: same as `info` plus inline `args=<json>` for `tools/call`.
+  - `trace`: identical to the legacy `DEBUG=1` output (full request/response headers and bodies).
+
+  `DEBUG=1` (or any truthy `DEBUG` value) continues to work and maps to `trace`. Internal "Session initialized"/"Session closed" log lines are now suppressed at `info` level, since the per-request log line already conveys that information.
+
+### Patch Changes
+
+- bdf9182: fix(widgets): pre-warm widget Vite entries before registration to prevent first-render `/.vite/deps/*` 504s
+
+  When a widget is registered (initial boot, watcher add-file, or watcher add-folder), `mount-widgets-dev` now calls `viteServer.warmupRequest()` followed by `viteServer.waitForRequestsIdle()` for the widget's `entry.tsx` before exposing it to the inspector. This forces Vite's `depsOptimizer` to finish pre-bundling and stabilise its dependency hash before the browser starts requesting `/.vite/deps/*` modules.
+
+  Previously, the inspector iframe could fetch optimized dependencies (e.g. `mcp-use_react.js`) with a stale Vite hash while `depsOptimizer` was still re-bundling, which surfaced as `504 Gateway Timeout` errors and a blank widget on first interaction in Vibe-created sandboxes. Each widget is warmed at most once per dev-server lifetime; failures fall back to a warning so registration never blocks.
+  - @mcp-use/cli@3.1.2
+  - @mcp-use/inspector@4.0.0
+
 ## 1.26.0-canary.1
 
 ### Minor Changes
