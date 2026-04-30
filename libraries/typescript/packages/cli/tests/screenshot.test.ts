@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   encodePropsParam,
   extractViewName,
-  hashInputs,
   parseDimension,
   parseHeaders,
+  timestampSuffix,
 } from "../src/commands/screenshot.js";
 
 describe("parseHeaders", () => {
@@ -40,26 +40,20 @@ describe("parseHeaders", () => {
   });
 });
 
-describe("hashInputs", () => {
-  it("returns a 6-char hex string", () => {
-    const h = hashInputs({}, "light");
-    expect(h).toMatch(/^[0-9a-f]{6}$/);
+describe("timestampSuffix", () => {
+  it("returns a 15-char YYYYMMDDTHHmmss string", () => {
+    const ts = timestampSuffix();
+    expect(ts).toMatch(/^\d{8}T\d{6}$/);
   });
 
-  it("is deterministic for the same inputs", () => {
-    const props = { toolInput: { a: 1 }, toolOutput: { b: [1, 2] } };
-    expect(hashInputs(props, "light")).toBe(hashInputs(props, "light"));
+  it("formats a known date correctly", () => {
+    const d = new Date(2024, 0, 15, 10, 30, 5); // 2024-01-15 10:30:05
+    expect(timestampSuffix(d)).toBe("20240115T103005");
   });
 
-  it("changes when theme changes", () => {
-    const props = { toolInput: { a: 1 } };
-    expect(hashInputs(props, "light")).not.toBe(hashInputs(props, "dark"));
-  });
-
-  it("changes when toolOutput changes", () => {
-    const a = { toolOutput: { x: 1 } };
-    const b = { toolOutput: { x: 2 } };
-    expect(hashInputs(a, "light")).not.toBe(hashInputs(b, "light"));
+  it("pads single-digit months, days, hours, minutes, seconds", () => {
+    const d = new Date(2024, 0, 1, 0, 0, 0);
+    expect(timestampSuffix(d)).toBe("20240101T000000");
   });
 });
 

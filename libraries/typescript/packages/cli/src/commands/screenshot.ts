@@ -2,7 +2,6 @@ import chalk from "chalk";
 import { Command } from "commander";
 import { MCPClient } from "mcp-use/client";
 import { spawn, type ChildProcess } from "node:child_process";
-import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -179,15 +178,14 @@ export function parseHeaders(
 }
 
 /**
- * Stable 6-char hash of the rendering inputs that affect the pixels.
+ * Returns a filesystem-safe timestamp string: YYYYMMDDTHHmmss
  */
-export function hashInputs(props: ResolvedProps, theme: string): string {
-  const stable = JSON.stringify({
-    toolInput: props.toolInput ?? null,
-    toolOutput: props.toolOutput ?? null,
-    theme,
-  });
-  return createHash("sha256").update(stable).digest("hex").slice(0, 6);
+export function timestampSuffix(date = new Date()): string {
+  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
+  return (
+    `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
+    `T${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
+  );
 }
 
 export function encodePropsParam(props: ResolvedProps): string {
@@ -372,8 +370,8 @@ export async function screenshotCommand(
     previewUrl.searchParams.set("theme", options.theme);
     previewUrl.searchParams.set("server", mcpUrl);
 
-    const hash = hashInputs(resolved, options.theme);
-    const outPath = path.resolve(options.output ?? `./${viewName}-${hash}.png`);
+    const ts = timestampSuffix();
+    const outPath = path.resolve(options.output ?? `./${viewName}-${ts}.png`);
     await mkdir(path.dirname(outPath), { recursive: true });
 
     const browser = await playwright.chromium.launch();
@@ -434,7 +432,7 @@ export function createScreenshotCommand(cliBin: string): Command {
     )
     .option(
       "--output <path>",
-      "Output PNG path. Defaults to ./<view>-<hash>.png in cwd."
+      "Output PNG path. Defaults to ./<view>-<timestamp>.png in cwd."
     )
     .option(
       "--header <K:V...>",
