@@ -6,6 +6,18 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.25.2" description="April 2026">
+  ## Debug log tiers & widget dev first render
+  Patch release adding tiered `MCP_DEBUG_LEVEL` logging for MCP servers, pre-warming Vite widget entries in dev to avoid first-render 504s, and Inspector 3.0.2 (see inspector changelog).
+
+- **New**: `MCP_DEBUG_LEVEL` environment variable on MCP servers — `info` (default), `debug`, or `trace` — tiered framework logging with clearer precedence than legacy truthy `DEBUG` (`#1430`)
+- **Fix**: Widget dev server pre-warms Vite entries before tool registration so the first widget render does not time out with HTTP 504 (`#1425`)
+- **Fix** (@mcp-use/inspector): Command palette e2e tests updated for the Settings dropdown trigger (`#1428`) (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v3.0.2
+- **Update**: Updated @mcp-use/cli to v3.1.2
+- **Update**: Updated create-mcp-use-app to v0.14.10
+</Update>
+
 <Update label="v1.25.1" description="April 2026">
   ## OAuth error handling, Supabase endpoints & CLI bundling
   Patch release fixing OAuth error redirects, Supabase OAuth 2.1 endpoints, CLI bundling for Node ESM, bun build compatibility, `create-mcp-use-app` dot-directory init, and Inspector 3.0.1 (see inspector changelog).
