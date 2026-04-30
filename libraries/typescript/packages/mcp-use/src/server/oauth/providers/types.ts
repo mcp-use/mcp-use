@@ -170,6 +170,18 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
 }
 
 /**
+ * Clerk OAuth provider configuration
+ */
+export interface ClerkOAuthConfig extends BaseOAuthConfig {
+  provider: "clerk";
+  /** Clerk Frontend API URL (e.g. https://verb-noun-##.clerk.accounts.dev or https://clerk.yourdomain.com) */
+  frontendApiUrl: string;
+  /** Optional audience for JWT verification */
+  audience?: string;
+  verifyJwt?: boolean;
+}
+
+/**
  * Better Auth OAuth provider configuration
  */
 export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
@@ -205,6 +217,7 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
 export type OAuthConfig =
   | SupabaseOAuthConfig
   | Auth0OAuthConfig
+  | ClerkOAuthConfig
   | KeycloakOAuthConfig
   | WorkOSOAuthConfig
   | BetterAuthOAuthConfig
