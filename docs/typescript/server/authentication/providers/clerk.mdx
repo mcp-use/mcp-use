@@ -1,0 +1,155 @@
+---
+title: "Clerk Provider"
+description: "Configure Clerk OAuth 2.0 authentication for your MCP server"
+icon: "/images/icons/clerk.svg"
+---
+
+Clerk uses Dynamic Client Registration (DCR). MCP clients discover Clerk's OAuth endpoints via `.well-known` passthrough and register themselves directly with Clerk. Your server only verifies the resulting tokens — it never handles authorization or token exchange directly.
+
+## Setup
+
+### 1. Create a Clerk application
+
+Sign up at the [Clerk Dashboard](https://dashboard.clerk.com/) and create a new application.
+
+### 2. Enable Dynamic Client Registration
+
+In the Clerk Dashboard, go to **Configure → OAuth Applications** and enable **Dynamic Client Registration**.
+
+### 3. Find your Frontend API URL
+
+In the Clerk Dashboard, go to **API Keys**. Your Frontend API URL is shown there:
+
+- **Development:** `https://[verb-noun-##].clerk.accounts.dev`
+- **Production:** `https://clerk.[YOUR_APP_DOMAIN].com`
+
+### 4. Environment variables
+
+```bash
+MCP_USE_OAUTH_CLERK_FRONTEND_API_URL=https://verb-noun-42.clerk.accounts.dev
+```
+
+## Configuration
+
+```typescript
+import { MCPServer, oauthClerkProvider } from 'mcp-use/server'
+
+// Zero-config: reads MCP_USE_OAUTH_CLERK_FRONTEND_API_URL
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  oauth: oauthClerkProvider()
+})
+
+await server.listen(3000)
+```
+
+Or pass config explicitly:
+
+```typescript
+oauth: oauthClerkProvider({
+  frontendApiUrl: 'https://verb-noun-42.clerk.accounts.dev',
+
+  // Optional: restrict token acceptance to a specific audience
+  audience: 'https://my-mcp-api.example.com',
+
+  // Disable JWT verification during development only
+  verifyJwt: process.env.NODE_ENV === 'production',
+
+  // Override advertised scopes
+  // Default: ['profile', 'email', 'offline_access']
+  scopesSupported: ['profile', 'email', 'offline_access'],
+})
+```
+
+<Warning>
+Never disable `verifyJwt` in production. It skips signature verification and accepts any token.
+</Warning>
+
+## Accessing user info in tools
+
+Clerk provides standard OIDC claims plus organization context when using Clerk Organizations:
+
+```typescript
+server.tool(
+  {
+    name: 'get-profile',
+    description: 'Get authenticated user profile',
+  },
+  async (_args, ctx) => ({
+    userId: ctx.auth.user.userId,
+    email: ctx.auth.user.email,
+    name: ctx.auth.user.name,
+    username: ctx.auth.user.username,
+    picture: ctx.auth.user.picture,
+    // Organization context (when using Clerk Organizations)
+    orgId: ctx.auth.user.org_id,
+    orgRole: ctx.auth.user.org_role,
+    orgSlug: ctx.auth.user.org_slug,
+    roles: ctx.auth.user.roles,
+    permissions: ctx.auth.permissions,
+    scopes: ctx.auth.scopes,
+  })
+)
+```
+
+## Organization-based access control
+
+When using [Clerk Organizations](https://clerk.com/docs/organizations/overview), the JWT includes `org_id`, `org_role`, `org_slug`, and `org_permissions`. Use these to implement multi-tenant access control:
+
+```typescript
+server.tool(
+  {
+    name: 'get-documents',
+    description: 'Get documents for the authenticated organization',
+  },
+  async (_args, ctx) => {
+    const orgId = ctx.auth.user.org_id as string | undefined
+
+    if (!orgId) {
+      return {
+        content: [{ type: 'text', text: 'Organization context required' }],
+        isError: true,
+      }
+    }
+
+    const documents = await db.documents.findMany({
+      where: { organizationId: orgId },
+    })
+
+    return { content: [{ type: 'text', text: JSON.stringify(documents) }] }
+  }
+)
+```
+
+Check organization permissions (set in the Clerk Dashboard under **Organizations → Roles & Permissions**):
+
+```typescript
+server.tool(
+  {
+    name: 'delete-document',
+    description: 'Delete a document (requires org:documents:delete)',
+  },
+  async ({ documentId }, ctx) => {
+    if (!ctx.auth.permissions?.includes('org:documents:delete')) {
+      return {
+        content: [{ type: 'text', text: 'Forbidden: org:documents:delete permission required' }],
+        isError: true,
+      }
+    }
+
+    await db.documents.delete({ id: documentId })
+    return { content: [{ type: 'text', text: 'Document deleted' }] }
+  }
+)
+```
+
+## Resources
+
+- [Runnable mcp-use + Clerk example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/examples/server/oauth/clerk)
+- [Clerk OAuth Documentation](https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth)
+- [Clerk Organizations](https://clerk.com/docs/organizations/overview)
+
+## Next Steps
+
+- [User Context](/typescript/server/authentication/user-context) — Access user information in tools
