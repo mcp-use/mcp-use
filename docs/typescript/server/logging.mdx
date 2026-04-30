@@ -8,11 +8,11 @@ mcp-use provides comprehensive logging for MCP servers, making it easy to unders
 
 ## Log Levels
 
-The server provides different logging levels through environment variables:
+HTTP request logging is controlled by the `MCP_DEBUG_LEVEL` environment variable, which has three levels: `info` (default), `debug`, and `trace`.
 
-### Production Mode (Default)
+### Info (Default)
 
-Clean, informative logs showing MCP operations:
+One compact line per request — session, client, the MCP method, and the outcome:
 
 ```bash
 node server.js
@@ -21,61 +21,38 @@ node server.js
 **Output:**
 
 ```
-[MCP] Server mounted at /mcp (Streamable HTTP Transport)
-[MCP] Session initialized: abc123
-[MCP] tools/call:analyze-sentiment completed in 234ms
-[MCP] Session closed: abc123
+[19:44:56.927] POST /mcp [initialize: my-client/0.1.0] → session=92c4e0b OK (1ms)
+[19:44:56.935] sess=92c4e0b POST /mcp [notifications/initialized] OK (1ms)
+[19:44:56.943] sess=92c4e0b POST /mcp [tools/list] OK (1ms)
+[19:44:56.950] sess=92c4e0b POST /mcp [tools/call: greet] OK (1ms)
+[19:44:56.958] sess=92c4e0b POST /mcp [tools/call: divide] ERROR cannot divide by zero (0ms)
+[19:44:56.965] sess=92c4e0b POST /mcp [tools/call: does-not-exist] ERROR MCP error -32602: Tool does-not-exist not found (0ms)
 ```
 
-### Debug Mode
+### Debug
 
-Enable debug mode for development and troubleshooting:
+Same as `info` but appends inline `args=<json>` for `tools/call` requests:
 
 ```bash
-DEBUG=1 node server.js
+MCP_DEBUG_LEVEL=debug node server.js
 ```
 
 **Output:**
 
 ```
-[MCP] Server initialized: my-server v1.0.0
-[MCP] Registered tool: analyze-sentiment
-[MCP] Registered resource: config://app-settings
-[MCP] Session initialized: abc123
-[MCP] tools/call:analyze-sentiment started
-[MCP] tools/call:analyze-sentiment completed in 234ms
+[19:44:57.918] sess=f93f8b1 POST /mcp [tools/call: greet] args={"name":"Andrew","formal":true} OK (1ms)
+[19:44:57.926] sess=f93f8b1 POST /mcp [tools/call: divide] args={"a":10,"b":0} ERROR cannot divide by zero (0ms)
 ```
 
-### Verbose Debug Mode
+### Trace
 
-Full request/response logging with JSON-RPC details:
+Full request and response dump (headers and bodies) following the summary line — useful for protocol-level debugging:
 
 ```bash
-DEBUG=2 node server.js
+MCP_DEBUG_LEVEL=trace node server.js
 ```
 
-**Output:**
-
-```
-[MCP] Session initialized: abc123
-[MCP] → Request: {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "name": "analyze-sentiment",
-    "arguments": { "text": "I love this!" }
-  }
-}
-[MCP] tools/call:analyze-sentiment completed in 234ms
-[MCP] ← Response: {
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "content": [{ "type": "text", "text": "Sentiment: positive" }]
-  }
-}
-```
+The legacy `DEBUG=1` flag continues to work and is equivalent to `MCP_DEBUG_LEVEL=trace`.
 
 ## Built-in Logging System
 
