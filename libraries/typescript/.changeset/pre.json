@@ -8,6 +8,7 @@
     "mcp-use": "1.25.1"
   },
   "changesets": [
-    "fix-widget-dev-deps-504"
+    "fix-widget-dev-deps-504",
+    "mcp-debug-level"
   ]
 }
