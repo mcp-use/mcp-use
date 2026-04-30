@@ -20,19 +20,19 @@ Context helpers for accessing authentication in tools.
 
 Get the current authenticated user's access token.
 
-    Returns None if the request is not authenticated.
+Returns None if the request is not authenticated.
 
-    Example:
-        ```python
-        from mcp_use.server.auth import get_access_token
+Example:
+    ```python
+    from mcp_use.server.auth import get_access_token
 
-        @server.tool()
-        def whoami() -> str:
-            token = get_access_token()
-            if not token:
-                return "Not authenticated"
-            return f"Hello \{token.claims.get('email')\}"
-        ```
+    @server.tool()
+    def whoami() -> str:
+        token = get_access_token()
+        if not token:
+            return "Not authenticated"
+        return f"Hello \{token.claims.get('email')\}"
+    ```
 
 ```python
 from mcp_use.server.auth.dependencies import get_access_token
@@ -55,17 +55,17 @@ def get_access_token():
 
 Get the access token or raise AuthenticationError if not authenticated.
 
-    Example:
-        ```python
-        from mcp_use.server.auth import require_auth
+Example:
+    ```python
+    from mcp_use.server.auth import require_auth
 
-        @server.tool()
-        def admin_action() -> str:
-            token = require_auth()  # Raises if not authenticated
-            if "admin" not in token.scopes:
-                return "Admin scope required"
-            return "Admin action performed"
-        ```
+    @server.tool()
+    def admin_action() -> str:
+        token = require_auth()  # Raises if not authenticated
+        if "admin" not in token.scopes:
+            return "Admin scope required"
+        return "Admin action performed"
+    ```
 
 ```python
 from mcp_use.server.auth.dependencies import require_auth

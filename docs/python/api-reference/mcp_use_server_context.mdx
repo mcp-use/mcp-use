@@ -59,18 +59,18 @@ def get_http_request():
 
 Request the list of roots from the client.
 
-        Roots represent directories or files that the client has access to
-        and wants to make available to the server.
+Roots represent directories or files that the client has access to
+and wants to make available to the server.
 
-        Example:
-            ```python
-            @mcp.tool()
-            async def analyze_workspace(ctx: Context) -> str:
-                roots = await ctx.list_roots()
-                if not roots:
-                    return "No roots provided by client"
-                return f"Client has \{len(roots)\} root(s): \{[str(r.uri) for r in roots]\}"
-            ```
+Example:
+    ```python
+    @mcp.tool()
+    async def analyze_workspace(ctx: Context) -> str:
+        roots = await ctx.list_roots()
+        if not roots:
+            return "No roots provided by client"
+        return f"Client has \{len(roots)\} root(s): \{[str(r.uri) for r in roots]\}"
+    ```
 
 
 **Returns**

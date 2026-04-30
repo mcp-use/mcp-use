@@ -20,31 +20,31 @@ View the source code for this module on GitHub: <a href='https://github.com/mcp-
 
 Extended ServerSession that routes initialize requests through middleware.
 
-    This class intercepts the MCP initialize handshake at the protocol layer,
-    allowing middleware to:
-    - Validate client capabilities or metadata during connection
-    - Log connection attempts and protocol versions
-    - Reject connections early based on initialization parameters
+This class intercepts the MCP initialize handshake at the protocol layer,
+allowing middleware to:
+- Validate client capabilities or metadata during connection
+- Log connection attempts and protocol versions
+- Reject connections early based on initialization parameters
 
-    It also tracks all active sessions so the server can broadcast notifications
-    (e.g., ``notifications/resources/updated``) to all connected clients.
+It also tracks all active sessions so the server can broadcast notifications
+(e.g., ``notifications/resources/updated``) to all connected clients.
 
-    The class is injected via monkey-patching of ``mcp.server.session.ServerSession``
-    to intercept session creation within the MCP SDK.
+The class is injected via monkey-patching of ``mcp.server.session.ServerSession``
+to intercept session creation within the MCP SDK.
 
-    Note:
-        This implementation uses class attributes for middleware injection,
-        which means only ONE MCPServer instance is supported per process.
-        This is compatible with standard deployment patterns (e.g., uvicorn workers
-        run in separate processes), but multiple MCPServer instances in the
-        same process will share/override each other's middleware configuration.
+Note:
+    This implementation uses class attributes for middleware injection,
+    which means only ONE MCPServer instance is supported per process.
+    This is compatible with standard deployment patterns (e.g., uvicorn workers
+    run in separate processes), but multiple MCPServer instances in the
+    same process will share/override each other's middleware configuration.
 
-    Attributes:
-        _middleware_manager: The middleware manager to process initialize requests.
-            Injected by MCPServer during initialization.
-        _transport_type: The transport type (e.g., "stdio", "streamable-http").
-            Injected by MCPServer during initialization.
-        _active_sessions: Weak set of all active sessions for broadcasting notifications.
+Attributes:
+    _middleware_manager: The middleware manager to process initialize requests.
+        Injected by MCPServer during initialization.
+    _transport_type: The transport type (e.g., "stdio", "streamable-http").
+        Injected by MCPServer during initialization.
+    _active_sessions: Weak set of all active sessions for broadcasting notifications.
 
 </div>
 </RandomGradientBackground>

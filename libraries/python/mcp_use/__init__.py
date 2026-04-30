@@ -15,6 +15,7 @@ from .logging import MCP_USE_DEBUG, Logger, logger  # isort: skip
 from .agents import observability  # noqa: E402
 from .agents.mcpagent import MCPAgent
 from .client import MCPClient
+from .client.connectors.factory import Connector
 from .client.prompts import CODE_MODE_AGENT_PROMPT
 from .config import load_config_file
 from .connectors import BaseConnector, HttpConnector, StdioConnector, WebSocketConnector
@@ -32,6 +33,7 @@ __all__ = [
     "StdioConnector",
     "WebSocketConnector",
     "HttpConnector",
+    "Connector",
     "load_config_file",
     "logger",
     "MCP_USE_DEBUG",
