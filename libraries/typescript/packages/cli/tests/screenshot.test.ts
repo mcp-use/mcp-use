@@ -20,23 +20,19 @@ describe("parseHeaders", () => {
   });
 
   it("parses repeated --header values", () => {
-    const headers = parseHeaders(
-      ["X-Foo: bar", "X-Bar:  baz "],
-      undefined
-    );
+    const headers = parseHeaders(["X-Foo: bar", "X-Bar:  baz "], undefined);
     expect(headers).toEqual({ "X-Foo": "bar", "X-Bar": "baz" });
   });
 
   it("merges --header on top of --auth", () => {
-    const headers = parseHeaders(
-      ["Authorization: Bearer override"],
-      "ignored"
-    );
+    const headers = parseHeaders(["Authorization: Bearer override"], "ignored");
     expect(headers["Authorization"]).toBe("Bearer override");
   });
 
   it("throws on missing colon", () => {
-    expect(() => parseHeaders(["bogus"], undefined)).toThrow(/Invalid --header/);
+    expect(() => parseHeaders(["bogus"], undefined)).toThrow(
+      /Invalid --header/
+    );
   });
 
   it("throws on empty key", () => {
@@ -93,9 +89,9 @@ describe("extractViewName", () => {
   });
 
   it("strips a trailing buildId segment", () => {
-    expect(
-      extractViewName("ui://widget/kanban-board.abc123def.html")
-    ).toBe("kanban-board");
+    expect(extractViewName("ui://widget/kanban-board.abc123def.html")).toBe(
+      "kanban-board"
+    );
   });
 
   it("returns the original string when prefix doesn't match", () => {

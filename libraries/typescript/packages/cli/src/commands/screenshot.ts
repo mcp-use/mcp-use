@@ -69,10 +69,7 @@ async function probeServer(url: string, timeoutMs = 1500): Promise<boolean> {
 /**
  * Wait until `/inspector/health` reports ready, polling every second.
  */
-async function waitForHealth(
-  url: string,
-  maxAttempts = 60
-): Promise<boolean> {
+async function waitForHealth(url: string, maxAttempts = 60): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     if (await probeServer(url)) return true;
     await new Promise((r) => setTimeout(r, 1000));
@@ -112,7 +109,9 @@ async function ensureDevServer(
   const url = `http://localhost:${port}`;
   if (!options.quiet) {
     console.error(
-      formatInfo(`Starting dev server on port ${port} (no running server detected)…`)
+      formatInfo(
+        `Starting dev server on port ${port} (no running server detected)…`
+      )
     );
   }
 
@@ -203,7 +202,10 @@ type PlaywrightModule = {
     launch(options?: Record<string, unknown>): Promise<{
       newContext(options?: Record<string, unknown>): Promise<{
         newPage(): Promise<{
-          goto(url: string, options?: Record<string, unknown>): Promise<unknown>;
+          goto(
+            url: string,
+            options?: Record<string, unknown>
+          ): Promise<unknown>;
           waitForSelector(
             selector: string,
             options?: Record<string, unknown>
@@ -241,9 +243,7 @@ async function runInstall(): Promise<number> {
     ["playwright", "install", "chromium"],
     { stdio: "inherit", shell: process.platform === "win32" }
   );
-  return new Promise<number>((res) =>
-    browsers.on("exit", (c) => res(c ?? 1))
-  );
+  return new Promise<number>((res) => browsers.on("exit", (c) => res(c ?? 1)));
 }
 
 interface ResolvedToolCall {
@@ -281,9 +281,11 @@ async function callToolAndResolve(
       );
     }
     const meta = (tool as { _meta?: Record<string, unknown> })._meta;
-    const uiMeta = (meta?.ui as { resourceUri?: string } | undefined) ?? undefined;
+    const uiMeta =
+      (meta?.ui as { resourceUri?: string } | undefined) ?? undefined;
     const resourceUri =
-      uiMeta?.resourceUri ?? (meta?.["openai/outputTemplate"] as string | undefined);
+      uiMeta?.resourceUri ??
+      (meta?.["openai/outputTemplate"] as string | undefined);
     if (!resourceUri) {
       throw new Error(
         `Tool "${toolName}" does not declare a UI resource (expected _meta.ui.resourceUri or openai/outputTemplate).`
@@ -371,9 +373,7 @@ export async function screenshotCommand(
     previewUrl.searchParams.set("server", mcpUrl);
 
     const hash = hashInputs(resolved, options.theme);
-    const outPath = path.resolve(
-      options.output ?? `./${viewName}-${hash}.png`
-    );
+    const outPath = path.resolve(options.output ?? `./${viewName}-${hash}.png`);
     await mkdir(path.dirname(outPath), { recursive: true });
 
     const browser = await playwright.chromium.launch();
@@ -420,10 +420,7 @@ export function createScreenshotCommand(cliBin: string): Command {
       "--tool <name>",
       "Tool to call. Its UI resource is rendered with the result."
     )
-    .option(
-      "--args <json>",
-      "JSON-encoded arguments for the tool call."
-    )
+    .option("--args <json>", "JSON-encoded arguments for the tool call.")
     .option("--width <px>", "Browser viewport width in pixels.", "800")
     .option("--height <px>", "Browser viewport height in pixels.", "600")
     .option(
@@ -444,19 +441,12 @@ export function createScreenshotCommand(cliBin: string): Command {
       "HTTP header forwarded to the MCP server. Repeatable.",
       (val: string, prev: string[] = []) => [...prev, val]
     )
-    .option(
-      "--auth <token>",
-      "Bearer token forwarded as Authorization header."
-    )
+    .option("--auth <token>", "Bearer token forwarded as Authorization header.")
     .option(
       "--wait-for <selector>",
       'Override readiness selector (default: body[data-view-ready="true"]).'
     )
-    .option(
-      "--timeout <ms>",
-      "Navigation + readiness timeout in ms.",
-      "30000"
-    )
+    .option("--timeout <ms>", "Navigation + readiness timeout in ms.", "30000")
     .option("--quiet", "Suppress dev-server output.")
     .option(
       "--install",
