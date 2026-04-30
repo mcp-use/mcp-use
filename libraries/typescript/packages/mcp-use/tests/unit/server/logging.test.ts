@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context, Next } from "hono";
 
-import {
-  getDebugLevel,
-  requestLogger,
-} from "../../../src/server/logging.js";
+import { getDebugLevel, requestLogger } from "../../../src/server/logging.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -35,11 +32,7 @@ function makeContext(opts: MockOptions = {}): {
     method,
     headers,
   };
-  if (
-    opts.requestBody !== undefined &&
-    method !== "GET" &&
-    method !== "HEAD"
-  ) {
+  if (opts.requestBody !== undefined && method !== "GET" && method !== "HEAD") {
     requestInit.body =
       typeof opts.requestBody === "string"
         ? opts.requestBody
@@ -295,7 +288,9 @@ describe("requestLogger", () => {
     await requestLogger(ctx, next);
 
     const line = logLines()[0];
-    expect(line).toContain("[resources/read: ui://widget/weather-display.html]");
+    expect(line).toContain(
+      "[resources/read: ui://widget/weather-display.html]"
+    );
     expect(line).toContain("OK");
   });
 
@@ -346,7 +341,9 @@ describe("requestLogger", () => {
     await requestLogger(ctx, next);
 
     const line = logLines()[0];
-    expect(line).toContain("ERROR MCP error -32602: Tool does-not-exist not found");
+    expect(line).toContain(
+      "ERROR MCP error -32602: Tool does-not-exist not found"
+    );
   });
 
   it("extracts tool error text from result.isError responses", async () => {
