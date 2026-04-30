@@ -244,6 +244,12 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
         }
       }
       parts.push(segment);
+    } else if (mcpMethod === "resources/read") {
+      const uri = requestBody?.params?.uri ?? "?";
+      parts.push(chalk.bold(`[resources/read: ${uri}]`));
+    } else if (mcpMethod === "prompts/get") {
+      const promptName = requestBody?.params?.name ?? "?";
+      parts.push(chalk.bold(`[prompts/get: ${promptName}]`));
     } else {
       parts.push(chalk.bold(`[${mcpMethod}]`));
     }

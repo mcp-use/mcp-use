@@ -277,6 +277,50 @@ describe("requestLogger", () => {
     expect(line).toContain('args={"name":"Andrew","formal":true}');
   });
 
+  it("resources/read shows the resource URI", async () => {
+    process.env.MCP_DEBUG_LEVEL = "info";
+    const { ctx, next } = makeContext({
+      requestHeaders: { "mcp-session-id": "abcdefg" },
+      requestBody: {
+        jsonrpc: "2.0",
+        id: 10,
+        method: "resources/read",
+        params: { uri: "ui://widget/weather-display.html" },
+      },
+      responseStatus: 200,
+      responseContentType: "application/json",
+      responseBody: JSON.stringify({ jsonrpc: "2.0", id: 10, result: {} }),
+    });
+
+    await requestLogger(ctx, next);
+
+    const line = logLines()[0];
+    expect(line).toContain("[resources/read: ui://widget/weather-display.html]");
+    expect(line).toContain("OK");
+  });
+
+  it("prompts/get shows the prompt name", async () => {
+    process.env.MCP_DEBUG_LEVEL = "info";
+    const { ctx, next } = makeContext({
+      requestHeaders: { "mcp-session-id": "abcdefg" },
+      requestBody: {
+        jsonrpc: "2.0",
+        id: 11,
+        method: "prompts/get",
+        params: { name: "summarize" },
+      },
+      responseStatus: 200,
+      responseContentType: "application/json",
+      responseBody: JSON.stringify({ jsonrpc: "2.0", id: 11, result: {} }),
+    });
+
+    await requestLogger(ctx, next);
+
+    const line = logLines()[0];
+    expect(line).toContain("[prompts/get: summarize]");
+    expect(line).toContain("OK");
+  });
+
   it("extracts JSON-RPC error message from response body", async () => {
     process.env.MCP_DEBUG_LEVEL = "info";
     const { ctx, next } = makeContext({
