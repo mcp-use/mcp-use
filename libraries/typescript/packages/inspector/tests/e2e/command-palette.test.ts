@@ -45,7 +45,10 @@ test.describe("Inspector Command Palette Tests", () => {
   });
 
   test("should open command palette with button click", async () => {
-    // Click the Cmd+K button in header
+    // Open the Settings dropdown (command palette trigger moved there)
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
+
+    // Click the Command Palette menu item
     await page.getByTestId("command-palette-trigger-button").click();
 
     // Verify command palette dialog opens
