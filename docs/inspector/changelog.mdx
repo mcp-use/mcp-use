@@ -6,6 +6,14 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v3.0.2" description="April 2026">
+  ## E2E alignment for Settings dropdown
+  Patch release updating Playwright coverage for the command palette Settings entry after the navbar refactor; paired with `mcp-use` v1.25.2.
+
+- **Fix**: Command palette e2e test targets the Settings option via the dropdown trigger introduced in the inspector settings UX (`#1428`)
+- **Update**: Updated mcp-use to v1.25.2
+</Update>
+
 <Update label="v3.0.1" description="April 2026">
   ## OAuth single-tab flow, embed fixes & Hono detection
   Patch release fixing OAuth redirect flows, embedded `ChatTab` UI leaks, and Hono duck-type detection in `mountInspector`; paired with `mcp-use` v1.25.1.

@@ -1,22 +1,40 @@
+import chalk from "chalk";
 import type { Context, Next } from "hono";
 
 import { getEnv } from "./utils/runtime.js";
 
 /**
- * Check if DEBUG mode is enabled via environment variable
+ * Server-side debug verbosity for MCP request logging.
+ *
+ * - `info`: one compact line per request (default)
+ * - `debug`: adds `args=<json>` for `tools/call` requests
+ * - `trace`: includes full request/response headers and bodies (legacy DEBUG=1)
  */
-function isDebugMode(): boolean {
+export type McpDebugLevel = "info" | "debug" | "trace";
+
+/**
+ * Resolve the active debug level from environment variables.
+ *
+ * Precedence: `MCP_DEBUG_LEVEL` (info|debug|trace) > legacy `DEBUG` (any truthy → trace).
+ */
+export function getDebugLevel(): McpDebugLevel {
+  const explicit = getEnv("MCP_DEBUG_LEVEL")?.trim().toLowerCase();
+  if (explicit === "info" || explicit === "debug" || explicit === "trace") {
+    return explicit;
+  }
+
+  // Backward compatibility: DEBUG=1 (or any non-falsy value) maps to `trace`.
   const debugEnv = getEnv("DEBUG");
-  return (
+  const debugEnabled =
     debugEnv !== undefined &&
     debugEnv !== "" &&
     debugEnv !== "0" &&
-    debugEnv.toLowerCase() !== "false"
-  );
+    debugEnv.toLowerCase() !== "false";
+  return debugEnabled ? "trace" : "info";
 }
 
 /**
- * Format an object for logging (pretty-print JSON)
+ * Format an object for logging (pretty-print JSON, truncating long strings).
  */
 function formatForLogging(obj: any): string {
   function truncate(val: any): any {
@@ -43,38 +61,118 @@ function formatForLogging(obj: any): string {
 }
 
 /**
- * Middleware that logs incoming HTTP requests with a timestamp, color-coded status code, and optional debug details.
+ * Compact JSON.stringify for inline `args=` output. Falls back to `String(v)`
+ * if the value is not serializable.
+ */
+function inlineJson(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+/**
+ * Short session ID used in log lines (matches example format `92c4e0b`).
+ */
+function shortSessionId(sid: string | null | undefined): string | null {
+  if (!sid) return null;
+  return sid.replace(/-/g, "").slice(0, 7);
+}
+
+/**
+ * Try to extract a JSON-RPC error from the response body. Returns the first
+ * error message found, or `null` if none.
  *
- * Skips logging for inspector telemetry and RPC endpoints under /inspector/api/tel/, /inspector/api/rpc/stream, and /inspector/api/rpc/log.
- * For POST requests to /mcp, includes the MCP method name when present. When DEBUG is enabled, logs request headers/body and response headers/body.
+ * Recognized errors:
+ *  - JSON-RPC error envelope: `{ error: { message } }`
+ *  - Tool call errors:        `{ result: { isError: true, content: [{ text }] } }`
  *
- * @param c - Hono context for the current request/response
- * @param next - Next middleware function to invoke
+ * Handles both `application/json` and `text/event-stream` (SSE) payloads,
+ * and JSON-RPC batches (arrays of messages).
+ */
+async function extractResponseError(res: Response): Promise<string | null> {
+  if (!res.body) return null;
+
+  let text: string;
+  try {
+    text = await res.clone().text();
+  } catch {
+    return null;
+  }
+  if (!text) return null;
+
+  // Collect candidate JSON payloads. SSE responses are framed as
+  // `event: message\ndata: <json>\n\n` — extract each `data:` line.
+  const isSse = (res.headers.get("content-type") || "").includes(
+    "text/event-stream"
+  );
+  const payloads: unknown[] = [];
+  const tryParse = (raw: string) => {
+    try {
+      payloads.push(JSON.parse(raw));
+    } catch {
+      // not JSON — skip
+    }
+  };
+  if (isSse) {
+    for (const line of text.split(/\r?\n/)) {
+      if (line.startsWith("data:")) {
+        const data = line.slice(5).trim();
+        if (data) tryParse(data);
+      }
+    }
+  } else {
+    tryParse(text);
+  }
+
+  for (const payload of payloads) {
+    for (const msg of Array.isArray(payload) ? payload : [payload]) {
+      if (!msg || typeof msg !== "object") continue;
+      const m = msg as any;
+      if (typeof m.error?.message === "string") return m.error.message;
+      if (m.result?.isError === true) {
+        const textBlock = Array.isArray(m.result.content)
+          ? m.result.content.find(
+              (b: any) => b?.type === "text" && typeof b.text === "string"
+            )
+          : null;
+        return textBlock ? String(textBlock.text) : "tool error";
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Middleware that logs incoming HTTP requests in a compact format controlled
+ * by `MCP_DEBUG_LEVEL` (or legacy `DEBUG`). See {@link getDebugLevel}.
+ *
+ * Skips logging for inspector telemetry/RPC endpoints, dev widget assets, and
+ * polling GETs against `/mcp` and `/inspector/api/*`.
  */
 export async function requestLogger(c: Context, next: Next): Promise<void> {
+  const startedAt = Date.now();
   const timestamp = new Date().toISOString().substring(11, 23);
   const method = c.req.method;
   const url = c.req.url;
-  const debugMode = isDebugMode();
+  const level = getDebugLevel();
 
-  // Filter out noisy endpoints that create log spam
   const pathname = new URL(url).pathname;
   const noisyPaths = [
-    "/inspector/api/tel/", // Telemetry endpoints (posthog, scarf)
-    "/inspector/api/rpc/stream", // RPC stream (SSE)
-    "/inspector/api/rpc/log", // RPC log endpoint
-    "/inspector", // Inspector UI and static assets
-    "/mcp-use/widgets/", // Dev widget Vite proxy and assets
-    "/mcp-use/public/", // Public static files
+    "/inspector/api/tel/",
+    "/inspector/api/rpc/stream",
+    "/inspector/api/rpc/log",
+    "/inspector",
+    "/mcp-use/widgets/",
+    "/mcp-use/public/",
   ];
-  // Also skip GET /mcp (SSE/health) and GET /inspector/api/* (API polling, dev-widget, etc.)
   const isNoisyGet =
     method === "GET" &&
     (pathname === "/mcp" ||
       pathname.startsWith("/inspector/api/") ||
       pathname.startsWith("/mcp-use/"));
 
-  // Skip logging for noisy paths and noisy GETs but still process the request
   if (
     noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath)) ||
     isNoisyGet
@@ -83,132 +181,176 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
     return;
   }
 
-  // Get request body for logging
+  // Capture request body up front so we can extract MCP method/params.
   let requestBody: any = null;
   let requestHeaders: Record<string, string> = {};
 
-  if (debugMode) {
-    // Log request headers - c.req.header() without args returns all headers
+  if (level === "trace") {
     const allHeaders = c.req.header();
-    if (allHeaders) {
-      requestHeaders = allHeaders;
-    }
+    if (allHeaders) requestHeaders = allHeaders;
   }
 
-  // Get request body (for MCP method logging or full debug logging)
   if (method !== "GET" && method !== "HEAD") {
     try {
-      // Clone the request to avoid consuming the original body stream
       const clonedRequest = c.req.raw.clone();
       requestBody = await clonedRequest.json().catch(() => {
-        // If JSON parsing fails, try to get as text
         return clonedRequest.text().catch(() => null);
       });
     } catch {
-      // Ignore errors
+      // ignore — body is optional for the log line
     }
   }
 
   await next();
 
-  // Get status code from response
+  const durationMs = Date.now() - startedAt;
   const statusCode = c.res.status;
-  let statusColor = "";
 
-  if (statusCode >= 200 && statusCode < 300) {
-    statusColor = "\x1b[32m"; // Green for 2xx
-  } else if (statusCode >= 300 && statusCode < 400) {
-    statusColor = "\x1b[33m"; // Yellow for 3xx
-  } else if (statusCode >= 400 && statusCode < 500) {
-    statusColor = "\x1b[31m"; // Red for 4xx
-  } else if (statusCode >= 500) {
-    statusColor = "\x1b[35m"; // Magenta for 5xx
-  }
+  // Session ID: incoming header for established sessions, response header for
+  // initialize requests (the SDK transport stamps it on the response).
+  const incomingSid = c.req.header("mcp-session-id");
+  const responseSid = c.res.headers.get("mcp-session-id");
+  const mcpMethod: string | undefined = requestBody?.method;
+  const isInitialize = mcpMethod === "initialize";
 
-  // Add MCP method info for POST requests to /mcp
-  let logMessage = `[${timestamp}] ${method} \x1b[1m${new URL(url).pathname}\x1b[0m`;
-  if (method === "POST" && url.includes("/mcp") && requestBody?.method) {
-    logMessage += ` \x1b[1m[${requestBody.method}]\x1b[0m`;
-  }
-  logMessage += ` ${statusColor}${statusCode}\x1b[0m`;
+  // Build the line. Colors mirror typical access-log palettes: timestamps,
+  // session ids, args and durations are dimmed; method/path/MCP-method are
+  // bold; outcome is green (OK) or red (ERROR).
+  const parts: string[] = [chalk.gray(`[${timestamp}]`)];
 
-  console.log(logMessage);
+  const sessPrefix = !isInitialize ? shortSessionId(incomingSid) : null;
+  if (sessPrefix) parts.push(chalk.gray(`sess=${sessPrefix}`));
 
-  // Debug mode: log detailed request/response information
-  if (debugMode) {
-    console.log("\n\x1b[36m" + "=".repeat(80) + "\x1b[0m");
-    console.log("\x1b[1m\x1b[36m[DEBUG] Request Details\x1b[0m");
-    console.log("\x1b[36m" + "-".repeat(80) + "\x1b[0m");
+  parts.push(method);
+  parts.push(chalk.bold(pathname));
 
-    // Request headers
-    if (Object.keys(requestHeaders).length > 0) {
-      console.log("\x1b[33mRequest Headers:\x1b[0m");
-      console.log(formatForLogging(requestHeaders));
-    }
-
-    // Request body
-    if (requestBody !== null) {
-      console.log("\x1b[33mRequest Body:\x1b[0m");
-      if (typeof requestBody === "string") {
-        console.log(requestBody);
-      } else {
-        console.log(formatForLogging(requestBody));
-      }
-    }
-
-    // Response headers
-    const responseHeaders: Record<string, string> = {};
-    c.res.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-    if (Object.keys(responseHeaders).length > 0) {
-      console.log("\x1b[33mResponse Headers:\x1b[0m");
-      console.log(formatForLogging(responseHeaders));
-    }
-
-    // Response body
-    try {
-      // Check if response has a body and can be cloned
-      // Clone the response to read the body without consuming the original stream
-      // This ensures the original response remains intact for the client
-      if (c.res.body !== null && c.res.body !== undefined) {
-        try {
-          const clonedResponse = c.res.clone();
-          const responseBody = await clonedResponse.text().catch(() => null);
-
-          if (responseBody !== null && responseBody.length > 0) {
-            console.log("\x1b[33mResponse Body:\x1b[0m");
-            // Try to parse as JSON for pretty printing
-            try {
-              const jsonBody = JSON.parse(responseBody);
-              console.log(formatForLogging(jsonBody));
-            } catch {
-              // Not JSON, print as text (truncate if too long)
-              const maxLength = 10000;
-              if (responseBody.length > maxLength) {
-                console.log(
-                  responseBody.substring(0, maxLength) +
-                    `\n... (truncated, ${responseBody.length - maxLength} more characters)`
-                );
-              } else {
-                console.log(responseBody);
-              }
-            }
-          } else {
-            console.log("\x1b[33mResponse Body:\x1b[0m (empty)");
-          }
-        } catch (cloneError) {
-          // If cloning fails (e.g., response already consumed), log that
-          console.log("\x1b[33mResponse Body:\x1b[0m (unable to clone/read)");
+  if (mcpMethod) {
+    if (isInitialize) {
+      const ci = requestBody?.params?.clientInfo;
+      const label =
+        ci?.name && ci?.version
+          ? `: ${ci.name}/${ci.version}`
+          : ci?.name
+            ? `: ${ci.name}`
+            : "";
+      parts.push(chalk.bold(`[initialize${label}]`));
+    } else if (mcpMethod === "tools/call") {
+      const toolName = requestBody?.params?.name ?? "?";
+      let segment = chalk.bold(`[tools/call: ${toolName}]`);
+      if (level !== "info") {
+        const args = requestBody?.params?.arguments;
+        if (args !== undefined) {
+          segment += ` args=${inlineJson(args)}`;
         }
-      } else {
-        console.log("\x1b[33mResponse Body:\x1b[0m (no body)");
       }
-    } catch (error) {
-      // If we can't read the response body, log that
-      console.log("\x1b[33mResponse Body:\x1b[0m (unable to read)");
+      parts.push(segment);
+    } else if (mcpMethod === "resources/read") {
+      const uri = requestBody?.params?.uri ?? "?";
+      parts.push(chalk.bold(`[resources/read: ${uri}]`));
+    } else if (mcpMethod === "prompts/get") {
+      const promptName = requestBody?.params?.name ?? "?";
+      parts.push(chalk.bold(`[prompts/get: ${promptName}]`));
+    } else {
+      parts.push(chalk.bold(`[${mcpMethod}]`));
     }
-
-    console.log("\x1b[36m" + "=".repeat(80) + "\x1b[0m\n");
   }
+
+  if (isInitialize && responseSid) {
+    parts.push(chalk.gray(`→ session=${shortSessionId(responseSid)}`));
+  }
+
+  // Outcome:
+  //  - MCP requests: OK / ERROR <message> based on JSON-RPC error parsing.
+  //  - Plain HTTP (HEAD, etc.): the raw status code, colored by class.
+  let outcomePart: string;
+  const errMsg = await extractResponseError(c.res);
+  if (errMsg) {
+    outcomePart = chalk.red(`ERROR ${errMsg}`);
+  } else if (mcpMethod) {
+    outcomePart =
+      statusCode >= 400
+        ? chalk.red(`ERROR (HTTP ${statusCode})`)
+        : chalk.green("OK");
+  } else {
+    outcomePart =
+      statusCode >= 500
+        ? chalk.magenta(String(statusCode))
+        : statusCode >= 400
+          ? chalk.red(String(statusCode))
+          : statusCode >= 300
+            ? chalk.yellow(String(statusCode))
+            : chalk.green(String(statusCode));
+  }
+  parts.push(outcomePart);
+  parts.push(chalk.gray(`(${durationMs}ms)`));
+
+  console.log(parts.join(" "));
+
+  // Trace mode preserves the legacy DEBUG=1 behavior: detailed request and
+  // response dumps follow the summary line.
+  if (level !== "trace") return;
+
+  console.log("\n" + chalk.cyan("=".repeat(80)));
+  console.log(chalk.bold.cyan("[TRACE] Request Details"));
+  console.log(chalk.cyan("-".repeat(80)));
+
+  if (Object.keys(requestHeaders).length > 0) {
+    console.log(chalk.yellow("Request Headers:"));
+    console.log(formatForLogging(requestHeaders));
+  }
+
+  if (requestBody !== null) {
+    console.log(chalk.yellow("Request Body:"));
+    if (typeof requestBody === "string") {
+      console.log(requestBody);
+    } else {
+      console.log(formatForLogging(requestBody));
+    }
+  }
+
+  const responseHeaders: Record<string, string> = {};
+  c.res.headers.forEach((value, key) => {
+    responseHeaders[key] = value;
+  });
+  if (Object.keys(responseHeaders).length > 0) {
+    console.log(chalk.yellow("Response Headers:"));
+    console.log(formatForLogging(responseHeaders));
+  }
+
+  try {
+    if (c.res.body !== null && c.res.body !== undefined) {
+      try {
+        const clonedResponse = c.res.clone();
+        const responseBody = await clonedResponse.text().catch(() => null);
+
+        if (responseBody !== null && responseBody.length > 0) {
+          console.log(chalk.yellow("Response Body:"));
+          try {
+            const jsonBody = JSON.parse(responseBody);
+            console.log(formatForLogging(jsonBody));
+          } catch {
+            const maxLength = 10000;
+            if (responseBody.length > maxLength) {
+              console.log(
+                responseBody.substring(0, maxLength) +
+                  `\n... (truncated, ${responseBody.length - maxLength} more characters)`
+              );
+            } else {
+              console.log(responseBody);
+            }
+          }
+        } else {
+          console.log(chalk.yellow("Response Body:") + " (empty)");
+        }
+      } catch {
+        console.log(chalk.yellow("Response Body:") + " (unable to clone/read)");
+      }
+    } else {
+      console.log(chalk.yellow("Response Body:") + " (no body)");
+    }
+  } catch {
+    console.log(chalk.yellow("Response Body:") + " (unable to read)");
+  }
+
+  console.log(chalk.cyan("=".repeat(80)) + "\n");
 }
