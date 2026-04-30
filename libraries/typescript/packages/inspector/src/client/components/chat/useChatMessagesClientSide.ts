@@ -271,6 +271,7 @@ export function useChatMessagesClientSide({
             provider: llmConfig.provider,
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
+            baseUrl: llmConfig.baseUrl,
             temperature: llmConfig.temperature,
           },
           messages: providerMessages,

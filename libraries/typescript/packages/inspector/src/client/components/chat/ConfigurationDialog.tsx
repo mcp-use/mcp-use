@@ -33,6 +33,16 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
+import type { ProviderName } from "@/llm/types";
+import {
+  getDefaultBaseUrl,
+  providerRequiresApiKey,
+  providerSupportsBaseUrl,
+} from "./types";
+import { getProviderLabel, ProviderIcon } from "./providerMeta";
+import { buildLmStudioApiUrl } from "@/llm/providers/lmstudio/utils";
+import { fetchLocalProvider } from "@/llm/providers/localProviderFetch";
+import { buildOllamaApiUrl } from "@/llm/providers/ollama/utils";
 
 interface ModelOption {
   id: string;
@@ -94,15 +104,23 @@ function getCachedModels(provider: string): ModelOption[] | null {
   return null;
 }
 
+function getModelsCacheKey(provider: ProviderName, baseUrl?: string): string {
+  return (provider === "ollama" || provider === "lmstudio") && baseUrl
+    ? `${provider}:${baseUrl.trim().toLowerCase()}`
+    : provider;
+}
+
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: ProviderName;
   tempModel: string;
   tempApiKey: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  tempBaseUrl: string;
+  onProviderChange: (provider: ProviderName) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onBaseUrlChange: (baseUrl: string) => void;
   onSave: () => void;
   onClear?: () => void;
   showClearButton?: boolean;
@@ -174,15 +192,68 @@ async function fetchGoogleModels(apiKey: string): Promise<ModelOption[]> {
   );
 }
 
+async function fetchOllamaModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ModelOption[]> {
+  const response = await fetchLocalProvider(
+    buildOllamaApiUrl(baseUrl, "/api/tags"),
+    {
+      headers: {
+        ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Ollama models: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return (data.models || []).map(
+    (model: { model?: string; name?: string }) => ({
+      id: model.model || model.name || "",
+    })
+  );
+}
+
+async function fetchLmStudioModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ModelOption[]> {
+  const response = await fetchLocalProvider(
+    buildLmStudioApiUrl(baseUrl, "/v1/models"),
+    {
+      headers: {
+        ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch LM Studio models: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  return (data.data || []).map(
+    (model: { id: string; name?: string; owned_by?: string }) => ({
+      id: model.id,
+      displayName: model.name || model.id || model.owned_by,
+    })
+  );
+}
+
 export function ConfigurationDialog({
   open,
   onOpenChange,
   tempProvider,
   tempModel,
   tempApiKey,
+  tempBaseUrl,
   onProviderChange,
   onModelChange,
   onApiKeyChange,
+  onBaseUrlChange,
   onSave,
   onClear,
   showClearButton = false,
@@ -194,10 +265,19 @@ export function ConfigurationDialog({
   const [modelError, setModelError] = useState<string | null>(null);
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const modelsCacheKey = getModelsCacheKey(tempProvider, tempBaseUrl);
 
   // Fetch models when API key is set and provider is selected
   useEffect(() => {
-    if (!open || !tempApiKey.trim() || !tempProvider) {
+    const needsApiKey = providerRequiresApiKey(tempProvider);
+    const needsBaseUrl = providerSupportsBaseUrl(tempProvider);
+
+    if (
+      !open ||
+      !tempProvider ||
+      (needsApiKey && !tempApiKey.trim()) ||
+      (needsBaseUrl && !tempBaseUrl.trim())
+    ) {
       setModels([]);
       setModelError(null);
       return;
@@ -205,7 +285,7 @@ export function ConfigurationDialog({
 
     const loadModels = async () => {
       // Check cache first
-      const cachedModels = getCachedModels(tempProvider);
+      const cachedModels = getCachedModels(modelsCacheKey);
       if (cachedModels) {
         setModels(cachedModels);
         setModelError(null);
@@ -224,10 +304,14 @@ export function ConfigurationDialog({
           fetchedModels = await fetchAnthropicModels(tempApiKey);
         } else if (tempProvider === "google") {
           fetchedModels = await fetchGoogleModels(tempApiKey);
+        } else if (tempProvider === "lmstudio") {
+          fetchedModels = await fetchLmStudioModels(tempBaseUrl, tempApiKey);
+        } else if (tempProvider === "ollama") {
+          fetchedModels = await fetchOllamaModels(tempBaseUrl, tempApiKey);
         }
 
         // Cache the fetched models
-        setModelsCache(tempProvider, fetchedModels);
+        setModelsCache(modelsCacheKey, fetchedModels);
         setModels(fetchedModels);
       } catch (error) {
         setModelError(
@@ -244,7 +328,7 @@ export function ConfigurationDialog({
     // Debounce the API call
     const timeoutId = setTimeout(loadModels, 500);
     return () => clearTimeout(timeoutId);
-  }, [tempApiKey, tempProvider, open]);
+  }, [tempApiKey, tempBaseUrl, tempProvider, open, modelsCacheKey]);
 
   // Reset model when provider changes
   useEffect(() => {
@@ -253,9 +337,21 @@ export function ConfigurationDialog({
     }
   }, [tempProvider, open, onModelChange]);
 
-  const getProviderIcon = (provider: string) => {
-    return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
-  };
+  const showBaseUrlField = providerSupportsBaseUrl(tempProvider);
+  const showModelSection =
+    open &&
+    (!providerRequiresApiKey(tempProvider) || !!tempApiKey.trim()) &&
+    (!showBaseUrlField || !!tempBaseUrl.trim());
+  const apiKeyLabel =
+    tempProvider === "ollama" || tempProvider === "lmstudio"
+      ? "API Key (optional)"
+      : "API Key";
+  const apiKeyPlaceholder =
+    tempProvider === "ollama"
+      ? "Leave empty for local Ollama"
+      : tempProvider === "lmstudio"
+        ? "Leave empty for local LM Studio"
+        : "Enter your API key";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -305,46 +401,64 @@ export function ConfigurationDialog({
               <SelectContent>
                 <SelectItem value="openai">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("openai")}
-                      alt="OpenAI"
-                      className="w-4 h-4"
-                    />
-                    <span>OpenAI</span>
+                    <ProviderIcon provider="openai" />
+                    <span>{getProviderLabel("openai")}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="anthropic">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("anthropic")}
-                      alt="Anthropic"
-                      className="w-4 h-4"
-                    />
-                    <span>Anthropic</span>
+                    <ProviderIcon provider="anthropic" />
+                    <span>{getProviderLabel("anthropic")}</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="google">
                   <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("google")}
-                      alt="Google"
-                      className="w-4 h-4"
-                    />
-                    <span>Google</span>
+                    <ProviderIcon provider="google" />
+                    <span>{getProviderLabel("google")}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="ollama">
+                  <div className="flex items-center gap-2">
+                    <ProviderIcon provider="ollama" />
+                    <span>{getProviderLabel("ollama")}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="lmstudio">
+                  <div className="flex items-center gap-2">
+                    <ProviderIcon provider="lmstudio" />
+                    <span>{getProviderLabel("lmstudio")}</span>
                   </div>
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
+          {showBaseUrlField && (
+            <div className="space-y-2">
+              <Label>Base URL</Label>
+              <Input
+                value={tempBaseUrl}
+                onChange={(e) => onBaseUrlChange(e.target.value)}
+                placeholder={getDefaultBaseUrl(tempProvider)}
+                data-testid="chat-config-base-url-input"
+              />
+              <p className="text-xs text-muted-foreground">
+                Defaults to {getDefaultBaseUrl(tempProvider)}. You can also use
+                {tempProvider === "ollama"
+                  ? " a proxied or remote Ollama host here."
+                  : " a proxied or remote LM Studio host here."}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label>API Key</Label>
+            <Label>{apiKeyLabel}</Label>
             <div className="relative">
               <Input
                 type={showPassword ? "text" : "password"}
                 value={tempApiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder="Enter your API key"
+                placeholder={apiKeyPlaceholder}
                 className="pr-10"
                 data-testid="chat-config-api-key-input"
               />
@@ -363,11 +477,15 @@ export function ConfigurationDialog({
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Your API key is stored locally and never sent to our servers
+              {tempProvider === "ollama"
+                ? "Optional for local Ollama. Stored locally and never sent to our servers."
+                : tempProvider === "lmstudio"
+                  ? "Optional for local LM Studio. Stored locally and never sent to our servers."
+                  : "Your API key is stored locally and never sent to our servers."}
             </p>
           </div>
 
-          {tempApiKey.trim() && (
+          {showModelSection && (
             <div className="space-y-2">
               <Label>Model</Label>
               {isLoadingModels ? (
@@ -456,7 +574,9 @@ export function ConfigurationDialog({
             <Button
               onClick={onSave}
               disabled={
-                !tempApiKey.trim() || (!!tempApiKey.trim() && !tempModel.trim())
+                (providerRequiresApiKey(tempProvider) && !tempApiKey.trim()) ||
+                (showBaseUrlField && !tempBaseUrl.trim()) ||
+                !tempModel.trim()
               }
               className={showClearButton ? "ml-auto" : ""}
               data-testid="chat-config-save-button"

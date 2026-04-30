@@ -168,6 +168,8 @@ export function ChatTab({
     setTempApiKey,
     tempModel,
     setTempModel,
+    tempBaseUrl,
+    setTempBaseUrl,
     saveLLMConfig,
     clearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
@@ -1024,9 +1026,11 @@ export function ChatTab({
             tempProvider={tempProvider}
             tempModel={tempModel}
             tempApiKey={tempApiKey}
+            tempBaseUrl={tempBaseUrl}
             onProviderChange={setTempProvider}
             onModelChange={setTempModel}
             onApiKeyChange={setTempApiKey}
+            onBaseUrlChange={setTempBaseUrl}
             onSave={saveLLMConfig}
             onClear={handleClearConfig}
             showClearButton={!isManaged}
@@ -1091,9 +1095,11 @@ export function ChatTab({
         tempProvider={tempProvider}
         tempModel={tempModel}
         tempApiKey={tempApiKey}
+        tempBaseUrl={tempBaseUrl}
         onProviderChange={setTempProvider}
         onModelChange={setTempModel}
         onApiKeyChange={setTempApiKey}
+        onBaseUrlChange={setTempBaseUrl}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
         hideConfigButton={

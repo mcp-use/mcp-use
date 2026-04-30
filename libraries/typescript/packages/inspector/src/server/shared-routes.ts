@@ -125,6 +125,59 @@ export function registerInspectorRoutes(
     }
   });
 
+  // Proxy local-provider HTTP requests through the inspector server
+  app.all("/inspector/api/llm/proxy", async (c) => {
+    try {
+      const targetUrl = c.req.header("X-LLM-Target-URL");
+      if (!targetUrl) {
+        return c.json({ error: "Missing X-LLM-Target-URL header" }, 400);
+      }
+
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(targetUrl);
+      } catch {
+        return c.json({ error: "Invalid target URL" }, 400);
+      }
+
+      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+        return c.json({ error: "Unsupported target URL protocol" }, 400);
+      }
+
+      const headers = new Headers(c.req.raw.headers);
+      headers.delete("host");
+      headers.delete("origin");
+      headers.delete("referer");
+      headers.delete("content-length");
+      headers.delete("x-llm-target-url");
+
+      const method = c.req.method.toUpperCase();
+      const body =
+        method === "GET" || method === "HEAD"
+          ? undefined
+          : await c.req.arrayBuffer();
+
+      const response = await fetch(targetUrl, {
+        method,
+        headers,
+        body,
+      });
+
+      const responseHeaders = new Headers(response.headers);
+      responseHeaders.delete("content-encoding");
+      responseHeaders.delete("transfer-encoding");
+      responseHeaders.delete("connection");
+
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+      });
+    } catch (error) {
+      return c.json(formatErrorResponse(error, "llmProviderProxy"), 500);
+    }
+  });
+
   // Widget storage endpoint - store widget data for rendering
   app.post("/inspector/api/resources/widget/store", async (c) => {
     try {
