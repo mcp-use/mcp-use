@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "4.0.0",
     "mcp-use": "1.26.0"
   },
-  "changesets": []
+  "changesets": [
+    "clerk-oauth-remove-openid-default-scope"
+  ]
 }

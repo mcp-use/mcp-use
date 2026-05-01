@@ -1,5 +1,26 @@
 # mcp-use
 
+## 1.27.0-canary.0
+
+### Minor Changes
+
+- 1633518: feat(mcp-use): add Clerk OAuth provider
+
+  Adds `oauthClerkProvider` for using Clerk as an OAuth authorization
+  server in MCP servers. Uses DCR-direct mode — MCP clients register and
+  authenticate directly with Clerk, and the MCP server verifies
+  Clerk-issued JWTs via JWKS.
+
+  Default scopes are `["profile", "email", "offline_access"]`. The
+  `openid` scope is excluded by default because it requires OIDC to be
+  explicitly enabled in the Clerk Dashboard; users who need it can pass
+  `scopesSupported: ["openid", "profile", "email", "offline_access"]`.
+
+### Patch Changes
+
+- @mcp-use/cli@3.1.3-canary.0
+- @mcp-use/inspector@5.0.0-canary.0
+
 ## 1.26.0
 
 ### Minor Changes
