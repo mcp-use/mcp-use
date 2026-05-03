@@ -12,6 +12,7 @@ interface LLMConfig {
   model: string;
   apiKey: string;
   temperature?: number;
+  baseUrl?: string;
 }
 
 interface OAuthTokens {
@@ -182,6 +183,7 @@ export async function* handleChatRequestStream(requestBody: {
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
         temperature: llmConfig.temperature,
+        baseUrl: llmConfig.baseUrl,
       },
       messages: providerMessages,
       tools,
@@ -342,6 +344,7 @@ export async function handleChatRequest(requestBody: {
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
         temperature: llmConfig.temperature,
+        baseUrl: llmConfig.baseUrl,
       },
       messages: providerMessages,
       tools,

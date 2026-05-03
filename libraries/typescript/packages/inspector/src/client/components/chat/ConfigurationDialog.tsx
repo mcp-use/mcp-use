@@ -100,9 +100,11 @@ interface ConfigurationDialogProps {
   tempProvider: "openai" | "anthropic" | "google";
   tempModel: string;
   tempApiKey: string;
+  tempBaseUrl?: string;
   onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onBaseUrlChange?: (baseUrl: string) => void;
   onSave: () => void;
   onClear?: () => void;
   showClearButton?: boolean;
@@ -119,8 +121,12 @@ interface ConfigurationDialogProps {
   };
 }
 
-async function fetchOpenAIModels(apiKey: string): Promise<ModelOption[]> {
-  const response = await fetch("https://api.openai.com/v1/models", {
+async function fetchOpenAIModels(
+  apiKey: string,
+  baseUrl?: string
+): Promise<ModelOption[]> {
+  const origin = baseUrl ?? "https://api.openai.com/v1";
+  const response = await fetch(`${origin}/models`, {
     headers: {
       Authorization: `Bearer ${apiKey}`,
     },
@@ -180,9 +186,11 @@ export function ConfigurationDialog({
   tempProvider,
   tempModel,
   tempApiKey,
+  tempBaseUrl = "",
   onProviderChange,
   onModelChange,
   onApiKeyChange,
+  onBaseUrlChange,
   onSave,
   onClear,
   showClearButton = false,
@@ -204,8 +212,14 @@ export function ConfigurationDialog({
     }
 
     const loadModels = async () => {
+      // Cache key includes baseUrl so different endpoints get separate caches
+      const cacheKey =
+        tempProvider === "openai" && tempBaseUrl.trim()
+          ? `${tempProvider}:${tempBaseUrl.trim()}`
+          : tempProvider;
+
       // Check cache first
-      const cachedModels = getCachedModels(tempProvider);
+      const cachedModels = getCachedModels(cacheKey);
       if (cachedModels) {
         setModels(cachedModels);
         setModelError(null);
@@ -219,7 +233,10 @@ export function ConfigurationDialog({
       try {
         let fetchedModels: ModelOption[] = [];
         if (tempProvider === "openai") {
-          fetchedModels = await fetchOpenAIModels(tempApiKey);
+          fetchedModels = await fetchOpenAIModels(
+            tempApiKey,
+            tempBaseUrl.trim() || undefined
+          );
         } else if (tempProvider === "anthropic") {
           fetchedModels = await fetchAnthropicModels(tempApiKey);
         } else if (tempProvider === "google") {
@@ -227,7 +244,7 @@ export function ConfigurationDialog({
         }
 
         // Cache the fetched models
-        setModelsCache(tempProvider, fetchedModels);
+        setModelsCache(cacheKey, fetchedModels);
         setModels(fetchedModels);
       } catch (error) {
         setModelError(
@@ -244,7 +261,7 @@ export function ConfigurationDialog({
     // Debounce the API call
     const timeoutId = setTimeout(loadModels, 500);
     return () => clearTimeout(timeoutId);
-  }, [tempApiKey, tempProvider, open]);
+  }, [tempApiKey, tempProvider, tempBaseUrl, open]);
 
   // Reset model when provider changes
   useEffect(() => {
@@ -366,6 +383,22 @@ export function ConfigurationDialog({
               Your API key is stored locally and never sent to our servers
             </p>
           </div>
+
+          {tempProvider === "openai" && (
+            <div className="space-y-2">
+              <Label>Base URL</Label>
+              <Input
+                value={tempBaseUrl}
+                onChange={(e) => onBaseUrlChange?.(e.target.value)}
+                placeholder="https://api.openai.com/v1 (default)"
+                data-testid="chat-config-base-url-input"
+              />
+              <p className="text-xs text-muted-foreground">
+                Override for OpenAI-compatible providers (e.g. LM Studio,
+                OpenRouter). Leave blank to use the default OpenAI endpoint.
+              </p>
+            </div>
+          )}
 
           {tempApiKey.trim() && (
             <div className="space-y-2">

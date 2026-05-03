@@ -28,9 +28,11 @@ interface ChatHeaderProps {
   tempProvider: "openai" | "anthropic" | "google";
   tempModel: string;
   tempApiKey: string;
+  tempBaseUrl?: string;
   onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onBaseUrlChange?: (baseUrl: string) => void;
   onSaveConfig: () => void;
   onClearConfig: () => void;
   /** When true, hides the API key config badge/button and dialog. */
@@ -67,9 +69,11 @@ export function ChatHeader({
   tempProvider,
   tempModel,
   tempApiKey,
+  tempBaseUrl,
   onProviderChange,
   onModelChange,
   onApiKeyChange,
+  onBaseUrlChange,
   onSaveConfig,
   onClearConfig,
   hideConfigButton,
@@ -180,7 +184,7 @@ export function ChatHeader({
               </DropdownMenu>
             )}
 
-            <div className="w-[1px] h-4 bg-border mx-1" />
+            <div className="w-px h-4 bg-border mx-1" />
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -219,9 +223,11 @@ export function ChatHeader({
             tempProvider={tempProvider}
             tempModel={tempModel}
             tempApiKey={tempApiKey}
+            tempBaseUrl={tempBaseUrl}
             onProviderChange={onProviderChange}
             onModelChange={onModelChange}
             onApiKeyChange={onApiKeyChange}
+            onBaseUrlChange={onBaseUrlChange}
             onSave={onSaveConfig}
             onClear={onClearConfig}
             showClearButton={!!llmConfig && !freeTierInfo}

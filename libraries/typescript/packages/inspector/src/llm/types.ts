@@ -16,6 +16,7 @@ export interface ProviderConfig {
   apiKey: string;
   temperature?: number;
   maxTokens?: number;
+  baseUrl?: string;
 }
 
 export interface ImageContentPart {

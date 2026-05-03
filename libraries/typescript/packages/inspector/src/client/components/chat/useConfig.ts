@@ -19,6 +19,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   >("openai");
   const [tempApiKey, setTempApiKey] = useState("");
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
+  const [tempBaseUrl, setTempBaseUrl] = useState("");
 
   // Load API keys per provider from localStorage
   const getApiKeys = useCallback((): Record<string, string> => {
@@ -60,6 +61,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
           // Load API key for the provider from provider-specific storage
           setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
           setTempModel(config.model);
+          setTempBaseUrl(config.baseUrl ?? "");
         } catch (error) {
           console.error("Failed to load LLM config:", error);
         }
@@ -147,6 +149,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
       provider: tempProvider,
       apiKey: tempApiKey,
       model: tempModel,
+      ...(tempProvider === "openai" &&
+        tempBaseUrl.trim() && { baseUrl: tempBaseUrl.trim() }),
     };
 
     const newAuthConfig: AuthConfig = {
@@ -193,6 +197,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     tempProvider,
     tempApiKey,
     tempModel,
+    tempBaseUrl,
     tempAuthType,
     tempUsername,
     tempPassword,
@@ -228,6 +233,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempApiKey,
     tempModel,
     setTempModel,
+    tempBaseUrl,
+    setTempBaseUrl,
     tempAuthType,
     saveLLMConfig,
     clearConfig,

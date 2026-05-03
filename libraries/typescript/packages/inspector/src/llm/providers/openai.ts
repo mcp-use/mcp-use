@@ -15,7 +15,7 @@ interface ChatParams {
   signal?: AbortSignal;
 }
 
-const DEFAULT_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 function toOpenAIContent(content: string | ContentPart[]): unknown {
   if (typeof content === "string") return content;
@@ -86,7 +86,8 @@ export async function* streamChat(
     }));
   }
 
-  const res = await fetch(DEFAULT_ENDPOINT, {
+  const endpoint = `${config.baseUrl ?? OPENAI_BASE_URL}/chat/completions`;
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -209,7 +210,8 @@ export async function chat(params: ChatParams): Promise<{
       },
     }));
   }
-  const res = await fetch(DEFAULT_ENDPOINT, {
+  const endpoint = `${config.baseUrl ?? OPENAI_BASE_URL}/chat/completions`;
+  const res = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
