@@ -2,6 +2,12 @@
 
 This directory contains examples for both Python and TypeScript implementations of mcp-use.
 
+## Templates — ready-to-deploy example apps
+
+If you're looking for **full example apps** you can deploy in one click (Chart Builder, Diagram Builder, Slide Deck, Maps Explorer, Widget Gallery, and more), see the dedicated **[Templates gallery](https://github.com/mcp-use/mcp-use#templates)** in the main README — or browse the [Templates page in the docs](https://mcp-use.com/docs/home/templates). Each template lives in its own repo with a live demo URL and a one-click deploy button.
+
+The examples below are **in-repo code samples** meant to illustrate specific APIs and patterns — not deployable apps.
+
 ## Quick Links
 
 - **[Python Examples](../libraries/python/examples/)** - Python client, server, and agent examples
@@ -25,6 +31,11 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
 - **[Middleware Example](../libraries/python/examples/server/middleware_example.py)** - Server middleware
 - **[Context Example](../libraries/python/examples/server/context_example.py)** - Server context usage
 - **[OAuth Example](../libraries/python/examples/simple_oauth_example.py)** - OAuth authentication
+- **[OAuth Dynamic Client Registration](../libraries/python/examples/client/oauth_dynamic_client_registration.py)** - RFC 7591 dynamic client registration
+- **[OAuth Preregistered Client](../libraries/python/examples/client/oauth_preregistered.py)** - Using a preregistered OAuth client
+- **[Client Middleware Example](../libraries/python/examples/example_middleware.py)** - Client-side middleware pipeline
+- **[Sandbox Everything](../libraries/python/examples/sandbox_everything.py)** - E2B sandbox all MCP features
+- **[Server Manager](../libraries/python/examples/simple_server_manager_use.py)** - Dynamic multi-server management
 
 ### Agent Examples
 - **[Chat Example](../libraries/python/examples/chat_example.py)** - Basic chat agent
@@ -58,18 +69,31 @@ When you clone this repository locally, you'll find `python/` and `typescript/` 
 ### Server Examples
 - **[Basic Server](../libraries/typescript/packages/mcp-use/examples/server/basic/simple/)** - Simple server implementation
 - **[Server Features](../libraries/typescript/packages/mcp-use/examples/server/features/)** - Advanced features
-  - [Conformance](../libraries/typescript/packages/mcp-use/examples/server/features/conformance/)
-  - [Elicitation](../libraries/typescript/packages/mcp-use/examples/server/features/elicitation/)
-  - [Notifications](../libraries/typescript/packages/mcp-use/examples/server/features/notifications/)
-  - [Sampling](../libraries/typescript/packages/mcp-use/examples/server/features/sampling/)
+  - [Everything](../libraries/typescript/packages/mcp-use/examples/server/features/everything/) - All MCP primitives in one server
+  - [Conformance](../libraries/typescript/packages/mcp-use/examples/server/features/conformance/) - MCP conformance test server
+  - [Elicitation](../libraries/typescript/packages/mcp-use/examples/server/features/elicitation/) - Form and URL elicitation
+  - [Sampling](../libraries/typescript/packages/mcp-use/examples/server/features/sampling/) - Server-initiated LLM sampling
+  - [Notifications](../libraries/typescript/packages/mcp-use/examples/server/features/notifications/) - Bidirectional notifications
+  - [Completion](../libraries/typescript/packages/mcp-use/examples/server/features/completion/) - Autocomplete for prompt args
+  - [Streaming Props](../libraries/typescript/packages/mcp-use/examples/server/features/streaming-props/) - Stream tool props to widgets
+  - [Middleware](../libraries/typescript/packages/mcp-use/examples/server/features/middleware/) - Built-in middleware pipeline
+  - [Express Middleware](../libraries/typescript/packages/mcp-use/examples/server/features/express-middleware/) - Express/Hono integration
+  - [Session Management](../libraries/typescript/packages/mcp-use/examples/server/features/session-management/) - Memory, filesystem, Redis storage
+  - [Proxy](../libraries/typescript/packages/mcp-use/examples/server/features/proxy/) - Proxy MCP server
+  - [Client Info](../libraries/typescript/packages/mcp-use/examples/server/features/client-info/) - Access client capabilities
+  - [DNS Rebinding](../libraries/typescript/packages/mcp-use/examples/server/features/dns-rebinding/) - DNS rebinding protection
 - **[OAuth Examples](../libraries/typescript/packages/mcp-use/examples/server/oauth/)** - OAuth implementations
   - [Auth0](../libraries/typescript/packages/mcp-use/examples/server/oauth/auth0/)
+  - [Better Auth](../libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth/)
   - [Supabase](../libraries/typescript/packages/mcp-use/examples/server/oauth/supabase/)
   - [WorkOS](../libraries/typescript/packages/mcp-use/examples/server/oauth/workos/)
 - **[Deployment](../libraries/typescript/packages/mcp-use/examples/server/deployment/)** - Deployment examples
-- **[UI Examples](../libraries/typescript/packages/mcp-use/examples/server/ui/)** - UI components
-- [Apps SDK](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/apps-sdk/)
-  - [MCP UI](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-ui/)
+- **[UI Examples](../libraries/typescript/packages/mcp-use/examples/server/ui/)** — MCP Apps widgets
+  - **[MCP Apps (recommended)](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/)** - Dual-protocol widgets with React auto-discovery
+  - [MCP Apps Gallery](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-ui/) - Three programmatic widgets via `server.uiResource({ type: "mcpApps" })`
+  - [Files](../libraries/typescript/packages/mcp-use/examples/server/ui/files/) - File-manager widget using `useFiles`
+  - [Model Context](../libraries/typescript/packages/mcp-use/examples/server/ui/model-context/) - Widgets reading host context (theme, locale, safe area)
+  - [Apps SDK (legacy)](../libraries/typescript/packages/mcp-use/examples/server/ui/mcp-apps/apps-sdk/) - ChatGPT Apps SDK only — prefer the dual-protocol **MCP Apps** example above
 
 ### Agent Examples
 - **[Basic Examples](../libraries/typescript/packages/mcp-use/examples/agent/basic/)** - Basic agent patterns

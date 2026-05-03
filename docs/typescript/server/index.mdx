@@ -12,7 +12,7 @@ It improves the official Model Context Protocol SDK with many developer friendly
 ## Key Features
 
 - **Full MCP compatibility**: MCP servers built with mcp-use are 100% compatible with the MCP specs.
-- **MCP Apps support**: UI widgets are compatible with MCP Apps for all compatible clients (ChatGPT, Claude, etc.). [UI Widgets](/typescript/server/ui-widgets).
+- **MCP Apps support**: UI widgets are compatible with MCP Apps for all compatible clients (ChatGPT, Claude, etc.). [UI Widgets](/typescript/server/mcp-apps).
 - **Edge runtime support**: Built-in Edge runtime support
 - **Built-in Inspector**: An handy MCP inspector is launched for you to test you MCP server. See [MCP Inspector](/inspector) for more details.
 - **Hot Module Reloading**: Add, remove, or update tools, prompts, and resources without restarting the server or dropping connections.
@@ -95,7 +95,7 @@ For detailed instructions, see the [Deploy Your Server](/typescript/server/deplo
 ### Next Steps
 
 - [Core features](/typescript/server/tools): Learn how to create MCP tools, prompts and resources.
-- [UI Widgets](/typescript/server/ui-widgets): Expose UI components to chat clients compatible with ChatGPT Apps SDK and MCP-UI.
+- [UI Widgets](/typescript/server/mcp-apps): Expose UI components to chat clients compatible with ChatGPT Apps SDK and MCP-UI.
 - [Configuration](/typescript/server/configuration): Advanced configuration and deployment options.
 - [Deploy Your Server](/typescript/server/deployment/mcp-use) - Deploy to production with one command
 
@@ -148,7 +148,7 @@ Rich, interactive React components that render in chat clients. Widgets are auto
 - **Type-Safe Props**: Zod schemas provide full TypeScript type safety
 - **Interactive**: Widgets can call tools, manage state, and respond to user actions
 
-**Learn more**: [UI Widgets Guide →](/typescript/server/ui-widgets)
+**Learn more**: [UI Widgets Guide →](/typescript/server/mcp-apps)
 
 ### **Custom Endpoints Integration**
 Full Hono functionality for custom routes, middleware, authentication, static file serving, and more. The server instance is also a Hono app.
@@ -201,7 +201,7 @@ class McpServer {
   <Card title="Prompts" icon="message-square" href="/typescript/server/prompts">
     Create reusable prompt templates for AI interactions
   </Card>
-  <Card title="UI Widgets" icon="palette" href="/typescript/server/ui-widgets">
+  <Card title="UI Widgets" icon="palette" href="/typescript/server/mcp-apps">
     Build interactive React components with auto-registration
   </Card>
   <Card title="Proxy Servers" icon="network-wired" href="/typescript/server/proxy">
