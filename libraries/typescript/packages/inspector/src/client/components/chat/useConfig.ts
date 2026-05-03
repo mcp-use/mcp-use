@@ -15,10 +15,11 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
   // LLM Config form state
   const [tempProvider, setTempProvider] = useState<
-    "openai" | "anthropic" | "google"
+    "openai" | "anthropic" | "google" | "custom"
   >("openai");
   const [tempApiKey, setTempApiKey] = useState("");
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
+  const [tempBaseUrl, setTempBaseUrl] = useState("http://localhost:1234");
 
   // Load API keys per provider from localStorage
   const getApiKeys = useCallback((): Record<string, string> => {
@@ -60,6 +61,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
           // Load API key for the provider from provider-specific storage
           setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
           setTempModel(config.model);
+          if (config.baseUrl) setTempBaseUrl(config.baseUrl);
         } catch (error) {
           console.error("Failed to load LLM config:", error);
         }
@@ -134,7 +136,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   }, [tempProvider, getApiKeys]);
 
   const saveLLMConfig = useCallback(() => {
-    if (!tempApiKey.trim()) {
+    // For the custom provider, API key is optional (local servers need none)
+    if (tempProvider !== "custom" && !tempApiKey.trim()) {
       return;
     }
 
@@ -147,6 +150,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
       provider: tempProvider,
       apiKey: tempApiKey,
       model: tempModel,
+      ...(tempProvider === "custom" && { baseUrl: tempBaseUrl }),
     };
 
     const newAuthConfig: AuthConfig = {
@@ -228,6 +232,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     setTempApiKey,
     tempModel,
     setTempModel,
+    tempBaseUrl,
+    setTempBaseUrl,
     tempAuthType,
     saveLLMConfig,
     clearConfig,

@@ -1,4 +1,4 @@
-import { Check, ChevronsUpDown, Eye, EyeOff, Key, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Eye, EyeOff, Key, Loader2, Server } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/client/components/ui/button";
@@ -97,12 +97,17 @@ function getCachedModels(provider: string): ModelOption[] | null {
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: "openai" | "anthropic" | "google" | "custom";
   tempModel: string;
   tempApiKey: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  /** Base URL for custom OpenAI-compatible providers */
+  tempBaseUrl?: string;
+  onProviderChange: (
+    provider: "openai" | "anthropic" | "google" | "custom"
+  ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onBaseUrlChange?: (url: string) => void;
   onSave: () => void;
   onClear?: () => void;
   showClearButton?: boolean;
@@ -174,15 +179,44 @@ async function fetchGoogleModels(apiKey: string): Promise<ModelOption[]> {
   );
 }
 
+/**
+ * Fetch models from any OpenAI-compatible /v1/models endpoint.
+ * API key is optional — local servers (LM Studio, Ollama) don't require one.
+ * Handles both OpenAI shape ({data:[]}) and Ollama shape ({models:[]}).
+ */
+async function fetchCustomModels(
+  baseUrl: string,
+  apiKey?: string
+): Promise<ModelOption[]> {
+  const base = baseUrl.replace(/\/$/, "");
+  const headers: Record<string, string> = {};
+  if (apiKey?.trim()) headers["Authorization"] = `Bearer ${apiKey}`;
+  const response = await fetch(`${base}/v1/models`, { headers });
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch models from ${base}/v1/models: ${response.statusText}`
+    );
+  }
+  const data = await response.json();
+  // Safer parsing: handles null/malformed entries and both response shapes
+  const list: unknown[] = data?.data || data?.models || [];
+  return list
+    .map((m: any) => m?.id || m?.name)
+    .filter(Boolean)
+    .map((id: string) => ({ id }));
+}
+
 export function ConfigurationDialog({
   open,
   onOpenChange,
   tempProvider,
   tempModel,
   tempApiKey,
+  tempBaseUrl = "http://localhost:1234",
   onProviderChange,
   onModelChange,
   onApiKeyChange,
+  onBaseUrlChange,
   onSave,
   onClear,
   showClearButton = false,
@@ -195,9 +229,11 @@ export function ConfigurationDialog({
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Fetch models when API key is set and provider is selected
+  // Fetch models when API key is set (or for custom providers where key is optional)
   useEffect(() => {
-    if (!open || !tempApiKey.trim() || !tempProvider) {
+    // Custom provider: API key is optional — only skip if dialog is closed
+    const needsApiKey = tempProvider !== "custom";
+    if (!open || (needsApiKey && !tempApiKey.trim()) || !tempProvider) {
       setModels([]);
       setModelError(null);
       return;
@@ -218,7 +254,9 @@ export function ConfigurationDialog({
 
       try {
         let fetchedModels: ModelOption[] = [];
-        if (tempProvider === "openai") {
+        if (tempProvider === "custom") {
+          fetchedModels = await fetchCustomModels(tempBaseUrl, tempApiKey);
+        } else if (tempProvider === "openai") {
           fetchedModels = await fetchOpenAIModels(tempApiKey);
         } else if (tempProvider === "anthropic") {
           fetchedModels = await fetchAnthropicModels(tempApiKey);
@@ -244,7 +282,7 @@ export function ConfigurationDialog({
     // Debounce the API call
     const timeoutId = setTimeout(loadModels, 500);
     return () => clearTimeout(timeoutId);
-  }, [tempApiKey, tempProvider, open]);
+  }, [tempApiKey, tempProvider, tempBaseUrl, open]);
 
   // Reset model when provider changes
   useEffect(() => {
@@ -252,6 +290,8 @@ export function ConfigurationDialog({
       onModelChange("");
     }
   }, [tempProvider, open, onModelChange]);
+
+
 
   const getProviderIcon = (provider: string) => {
     return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
@@ -333,6 +373,12 @@ export function ConfigurationDialog({
                     <span>Google</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="custom">
+                  <div className="flex items-center gap-2">
+                    <Server className="w-4 h-4" />
+                    <span>Custom (OpenAI-compatible)</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -344,7 +390,11 @@ export function ConfigurationDialog({
                 type={showPassword ? "text" : "password"}
                 value={tempApiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder="Enter your API key"
+                placeholder={
+                  tempProvider === "custom"
+                    ? "Enter API key (optional for local servers)"
+                    : "Enter your API key"
+                }
                 className="pr-10"
                 data-testid="chat-config-api-key-input"
               />
@@ -367,7 +417,23 @@ export function ConfigurationDialog({
             </p>
           </div>
 
-          {tempApiKey.trim() && (
+          {/* Base URL — shown only for custom provider */}
+          {tempProvider === "custom" && (
+            <div className="space-y-2">
+              <Label>Base URL</Label>
+              <Input
+                value={tempBaseUrl}
+                onChange={(e) => onBaseUrlChange?.(e.target.value)}
+                placeholder="http://localhost:1234"
+                data-testid="chat-config-base-url-input"
+              />
+              <p className="text-xs text-muted-foreground">
+                LM Studio: http://localhost:1234 · Ollama: http://localhost:11434
+              </p>
+            </div>
+          )}
+
+          {(tempApiKey.trim() || tempProvider === "custom") && (
             <div className="space-y-2">
               <Label>Model</Label>
               {isLoadingModels ? (
@@ -456,7 +522,8 @@ export function ConfigurationDialog({
             <Button
               onClick={onSave}
               disabled={
-                !tempApiKey.trim() || (!!tempApiKey.trim() && !tempModel.trim())
+                (tempProvider !== "custom" && !tempApiKey.trim()) ||
+                !tempModel.trim()
               }
               className={showClearButton ? "ml-auto" : ""}
               data-testid="chat-config-save-button"

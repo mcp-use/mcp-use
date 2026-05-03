@@ -5,6 +5,7 @@ import type {
   ProviderTool,
 } from "../types";
 import * as anthropic from "./anthropic";
+import * as custom from "./custom.ts";
 import * as google from "./google";
 import * as openai from "./openai";
 
@@ -30,6 +31,8 @@ export function streamChat(
       return anthropic.streamChat(params);
     case "google":
       return google.streamChat(params);
+    case "custom":
+      return custom.streamChat(params);
     default:
       throw new Error(`Unsupported LLM provider: ${params.config.provider}`);
   }
@@ -43,6 +46,8 @@ export function chat(params: ChatParams): Promise<ChatResult> {
       return anthropic.chat(params);
     case "google":
       return google.chat(params);
+    case "custom":
+      return custom.chat(params);
     default:
       throw new Error(`Unsupported LLM provider: ${params.config.provider}`);
   }

@@ -32,10 +32,16 @@ export interface Message {
 }
 
 export interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "anthropic" | "google" | "custom";
   apiKey: string;
   model: string;
   temperature?: number;
+  /** Custom endpoint base URL (e.g. http://localhost:1234) */
+  baseUrl?: string;
+  /** Override the completions sub-path (default: /v1/chat/completions) */
+  endpoint?: string;
+  /** Extra HTTP headers for the custom provider */
+  headers?: Record<string, string>;
 }
 
 export interface AuthConfig {
@@ -72,4 +78,5 @@ export const DEFAULT_MODELS = {
   openai: "gpt-4o",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
+  custom: "",
 };

@@ -8,7 +8,7 @@
  * langchain to bundle their apps.
  */
 
-export type ProviderName = "openai" | "anthropic" | "google";
+export type ProviderName = "openai" | "anthropic" | "google" | "custom";
 
 export interface ProviderConfig {
   provider: ProviderName;
@@ -16,6 +16,12 @@ export interface ProviderConfig {
   apiKey: string;
   temperature?: number;
   maxTokens?: number;
+  /** Base URL for custom OpenAI-compatible providers (e.g. http://localhost:1234) */
+  baseUrl?: string;
+  /** Override the completions path (default: /v1/chat/completions) */
+  endpoint?: string;
+  /** Extra HTTP headers merged on top of Content-Type and Authorization */
+  headers?: Record<string, string>;
 }
 
 export interface ImageContentPart {

@@ -7,7 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { Copy, Download, SquarePen } from "lucide-react";
+import { Copy, Download, Server, SquarePen } from "lucide-react";
 import { ConfigurationDialog } from "./ConfigurationDialog";
 import {
   DropdownMenu,
@@ -25,14 +25,19 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: "openai" | "anthropic" | "google" | "custom";
   tempModel: string;
   tempApiKey: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  onProviderChange: (
+    provider: "openai" | "anthropic" | "google" | "custom"
+  ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
   onSaveConfig: () => void;
   onClearConfig: () => void;
+  /** Base URL for custom OpenAI-compatible providers */
+  tempBaseUrl?: string;
+  onBaseUrlChange?: (url: string) => void;
   /** When true, hides the API key config badge/button and dialog. */
   hideConfigButton?: boolean;
   /**
@@ -82,6 +87,8 @@ export function ChatHeader({
   hideClearButton,
   onCopyChat,
   onExportChat,
+  tempBaseUrl,
+  onBaseUrlChange,
 }: ChatHeaderProps) {
   return (
     <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
@@ -95,11 +102,15 @@ export function ChatHeader({
                 className="hidden sm:flex ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
                 onClick={() => onConfigDialogOpenChange(true)}
               >
-                <img
-                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
-                  alt={llmConfig.provider}
-                  className="w-4 h-4 mr-0"
-                />
+                {llmConfig.provider === "custom" ? (
+                  <Server className="w-4 h-4 mr-1" />
+                ) : (
+                  <img
+                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                    alt={llmConfig.provider}
+                    className="w-4 h-4 mr-0"
+                  />
+                )}
                 {llmConfig.provider}/{llmConfig.model}
               </Badge>
             </TooltipTrigger>
@@ -122,11 +133,15 @@ export function ChatHeader({
                 className="p-2 sm:hidden"
                 onClick={() => onConfigDialogOpenChange(true)}
               >
-                <img
-                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
-                  alt={llmConfig.provider}
-                  className="w-4 h-4"
-                />
+                {llmConfig.provider === "custom" ? (
+                  <Server className="w-4 h-4" />
+                ) : (
+                  <img
+                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                    alt={llmConfig.provider}
+                    className="w-4 h-4"
+                  />
+                )}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -219,9 +234,11 @@ export function ChatHeader({
             tempProvider={tempProvider}
             tempModel={tempModel}
             tempApiKey={tempApiKey}
+            tempBaseUrl={tempBaseUrl}
             onProviderChange={onProviderChange}
             onModelChange={onModelChange}
             onApiKeyChange={onApiKeyChange}
+            onBaseUrlChange={onBaseUrlChange}
             onSave={onSaveConfig}
             onClear={onClearConfig}
             showClearButton={!!llmConfig && !freeTierInfo}
