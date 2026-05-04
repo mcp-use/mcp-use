@@ -9,8 +9,8 @@ export const SimpleSplitCard = ({
   rightHref,
   leftLogo,
   rightLogo,
-  leftLabel = "Python",
-  rightLabel = "TypeScript",
+  leftLabel = "Typescript",
+  rightLabel = "Python",
   className,
   imgAlt,
 }) => {
