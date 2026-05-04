@@ -5,10 +5,11 @@
 
 import { convertMessagesToProvider } from "../llm/messageFormat";
 import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
+import { resolveProvider } from "../llm/types";
 import type { ProviderMessage, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "openai-compatible" | "anthropic" | "google";
   model: string;
   apiKey: string;
   temperature?: number;
@@ -179,7 +180,7 @@ export async function* handleChatRequestStream(requestBody: {
 
     for await (const ev of runToolLoop({
       config: {
-        provider: llmConfig.provider,
+        provider: resolveProvider(llmConfig.provider),
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
         temperature: llmConfig.temperature,
@@ -340,7 +341,7 @@ export async function handleChatRequest(requestBody: {
 
     const { content, toolCalls } = await runToolLoopNonStreaming({
       config: {
-        provider: llmConfig.provider,
+        provider: resolveProvider(llmConfig.provider),
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
         temperature: llmConfig.temperature,

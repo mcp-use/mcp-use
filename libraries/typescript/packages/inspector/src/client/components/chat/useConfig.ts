@@ -15,7 +15,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
   // LLM Config form state
   const [tempProvider, setTempProvider] = useState<
-    "openai" | "anthropic" | "google"
+    "openai" | "openai-compatible" | "anthropic" | "google"
   >("openai");
   const [tempApiKey, setTempApiKey] = useState("");
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
@@ -129,14 +129,16 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
   // Update model and load API key when provider changes
   useEffect(() => {
-    setTempModel(DEFAULT_MODELS[tempProvider]);
-    // Load API key for the selected provider
+    if (tempProvider !== "openai-compatible") {
+      setTempModel(DEFAULT_MODELS[tempProvider]);
+      setTempBaseUrl("");
+    }
     const apiKeys = getApiKeys();
     setTempApiKey(apiKeys[tempProvider] || "");
   }, [tempProvider, getApiKeys]);
 
   const saveLLMConfig = useCallback(() => {
-    if (!tempApiKey.trim()) {
+    if (tempProvider === "openai-compatible" ? !tempBaseUrl.trim() : !tempApiKey.trim()) {
       return;
     }
 
@@ -149,7 +151,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
       provider: tempProvider,
       apiKey: tempApiKey,
       model: tempModel,
-      ...(tempProvider === "openai" &&
+      ...(tempProvider === "openai-compatible" &&
         tempBaseUrl.trim() && { baseUrl: tempBaseUrl.trim() }),
     };
 
@@ -214,6 +216,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     delete apiKeys[tempProvider];
     saveApiKeys(apiKeys);
     setTempApiKey("");
+    setTempBaseUrl("");
     setTempUsername("");
     setTempPassword("");
     setTempToken("");

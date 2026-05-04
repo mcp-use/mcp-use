@@ -32,7 +32,7 @@ export interface Message {
 }
 
 export interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider: "openai" | "openai-compatible" | "anthropic" | "google";
   apiKey: string;
   model: string;
   temperature?: number;
@@ -71,6 +71,7 @@ export type StreamProtocol = "sse" | "data-stream";
 
 export const DEFAULT_MODELS = {
   openai: "gpt-4o",
+  "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
 };

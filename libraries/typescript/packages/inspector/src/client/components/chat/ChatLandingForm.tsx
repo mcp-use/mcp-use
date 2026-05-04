@@ -1,4 +1,5 @@
 import { AuroraBackground } from "@/client/components/ui/aurora-background";
+import { resolveProvider } from "@/llm/types";
 import { Badge } from "@/client/components/ui/badge";
 import { BlurFade } from "@/client/components/ui/blur-fade";
 import { Button } from "@/client/components/ui/button";
@@ -199,7 +200,7 @@ export function ChatLandingForm({
                     onClick={() => onConfigDialogOpenChange(true)}
                   >
                     <img
-                      src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                      src={`https://inspector-cdn.mcp-use.com/providers/${resolveProvider(llmConfig.provider)}.png`}
                       alt={llmConfig.provider}
                       className="w-4 h-4 mr-0 rounded-full"
                     />

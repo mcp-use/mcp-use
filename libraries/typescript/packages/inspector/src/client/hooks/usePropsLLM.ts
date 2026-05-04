@@ -1,4 +1,5 @@
 import { chat } from "@/llm/providers";
+import { resolveProvider } from "@/llm/types";
 import type { ProviderMessage } from "@/llm/types";
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback } from "react";
@@ -99,7 +100,7 @@ Example: {"query": "example search term", "results": [{"fruit": "Apple", "color"
         ];
         const { text } = await chat({
           config: {
-            provider: llmConfig.provider,
+            provider: resolveProvider(llmConfig.provider),
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
             temperature: llmConfig.temperature,
@@ -154,7 +155,7 @@ Based on this information, suggest 3-5 common customizable properties like theme
       ];
       const { text } = await chat({
         config: {
-          provider: llmConfig.provider,
+          provider: resolveProvider(llmConfig.provider),
           model: llmConfig.model,
           apiKey: llmConfig.apiKey,
           temperature: llmConfig.temperature,

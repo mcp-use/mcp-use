@@ -1,3 +1,4 @@
+import { resolveProvider } from "@/llm/types";
 import type { LLMConfig } from "./types";
 
 import { Badge } from "@/client/components/ui/badge";
@@ -25,11 +26,13 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google";
   tempModel: string;
   tempApiKey: string;
   tempBaseUrl?: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  onProviderChange: (
+    provider: "openai" | "openai-compatible" | "anthropic" | "google"
+  ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
   onBaseUrlChange?: (baseUrl: string) => void;
@@ -100,7 +103,7 @@ export function ChatHeader({
                 onClick={() => onConfigDialogOpenChange(true)}
               >
                 <img
-                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                  src={`https://inspector-cdn.mcp-use.com/providers/${resolveProvider(llmConfig.provider)}.png`}
                   alt={llmConfig.provider}
                   className="w-4 h-4 mr-0"
                 />
@@ -127,7 +130,7 @@ export function ChatHeader({
                 onClick={() => onConfigDialogOpenChange(true)}
               >
                 <img
-                  src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                  src={`https://inspector-cdn.mcp-use.com/providers/${resolveProvider(llmConfig.provider)}.png`}
                   alt={llmConfig.provider}
                   className="w-4 h-4"
                 />

@@ -2,6 +2,6 @@
 "@mcp-use/inspector": patch
 ---
 
-Add configurable Base URL support for OpenAI-compatible providers in the inspector chat.
+Add "OpenAI Compatible" provider option to the inspector chat configuration.
 
-The OpenAI provider now accepts an optional `baseUrl` field, allowing users to point the inspector chat at any OpenAI-compatible API (e.g. LM Studio at `http://localhost:1234/v1`, OpenRouter at `https://openrouter.ai/api/v1`). When left blank the default OpenAI endpoint (`https://api.openai.com/v1`) is used.
+A new "OpenAI Compatible" entry in the provider dropdown lets users point the inspector chat at any OpenAI-compatible API (e.g. LM Studio, Ollama, OpenRouter). Selecting it exposes a required Base URL field and an optional API key. The standard OpenAI provider is unchanged.
