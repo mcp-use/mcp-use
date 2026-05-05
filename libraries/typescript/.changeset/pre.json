@@ -8,6 +8,7 @@
     "mcp-use": "1.26.0"
   },
   "changesets": [
-    "clerk-oauth-remove-openid-default-scope"
+    "clerk-oauth-remove-openid-default-scope",
+    "fix-deploy-env-propagation"
   ]
 }
