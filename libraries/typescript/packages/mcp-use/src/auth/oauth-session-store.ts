@@ -63,7 +63,6 @@ export class OAuthSessionStore {
   readonly scope?: string;
 
   private store: KVStore;
-  private pendingCodeVerifier: string | null = null;
   private _cachedAuthServerUrl: string | null = null;
   private _cachedMetadata: AuthorizationServerMetadata | null = null;
   private _refreshPromise: Promise<OAuthTokens | null> | null = null;
@@ -108,7 +107,7 @@ export class OAuthSessionStore {
   // --- SDK Interface Methods (delegated) ---
 
   get redirectUrl(): string {
-    return sanitizeUrl(this.callbackUrl);
+    return this.callbackUrl;
   }
 
   get clientMetadata(): OAuthClientMetadata {
@@ -154,11 +153,11 @@ export class OAuthSessionStore {
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    const key = this.getKey("tokens");
-    await this.store.set(key, JSON.stringify(tokens));
-    await this.store.remove(this.getKey("code_verifier"));
-    await this.store.remove(this.getKey("last_auth_url"));
-    this.pendingCodeVerifier = null;
+    await Promise.all([
+      this.store.set(this.getKey("tokens"), JSON.stringify(tokens)),
+      this.store.remove(this.getKey("code_verifier")),
+      this.store.remove(this.getKey("last_auth_url")),
+    ]);
   }
 
   async clientInformation(): Promise<OAuthClientInformation | undefined> {
@@ -182,9 +181,11 @@ export class OAuthSessionStore {
         console.info(
           `[${this.storageKeyPrefix}] Invalidating cached OAuth client info due to redirect URI mismatch.`
         );
-        await this.store.remove(key);
-        await this.store.remove(this.getKey("tokens"));
-        await this.store.remove(this.getKey("last_auth_url"));
+        await Promise.all([
+          this.store.remove(key),
+          this.store.remove(this.getKey("tokens")),
+          this.store.remove(this.getKey("last_auth_url")),
+        ]);
         return undefined;
       }
 
@@ -207,9 +208,7 @@ export class OAuthSessionStore {
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
-    const key = this.getKey("code_verifier");
-    await this.store.set(key, codeVerifier);
-    this.pendingCodeVerifier = codeVerifier;
+    await this.store.set(this.getKey("code_verifier"), codeVerifier);
   }
 
   async codeVerifier(): Promise<string> {
@@ -228,11 +227,12 @@ export class OAuthSessionStore {
   ): Promise<void> {
     switch (scope) {
       case "all":
-        await this.store.remove(this.getKey("tokens"));
-        await this.store.remove(this.getKey("client_info"));
-        await this.store.remove(this.getKey("code_verifier"));
-        await this.store.remove(this.getKey("last_auth_url"));
-        this.pendingCodeVerifier = null;
+        await Promise.all([
+          this.store.remove(this.getKey("tokens")),
+          this.store.remove(this.getKey("client_info")),
+          this.store.remove(this.getKey("code_verifier")),
+          this.store.remove(this.getKey("last_auth_url")),
+        ]);
         break;
       case "client":
         await this.store.remove(this.getKey("client_info"));
@@ -242,7 +242,6 @@ export class OAuthSessionStore {
         break;
       case "verifier":
         await this.store.remove(this.getKey("code_verifier"));
-        this.pendingCodeVerifier = null;
         break;
       default:
         break;
@@ -267,14 +266,12 @@ export class OAuthSessionStore {
   ): Promise<string> {
     const state = globalThis.crypto.randomUUID();
     const stateKey = `${this.storageKeyPrefix}:state_${state}`;
-    const codeVerifierSnapshot =
-      this.pendingCodeVerifier ||
-      (await this.store.get(this.getKey("code_verifier")));
+    const codeVerifier = await this.store.get(this.getKey("code_verifier"));
 
     const stateData: StoredState = {
       serverUrlHash: this.serverUrlHash,
       expiry: Date.now() + 1000 * 60 * 10, // State expires in 10 minutes
-      codeVerifier: codeVerifierSnapshot || undefined,
+      codeVerifier: codeVerifier || undefined,
       providerOptions: {
         serverUrl: this.serverUrl,
         storageKeyPrefix: this.storageKeyPrefix,
@@ -287,17 +284,13 @@ export class OAuthSessionStore {
       returnUrl: opts.returnUrl,
     };
 
-    console.log(`[OAuth] Storing state key: ${stateKey}`);
-    await this.store.set(stateKey, JSON.stringify(stateData));
-
-    const verified = await this.store.get(stateKey);
-    console.log(`[OAuth] State stored successfully: ${!!verified}`);
-
     authorizationUrl.searchParams.set("state", state);
-    const authUrlString = authorizationUrl.toString();
-    const sanitizedAuthUrl = sanitizeUrl(authUrlString);
+    const sanitizedAuthUrl = sanitizeUrl(authorizationUrl.toString());
 
-    await this.store.set(this.getKey("last_auth_url"), sanitizedAuthUrl);
+    await Promise.all([
+      this.store.set(stateKey, JSON.stringify(stateData)),
+      this.store.set(this.getKey("last_auth_url"), sanitizedAuthUrl),
+    ]);
 
     return sanitizedAuthUrl;
   }
