@@ -288,8 +288,21 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     const data = localStorage.getItem(key);
     if (!data) return undefined;
     try {
-      // TODO: Add validation using a schema
-      const clientInfo = JSON.parse(data) as OAuthClientInformation & {
+      const parsed = JSON.parse(data);
+      
+      // Validate required OAuth client information fields
+      const requiredFields = ['client_id', 'client_secret', 'grant_types', 'response_types'];
+      const missingFields = requiredFields.filter((field) => !(field in parsed));
+      
+      if (missingFields.length > 0) {
+        console.warn(
+          `[${this.storageKeyPrefix}] Invalid OAuth client info: missing fields [${missingFields.join(', ')}]`
+        );
+        localStorage.removeItem(key);
+        return undefined;
+      }
+      
+      const clientInfo = parsed as OAuthClientInformation & {
         redirect_uris?: string[];
       };
       const storedRedirectUris = Array.isArray(clientInfo.redirect_uris)
@@ -315,7 +328,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     } catch (e) {
       console.warn(
         `[${this.storageKeyPrefix}] Failed to parse client information:`,
-        e
+        e instanceof Error ? e.message : String(e)
       );
       localStorage.removeItem(key);
       return undefined;

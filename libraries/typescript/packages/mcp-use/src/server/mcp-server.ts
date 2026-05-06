@@ -2862,7 +2862,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               errorType,
               executionTimeMs,
             })
-            .catch((e) => console.debug(`Failed to track tool call: ${e}`));
+            .catch((e) => {
+              // Silently ignore telemetry errors to prevent blocking tool execution
+              // but log at debug level for troubleshooting
+              const logger = require('../../utils/logger').default;
+              logger.debug(`Telemetry: Failed to track tool call - ${e instanceof Error ? e.message : String(e)}`);
+            });
         }
       };
 
@@ -2950,7 +2955,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               success,
               errorType,
             })
-            .catch((e) => console.debug(`Failed to track prompt call: ${e}`));
+            .catch((e) => {
+              // Silently ignore telemetry errors to prevent blocking prompt execution
+              const logger = require('../../utils/logger').default;
+              logger.debug(`Telemetry: Failed to track prompt call - ${e instanceof Error ? e.message : String(e)}`);
+            });
         }
       };
 
@@ -3030,7 +3039,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               success,
               errorType,
             })
-            .catch((e) => console.debug(`Failed to track resource call: ${e}`));
+            .catch((e) => {
+              // Silently ignore telemetry errors to prevent blocking resource access
+              const logger = require('../../utils/logger').default;
+              logger.debug(`Telemetry: Failed to track resource call - ${e instanceof Error ? e.message : String(e)}`);
+            });
         }
       };
 

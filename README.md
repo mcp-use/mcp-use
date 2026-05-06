@@ -60,7 +60,7 @@ Visit our [docs](https://mcp-use.com/docs) or jump to a quickstart ([TypeScript]
 
 ### <img src="./static/typescript.svg" height="14" style="margin-right:4px; top:-1px; position:relative;" align="center" /> TypeScript
 
-Build your first MCP Server or MPC App:
+Build your first MCP Server or MCP App:
 
 ```bash
 npx create-mcp-use-app@latest

@@ -200,17 +200,26 @@ export async function mountSession(
       case "notifications/tools/list_changed":
         parentServer.nativeServer.server
           .sendToolListChanged()
-          .catch(console.error);
+          .catch((err) => {
+            const logger = require('../../utils/logger').default;
+            logger.warn(`Failed to forward tool list changed notification: ${err instanceof Error ? err.message : String(err)}`);
+          });
         break;
       case "notifications/resources/list_changed":
         parentServer.nativeServer.server
           .sendResourceListChanged()
-          .catch(console.error);
+          .catch((err) => {
+            const logger = require('../../utils/logger').default;
+            logger.warn(`Failed to forward resource list changed notification: ${err instanceof Error ? err.message : String(err)}`);
+          });
         break;
       case "notifications/prompts/list_changed":
         parentServer.nativeServer.server
           .sendPromptListChanged()
-          .catch(console.error);
+          .catch((err) => {
+            const logger = require('../../utils/logger').default;
+            logger.warn(`Failed to forward prompt list changed notification: ${err instanceof Error ? err.message : String(err)}`);
+          });
         break;
       default:
         // Ignore other notification types - only forward list_changed

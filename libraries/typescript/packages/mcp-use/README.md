@@ -21,7 +21,7 @@
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
     <br/>
     <a href="https://mcp-use.com/docs/python" alt="Python docs">
-        <img src="https://img.shields.io/badge/pyhton-docs-blue?labelColor=white&logo=python" alt="Badge"></a>
+        <img src="https://img.shields.io/badge/python-docs-blue?labelColor=white&logo=python" alt="Badge"></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
         <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
@@ -60,7 +60,7 @@ Visit our [docs](https://mcp-use.com/docs) or jump to a quickstart ([TypeScript]
 
 ### TypeScript
 
-Build your first MCP Server or MPC App:
+Build your first MCP Server or MCP App:
 
 ```bash
 npx create-mcp-use-app@latest

@@ -29,6 +29,33 @@ We welcome all kinds of contributions! Here are some ways you can help:
 - **Add new features**: Have an idea? Open an issue to discuss it first, then submit a PR
 - **Improve documentation**: Fix typos, clarify explanations, or add examples
 
+## Your First Contribution
+If this is your first contribution, start by picking one of these high-impact entry points:
+
+- **Improve a doc or example**: A clear README, example, or contributor guide is one of the fastest ways to help new users and maintainers.
+- **Triage a GitHub issue**: Reply with the missing details, label it correctly, and close duplicates to keep the project healthy.
+- **Ship a runnable starter**: Add or improve a minimal MCP Server / MCP App example that works end-to-end in one command.
+- **Bridge the protocol conversation**: Help the MCP committee by documenting protocol best practices, issue flow, or interop guidance.
+
+### Run the repo locally
+For Python:
+
+```bash
+cd libraries/python
+uv venv
+.venv\Scripts\activate  # Windows
+# or source .venv/bin/activate
+uv pip install -e ".[dev,anthropic,openai,search,e2b]"
+```
+
+For TypeScript:
+
+```bash
+cd libraries/typescript
+pnpm install
+pnpm build
+```
+
 If you have any questions or need guidance, join our [Discord](https://discord.gg/XkNkSkMz3V), we're super happy to help!
 
 ## Repository Structure
