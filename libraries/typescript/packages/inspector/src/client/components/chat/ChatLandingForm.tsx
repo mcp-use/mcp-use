@@ -198,11 +198,13 @@ export function ChatLandingForm({
                     className="pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
                     onClick={() => onConfigDialogOpenChange(true)}
                   >
-                    <img
-                      src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
-                      alt={llmConfig.provider}
-                      className="w-4 h-4 mr-0 rounded-full"
-                    />
+                    {llmConfig.provider !== "openai-compatible" && (
+                      <img
+                        src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                        alt={llmConfig.provider}
+                        className="w-4 h-4 mr-0 rounded-full"
+                      />
+                    )}
                     {llmConfig.provider}/{llmConfig.model}
                   </Badge>
                 </TooltipTrigger>

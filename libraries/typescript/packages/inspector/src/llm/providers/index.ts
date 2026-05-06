@@ -25,6 +25,7 @@ export function streamChat(
 ): AsyncGenerator<LlmStreamEvent, void, unknown> {
   switch (params.config.provider) {
     case "openai":
+    case "openai-compatible":
       return openai.streamChat(params);
     case "anthropic":
       return anthropic.streamChat(params);
@@ -38,6 +39,7 @@ export function streamChat(
 export function chat(params: ChatParams): Promise<ChatResult> {
   switch (params.config.provider) {
     case "openai":
+    case "openai-compatible":
       return openai.chat(params);
     case "anthropic":
       return anthropic.chat(params);

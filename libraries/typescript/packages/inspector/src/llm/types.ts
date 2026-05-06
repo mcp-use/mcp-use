@@ -8,7 +8,11 @@
  * langchain to bundle their apps.
  */
 
-export type ProviderName = "openai" | "anthropic" | "google";
+export type ProviderName =
+  | "openai"
+  | "openai-compatible"
+  | "anthropic"
+  | "google";
 
 export interface ProviderConfig {
   provider: ProviderName;
@@ -16,6 +20,7 @@ export interface ProviderConfig {
   apiKey: string;
   temperature?: number;
   maxTokens?: number;
+  baseUrl?: string;
 }
 
 export interface ImageContentPart {

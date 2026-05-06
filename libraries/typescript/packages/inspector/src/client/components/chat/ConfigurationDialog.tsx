@@ -97,12 +97,16 @@ function getCachedModels(provider: string): ModelOption[] | null {
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider: "openai" | "anthropic" | "google";
+  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google";
   tempModel: string;
   tempApiKey: string;
-  onProviderChange: (provider: "openai" | "anthropic" | "google") => void;
+  tempBaseUrl?: string;
+  onProviderChange: (
+    provider: "openai" | "openai-compatible" | "anthropic" | "google"
+  ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onBaseUrlChange?: (baseUrl: string) => void;
   onSave: () => void;
   onClear?: () => void;
   showClearButton?: boolean;
@@ -117,6 +121,43 @@ interface ConfigurationDialogProps {
   freeTierInfo?: {
     onLoginClick: () => void;
   };
+}
+
+async function fetchOpenAICompatibleModels(
+  baseUrl: string,
+  apiKey: string
+): Promise<ModelOption[]> {
+  const stripped = baseUrl.replace(/\/+$/, "");
+  const headers: Record<string, string> = {};
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${stripped}/models`, { headers });
+  } catch {
+    // fetch() rejects with a generic TypeError when CORS blocks the response,
+    // when the server is unreachable, or on mixed-content.
+    throw new Error(
+      "Failed to reach the server. Check the URL is correct and that CORS is enabled on the server."
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch models: ${response.statusText}`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("Invalid URL — response was not JSON");
+  }
+
+  const data = await response.json();
+  if (!Array.isArray(data?.data)) {
+    throw new Error(
+      "Unexpected response format — expected { data: [...] } from the OpenAI-compatible endpoint"
+    );
+  }
+  return data.data.map((model: { id: string }) => ({ id: model.id }));
 }
 
 async function fetchOpenAIModels(apiKey: string): Promise<ModelOption[]> {
@@ -180,9 +221,11 @@ export function ConfigurationDialog({
   tempProvider,
   tempModel,
   tempApiKey,
+  tempBaseUrl = "",
   onProviderChange,
   onModelChange,
   onApiKeyChange,
+  onBaseUrlChange,
   onSave,
   onClear,
   showClearButton = false,
@@ -195,17 +238,26 @@ export function ConfigurationDialog({
   const [comboboxOpen, setComboboxOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Fetch models when API key is set and provider is selected
+  // Fetch models when API key / base URL is set and provider is selected
   useEffect(() => {
-    if (!open || !tempApiKey.trim() || !tempProvider) {
+    const hasCredential =
+      tempProvider === "openai-compatible"
+        ? !!tempBaseUrl.trim()
+        : !!tempApiKey.trim();
+    if (!open || !hasCredential) {
       setModels([]);
       setModelError(null);
       return;
     }
 
     const loadModels = async () => {
+      const cacheKey =
+        tempProvider === "openai-compatible"
+          ? `${tempProvider}:${tempBaseUrl}`
+          : tempProvider;
+
       // Check cache first
-      const cachedModels = getCachedModels(tempProvider);
+      const cachedModels = getCachedModels(cacheKey);
       if (cachedModels) {
         setModels(cachedModels);
         setModelError(null);
@@ -218,7 +270,12 @@ export function ConfigurationDialog({
 
       try {
         let fetchedModels: ModelOption[] = [];
-        if (tempProvider === "openai") {
+        if (tempProvider === "openai-compatible") {
+          fetchedModels = await fetchOpenAICompatibleModels(
+            tempBaseUrl,
+            tempApiKey
+          );
+        } else if (tempProvider === "openai") {
           fetchedModels = await fetchOpenAIModels(tempApiKey);
         } else if (tempProvider === "anthropic") {
           fetchedModels = await fetchAnthropicModels(tempApiKey);
@@ -227,7 +284,7 @@ export function ConfigurationDialog({
         }
 
         // Cache the fetched models
-        setModelsCache(tempProvider, fetchedModels);
+        setModelsCache(cacheKey, fetchedModels);
         setModels(fetchedModels);
       } catch (error) {
         setModelError(
@@ -244,7 +301,7 @@ export function ConfigurationDialog({
     // Debounce the API call
     const timeoutId = setTimeout(loadModels, 500);
     return () => clearTimeout(timeoutId);
-  }, [tempApiKey, tempProvider, open]);
+  }, [tempApiKey, tempProvider, tempBaseUrl, open]);
 
   // Reset model when provider changes
   useEffect(() => {
@@ -333,6 +390,11 @@ export function ConfigurationDialog({
                     <span>Google</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="openai-compatible">
+                  <div className="flex items-center gap-2">
+                    <span>OpenAI Compatible</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -344,7 +406,11 @@ export function ConfigurationDialog({
                 type={showPassword ? "text" : "password"}
                 value={tempApiKey}
                 onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder="Enter your API key"
+                placeholder={
+                  tempProvider === "openai-compatible"
+                    ? "Enter your API key (optional)"
+                    : "Enter your API key"
+                }
                 className="pr-10"
                 data-testid="chat-config-api-key-input"
               />
@@ -367,7 +433,25 @@ export function ConfigurationDialog({
             </p>
           </div>
 
-          {tempApiKey.trim() && (
+          {tempProvider === "openai-compatible" && (
+            <div className="space-y-2">
+              <Label>Base URL</Label>
+              <Input
+                value={tempBaseUrl}
+                onChange={(e) => onBaseUrlChange?.(e.target.value)}
+                placeholder="http://localhost:11434/v1"
+                data-testid="chat-config-base-url-input"
+              />
+              <p className="text-xs text-muted-foreground">
+                Base URL of your OpenAI-compatible API. Local servers must have
+                CORS enabled.
+              </p>
+            </div>
+          )}
+
+          {(tempProvider === "openai-compatible"
+            ? !!tempBaseUrl.trim()
+            : !!tempApiKey.trim()) && (
             <div className="space-y-2">
               <Label>Model</Label>
               {isLoadingModels ? (
@@ -456,7 +540,9 @@ export function ConfigurationDialog({
             <Button
               onClick={onSave}
               disabled={
-                !tempApiKey.trim() || (!!tempApiKey.trim() && !tempModel.trim())
+                tempProvider === "openai-compatible"
+                  ? !tempBaseUrl.trim() || !tempModel.trim()
+                  : !tempApiKey.trim() || !tempModel.trim()
               }
               className={showClearButton ? "ml-auto" : ""}
               data-testid="chat-config-save-button"
