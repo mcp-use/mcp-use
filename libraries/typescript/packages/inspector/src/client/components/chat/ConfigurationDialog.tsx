@@ -143,13 +143,12 @@ async function fetchOpenAICompatibleModels(
   baseUrl: string,
   apiKey: string
 ): Promise<ModelOption[]> {
-  const stripped = baseUrl.replace(/\/+$/, "");
   const headers: Record<string, string> = {};
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
   let response: Response;
   try {
-    response = await fetch(`${stripped}/models`, { headers });
+    response = await fetch(`${baseUrl}/models`, { headers });
   } catch {
     // fetch() rejects with a generic TypeError when CORS blocks the response,
     // when the server is unreachable, or on mixed-content.

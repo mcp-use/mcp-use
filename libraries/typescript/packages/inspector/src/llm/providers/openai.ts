@@ -18,8 +18,7 @@ interface ChatParams {
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 function buildEndpoint(config: ProviderConfig, path: string): string {
-  const base = (config.baseUrl ?? OPENAI_BASE_URL).replace(/\/+$/, "");
-  return `${base}${path}`;
+  return `${config.baseUrl ?? OPENAI_BASE_URL}${path}`;
 }
 
 function buildHeaders(config: ProviderConfig): Record<string, string> {
