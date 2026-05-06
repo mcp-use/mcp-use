@@ -29,7 +29,7 @@ function withOpenRouter(params: ChatParams): ChatParams {
       baseUrl: "https://openrouter.ai/api/v1/chat/completions",
       extraHeaders: {
         "HTTP-Referer": "https://inspector.mcp-use.com",
-        "X-Title": "MCP Inspector",
+        "X-Title": "mcp-use Inspector",
       },
     },
   };
