@@ -32,10 +32,16 @@ export interface Message {
 }
 
 export interface LLMConfig {
-  provider: "openai" | "anthropic" | "google";
+  provider:
+    | "openai"
+    | "openai-compatible"
+    | "anthropic"
+    | "google"
+    | "openrouter";
   apiKey: string;
   model: string;
   temperature?: number;
+  baseUrl?: string;
 }
 
 export interface AuthConfig {
@@ -70,6 +76,8 @@ export type StreamProtocol = "sse" | "data-stream";
 
 export const DEFAULT_MODELS = {
   openai: "gpt-4o",
+  "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
+  openrouter: "meta-llama/llama-3.1-8b-instruct:free",
 };

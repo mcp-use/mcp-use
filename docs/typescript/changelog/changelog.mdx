@@ -6,6 +6,22 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.27.0" description="May 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.27.0&title=Clerk%20OAuth%2C%20pre-registered%20client%20IDs%20%26%20inspector%20providers&date=2026-05&lang=typescript" alt="Release 1.27.0" />
+  </Frame>
+  ## Clerk OAuth, pre-registered client IDs & inspector providers
+  Minor release adding a Clerk OAuth provider, pre-registered OAuth client credentials for proxy-mode flows, OpenRouter and OpenAI-compatible providers in the Inspector chat, browser-side telemetry env-var honoring, and a CLI fix for env propagation on redeploys.
+
+- **New**: `oauthClerkProvider` for using Clerk as an OAuth authorization server in MCP servers — DCR-direct mode where MCP clients register and authenticate directly with Clerk and the server verifies Clerk-issued JWTs via JWKS; default scopes are `["profile", "email", "offline_access"]` and `openid` is excluded by default because it requires OIDC to be explicitly enabled in the Clerk Dashboard (`#1429`)
+- **New**: Pre-registered OAuth client credentials in proxy mode — `UseMcpOptions` / `McpServerOptions` accept `oauth: { clientId?, clientSecret?, scope? }`; with `clientId` set, `BrowserOAuthClientProvider` returns it from `clientInformation()` so the SDK skips Dynamic Client Registration (required for providers like Slack or WorkOS that strip `registration_endpoint` from metadata); with `clientSecret` set, the SDK auto-switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post` (`#1400`)
+- **Fix**: `MCP_USE_ANONYMIZED_TELEMETRY=false` now disables the in-browser `useMcp` `posthog-js` init — the inspector server mirrors the env var into a per-page runtime flag (`window.__MCP_USE_ANONYMIZED_TELEMETRY__`) before the client bundle runs, so a single env var disables every telemetry path (Node-side, server-side proxy, and browser); the flag is page-scoped so unsetting the env var fully restores defaults on the next page load (`#1443`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy --env`/`--env-file` propagates env vars on redeploys — previously only forwarded on initial server creation, now upserts each entry against the env-variables API (`PATCH` for existing keys, `POST` for new keys) before triggering the deployment (`#1433`)
+- **Enhancement** (@mcp-use/inspector): OpenRouter and OpenAI-compatible providers in chat configuration; `Client ID` / `Client Secret` / `Scope` fields in the Authentication dialog (see inspector changelog)
+- **Update**: Updated @mcp-use/inspector to v5.0.0
+- **Update**: Updated @mcp-use/cli to v3.1.3
+</Update>
+
 <Update label="v1.25.2" description="April 2026">
   ## Debug log tiers & widget dev first render
   Patch release adding tiered `MCP_DEBUG_LEVEL` logging for MCP servers, pre-warming Vite widget entries in dev to avoid first-render 504s, and Inspector 3.0.2 (see inspector changelog).

@@ -55,6 +55,14 @@ interface RuntimeConfig {
    * pre-built npm tarball can be configured at deploy time.
    */
   manufactChatUrl?: string | null;
+  /**
+   * Disable anonymized telemetry across the inspector and any `useMcp` hooks
+   * it instantiates. Auto-populated from `MCP_USE_ANONYMIZED_TELEMETRY=false`
+   * on the serving process; the value is forwarded to the browser so the
+   * client-side posthog-js init in `mcp-use/react` can be skipped before any
+   * network calls are made.
+   */
+  disableTelemetry?: boolean;
 }
 
 /**
@@ -91,6 +99,12 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
   if (config.manufactChatUrl) {
     scripts.push(
       `<script>window.__MANUFACT_CHAT_URL__ = ${JSON.stringify(config.manufactChatUrl)};</script>`
+    );
+  }
+
+  if (config.disableTelemetry) {
+    scripts.push(
+      `<script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;</script>`
     );
   }
 
@@ -131,6 +145,11 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     if (config.manufactChatUrl) {
       scripts.push(
         `<script>window.__MANUFACT_CHAT_URL__ = ${JSON.stringify(config.manufactChatUrl)};</script>`
+      );
+    }
+    if (config.disableTelemetry) {
+      scripts.push(
+        `<script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;try{localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY","false");}catch(e){}</script>`
       );
     }
     return scripts.join("\n    ");
@@ -235,12 +254,18 @@ export function registerStaticRoutes(
 ) {
   // When the inspector's own server serves, the proxy is always available.
   // Default proxyUrl so the client can use it; callers may override with null to disable.
+  // disableTelemetry is auto-populated from MCP_USE_ANONYMIZED_TELEMETRY=false so
+  // setting that single env var disables both the inspector's own telemetry and
+  // the in-browser posthog-js init triggered by `useMcp` hooks rendered inside.
   const effectiveConfig: RuntimeConfig = {
     ...runtimeConfig,
     proxyUrl:
       runtimeConfig?.proxyUrl !== undefined
         ? runtimeConfig.proxyUrl
         : "/inspector/api/proxy",
+    disableTelemetry:
+      runtimeConfig?.disableTelemetry ??
+      process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false",
   };
 
   if (USE_CDN) {

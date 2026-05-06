@@ -1,4 +1,5 @@
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
+import type { OAuthClientInformation } from "@modelcontextprotocol/sdk/shared/auth.js";
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
 
@@ -69,6 +70,8 @@ export function createBrowserOAuthProvider(params: {
     window: globalThis.Window | null
   ) => void;
   installFetchInterceptor: boolean;
+  staticClientInfo?: OAuthClientInformation;
+  scope?: string;
 }): {
   provider: BrowserOAuthClientProvider;
   oauthProxyUrl?: string;
@@ -86,6 +89,8 @@ export function createBrowserOAuthProvider(params: {
     oauthProxyUrl,
     connectionUrl: params.gatewayUrl,
     onPopupWindow: params.onPopupWindow,
+    staticClientInfo: params.staticClientInfo,
+    scope: params.scope,
   });
 
   if (oauthProxyUrl && params.installFetchInterceptor) {

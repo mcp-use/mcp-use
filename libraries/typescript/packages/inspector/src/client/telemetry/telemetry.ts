@@ -142,12 +142,21 @@ export class Telemetry {
   }
 
   private isTelemetryDisabled(): boolean {
+    // Server-injected runtime flag (auto-populated from MCP_USE_ANONYMIZED_TELEMETRY=false on
+    // the serving process). Checked first so a blocked localStorage doesn't defeat the env opt-out.
+    if (
+      typeof window !== "undefined" &&
+      (window as unknown as { __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean })
+        .__MCP_USE_ANONYMIZED_TELEMETRY__ === false
+    ) {
+      return true;
+    }
     // Check localStorage
     if (isLocalStorageFunctional()) {
       const stored = localStorage.getItem(getCacheKey("disabled"));
       if (stored === "true") return true;
     }
-    // Check environment variable (if available)
+    // Check environment variable (if available — only matches when bundler inlined it)
     if (
       typeof process !== "undefined" &&
       process.env?.MCP_USE_ANONYMIZED_TELEMETRY === "false"

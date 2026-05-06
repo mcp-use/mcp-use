@@ -1,5 +1,80 @@
 # @mcp-use/inspector
 
+## 5.0.0-canary.5
+
+### Patch Changes
+
+- 02c8e2d: fix(inspector): honor `MCP_USE_ANONYMIZED_TELEMETRY=false` for the
+  in-browser `useMcp` posthog-js init.
+
+  Previously the env var only disabled Node-side telemetry and the
+  inspector's server-side proxy. The `useMcp` React hook still
+  initialized `posthog-js` directly in the browser, sending events to
+  `https://eu.i.posthog.com` that ad/tracker blockers would flag.
+
+  The inspector server now mirrors the env var into a per-page runtime
+  flag (`window.__MCP_USE_ANONYMIZED_TELEMETRY__`) before the client
+  bundle runs; both `mcp-use`'s browser telemetry and the inspector's
+  own client telemetry honor that flag, so a single env var disables
+  every telemetry path. The flag is page-scoped — it leaves no
+  persistent state, so unsetting the env var fully restores defaults on
+  the next page load. Default behavior (telemetry on) is unchanged.
+
+- Updated dependencies [02c8e2d]
+  - mcp-use@1.27.0-canary.5
+
+## 5.0.0-canary.4
+
+### Minor Changes
+
+- afbfa92: Add support for pre-registered OAuth client IDs (proxy mode), including optional client secrets for confidential clients.
+
+  `UseMcpOptions` / `McpServerOptions` now accept an `oauth: { clientId?, clientSecret?, scope? }` field. When `clientId` is provided, `BrowserOAuthClientProvider` returns it from `clientInformation()` so the SDK skips Dynamic Client Registration — required for MCP servers that proxy through providers like Slack or WorkOS, which strip `registration_endpoint` from metadata. When `clientSecret` is also provided, the SDK auto-switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post`, which is useful for providers that don't support PKCE. `scope` is forwarded as `clientMetadata.scope`.
+
+  The Inspector's Authentication dialog now has `Client ID`, `Client Secret`, and `Scope` fields, all wired through `addServer` / `updateServer`.
+
+### Patch Changes
+
+- Updated dependencies [afbfa92]
+  - mcp-use@1.27.0-canary.4
+
+## 5.0.0-canary.3
+
+### Minor Changes
+
+- 870983e: Add OpenRouter as a first-class provider in the inspector chat configuration.
+
+  Selecting "OpenRouter" lets users authenticate with a single OpenRouter API key and access models from multiple upstream providers (OpenAI, Anthropic, Google, etc.). Internally, OpenRouter requests reuse the OpenAI provider with an override base URL and the required `HTTP-Referer` / `X-Title` headers.
+
+### Patch Changes
+
+- mcp-use@1.27.0-canary.3
+
+## 5.0.0-canary.2
+
+### Minor Changes
+
+- 8b4f674: Add "OpenAI Compatible" provider option to the inspector chat configuration.
+
+  A new "OpenAI Compatible" entry in the provider dropdown lets users point the inspector chat at any OpenAI-compatible API (e.g. LM Studio, Ollama, OpenRouter). Selecting it exposes a required Base URL field and an optional API key. The standard OpenAI provider is unchanged.
+
+### Patch Changes
+
+- mcp-use@1.27.0-canary.2
+
+## 5.0.0-canary.1
+
+### Patch Changes
+
+- mcp-use@1.27.0-canary.1
+
+## 5.0.0-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1633518]
+  - mcp-use@1.27.0-canary.0
+
 ## 4.0.0
 
 ### Patch Changes

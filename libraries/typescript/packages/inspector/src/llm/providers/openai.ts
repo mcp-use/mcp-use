@@ -15,7 +15,22 @@ interface ChatParams {
   signal?: AbortSignal;
 }
 
-const DEFAULT_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
+
+function buildEndpoint(config: ProviderConfig, path: string): string {
+  return `${config.baseUrl ?? OPENAI_BASE_URL}${path}`;
+}
+
+function buildHeaders(config: ProviderConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...config.extraHeaders,
+  };
+  if (config.apiKey) {
+    headers.Authorization = `Bearer ${config.apiKey}`;
+  }
+  return headers;
+}
 
 function toOpenAIContent(content: string | ContentPart[]): unknown {
   if (typeof content === "string") return content;
@@ -86,12 +101,10 @@ export async function* streamChat(
     }));
   }
 
-  const res = await fetch(DEFAULT_ENDPOINT, {
+  const endpoint = buildEndpoint(config, "/chat/completions");
+  const res = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
+    headers: buildHeaders(config),
     body: JSON.stringify(body),
     signal,
   });
@@ -209,12 +222,10 @@ export async function chat(params: ChatParams): Promise<{
       },
     }));
   }
-  const res = await fetch(DEFAULT_ENDPOINT, {
+  const endpoint = buildEndpoint(config, "/chat/completions");
+  const res = await fetch(endpoint, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
+    headers: buildHeaders(config),
     body: JSON.stringify(body),
     signal,
   });

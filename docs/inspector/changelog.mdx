@@ -6,6 +6,20 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v5.0.0" description="May 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=5.0.0&title=OpenRouter%2C%20pre-registered%20OAuth%20%26%20telemetry%20env&date=2026-05&lang=inspector" alt="Release 5.0.0" />
+  </Frame>
+  ## OpenRouter, pre-registered OAuth & telemetry env
+  Major release paired with `mcp-use` v1.27.0: OpenRouter and OpenAI-compatible providers in chat configuration, pre-registered OAuth client credentials in the connection dialog, and `MCP_USE_ANONYMIZED_TELEMETRY` honored in browser telemetry.
+
+- **New**: OpenRouter as a first-class chat provider — a single OpenRouter API key fronts upstream OpenAI / Anthropic / Google models; internally reuses the OpenAI provider with an override base URL and the required `HTTP-Referer` / `X-Title` headers (`#1403`)
+- **New**: "OpenAI Compatible" entry in the chat provider dropdown — point inspector chat at any OpenAI-compatible API (LM Studio, Ollama, OpenRouter, etc.) with a required Base URL field and an optional API key; the standard OpenAI provider is unchanged (`#1437`)
+- **New**: `Client ID`, `Client Secret`, and `Scope` fields in the Authentication dialog wired through `addServer` / `updateServer` for pre-registered OAuth flows against providers that strip `registration_endpoint` from metadata (`#1400`)
+- **Fix**: Browser telemetry honors `MCP_USE_ANONYMIZED_TELEMETRY=false` — the inspector server mirrors the env var into `window.__MCP_USE_ANONYMIZED_TELEMETRY__` before the client bundle loads, so a single env var disables both `mcp-use`'s in-browser `posthog-js` and the inspector's own client telemetry (`#1443`)
+- **Update**: Updated mcp-use to v1.27.0
+</Update>
+
 <Update label="v3.0.2" description="April 2026">
   ## E2E alignment for Settings dropdown
   Patch release updating Playwright coverage for the command palette Settings entry after the navbar refactor; paired with `mcp-use` v1.25.2.

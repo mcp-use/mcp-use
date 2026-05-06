@@ -102,6 +102,44 @@ function parseEnvVar(envStr: string): { key: string; value: string } {
   return { key, value };
 }
 
+/**
+ * Upsert env vars onto an existing server via the env-variables API.
+ *
+ * The `--env`/`--env-file` flags are only honored on initial server creation
+ * (where `env` rides on the createServer body). On redeploys we have to call
+ * the dedicated env-variables endpoints, otherwise the values are silently
+ * dropped. Existing keys are updated; new keys are created. Keys not in the
+ * supplied set are left alone — clearing requires `mcp-use servers env rm`.
+ */
+export async function syncEnvVarsToServer(
+  api: McpUseAPI,
+  serverId: string,
+  envVars: Record<string, string>
+): Promise<{ created: number; updated: number }> {
+  const entries = Object.entries(envVars);
+  if (entries.length === 0) return { created: 0, updated: 0 };
+
+  const existing = await api.listEnvVariables(serverId);
+  const byKey = new Map(existing.map((v) => [v.key, v]));
+
+  const results = await Promise.all(
+    entries.map(async ([key, value]) => {
+      const found = byKey.get(key);
+      if (found) {
+        await api.updateEnvVariable(serverId, found.id, { value });
+        return "updated" as const;
+      }
+      await api.createEnvVariable(serverId, { key, value });
+      return "created" as const;
+    })
+  );
+
+  return {
+    created: results.filter((r) => r === "created").length,
+    updated: results.filter((r) => r === "updated").length,
+  };
+}
+
 async function buildEnvVars(
   options: DeployOptions
 ): Promise<Record<string, string>> {
@@ -1238,6 +1276,20 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           console.log(chalk.gray(`  Redeploying to maintain the same URL...`));
           console.log(chalk.cyan(`  URL: ${getMcpServerUrl(existingDep)}\n`));
 
+          if (Object.keys(envVars).length > 0) {
+            const synced = await syncEnvVarsToServer(api, serverId, envVars);
+            console.log(
+              chalk.green(
+                `✓ Synced ${synced.created + synced.updated} environment variable(s)` +
+                  (synced.created || synced.updated
+                    ? chalk.gray(
+                        ` (${synced.created} created, ${synced.updated} updated)`
+                      )
+                    : "")
+              )
+            );
+          }
+
           const newDep = await api.createDeployment({
             serverId,
             branch,
@@ -1281,6 +1333,19 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     let deploymentId: string | undefined;
 
     if (serverId) {
+      if (Object.keys(envVars).length > 0) {
+        const synced = await syncEnvVarsToServer(api, serverId, envVars);
+        console.log(
+          chalk.green(
+            `✓ Synced ${synced.created + synced.updated} environment variable(s)` +
+              (synced.created || synced.updated
+                ? chalk.gray(
+                    ` (${synced.created} created, ${synced.updated} updated)`
+                  )
+                : "")
+          )
+        );
+      }
       console.log(chalk.gray("Creating deployment..."));
       try {
         const result = await api.createDeployment({

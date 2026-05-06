@@ -1,5 +1,66 @@
 # @mcp-use/cli
 
+## 3.1.3-canary.5
+
+### Patch Changes
+
+- Updated dependencies [02c8e2d]
+  - @mcp-use/inspector@5.0.0-canary.5
+  - mcp-use@1.27.0-canary.5
+
+## 3.1.3-canary.4
+
+### Patch Changes
+
+- Updated dependencies [afbfa92]
+  - mcp-use@1.27.0-canary.4
+  - @mcp-use/inspector@5.0.0-canary.4
+
+## 3.1.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [870983e]
+  - @mcp-use/inspector@5.0.0-canary.3
+  - mcp-use@1.27.0-canary.3
+
+## 3.1.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8b4f674]
+  - @mcp-use/inspector@5.0.0-canary.2
+  - mcp-use@1.27.0-canary.2
+
+## 3.1.3-canary.1
+
+### Patch Changes
+
+- 6229097: fix(cli): propagate `--env`/`--env-file` to the server on `mcp-use deploy` redeploys
+
+  `mcp-use deploy --env KEY=VAL` previously only forwarded env vars when the
+  deploy created a new server: the values rode along on the `createServer`
+  request body. On redeploys (an existing linked server, or a previously failed
+  deployment), the CLI parsed the flags, displayed them in the configuration
+  preview, and then silently dropped them — `createDeployment` was called
+  without ever touching the server's env vars.
+
+  The deploy command now upserts each `--env`/`--env-file` entry against the
+  server's env-variables API before triggering the deployment: keys that exist
+  get a `PATCH` with the new value, new keys get a `POST`. Keys not present in
+  the supplied set are left untouched (clearing still requires
+  `mcp-use servers env rm`).
+  - mcp-use@1.27.0-canary.1
+  - @mcp-use/inspector@5.0.0-canary.1
+
+## 3.1.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1633518]
+  - mcp-use@1.27.0-canary.0
+  - @mcp-use/inspector@5.0.0-canary.0
+
 ## 3.1.2
 
 ### Patch Changes

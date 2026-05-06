@@ -24,6 +24,22 @@ export default defineConfig({
         );
       },
     },
+    // Mirror MCP_USE_ANONYMIZED_TELEMETRY=false into a per-page window flag so
+    // the env-var opt-out works in pure-Vite dev mode too (the inspector
+    // backend's `injectRuntimeConfig` never runs when Vite serves directly).
+    {
+      name: "inject-telemetry-opt-out",
+      transformIndexHtml() {
+        if (process.env.MCP_USE_ANONYMIZED_TELEMETRY !== "false") return [];
+        return [
+          {
+            tag: "script",
+            children: "window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;",
+            injectTo: "head-prepend",
+          },
+        ];
+      },
+    },
     // Custom plugin to handle OAuth callback redirects in dev mode
     {
       name: "oauth-callback-redirect",

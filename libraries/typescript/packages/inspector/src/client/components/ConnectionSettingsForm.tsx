@@ -46,6 +46,8 @@ interface ConnectionSettingsFormProps {
   // OAuth fields
   clientId: string;
   setClientId: (value: string) => void;
+  clientSecret: string;
+  setClientSecret: (value: string) => void;
   scope: string;
   setScope: (value: string) => void;
 
@@ -101,6 +103,8 @@ export function ConnectionSettingsForm({
   setProxyAddress,
   clientId,
   setClientId,
+  clientSecret,
+  setClientSecret,
   scope,
   setScope,
   autoSwitch,
@@ -165,6 +169,7 @@ export function ConnectionSettingsForm({
         clientId || scope
           ? {
               clientId,
+              ...(clientId && clientSecret ? { clientSecret } : {}),
               scope,
             }
           : undefined,
@@ -256,6 +261,7 @@ export function ConnectionSettingsForm({
 
         if (config.oauth) {
           setClientId(config.oauth.clientId || "");
+          setClientSecret(config.oauth.clientSecret || "");
           setScope(config.oauth.scope || "");
         }
 
@@ -406,7 +412,7 @@ export function ConnectionSettingsForm({
                 data-testid="connection-form-auth-button"
                 variant="outline"
                 className={cn(
-                  (clientId || scope) && "border-2",
+                  (clientId || clientSecret || scope) && "border-2",
                   "w-full justify-center hover:text-white cursor-pointer",
                   buttonClassName
                 )}
@@ -432,6 +438,20 @@ export function ConnectionSettingsForm({
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Client Secret</Label>
+                <Input
+                  data-testid="auth-dialog-client-secret-input"
+                  type="password"
+                  placeholder="Client Secret (optional)"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Stored in your browser's localStorage.
+                </p>
               </div>
 
               {/* Scope */}

@@ -308,6 +308,40 @@ export type UseMcpOptions = {
    */
   authProvider?: OAuthClientProvider;
   /**
+   * Pre-registered OAuth client settings.
+   *
+   * Use this when the upstream auth server does **not** support Dynamic Client
+   * Registration — for example, MCP servers running in proxy mode against
+   * Slack, WorkOS, or similar providers. The configured `clientId` is returned
+   * directly from `clientInformation()`, bypassing DCR; `scope` is forwarded to
+   * the SDK as `clientMetadata.scope` so it lands in the authorize request.
+   *
+   * @example
+   * ```typescript
+   * useMcp({
+   *   url: 'https://mcp.example.com',
+   *   oauth: {
+   *     clientId: 'my-preregistered-client-id',
+   *     clientSecret: 'my-preregistered-client-secret',
+   *     scope: 'openid profile email',
+   *   },
+   * })
+   * ```
+   */
+  oauth?: {
+    /** Pre-registered OAuth client_id. */
+    clientId?: string;
+    /**
+     * Pre-registered OAuth client_secret for confidential clients at providers
+     * that don't support PKCE. When set alongside `clientId`, the SDK switches
+     * token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post`.
+     * Only meaningful when `clientId` is also set; ignored otherwise.
+     */
+    clientSecret?: string;
+    /** OAuth scope string included in the authorize request. */
+    scope?: string;
+  };
+  /**
    * Initial server info to use from cache (internal use).
    * This will be displayed immediately while the actual server info is being fetched.
    * Once the real server info is available, it will replace this cached value.
