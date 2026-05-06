@@ -1,6 +1,8 @@
 from langchain_core.messages import SystemMessage
 from langchain_core.tools import BaseTool
 
+from mcp_use.logging import logger
+
 
 def generate_tool_descriptions(tools: list[BaseTool], disallowed_tools: list[str] | None = None) -> list[str]:
     """
@@ -43,9 +45,8 @@ def build_system_prompt_content(
     tool_descriptions_block = "\n".join(tool_description_lines)
     # Add a check for missing placeholder to prevent errors
     if "{tool_descriptions}" not in template:
-        # Handle this case: maybe append descriptions at the end or raise an error
-        # For now, let's append if placeholder is missing
-        print("Warning: '{tool_descriptions}' placeholder not found in template.")
+        # Append tool descriptions at the end when the placeholder is absent.
+        logger.warning("'{tool_descriptions}' placeholder not found in system prompt template; appending tools at end.")
         system_prompt_content = template + "\n\nAvailable tools:\n" + tool_descriptions_block
     else:
         system_prompt_content = template.format(tool_descriptions=tool_descriptions_block)
