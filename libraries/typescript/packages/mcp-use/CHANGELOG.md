@@ -1,5 +1,53 @@
 # mcp-use
 
+## 1.27.0
+
+### Minor Changes
+
+- 78cfc8a: feat(mcp-use): add Clerk OAuth provider
+
+  Adds `oauthClerkProvider` for using Clerk as an OAuth authorization
+  server in MCP servers. Uses DCR-direct mode — MCP clients register and
+  authenticate directly with Clerk, and the MCP server verifies
+  Clerk-issued JWTs via JWKS.
+
+  Default scopes are `["profile", "email", "offline_access"]`. The
+  `openid` scope is excluded by default because it requires OIDC to be
+  explicitly enabled in the Clerk Dashboard; users who need it can pass
+  `scopesSupported: ["openid", "profile", "email", "offline_access"]`.
+
+- 78cfc8a: Add support for pre-registered OAuth client IDs (proxy mode), including optional client secrets for confidential clients.
+
+  `UseMcpOptions` / `McpServerOptions` now accept an `oauth: { clientId?, clientSecret?, scope? }` field. When `clientId` is provided, `BrowserOAuthClientProvider` returns it from `clientInformation()` so the SDK skips Dynamic Client Registration — required for MCP servers that proxy through providers like Slack or WorkOS, which strip `registration_endpoint` from metadata. When `clientSecret` is also provided, the SDK auto-switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post`, which is useful for providers that don't support PKCE. `scope` is forwarded as `clientMetadata.scope`.
+
+  The Inspector's Authentication dialog now has `Client ID`, `Client Secret`, and `Scope` fields, all wired through `addServer` / `updateServer`.
+
+### Patch Changes
+
+- 78cfc8a: fix(inspector): honor `MCP_USE_ANONYMIZED_TELEMETRY=false` for the
+  in-browser `useMcp` posthog-js init.
+
+  Previously the env var only disabled Node-side telemetry and the
+  inspector's server-side proxy. The `useMcp` React hook still
+  initialized `posthog-js` directly in the browser, sending events to
+  `https://eu.i.posthog.com` that ad/tracker blockers would flag.
+
+  The inspector server now mirrors the env var into a per-page runtime
+  flag (`window.__MCP_USE_ANONYMIZED_TELEMETRY__`) before the client
+  bundle runs; both `mcp-use`'s browser telemetry and the inspector's
+  own client telemetry honor that flag, so a single env var disables
+  every telemetry path. The flag is page-scoped — it leaves no
+  persistent state, so unsetting the env var fully restores defaults on
+  the next page load. Default behavior (telemetry on) is unchanged.
+
+- Updated dependencies [78cfc8a]
+- Updated dependencies [78cfc8a]
+- Updated dependencies [78cfc8a]
+- Updated dependencies [78cfc8a]
+- Updated dependencies [78cfc8a]
+  - @mcp-use/cli@3.1.3
+  - @mcp-use/inspector@5.0.0
+
 ## 1.27.0-canary.5
 
 ### Patch Changes
