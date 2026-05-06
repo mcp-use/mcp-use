@@ -12,6 +12,7 @@
     "fix-deploy-env-propagation",
     "inspector-openai-base-url",
     "inspector-openrouter-provider",
+    "inspector-telemetry-env-var-disable",
     "oauth-preregistered-client-id"
   ]
 }
