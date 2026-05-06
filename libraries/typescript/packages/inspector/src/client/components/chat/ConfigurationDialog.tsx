@@ -515,7 +515,6 @@ export function ConfigurationDialog({
                 </SelectItem>
                 <SelectItem value="openai-compatible">
                   <div className="flex items-center gap-2">
-                    <ProviderIcon provider="openai-compatible" />
                     <span>{getProviderLabel("openai-compatible")}</span>
                   </div>
                 </SelectItem>

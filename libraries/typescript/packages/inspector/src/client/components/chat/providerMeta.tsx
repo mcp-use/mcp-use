@@ -50,6 +50,10 @@ export function ProviderIcon({
   provider: ProviderName;
   className?: string;
 }) {
+  if (provider === "openai-compatible") {
+    return null;
+  }
+
   const iconSrc = getProviderIconSrc(provider);
 
   if (iconSrc) {
