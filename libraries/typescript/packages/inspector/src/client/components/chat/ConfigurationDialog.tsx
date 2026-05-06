@@ -47,6 +47,12 @@ interface CachedModels {
 const MODELS_CACHE_KEY = "mcp-inspector-models-cache";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
+// OpenRouter doesn't ship a logo on our provider CDN yet, so inline the
+// official mark as a data URL with a neutral gray fill. We'll move this to
+// the CDN alongside the other provider icons in a follow-up.
+const OPENROUTER_ICON_SVG = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="#94A3B8" stroke="#94A3B8"><g><path fill="none" d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path fill="none" d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></g></svg>`;
+export const OPENROUTER_ICON_URL = `data:image/svg+xml,${encodeURIComponent(OPENROUTER_ICON_SVG)}`;
+
 // Helper functions for models cache
 function getModelsCache(): Record<string, CachedModels> {
   try {
@@ -97,12 +103,22 @@ function getCachedModels(provider: string): ModelOption[] | null {
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google";
+  tempProvider:
+    | "openai"
+    | "openai-compatible"
+    | "anthropic"
+    | "google"
+    | "openrouter";
   tempModel: string;
   tempApiKey: string;
   tempBaseUrl?: string;
   onProviderChange: (
-    provider: "openai" | "openai-compatible" | "anthropic" | "google"
+    provider:
+      | "openai"
+      | "openai-compatible"
+      | "anthropic"
+      | "google"
+      | "openrouter"
   ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
@@ -215,6 +231,26 @@ async function fetchGoogleModels(apiKey: string): Promise<ModelOption[]> {
   );
 }
 
+async function fetchOpenRouterModels(apiKey: string): Promise<ModelOption[]> {
+  const response = await fetch("https://openrouter.ai/api/v1/models", {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch OpenRouter models: ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  return data.data.map((model: { id: string; name?: string }) => ({
+    id: model.id,
+    displayName: model.name,
+  }));
+}
+
 export function ConfigurationDialog({
   open,
   onOpenChange,
@@ -281,6 +317,8 @@ export function ConfigurationDialog({
           fetchedModels = await fetchAnthropicModels(tempApiKey);
         } else if (tempProvider === "google") {
           fetchedModels = await fetchGoogleModels(tempApiKey);
+        } else if (tempProvider === "openrouter") {
+          fetchedModels = await fetchOpenRouterModels(tempApiKey);
         }
 
         // Cache the fetched models
@@ -311,6 +349,9 @@ export function ConfigurationDialog({
   }, [tempProvider, open, onModelChange]);
 
   const getProviderIcon = (provider: string) => {
+    if (provider === "openrouter") {
+      return OPENROUTER_ICON_URL;
+    }
     return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
   };
 
@@ -388,6 +429,16 @@ export function ConfigurationDialog({
                       className="w-4 h-4"
                     />
                     <span>Google</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="openrouter">
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={getProviderIcon("openrouter")}
+                      alt="OpenRouter"
+                      className="w-4 h-4"
+                    />
+                    <span>OpenRouter</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="openai-compatible">

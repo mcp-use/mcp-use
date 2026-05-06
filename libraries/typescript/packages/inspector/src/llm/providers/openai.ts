@@ -25,6 +25,7 @@ function buildEndpoint(config: ProviderConfig, path: string): string {
 function buildHeaders(config: ProviderConfig): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...config.extraHeaders,
   };
   if (config.apiKey) {
     headers.Authorization = `Bearer ${config.apiKey}`;

@@ -8,7 +8,10 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Copy, Download, SquarePen } from "lucide-react";
-import { ConfigurationDialog } from "./ConfigurationDialog";
+import {
+  ConfigurationDialog,
+  OPENROUTER_ICON_URL,
+} from "./ConfigurationDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,12 +28,22 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google";
+  tempProvider:
+    | "openai"
+    | "openai-compatible"
+    | "anthropic"
+    | "google"
+    | "openrouter";
   tempModel: string;
   tempApiKey: string;
   tempBaseUrl?: string;
   onProviderChange: (
-    provider: "openai" | "openai-compatible" | "anthropic" | "google"
+    provider:
+      | "openai"
+      | "openai-compatible"
+      | "anthropic"
+      | "google"
+      | "openrouter"
   ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
@@ -103,7 +116,11 @@ export function ChatHeader({
               >
                 {llmConfig.provider !== "openai-compatible" && (
                   <img
-                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                    src={
+                      llmConfig.provider === "openrouter"
+                        ? OPENROUTER_ICON_URL
+                        : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                    }
                     alt={llmConfig.provider}
                     className="w-4 h-4 mr-0"
                   />
@@ -132,7 +149,11 @@ export function ChatHeader({
               >
                 {llmConfig.provider !== "openai-compatible" && (
                   <img
-                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                    src={
+                      llmConfig.provider === "openrouter"
+                        ? OPENROUTER_ICON_URL
+                        : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                    }
                     alt={llmConfig.provider}
                     className="w-4 h-4"
                   />

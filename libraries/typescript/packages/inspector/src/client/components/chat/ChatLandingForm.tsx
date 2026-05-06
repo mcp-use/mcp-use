@@ -13,6 +13,7 @@ import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
+import { OPENROUTER_ICON_URL } from "./ConfigurationDialog";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
 import type { ToolInfo } from "./ToolSelector";
@@ -200,7 +201,11 @@ export function ChatLandingForm({
                   >
                     {llmConfig.provider !== "openai-compatible" && (
                       <img
-                        src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                        src={
+                          llmConfig.provider === "openrouter"
+                            ? OPENROUTER_ICON_URL
+                            : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                        }
                         alt={llmConfig.provider}
                         className="w-4 h-4 mr-0 rounded-full"
                       />

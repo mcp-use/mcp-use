@@ -12,7 +12,8 @@ export type ProviderName =
   | "openai"
   | "openai-compatible"
   | "anthropic"
-  | "google";
+  | "google"
+  | "openrouter";
 
 export interface ProviderConfig {
   provider: ProviderName;
@@ -21,6 +22,8 @@ export interface ProviderConfig {
   temperature?: number;
   maxTokens?: number;
   baseUrl?: string;
+  /** Extra HTTP headers to merge into every request (e.g. OpenRouter's HTTP-Referer). */
+  extraHeaders?: Record<string, string>;
 }
 
 export interface ImageContentPart {
