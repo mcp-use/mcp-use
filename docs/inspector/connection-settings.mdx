@@ -78,10 +78,13 @@ The inspector supports OAuth 2.0 authentication for MCP servers that require it.
 
 ### Setting Up OAuth
 
+By default the inspector relies on Dynamic Client Registration (DCR), so no credentials are needed. Use the Authentication dialog when the upstream auth server doesn't expose `registration_endpoint` (common for proxy-mode servers fronting Slack, WorkOS, or GitHub) or when the provider requires a confidential client without PKCE.
+
 1. Click the **Authentication** button in the connection form
 2. Enter your OAuth credentials:
 
-   - **Client ID**: Your OAuth application client ID
+   - **Client ID**: Pre-registered OAuth client ID. Setting this skips DCR.
+   - **Client Secret**: Pre-registered OAuth client secret (optional). Required for confidential clients without PKCE; when set alongside Client ID, the SDK switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post`.
    - **Scope**: Space-separated list of OAuth scopes
 
 3. Click **Save** to store the configuration
@@ -173,6 +176,7 @@ Export your connection configuration as JSON:
   "maxTotalTimeout": 60000,
   "oauth": {
     "clientId": "your-client-id",
+    "clientSecret": "your-client-secret",
     "scope": "read write"
   }
 }

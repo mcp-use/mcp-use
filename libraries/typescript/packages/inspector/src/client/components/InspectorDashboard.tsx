@@ -39,9 +39,11 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import {
+  buildOAuthStaticConfig,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
   type EditableConnectionConfig,
+  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 import {
   getConfiguredServerAlias,
@@ -148,7 +150,8 @@ export function InspectorDashboard() {
       url: string,
       name?: string,
       proxyConfig?: any,
-      transportType?: "http" | "sse"
+      transportType?: "http" | "sse",
+      oauth?: OAuthStaticConfig
     ) => {
       addServer(url, {
         url,
@@ -157,6 +160,7 @@ export function InspectorDashboard() {
         transportType,
         preventAutoAuth: true,
         useRedirectFlow: true,
+        ...(oauth ? { oauth } : {}),
       });
     },
     [addServer]
@@ -172,6 +176,7 @@ export function InspectorDashboard() {
           headers?: Record<string, string>;
         };
         transportType?: "http" | "sse";
+        oauth?: OAuthStaticConfig;
       }
     ) => {
       // Check if already updating this connection
@@ -299,6 +304,7 @@ export function InspectorDashboard() {
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState("");
 
   const connectFormGradientRef = useRef<HTMLDivElement>(null);
@@ -411,6 +417,8 @@ export function InspectorDashboard() {
           }
         : undefined;
 
+    const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
+
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
       url: normalizedUrl,
@@ -438,6 +446,7 @@ export function InspectorDashboard() {
       ...(Object.keys(headersObject).length > 0 && !proxyConfig
         ? { headers: headersObject }
         : {}),
+      ...(oauthConfig ? { oauth: oauthConfig } : {}),
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
@@ -463,10 +472,21 @@ export function InspectorDashboard() {
     setUrl("");
     setCustomHeaders([]);
     setClientId("");
+    setClientSecret("");
     setScope("");
 
     toast.success("Server added successfully");
-  }, [url, alias, connectionType, proxyAddress, customHeaders, addServer]);
+  }, [
+    url,
+    alias,
+    connectionType,
+    proxyAddress,
+    customHeaders,
+    clientId,
+    clientSecret,
+    scope,
+    addServer,
+  ]);
 
   const handleClearAllConnections = () => {
     // Remove all connections
@@ -571,7 +591,8 @@ export function InspectorDashboard() {
           config.url,
           config.name,
           config.proxyConfig,
-          config.transportType
+          config.transportType,
+          config.oauth
         );
       } else if (
         currentConnection &&
@@ -586,6 +607,7 @@ export function InspectorDashboard() {
           name: config.name,
           proxyConfig: config.proxyConfig,
           transportType: config.transportType,
+          oauth: config.oauth,
         });
       }
 
@@ -1174,6 +1196,8 @@ export function InspectorDashboard() {
             setProxyAddress={setProxyAddress}
             clientId={clientId}
             setClientId={setClientId}
+            clientSecret={clientSecret}
+            setClientSecret={setClientSecret}
             scope={scope}
             setScope={setScope}
             onConnect={handleAddConnection}
