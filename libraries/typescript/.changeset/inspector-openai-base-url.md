@@ -1,5 +1,5 @@
 ---
-"@mcp-use/inspector": patch
+"@mcp-use/inspector": minor
 ---
 
 Add "OpenAI Compatible" provider option to the inspector chat configuration.
