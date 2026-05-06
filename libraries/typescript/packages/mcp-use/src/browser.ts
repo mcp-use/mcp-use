@@ -32,16 +32,11 @@ export type { StoredState } from "./auth/types.js";
 export { Logger, logger } from "./logging.js";
 export type { LogLevel } from "./logging.js";
 
-// Export browser telemetry (browser-specific implementation)
+// Re-export browser telemetry aliases for compatibility
 export {
-  Tel,
-  Telemetry,
-  setTelemetrySource,
+  Telemetry as BrowserTelemetry,
+  setTelemetrySource as setBrowserTelemetrySource,
 } from "./telemetry/telemetry-browser.js";
-
-// Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "./telemetry/telemetry-browser.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "./telemetry/telemetry-browser.js";
 
 // Export observability
 export {

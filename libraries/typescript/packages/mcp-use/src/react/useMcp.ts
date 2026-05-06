@@ -13,7 +13,7 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
 import { Logger, type LogLevel, logger } from "../logging.js";
-import { Tel } from "../telemetry/telemetry-browser.js";
+import { Telemetry } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
 import { applyProxyConfig } from "../utils/proxy-config.js";
@@ -527,7 +527,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
       // Track failed connection
       if (url) {
-        Tel.getInstance()
+        Telemetry.getInstance()
           .trackUseMcpConnection({
             url,
             transportType: transportType,
@@ -849,7 +849,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         }
 
         // Track successful connection
-        Tel.getInstance()
+        Telemetry.getInstance()
           .trackUseMcpConnection({
             url,
             transportType: transportTypeParam,
@@ -1322,7 +1322,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         addLog("info", `Tool "${name}" call successful:`, result);
 
         // Track successful tool call
-        Tel.getInstance()
+        Telemetry.getInstance()
           .trackUseMcpToolCall({
             toolName: name,
             success: true,
@@ -1335,7 +1335,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         addLog("error", `Tool "${name}" call failed:`, err);
 
         // Track failed tool call
-        Tel.getInstance()
+        Telemetry.getInstance()
           .trackUseMcpToolCall({
             toolName: name,
             success: false,
@@ -1607,7 +1607,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         addLog("info", "Resource read successful:", result);
 
         // Track successful resource read
-        Tel.getInstance()
+        Telemetry.getInstance()
           .trackUseMcpResourceRead({
             resourceUri: uri,
             success: true,
@@ -1619,7 +1619,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         addLog("error", "Resource read failed:", err);
 
         // Track failed resource read
-        Tel.getInstance()
+        Telemetry.getInstance()
           .trackUseMcpResourceRead({
             resourceUri: uri,
             success: false,

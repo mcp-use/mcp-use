@@ -43,7 +43,6 @@ export {
 // (Node.js-specific telemetry with posthog-node is only used when directly imported)
 export {
   Telemetry,
-  Tel,
   setTelemetrySource,
   isBrowserEnvironment,
 } from "./telemetry-browser.js";

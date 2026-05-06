@@ -3,7 +3,7 @@ import { normalizeClientInfo, resolveCallbacks } from "../config.js";
 import type { BaseConnector } from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { logger } from "../logging.js";
-import { Tel } from "../telemetry/telemetry-browser.js";
+import { Telemetry } from "../telemetry/telemetry-browser.js";
 import { getPackageVersion } from "../version.js";
 import { BaseMCPClient } from "./base.js";
 
@@ -18,7 +18,7 @@ import { BaseMCPClient } from "./base.js";
  */
 function trackBrowserClientInit(config: Record<string, any>): void {
   const servers = Object.keys(config.mcpServers ?? {});
-  Tel.getInstance()
+  Telemetry.getInstance()
     .trackMCPClientInit({
       codeMode: false,
       sandbox: false,

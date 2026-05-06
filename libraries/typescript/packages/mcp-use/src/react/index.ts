@@ -13,16 +13,11 @@ export { useMcp } from "./useMcp.js";
 // Re-export auth callback handler for OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
 
-// Re-export browser telemetry (browser-specific implementation)
+// Re-export browser telemetry aliases for compatibility
 export {
-  Tel,
-  Telemetry,
-  setTelemetrySource,
+  Telemetry as BrowserTelemetry,
+  setTelemetrySource as setBrowserTelemetrySource,
 } from "../telemetry/telemetry-browser.js";
-
-// Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "../telemetry/telemetry-browser.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/telemetry-browser.js";
 
 // Re-export core types for convenience when using hook result
 export type {
