@@ -10,6 +10,7 @@
   "changesets": [
     "clerk-oauth-remove-openid-default-scope",
     "fix-deploy-env-propagation",
-    "inspector-openai-base-url"
+    "inspector-openai-base-url",
+    "inspector-openrouter-provider"
   ]
 }
