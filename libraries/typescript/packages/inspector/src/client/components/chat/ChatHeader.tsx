@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Copy, Download, SquarePen } from "lucide-react";
-import { ConfigurationDialog } from "./ConfigurationDialog";
+import { ConfigurationDialog, OPENROUTER_ICON_URL } from "./ConfigurationDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -105,7 +105,7 @@ export function ChatHeader({
                   <img
                     src={
                       llmConfig.provider === "openrouter"
-                        ? "https://openrouter.ai/favicon.ico"
+                        ? OPENROUTER_ICON_URL
                         : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
                     }
                     alt={llmConfig.provider}
@@ -138,7 +138,7 @@ export function ChatHeader({
                   <img
                     src={
                       llmConfig.provider === "openrouter"
-                        ? "https://openrouter.ai/favicon.ico"
+                        ? OPENROUTER_ICON_URL
                         : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
                     }
                     alt={llmConfig.provider}
