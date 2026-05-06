@@ -254,6 +254,17 @@ export class Telemetry {
   }
 
   private _checkTelemetryDisabled(): boolean {
+    // Runtime flag injected by a host page (e.g. the inspector mirrors
+    // MCP_USE_ANONYMIZED_TELEMETRY=false from the server here). Checked first
+    // so a blocked localStorage doesn't defeat the opt-out.
+    if (
+      typeof window !== "undefined" &&
+      (window as unknown as { __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean })
+        .__MCP_USE_ANONYMIZED_TELEMETRY__ === false
+    ) {
+      return true;
+    }
+
     // Check localStorage (Browser)
     if (
       isLocalStorageFunctional() &&
