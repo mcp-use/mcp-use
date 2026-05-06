@@ -21,7 +21,6 @@ export interface ProviderConfig {
   apiKey: string;
   temperature?: number;
   maxTokens?: number;
-  /** Override the default API base URL (e.g. for OpenRouter or self-hosted endpoints). */
   baseUrl?: string;
   /** Extra HTTP headers to merge into every request (e.g. OpenRouter's HTTP-Referer). */
   extraHeaders?: Record<string, string>;
