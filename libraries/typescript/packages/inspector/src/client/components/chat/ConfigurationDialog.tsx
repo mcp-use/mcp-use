@@ -443,8 +443,8 @@ export function ConfigurationDialog({
                 data-testid="chat-config-base-url-input"
               />
               <p className="text-xs text-muted-foreground">
-                Base URL of your OpenAI-compatible API. Local servers must
-                have CORS enabled.
+                Base URL of your OpenAI-compatible API. Local servers must have
+                CORS enabled.
               </p>
             </div>
           )}

@@ -81,9 +81,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
           // Load API key for the provider from provider-specific storage
           setTempApiKey(apiKeys[config.provider] || config.apiKey || "");
           setTempModel(config.model);
-          setTempBaseUrl(
-            baseUrls[config.provider] ?? config.baseUrl ?? ""
-          );
+          setTempBaseUrl(baseUrls[config.provider] ?? config.baseUrl ?? "");
         } catch (error) {
           console.error("Failed to load LLM config:", error);
         }
@@ -164,7 +162,11 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   }, [tempProvider, getApiKeys, getBaseUrls]);
 
   const saveLLMConfig = useCallback(() => {
-    if (tempProvider === "openai-compatible" ? !tempBaseUrl.trim() : !tempApiKey.trim()) {
+    if (
+      tempProvider === "openai-compatible"
+        ? !tempBaseUrl.trim()
+        : !tempApiKey.trim()
+    ) {
       return;
     }
 
