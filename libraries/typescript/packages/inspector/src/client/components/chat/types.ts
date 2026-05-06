@@ -32,7 +32,12 @@ export interface Message {
 }
 
 export interface LLMConfig {
-  provider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter";
+  provider:
+    | "openai"
+    | "openai-compatible"
+    | "anthropic"
+    | "google"
+    | "openrouter";
   apiKey: string;
   model: string;
   temperature?: number;

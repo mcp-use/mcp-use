@@ -103,12 +103,22 @@ function getCachedModels(provider: string): ModelOption[] | null {
 interface ConfigurationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter";
+  tempProvider:
+    | "openai"
+    | "openai-compatible"
+    | "anthropic"
+    | "google"
+    | "openrouter";
   tempModel: string;
   tempApiKey: string;
   tempBaseUrl?: string;
   onProviderChange: (
-    provider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter"
+    provider:
+      | "openai"
+      | "openai-compatible"
+      | "anthropic"
+      | "google"
+      | "openrouter"
   ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
@@ -229,7 +239,9 @@ async function fetchOpenRouterModels(apiKey: string): Promise<ModelOption[]> {
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch OpenRouter models: ${response.statusText}`);
+    throw new Error(
+      `Failed to fetch OpenRouter models: ${response.statusText}`
+    );
   }
 
   const data = await response.json();
@@ -238,7 +250,6 @@ async function fetchOpenRouterModels(apiKey: string): Promise<ModelOption[]> {
     displayName: model.name,
   }));
 }
-
 
 export function ConfigurationDialog({
   open,

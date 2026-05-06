@@ -8,7 +8,10 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Copy, Download, SquarePen } from "lucide-react";
-import { ConfigurationDialog, OPENROUTER_ICON_URL } from "./ConfigurationDialog";
+import {
+  ConfigurationDialog,
+  OPENROUTER_ICON_URL,
+} from "./ConfigurationDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,12 +28,22 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter";
+  tempProvider:
+    | "openai"
+    | "openai-compatible"
+    | "anthropic"
+    | "google"
+    | "openrouter";
   tempModel: string;
   tempApiKey: string;
   tempBaseUrl?: string;
   onProviderChange: (
-    provider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter"
+    provider:
+      | "openai"
+      | "openai-compatible"
+      | "anthropic"
+      | "google"
+      | "openrouter"
   ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
