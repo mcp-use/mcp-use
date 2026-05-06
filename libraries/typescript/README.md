@@ -625,6 +625,23 @@ pnpm test
 pnpm dev
 ```
 
+### Finding Unused Code with Knip
+
+This monorepo uses [Knip](https://knip.dev/) to find unused files, exports, and dependencies.
+
+```bash
+# Full report (files, exports, dependencies, types, etc.)
+pnpm knip
+
+# Unused dependencies only (non-blocking)
+pnpm knip:deps
+
+# Production mode — excludes tests, stories, devDependencies
+pnpm knip:production
+```
+
+Configuration lives in [`knip.json`](./knip.json). When false positives appear, prefer refining `entry` / `project` patterns or adding tag-based overrides over broad `ignore` rules. See the [Knip configuration docs](https://knip.dev/reference/configuration) for details.
+
 ---
 
 ## 📜 License

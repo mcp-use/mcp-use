@@ -75,6 +75,7 @@ export function LayoutContent({
             apiKey: "server-managed",
           }
         }
+        enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
         hideTitle={embeddedConfig.chatHideTitle}
         hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
         hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
@@ -218,6 +219,7 @@ export function LayoutContent({
                   }
                 : undefined)
             }
+            enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
             hideTitle={embeddedConfig.chatHideTitle}
             hideModelBadge={
               embeddedConfig.chatHideModelBadge ?? !!embeddedConfig.chatApiUrl

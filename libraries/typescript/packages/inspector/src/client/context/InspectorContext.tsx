@@ -70,6 +70,8 @@ export interface EmbeddedConfig {
   chatCredentials?: RequestCredentials;
   /** Externally-managed LLM config passed to ChatTab (bypasses config UI) */
   managedLlmConfig?: LLMConfig;
+  /** Opt in to the Manufact free-tier sign-in / upgrade UI in the chat. */
+  chatEnableFreeTierUpgrade?: boolean;
   // --- Chat UI customization ---
   /** Hide the "Chat" title in the header */
   chatHideTitle?: boolean;
@@ -186,6 +188,7 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
           // Include cookies so the backend can recognise authenticated users
           // (session cookie shared across subdomains via COOKIE_DOMAIN).
           chatCredentials: "include" as RequestCredentials,
+          chatEnableFreeTierUpgrade: true,
         }
       : {},
   });

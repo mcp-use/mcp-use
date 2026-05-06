@@ -4,54 +4,47 @@ description: "Configure Supabase OAuth 2.1 server authentication for your MCP se
 icon: "/images/icons/supabase.svg"
 ---
 
-Supabase's [OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server/getting-started) hosts `/authorize`, `/token`, `/register`, and `.well-known` discovery on your Supabase project — the MCP server only verifies the resulting JWTs. **You host the consent UI**: Supabase redirects the browser to a URL you configure, and your route uses the Supabase JS SDK to load the authorization details, render sign-in + consent, and submit the decision back to Supabase.
+Use [Supabase's OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server/getting-started) to sign users into your MCP server. Supabase handles the OAuth flow and issues the tokens; your server verifies them and you host the consent page.
 
-<Note>
-  This provider targets Supabase's OAuth 2.1 server (see [MCP authentication guide](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)). It's a different feature than Supabase Auth's social logins — enable it explicitly in the dashboard under **Authentication → OAuth Server**.
-</Note>
+## Prerequisites
+
+Before your MCP server will work, configure these in the [Supabase Dashboard](https://app.supabase.com/):
+
+<Steps>
+  <Step title="Enable the OAuth 2.1 server">
+    **Authentication → Sign In / Providers → OAuth Server** → toggle on. Also toggle **Allow Dynamic OAuth Apps** so MCP clients can self-register.
+  </Step>
+  <Step title="Set the consent screen URL">
+    Point it at the route your MCP server will host, e.g. `http://localhost:3000/auth/consent`. Supabase redirects the browser here with `?authorization_id=<uuid>` after `/authorize`.
+  </Step>
+  <Step title="Enable a sign-in method">
+    Users must be signed in before they can consent. Pick one under **Authentication → Sign In / Providers**:
+    - **Anonymous sign-ins** — one-click guest sessions, ideal for demos
+    - **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.) — for real apps
+  </Step>
+  <Step title="Copy your keys">
+    From **Project Settings**:
+    - **Project ID** (General)
+    - **Publishable key** — `sb_publishable_...` (API Keys). Used by *your* consent route and by tools that call Supabase — not by the provider itself.
+  </Step>
+</Steps>
 
 ## Host the consent UI
 
-Supabase redirects the browser to the consent screen URL you configure in the dashboard (e.g. `/auth/consent?authorization_id=<uuid>`). Your route signs the user in, loads the authorization details with the Supabase JS SDK, and submits the approve/deny decision back to Supabase — mcp-use is not involved in this step.
+Supabase redirects the browser to the consent screen URL you configured above. Your route signs the user in, loads the authorization details with the Supabase JS SDK, and submits the approve/deny decision back to Supabase — mcp-use is not involved in this step.
 
-Follow Supabase's [OAuth Server — Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started) for the canonical implementation. For a wired-up reference, see the [runnable mcp-use + Supabase example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase).
+Don't want to build it from scratch? Start from the [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template) — it has sign-in, consent, and approve/deny already wired up. Or follow Supabase's [OAuth Server — Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started) to roll your own.
 
-## Setup
-
-### 1. Create a Supabase project
-
-Go to the [Supabase Dashboard](https://app.supabase.com/) and create or select a project. Copy the **Project ID** from **Project Settings → General**.
-
-### 2. Enable the OAuth Server
-
-In **Authentication → OAuth Server**, enable the OAuth 2.1 server and set the **consent screen URL** to the route your MCP server will host:
-
-```
-http://localhost:3000/auth/consent
-```
-
-Supabase will redirect users here with `?authorization_id=<uuid>` after `/authorize`.
-
-### 3. Enable a sign-in method
-
-Users must be signed in before they can consent. Pick one in **Authentication → Sign In / Providers**:
-
-- **Anonymous sign-ins** — one-click guest sessions, ideal for demos
-- **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.) — for real apps
-
-### 4. Environment variables
+## Environment variables
 
 ```bash
+# Required — read by oauthSupabaseProvider()
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
 
-# Publishable key (sb_publishable_...) from Project Settings → API Keys.
-# Used by the consent UI and by tools calling Supabase REST/APIs.
+# Used by your consent UI and by tools calling Supabase REST/APIs.
+# Not read by oauthSupabaseProvider() itself.
 MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
-
-<Note>
-  New Supabase projects issue `sb_publishable_...` keys. If your project still uses the legacy `anon` JWT key, it will continue to work here — but prefer publishable keys going forward.
-</Note>
 
 ## Configure the MCP server
 
@@ -134,7 +127,7 @@ server.tool(
 
 ## Resources
 
-- [Runnable mcp-use + Supabase example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
+- [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template) — starter template with the consent UI already wired up
 - [Supabase OAuth Server — Getting Started](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
 - [Supabase OAuth Server — MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)

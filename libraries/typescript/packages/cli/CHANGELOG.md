@@ -1,5 +1,189 @@
 # @mcp-use/cli
 
+## 3.1.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [870983e]
+  - @mcp-use/inspector@5.0.0-canary.3
+  - mcp-use@1.27.0-canary.3
+
+## 3.1.3-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8b4f674]
+  - @mcp-use/inspector@5.0.0-canary.2
+  - mcp-use@1.27.0-canary.2
+
+## 3.1.3-canary.1
+
+### Patch Changes
+
+- 6229097: fix(cli): propagate `--env`/`--env-file` to the server on `mcp-use deploy` redeploys
+
+  `mcp-use deploy --env KEY=VAL` previously only forwarded env vars when the
+  deploy created a new server: the values rode along on the `createServer`
+  request body. On redeploys (an existing linked server, or a previously failed
+  deployment), the CLI parsed the flags, displayed them in the configuration
+  preview, and then silently dropped them — `createDeployment` was called
+  without ever touching the server's env vars.
+
+  The deploy command now upserts each `--env`/`--env-file` entry against the
+  server's env-variables API before triggering the deployment: keys that exist
+  get a `PATCH` with the new value, new keys get a `POST`. Keys not present in
+  the supplied set are left untouched (clearing still requires
+  `mcp-use servers env rm`).
+  - mcp-use@1.27.0-canary.1
+  - @mcp-use/inspector@5.0.0-canary.1
+
+## 3.1.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [1633518]
+  - mcp-use@1.27.0-canary.0
+  - @mcp-use/inspector@5.0.0-canary.0
+
+## 3.1.2
+
+### Patch Changes
+
+- Updated dependencies [bdf9182]
+- Updated dependencies [bdf9182]
+  - mcp-use@1.26.0
+  - @mcp-use/inspector@4.0.0
+
+## 3.1.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [1b70559]
+  - mcp-use@1.26.0-canary.1
+  - @mcp-use/inspector@4.0.0-canary.1
+
+## 3.1.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [2636f32]
+  - mcp-use@1.25.2-canary.0
+  - @mcp-use/inspector@3.0.2-canary.0
+
+## 3.1.1
+
+### Patch Changes
+
+- 806dbca: fix(cli): keep `mcp-use build` non-fatal under the bun runtime
+
+  Building a project with `bun run build` inside an `oven/bun:alpine` image was failing in the tool-registry type-generation step. That step uses `tsx/esm/api`'s `tsImport`, which relies on Node.js custom loader hooks that bun does not implement, and the exception killed the whole build.
+
+  Three small changes keep the build moving:
+  - Detect the bun runtime up front in `generateToolRegistryTypesForServer` and skip the `tsx/esm/api` import with a clear warning instead of crashing.
+  - Wrap the build command's call to `generateToolRegistryTypesForServer` in try/catch so any other import-time error in the user's server file is surfaced as a non-blocking warning rather than exiting the build.
+  - Invoke `tsc --noEmit` via `process.execPath` instead of hardcoding `node`, so bun-only images (which don't ship a `node` binary) can still type-check. Also drop `--max-old-space-size=4096` under bun, which doesn't accept that flag.
+
+  Type generation remains available on Node.js. Under bun, users can still refresh `.mcp-use/tool-registry.d.ts` by running `mcp-use generate-types` from a Node.js shell when needed.
+
+- 806dbca: fix(build): bundle each TypeScript entry with esbuild so extensionless relative imports resolve under plain Node ESM
+
+  `mcp-use build` now runs esbuild with `bundle: true` and `packages: "external"`. Relative imports between a user's source files are resolved at build time; third-party packages (`mcp-use`, `react`, `zod`, etc.) stay as external imports that Node resolves from `node_modules`. Users can keep writing idiomatic TypeScript imports without `.js` suffixes and `mcp-use start` no longer hits `ERR_MODULE_NOT_FOUND`.
+
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+  - @mcp-use/inspector@3.0.1
+  - mcp-use@1.25.1
+
+## 3.1.1-canary.8
+
+### Patch Changes
+
+- Updated dependencies [d62850e]
+  - @mcp-use/inspector@3.0.1-canary.8
+  - mcp-use@1.25.1-canary.8
+
+## 3.1.1-canary.7
+
+### Patch Changes
+
+- Updated dependencies [dd0ec5f]
+  - mcp-use@1.25.1-canary.7
+  - @mcp-use/inspector@3.0.1-canary.7
+
+## 3.1.1-canary.6
+
+### Patch Changes
+
+- Updated dependencies [47b446e]
+  - @mcp-use/inspector@3.0.1-canary.6
+  - mcp-use@1.25.1-canary.6
+
+## 3.1.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [c1ea21a]
+  - mcp-use@1.25.1-canary.5
+  - @mcp-use/inspector@3.0.1-canary.5
+
+## 3.1.1-canary.4
+
+### Patch Changes
+
+- 37a217c: fix(build): bundle each TypeScript entry with esbuild so extensionless relative imports resolve under plain Node ESM
+
+  `mcp-use build` now runs esbuild with `bundle: true` and `packages: "external"`. Relative imports between a user's source files are resolved at build time; third-party packages (`mcp-use`, `react`, `zod`, etc.) stay as external imports that Node resolves from `node_modules`. Users can keep writing idiomatic TypeScript imports without `.js` suffixes and `mcp-use start` no longer hits `ERR_MODULE_NOT_FOUND`.
+  - mcp-use@1.25.1-canary.4
+  - @mcp-use/inspector@3.0.1-canary.4
+
+## 3.1.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f41869b]
+  - @mcp-use/inspector@3.0.1-canary.3
+  - mcp-use@1.25.1-canary.3
+
+## 3.1.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dfe35fa]
+  - @mcp-use/inspector@3.0.1-canary.2
+  - mcp-use@1.25.1-canary.2
+
+## 3.1.1-canary.1
+
+### Patch Changes
+
+- 7f4e99d: fix(cli): keep `mcp-use build` non-fatal under the bun runtime
+
+  Building a project with `bun run build` inside an `oven/bun:alpine` image was failing in the tool-registry type-generation step. That step uses `tsx/esm/api`'s `tsImport`, which relies on Node.js custom loader hooks that bun does not implement, and the exception killed the whole build.
+
+  Three small changes keep the build moving:
+  - Detect the bun runtime up front in `generateToolRegistryTypesForServer` and skip the `tsx/esm/api` import with a clear warning instead of crashing.
+  - Wrap the build command's call to `generateToolRegistryTypesForServer` in try/catch so any other import-time error in the user's server file is surfaced as a non-blocking warning rather than exiting the build.
+  - Invoke `tsc --noEmit` via `process.execPath` instead of hardcoding `node`, so bun-only images (which don't ship a `node` binary) can still type-check. Also drop `--max-old-space-size=4096` under bun, which doesn't accept that flag.
+
+  Type generation remains available on Node.js. Under bun, users can still refresh `.mcp-use/tool-registry.d.ts` by running `mcp-use generate-types` from a Node.js shell when needed.
+  - mcp-use@1.25.1-canary.1
+  - @mcp-use/inspector@3.0.1-canary.1
+
+## 3.1.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c864134]
+- Updated dependencies [a59476b]
+  - @mcp-use/inspector@3.0.1-canary.0
+  - mcp-use@1.25.1-canary.0
+
 ## 3.1.0
 
 ### Minor Changes

@@ -28,16 +28,6 @@ export async function onMcpAuthorization() {
 
   try {
     // --- Basic Error Handling ---
-    if (error) {
-      throw new Error(
-        `OAuth error: ${error} - ${errorDescription || "No description provided."}`
-      );
-    }
-    if (!code) {
-      throw new Error(
-        "Authorization code not found in callback query parameters."
-      );
-    }
     if (!state) {
       throw new Error(
         "State parameter not found or invalid in callback query parameters."
@@ -102,6 +92,57 @@ export async function onMcpAuthorization() {
       localStorage.removeItem(stateKey); // Clean up expired state
       throw new Error(
         "OAuth state has expired. Please try initiating authentication again."
+      );
+    }
+
+    // Handle OAuth errors after state lookup so we can use the recovered
+    // storedStateData to redirect back to the originating page with error
+    // params, instead of showing a raw error page.
+    if (error) {
+      console.log(
+        `${logPrefix} OAuth error received: ${error} - ${errorDescription || "No description"}`
+      );
+      const isRedirectFlow = storedStateData.flowType === "redirect";
+      const hasOpener = window.opener && !window.opener.closed;
+
+      const redirectWithError = (target: string) => {
+        console.log(`${logPrefix} Returning to: ${target}`);
+        localStorage.removeItem(stateKey!);
+        const url = new URL(target);
+        url.searchParams.set("auth_error", error);
+        if (errorDescription) {
+          url.searchParams.set("auth_error_description", errorDescription);
+        }
+        window.location.href = url.toString();
+      };
+
+      // Prefer redirect when the originating flow was a full-page redirect, or
+      // when there is no opener to post back to.
+      if (storedStateData.returnUrl && (isRedirectFlow || !hasOpener)) {
+        redirectWithError(storedStateData.returnUrl);
+        return;
+      }
+      if (hasOpener) {
+        window.opener.postMessage(
+          {
+            type: "mcp_auth_callback",
+            success: false,
+            error: `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
+          },
+          window.location.origin
+        );
+        localStorage.removeItem(stateKey);
+        window.close();
+        return;
+      }
+      throw new Error(
+        `OAuth error: ${error}${errorDescription ? ` - ${errorDescription}` : ""}`
+      );
+    }
+
+    if (!code) {
+      throw new Error(
+        "Authorization code not found in callback query parameters."
       );
     }
 

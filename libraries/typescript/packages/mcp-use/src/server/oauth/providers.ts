@@ -8,6 +8,7 @@
 import type { OAuthProvider } from "./providers/types.js";
 import { SupabaseOAuthProvider } from "./providers/supabase.js";
 import { Auth0OAuthProvider } from "./providers/auth0.js";
+import { ClerkOAuthProvider } from "./providers/clerk.js";
 import { KeycloakOAuthProvider } from "./providers/keycloak.js";
 import { WorkOSOAuthProvider } from "./providers/workos.js";
 import { BetterAuthOAuthProvider } from "./providers/better-auth.js";
@@ -294,6 +295,75 @@ export function oauthWorkOSProvider(
   return new WorkOSOAuthProvider({
     provider: "workos",
     subdomain,
+    verifyJwt: config.verifyJwt,
+    scopesSupported: config.scopesSupported,
+  });
+}
+
+/**
+ * Configuration for Clerk OAuth provider
+ */
+export interface ClerkProviderConfig {
+  /** Clerk Frontend API URL (e.g. https://verb-noun-##.clerk.accounts.dev or https://clerk.yourdomain.com) */
+  frontendApiUrl: string;
+  /** Optional audience for JWT verification */
+  audience?: string;
+  verifyJwt?: boolean;
+  scopesSupported?: string[];
+}
+
+/**
+ * Create a Clerk OAuth provider
+ *
+ * Uses Dynamic Client Registration (DCR). MCP clients register themselves
+ * automatically with Clerk — enable DCR in the Clerk Dashboard under
+ * Configure → OAuth Applications → Dynamic Client Registration.
+ * The MCP server only verifies Clerk-issued tokens; authorize/token/register
+ * are all discovered via `.well-known` and called directly against Clerk.
+ *
+ * Environment variables:
+ * - MCP_USE_OAUTH_CLERK_FRONTEND_API_URL (required)
+ *
+ * @param config - Optional Clerk configuration (overrides environment variables)
+ * @returns OAuthProvider instance
+ *
+ * @example Zero-config with environment variables
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthClerkProvider()
+ * });
+ * ```
+ *
+ * @example With explicit configuration
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthClerkProvider({
+ *     frontendApiUrl: 'https://verb-noun-42.clerk.accounts.dev'
+ *   })
+ * });
+ * ```
+ */
+export function oauthClerkProvider(
+  config: Partial<ClerkProviderConfig> = {}
+): OAuthProvider {
+  const frontendApiUrl =
+    config.frontendApiUrl ?? getEnv("MCP_USE_OAUTH_CLERK_FRONTEND_API_URL");
+
+  if (!frontendApiUrl) {
+    throw new Error(
+      "Clerk frontendApiUrl is required. " +
+        "Set MCP_USE_OAUTH_CLERK_FRONTEND_API_URL environment variable or pass frontendApiUrl in config."
+    );
+  }
+
+  return new ClerkOAuthProvider({
+    provider: "clerk",
+    frontendApiUrl,
+    audience: config.audience,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,
   });

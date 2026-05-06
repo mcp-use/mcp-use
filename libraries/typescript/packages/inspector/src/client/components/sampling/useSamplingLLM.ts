@@ -60,6 +60,7 @@ export function useSamplingLLM({ llmConfig }: UseSamplingLLMProps) {
           apiKey: llmConfig.apiKey,
           temperature: temperature ?? llmConfig.temperature,
           maxTokens,
+          baseUrl: llmConfig.baseUrl,
         },
         messages: providerMessages,
       });

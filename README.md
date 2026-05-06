@@ -434,6 +434,9 @@ main();
 
 ---
 
+## Security
+See [SECURITY.md](https://github.com/mcp-use/mcp-use/blob/main/SECURITY.md)
+
 ## Community & Support
 
 - **Discord**: [Join our community](https://discord.gg/XkNkSkMz3V)

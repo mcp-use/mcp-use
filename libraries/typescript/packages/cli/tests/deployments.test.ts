@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Deployment } from "../src/utils/api.js";
+import type { Deployment, EnvVariable } from "../src/utils/api.js";
 
 // Create a mock API instance
 const mockApiInstance = {
@@ -11,6 +11,10 @@ const mockApiInstance = {
   getDeploymentLogs: vi.fn(),
   getDeploymentBuildLogs: vi.fn(),
   streamDeploymentLogs: vi.fn(),
+  listEnvVariables: vi.fn(),
+  createEnvVariable: vi.fn(),
+  updateEnvVariable: vi.fn(),
+  deleteEnvVariable: vi.fn(),
 };
 
 // Mock the entire api module
@@ -45,24 +49,20 @@ vi.mock("../src/utils/config.js", () => {
   };
 });
 
-// Mock chalk to avoid color codes in tests
+// Mock chalk to avoid color codes in tests. Uses a Proxy so any chained
+// property access (chalk.red.bold, chalk.gray, etc.) returns a function that
+// just echoes its input — without eagerly building an infinite tree.
 vi.mock("chalk", () => {
-  const createChain = () => {
-    const fn = (str: string) => str;
-    fn.bold = createChain();
-    fn.red = createChain();
-    fn.green = createChain();
-    fn.yellow = createChain();
-    fn.cyan = createChain();
-    fn.gray = createChain();
-    fn.white = createChain();
-    fn.whiteBright = createChain();
-    return fn;
-  };
-
-  return {
-    default: createChain(),
-  };
+  const passthrough: any = new Proxy(
+    function passthrough(s: string) {
+      return s;
+    },
+    {
+      get: () => passthrough,
+      apply: (_t, _this, args) => args[0],
+    }
+  );
+  return { default: passthrough };
 });
 
 // Mock readline for prompts
@@ -782,6 +782,148 @@ describe("Error Handling", () => {
       : apiError;
 
     expect(userMessage).toBe("Deployment not found");
+  });
+});
+
+describe("syncEnvVarsToServer", () => {
+  const SERVER_ID = "srv_abc";
+
+  function makeExisting(overrides: Partial<EnvVariable> = {}): EnvVariable {
+    return {
+      id: "env_existing",
+      serverId: SERVER_ID,
+      key: "EXISTING",
+      value: "old",
+      environments: ["production", "preview", "development"],
+      sensitive: false,
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns zero counts when no env vars are provided", async () => {
+    const { syncEnvVarsToServer } = await import("../src/commands/deploy.js");
+
+    const result = await syncEnvVarsToServer(
+      mockApiInstance as any,
+      SERVER_ID,
+      {}
+    );
+
+    expect(result).toEqual({ created: 0, updated: 0 });
+    expect(mockApiInstance.listEnvVariables).not.toHaveBeenCalled();
+    expect(mockApiInstance.createEnvVariable).not.toHaveBeenCalled();
+    expect(mockApiInstance.updateEnvVariable).not.toHaveBeenCalled();
+  });
+
+  it("creates env variables that don't exist on the server", async () => {
+    const { syncEnvVarsToServer } = await import("../src/commands/deploy.js");
+    mockApiInstance.listEnvVariables.mockResolvedValue([]);
+    mockApiInstance.createEnvVariable.mockResolvedValue(makeExisting());
+
+    const result = await syncEnvVarsToServer(
+      mockApiInstance as any,
+      SERVER_ID,
+      { API_KEY: "abc", DATABASE_URL: "postgres://x" }
+    );
+
+    expect(mockApiInstance.listEnvVariables).toHaveBeenCalledWith(SERVER_ID);
+    expect(mockApiInstance.createEnvVariable).toHaveBeenCalledTimes(2);
+    expect(mockApiInstance.createEnvVariable).toHaveBeenCalledWith(SERVER_ID, {
+      key: "API_KEY",
+      value: "abc",
+    });
+    expect(mockApiInstance.createEnvVariable).toHaveBeenCalledWith(SERVER_ID, {
+      key: "DATABASE_URL",
+      value: "postgres://x",
+    });
+    expect(mockApiInstance.updateEnvVariable).not.toHaveBeenCalled();
+    expect(result).toEqual({ created: 2, updated: 0 });
+  });
+
+  it("updates env variables that already exist on the server", async () => {
+    const { syncEnvVarsToServer } = await import("../src/commands/deploy.js");
+    mockApiInstance.listEnvVariables.mockResolvedValue([
+      makeExisting({ id: "env_1", key: "API_KEY", value: "old" }),
+    ]);
+    mockApiInstance.updateEnvVariable.mockResolvedValue(makeExisting());
+
+    const result = await syncEnvVarsToServer(
+      mockApiInstance as any,
+      SERVER_ID,
+      { API_KEY: "new" }
+    );
+
+    expect(mockApiInstance.updateEnvVariable).toHaveBeenCalledWith(
+      SERVER_ID,
+      "env_1",
+      { value: "new" }
+    );
+    expect(mockApiInstance.createEnvVariable).not.toHaveBeenCalled();
+    expect(result).toEqual({ created: 0, updated: 1 });
+  });
+
+  it("mixes creates and updates in a single sync", async () => {
+    const { syncEnvVarsToServer } = await import("../src/commands/deploy.js");
+    mockApiInstance.listEnvVariables.mockResolvedValue([
+      makeExisting({ id: "env_1", key: "API_KEY", value: "old" }),
+    ]);
+    mockApiInstance.createEnvVariable.mockResolvedValue(makeExisting());
+    mockApiInstance.updateEnvVariable.mockResolvedValue(makeExisting());
+
+    const result = await syncEnvVarsToServer(
+      mockApiInstance as any,
+      SERVER_ID,
+      { API_KEY: "new", BRAND_NEW: "value" }
+    );
+
+    expect(mockApiInstance.updateEnvVariable).toHaveBeenCalledWith(
+      SERVER_ID,
+      "env_1",
+      { value: "new" }
+    );
+    expect(mockApiInstance.createEnvVariable).toHaveBeenCalledWith(SERVER_ID, {
+      key: "BRAND_NEW",
+      value: "value",
+    });
+    expect(result).toEqual({ created: 1, updated: 1 });
+  });
+
+  it("does not delete or modify keys that aren't in the supplied set", async () => {
+    const { syncEnvVarsToServer } = await import("../src/commands/deploy.js");
+    mockApiInstance.listEnvVariables.mockResolvedValue([
+      makeExisting({ id: "env_1", key: "API_KEY", value: "old" }),
+      makeExisting({ id: "env_2", key: "UNTOUCHED", value: "stay" }),
+    ]);
+    mockApiInstance.updateEnvVariable.mockResolvedValue(makeExisting());
+
+    await syncEnvVarsToServer(mockApiInstance as any, SERVER_ID, {
+      API_KEY: "new",
+    });
+
+    expect(mockApiInstance.updateEnvVariable).toHaveBeenCalledTimes(1);
+    expect(mockApiInstance.updateEnvVariable).toHaveBeenCalledWith(
+      SERVER_ID,
+      "env_1",
+      { value: "new" }
+    );
+    expect(mockApiInstance.deleteEnvVariable).not.toHaveBeenCalled();
+  });
+
+  it("propagates API errors so the caller can fail the deploy", async () => {
+    const { syncEnvVarsToServer } = await import("../src/commands/deploy.js");
+    mockApiInstance.listEnvVariables.mockRejectedValue(
+      new Error("API request failed: 500")
+    );
+
+    await expect(
+      syncEnvVarsToServer(mockApiInstance as any, SERVER_ID, { K: "v" })
+    ).rejects.toThrow("500");
   });
 });
 

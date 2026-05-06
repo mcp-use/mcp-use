@@ -95,6 +95,9 @@ importers:
       husky:
         specifier: ^9.1.7
         version: 9.1.7
+      knip:
+        specifier: ^5.88.1
+        version: 5.88.1(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(typescript@5.9.3)
       lint-staged:
         specifier: ^16.4.0
         version: 16.4.0
@@ -455,9 +458,6 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
-      knip:
-        specifier: ^5.73.0
-        version: 5.88.1(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(typescript@5.9.3)
       oauth2-mock-server:
         specifier: ^8.2.0
         version: 8.2.1
@@ -1082,6 +1082,22 @@ importers:
       '@types/node':
         specifier: ^25.0.2
         version: 25.3.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/mcp-use/examples/server/oauth/clerk:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.6.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0

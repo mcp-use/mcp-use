@@ -1,5 +1,206 @@
 # mcp-use
 
+## 1.27.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [870983e]
+  - @mcp-use/inspector@5.0.0-canary.3
+  - @mcp-use/cli@3.1.3-canary.3
+
+## 1.27.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8b4f674]
+  - @mcp-use/inspector@5.0.0-canary.2
+  - @mcp-use/cli@3.1.3-canary.2
+
+## 1.27.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [6229097]
+  - @mcp-use/cli@3.1.3-canary.1
+  - @mcp-use/inspector@5.0.0-canary.1
+
+## 1.27.0-canary.0
+
+### Minor Changes
+
+- 1633518: feat(mcp-use): add Clerk OAuth provider
+
+  Adds `oauthClerkProvider` for using Clerk as an OAuth authorization
+  server in MCP servers. Uses DCR-direct mode — MCP clients register and
+  authenticate directly with Clerk, and the MCP server verifies
+  Clerk-issued JWTs via JWKS.
+
+  Default scopes are `["profile", "email", "offline_access"]`. The
+  `openid` scope is excluded by default because it requires OIDC to be
+  explicitly enabled in the Clerk Dashboard; users who need it can pass
+  `scopesSupported: ["openid", "profile", "email", "offline_access"]`.
+
+### Patch Changes
+
+- @mcp-use/cli@3.1.3-canary.0
+- @mcp-use/inspector@5.0.0-canary.0
+
+## 1.26.0
+
+### Minor Changes
+
+- bdf9182: feat(server): add `MCP_DEBUG_LEVEL` env var with `info` / `debug` / `trace` levels for HTTP request logs
+
+  Replaces the previous all-or-nothing `DEBUG=1` behavior with three explicit verbosity levels:
+  - `info` (default): one compact line per request, e.g.
+    `[19:44:56] POST /mcp [tools/call: greet] OK (1ms)`. Initialize lines now include the client `name/version` and the new short session id (`→ session=92c4e0b`); subsequent requests are prefixed with `sess=<short>`. JSON-RPC and tool errors are extracted from the response body and shown inline (`ERROR cannot divide by zero`).
+  - `debug`: same as `info` plus inline `args=<json>` for `tools/call`.
+  - `trace`: identical to the legacy `DEBUG=1` output (full request/response headers and bodies).
+
+  `DEBUG=1` (or any truthy `DEBUG` value) continues to work and maps to `trace`. Internal "Session initialized"/"Session closed" log lines are now suppressed at `info` level, since the per-request log line already conveys that information.
+
+### Patch Changes
+
+- bdf9182: fix(widgets): pre-warm widget Vite entries before registration to prevent first-render `/.vite/deps/*` 504s
+
+  When a widget is registered (initial boot, watcher add-file, or watcher add-folder), `mount-widgets-dev` now calls `viteServer.warmupRequest()` followed by `viteServer.waitForRequestsIdle()` for the widget's `entry.tsx` before exposing it to the inspector. This forces Vite's `depsOptimizer` to finish pre-bundling and stabilise its dependency hash before the browser starts requesting `/.vite/deps/*` modules.
+
+  Previously, the inspector iframe could fetch optimized dependencies (e.g. `mcp-use_react.js`) with a stale Vite hash while `depsOptimizer` was still re-bundling, which surfaced as `504 Gateway Timeout` errors and a blank widget on first interaction in Vibe-created sandboxes. Each widget is warmed at most once per dev-server lifetime; failures fall back to a warning so registration never blocks.
+  - @mcp-use/cli@3.1.2
+  - @mcp-use/inspector@4.0.0
+
+## 1.26.0-canary.1
+
+### Minor Changes
+
+- 1b70559: feat(server): add `MCP_DEBUG_LEVEL` env var with `info` / `debug` / `trace` levels for HTTP request logs
+
+  Replaces the previous all-or-nothing `DEBUG=1` behavior with three explicit verbosity levels:
+  - `info` (default): one compact line per request, e.g.
+    `[19:44:56] POST /mcp [tools/call: greet] OK (1ms)`. Initialize lines now include the client `name/version` and the new short session id (`→ session=92c4e0b`); subsequent requests are prefixed with `sess=<short>`. JSON-RPC and tool errors are extracted from the response body and shown inline (`ERROR cannot divide by zero`).
+  - `debug`: same as `info` plus inline `args=<json>` for `tools/call`.
+  - `trace`: identical to the legacy `DEBUG=1` output (full request/response headers and bodies).
+
+  `DEBUG=1` (or any truthy `DEBUG` value) continues to work and maps to `trace`. Internal "Session initialized"/"Session closed" log lines are now suppressed at `info` level, since the per-request log line already conveys that information.
+
+### Patch Changes
+
+- @mcp-use/cli@3.1.2-canary.1
+- @mcp-use/inspector@4.0.0-canary.1
+
+## 1.25.2-canary.0
+
+### Patch Changes
+
+- 2636f32: fix(widgets): pre-warm widget Vite entries before registration to prevent first-render `/.vite/deps/*` 504s
+
+  When a widget is registered (initial boot, watcher add-file, or watcher add-folder), `mount-widgets-dev` now calls `viteServer.warmupRequest()` followed by `viteServer.waitForRequestsIdle()` for the widget's `entry.tsx` before exposing it to the inspector. This forces Vite's `depsOptimizer` to finish pre-bundling and stabilise its dependency hash before the browser starts requesting `/.vite/deps/*` modules.
+
+  Previously, the inspector iframe could fetch optimized dependencies (e.g. `mcp-use_react.js`) with a stale Vite hash while `depsOptimizer` was still re-bundling, which surfaced as `504 Gateway Timeout` errors and a blank widget on first interaction in Vibe-created sandboxes. Each widget is warmed at most once per dev-server lifetime; failures fall back to a warning so registration never blocks.
+  - @mcp-use/cli@3.1.2-canary.0
+  - @mcp-use/inspector@3.0.2-canary.0
+
+## 1.25.1
+
+### Patch Changes
+
+- 806dbca: Fix OAuth error handling to redirect back to inspector instead of showing raw error page. When OAuth callback receives an error (e.g. user denies access), the callback now looks up the stored state first to retrieve the returnUrl, then redirects back to the inspector with error parameters instead of immediately throwing and displaying a raw error page with stack traces. The inspector surfaces these errors as a persistent App-level toast that fires regardless of the active route.
+- 806dbca: Fix Supabase OAuth provider to use OAuth 2.1 server endpoints
+
+  `SupabaseOAuthProvider.getAuthEndpoint()` and `getTokenEndpoint()` now return `/auth/v1/oauth/authorize` and `/auth/v1/oauth/token` — the OAuth 2.1 server paths — instead of the legacy `/auth/v1/authorize` and `/auth/v1/token`. Metadata discovery and JWT verification were already correct, so most DCR-direct clients weren't affected, but any code path that consulted the provider's endpoint getters was pointed at the wrong URLs.
+
+  Also clarifies the Supabase provider docs: adds a `<Steps>` prerequisites block (enable OAuth Server, allow dynamic OAuth apps, set consent URL, pick a sign-in method) and notes that `MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY` is used by your consent UI and Supabase SDK calls — the provider itself only needs the project ID.
+
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+- Updated dependencies [806dbca]
+  - @mcp-use/inspector@3.0.1
+  - @mcp-use/cli@3.1.1
+
+## 1.25.1-canary.8
+
+### Patch Changes
+
+- Updated dependencies [d62850e]
+  - @mcp-use/inspector@3.0.1-canary.8
+  - @mcp-use/cli@3.1.1-canary.8
+
+## 1.25.1-canary.7
+
+### Patch Changes
+
+- dd0ec5f: Fix Supabase OAuth provider to use OAuth 2.1 server endpoints
+
+  `SupabaseOAuthProvider.getAuthEndpoint()` and `getTokenEndpoint()` now return `/auth/v1/oauth/authorize` and `/auth/v1/oauth/token` — the OAuth 2.1 server paths — instead of the legacy `/auth/v1/authorize` and `/auth/v1/token`. Metadata discovery and JWT verification were already correct, so most DCR-direct clients weren't affected, but any code path that consulted the provider's endpoint getters was pointed at the wrong URLs.
+
+  Also clarifies the Supabase provider docs: adds a `<Steps>` prerequisites block (enable OAuth Server, allow dynamic OAuth apps, set consent URL, pick a sign-in method) and notes that `MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY` is used by your consent UI and Supabase SDK calls — the provider itself only needs the project ID.
+  - @mcp-use/cli@3.1.1-canary.7
+  - @mcp-use/inspector@3.0.1-canary.7
+
+## 1.25.1-canary.6
+
+### Patch Changes
+
+- Updated dependencies [47b446e]
+  - @mcp-use/inspector@3.0.1-canary.6
+  - @mcp-use/cli@3.1.1-canary.6
+
+## 1.25.1-canary.5
+
+### Patch Changes
+
+- c1ea21a: Fix OAuth error handling to redirect back to inspector instead of showing raw error page. When OAuth callback receives an error (e.g. user denies access), the callback now looks up the stored state first to retrieve the returnUrl, then redirects back to the inspector with error parameters instead of immediately throwing and displaying a raw error page with stack traces. The inspector surfaces these errors as a persistent App-level toast that fires regardless of the active route.
+- Updated dependencies [c1ea21a]
+  - @mcp-use/inspector@3.0.1-canary.5
+  - @mcp-use/cli@3.1.1-canary.5
+
+## 1.25.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [37a217c]
+  - @mcp-use/cli@3.1.1-canary.4
+  - @mcp-use/inspector@3.0.1-canary.4
+
+## 1.25.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [f41869b]
+  - @mcp-use/inspector@3.0.1-canary.3
+  - @mcp-use/cli@3.1.1-canary.3
+
+## 1.25.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [dfe35fa]
+  - @mcp-use/inspector@3.0.1-canary.2
+  - @mcp-use/cli@3.1.1-canary.2
+
+## 1.25.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [7f4e99d]
+  - @mcp-use/cli@3.1.1-canary.1
+  - @mcp-use/inspector@3.0.1-canary.1
+
+## 1.25.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c864134]
+- Updated dependencies [a59476b]
+  - @mcp-use/inspector@3.0.1-canary.0
+  - @mcp-use/cli@3.1.1-canary.0
+
 ## 1.25.0
 
 ### Minor Changes

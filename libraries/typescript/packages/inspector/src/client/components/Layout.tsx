@@ -71,6 +71,7 @@ export function Layout({ children }: LayoutProps) {
         proxyConfig,
         transportType,
         preventAutoAuth: true,
+        useRedirectFlow: true,
         clientOptions: {
           capabilities: {
             extensions: {
