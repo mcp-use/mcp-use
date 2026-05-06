@@ -1,6 +1,5 @@
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import { runToolLoop } from "@/llm/toolLoop";
-import { resolveProvider } from "@/llm/types";
 import type { ProviderTool } from "@/llm/types";
 import type { McpServer } from "mcp-use/react";
 import { useCallback, useRef, useState } from "react";
@@ -269,7 +268,7 @@ export function useChatMessagesClientSide({
 
         for await (const ev of runToolLoop({
           config: {
-            provider: resolveProvider(llmConfig.provider),
+            provider: llmConfig.provider,
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
             temperature: llmConfig.temperature,

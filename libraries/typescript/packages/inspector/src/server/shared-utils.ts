@@ -5,7 +5,6 @@
 
 import { convertMessagesToProvider } from "../llm/messageFormat";
 import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
-import { resolveProvider } from "../llm/types";
 import type { ProviderMessage, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
@@ -180,7 +179,7 @@ export async function* handleChatRequestStream(requestBody: {
 
     for await (const ev of runToolLoop({
       config: {
-        provider: resolveProvider(llmConfig.provider),
+        provider: llmConfig.provider,
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
         temperature: llmConfig.temperature,
@@ -341,7 +340,7 @@ export async function handleChatRequest(requestBody: {
 
     const { content, toolCalls } = await runToolLoopNonStreaming({
       config: {
-        provider: resolveProvider(llmConfig.provider),
+        provider: llmConfig.provider,
         model: llmConfig.model,
         apiKey: llmConfig.apiKey,
         temperature: llmConfig.temperature,

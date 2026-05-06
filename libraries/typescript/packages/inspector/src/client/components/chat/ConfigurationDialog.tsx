@@ -127,9 +127,20 @@ async function fetchOpenAICompatibleModels(
   baseUrl: string,
   apiKey: string
 ): Promise<ModelOption[]> {
-  const response = await fetch(`${baseUrl}/models`, {
-    headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined,
-  });
+  const stripped = baseUrl.replace(/\/+$/, "");
+  const headers: Record<string, string> = {};
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${stripped}/models`, { headers });
+  } catch {
+    // fetch() rejects with a generic TypeError when CORS blocks the response,
+    // when the server is unreachable, or on mixed-content.
+    throw new Error(
+      "Failed to reach the server. Check the URL is correct and that CORS is enabled on the server."
+    );
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch models: ${response.statusText}`);
@@ -137,10 +148,15 @@ async function fetchOpenAICompatibleModels(
 
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
-    throw new Error("Invalid URL");
+    throw new Error("Invalid URL — response was not JSON");
   }
 
   const data = await response.json();
+  if (!Array.isArray(data?.data)) {
+    throw new Error(
+      "Unexpected response format — expected { data: [...] } from the OpenAI-compatible endpoint"
+    );
+  }
   return data.data.map((model: { id: string }) => ({ id: model.id }));
 }
 
@@ -354,16 +370,6 @@ export function ConfigurationDialog({
                     <span>OpenAI</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="openai-compatible">
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={getProviderIcon("openai")}
-                      alt="OpenAI Compatible"
-                      className="w-4 h-4"
-                    />
-                    <span>OpenAI Compatible</span>
-                  </div>
-                </SelectItem>
                 <SelectItem value="anthropic">
                   <div className="flex items-center gap-2">
                     <img
@@ -382,6 +388,11 @@ export function ConfigurationDialog({
                       className="w-4 h-4"
                     />
                     <span>Google</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="openai-compatible">
+                  <div className="flex items-center gap-2">
+                    <span>OpenAI Compatible</span>
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -432,8 +443,8 @@ export function ConfigurationDialog({
                 data-testid="chat-config-base-url-input"
               />
               <p className="text-xs text-muted-foreground">
-                Base URL of your OpenAI-compatible API (e.g. LM Studio, Ollama,
-                OpenRouter).
+                Base URL of your OpenAI-compatible API. Local servers must
+                have CORS enabled.
               </p>
             </div>
           )}

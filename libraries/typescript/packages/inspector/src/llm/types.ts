@@ -8,13 +8,11 @@
  * langchain to bundle their apps.
  */
 
-export type ProviderName = "openai" | "anthropic" | "google";
-
-/** Maps UI-level provider names (including aliases like "openai-compatible") to the underlying LLM provider. */
-export function resolveProvider(provider: string): ProviderName {
-  if (provider === "openai-compatible") return "openai";
-  return provider as ProviderName;
-}
+export type ProviderName =
+  | "openai"
+  | "openai-compatible"
+  | "anthropic"
+  | "google";
 
 export interface ProviderConfig {
   provider: ProviderName;
