@@ -15,7 +15,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
   // LLM Config form state
   const [tempProvider, setTempProvider] = useState<
-    "openai" | "openai-compatible" | "anthropic" | "google"
+    "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter"
   >("openai");
   const [tempApiKey, setTempApiKey] = useState("");
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);

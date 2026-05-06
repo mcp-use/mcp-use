@@ -18,6 +18,9 @@ interface ChatParams {
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 
 function buildEndpoint(config: ProviderConfig, path: string): string {
+  if (config.baseUrl?.includes("/chat/completions")) {
+    return config.baseUrl;
+  }
   const base = (config.baseUrl ?? OPENAI_BASE_URL).replace(/\/+$/, "");
   return `${base}${path}`;
 }
@@ -25,6 +28,7 @@ function buildEndpoint(config: ProviderConfig, path: string): string {
 function buildHeaders(config: ProviderConfig): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...config.extraHeaders,
   };
   if (config.apiKey) {
     headers.Authorization = `Bearer ${config.apiKey}`;

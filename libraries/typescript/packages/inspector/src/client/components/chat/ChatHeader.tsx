@@ -25,12 +25,12 @@ interface ChatHeaderProps {
   onCopyChat?: () => void;
   onExportChat?: (format: "json" | "markdown") => void;
   // Configuration props
-  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google";
+  tempProvider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter";
   tempModel: string;
   tempApiKey: string;
   tempBaseUrl?: string;
   onProviderChange: (
-    provider: "openai" | "openai-compatible" | "anthropic" | "google"
+    provider: "openai" | "openai-compatible" | "anthropic" | "google" | "openrouter"
   ) => void;
   onModelChange: (model: string) => void;
   onApiKeyChange: (apiKey: string) => void;
@@ -103,7 +103,11 @@ export function ChatHeader({
               >
                 {llmConfig.provider !== "openai-compatible" && (
                   <img
-                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                    src={
+                      llmConfig.provider === "openrouter"
+                        ? "https://openrouter.ai/favicon.ico"
+                        : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                    }
                     alt={llmConfig.provider}
                     className="w-4 h-4 mr-0"
                   />
@@ -132,7 +136,11 @@ export function ChatHeader({
               >
                 {llmConfig.provider !== "openai-compatible" && (
                   <img
-                    src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
+                    src={
+                      llmConfig.provider === "openrouter"
+                        ? "https://openrouter.ai/favicon.ico"
+                        : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                    }
                     alt={llmConfig.provider}
                     className="w-4 h-4"
                   />
