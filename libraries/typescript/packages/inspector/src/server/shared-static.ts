@@ -104,7 +104,7 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
 
   if (config.disableTelemetry) {
     scripts.push(
-      `<script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;try{localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY","false");}catch(e){}</script>`
+      `<script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;</script>`
     );
   }
 

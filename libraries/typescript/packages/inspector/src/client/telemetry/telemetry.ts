@@ -155,11 +155,6 @@ export class Telemetry {
     if (isLocalStorageFunctional()) {
       const stored = localStorage.getItem(getCacheKey("disabled"));
       if (stored === "true") return true;
-      if (
-        localStorage.getItem("MCP_USE_ANONYMIZED_TELEMETRY") === "false"
-      ) {
-        return true;
-      }
     }
     // Check environment variable (if available — only matches when bundler inlined it)
     if (
