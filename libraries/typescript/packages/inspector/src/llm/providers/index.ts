@@ -26,7 +26,7 @@ function withOpenRouter(params: ChatParams): ChatParams {
     ...params,
     config: {
       ...params.config,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
+      baseUrl: "https://openrouter.ai/api/v1",
       extraHeaders: {
         "HTTP-Referer": "https://inspector.mcp-use.com",
         "X-Title": "mcp-use Inspector",
