@@ -54,17 +54,9 @@
     "eslint-plugin-import": "^2.32.0",
     "husky": "^9.1.7",
     "knip": "^5.88.1",
-    "lint-staged": "^16.4.0",
     "prettier": "^3.8.2",
     "tsup": "^8.5.1",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.58.2"
-  },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "prettier --write",
-      "eslint --fix"
-    ]
+    "typescript": "^5.9.3"
   },
   "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937",
   "pnpm": {
