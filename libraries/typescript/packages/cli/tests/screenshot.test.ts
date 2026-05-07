@@ -1,44 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  encodePropsParam,
   extractViewName,
   parseDimension,
-  parseHeaders,
   timestampSuffix,
 } from "../src/commands/screenshot.js";
-
-describe("parseHeaders", () => {
-  it("returns empty object when no auth or headers", () => {
-    expect(parseHeaders(undefined, undefined)).toEqual({});
-    expect(parseHeaders([], undefined)).toEqual({});
-  });
-
-  it("includes Bearer token when --auth is provided", () => {
-    expect(parseHeaders(undefined, "abc123")).toEqual({
-      Authorization: "Bearer abc123",
-    });
-  });
-
-  it("parses repeated --header values", () => {
-    const headers = parseHeaders(["X-Foo: bar", "X-Bar:  baz "], undefined);
-    expect(headers).toEqual({ "X-Foo": "bar", "X-Bar": "baz" });
-  });
-
-  it("merges --header on top of --auth", () => {
-    const headers = parseHeaders(["Authorization: Bearer override"], "ignored");
-    expect(headers["Authorization"]).toBe("Bearer override");
-  });
-
-  it("throws on missing colon", () => {
-    expect(() => parseHeaders(["bogus"], undefined)).toThrow(
-      /Invalid --header/
-    );
-  });
-
-  it("throws on empty key", () => {
-    expect(() => parseHeaders([": value"], undefined)).toThrow(/Empty key/);
-  });
-});
 
 describe("timestampSuffix", () => {
   it("returns a YYYY-MM-DD_HH-mm-ss string", () => {
@@ -54,24 +19,6 @@ describe("timestampSuffix", () => {
   it("pads single-digit months, days, hours, minutes, seconds", () => {
     const d = new Date(2024, 0, 1, 0, 0, 0);
     expect(timestampSuffix(d)).toBe("2024-01-01_00-00-00");
-  });
-});
-
-describe("encodePropsParam", () => {
-  it("round-trips through base64", () => {
-    const props = {
-      toolInput: { a: 1 },
-      toolOutput: { servers: [{ name: "x" }] },
-    };
-    const encoded = encodePropsParam(props);
-    const decoded = JSON.parse(Buffer.from(encoded, "base64").toString("utf8"));
-    expect(decoded).toEqual(props);
-  });
-
-  it("produces URL-safe base64 (no whitespace)", () => {
-    const encoded = encodePropsParam({ toolInput: { x: "y" } });
-    expect(encoded).not.toContain(" ");
-    expect(encoded).not.toContain("\n");
   });
 });
 

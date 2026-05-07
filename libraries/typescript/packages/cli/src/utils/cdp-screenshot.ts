@@ -15,6 +15,13 @@ export interface CaptureScreenshotOptions {
   chromePath: string;
   /** Extra wait after the readiness selector matches, to let animations settle. */
   delayMs?: number;
+  /**
+   * Optional pre-render bundle. When provided, it is JSON-serialized and
+   * assigned to `globalThis.__mcpUsePreviewBundle` before any document
+   * scripts run. The inspector preview route reads this global and renders
+   * inline data instead of opening a live MCP connection from the browser.
+   */
+  bundle?: unknown;
 }
 
 interface PendingCall {
@@ -253,6 +260,22 @@ export async function captureScreenshot(
       },
       sessionId
     );
+
+    if (opts.bundle !== undefined) {
+      // Inject the bundle as a global before any document scripts run.
+      // JSON.stringify-of-JSON.stringify wraps the JSON literal as a string
+      // expression so we can JSON.parse it inside the page — this avoids
+      // having to escape `</script>` and other characters in the source.
+      const payload = JSON.stringify(JSON.stringify(opts.bundle));
+      await cdp.send(
+        "Page.addScriptToEvaluateOnNewDocument",
+        {
+          source: `globalThis.__mcpUsePreviewBundle = JSON.parse(${payload});`,
+          runImmediately: true,
+        },
+        sessionId
+      );
+    }
 
     await cdp.send("Page.navigate", { url: opts.url }, sessionId);
 

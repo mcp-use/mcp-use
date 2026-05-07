@@ -12,3 +12,7 @@ The CLI auto-spawns `mcp-use dev` if no server is detected, drives the user's ex
 No additional install step or peer dependency is required — the command uses your system Chrome. The browser path is auto-detected on macOS / Linux / Windows; override with `MCP_USE_CHROME_PATH`, `PUPPETEER_EXECUTABLE_PATH`, or `CHROME_PATH` if needed.
 
 The inspector exposes a new internal `<ViewPreview>` component and a `/preview/:view` client-side route. `MCPAppsRenderer` gains an optional `onReady` callback used by the preview route to drive the readiness signal (`body[data-view-ready="true"]`) that the screenshot command waits for before capturing.
+
+**Session-aware authentication.** Screenshot now reuses sessions saved by `mcp-use client connect`, so a single OAuth flow covers every subsequent screenshot of that server. Replace `--auth <token>` with `--session <name>` (defaults to the active session); `--mcp <url>` remains as an unauthenticated escape hatch. The OAuth token never enters the browser — the CLI calls the tool, reads the widget resource, and injects the result into Chrome via CDP `Page.addScriptToEvaluateOnNewDocument` (as `globalThis.__mcpUsePreviewBundle`). The preview route detects the global and renders inline, skipping the browser-side MCP connection entirely.
+
+**Breaking:** `mcp-use screenshot` flags `--auth` and `--header` are removed. Use `mcp-use client connect <url> --name <name>` (with OAuth) once, then `mcp-use screenshot --tool <name>`.
