@@ -180,9 +180,6 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-      playwright:
-        specifier: ^1.59.1
-        version: 1.59.1
       vitest:
         specifier: ^4.0.17
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@2.0.1))(tsx@4.21.0)(yaml@2.8.3)
@@ -7265,18 +7262,8 @@ packages:
     engines: {node: '>=18'}
     hasBin: true
 
-  playwright-core@1.59.1:
-    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright@1.58.2:
     resolution: {integrity: sha512-vA30H8Nvkq/cPBnNw4Q8TWz1EJyqgpuinBcHET0YVJVFldr8JDNiU9LaWAE1KqSkRYazuaBhTpB5ZzShOezQ6A==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.59.1:
-    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -15718,17 +15705,9 @@ snapshots:
 
   playwright-core@1.58.2: {}
 
-  playwright-core@1.59.1: {}
-
   playwright@1.58.2:
     dependencies:
       playwright-core: 1.58.2
-    optionalDependencies:
-      fsevents: 2.3.2
-
-  playwright@1.59.1:
-    dependencies:
-      playwright-core: 1.59.1
     optionalDependencies:
       fsevents: 2.3.2
 

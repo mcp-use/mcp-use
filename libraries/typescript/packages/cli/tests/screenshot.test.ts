@@ -41,19 +41,19 @@ describe("parseHeaders", () => {
 });
 
 describe("timestampSuffix", () => {
-  it("returns a 15-char YYYYMMDDTHHmmss string", () => {
+  it("returns a YYYY-MM-DD_HH-mm-ss string", () => {
     const ts = timestampSuffix();
-    expect(ts).toMatch(/^\d{8}T\d{6}$/);
+    expect(ts).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
   });
 
   it("formats a known date correctly", () => {
     const d = new Date(2024, 0, 15, 10, 30, 5); // 2024-01-15 10:30:05
-    expect(timestampSuffix(d)).toBe("20240115T103005");
+    expect(timestampSuffix(d)).toBe("2024-01-15_10-30-05");
   });
 
   it("pads single-digit months, days, hours, minutes, seconds", () => {
     const d = new Date(2024, 0, 1, 0, 0, 0);
-    expect(timestampSuffix(d)).toBe("20240101T000000");
+    expect(timestampSuffix(d)).toBe("2024-01-01_00-00-00");
   });
 });
 

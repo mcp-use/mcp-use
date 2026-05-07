@@ -68,6 +68,23 @@ export function ViewPreview() {
     return `${window.location.origin}/mcp`;
   }, [search]);
 
+  // Forwarded headers from the screenshot CLI (`?headers=<base64 JSON>`),
+  // so the preview can authenticate against a remote MCP server. This is
+  // a temporary plumb until the CLI grows a full auth-aware MCP client.
+  const previewHeaders = useMemo(() => {
+    const raw = search.get("headers");
+    if (!raw) return undefined;
+    try {
+      const parsed = JSON.parse(atob(raw));
+      if (parsed && typeof parsed === "object") {
+        return parsed as Record<string, string>;
+      }
+    } catch {
+      // Fall through.
+    }
+    return undefined;
+  }, [search]);
+
   const { servers, addServer, storageLoaded } = useMcpClient();
   const server = servers.find((s) => s.id === PREVIEW_SERVER_ID);
 
@@ -75,8 +92,12 @@ export function ViewPreview() {
   // LocalStorageProvider rehydration).
   useEffect(() => {
     if (!storageLoaded) return;
-    addServer(PREVIEW_SERVER_ID, { url: serverUrl, name: "Preview" });
-  }, [storageLoaded, serverUrl, addServer]);
+    addServer(PREVIEW_SERVER_ID, {
+      url: serverUrl,
+      name: "Preview",
+      ...(previewHeaders ? { headers: previewHeaders } : {}),
+    });
+  }, [storageLoaded, serverUrl, previewHeaders, addServer]);
 
   const ready = server?.state === "ready";
   const failed = server?.state === "failed";

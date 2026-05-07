@@ -5,6 +5,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
+import { captureScreenshot } from "../utils/cdp-screenshot.js";
+import { resolveChromePath } from "../utils/chrome-path.js";
 import { formatError, formatInfo } from "../utils/format.js";
 
 interface ScreenshotOptions {
@@ -12,13 +14,14 @@ interface ScreenshotOptions {
   args?: string;
   width: string;
   height: string;
-  server?: string;
+  inspector?: string;
+  mcp?: string;
   theme: "light" | "dark";
   output?: string;
   header?: string[];
   auth?: string;
   waitFor?: string;
-  install?: boolean;
+  delay?: string;
   quiet?: boolean;
   timeout: string;
 }
@@ -82,21 +85,22 @@ interface DevServerHandle {
 }
 
 /**
- * Resolve a usable dev-server URL: probe `--server` if given, else probe localhost:3000,
- * else spawn `mcp-use dev` on a free port and wait for readiness.
+ * Resolve a usable inspector host: probe `--inspector` if given, else probe localhost:3000,
+ * else spawn `mcp-use dev` on a free port and wait for readiness. The inspector host
+ * is where the `/inspector/preview/:view` SPA route renders the captured view.
  */
 async function ensureDevServer(
   options: ScreenshotOptions,
   cliBin: string
 ): Promise<DevServerHandle> {
-  if (options.server) {
-    const ok = await probeServer(options.server);
+  if (options.inspector) {
+    const ok = await probeServer(options.inspector);
     if (!ok) {
       throw new Error(
-        `Dev server at ${options.server} did not respond on /inspector/health`
+        `Inspector at ${options.inspector} did not respond on /inspector/health`
       );
     }
-    return { url: options.server };
+    return { url: options.inspector };
   }
 
   const localUrl = "http://localhost:3000";
@@ -178,70 +182,17 @@ export function parseHeaders(
 }
 
 /**
- * Returns a filesystem-safe timestamp string: YYYYMMDDTHHmmss
+ * Returns a filesystem-safe timestamp string: YYYY-MM-DD_HH-mm-ss
  */
 export function timestampSuffix(date = new Date()): string {
-  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
-  return (
-    `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}` +
-    `T${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`
-  );
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const datePart = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const timePart = `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
+  return `${datePart}_${timePart}`;
 }
 
 export function encodePropsParam(props: ResolvedProps): string {
   return Buffer.from(JSON.stringify(props), "utf8").toString("base64");
-}
-
-// Loose Playwright surface — typed at call sites only. The package is an
-// optional peer dep, so we deliberately avoid `import type` from "playwright"
-// which would fail to resolve in environments without it installed.
-type PlaywrightModule = {
-  chromium: {
-    launch(options?: Record<string, unknown>): Promise<{
-      newContext(options?: Record<string, unknown>): Promise<{
-        newPage(): Promise<{
-          goto(
-            url: string,
-            options?: Record<string, unknown>
-          ): Promise<unknown>;
-          waitForSelector(
-            selector: string,
-            options?: Record<string, unknown>
-          ): Promise<unknown>;
-          screenshot(options: Record<string, unknown>): Promise<unknown>;
-        }>;
-      }>;
-      close(): Promise<void>;
-    }>;
-  };
-};
-
-async function loadPlaywright(): Promise<PlaywrightModule | null> {
-  try {
-    // @ts-ignore — optional peer dep, resolved at runtime
-    return (await import("playwright")) as PlaywrightModule;
-  } catch {
-    return null;
-  }
-}
-
-async function runInstall(): Promise<number> {
-  const npmInstall = spawn(
-    process.platform === "win32" ? "npm.cmd" : "npm",
-    ["install", "playwright"],
-    { stdio: "inherit", shell: process.platform === "win32" }
-  );
-  const code1 = await new Promise<number>((res) =>
-    npmInstall.on("exit", (c) => res(c ?? 1))
-  );
-  if (code1 !== 0) return code1;
-
-  const browsers = spawn(
-    process.platform === "win32" ? "npx.cmd" : "npx",
-    ["playwright", "install", "chromium"],
-    { stdio: "inherit", shell: process.platform === "win32" }
-  );
-  return new Promise<number>((res) => browsers.on("exit", (c) => res(c ?? 1)));
 }
 
 interface ResolvedToolCall {
@@ -317,11 +268,6 @@ export async function screenshotCommand(
   options: ScreenshotOptions,
   cliBin: string
 ): Promise<void> {
-  if (options.install) {
-    const code = await runInstall();
-    process.exit(code);
-  }
-
   if (!options.tool) {
     console.error(
       formatError("--tool <name> is required (optionally with --args).")
@@ -329,18 +275,19 @@ export async function screenshotCommand(
     process.exit(1);
   }
 
-  const playwright = await loadPlaywright();
-  if (!playwright) {
+  let chromePath: string;
+  try {
+    chromePath = resolveChromePath();
+  } catch (err) {
     console.error(
-      formatError(
-        "Playwright not found. Run `mcp-use screenshot --install` to install it (and the Chromium browser binary), or `npm install playwright && npx playwright install chromium` manually."
-      )
+      formatError(err instanceof Error ? err.message : String(err))
     );
     process.exit(1);
   }
 
   const width = parseDimension(options.width, "width");
   const height = parseDimension(options.height, "height");
+  const navTimeout = parseInt(options.timeout, 10) || 30000;
   const headers = parseHeaders(options.header, options.auth);
 
   const dev = await ensureDevServer(options, cliBin);
@@ -355,7 +302,7 @@ export async function screenshotCommand(
   let viewName: string;
 
   try {
-    const mcpUrl = `${dev.url}/mcp`;
+    const mcpUrl = options.mcp ?? `${dev.url}/mcp`;
     const tc = await callToolAndResolve(
       mcpUrl,
       headers,
@@ -369,35 +316,29 @@ export async function screenshotCommand(
     previewUrl.searchParams.set("props", encodePropsParam(resolved));
     previewUrl.searchParams.set("theme", options.theme);
     previewUrl.searchParams.set("server", mcpUrl);
+    if (Object.keys(headers).length > 0) {
+      previewUrl.searchParams.set(
+        "headers",
+        Buffer.from(JSON.stringify(headers), "utf8").toString("base64")
+      );
+    }
 
     const ts = timestampSuffix();
     const outPath = path.resolve(options.output ?? `./${viewName}-${ts}.png`);
     await mkdir(path.dirname(outPath), { recursive: true });
 
-    const browser = await playwright.chromium.launch();
-    try {
-      const ctx = await browser.newContext({
-        viewport: { width, height },
-        deviceScaleFactor: 1,
-        colorScheme: options.theme,
-      });
-      const page = await ctx.newPage();
-      const navTimeout = parseInt(options.timeout, 10) || 30000;
-      await page.goto(previewUrl.toString(), {
-        waitUntil: "load",
-        timeout: navTimeout,
-      });
-      const waitSelector = options.waitFor ?? 'body[data-view-ready="true"]';
-      await page.waitForSelector(waitSelector, { timeout: navTimeout });
-      await page.screenshot({
-        path: outPath,
-        type: "png",
-        fullPage: false,
-        clip: { x: 0, y: 0, width, height },
-      });
-    } finally {
-      await browser.close();
-    }
+    const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
+    await captureScreenshot({
+      url: previewUrl.toString(),
+      width,
+      height,
+      theme: options.theme,
+      waitForSelector: options.waitFor ?? 'body[data-view-ready="true"]',
+      timeoutMs: navTimeout,
+      outputPath: outPath,
+      chromePath,
+      delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
+    });
 
     console.log(`Saved screenshot: ${outPath} (${width}×${height})`);
   } catch (err) {
@@ -422,8 +363,12 @@ export function createScreenshotCommand(cliBin: string): Command {
     .option("--width <px>", "Browser viewport width in pixels.", "800")
     .option("--height <px>", "Browser viewport height in pixels.", "600")
     .option(
-      "--server <url>",
-      "MCP server URL. When omitted, probes localhost:3000 then auto-spawns `mcp-use dev`."
+      "--inspector <url>",
+      "Inspector host that serves /inspector/preview/:view. When omitted, probes localhost:3000 then auto-spawns `mcp-use dev`."
+    )
+    .option(
+      "--mcp <url>",
+      "MCP server URL to call the tool against. Defaults to `<inspector>/mcp`. Use this to render a remote MCP's view inside a local inspector."
     )
     .option(
       "--theme <light|dark>",
@@ -444,12 +389,13 @@ export function createScreenshotCommand(cliBin: string): Command {
       "--wait-for <selector>",
       'Override readiness selector (default: body[data-view-ready="true"]).'
     )
+    .option(
+      "--delay <ms>",
+      "Extra wait after readiness, to let chart animations / async layouts settle.",
+      "0"
+    )
     .option("--timeout <ms>", "Navigation + readiness timeout in ms.", "30000")
     .option("--quiet", "Suppress dev-server output.")
-    .option(
-      "--install",
-      "Install Playwright + the Chromium browser binary, then exit."
-    )
     .action(async (opts: ScreenshotOptions) => {
       await screenshotCommand(opts, cliBin);
     });
