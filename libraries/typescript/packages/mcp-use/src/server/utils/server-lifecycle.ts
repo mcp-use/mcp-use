@@ -4,6 +4,7 @@
  * Runtime-aware helpers for server startup, path rewriting, and CORS handling.
  */
 
+import chalk from "chalk";
 import type { Hono as HonoType } from "hono";
 import { getEnv, isDeno } from "./runtime.js";
 
@@ -161,6 +162,11 @@ export async function startServer(
       }
     );
     console.log(`[SERVER] Listening`);
+    console.log(
+      chalk.gray(
+        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+      )
+    );
     return {
       close: async () => {},
       forceClose: async () => {},
@@ -177,6 +183,11 @@ export async function startServer(
       (_info: any) => {
         console.log(`[SERVER] Listening on http://${host}:${port}`);
         console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
+        console.log(
+          chalk.gray(
+            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+          )
+        );
       }
     );
 
