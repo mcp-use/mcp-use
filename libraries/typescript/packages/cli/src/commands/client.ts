@@ -17,7 +17,9 @@ import {
   formatSuccess,
   formatTable,
   formatToolCall,
+  formatToolMode,
   formatWarning,
+  isStdoutTty,
 } from "../utils/format.js";
 import {
   buildOAuthProvider,
@@ -392,15 +394,22 @@ export async function listSessionsCommand(): Promise<void> {
     const sessions = await listAllSessions();
 
     if (sessions.length === 0) {
-      console.log(formatInfo("No saved sessions"));
-      console.log(
-        formatInfo("Connect to a server with: npx mcp-use client connect <url>")
-      );
+      if (isStdoutTty()) {
+        console.log(formatInfo("No saved sessions"));
+        console.log(
+          formatInfo(
+            "Connect to a server with: npx mcp-use client connect <url>"
+          )
+        );
+      }
       return;
     }
 
-    console.log(formatHeader("Saved Sessions:"));
-    console.log("");
+    const tty = isStdoutTty();
+    if (tty) {
+      console.log(formatHeader("Saved Sessions:"));
+      console.log("");
+    }
 
     const tableData = sessions.map((s) => ({
       name: s.isActive ? chalk.green.bold(`${s.name} *`) : s.name,
@@ -410,23 +419,21 @@ export async function listSessionsCommand(): Promise<void> {
           ? s.config.url || ""
           : `${s.config.command} ${(s.config.args || []).join(" ")}`,
       server: s.config.serverInfo?.name || "unknown",
-      status: activeSessions.has(s.name)
-        ? chalk.green("connected")
-        : chalk.gray("disconnected"),
     }));
 
     console.log(
       formatTable(tableData, [
         { key: "name", header: "Name" },
         { key: "type", header: "Type" },
-        { key: "target", header: "Target", width: 40 },
+        { key: "target", header: "Target", truncate: true },
         { key: "server", header: "Server" },
-        { key: "status", header: "Status" },
       ])
     );
 
-    console.log("");
-    console.log(chalk.gray("* = active session"));
+    if (tty) {
+      console.log("");
+      console.log(chalk.gray("* = active session"));
+    }
   } catch (error: any) {
     console.error(formatError(`Failed to list sessions: ${error.message}`));
     await cleanupAndExit(1);
@@ -467,22 +474,44 @@ export async function listToolsCommand(options: {
     if (options.json) {
       console.log(formatJson(tools));
     } else if (tools.length === 0) {
-      console.log(formatInfo("No tools available"));
+      if (isStdoutTty()) console.log(formatInfo("No tools available"));
     } else {
-      console.log(formatHeader(`Available Tools (${tools.length}):`));
-      console.log("");
+      const tty = isStdoutTty();
+      if (tty) {
+        console.log(formatHeader(`Available Tools (${tools.length}):`));
+        console.log("");
+      }
 
-      const tableData = tools.map((tool) => ({
-        name: chalk.bold(tool.name),
-        description: tool.description || chalk.gray("No description"),
-      }));
+      const tableData = tools.map((tool) => {
+        const props = (tool.inputSchema as any)?.properties ?? {};
+        const required = (tool.inputSchema as any)?.required ?? [];
+        const total = Object.keys(props).length;
+        const reqCount = Array.isArray(required) ? required.length : 0;
+        const argsCell =
+          total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
+        return {
+          name: chalk.bold(tool.name),
+          mode: formatToolMode((tool as any).annotations),
+          args: argsCell,
+          description: tool.description || chalk.gray("(no description)"),
+        };
+      });
 
       console.log(
         formatTable(tableData, [
-          { key: "name", header: "Tool", width: 25 },
-          { key: "description", header: "Description", width: 50 },
+          { key: "name", header: "Tool" },
+          { key: "mode", header: "Mode" },
+          { key: "args", header: "Args" },
+          { key: "description", header: "Description", truncate: true },
         ])
       );
+
+      if (tty) {
+        console.log("");
+        console.log(
+          chalk.gray("ARGS shows required/total. Modes: read-only · write · destructive.")
+        );
+      }
     }
   } catch (error: any) {
     console.error(formatError(`Failed to list tools: ${error.message}`));
@@ -625,22 +654,27 @@ export async function listResourcesCommand(options: {
     if (options.json) {
       console.log(formatJson(resources));
     } else if (resources.length === 0) {
-      console.log(formatInfo("No resources available"));
+      if (isStdoutTty()) console.log(formatInfo("No resources available"));
     } else {
-      console.log(formatHeader(`Available Resources (${resources.length}):`));
-      console.log("");
+      const tty = isStdoutTty();
+      if (tty) {
+        console.log(
+          formatHeader(`Available Resources (${resources.length}):`)
+        );
+        console.log("");
+      }
 
       const tableData = resources.map((resource) => ({
-        uri: resource.uri,
-        name: resource.name || chalk.gray("(no name)"),
+        name: chalk.bold(resource.name || "(no name)"),
         type: resource.mimeType || chalk.gray("unknown"),
+        uri: resource.uri,
       }));
 
       console.log(
         formatTable(tableData, [
-          { key: "uri", header: "URI", width: 40 },
-          { key: "name", header: "Name", width: 20 },
-          { key: "type", header: "Type", width: 15 },
+          { key: "name", header: "Name" },
+          { key: "type", header: "Type" },
+          { key: "uri", header: "URI", truncate: true },
         ])
       );
     }
@@ -769,20 +803,33 @@ export async function listPromptsCommand(options: {
     if (options.json) {
       console.log(formatJson(prompts));
     } else if (prompts.length === 0) {
-      console.log(formatInfo("No prompts available"));
+      if (isStdoutTty()) console.log(formatInfo("No prompts available"));
     } else {
-      console.log(formatHeader(`Available Prompts (${prompts.length}):`));
-      console.log("");
+      const tty = isStdoutTty();
+      if (tty) {
+        console.log(formatHeader(`Available Prompts (${prompts.length}):`));
+        console.log("");
+      }
 
-      const tableData = prompts.map((prompt) => ({
-        name: chalk.bold(prompt.name),
-        description: prompt.description || chalk.gray("No description"),
-      }));
+      const tableData = prompts.map((prompt) => {
+        const args = (prompt as any).arguments ?? [];
+        const reqCount = Array.isArray(args)
+          ? args.filter((a: any) => a?.required).length
+          : 0;
+        const total = Array.isArray(args) ? args.length : 0;
+        const argsCell = total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
+        return {
+          name: chalk.bold(prompt.name),
+          args: argsCell,
+          description: prompt.description || chalk.gray("(no description)"),
+        };
+      });
 
       console.log(
         formatTable(tableData, [
-          { key: "name", header: "Prompt", width: 25 },
-          { key: "description", header: "Description", width: 50 },
+          { key: "name", header: "Prompt" },
+          { key: "args", header: "Args" },
+          { key: "description", header: "Description", truncate: true },
         ])
       );
     }

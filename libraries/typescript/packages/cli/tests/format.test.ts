@@ -18,7 +18,10 @@ import type { CallToolResult } from "mcp-use";
 
 describe("Format Utilities", () => {
   describe("formatTable", () => {
-    it("should format data as ASCII table", () => {
+    const ANSI = /\x1b\[[0-9;]*m/g;
+    const strip = (s: string) => s.replace(ANSI, "");
+
+    it("renders borderless layout with UPPERCASE bold headers", () => {
       const data = [
         { name: "Alice", age: 30 },
         { name: "Bob", age: 25 },
@@ -28,27 +31,127 @@ describe("Format Utilities", () => {
         { key: "age", header: "Age" },
       ];
 
-      const result = formatTable(data, columns);
+      const result = formatTable(data, columns, { tsv: false });
+      const lines = result.split("\n");
 
-      expect(result).toContain("┌");
-      expect(result).toContain("│");
-      expect(result).toContain("Name");
-      expect(result).toContain("Age");
-      expect(result).toContain("Alice");
-      expect(result).toContain("Bob");
+      // No box-drawing glyphs anywhere.
+      for (const glyph of ["┌", "┐", "└", "┘", "│", "─", "├", "┤", "┬", "┴"]) {
+        expect(result).not.toContain(glyph);
+      }
+
+      // Header row is UPPERCASE (boldness depends on chalk color support,
+      // which is auto-disabled under vitest's non-TTY stdio).
+      expect(strip(lines[0])).toContain("NAME");
+      expect(strip(lines[0])).toContain("AGE");
+      expect(strip(lines[0])).not.toContain("Name");
+
+      // Data rows present and aligned with a two-space gutter.
+      expect(strip(lines[1])).toMatch(/^Alice\s{2,}30$/);
+      expect(strip(lines[2])).toMatch(/^Bob\s{2,}25$/);
+
+      // Visible-width alignment: name column padded so ages start at the same offset.
+      const ageCol1 = strip(lines[1]).indexOf("30");
+      const ageCol2 = strip(lines[2]).indexOf("25");
+      expect(ageCol1).toBe(ageCol2);
     });
 
-    it("should handle empty data", () => {
-      const result = formatTable([], []);
+    it("aligns columns when cells contain ANSI escape codes", () => {
+      // chalk.bold + chalk.green; pretend they are fixed escapes.
+      const data = [
+        { name: "\x1b[1mAlice\x1b[22m", status: "\x1b[32mok\x1b[39m" },
+        { name: "Bob", status: "fail" },
+      ];
+      const columns = [
+        { key: "name", header: "Name" },
+        { key: "status", header: "Status" },
+      ];
+
+      const result = formatTable(data, columns, { tsv: false });
+      const lines = result.split("\n").map(strip);
+
+      const statusCol1 = lines[1].indexOf("ok");
+      const statusCol2 = lines[2].indexOf("fail");
+      expect(statusCol1).toBe(statusCol2);
+    });
+
+    it("truncates with ellipsis when total width exceeds maxWidth", () => {
+      const data = [
+        { name: "tool-a", description: "x".repeat(200) },
+      ];
+      const columns = [
+        { key: "name", header: "Tool" },
+        { key: "description", header: "Description", truncate: true },
+      ];
+
+      const result = formatTable(data, columns, { tsv: false, maxWidth: 40 });
+      const lines = result.split("\n").map(strip);
+
+      expect(lines[1]).toContain("…");
+      expect(lines[1].length).toBeLessThanOrEqual(40);
+    });
+
+    it("non-truncatable columns keep their full width", () => {
+      const data = [{ name: "very-long-tool-name-here", desc: "z".repeat(80) }];
+      const columns = [
+        { key: "name", header: "Tool" },
+        { key: "desc", header: "Description", truncate: true },
+      ];
+
+      const result = formatTable(data, columns, { tsv: false, maxWidth: 40 });
+      const lines = result.split("\n").map(strip);
+
+      expect(lines[1]).toContain("very-long-tool-name-here");
+    });
+
+    it("emits TSV with no header in tsv mode", () => {
+      const data = [
+        { name: "Alice", age: 30 },
+        { name: "Bob", age: 25 },
+      ];
+      const columns = [
+        { key: "name", header: "Name" },
+        { key: "age", header: "Age" },
+      ];
+
+      const result = formatTable(data, columns, { tsv: true });
+
+      expect(result).toBe("Alice\t30\nBob\t25");
+      expect(result).not.toContain("Name");
+      expect(result).not.toContain("\x1b[");
+    });
+
+    it("strips ANSI escapes from TSV cells", () => {
+      const data = [{ name: "\x1b[1mAlice\x1b[22m", status: "\x1b[32mok\x1b[39m" }];
+      const columns = [
+        { key: "name", header: "Name" },
+        { key: "status", header: "Status" },
+      ];
+
+      const result = formatTable(data, columns, { tsv: true });
+      expect(result).toBe("Alice\tok");
+    });
+
+    it("collapses tabs and newlines inside TSV cells", () => {
+      const data = [{ name: "a\tb\nc", value: "x" }];
+      const columns = [
+        { key: "name", header: "Name" },
+        { key: "value", header: "Value" },
+      ];
+
+      const result = formatTable(data, columns, { tsv: true });
+      // Single tab between columns; embedded tabs/newlines collapsed to spaces.
+      expect(result.split("\t")).toHaveLength(2);
+      expect(result.startsWith("a b c")).toBe(true);
+    });
+
+    it("returns empty string for no data in tsv mode", () => {
+      const result = formatTable([], [{ key: "x", header: "X" }], { tsv: true });
+      expect(result).toBe("");
+    });
+
+    it("returns 'No items found' for no data in TTY mode", () => {
+      const result = formatTable([], [{ key: "x", header: "X" }], { tsv: false });
       expect(result).toContain("No items found");
-    });
-
-    it("should respect column widths", () => {
-      const data = [{ name: "A" }];
-      const columns = [{ key: "name", header: "Name", width: 20 }];
-
-      const result = formatTable(data, columns);
-      expect(result).toContain("A");
     });
   });
 
