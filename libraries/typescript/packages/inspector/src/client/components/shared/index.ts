@@ -4,3 +4,4 @@ export { RpcPanel } from "./RpcPanel";
 export { SchemaFormField } from "./SchemaFormField";
 export { JSONDisplay } from "./JSONDisplay";
 export { MarkdownRenderer } from "./MarkdownRenderer";
+export { CompletionInput } from "./CompletionInput";

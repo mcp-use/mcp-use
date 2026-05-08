@@ -13,6 +13,18 @@ interface PromptExecutionPanelProps {
   onArgChange: (key: string, value: any) => void;
   onExecute: () => void;
   onSave: () => void;
+  /**
+   * Optional fetcher for server-side completion suggestions.
+   * When provided, string-type argument fields display an autocomplete
+   * dropdown as the user types. Omit to fall back to plain inputs.
+   *
+   * @param argName - The argument whose value is being completed
+   * @param value   - The partial value typed so far
+   */
+  onFetchArgSuggestions?: (
+    argName: string,
+    value: string
+  ) => Promise<string[]>;
 }
 
 export function PromptExecutionPanel({
@@ -23,6 +35,7 @@ export function PromptExecutionPanel({
   onArgChange,
   onExecute,
   onSave,
+  onFetchArgSuggestions,
 }: PromptExecutionPanelProps) {
   // Handle Cmd/Ctrl + Enter keyboard shortcut
   useEffect(() => {
@@ -110,6 +123,7 @@ export function PromptExecutionPanel({
           selectedPrompt={selectedPrompt}
           promptArgs={promptArgs}
           onArgChange={onArgChange}
+          onFetchArgSuggestions={onFetchArgSuggestions}
         />
       </div>
     </div>
