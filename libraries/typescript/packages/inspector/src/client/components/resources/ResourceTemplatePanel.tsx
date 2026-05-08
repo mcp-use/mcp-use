@@ -93,7 +93,6 @@ export function ResourceTemplatePanel({
   const stableVarKey = vars.join(",");
   useMemo(() => {
     setValues(Object.fromEntries(vars.map((v) => [v, ""])));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stableVarKey]);
 
   const builtUri = useMemo(

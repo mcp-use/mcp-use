@@ -95,6 +95,18 @@ export function CompletionInput({
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
+  const selectSuggestion = useCallback(
+    (suggestion: string) => {
+      onChange(suggestion);
+      setSuggestions([]);
+      setIsOpen(false);
+      setActiveIndex(-1);
+      // Return focus to input after selection
+      inputRef.current?.focus();
+    },
+    [onChange]
+  );
+
   // ── Keyboard navigation ───────────────────────────────────────────────────
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -124,21 +136,11 @@ export function CompletionInput({
           setIsOpen(false);
           setActiveIndex(-1);
           break;
+        default:
+          break;
       }
     },
-    [isOpen, suggestions, activeIndex]
-  );
-
-  const selectSuggestion = useCallback(
-    (suggestion: string) => {
-      onChange(suggestion);
-      setSuggestions([]);
-      setIsOpen(false);
-      setActiveIndex(-1);
-      // Return focus to input after selection
-      inputRef.current?.focus();
-    },
-    [onChange]
+    [isOpen, suggestions, activeIndex, selectSuggestion]
   );
 
   return (
