@@ -651,49 +651,31 @@ function MCPAppsRendererBase({
       return {};
     };
 
+    
+
     bridge.onsizechange = ({ width, height }) => {
-      // Use ref so this closure always reads the current displayMode even
-      // though it was captured when the bridge was first created.
-      if (displayModeRef.current !== "inline") return;
-      const iframeEl = iframe;
-      if (!iframeEl || (height === undefined && width === undefined)) return;
+  if (displayModeRef.current !== "inline") return;
+  const iframeEl = iframe;
+  if (!iframeEl || height === undefined) return;  // width no longer needed
 
-      // Apply size changes with animation
-      const style = getComputedStyle(iframeEl);
-      const isBorderBox = style.boxSizing === "border-box";
+  const style = getComputedStyle(iframeEl);
+  const isBorderBox = style.boxSizing === "border-box";
 
-      let adjustedWidth = width;
-      let adjustedHeight = height;
+  let adjustedHeight = height;
+  if (isBorderBox) {
+    adjustedHeight +=
+      parseFloat(style.borderTopWidth) +
+      parseFloat(style.borderBottomWidth);
+  }
 
-      if (adjustedWidth !== undefined && isBorderBox) {
-        adjustedWidth +=
-          parseFloat(style.borderLeftWidth) +
-          parseFloat(style.borderRightWidth);
-      }
-      if (adjustedHeight !== undefined && isBorderBox) {
-        adjustedHeight +=
-          parseFloat(style.borderTopWidth) +
-          parseFloat(style.borderBottomWidth);
-      }
+  const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
+  const to: Keyframe = { height: `${adjustedHeight}px` };
 
-      const from: Keyframe = {};
-      const to: Keyframe = {};
+  iframeEl.style.height = `${adjustedHeight}px`;
+  setInlineHeight(adjustedHeight);
 
-      if (adjustedWidth !== undefined) {
-        from.width = `${iframeEl.offsetWidth}px`;
-        iframeEl.style.width = to.width = `min(${adjustedWidth}px, 100%)`;
-      }
-      if (adjustedHeight !== undefined) {
-        from.height = `${iframeEl.offsetHeight}px`;
-        iframeEl.style.height = to.height = `${adjustedHeight}px`;
-        // Persist in state so React uses this height when returning to inline
-        // mode (avoids snapping back to DEFAULT_HEIGHT and missing a resize
-        // event when the PiP container happens to be the same pixel height).
-        setInlineHeight(adjustedHeight);
-      }
-
-      iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
-    };
+  iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
+};
 
     bridgeRef.current = bridge;
 
