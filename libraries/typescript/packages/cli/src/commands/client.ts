@@ -594,6 +594,10 @@ export async function callToolCommand(
     } else {
       console.log(formatToolCall(callResult));
     }
+
+    if (callResult.isError) {
+      await cleanupAndExit(1);
+    }
   } catch (error: any) {
     console.error(formatError(`Failed to call tool: ${error.message}`));
     await cleanupAndExit(1);
