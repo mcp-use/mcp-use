@@ -47,7 +47,6 @@ export default defineConfig({
         "../mcp-use/dist/src/utils/index.js"
       ),
       "posthog-node": path.resolve(stubDir, "posthog-node.js"),
-      "posthog-js": path.resolve(stubDir, "posthog-js.js"),
       "@scarf/scarf": path.resolve(stubDir, "@scarf/scarf.js"),
       dotenv: path.resolve(stubDir, "dotenv.js"),
       util: path.resolve(stubDir, "util.js"),
@@ -85,7 +84,7 @@ export default defineConfig({
       "mcp-use/utils",
       "react-syntax-highlighter",
     ],
-    exclude: ["posthog-node", "posthog-js", "tar", "path-scurry"],
+    exclude: ["posthog-node", "tar", "path-scurry"],
   },
   build: {
     lib: {

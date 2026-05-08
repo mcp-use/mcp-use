@@ -142,14 +142,13 @@ function buildHeaders(config: ProviderConfig): HeadersInit {
 }
 
 function normalizeToolCalls(toolCalls: unknown): Array<{
-  id: string;
   name: string;
   args: Record<string, unknown>;
 }> {
   if (!Array.isArray(toolCalls)) return [];
 
   return toolCalls
-    .map((toolCall, index) => {
+    .map((toolCall) => {
       const functionCall =
         toolCall && typeof toolCall === "object"
           ? (toolCall as { function?: Record<string, unknown> }).function
@@ -164,7 +163,6 @@ function normalizeToolCalls(toolCalls: unknown): Array<{
           : {};
 
       return {
-        id: `call_${index}_${name || "tool"}`,
         name,
         args,
       };
@@ -209,10 +207,12 @@ export async function* streamChat(
     if (toolCalls.length > 0) {
       for (const [offset, toolCall] of toolCalls.entries()) {
         const index = emittedToolCalls + offset;
+        const toolCallId = `call_${index}_${toolCall.name || "tool"}`;
+
         yield {
           type: "tool-call-start",
           index,
-          toolCallId: toolCall.id,
+          toolCallId,
           toolName: toolCall.name,
         };
 
@@ -221,7 +221,7 @@ export async function* streamChat(
           yield {
             type: "tool-call-args-delta",
             index,
-            toolCallId: toolCall.id,
+            toolCallId,
             toolName: toolCall.name,
             argsDelta: argsJson,
           };
@@ -230,7 +230,7 @@ export async function* streamChat(
         yield {
           type: "tool-call-ready",
           index,
-          toolCallId: toolCall.id,
+          toolCallId,
           toolName: toolCall.name,
           args: toolCall.args,
         };
@@ -281,6 +281,10 @@ export async function chat(params: ChatParams): Promise<{
 
   return {
     text: typeof message.content === "string" ? message.content : "",
-    toolCalls: normalizeToolCalls(message.tool_calls),
+    toolCalls: normalizeToolCalls(message.tool_calls).map((tc, index) => ({
+      id: `call_${index}_${tc.name || "tool"}`,
+      name: tc.name,
+      args: tc.args,
+    })),
   };
 }

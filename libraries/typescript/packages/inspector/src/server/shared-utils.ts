@@ -15,7 +15,7 @@ interface LLMConfig {
     | "google"
     | "openrouter"
     | "ollama"
-    | "lmstudio";
+    | "ollama";
   model: string;
   apiKey: string;
   temperature?: number;

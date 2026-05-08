@@ -117,7 +117,7 @@ interface MCPChatMessageEventData {
     | "google"
     | "openrouter"
     | "ollama"
-    | "lmstudio";
+    | "ollama";
   model: string;
   messageCount: number;
   toolCallsCount?: number;

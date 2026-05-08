@@ -78,28 +78,18 @@ export const DEFAULT_MODELS: Record<ProviderName, string> = {
   google: "gemini-2.5-flash",
   openrouter: "meta-llama/llama-3.1-8b-instruct:free",
   ollama: "qwen3",
-  lmstudio: "local-model",
 };
 
 export const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
   ollama: "http://localhost:11434",
-  lmstudio: "http://localhost:1234/v1",
 };
 
 export function providerRequiresApiKey(provider: ProviderName): boolean {
-  return (
-    provider !== "ollama" &&
-    provider !== "lmstudio" &&
-    provider !== "openai-compatible"
-  );
+  return provider !== "ollama" && provider !== "openai-compatible";
 }
 
 export function providerSupportsBaseUrl(provider: ProviderName): boolean {
-  return (
-    provider === "ollama" ||
-    provider === "lmstudio" ||
-    provider === "openai-compatible"
-  );
+  return provider === "ollama" || provider === "openai-compatible";
 }
 
 export function getDefaultBaseUrl(provider: ProviderName): string {
