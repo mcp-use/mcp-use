@@ -10,6 +10,11 @@ import { createInterface } from "node:readline";
 /**
  * Build a NodeOAuthClientProvider that opens the user's browser via the
  * `open` package (already a CLI dependency, bundled via tsup).
+ *
+ * In non-TTY contexts (piped output, agents, CI) we don't auto-open a browser
+ * — instead we print the authorization URL so the caller can surface it to a
+ * human or open it themselves. This avoids surprising browser launches when
+ * an LLM agent invokes the CLI.
  */
 export async function buildOAuthProvider(
   serverUrl: string,
@@ -21,6 +26,11 @@ export async function buildOAuthProvider(
     storageKeyPrefix: "mcp:auth",
     ...options,
     openBrowser: async (url) => {
+      if (!process.stdout.isTTY) {
+        console.error(`\n  Open this URL in a browser to authenticate:`);
+        console.error(`  ${url}\n`);
+        return;
+      }
       const { default: open } = await import("open");
       await open(url);
     },
@@ -40,7 +50,11 @@ export async function runOAuthFlow(
   serverUrl: string,
   print: (line: string) => void = console.error.bind(console)
 ): Promise<void> {
-  print(`→ Opening browser to authenticate...`);
+  print(
+    process.stdout.isTTY
+      ? `→ Opening browser to authenticate...`
+      : `→ OAuth authentication required.`
+  );
   print(
     `  Listening on http://127.0.0.1:${provider.callbackPort}/callback (waiting up to 5m)`
   );
