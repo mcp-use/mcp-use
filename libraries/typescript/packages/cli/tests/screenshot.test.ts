@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  detectToolResourceUri,
   extractViewName,
   parseDimension,
   timestampSuffix,
@@ -50,5 +51,45 @@ describe("parseDimension", () => {
     expect(() => parseDimension("0", "width")).toThrow(/positive integer/);
     expect(() => parseDimension("-1", "width")).toThrow(/positive integer/);
     expect(() => parseDimension("abc", "width")).toThrow(/positive integer/);
+  });
+});
+
+describe("detectToolResourceUri", () => {
+  it("returns null for a tool without _meta", () => {
+    expect(detectToolResourceUri({})).toBeNull();
+    expect(detectToolResourceUri(undefined)).toBeNull();
+    expect(detectToolResourceUri(null)).toBeNull();
+  });
+
+  it("returns null when _meta is empty or has no UI keys", () => {
+    expect(detectToolResourceUri({ _meta: {} })).toBeNull();
+    expect(detectToolResourceUri({ _meta: { unrelated: "value" } })).toBeNull();
+  });
+
+  it("reads _meta.ui.resourceUri", () => {
+    expect(
+      detectToolResourceUri({
+        _meta: { ui: { resourceUri: "ui://widget/board.html" } },
+      })
+    ).toBe("ui://widget/board.html");
+  });
+
+  it('falls back to _meta["openai/outputTemplate"]', () => {
+    expect(
+      detectToolResourceUri({
+        _meta: { "openai/outputTemplate": "ui://widget/list.html" },
+      })
+    ).toBe("ui://widget/list.html");
+  });
+
+  it("prefers _meta.ui.resourceUri over openai/outputTemplate", () => {
+    expect(
+      detectToolResourceUri({
+        _meta: {
+          ui: { resourceUri: "ui://widget/preferred.html" },
+          "openai/outputTemplate": "ui://widget/fallback.html",
+        },
+      })
+    ).toBe("ui://widget/preferred.html");
   });
 });

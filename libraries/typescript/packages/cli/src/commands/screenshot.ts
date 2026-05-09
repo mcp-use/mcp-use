@@ -40,6 +40,121 @@ interface ScreenshotBundle {
 }
 
 /**
+ * Inspect a tool's `_meta` for the UI resource URI it renders, if any. Falls back
+ * to the OpenAI Apps `openai/outputTemplate` key for cross-ecosystem compatibility.
+ */
+export function detectToolResourceUri(
+  tool: { _meta?: Record<string, unknown> } | undefined | null
+): string | null {
+  if (!tool) return null;
+  const meta = tool._meta;
+  if (!meta) return null;
+  const uiMeta = (meta.ui as { resourceUri?: string } | undefined) ?? undefined;
+  return (
+    uiMeta?.resourceUri ??
+    (meta["openai/outputTemplate"] as string | undefined) ??
+    null
+  );
+}
+
+export interface CaptureToolScreenshotInputs {
+  session: MCPSession;
+  toolName: string;
+  toolArgs: Record<string, unknown>;
+  toolOutput: unknown;
+  resourceUri: string;
+  cliBin: string;
+}
+
+export interface CaptureToolScreenshotOptions {
+  width?: number;
+  height?: number;
+  theme?: "light" | "dark";
+  output?: string;
+  waitFor?: string;
+  delayMs?: number;
+  timeoutMs?: number;
+  inspector?: string;
+  quiet?: boolean;
+}
+
+export interface CaptureToolScreenshotResult {
+  outputPath: string;
+  width: number;
+  height: number;
+  view: string;
+}
+
+/**
+ * End-to-end screenshot pipeline for a tool whose UI resource has already been
+ * resolved. Reuses the caller's existing tool result so we don't re-invoke the
+ * tool, ensures a dev server is running (spawning one if needed), reads the UI
+ * resource, and captures via CDP. Cleans up any spawned dev server before
+ * returning, even on failure.
+ */
+export async function captureToolScreenshot(
+  inputs: CaptureToolScreenshotInputs,
+  options: CaptureToolScreenshotOptions = {}
+): Promise<CaptureToolScreenshotResult> {
+  const width = options.width ?? 800;
+  const height = options.height ?? 600;
+  const theme: "light" | "dark" = options.theme ?? "light";
+  const timeoutMs = options.timeoutMs ?? 30000;
+  const delayMs = options.delayMs ?? 0;
+
+  const chromePath = resolveChromePath();
+  const view = extractViewName(inputs.resourceUri);
+
+  const devOptions: ScreenshotOptions = {
+    width: String(width),
+    height: String(height),
+    theme,
+    timeout: String(timeoutMs),
+    inspector: options.inspector,
+    quiet: options.quiet,
+  };
+
+  let devHandle: DevServerHandle | undefined;
+  try {
+    devHandle = await ensureDevServer(devOptions, inputs.cliBin);
+
+    const resourceContents = await inputs.session.readResource(
+      inputs.resourceUri
+    );
+    const bundle: ScreenshotBundle = {
+      resourceUri: inputs.resourceUri,
+      resourceContents,
+      toolInput: inputs.toolArgs,
+      toolOutput: inputs.toolOutput,
+    };
+
+    const previewUrl = new URL(`/inspector/preview/${view}`, devHandle.url);
+    previewUrl.searchParams.set("theme", theme);
+
+    const ts = timestampSuffix();
+    const outputPath = path.resolve(options.output ?? `./${view}-${ts}.png`);
+    await mkdir(path.dirname(outputPath), { recursive: true });
+
+    await captureScreenshot({
+      url: previewUrl.toString(),
+      width,
+      height,
+      theme,
+      waitForSelector: options.waitFor ?? 'body[data-view-ready="true"]',
+      timeoutMs,
+      outputPath,
+      chromePath,
+      delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
+      bundle,
+    });
+
+    return { outputPath, width, height, view };
+  } finally {
+    killChild(devHandle?.child);
+  }
+}
+
+/**
  * Allocate a free TCP port by binding to 0 and reading back what the OS chose.
  */
 function getFreePort(): Promise<number> {
@@ -237,7 +352,6 @@ export async function screenshotCommand(
   cliBin: string
 ): Promise<void> {
   let exitCode = 0;
-  let devHandle: DevServerHandle | undefined;
 
   try {
     if (!options.tool) {
@@ -248,9 +362,8 @@ export async function screenshotCommand(
       return;
     }
 
-    let chromePath: string;
     try {
-      chromePath = resolveChromePath();
+      resolveChromePath();
     } catch (err) {
       console.error(
         formatError(err instanceof Error ? err.message : String(err))
@@ -262,6 +375,7 @@ export async function screenshotCommand(
     const width = parseDimension(options.width, "width");
     const height = parseDimension(options.height, "height");
     const navTimeout = parseInt(options.timeout, 10) || 30000;
+    const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
 
     // Resolve session before spawning the dev server so auth issues fail fast.
     const session = await resolveSessionForScreenshot(options);
@@ -269,14 +383,6 @@ export async function screenshotCommand(
       exitCode = 1;
       return;
     }
-
-    devHandle = await ensureDevServer(options, cliBin);
-    const handleSignal = (sig: NodeJS.Signals) => () => {
-      killChild(devHandle?.child);
-      process.exit(sig === "SIGTERM" ? 143 : 130);
-    };
-    process.on("SIGINT", handleSignal("SIGINT"));
-    process.on("SIGTERM", handleSignal("SIGTERM"));
 
     const tool = session.tools.find((t) => t.name === options.tool);
     if (!tool) {
@@ -286,60 +392,48 @@ export async function screenshotCommand(
           .join(", ")}`
       );
     }
-    const meta = (tool as { _meta?: Record<string, unknown> })._meta;
-    const uiMeta =
-      (meta?.ui as { resourceUri?: string } | undefined) ?? undefined;
-    const resourceUri =
-      uiMeta?.resourceUri ??
-      (meta?.["openai/outputTemplate"] as string | undefined);
+    const resourceUri = detectToolResourceUri(tool);
     if (!resourceUri) {
       throw new Error(
         `Tool "${options.tool}" does not declare a UI resource (expected _meta.ui.resourceUri or openai/outputTemplate).`
       );
     }
-    const view = extractViewName(resourceUri);
 
     const toolArgs: Record<string, unknown> = options.args
       ? JSON.parse(options.args)
       : {};
     const toolOutput = await session.callTool(options.tool, toolArgs);
-    const resourceContents = await session.readResource(resourceUri);
 
-    const bundle: ScreenshotBundle = {
-      resourceUri,
-      resourceContents,
-      toolInput: toolArgs,
-      toolOutput,
-    };
+    const result = await captureToolScreenshot(
+      {
+        session,
+        toolName: options.tool,
+        toolArgs,
+        toolOutput,
+        resourceUri,
+        cliBin,
+      },
+      {
+        width,
+        height,
+        theme: options.theme,
+        output: options.output,
+        waitFor: options.waitFor,
+        delayMs,
+        timeoutMs: navTimeout,
+        inspector: options.inspector,
+        quiet: options.quiet,
+      }
+    );
 
-    const previewUrl = new URL(`/inspector/preview/${view}`, devHandle.url);
-    previewUrl.searchParams.set("theme", options.theme);
-
-    const ts = timestampSuffix();
-    const outPath = path.resolve(options.output ?? `./${view}-${ts}.png`);
-    await mkdir(path.dirname(outPath), { recursive: true });
-
-    const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
-    await captureScreenshot({
-      url: previewUrl.toString(),
-      width,
-      height,
-      theme: options.theme,
-      waitForSelector: options.waitFor ?? 'body[data-view-ready="true"]',
-      timeoutMs: navTimeout,
-      outputPath: outPath,
-      chromePath,
-      delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
-      bundle,
-    });
-
-    console.log(`Saved screenshot: ${outPath} (${width}×${height})`);
+    console.log(
+      `Saved screenshot: ${result.outputPath} (${result.width}×${result.height})`
+    );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(formatError(`Screenshot failed: ${msg}`));
     exitCode = 1;
   } finally {
-    killChild(devHandle?.child);
     await cleanupAndExit(exitCode);
   }
 }

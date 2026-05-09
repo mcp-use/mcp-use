@@ -44,6 +44,7 @@ import {
   authRefreshCommand,
   authLogoutCommand,
 } from "./client-auth.js";
+import { captureToolScreenshot, detectToolResourceUri } from "./screenshot.js";
 
 export async function connectCommand(
   urlOrCommand: string,
@@ -416,7 +417,14 @@ export async function describeToolCommand(
 export async function callToolCommand(
   toolName: string,
   argsList?: string[],
-  options?: { session?: string; timeout?: number; json?: boolean }
+  options?: {
+    session?: string;
+    timeout?: number;
+    json?: boolean;
+    screenshot?: boolean;
+    screenshotOutput?: string;
+  },
+  cliBin?: string
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options?.session || null);
@@ -476,10 +484,70 @@ export async function callToolCommand(
       timeout: options?.timeout,
     });
 
+    // Auto-screenshot if the tool renders a widget. Capture before printing
+    // so the screenshot path is part of the printed result — agents reading
+    // `--json` output get the path inside the JSON. Failures here don't fail
+    // the tool call; the result is still printed and a warning is logged.
+    let screenshot: {
+      path: string;
+      width: number;
+      height: number;
+      view: string;
+    } | null = null;
+    let screenshotError: string | null = null;
+    if (options?.screenshot !== false && cliBin) {
+      const tool = session.tools.find((t) => t.name === toolName);
+      const resourceUri = detectToolResourceUri(tool);
+      if (resourceUri) {
+        console.error(
+          formatInfo(`Capturing widget screenshot (${resourceUri})...`)
+        );
+        try {
+          const shot = await captureToolScreenshot(
+            {
+              session,
+              toolName,
+              toolArgs: args,
+              toolOutput: callResult,
+              resourceUri,
+              cliBin,
+            },
+            options?.screenshotOutput
+              ? { output: options.screenshotOutput }
+              : {}
+          );
+          screenshot = {
+            path: shot.outputPath,
+            width: shot.width,
+            height: shot.height,
+            view: shot.view,
+          };
+        } catch (err: any) {
+          screenshotError = err?.message ?? String(err);
+        }
+      }
+    }
+
     if (options?.json) {
       console.log(formatJson(callResult));
     } else {
       console.log(formatToolCall(callResult));
+    }
+
+    if (screenshot) {
+      // Always announce the screenshot on stderr so `--json` stdout stays a
+      // clean CallToolResult — agents piping JSON shouldn't have to filter
+      // status lines out of their parse target.
+      console.error(
+        formatSuccess(
+          `Saved widget screenshot: ${screenshot.path} (${screenshot.width}×${screenshot.height})`
+        )
+      );
+    }
+    if (screenshotError) {
+      console.error(
+        formatWarning(`Skipped widget screenshot: ${screenshotError}`)
+      );
     }
 
     if (callResult.isError) {
@@ -843,6 +911,8 @@ export async function interactiveCommand(options: {
               )
             );
           } else if (command === "call" && arg) {
+            // TODO(mcp-1566): mirror the auto widget-screenshot flow from
+            // `client tools call` here. Skipped for now to keep the REPL terse.
             // Prompt for arguments
             rl.question(
               "Arguments (JSON, or press Enter for none): ",
@@ -970,7 +1040,7 @@ export async function interactiveCommand(options: {
 /**
  * Create the client command group
  */
-export function createClientCommand(): Command {
+export function createClientCommand(cliBin: string): Command {
   const clientCommand = new Command("client").description(
     "Interactive MCP client for terminal usage"
   );
@@ -1030,7 +1100,15 @@ export function createClientCommand(): Command {
     .option("--session <name>", "Use specific session")
     .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
     .option("--json", "Output as JSON")
-    .action(callToolCommand);
+    .option(
+      "--no-screenshot",
+      "Skip the auto-screenshot for tools that render a widget"
+    )
+    .option(
+      "--screenshot-output <path>",
+      "Output PNG path for the widget screenshot (defaults to ./<view>-<timestamp>.png)"
+    )
+    .action((name, args, opts) => callToolCommand(name, args, opts, cliBin));
   toolsCommand
     .command("describe <name>")
     .description("Show tool details and schema")

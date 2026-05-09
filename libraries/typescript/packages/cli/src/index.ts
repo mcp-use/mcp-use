@@ -3061,8 +3061,9 @@ program
     });
   });
 
-// Client command
-program.addCommand(createClientCommand());
+// Client command — pass the CLI bin path so `tools call` can auto-spawn a dev
+// server for widget-screenshot capture, mirroring `mcp-use screenshot`.
+program.addCommand(createClientCommand(process.argv[1] ?? __filename));
 
 // Deployments command
 program.addCommand(createDeploymentsCommand());
