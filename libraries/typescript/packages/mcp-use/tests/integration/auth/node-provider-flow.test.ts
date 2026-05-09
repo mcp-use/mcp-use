@@ -29,6 +29,8 @@ interface FakeAS {
   lastAuthorizeUrl: string | null;
   /** Last issued code. */
   lastCode: string | null;
+  /** Count of /token POSTs by grant_type. */
+  tokenGrants: { authorization_code: number; refresh_token: number };
 }
 
 async function startFakeAuthServer(): Promise<FakeAS> {
@@ -39,6 +41,7 @@ async function startFakeAuthServer(): Promise<FakeAS> {
     registered: [],
     lastAuthorizeUrl: null,
     lastCode: null,
+    tokenGrants: { authorization_code: 0, refresh_token: 0 },
   };
 
   const server = createServer(async (req, res) => {
@@ -102,11 +105,22 @@ async function startFakeAuthServer(): Promise<FakeAS> {
     }
 
     if (url.pathname === "/token" && req.method === "POST") {
-      // Issue tokens for either authorization_code or refresh_token.
+      const body = await readBody(req);
+      const params = new URLSearchParams(body);
+      const grant = params.get("grant_type");
+      if (grant === "refresh_token") {
+        state.tokenGrants.refresh_token += 1;
+      } else {
+        state.tokenGrants.authorization_code += 1;
+      }
+      const suffix = state.tokenGrants.refresh_token;
       res.statusCode = 200;
       res.end(
         JSON.stringify({
-          access_token: "test-access-token",
+          access_token:
+            grant === "refresh_token"
+              ? `test-access-token-refreshed-${suffix}`
+              : "test-access-token",
           refresh_token: "test-refresh-token",
           token_type: "Bearer",
           expires_in: 3600,
@@ -281,6 +295,72 @@ describe("NodeOAuthClientProvider — full flow", () => {
     );
     await provider.getAuthorizationCode();
     expect(provider.hasPendingFlow).toBe(false);
+  });
+
+  it("forceRefresh exchanges the refresh_token for a new access token", async () => {
+    let openedUrl: string | null = null;
+    const provider = await NodeOAuthClientProvider.create(fakeAS.url, {
+      baseDir,
+      preferredPort: 33578,
+      openBrowser: (url) => {
+        openedUrl = url;
+      },
+    });
+
+    // Drive the initial flow so tokens + refresh_token are persisted.
+    await auth(provider, { serverUrl: fakeAS.url });
+    const stateParam = new URL(openedUrl!).searchParams.get("state");
+    await fetch(
+      `http://127.0.0.1:${provider.callbackPort}/callback?code=fake-code&state=${stateParam}`
+    );
+    const code = await provider.getAuthorizationCode();
+    await auth(provider, { serverUrl: fakeAS.url, authorizationCode: code });
+
+    const initial = await provider.tokens();
+    expect(initial?.access_token).toBe("test-access-token");
+    const grantsBefore = fakeAS.tokenGrants.refresh_token;
+
+    const refreshed = await provider.forceRefresh();
+    expect(refreshed).not.toBeNull();
+    expect(refreshed!.access_token).toMatch(/^test-access-token-refreshed-/);
+    expect(fakeAS.tokenGrants.refresh_token).toBe(grantsBefore + 1);
+
+    // Persisted tokens reflect the refreshed value.
+    const persisted = await provider.tokens();
+    expect(persisted?.access_token).toBe(refreshed!.access_token);
+  });
+
+  it("forceRefresh returns null when no refresh_token is stored", async () => {
+    const provider = await NodeOAuthClientProvider.create(fakeAS.url, {
+      baseDir,
+      preferredPort: 33588,
+      openBrowser: () => {},
+    });
+    expect(await provider.forceRefresh()).toBeNull();
+  });
+
+  it("escapes HTML in the loopback failure page", async () => {
+    const provider = await NodeOAuthClientProvider.create(fakeAS.url, {
+      baseDir,
+      preferredPort: 33598,
+      openBrowser: () => {},
+    });
+    await auth(provider, { serverUrl: fakeAS.url });
+
+    const port = provider.callbackPort;
+    const payload = "<script>alert(1)</script>";
+    const resp = await fetch(
+      `http://127.0.0.1:${port}/callback?error=${encodeURIComponent(
+        payload
+      )}&error_description=${encodeURIComponent(payload)}`
+    );
+    const html = await resp.text();
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+
+    await expect(provider.getAuthorizationCode()).rejects.toMatchObject({
+      name: "OAuthFlowError",
+    });
   });
 
   it("walks the port range when the preferred port is taken", async () => {

@@ -86,12 +86,21 @@ h1{font-size:20px;margin:0 0 12px}p{line-height:1.5}</style></head>
 <body><h1>Authentication complete</h1>
 <p>You can close this tab and return to your terminal.</p></body></html>`;
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const FAILURE_HTML = (err: string, desc?: string) => `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Authentication failed</title>
 <style>body{font-family:system-ui,sans-serif;max-width:480px;margin:80px auto;padding:0 24px;color:#222}
 h1{font-size:20px;margin:0 0 12px;color:#b00020}p{line-height:1.5}code{background:#f3f3f3;padding:2px 6px;border-radius:3px}</style></head>
 <body><h1>Authentication failed</h1>
-<p><code>${err}</code>${desc ? `: ${desc.replace(/[<>&]/g, "")}` : ""}</p>
+<p><code>${escapeHtml(err)}</code>${desc ? `: ${escapeHtml(desc)}` : ""}</p>
 <p>You can close this tab and return to your terminal.</p></body></html>`;
 
 /**
@@ -301,14 +310,8 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
    * Force-refresh the access token using the persisted refresh_token.
    * Returns the new tokens on success, or null if no refresh_token / refresh failed.
    */
-  async forceRefresh(): Promise<OAuthTokens | null> {
-    const existing = await this.session.tokens();
-    if (!existing?.refresh_token) return null;
-    // OAuthSessionStore.tokens() refreshes when JWT is near expiry. To force
-    // unconditionally, drop the access_token and read again.
-    await this.saveTokens({ ...existing, access_token: "" });
-    const refreshed = await this.session.tokens();
-    return refreshed ?? null;
+  forceRefresh(): Promise<OAuthTokens | null> {
+    return this.session.forceRefresh();
   }
 
   /**
