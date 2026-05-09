@@ -367,9 +367,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
    * @param authorizationUrl The fully constructed authorization URL from the SDK.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    const sanitizedAuthUrl = await this.prepareAuthorizationUrl(
-      authorizationUrl
-    );
+    const sanitizedAuthUrl =
+      await this.prepareAuthorizationUrl(authorizationUrl);
 
     // If auto-auth is prevented, just store the URL but don't redirect/popup
     if (this.preventAutoAuth) {
