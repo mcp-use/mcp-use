@@ -651,31 +651,31 @@ function MCPAppsRendererBase({
       return {};
     };
 
-    
-
     bridge.onsizechange = ({ width, height }) => {
-  if (displayModeRef.current !== "inline") return;
-  const iframeEl = iframe;
-  if (!iframeEl || height === undefined) return;  // width no longer needed
+      // Use ref so this closure always reads the current displayMode even
+      // though it was captured when the bridge was first created.
+      if (displayModeRef.current !== "inline") return;
+      const iframeEl = iframe;
+      if (!iframeEl || height === undefined) return; // width no longer needed
 
-  const style = getComputedStyle(iframeEl);
-  const isBorderBox = style.boxSizing === "border-box";
+      const style = getComputedStyle(iframeEl);
+      const isBorderBox = style.boxSizing === "border-box";
 
-  let adjustedHeight = height;
-  if (isBorderBox) {
-    adjustedHeight +=
-      parseFloat(style.borderTopWidth) +
-      parseFloat(style.borderBottomWidth);
-  }
+      let adjustedHeight = height;
+      if (isBorderBox) {
+        adjustedHeight +=
+          parseFloat(style.borderTopWidth) +
+          parseFloat(style.borderBottomWidth);
+      }
 
-  const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
-  const to: Keyframe = { height: `${adjustedHeight}px` };
+      const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
+      const to: Keyframe = { height: `${adjustedHeight}px` };
 
-  iframeEl.style.height = `${adjustedHeight}px`;
-  setInlineHeight(adjustedHeight);
+      iframeEl.style.height = `${adjustedHeight}px`;
+      setInlineHeight(adjustedHeight);
 
-  iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
-};
+      iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
+    };
 
     bridgeRef.current = bridge;
 
@@ -1073,10 +1073,7 @@ function MCPAppsRendererBase({
     height: isFullscreen || isPip ? "100%" : `${inlineHeight}px`,
     width: "100%",
     maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
-    transition:
-      isFullscreen || isPip
-        ? undefined
-        : "height 300ms ease-out, width 300ms ease-out",
+    transition: isFullscreen || isPip ? undefined : "height 300ms ease-out",
   };
 
   return (
