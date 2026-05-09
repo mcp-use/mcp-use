@@ -656,7 +656,7 @@ function MCPAppsRendererBase({
       // though it was captured when the bridge was first created.
       if (displayModeRef.current !== "inline") return;
       const iframeEl = iframe;
-      if (!iframeEl || height === undefined) return; // width no longer needed
+      if (!iframeEl || height === undefined) return;
 
       const style = getComputedStyle(iframeEl);
       const isBorderBox = style.boxSizing === "border-box";
