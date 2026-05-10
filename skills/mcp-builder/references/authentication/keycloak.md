@@ -2,7 +2,7 @@
 
 Setting up OAuth with Keycloak. Keycloak exposes full OAuth 2.1 + OIDC endpoints on every realm, including native [Dynamic Client Registration](https://www.keycloak.org/securing-apps/client-registration) (RFC 7591). MCP clients discover Keycloak via `.well-known` metadata, register themselves, complete a PKCE flow, and send the access token as a bearer on MCP requests — **the MCP server only verifies the JWT against Keycloak's JWKS**.
 
-**Learn more:** [Keycloak Documentation](https://www.keycloak.org/documentation) · [Keycloak DCR](https://www.keycloak.org/securing-apps/client-registration) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/keycloak)
+**Learn more:** [Keycloak Documentation](https://www.keycloak.org/documentation) · [Keycloak DCR](https://www.keycloak.org/securing-apps/client-registration) · [Standalone starter template](https://github.com/mcp-use/mcp-oauth-keycloak-template) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/keycloak)
 
 ---
 

@@ -2,7 +2,7 @@
 
 Setting up OAuth with WorkOS AuthKit. DCR mode only — MCP clients register themselves directly with WorkOS; the MCP server just verifies the resulting tokens.
 
-**Learn more:** [WorkOS AuthKit MCP docs](https://workos.com/docs/authkit/mcp) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
+**Learn more:** [WorkOS AuthKit MCP docs](https://workos.com/docs/authkit/mcp) · [Standalone starter template](https://github.com/mcp-use/mcp-oauth-workos-template) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
 
 ---
 
