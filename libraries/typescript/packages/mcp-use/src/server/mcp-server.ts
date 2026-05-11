@@ -3321,8 +3321,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param callback - Optional callback function (alternative to toolDefinition.cb)
    * @returns This server instance for method chaining
    *
+   * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
+   * `widget`, etc.) are exported from `mcp-use/server` — see {@link text}.
+   *
    * @example
    * ```typescript
+   * import { text } from "mcp-use/server";
+   *
    * // Basic tool
    * server.tool({
    *   name: 'get-time',
@@ -3334,6 +3339,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @example
    * ```typescript
+   * import { text } from "mcp-use/server";
+   * import { z } from "zod";
+   *
    * // Tool with parameters
    * server.tool({
    *   name: 'add',
@@ -3349,6 +3357,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @example
    * ```typescript
+   * import { text, error } from "mcp-use/server";
+   *
    * // Tool with context (for OAuth)
    * server.tool({
    *   name: 'user-info',

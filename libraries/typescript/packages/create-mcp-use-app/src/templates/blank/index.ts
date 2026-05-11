@@ -1,4 +1,5 @@
-import { MCPServer } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
 
 // Create MCP server instance
 const server = new MCPServer({
@@ -29,26 +30,25 @@ const server = new MCPServer({
  * Docs: https://mcp-use.com/docs/typescript/server/mcp-apps
  */
 
-/*
+/**
  * Define MCP tools
  * Docs: https://mcp-use.com/docs/typescript/server/tools
-
+ *
+ * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
+ * `widget`, ...) are exported from `mcp-use/server`.
+ */
 server.tool(
   {
-    name: "fetch-weather",
-    description: "Fetch the weather for a city",
+    name: "echo",
+    description: "Echo a message back to the caller",
     schema: z.object({
-      city: z.string().describe("The city to fetch the weather for"),
+      message: z.string().describe("The message to echo back"),
     }),
   },
-  async ({ city }) => {
-    const response = await fetch(`https://wttr.in/${city}?format=j1`);
-    const data: any = await response.json();
-    const current = data.current_condition[0];
-    return text(`The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`);
+  async ({ message }) => {
+    return text(message);
   }
 );
- */
 
 /*
  * Define MCP resources
