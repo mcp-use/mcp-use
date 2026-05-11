@@ -18,6 +18,7 @@ import type { CallToolResult } from "mcp-use";
 
 describe("Format Utilities", () => {
   describe("formatTable", () => {
+    // eslint-disable-next-line no-control-regex
     const ANSI = /\x1b\[[0-9;]*m/g;
     const strip = (s: string) => s.replace(ANSI, "");
 
@@ -75,9 +76,7 @@ describe("Format Utilities", () => {
     });
 
     it("truncates with ellipsis when total width exceeds maxWidth", () => {
-      const data = [
-        { name: "tool-a", description: "x".repeat(200) },
-      ];
+      const data = [{ name: "tool-a", description: "x".repeat(200) }];
       const columns = [
         { key: "name", header: "Tool" },
         { key: "description", header: "Description", truncate: true },
@@ -121,7 +120,9 @@ describe("Format Utilities", () => {
     });
 
     it("strips ANSI escapes from TSV cells", () => {
-      const data = [{ name: "\x1b[1mAlice\x1b[22m", status: "\x1b[32mok\x1b[39m" }];
+      const data = [
+        { name: "\x1b[1mAlice\x1b[22m", status: "\x1b[32mok\x1b[39m" },
+      ];
       const columns = [
         { key: "name", header: "Name" },
         { key: "status", header: "Status" },
@@ -145,12 +146,16 @@ describe("Format Utilities", () => {
     });
 
     it("returns empty string for no data in tsv mode", () => {
-      const result = formatTable([], [{ key: "x", header: "X" }], { tsv: true });
+      const result = formatTable([], [{ key: "x", header: "X" }], {
+        tsv: true,
+      });
       expect(result).toBe("");
     });
 
     it("returns 'No items found' for no data in TTY mode", () => {
-      const result = formatTable([], [{ key: "x", header: "X" }], { tsv: false });
+      const result = formatTable([], [{ key: "x", header: "X" }], {
+        tsv: false,
+      });
       expect(result).toContain("No items found");
     });
   });

@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import type { CallToolResult } from "mcp-use/client";
 
+// eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*m/g;
 const GUTTER = "  ";
 const MIN_TRUNCATABLE_WIDTH = 8;
@@ -76,7 +77,8 @@ export function formatTable(
     return chalk.gray("No items found");
   }
 
-  const maxWidth = options.maxWidth ?? process.stdout.columns ?? DEFAULT_MAX_WIDTH;
+  const maxWidth =
+    options.maxWidth ?? process.stdout.columns ?? DEFAULT_MAX_WIDTH;
 
   // Natural width = max(header width, widest cell), per column.
   const natural = columns.map((col) => {
