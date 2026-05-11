@@ -1,5 +1,89 @@
 # mcp-use
 
+## 1.28.0-canary.5
+
+### Minor Changes
+
+- 25a906a: feat(auth): Node OAuth client provider + CLI OAuth flow
+
+  Adds a real OAuth flow to the `mcp-use` CLI. `mcp-use client connect <url>`
+  against an OAuth-protected MCP server now opens a browser, captures the
+  authorization code via a localhost loopback, persists tokens to
+  `~/.mcp-use/oauth/<urlHash>/`, and silently refreshes them on subsequent
+  commands — no flag plumbing.
+
+  New on `mcp-use`:
+  - `mcp-use/auth/node` entrypoint exporting `NodeOAuthClientProvider`,
+    `FileKVStore`, the `KVStore` type, and re-exporting the SDK's `auth` and
+    `UnauthorizedError`.
+  - `NodeOAuthClientProvider` implements `OAuthClientProvider`, owns the
+    loopback callback server (preferred port 33418, walks up to 33427 on
+    conflict, persisted across runs), and exposes `getAuthorizationCode()`
+    for the orchestrator pattern in `useMcp.ts`.
+  - `FileKVStore` writes tokens, client info, and code verifiers to one file
+    per key under `~/.mcp-use/oauth/<urlHash>/` with `0o600` perms and atomic
+    rename on write.
+
+  New on `@mcp-use/cli`:
+  - `mcp-use client connect <url>` auto-runs OAuth on `UnauthorizedError`
+    when no `--auth` is supplied. New flags: `--no-oauth`, `--auth-timeout`.
+  - `mcp-use client auth status|refresh|logout [session]` for token
+    introspection, forced refresh, and revocation. (No `auth login` — that's
+    what `connect` is for.)
+  - Follow-up commands (`tools list`, etc.) on OAuth sessions transparently
+    refresh expiring JWTs. If the refresh token itself is dead, the CLI
+    prompts to re-auth on TTY or prints the exact `connect` command to run
+    on non-TTY.
+
+### Patch Changes
+
+- 25a906a: fix(auth): make `forceRefresh()` actually exchange the refresh_token, and escape HTML in the loopback failure page
+  - `NodeOAuthClientProvider.forceRefresh()` now delegates to a new
+    `OAuthSessionStore.forceRefresh()` that calls the existing dedup'd
+    refresh path directly. The previous implementation tried to coerce a
+    refresh by zeroing out `access_token` and re-reading via `tokens()`,
+    but `tokens()` gates the refresh path on a truthy `access_token`, so
+    no network call was ever made and the stale tokens were returned. This
+    is what `mcp-use client auth refresh` runs.
+  - The loopback failure page (rendered when the OAuth server redirects
+    back with `?error=…`) now HTML-escapes both the `error` code and
+    `error_description` rather than only stripping `<>&` from the
+    description. Closes a low-severity reflected-XSS in the localhost
+    callback page.
+
+- 25a906a: fix(auth): handle SDK-initiated OAuth redirect on 401 in CLI connect
+
+  The SDK's `StreamableHTTPClientTransport` auto-calls `auth()` on a 401, which
+  in turn calls our `redirectToAuthorization()` — binding the loopback and
+  opening the browser before the transport throws. Two fixes so the CLI's
+  `connect` command picks up where the SDK left off instead of dying:
+  - `NodeOAuthClientProvider` exposes `hasPendingFlow` so orchestrators can
+    detect that the SDK already kicked off the flow and skip straight to
+    `getAuthorizationCode()` (calling `auth()` again would throw "an
+    authorization is already in progress").
+  - `mcp-use client connect`'s `runOAuthFlow` uses `hasPendingFlow` to skip
+    the duplicate `auth()` call, and `isUnauthorized` now also matches the
+    rewrapped 401 that `HttpConnector` throws (plain `Error` with `code = 401`).
+
+  Without these, the first connect to an OAuth-protected server printed
+  "Authentication required" and `process.exit(1)`'d before the browser
+  callback returned — leaving the user staring at a "connection refused"
+  loopback page.
+
+- 25a906a: feat(server): print a one-line hint on startup pointing devs at the
+  `mcp-use client connect <url>` CLI. Appears in dim gray right after
+  the existing `[SERVER] Listening` / `[MCP] Endpoints` lines.
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+  - @mcp-use/cli@3.2.0-canary.5
+  - @mcp-use/inspector@6.0.0-canary.5
+
 ## 1.27.2-canary.4
 
 ### Patch Changes

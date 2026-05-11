@@ -9,9 +9,19 @@
   },
   "changesets": [
     "cleanup-unused-deps",
+    "cli-borderless-tables",
+    "cli-client-headless-exit",
+    "cli-oauth-non-tty-no-browser",
+    "cli-tool-call-error-details",
+    "cli-tool-call-failure-exit-code",
+    "cli-tool-call-key-value-args",
     "dependabot-1e0b22ca",
     "expose-response-helpers",
+    "node-oauth-cli-flow",
+    "node-oauth-force-refresh-and-xss",
+    "node-oauth-pending-flow-fix",
     "oauth-session-store-extract",
-    "resolve-unlisted-deps"
+    "resolve-unlisted-deps",
+    "server-cli-connect-hint"
   ]
 }

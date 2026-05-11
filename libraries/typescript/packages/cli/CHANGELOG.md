@@ -1,5 +1,155 @@
 # @mcp-use/cli
 
+## 3.2.0-canary.5
+
+### Minor Changes
+
+- 25a906a: feat(cli): borderless aligned-columns table rendering, gh/kubectl style
+
+  Replaced the box-drawing ASCII table in `mcp-use client {tools,resources,prompts,sessions} list` with a borderless layout: UPPERCASE bold headers, two-space gutter between columns, ANSI-stripped width math, ellipsis truncation for long descriptions, sized to the terminal width (or 100 cols). Tool rows now also show a `MODE` column (read-only / write / destructive, derived from the tool's MCP annotations) and an `ARGS` column (required/total).
+
+  When stdout is not a TTY (pipes, agents, CI), every list command instead emits tab-separated values with no header, no decorative banners, and no ANSI — matching how the GitHub CLI behaves. This makes the CLI directly parseable by AI agents and shell pipelines.
+
+- 25a906a: feat(cli): accept `key=value` args for `client tools call` and `client prompts get`
+
+  Previously the only way to pass arguments to a tool or prompt was a single
+  JSON-encoded string, which is brittle for both humans (shell escaping) and
+  agents (extra JSON-stringify step, easy to get wrong). Now each argument is a
+  variadic positional in `key=value` form, with types coerced from the tool's
+  input schema (`number`, `integer`, `boolean`, `array`, `object`, `string`,
+  nullable unions). For nested objects or arrays, `key:=<json>` (httpie-style)
+  forces the value to be parsed as JSON.
+
+  ```bash
+  # Before
+  mcp-use client tools call greet '{"name":"world","count":3,"enabled":true}'
+
+  # After
+  mcp-use client tools call greet name=world count=3 enabled=true
+
+  # Nested values
+  mcp-use client tools call create-doc title=hello meta:='{"tags":["a","b"]}'
+  ```
+
+  The legacy single-JSON-object form is still accepted for backward
+  compatibility (a single positional starting with `{` is parsed as a JSON
+  object), and a leading `--` on a key is stripped if present (`--name=world`
+  works the same as `name=world`). The same syntax applies to
+  `mcp-use client prompts get`. Error messages now show usage examples and the
+  target tool's schema so agents can self-correct.
+
+- 25a906a: feat(auth): Node OAuth client provider + CLI OAuth flow
+
+  Adds a real OAuth flow to the `mcp-use` CLI. `mcp-use client connect <url>`
+  against an OAuth-protected MCP server now opens a browser, captures the
+  authorization code via a localhost loopback, persists tokens to
+  `~/.mcp-use/oauth/<urlHash>/`, and silently refreshes them on subsequent
+  commands — no flag plumbing.
+
+  New on `mcp-use`:
+  - `mcp-use/auth/node` entrypoint exporting `NodeOAuthClientProvider`,
+    `FileKVStore`, the `KVStore` type, and re-exporting the SDK's `auth` and
+    `UnauthorizedError`.
+  - `NodeOAuthClientProvider` implements `OAuthClientProvider`, owns the
+    loopback callback server (preferred port 33418, walks up to 33427 on
+    conflict, persisted across runs), and exposes `getAuthorizationCode()`
+    for the orchestrator pattern in `useMcp.ts`.
+  - `FileKVStore` writes tokens, client info, and code verifiers to one file
+    per key under `~/.mcp-use/oauth/<urlHash>/` with `0o600` perms and atomic
+    rename on write.
+
+  New on `@mcp-use/cli`:
+  - `mcp-use client connect <url>` auto-runs OAuth on `UnauthorizedError`
+    when no `--auth` is supplied. New flags: `--no-oauth`, `--auth-timeout`.
+  - `mcp-use client auth status|refresh|logout [session]` for token
+    introspection, forced refresh, and revocation. (No `auth login` — that's
+    what `connect` is for.)
+  - Follow-up commands (`tools list`, etc.) on OAuth sessions transparently
+    refresh expiring JWTs. If the refresh token itself is dead, the CLI
+    prompts to re-auth on TTY or prints the exact `connect` command to run
+    on non-TTY.
+
+### Patch Changes
+
+- 25a906a: fix(cli): exit cleanly after `client` subcommands so headless agents don't hang
+
+  Each `mcp-use client` subcommand spins up a fresh `MCPClient` + HTTP/SSE
+  transport per process invocation but never closed it before returning, so
+  the underlying socket kept the Node event loop alive and the CLI process
+  hung after `tools list`, `tools call`, `resources read`, etc. — making the
+  client unusable for headless / agent-driven flows.
+
+  Each one-shot subcommand now closes its in-memory sessions and exits at
+  the end. Long-running commands (`subscribe`, `interactive`) are unchanged
+  and still keep the loop alive until Ctrl+C / `quit`.
+
+- 25a906a: fix(cli): don't auto-open a browser for OAuth in non-TTY contexts
+
+  When `mcp-use client connect` (or a session restore) hits an OAuth flow,
+  the CLI used to launch the user's browser unconditionally. That's the
+  right call from an interactive terminal, but surprising when an LLM
+  agent or a CI script runs the same command — the agent has no way to
+  "see" the browser, and the user gets an unexpected window.
+
+  `stdout.isTTY` now gates the browser launch:
+  - TTY: opens the browser as before.
+  - Non-TTY: prints the authorization URL to stderr and waits on the
+    loopback callback, so the caller (human or agent) can hand the URL
+    off however it wants.
+
+  The leading "→ Opening browser to authenticate..." message is also
+  adjusted to "→ OAuth authentication required." in non-TTY mode so the
+  log doesn't claim a browser was opened when it wasn't.
+
+- 25a906a: fix(cli): surface tool call error details in `client tools call`
+
+  Previously when a tool call returned `isError: true`, the CLI showed
+  only "✗ Tool execution failed" without making it clear that the
+  following content was the error message — and printed nothing at all
+  when the server returned no content. Both human users and agent
+  callers had no way to debug what went wrong.
+
+  The output now labels the error content explicitly ("Error details:"),
+  colors text content red, surfaces `structuredContent` when present,
+  and falls back to "(no error details provided by server)" if the
+  server returned neither. Connection-level failures (caught Errors)
+  now also print any attached `data` payload.
+
+- 25a906a: fix(cli): exit non-zero when `client tools call` returns `isError: true`
+
+  `mcp-use client tools call <tool>` printed "✗ Tool execution failed"
+  but still exited 0, so headless agents and shell pipelines couldn't
+  distinguish a successful tool call from a failed one. The command now
+  exits 1 when the tool result has `isError: true`, in both default and
+  `--json` output modes. The result content is still printed first so the
+  failure detail remains visible.
+
+- 25a906a: fix(auth): handle SDK-initiated OAuth redirect on 401 in CLI connect
+
+  The SDK's `StreamableHTTPClientTransport` auto-calls `auth()` on a 401, which
+  in turn calls our `redirectToAuthorization()` — binding the loopback and
+  opening the browser before the transport throws. Two fixes so the CLI's
+  `connect` command picks up where the SDK left off instead of dying:
+  - `NodeOAuthClientProvider` exposes `hasPendingFlow` so orchestrators can
+    detect that the SDK already kicked off the flow and skip straight to
+    `getAuthorizationCode()` (calling `auth()` again would throw "an
+    authorization is already in progress").
+  - `mcp-use client connect`'s `runOAuthFlow` uses `hasPendingFlow` to skip
+    the duplicate `auth()` call, and `isUnauthorized` now also matches the
+    rewrapped 401 that `HttpConnector` throws (plain `Error` with `code = 401`).
+
+  Without these, the first connect to an OAuth-protected server printed
+  "Authentication required" and `process.exit(1)`'d before the browser
+  callback returned — leaving the user staring at a "connection refused"
+  loopback page.
+
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+  - mcp-use@1.28.0-canary.5
+  - @mcp-use/inspector@6.0.0-canary.5
+
 ## 3.1.5-canary.4
 
 ### Patch Changes

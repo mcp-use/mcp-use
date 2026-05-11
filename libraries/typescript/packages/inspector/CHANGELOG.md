@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 6.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+  - mcp-use@1.28.0-canary.5
+
 ## 5.0.2-canary.4
 
 ### Patch Changes
