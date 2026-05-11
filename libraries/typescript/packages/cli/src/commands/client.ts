@@ -21,6 +21,7 @@ import {
   formatWarning,
   isStdoutTty,
 } from "../utils/format.js";
+import { parsePromptArgs, parseToolArgs } from "../utils/parse-args.js";
 import {
   buildOAuthProvider,
   isUnauthorized,
@@ -487,8 +488,7 @@ export async function listToolsCommand(options: {
         const required = (tool.inputSchema as any)?.required ?? [];
         const total = Object.keys(props).length;
         const reqCount = Array.isArray(required) ? required.length : 0;
-        const argsCell =
-          total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
+        const argsCell = total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
         return {
           name: chalk.bold(tool.name),
           mode: formatToolMode((tool as any).annotations),
@@ -509,7 +509,9 @@ export async function listToolsCommand(options: {
       if (tty) {
         console.log("");
         console.log(
-          chalk.gray("ARGS shows required/total. Modes: read-only · write · destructive.")
+          chalk.gray(
+            "ARGS shows required/total. Modes: read-only · write · destructive."
+          )
         );
       }
     }
@@ -569,7 +571,7 @@ export async function describeToolCommand(
  */
 export async function callToolCommand(
   toolName: string,
-  argsJson?: string,
+  argsList?: string[],
   options?: { session?: string; timeout?: number; json?: boolean }
 ): Promise<void> {
   try {
@@ -580,36 +582,48 @@ export async function callToolCommand(
 
     const { session } = result!;
 
-    // Parse arguments
-    let args: Record<string, any> = {};
-    if (argsJson) {
-      try {
-        args = JSON.parse(argsJson);
-      } catch (error) {
-        console.error(formatError("Invalid JSON arguments"));
-        await cleanupAndExit(1);
-      }
-    } else {
-      // Check if tool requires arguments
-      const tools = session.tools;
-      const tool = tools.find((t) => t.name === toolName);
+    const tools = session.tools;
+    const tool = tools.find((t) => t.name === toolName);
 
-      if (tool?.inputSchema?.required && tool.inputSchema.required.length > 0) {
-        console.error(
-          formatError(
-            "This tool requires arguments. Provide them as a JSON string."
-          )
-        );
+    // Parse arguments: key=value pairs, key:=jsonvalue, or a single JSON object
+    let args: Record<string, unknown> = {};
+    if (argsList && argsList.length > 0) {
+      try {
+        args = parseToolArgs(argsList, tool?.inputSchema as any);
+      } catch (error: any) {
+        console.error(formatError(error.message));
         console.log("");
-        console.log(formatInfo("Example:"));
+        console.log(formatInfo("Usage:"));
         console.log(
-          `  npx mcp-use client tools call ${toolName} '{"param": "value"}'`
+          `  npx mcp-use client tools call ${toolName} key=value [key2=value2 ...]`
         );
-        console.log("");
-        console.log(formatInfo("Tool schema:"));
-        console.log(formatSchema(tool.inputSchema));
+        console.log(
+          `  npx mcp-use client tools call ${toolName} nested:='{"a":1}'   # JSON value`
+        );
+        console.log(
+          `  npx mcp-use client tools call ${toolName} '{"key":"value"}'   # full JSON object`
+        );
+        if (tool?.inputSchema) {
+          console.log("");
+          console.log(formatInfo("Tool schema:"));
+          console.log(formatSchema(tool.inputSchema));
+        }
         await cleanupAndExit(1);
       }
+    } else if (
+      tool?.inputSchema?.required &&
+      tool.inputSchema.required.length > 0
+    ) {
+      console.error(formatError("This tool requires arguments."));
+      console.log("");
+      console.log(formatInfo("Provide arguments as key=value pairs:"));
+      console.log(
+        `  npx mcp-use client tools call ${toolName} key=value [key2=value2 ...]`
+      );
+      console.log("");
+      console.log(formatInfo("Tool schema:"));
+      console.log(formatSchema(tool.inputSchema));
+      await cleanupAndExit(1);
     }
 
     // Call the tool
@@ -658,9 +672,7 @@ export async function listResourcesCommand(options: {
     } else {
       const tty = isStdoutTty();
       if (tty) {
-        console.log(
-          formatHeader(`Available Resources (${resources.length}):`)
-        );
+        console.log(formatHeader(`Available Resources (${resources.length}):`));
         console.log("");
       }
 
@@ -845,7 +857,7 @@ export async function listPromptsCommand(options: {
  */
 export async function getPromptCommand(
   promptName: string,
-  argsJson?: string,
+  argsList?: string[],
   options?: { session?: string; json?: boolean }
 ): Promise<void> {
   try {
@@ -856,13 +868,21 @@ export async function getPromptCommand(
 
     const { session } = result!;
 
-    // Parse arguments
-    let args: Record<string, any> = {};
-    if (argsJson) {
+    // Parse arguments: key=value pairs or a single JSON object
+    let args: Record<string, string> = {};
+    if (argsList && argsList.length > 0) {
       try {
-        args = JSON.parse(argsJson);
-      } catch (error) {
-        console.error(formatError("Invalid JSON arguments"));
+        args = parsePromptArgs(argsList);
+      } catch (error: any) {
+        console.error(formatError(error.message));
+        console.log("");
+        console.log(formatInfo("Usage:"));
+        console.log(
+          `  npx mcp-use client prompts get ${promptName} key=value [key2=value2 ...]`
+        );
+        console.log(
+          `  npx mcp-use client prompts get ${promptName} '{"key":"value"}'   # full JSON object`
+        );
         await cleanupAndExit(1);
       }
     }
@@ -1152,8 +1172,10 @@ export function createClientCommand(): Command {
     .option("--json", "Output as JSON")
     .action(listToolsCommand);
   toolsCommand
-    .command("call <name> [args]")
-    .description("Call a tool with arguments (JSON string)")
+    .command("call <name> [args...]")
+    .description(
+      "Call a tool. Args as key=value pairs (use key:=<json> for nested values, or pass a JSON object)"
+    )
     .option("--session <name>", "Use specific session")
     .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
     .option("--json", "Output as JSON")
@@ -1204,8 +1226,10 @@ export function createClientCommand(): Command {
     .option("--json", "Output as JSON")
     .action(listPromptsCommand);
   promptsCommand
-    .command("get <name> [args]")
-    .description("Get a prompt with arguments (JSON string)")
+    .command("get <name> [args...]")
+    .description(
+      "Get a prompt. Args as key=value pairs (or pass a JSON object)"
+    )
     .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
     .action(getPromptCommand);
