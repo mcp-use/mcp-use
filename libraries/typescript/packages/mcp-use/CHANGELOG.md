@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.27.2-canary.0
+
+### Patch Changes
+
+- 549f50c: Updated dependency `next` to `^15.5.18`.
+  - @mcp-use/cli@3.1.5-canary.0
+  - @mcp-use/inspector@5.0.2-canary.0
+
 ## 1.27.1
 
 ### Patch Changes

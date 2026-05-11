@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "5.0.1",
     "mcp-use": "1.27.1"
   },
-  "changesets": []
+  "changesets": [
+    "dependabot-1e0b22ca"
+  ]
 }
