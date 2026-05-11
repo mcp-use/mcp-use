@@ -19,7 +19,10 @@
       "ignoreUnresolved": ["./version.js", "../version.js", "./src/version.js"]
     },
     "packages/cli": {
-      "project": ["src/**/*.ts", "tests/**/*.ts"]
+      "project": ["src/**/*.ts", "tests/**/*.ts"],
+      "ignoreDependencies": [
+        "@mcp-use/inspector"
+      ]
     },
     "packages/inspector": {
       "entry": [
@@ -36,7 +39,7 @@
       ]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["src/index.tsx", "scripts/**/*.{js,mjs,ts}"],
+      "entry": ["scripts/**/*.{js,mjs,ts}"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

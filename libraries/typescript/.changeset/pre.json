@@ -8,6 +8,8 @@
     "mcp-use": "1.27.1"
   },
   "changesets": [
-    "dependabot-1e0b22ca"
+    "cleanup-unused-deps",
+    "dependabot-1e0b22ca",
+    "expose-response-helpers"
   ]
 }

@@ -1,5 +1,26 @@
 # create-mcp-use-app
 
+## 0.14.12-canary.1
+
+### Patch Changes
+
+- 79a3f4c: Make `mcp-use/server` response helpers discoverable to humans and coding agents.
+  - **`MCPServer.tool()` JSDoc**: each `@example` block now includes the matching `import { ... } from "mcp-use/server"` line, plus a note that helpers (`text`, `object`, `image`, `markdown`, `html`, `error`, `widget`, …) are exported from `mcp-use/server`. Previously the examples called `text(...)` / `error(...)` with no import, so anyone reading the hover doc had no breadcrumb to the package.
+  - **`create-mcp-use-app` blank template**: the commented tool/resource/prompt blocks previously called `text(...)`, `object(...)`, and `z.object(...)` without showing where any of those came from — and the file's top-level imports never referenced them either. Each commented block now includes the relevant `import { ... } from "mcp-use/server"` / `import { z } from "zod"` lines inside the comment, alongside a leading note naming the available response helpers. The template stays truly blank (no tools registered) but the discovery path is now local to the file.
+
+## 0.14.12-canary.0
+
+### Patch Changes
+
+- 2810bf6: Remove unused dependencies and devDependencies flagged by `knip`.
+  - Root: drop `lint-staged` and `typescript-eslint` (unused; ESLint config uses `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` directly, and Husky pre-commit runs `pnpm format`/`lint:fix` directly without lint-staged). Removed the stale root `lint-staged` config block.
+  - `@mcp-use/cli`: drop `globby`, `ws`, `@types/ws` (no source references; `globby` was explicitly replaced by Node built-ins). Removed `globby` from `tsup.config.ts` `noExternal`.
+  - `create-mcp-use-app`: drop `fs-extra` and `@types/fs-extra` (no source references).
+  - `mcp-use`: drop `ws`, `@types/ws`, `@antfu/eslint-config`, `@langchain/anthropic` (devDep — already an optional peer; only referenced as a string for dynamic import), `eslint-plugin-format`, `lint-staged`. Removed the stale package-level `lint-staged` config block.
+  - `knip.json`: ignore `@mcp-use/inspector` for the `cli` package (resolved dynamically via `createRequire().resolve` to read its `package.json`).
+
+  `pnpm knip:deps` now reports 0 unused (dev)dependencies. `pnpm install --frozen-lockfile`, `pnpm lint`, and `pnpm build` all succeed.
+
 ## 0.14.11
 
 ### Patch Changes
