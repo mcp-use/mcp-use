@@ -9,7 +9,15 @@ export interface SessionConfig {
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+  /** Static Bearer token. Used when authMode is undefined or "bearer". */
   authToken?: string;
+  /**
+   * How this session authenticates to the server.
+   * - "bearer": static token in `authToken`.
+   * - "oauth": tokens live in `~/.mcp-use/oauth/<urlHash>/`, managed by NodeOAuthClientProvider.
+   * Undefined = legacy bearer (back-compat with sessions saved before OAuth shipped).
+   */
+  authMode?: "bearer" | "oauth";
   lastUsed: string;
   serverInfo?: {
     name: string;

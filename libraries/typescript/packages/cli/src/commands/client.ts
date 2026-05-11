@@ -3,6 +3,7 @@ import { Command } from "commander";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
 import { getPackageVersion } from "mcp-use/server";
+import type { NodeOAuthClientProvider } from "mcp-use/auth/node";
 import { createInterface } from "node:readline";
 import {
   formatError,
@@ -16,8 +17,17 @@ import {
   formatSuccess,
   formatTable,
   formatToolCall,
+  formatToolMode,
   formatWarning,
+  isStdoutTty,
 } from "../utils/format.js";
+import { parsePromptArgs, parseToolArgs } from "../utils/parse-args.js";
+import {
+  buildOAuthProvider,
+  isUnauthorized,
+  promptYesNo,
+  runOAuthFlow,
+} from "../utils/oauth.js";
 import {
   getActiveSession,
   getSession,
@@ -26,6 +36,11 @@ import {
   setActiveSession,
   updateSessionInfo,
 } from "../utils/session-storage.js";
+import {
+  authStatusCommand,
+  authRefreshCommand,
+  authLogoutCommand,
+} from "./client-auth.js";
 
 // In-memory session map
 const activeSessions = new Map<
@@ -34,7 +49,31 @@ const activeSessions = new Map<
 >();
 
 /**
- * Get or restore a session by name
+ * Close every in-memory session and exit with `code`.
+ *
+ * Each `client` subcommand opens a fresh transport per process invocation,
+ * which keeps an HTTP/SSE socket alive after the command returns. Without
+ * this, the Node event loop never goes idle and headless agents hang. We
+ * call `closeAllSessions()` so the server sees a clean disconnect, then
+ * force-exit to guarantee termination even if the SDK transport leaves
+ * stray handles.
+ */
+async function cleanupAndExit(code: number): Promise<never> {
+  for (const [name, { client }] of activeSessions) {
+    try {
+      await client.closeAllSessions();
+    } catch {
+      // best-effort: we're exiting anyway
+    }
+    activeSessions.delete(name);
+  }
+  process.exit(code);
+}
+
+/**
+ * Get or restore a session by name. For OAuth-mode sessions whose tokens
+ * have expired and can't be refreshed, prompts to re-auth on TTY or prints
+ * a clear `connect` command to re-run on non-TTY.
  */
 async function getOrRestoreSession(
   sessionName: string | null
@@ -67,19 +106,28 @@ async function getOrRestoreSession(
     return null;
   }
 
-  // Reconnect
   try {
     const client = new MCPClient();
     const cliClientInfo = getCliClientInfo();
+    let authProvider: NodeOAuthClientProvider | undefined;
 
     if (config.type === "http") {
-      client.addServer(sessionName, {
-        url: config.url!,
-        headers: config.authToken
-          ? { Authorization: `Bearer ${config.authToken}` }
-          : undefined,
-        clientInfo: cliClientInfo,
-      });
+      if (config.authMode === "oauth") {
+        authProvider = await buildOAuthProvider(config.url!);
+        client.addServer(sessionName, {
+          url: config.url!,
+          authProvider,
+          clientInfo: cliClientInfo,
+        });
+      } else {
+        client.addServer(sessionName, {
+          url: config.url!,
+          headers: config.authToken
+            ? { Authorization: `Bearer ${config.authToken}` }
+            : undefined,
+          clientInfo: cliClientInfo,
+        });
+      }
     } else if (config.type === "stdio") {
       client.addServer(sessionName, {
         command: config.command!,
@@ -92,9 +140,38 @@ async function getOrRestoreSession(
       return null;
     }
 
-    const session = await client.createSession(sessionName);
-    activeSessions.set(sessionName, { client, session });
+    let session: MCPSession;
+    try {
+      session = await client.createSession(sessionName);
+    } catch (err) {
+      // OAuth-only fallback: tokens expired and refresh failed → re-auth.
+      if (
+        config.type === "http" &&
+        config.authMode === "oauth" &&
+        authProvider &&
+        isUnauthorized(err)
+      ) {
+        const reAuth = await promptYesNo(
+          `! Tokens for session '${sessionName}' expired and could not refresh. Re-authenticate now?`,
+          true
+        );
+        if (!reAuth) {
+          console.error(formatError(`Tokens expired and could not refresh.`));
+          console.error(
+            formatInfo(
+              `Run: mcp-use client connect ${config.url} --name ${sessionName}`
+            )
+          );
+          return null;
+        }
+        await runOAuthFlow(authProvider, config.url!);
+        session = await client.createSession(sessionName);
+      } else {
+        throw err;
+      }
+    }
 
+    activeSessions.set(sessionName, { client, session });
     console.error(formatInfo(`Reconnected to session '${sessionName}'`));
     return { name: sessionName, session };
   } catch (error: any) {
@@ -130,6 +207,8 @@ export async function connectCommand(
     name?: string;
     stdio?: boolean;
     auth?: string;
+    oauth?: boolean;
+    authTimeout?: string;
   }
 ): Promise<void> {
   try {
@@ -168,21 +247,53 @@ export async function connectCommand(
       // HTTP connection
       console.error(formatInfo(`Connecting to ${urlOrCommand}...`));
 
+      // Static --auth bypasses OAuth entirely. `--no-oauth` disables auto-OAuth
+      // on 401 (commander maps `--no-oauth` to options.oauth === false).
+      const wantOAuth = !options.auth && options.oauth !== false;
+      let authProvider: NodeOAuthClientProvider | undefined;
+      if (wantOAuth) {
+        const authTimeoutMs = options.authTimeout
+          ? Number.parseInt(options.authTimeout, 10)
+          : undefined;
+        authProvider = await buildOAuthProvider(urlOrCommand, {
+          ...(authTimeoutMs ? { authTimeoutMs } : {}),
+        });
+      }
+
       client.addServer(sessionName, {
         url: urlOrCommand,
-        headers: options.auth
-          ? { Authorization: `Bearer ${options.auth}` }
-          : undefined,
+        ...(authProvider
+          ? { authProvider }
+          : options.auth
+            ? { headers: { Authorization: `Bearer ${options.auth}` } }
+            : {}),
         clientInfo: cliClientInfo,
       });
 
-      session = await client.createSession(sessionName);
+      try {
+        session = await client.createSession(sessionName);
+      } catch (err) {
+        if (authProvider && isUnauthorized(err)) {
+          console.error(
+            formatWarning(
+              "Server requires authentication. Starting OAuth flow."
+            )
+          );
+          await runOAuthFlow(authProvider, urlOrCommand);
+          console.error(formatSuccess("Authentication successful"));
+          // Provider has tokens now; the SDK will pick them up on retry.
+          session = await client.createSession(sessionName);
+        } else {
+          throw err;
+        }
+      }
 
       // Save session config
       await saveSession(sessionName, {
         type: "http",
         url: urlOrCommand,
-        authToken: options.auth,
+        authMode: authProvider ? "oauth" : options.auth ? "bearer" : undefined,
+        authToken: authProvider ? undefined : options.auth,
         lastUsed: new Date().toISOString(),
       });
     }
@@ -229,8 +340,9 @@ export async function connectCommand(
     );
   } catch (error: any) {
     console.error(formatError(`Connection failed: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -248,16 +360,16 @@ export async function disconnectCommand(
         activeSessions.delete(name);
         console.log(formatSuccess(`Disconnected from ${name}`));
       }
-      return;
+      await cleanupAndExit(0);
     }
 
     if (!sessionName) {
       const active = await getActiveSession();
       if (!active) {
         console.error(formatError("No active session to disconnect"));
-        return;
+        await cleanupAndExit(0);
       }
-      sessionName = active.name;
+      sessionName = active!.name;
     }
 
     const sessionData = activeSessions.get(sessionName);
@@ -270,8 +382,9 @@ export async function disconnectCommand(
     }
   } catch (error: any) {
     console.error(formatError(`Failed to disconnect: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -282,15 +395,22 @@ export async function listSessionsCommand(): Promise<void> {
     const sessions = await listAllSessions();
 
     if (sessions.length === 0) {
-      console.log(formatInfo("No saved sessions"));
-      console.log(
-        formatInfo("Connect to a server with: npx mcp-use client connect <url>")
-      );
+      if (isStdoutTty()) {
+        console.log(formatInfo("No saved sessions"));
+        console.log(
+          formatInfo(
+            "Connect to a server with: npx mcp-use client connect <url>"
+          )
+        );
+      }
       return;
     }
 
-    console.log(formatHeader("Saved Sessions:"));
-    console.log("");
+    const tty = isStdoutTty();
+    if (tty) {
+      console.log(formatHeader("Saved Sessions:"));
+      console.log("");
+    }
 
     const tableData = sessions.map((s) => ({
       name: s.isActive ? chalk.green.bold(`${s.name} *`) : s.name,
@@ -300,27 +420,26 @@ export async function listSessionsCommand(): Promise<void> {
           ? s.config.url || ""
           : `${s.config.command} ${(s.config.args || []).join(" ")}`,
       server: s.config.serverInfo?.name || "unknown",
-      status: activeSessions.has(s.name)
-        ? chalk.green("connected")
-        : chalk.gray("disconnected"),
     }));
 
     console.log(
       formatTable(tableData, [
         { key: "name", header: "Name" },
         { key: "type", header: "Type" },
-        { key: "target", header: "Target", width: 40 },
+        { key: "target", header: "Target", truncate: true },
         { key: "server", header: "Server" },
-        { key: "status", header: "Status" },
       ])
     );
 
-    console.log("");
-    console.log(chalk.gray("* = active session"));
+    if (tty) {
+      console.log("");
+      console.log(chalk.gray("* = active session"));
+    }
   } catch (error: any) {
     console.error(formatError(`Failed to list sessions: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -332,8 +451,9 @@ export async function switchSessionCommand(name: string): Promise<void> {
     console.log(formatSuccess(`Switched to session '${name}'`));
   } catch (error: any) {
     console.error(formatError(`Failed to switch session: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -345,39 +465,61 @@ export async function listToolsCommand(options: {
 }): Promise<void> {
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
     const tools = await session.listTools();
 
     if (options.json) {
       console.log(formatJson(tools));
-      return;
+    } else if (tools.length === 0) {
+      if (isStdoutTty()) console.log(formatInfo("No tools available"));
+    } else {
+      const tty = isStdoutTty();
+      if (tty) {
+        console.log(formatHeader(`Available Tools (${tools.length}):`));
+        console.log("");
+      }
+
+      const tableData = tools.map((tool) => {
+        const props = (tool.inputSchema as any)?.properties ?? {};
+        const required = (tool.inputSchema as any)?.required ?? [];
+        const total = Object.keys(props).length;
+        const reqCount = Array.isArray(required) ? required.length : 0;
+        const argsCell = total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
+        return {
+          name: chalk.bold(tool.name),
+          mode: formatToolMode((tool as any).annotations),
+          args: argsCell,
+          description: tool.description || chalk.gray("(no description)"),
+        };
+      });
+
+      console.log(
+        formatTable(tableData, [
+          { key: "name", header: "Tool" },
+          { key: "mode", header: "Mode" },
+          { key: "args", header: "Args" },
+          { key: "description", header: "Description", truncate: true },
+        ])
+      );
+
+      if (tty) {
+        console.log("");
+        console.log(
+          chalk.gray(
+            "ARGS shows required/total. Modes: read-only · write · destructive."
+          )
+        );
+      }
     }
-
-    if (tools.length === 0) {
-      console.log(formatInfo("No tools available"));
-      return;
-    }
-
-    console.log(formatHeader(`Available Tools (${tools.length}):`));
-    console.log("");
-
-    const tableData = tools.map((tool) => ({
-      name: chalk.bold(tool.name),
-      description: tool.description || chalk.gray("No description"),
-    }));
-
-    console.log(
-      formatTable(tableData, [
-        { key: "name", header: "Tool", width: 25 },
-        { key: "description", header: "Description", width: 50 },
-      ])
-    );
   } catch (error: any) {
     console.error(formatError(`Failed to list tools: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -389,9 +531,11 @@ export async function describeToolCommand(
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
     const tools = session.tools;
     const tool = tools.find((t) => t.name === toolName);
 
@@ -400,25 +544,26 @@ export async function describeToolCommand(
       console.log("");
       console.log(formatInfo("Available tools:"));
       tools.forEach((t) => console.log(`  • ${t.name}`));
-      return;
+      await cleanupAndExit(1);
     }
 
-    console.log(formatHeader(`Tool: ${tool.name}`));
+    console.log(formatHeader(`Tool: ${tool!.name}`));
     console.log("");
 
-    if (tool.description) {
-      console.log(tool.description);
+    if (tool!.description) {
+      console.log(tool!.description);
       console.log("");
     }
 
-    if (tool.inputSchema) {
+    if (tool!.inputSchema) {
       console.log(formatHeader("Input Schema:"));
-      console.log(formatSchema(tool.inputSchema));
+      console.log(formatSchema(tool!.inputSchema));
     }
   } catch (error: any) {
     console.error(formatError(`Failed to describe tool: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -426,45 +571,59 @@ export async function describeToolCommand(
  */
 export async function callToolCommand(
   toolName: string,
-  argsJson?: string,
+  argsList?: string[],
   options?: { session?: string; timeout?: number; json?: boolean }
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options?.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
 
-    // Parse arguments
-    let args: Record<string, any> = {};
-    if (argsJson) {
+    const tools = session.tools;
+    const tool = tools.find((t) => t.name === toolName);
+
+    // Parse arguments: key=value pairs, key:=jsonvalue, or a single JSON object
+    let args: Record<string, unknown> = {};
+    if (argsList && argsList.length > 0) {
       try {
-        args = JSON.parse(argsJson);
-      } catch (error) {
-        console.error(formatError("Invalid JSON arguments"));
-        return;
-      }
-    } else {
-      // Check if tool requires arguments
-      const tools = session.tools;
-      const tool = tools.find((t) => t.name === toolName);
-
-      if (tool?.inputSchema?.required && tool.inputSchema.required.length > 0) {
-        console.error(
-          formatError(
-            "This tool requires arguments. Provide them as a JSON string."
-          )
-        );
+        args = parseToolArgs(argsList, tool?.inputSchema as any);
+      } catch (error: any) {
+        console.error(formatError(error.message));
         console.log("");
-        console.log(formatInfo("Example:"));
+        console.log(formatInfo("Usage:"));
         console.log(
-          `  npx mcp-use client tools call ${toolName} '{"param": "value"}'`
+          `  npx mcp-use client tools call ${toolName} key=value [key2=value2 ...]`
         );
-        console.log("");
-        console.log(formatInfo("Tool schema:"));
-        console.log(formatSchema(tool.inputSchema));
-        return;
+        console.log(
+          `  npx mcp-use client tools call ${toolName} nested:='{"a":1}'   # JSON value`
+        );
+        console.log(
+          `  npx mcp-use client tools call ${toolName} '{"key":"value"}'   # full JSON object`
+        );
+        if (tool?.inputSchema) {
+          console.log("");
+          console.log(formatInfo("Tool schema:"));
+          console.log(formatSchema(tool.inputSchema));
+        }
+        await cleanupAndExit(1);
       }
+    } else if (
+      tool?.inputSchema?.required &&
+      tool.inputSchema.required.length > 0
+    ) {
+      console.error(formatError("This tool requires arguments."));
+      console.log("");
+      console.log(formatInfo("Provide arguments as key=value pairs:"));
+      console.log(
+        `  npx mcp-use client tools call ${toolName} key=value [key2=value2 ...]`
+      );
+      console.log("");
+      console.log(formatInfo("Tool schema:"));
+      console.log(formatSchema(tool.inputSchema));
+      await cleanupAndExit(1);
     }
 
     // Call the tool
@@ -478,10 +637,22 @@ export async function callToolCommand(
     } else {
       console.log(formatToolCall(callResult));
     }
+
+    if (callResult.isError) {
+      await cleanupAndExit(1);
+    }
   } catch (error: any) {
     console.error(formatError(`Failed to call tool: ${error.message}`));
-    process.exit(1);
+    if (error?.data !== undefined) {
+      console.error(
+        chalk.gray(
+          typeof error.data === "string" ? error.data : formatJson(error.data)
+        )
+      );
+    }
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -493,42 +664,44 @@ export async function listResourcesCommand(options: {
 }): Promise<void> {
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
     const resourcesResult = await session.listAllResources();
     const resources = resourcesResult.resources;
 
     if (options.json) {
       console.log(formatJson(resources));
-      return;
+    } else if (resources.length === 0) {
+      if (isStdoutTty()) console.log(formatInfo("No resources available"));
+    } else {
+      const tty = isStdoutTty();
+      if (tty) {
+        console.log(formatHeader(`Available Resources (${resources.length}):`));
+        console.log("");
+      }
+
+      const tableData = resources.map((resource) => ({
+        name: chalk.bold(resource.name || "(no name)"),
+        type: resource.mimeType || chalk.gray("unknown"),
+        uri: resource.uri,
+      }));
+
+      console.log(
+        formatTable(tableData, [
+          { key: "name", header: "Name" },
+          { key: "type", header: "Type" },
+          { key: "uri", header: "URI", truncate: true },
+        ])
+      );
     }
-
-    if (resources.length === 0) {
-      console.log(formatInfo("No resources available"));
-      return;
-    }
-
-    console.log(formatHeader(`Available Resources (${resources.length}):`));
-    console.log("");
-
-    const tableData = resources.map((resource) => ({
-      uri: resource.uri,
-      name: resource.name || chalk.gray("(no name)"),
-      type: resource.mimeType || chalk.gray("unknown"),
-    }));
-
-    console.log(
-      formatTable(tableData, [
-        { key: "uri", header: "URI", width: 40 },
-        { key: "name", header: "Name", width: 20 },
-        { key: "type", header: "Type", width: 15 },
-      ])
-    );
   } catch (error: any) {
     console.error(formatError(`Failed to list resources: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -540,9 +713,11 @@ export async function readResourceCommand(
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
 
     console.error(formatInfo(`Reading resource: ${uri}`));
     const resource = await session.readResource(uri);
@@ -554,8 +729,9 @@ export async function readResourceCommand(
     }
   } catch (error: any) {
     console.error(formatError(`Failed to read resource: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -565,11 +741,16 @@ export async function subscribeResourceCommand(
   uri: string,
   options: { session?: string }
 ): Promise<void> {
+  // Subscribe is intentionally long-lived: it keeps the process alive to
+  // receive notifications until Ctrl+C. Don't run cleanupAndExit on the
+  // success path — only on error.
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
 
     await session.subscribeToResource(uri);
     console.log(formatSuccess(`Subscribed to resource: ${uri}`));
@@ -591,7 +772,7 @@ export async function subscribeResourceCommand(
     console.error(
       formatError(`Failed to subscribe to resource: ${error.message}`)
     );
-    process.exit(1);
+    await cleanupAndExit(1);
   }
 }
 
@@ -604,9 +785,11 @@ export async function unsubscribeResourceCommand(
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
 
     await session.unsubscribeFromResource(uri);
     console.log(formatSuccess(`Unsubscribed from resource: ${uri}`));
@@ -614,8 +797,9 @@ export async function unsubscribeResourceCommand(
     console.error(
       formatError(`Failed to unsubscribe from resource: ${error.message}`)
     );
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -627,40 +811,52 @@ export async function listPromptsCommand(options: {
 }): Promise<void> {
   try {
     const result = await getOrRestoreSession(options.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
     const promptsResult = await session.listPrompts();
     const prompts = promptsResult.prompts;
 
     if (options.json) {
       console.log(formatJson(prompts));
-      return;
+    } else if (prompts.length === 0) {
+      if (isStdoutTty()) console.log(formatInfo("No prompts available"));
+    } else {
+      const tty = isStdoutTty();
+      if (tty) {
+        console.log(formatHeader(`Available Prompts (${prompts.length}):`));
+        console.log("");
+      }
+
+      const tableData = prompts.map((prompt) => {
+        const args = (prompt as any).arguments ?? [];
+        const reqCount = Array.isArray(args)
+          ? args.filter((a: any) => a?.required).length
+          : 0;
+        const total = Array.isArray(args) ? args.length : 0;
+        const argsCell = total === 0 ? chalk.gray("—") : `${reqCount}/${total}`;
+        return {
+          name: chalk.bold(prompt.name),
+          args: argsCell,
+          description: prompt.description || chalk.gray("(no description)"),
+        };
+      });
+
+      console.log(
+        formatTable(tableData, [
+          { key: "name", header: "Prompt" },
+          { key: "args", header: "Args" },
+          { key: "description", header: "Description", truncate: true },
+        ])
+      );
     }
-
-    if (prompts.length === 0) {
-      console.log(formatInfo("No prompts available"));
-      return;
-    }
-
-    console.log(formatHeader(`Available Prompts (${prompts.length}):`));
-    console.log("");
-
-    const tableData = prompts.map((prompt) => ({
-      name: chalk.bold(prompt.name),
-      description: prompt.description || chalk.gray("No description"),
-    }));
-
-    console.log(
-      formatTable(tableData, [
-        { key: "name", header: "Prompt", width: 25 },
-        { key: "description", header: "Description", width: 50 },
-      ])
-    );
   } catch (error: any) {
     console.error(formatError(`Failed to list prompts: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -668,23 +864,33 @@ export async function listPromptsCommand(options: {
  */
 export async function getPromptCommand(
   promptName: string,
-  argsJson?: string,
+  argsList?: string[],
   options?: { session?: string; json?: boolean }
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options?.session || null);
-    if (!result) return;
+    if (!result) {
+      await cleanupAndExit(1);
+    }
 
-    const { session } = result;
+    const { session } = result!;
 
-    // Parse arguments
-    let args: Record<string, any> = {};
-    if (argsJson) {
+    // Parse arguments: key=value pairs or a single JSON object
+    let args: Record<string, string> = {};
+    if (argsList && argsList.length > 0) {
       try {
-        args = JSON.parse(argsJson);
-      } catch (error) {
-        console.error(formatError("Invalid JSON arguments"));
-        return;
+        args = parsePromptArgs(argsList);
+      } catch (error: any) {
+        console.error(formatError(error.message));
+        console.log("");
+        console.log(formatInfo("Usage:"));
+        console.log(
+          `  npx mcp-use client prompts get ${promptName} key=value [key2=value2 ...]`
+        );
+        console.log(
+          `  npx mcp-use client prompts get ${promptName} '{"key":"value"}'   # full JSON object`
+        );
+        await cleanupAndExit(1);
       }
     }
 
@@ -710,8 +916,9 @@ export async function getPromptCommand(
     }
   } catch (error: any) {
     console.error(formatError(`Failed to get prompt: ${error.message}`));
-    process.exit(1);
+    await cleanupAndExit(1);
   }
+  await cleanupAndExit(0);
 }
 
 /**
@@ -774,7 +981,7 @@ export async function interactiveCommand(options: {
       if (trimmed === "exit" || trimmed === "quit") {
         console.log(formatInfo("Goodbye!"));
         rl.close();
-        process.exit(0);
+        await cleanupAndExit(0);
       }
 
       const parts = trimmed.split(" ");
@@ -903,16 +1110,16 @@ export async function interactiveCommand(options: {
       rl.prompt();
     });
 
-    rl.on("close", () => {
+    rl.on("close", async () => {
       console.log("");
       console.log(formatInfo("Goodbye!"));
-      process.exit(0);
+      await cleanupAndExit(0);
     });
   } catch (error: any) {
     console.error(
       formatError(`Failed to start interactive mode: ${error.message}`)
     );
-    process.exit(1);
+    await cleanupAndExit(1);
   }
 }
 
@@ -930,7 +1137,15 @@ export function createClientCommand(): Command {
     .description("Connect to an MCP server")
     .option("--name <name>", "Session name")
     .option("--stdio", "Use stdio connector instead of HTTP")
-    .option("--auth <token>", "Authentication token")
+    .option("--auth <token>", "Static Bearer token (skips OAuth)")
+    .option(
+      "--no-oauth",
+      "Don't auto-trigger OAuth on 401; fail with the 401 instead"
+    )
+    .option(
+      "--auth-timeout <ms>",
+      "OAuth loopback wait timeout in ms (default 300000)"
+    )
     .action(connectCommand);
 
   clientCommand
@@ -964,8 +1179,10 @@ export function createClientCommand(): Command {
     .option("--json", "Output as JSON")
     .action(listToolsCommand);
   toolsCommand
-    .command("call <name> [args]")
-    .description("Call a tool with arguments (JSON string)")
+    .command("call <name> [args...]")
+    .description(
+      "Call a tool. Args as key=value pairs (use key:=<json> for nested values, or pass a JSON object)"
+    )
     .option("--session <name>", "Use specific session")
     .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
     .option("--json", "Output as JSON")
@@ -1016,8 +1233,10 @@ export function createClientCommand(): Command {
     .option("--json", "Output as JSON")
     .action(listPromptsCommand);
   promptsCommand
-    .command("get <name> [args]")
-    .description("Get a prompt with arguments (JSON string)")
+    .command("get <name> [args...]")
+    .description(
+      "Get a prompt. Args as key=value pairs (or pass a JSON object)"
+    )
     .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
     .action(getPromptCommand);
@@ -1029,6 +1248,24 @@ export function createClientCommand(): Command {
     .description("Start interactive REPL mode")
     .option("--session <name>", "Use specific session")
     .action(interactiveCommand);
+
+  // Auth scope (OAuth introspection / refresh / logout)
+  const authCommand = new Command("auth").description(
+    "Manage OAuth tokens for HTTP sessions"
+  );
+  authCommand
+    .command("status [session]")
+    .description("Show OAuth token status for a session")
+    .action(authStatusCommand);
+  authCommand
+    .command("refresh [session]")
+    .description("Force-refresh the OAuth access token")
+    .action(authRefreshCommand);
+  authCommand
+    .command("logout [session]")
+    .description("Remove stored OAuth tokens for the session's URL")
+    .action(authLogoutCommand);
+  clientCommand.addCommand(authCommand);
 
   return clientCommand;
 }

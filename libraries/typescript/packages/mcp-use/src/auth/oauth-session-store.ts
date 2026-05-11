@@ -334,4 +334,23 @@ export class OAuthSessionStore {
       this._refreshPromise = null;
     }
   }
+
+  /**
+   * Unconditionally exchange the persisted refresh_token for a new access
+   * token. Returns the new tokens on success, or `null` if no refresh_token
+   * is stored or the server rejected the grant. Shares the in-process
+   * coalescing window with the lazy refresh in `tokens()`.
+   */
+  async forceRefresh(): Promise<OAuthTokens | null> {
+    const data = await this.store.get(this.getKey("tokens"));
+    if (!data) return null;
+    let stored: OAuthTokens;
+    try {
+      stored = JSON.parse(data) as OAuthTokens;
+    } catch {
+      return null;
+    }
+    if (!stored.refresh_token) return null;
+    return this._dedupedRefresh(stored);
+  }
 }

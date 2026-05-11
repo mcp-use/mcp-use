@@ -140,8 +140,10 @@ describe("CLI Integration Tests", () => {
     it("should list sessions when none exist", async () => {
       const result = await runCLI(["client", "sessions", "list"]);
 
+      // Non-TTY (piped) stdout: gh-style empty output, just a clean exit.
+      // Decorative "No saved sessions" message is suppressed for agents/scripts.
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("No saved sessions");
+      expect(result.stdout.trim()).toBe("");
     });
 
     it("should show error when no active session for tools list", async () => {

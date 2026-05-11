@@ -72,6 +72,7 @@ export default defineConfig([
       "src/adapters/index.ts",
       "src/agents/index.ts",
       "src/auth/index.ts",
+      "src/auth/index-node.ts",
       "src/bin.ts",
       "src/client.ts",
       "src/server/index.ts",
