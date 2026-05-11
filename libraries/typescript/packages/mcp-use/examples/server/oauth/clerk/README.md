@@ -15,13 +15,13 @@ A production-ready example of an MCP server with Clerk OAuth 2.0 authentication,
 
 1. **Clerk Account**: Sign up at [clerk.com](https://clerk.com)
 2. **Node.js**: Version 18 or higher
-3. **Clerk Application**: Create an application in the [Clerk Dashboard](https://dashboard.clerk.com)
+3. **Clerk Application**: Create an application in the [Clerk Dashboard](https://dashboard.clerk.com/sign-in)
 
 ## Setup
 
 ### 1. Get Your Clerk Frontend API URL
 
-From the [Clerk Dashboard](https://dashboard.clerk.com):
+From the [Clerk Dashboard](https://dashboard.clerk.com/sign-in):
 
 1. Open your application
 2. Go to **Configure** → **API Keys**
@@ -33,7 +33,7 @@ From the [Clerk Dashboard](https://dashboard.clerk.com):
 
 **⚠️ IMPORTANT**: Dynamic Client Registration is **required** for MCP clients to work with Clerk.
 
-1. Go to the [Clerk Dashboard](https://dashboard.clerk.com)
+1. Go to the [Clerk Dashboard](https://dashboard.clerk.com/sign-in)
 2. Navigate to **Configure** → **OAuth Applications**
 3. Enable **Dynamic Client Registration**
 4. Save your changes
