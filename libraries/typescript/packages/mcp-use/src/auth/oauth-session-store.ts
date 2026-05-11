@@ -153,11 +153,11 @@ export class OAuthSessionStore {
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    await Promise.all([
-      this.store.set(this.getKey("tokens"), JSON.stringify(tokens)),
-      this.store.remove(this.getKey("code_verifier")),
-      this.store.remove(this.getKey("last_auth_url")),
-    ]);
+    // Persist tokens BEFORE clearing the verifier / last_auth_url so a failed
+    // write can't strand the auth flow with no way to recover.
+    await this.store.set(this.getKey("tokens"), JSON.stringify(tokens));
+    await this.store.remove(this.getKey("code_verifier"));
+    await this.store.remove(this.getKey("last_auth_url"));
   }
 
   async clientInformation(): Promise<OAuthClientInformation | undefined> {
@@ -181,11 +181,9 @@ export class OAuthSessionStore {
         console.info(
           `[${this.storageKeyPrefix}] Invalidating cached OAuth client info due to redirect URI mismatch.`
         );
-        await Promise.all([
-          this.store.remove(key),
-          this.store.remove(this.getKey("tokens")),
-          this.store.remove(this.getKey("last_auth_url")),
-        ]);
+        await this.store.remove(key);
+        await this.store.remove(this.getKey("tokens"));
+        await this.store.remove(this.getKey("last_auth_url"));
         return undefined;
       }
 
@@ -227,12 +225,10 @@ export class OAuthSessionStore {
   ): Promise<void> {
     switch (scope) {
       case "all":
-        await Promise.all([
-          this.store.remove(this.getKey("tokens")),
-          this.store.remove(this.getKey("client_info")),
-          this.store.remove(this.getKey("code_verifier")),
-          this.store.remove(this.getKey("last_auth_url")),
-        ]);
+        await this.store.remove(this.getKey("tokens"));
+        await this.store.remove(this.getKey("client_info"));
+        await this.store.remove(this.getKey("code_verifier"));
+        await this.store.remove(this.getKey("last_auth_url"));
         break;
       case "client":
         await this.store.remove(this.getKey("client_info"));
@@ -287,10 +283,10 @@ export class OAuthSessionStore {
     authorizationUrl.searchParams.set("state", state);
     const sanitizedAuthUrl = sanitizeUrl(authorizationUrl.toString());
 
-    await Promise.all([
-      this.store.set(stateKey, JSON.stringify(stateData)),
-      this.store.set(this.getKey("last_auth_url"), sanitizedAuthUrl),
-    ]);
+    // Persist the state record BEFORE the last_auth_url so a partial failure
+    // can't leave behind an auth URL whose state has no backing record.
+    await this.store.set(stateKey, JSON.stringify(stateData));
+    await this.store.set(this.getKey("last_auth_url"), sanitizedAuthUrl);
 
     return sanitizedAuthUrl;
   }
