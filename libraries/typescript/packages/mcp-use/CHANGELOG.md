@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.27.2-canary.3
+
+### Patch Changes
+
+- 5bb6d47: Declare `jsdom` and `@vitest/coverage-v8` as explicit devDependencies (resolves `pnpm knip` unlisted-dependency warnings). `@vitest/coverage-v8` is pinned to `~4.0.18` to match the installed `vitest` and satisfy its exact peer-dep constraint.
+  - @mcp-use/cli@3.1.5-canary.3
+  - @mcp-use/inspector@5.0.2-canary.3
+
 ## 1.27.2-canary.2
 
 ### Patch Changes

@@ -10,6 +10,7 @@
   "changesets": [
     "cleanup-unused-deps",
     "dependabot-1e0b22ca",
-    "expose-response-helpers"
+    "expose-response-helpers",
+    "resolve-unlisted-deps"
   ]
 }
