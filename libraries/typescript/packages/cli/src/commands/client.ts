@@ -643,6 +643,13 @@ export async function callToolCommand(
     }
   } catch (error: any) {
     console.error(formatError(`Failed to call tool: ${error.message}`));
+    if (error?.data !== undefined) {
+      console.error(
+        chalk.gray(
+          typeof error.data === "string" ? error.data : formatJson(error.data)
+        )
+      );
+    }
     await cleanupAndExit(1);
   }
   await cleanupAndExit(0);

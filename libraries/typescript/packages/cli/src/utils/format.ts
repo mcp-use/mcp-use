@@ -185,8 +185,12 @@ export function formatJson(data: any, pretty = true): string {
  */
 export function formatToolCall(result: CallToolResult): string {
   const lines: string[] = [];
+  const { isError, structuredContent } = result;
+  const hasContent = !!result.content?.length;
+  const hasStructured =
+    structuredContent !== undefined && structuredContent !== null;
 
-  if (result.isError) {
+  if (isError) {
     lines.push(chalk.red("✗ Tool execution failed"));
     lines.push("");
   } else {
@@ -194,15 +198,17 @@ export function formatToolCall(result: CallToolResult): string {
     lines.push("");
   }
 
-  // Format content
-  if (result.content && result.content.length > 0) {
+  if (hasContent) {
+    if (isError) {
+      lines.push(chalk.red.bold("Error details:"));
+    }
     result.content.forEach((item, index) => {
       if (result.content.length > 1) {
         lines.push(chalk.bold(`Content ${index + 1}:`));
       }
 
       if (item.type === "text") {
-        lines.push(item.text);
+        lines.push(isError ? chalk.red(item.text) : item.text);
       } else if (item.type === "image") {
         lines.push(chalk.cyan(`[Image: ${item.mimeType || "unknown type"}]`));
         if (item.data) {
@@ -224,6 +230,18 @@ export function formatToolCall(result: CallToolResult): string {
         lines.push("");
       }
     });
+  }
+
+  if (hasStructured) {
+    if (hasContent) lines.push("");
+    lines.push(
+      chalk.bold(isError ? "Structured error data:" : "Structured content:")
+    );
+    lines.push(formatJson(structuredContent));
+  }
+
+  if (isError && !hasContent && !hasStructured) {
+    lines.push(chalk.gray("(no error details provided by server)"));
   }
 
   return lines.join("\n");

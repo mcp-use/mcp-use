@@ -195,7 +195,49 @@ describe("Format Utilities", () => {
       const formatted = formatToolCall(result);
 
       expect(formatted).toContain("Tool execution failed");
+      expect(formatted).toContain("Error details:");
       expect(formatted).toContain("Error message");
+    });
+
+    it("should surface fallback text when failed tool has no content", () => {
+      const result: CallToolResult = {
+        content: [],
+        isError: true,
+      };
+
+      const formatted = formatToolCall(result);
+
+      expect(formatted).toContain("Tool execution failed");
+      expect(formatted).toContain("no error details provided by server");
+    });
+
+    it("should include structuredContent on failure", () => {
+      const result = {
+        content: [{ type: "text", text: "Boom" }],
+        isError: true,
+        structuredContent: { code: "E_FAIL", retryable: false },
+      } as unknown as CallToolResult;
+
+      const formatted = formatToolCall(result);
+
+      expect(formatted).toContain("Tool execution failed");
+      expect(formatted).toContain("Boom");
+      expect(formatted).toContain("Structured error data:");
+      expect(formatted).toContain("E_FAIL");
+      expect(formatted).toContain("retryable");
+    });
+
+    it("should include structuredContent on success", () => {
+      const result = {
+        content: [{ type: "text", text: "ok" }],
+        isError: false,
+        structuredContent: { items: 3 },
+      } as unknown as CallToolResult;
+
+      const formatted = formatToolCall(result);
+
+      expect(formatted).toContain("Structured content:");
+      expect(formatted).toContain("items");
     });
 
     it("should handle image content", () => {
