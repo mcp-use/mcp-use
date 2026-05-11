@@ -9,6 +9,7 @@
   },
   "changesets": [
     "create-app-chatgpt-tool-metadata",
+    "cute-windows-sort",
     "mcp-tools-list-output-schema"
   ]
 }
