@@ -11,6 +11,7 @@
     "cleanup-unused-deps",
     "dependabot-1e0b22ca",
     "expose-response-helpers",
+    "oauth-session-store-extract",
     "resolve-unlisted-deps"
   ]
 }
