@@ -228,11 +228,13 @@
   "devDependencies": {
     "@langchain/openai": "^1.2.8",
     "@types/morgan": "^1.9.10",
+    "@vitest/coverage-v8": "~4.0.18",
     "ai": ">=5.0.52",
     "esbuild": "0.27.1",
     "eslint": "^9.39.2",
     "express-rate-limit": ">=8.2.2",
     "husky": "^9.1.7",
+    "jsdom": "^27.0.0",
     "morgan": "^1.10.1",
     "react": "^19.2.3",
     "react-test-renderer": "^19.2.4",
