@@ -83,7 +83,7 @@ Load these before diving into tools/resources/widgets sections.
 ---
 
 ### 🔐 Adding Authentication?
-**When:** Protecting your server with OAuth (Auth0, Better Auth, Clerk, WorkOS, Supabase, Keycloak, or any other provider)
+**When:** Protecting your server with OAuth (Auth0, Better Auth, WorkOS, Supabase, Keycloak, or any other provider)
 
 - **[overview.md](references/authentication/overview.md)**
   - When: First time adding auth, understanding `ctx.auth`, or choosing a provider / integration mode
@@ -96,10 +96,6 @@ Load these before diving into tools/resources/widgets sections.
 - **[better-auth.md](references/authentication/better-auth.md)**
   - When: Using Better Auth with the `@better-auth/oauth-provider` plugin (self-hosted OAuth 2.1)
   - Covers: `oauthBetterAuthProvider`, auth URL / metadata routes, login and consent flows
-
-- **[clerk.md](references/authentication/clerk.md)**
-  - When: Using Clerk (DCR-based OAuth)
-  - Covers: `oauthClerkProvider`, enabling DCR, Frontend API URL, organization context
 
 - **[workos.md](references/authentication/workos.md)**
   - When: Using WorkOS AuthKit (DCR only)
