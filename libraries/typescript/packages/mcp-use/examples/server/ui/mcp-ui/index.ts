@@ -187,7 +187,11 @@ server.uiResource({
   description: "Render a single task with title, status, and assignee",
   props: {
     title: { type: "string", required: true, description: "Task title" },
-    description: { type: "string", required: false, description: "Task description" },
+    description: {
+      type: "string",
+      required: false,
+      description: "Task description",
+    },
     status: {
       type: "string",
       required: true,

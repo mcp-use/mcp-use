@@ -41,6 +41,12 @@ server.tool(
     schema: z.object({
       city: z.string().describe("The city to fetch the weather for"),
     }),
+    // Demo stub — no network. If you call an external weather API, set openWorldHint: true.
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
   },
   async ({ city }) => {
     return text(`The weather in ${city} is sunny`);

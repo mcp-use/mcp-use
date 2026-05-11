@@ -45,12 +45,28 @@ const fruits = [
   { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/10" },
 ];
 
+const fruitRowSchema = z.object({
+  fruit: z.string(),
+  color: z.string(),
+});
+
 server.tool(
   {
     name: "search-tools",
     description: "Search for fruits and display the results in a visual widget",
     schema: z.object({
       query: z.string().optional().describe("Search query to filter fruits"),
+    }),
+    // Hosts (e.g. ChatGPT) expect explicit hints. Use openWorldHint: true for HTTP/API calls;
+    // destructiveHint: true when deleting or overwriting user data.
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+    outputSchema: z.object({
+      query: z.string(),
+      results: z.array(fruitRowSchema),
     }),
     widget: {
       name: "product-search-result",
@@ -82,6 +98,11 @@ server.tool(
     schema: z.object({
       fruit: z.string().describe("The fruit name"),
     }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
     outputSchema: z.object({
       fruit: z.string(),
       color: z.string(),

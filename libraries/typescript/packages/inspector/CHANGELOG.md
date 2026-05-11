@@ -1,5 +1,34 @@
 # @mcp-use/inspector
 
+## 5.0.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [549f50c]
+  - mcp-use@1.27.2-canary.0
+
+## 5.0.1
+
+### Patch Changes
+
+- ca1b34f: Fix iframe width shrinking in inline chat mode; only height now responds to widget-reported sizes
+- Updated dependencies [ca1b34f]
+  - mcp-use@1.27.1
+
+## 5.0.1-canary.1
+
+### Patch Changes
+
+- 25a8745: Fix iframe width shrinking in inline chat mode; only height now responds to widget-reported sizes
+  - mcp-use@1.27.1-canary.1
+
+## 5.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c40cd03]
+  - mcp-use@1.27.1-canary.0
+
 ## 5.0.0
 
 ### Minor Changes

@@ -1,5 +1,38 @@
 # mcp-use
 
+## 1.27.2-canary.0
+
+### Patch Changes
+
+- 549f50c: Updated dependency `next` to `^15.5.18`.
+  - @mcp-use/cli@3.1.5-canary.0
+  - @mcp-use/inspector@5.0.2-canary.0
+
+## 1.27.1
+
+### Patch Changes
+
+- ca1b34f: Forward `outputSchema` from tool definitions into the MCP SDK so `tools/list` exposes output JSON Schema for clients (e.g. ChatGPT App Store validation).
+- Updated dependencies [ca1b34f]
+  - @mcp-use/inspector@5.0.1
+  - @mcp-use/cli@3.1.4
+
+## 1.27.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [25a8745]
+  - @mcp-use/inspector@5.0.1-canary.1
+  - @mcp-use/cli@3.1.4-canary.1
+
+## 1.27.1-canary.0
+
+### Patch Changes
+
+- c40cd03: Forward `outputSchema` from tool definitions into the MCP SDK so `tools/list` exposes output JSON Schema for clients (e.g. ChatGPT App Store validation).
+  - @mcp-use/cli@3.1.4-canary.0
+  - @mcp-use/inspector@5.0.1-canary.0
+
 ## 1.27.0
 
 ### Minor Changes

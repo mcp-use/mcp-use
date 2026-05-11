@@ -6,6 +6,14 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v5.0.1" description="May 2026">
+  ## MCP App width fix in chat
+  Patch release paired with `mcp-use` v1.27.1: MCP App width is pinned in chat so only height responds to widget-reported sizes.
+
+- **Fix**: Pin MCP App width in chat — `onSizeChange` only updates height, and the inline transition no longer animates `width`; prevents the chat panel from collapsing when widgets report narrower content (`#1462`)
+- **Update**: Updated mcp-use to v1.27.1
+</Update>
+
 <Update label="v5.0.0" description="May 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=5.0.0&title=OpenRouter%2C%20pre-registered%20OAuth%20%26%20telemetry%20env&date=2026-05&lang=inspector" alt="Release 5.0.0" />

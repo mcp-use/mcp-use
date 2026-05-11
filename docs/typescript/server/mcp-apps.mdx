@@ -177,12 +177,23 @@ This separation enables a powerful pattern: the **server computes data for the w
 server.tool({
   name: "search-products",
   schema: z.object({ query: z.string() }),
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true, // e.g. database or HTTP search — adjust per implementation
+  },
+  outputSchema: z.object({
+    query: z.string(),
+    results: z.array(
+      z.object({ id: z.string(), name: z.string(), price: z.number() })
+    ),
+  }),
   widget: { name: "product-search-result" },
 }, async ({ query }) => {
   const results = await db.search(query);
 
   return widget({
-    // Widget rendering data — LLM does NOT see this
+    // Widget rendering data — becomes structuredContent (hosts often validate against outputSchema)
     props: { query, results },
     // Text summary — LLM sees this
     output: text(`Found ${results.length} products matching "${query}"`),

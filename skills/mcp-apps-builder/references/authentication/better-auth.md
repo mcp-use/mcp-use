@@ -2,7 +2,7 @@
 
 Setting up a self-hosted OAuth 2.1 authorization server with Better Auth.
 
-**Learn more:** [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
+**Learn more:** [Better Auth OAuth Provider Plugin](https://better-auth.com/docs/plugins/oauth-provider) · [Standalone starter template](https://github.com/mcp-use/mcp-oauth-better-auth-template) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/better-auth)
 
 > Covers the `@better-auth/oauth-provider` plugin. The older Better Auth MCP plugin is deprecated — for legacy users, see the [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters).
 

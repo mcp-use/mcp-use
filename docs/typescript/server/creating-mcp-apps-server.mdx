@@ -74,6 +74,19 @@ server.tool(
     schema: z.object({
       query: z.string().optional().describe("Search query to filter fruits"),
     }),
+    // Hosts such as ChatGPT expect explicit behavior hints on every tool.
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false, // set true when calling external HTTP/APIs
+    },
+    // Describes structuredContent (here: widget props); helps validators and type generation.
+    outputSchema: z.object({
+      query: z.string(),
+      results: z.array(
+        z.object({ fruit: z.string(), color: z.string() })
+      ),
+    }),
     // Widget config — sets up metadata at registration time for Inspector and ChatGPT
     widget: {
       name: "product-search-result",  // Must match resources/product-search-result/ folder
@@ -88,7 +101,7 @@ server.tool(
 
     // widget() — returns runtime data for the widget
     return widget({
-      props: { query: query ?? "", results },  // Widget-only data (useWidget().props); not added to model context
+      props: { query: query ?? "", results },  // Widget-only data (useWidget().props); becomes structuredContent for hosts
       output: text(`Found ${results.length} fruits matching "${query ?? "all"}"`),  // What the model sees in the conversation
       // metadata: { ... } — optional; extra data for useWidget().metadata (cursors, timestamps, etc.)
     });
@@ -99,6 +112,10 @@ server.tool(
 **Summary:**
 - `widget: { name, invoking, invoked }` — Configures which widget to render and status messages
 - `widget({ props, output })` — `props` go to the widget via `useWidget().props`; `output` is shown to the model
+
+<Note>
+**ChatGPT and MCP catalogs**: Many hosts require `annotations.readOnlyHint`, `annotations.openWorldHint`, and `annotations.destructiveHint` (each an explicit boolean) on every tool, and recommend an `outputSchema` when the tool returns structured content—including widget tools, where `widget()` exposes `props` as `structuredContent` unless your `output` helper supplies its own.
+</Note>
 
 ## Step 3: Understand the Widget Component
 
@@ -162,6 +179,17 @@ server.tool(
     description: "Get detailed information about a product",
     schema: z.object({
       productId: z.string().describe("The product ID"),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true, // example assumes an external product API
+    },
+    outputSchema: z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number(),
+      description: z.string(),
     }),
   },
   async ({ productId }) => {
@@ -438,6 +466,17 @@ server.tool(
     name: "search-tools",
     description: "Search and display results",
     schema: z.object({ query: z.string().optional() }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+    outputSchema: z.object({
+      query: z.string(),
+      results: z.array(
+        z.object({ fruit: z.string(), color: z.string() })
+      ),
+    }),
     widget: {
       name: "product-search-result",
       invoking: "Searching...",
@@ -459,8 +498,19 @@ server.tool(
     name: "get-product-details",
     description: "Get product details",
     schema: z.object({ productId: z.string() }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+    outputSchema: z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number(),
+    }),
   },
-  async ({ productId }) => object({ id: productId, name: "Widget", price: 29 })
+  async ({ productId }) =>
+    object({ id: productId, name: "Widget", price: 29 })
 );
 
 server.listen().then(() => console.log("Server running"));
@@ -470,7 +520,7 @@ server.listen().then(() => console.log("Server running"));
 
 You've learned how to build MCP servers with widgets:
 
-- ✅ Define tools with `widget: { name, invoking, invoked }` and return `widget({ props, output })`
+- ✅ Define tools with `annotations`, optional `outputSchema`, `widget: { name, invoking, invoked }`, and return `widget({ props, output })`
 - ✅ Create widget components in `resources/<widget.name>/widget.tsx`
 - ✅ Use `useWidget()` for props, theme, and loading state
 - ✅ Use `useCallTool()` for widgets that call other tools

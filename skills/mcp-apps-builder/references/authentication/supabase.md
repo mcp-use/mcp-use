@@ -4,7 +4,7 @@ Setting up OAuth with Supabase's OAuth 2.1 server. Supabase hosts `/authorize`, 
 
 **You host the consent UI.** Supabase redirects the browser to a URL you configure, and your route uses the Supabase JS SDK to load authorization details, render sign-in + consent, and submit the decision back to Supabase. mcp-use is not involved in that step — follow Supabase's [OAuth Server — Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started).
 
-**Learn more:** [Supabase OAuth Server — MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
+**Learn more:** [Supabase OAuth Server — MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication) · [Standalone starter template](https://github.com/mcp-use/mcp-oauth-supabase-template) · [Runnable example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/supabase)
 
 > This targets Supabase's **OAuth 2.1 server** — a different feature from Supabase Auth's social logins. Enable it explicitly in the dashboard under **Authentication → OAuth Server**.
 
