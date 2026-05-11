@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.11
+
+### Patch Changes
+
+- ca1b34f: Add MCP tool `annotations` (`readOnlyHint`, `openWorldHint`, `destructiveHint`) and widget `outputSchema` to the `mcp-apps` template; add annotations to the `starter` template; align MCP Apps docs with ChatGPT App Store metadata expectations.
+
 ## 0.14.11-canary.0
 
 ### Patch Changes
