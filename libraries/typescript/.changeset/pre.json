@@ -7,5 +7,8 @@
     "@mcp-use/inspector": "5.0.0",
     "mcp-use": "1.27.0"
   },
-  "changesets": []
+  "changesets": [
+    "create-app-chatgpt-tool-metadata",
+    "mcp-tools-list-output-schema"
+  ]
 }
