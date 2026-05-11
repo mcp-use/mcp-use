@@ -651,7 +651,7 @@ function MCPAppsRendererBase({
       return {};
     };
 
-    bridge.onsizechange = ({ width, height }) => {
+    bridge.onsizechange = ({ height }) => {
       // Use ref so this closure always reads the current displayMode even
       // though it was captured when the bridge was first created.
       if (displayModeRef.current !== "inline") return;
