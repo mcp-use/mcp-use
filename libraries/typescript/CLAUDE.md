@@ -187,9 +187,10 @@ pnpm --filter @mcp-use/cli test
 
 ## Pre-commit Hooks
 
-Husky + lint-staged runs automatically on commit:
-- Prettier formatting
-- ESLint checks
+Husky runs automatically on commit and executes:
+- `pnpm format` (Prettier)
+- `pnpm lint:fix` (ESLint)
+- Changeset presence check when TypeScript/JavaScript files change
 
 If hooks fail, fix issues before committing.
 
