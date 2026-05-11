@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.27.1
+
+### Patch Changes
+
+- ca1b34f: Forward `outputSchema` from tool definitions into the MCP SDK so `tools/list` exposes output JSON Schema for clients (e.g. ChatGPT App Store validation).
+- Updated dependencies [ca1b34f]
+  - @mcp-use/inspector@5.0.1
+  - @mcp-use/cli@3.1.4
+
 ## 1.27.1-canary.1
 
 ### Patch Changes
