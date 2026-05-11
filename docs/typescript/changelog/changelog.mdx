@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.27.1" description="May 2026">
+  ## ChatGPT App metadata & inspector MCP App width fix
+  Patch release surfacing tool `outputSchema` in `tools/list`, adding tool annotations and `outputSchema` to the `create-mcp-use-app` mcp-apps template, and fixing MCP App width in inspector chat.
+
+- **Fix**: Forward `outputSchema` from tool definitions into the MCP SDK so `tools/list` exposes output JSON Schema for clients — required for ChatGPT App Store metadata validation (`#1466`)
+- **New** (create-mcp-use-app): MCP tool `annotations` (`readOnlyHint`, `openWorldHint`, `destructiveHint`) and widget `outputSchema` in the `mcp-apps` template; tool annotations in the `starter` template; MCP Apps docs aligned with ChatGPT App Store metadata expectations (`#1466`)
+- **Fix** (@mcp-use/inspector): MCP App width is pinned in chat — only height responds to widget-reported sizes, so the chat panel no longer collapses when a widget reports narrower content (`#1462`) (see inspector changelog)
+- **Documentation**: Clerk and WorkOS OAuth example READMEs now link to live pages — Clerk Dashboard `/sign-in` (200 instead of 404) and WorkOS `/docs/authkit` (`#1470`)
+- **Update**: Updated @mcp-use/inspector to v5.0.1
+- **Update**: Updated @mcp-use/cli to v3.1.4
+- **Update**: Updated create-mcp-use-app to v0.14.11
+</Update>
+
 <Update label="v1.27.0" description="May 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.27.0&title=Clerk%20OAuth%2C%20pre-registered%20client%20IDs%20%26%20inspector%20providers&date=2026-05&lang=typescript" alt="Release 1.27.0" />
