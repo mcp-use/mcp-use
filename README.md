@@ -21,7 +21,7 @@
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
     <br/>
     <a href="https://mcp-use.com/docs/python" alt="Python docs">
-        <img src="https://img.shields.io/badge/pyhton-docs-blue?labelColor=white&logo=python" alt="Badge"></a>
+        <img src="https://img.shields.io/badge/python-docs-blue?labelColor=white&logo=python" alt="Badge"></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Version">
         <img src="https://img.shields.io/pypi/v/mcp_use.svg"/></a>
     <a href="https://pypi.org/project/mcp_use/" alt="PyPI Downloads">
@@ -160,7 +160,79 @@ export default WeatherDisplay;
 
 Widgets in `resources/` are **auto-discovered** — no manual registration needed.
 
-Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/ui-widgets)
+Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/mcp-apps)
+
+
+## FAQ
+
+### What is mcp-use?
+
+mcp-use is the **fullstack MCP (Model Context Protocol) framework** for building MCP Servers and MCP Apps. It provides SDKs for both TypeScript and Python, enabling you to create tools that work across ChatGPT, Claude, and other MCP-compatible AI clients.
+
+### How is mcp-use different from other MCP frameworks?
+
+mcp-use is **fullstack** — it handles both MCP Servers (backend tools) and MCP Apps (interactive UI widgets):
+
+- **MCP Servers**: Define tools with Zod schemas, auto-discovered and validated
+- **MCP Apps**: Build React widgets that render in ChatGPT/Claude — write once, run everywhere
+- **MCP Inspector**: Built-in debugging tool (online + OSS)
+- **Manufact Cloud**: Deploy with observability, metrics, logs, branch-deployments
+
+### What languages are supported?
+
+mcp-use provides SDKs for both:
+
+- **TypeScript**: `npm install mcp-use` — Full MCP Server + MCP Apps support
+- **Python**: `pip install mcp-use` — MCP Server support with Pydantic schemas
+
+### How do I get started?
+
+**TypeScript Quickstart:**
+```bash
+npx create-mcp-use-app@latest
+```
+
+**Python Quickstart:**
+```bash
+pip install mcp-use
+```
+
+Visit [mcp-use.com/docs](https://mcp-use.com/docs) for full guides.
+
+### What are MCP Apps?
+
+MCP Apps are **interactive React widgets** that render inside ChatGPT, Claude, and other MCP clients:
+
+1. Define a tool on your MCP Server
+2. Create a React component in `resources/` (auto-discovered)
+3. Widgets render automatically when the tool is called
+
+This enables rich UI experiences beyond text responses — charts, maps, forms, slides, etc.
+
+### How do I deploy an MCP Server?
+
+**Option 1: Manufact MCP Cloud**
+Connect your GitHub repo to [manufact.com](https://manufact.com) for:
+- Zero-config deployment
+- Observability, metrics, logs
+- Branch deployments
+- Auto-scaling
+
+**Option 2: Self-hosted**
+```bash
+npx create-mcp-use-app@latest
+# Configure and deploy to your own infrastructure
+```
+
+### Can I use mcp-use with Claude Code / Cursor / Codex?
+
+Yes! Install the [mcp-use skill for MCP Apps Builder](https://skills.sh/mcp-use/mcp-use/mcp-apps-builder) to give your coding agent knowledge of mcp-use patterns.
+
+### Where can I get help?
+
+- **Documentation**: [mcp-use.com/docs](https://mcp-use.com/docs)
+- **Discord**: [discord.gg/XkNkSkMz3V](https://discord.gg/XkNkSkMz3V)
+- **GitHub Issues**: [github.com/mcp-use/mcp-use/issues](https://github.com/mcp-use/mcp-use/issues)
 
 ## Templates
 
@@ -433,6 +505,9 @@ main();
 </div>
 
 ---
+
+## Security
+See [SECURITY.md](https://github.com/mcp-use/mcp-use/blob/main/SECURITY.md)
 
 ## Community & Support
 
