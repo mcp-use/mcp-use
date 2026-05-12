@@ -234,7 +234,7 @@
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/30;
+    background-color: color-mix(in oklch, var(--muted) 80%, white);
   }
 
   body {
