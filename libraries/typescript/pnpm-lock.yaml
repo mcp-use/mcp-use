@@ -440,6 +440,9 @@ importers:
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
+      emulate:
+        specifier: 0.5.0
+        version: 0.5.0(hono@4.12.12)
       eslint:
         specifier: ^9.39.2
         version: 9.39.2(jiti@2.6.1)
@@ -4824,6 +4827,10 @@ packages:
 
   emoji-regex@8.0.0:
     resolution: {integrity: sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A==}
+
+  emulate@0.5.0:
+    resolution: {integrity: sha512-2LrOE8sqa1ITQ1aRR3kZhAhOCNz8hu+Kea9oBKdG/jEK6I/RYlMgHbsvQmbTTtr+nx6+fOOWkL6wqvfLeF5vuA==}
+    hasBin: true
 
   encodeurl@2.0.0:
     resolution: {integrity: sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg==}
@@ -11856,6 +11863,15 @@ snapshots:
   emoji-regex@10.6.0: {}
 
   emoji-regex@8.0.0: {}
+
+  emulate@0.5.0(hono@4.12.12):
+    dependencies:
+      '@hono/node-server': 1.19.13(hono@4.12.12)
+      commander: 14.0.3
+      picocolors: 1.1.1
+      yaml: 2.8.3
+    transitivePeerDependencies:
+      - hono
 
   encodeurl@2.0.0: {}
 
