@@ -2,7 +2,6 @@ import chalk from "chalk";
 import { Command } from "commander";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
-import { getPackageVersion } from "mcp-use/server";
 import type { NodeOAuthClientProvider } from "mcp-use/auth/node";
 import { createInterface } from "node:readline";
 import {
@@ -25,181 +24,27 @@ import { parsePromptArgs, parseToolArgs } from "../utils/parse-args.js";
 import {
   buildOAuthProvider,
   isUnauthorized,
-  promptYesNo,
   runOAuthFlow,
 } from "../utils/oauth.js";
 import {
   getActiveSession,
-  getSession,
   listAllSessions,
   saveSession,
   setActiveSession,
   updateSessionInfo,
 } from "../utils/session-storage.js";
 import {
+  activeSessions,
+  cleanupAndExit,
+  getCliClientInfo,
+  getOrRestoreSession,
+} from "../utils/session.js";
+import {
   authStatusCommand,
   authRefreshCommand,
   authLogoutCommand,
 } from "./client-auth.js";
-
-// In-memory session map
-const activeSessions = new Map<
-  string,
-  { client: MCPClient; session: MCPSession }
->();
-
-/**
- * Close every in-memory session and exit with `code`.
- *
- * Each `client` subcommand opens a fresh transport per process invocation,
- * which keeps an HTTP/SSE socket alive after the command returns. Without
- * this, the Node event loop never goes idle and headless agents hang. We
- * call `closeAllSessions()` so the server sees a clean disconnect, then
- * force-exit to guarantee termination even if the SDK transport leaves
- * stray handles.
- */
-async function cleanupAndExit(code: number): Promise<never> {
-  for (const [name, { client }] of activeSessions) {
-    try {
-      await client.closeAllSessions();
-    } catch {
-      // best-effort: we're exiting anyway
-    }
-    activeSessions.delete(name);
-  }
-  process.exit(code);
-}
-
-/**
- * Get or restore a session by name. For OAuth-mode sessions whose tokens
- * have expired and can't be refreshed, prompts to re-auth on TTY or prints
- * a clear `connect` command to re-run on non-TTY.
- */
-async function getOrRestoreSession(
-  sessionName: string | null
-): Promise<{ name: string; session: MCPSession } | null> {
-  // If no session name provided, use active session
-  if (!sessionName) {
-    const active = await getActiveSession();
-    if (!active) {
-      console.error(
-        formatError("No active session. Connect to a server first.")
-      );
-      console.error(
-        formatInfo("Use: npx mcp-use client connect <url> --name <name>")
-      );
-      return null;
-    }
-    sessionName = active.name;
-  }
-
-  // Check if session is already connected in memory
-  if (activeSessions.has(sessionName)) {
-    const { session } = activeSessions.get(sessionName)!;
-    return { name: sessionName, session };
-  }
-
-  // Try to restore from storage
-  const config = await getSession(sessionName);
-  if (!config) {
-    console.error(formatError(`Session '${sessionName}' not found`));
-    return null;
-  }
-
-  try {
-    const client = new MCPClient();
-    const cliClientInfo = getCliClientInfo();
-    let authProvider: NodeOAuthClientProvider | undefined;
-
-    if (config.type === "http") {
-      if (config.authMode === "oauth") {
-        authProvider = await buildOAuthProvider(config.url!);
-        client.addServer(sessionName, {
-          url: config.url!,
-          authProvider,
-          clientInfo: cliClientInfo,
-        });
-      } else {
-        client.addServer(sessionName, {
-          url: config.url!,
-          headers: config.authToken
-            ? { Authorization: `Bearer ${config.authToken}` }
-            : undefined,
-          clientInfo: cliClientInfo,
-        });
-      }
-    } else if (config.type === "stdio") {
-      client.addServer(sessionName, {
-        command: config.command!,
-        args: config.args || [],
-        env: config.env,
-        clientInfo: cliClientInfo,
-      });
-    } else {
-      console.error(formatError(`Unknown session type: ${config.type}`));
-      return null;
-    }
-
-    let session: MCPSession;
-    try {
-      session = await client.createSession(sessionName);
-    } catch (err) {
-      // OAuth-only fallback: tokens expired and refresh failed → re-auth.
-      if (
-        config.type === "http" &&
-        config.authMode === "oauth" &&
-        authProvider &&
-        isUnauthorized(err)
-      ) {
-        const reAuth = await promptYesNo(
-          `! Tokens for session '${sessionName}' expired and could not refresh. Re-authenticate now?`,
-          true
-        );
-        if (!reAuth) {
-          console.error(formatError(`Tokens expired and could not refresh.`));
-          console.error(
-            formatInfo(
-              `Run: mcp-use client connect ${config.url} --name ${sessionName}`
-            )
-          );
-          return null;
-        }
-        await runOAuthFlow(authProvider, config.url!);
-        session = await client.createSession(sessionName);
-      } else {
-        throw err;
-      }
-    }
-
-    activeSessions.set(sessionName, { client, session });
-    console.error(formatInfo(`Reconnected to session '${sessionName}'`));
-    return { name: sessionName, session };
-  } catch (error: any) {
-    console.error(formatError(`Failed to restore session: ${error.message}`));
-    return null;
-  }
-}
-
-/**
- * Connect command
- */
-/**
- * Default clientInfo for mcp-use CLI
- */
-function getCliClientInfo() {
-  return {
-    name: "mcp-use CLI",
-    title: "mcp-use CLI",
-    version: getPackageVersion(),
-    description: "mcp-use CLI - Command-line interface for MCP servers",
-    icons: [
-      {
-        src: "https://manufact.com/logo.png",
-      },
-    ],
-    websiteUrl: "https://manufact.com",
-  };
-}
+import { captureToolScreenshot, detectToolResourceUri } from "./screenshot.js";
 
 export async function connectCommand(
   urlOrCommand: string,
@@ -572,7 +417,13 @@ export async function describeToolCommand(
 export async function callToolCommand(
   toolName: string,
   argsList?: string[],
-  options?: { session?: string; timeout?: number; json?: boolean }
+  options?: {
+    session?: string;
+    timeout?: number;
+    json?: boolean;
+    screenshot?: boolean;
+    screenshotOutput?: string;
+  }
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options?.session || null);
@@ -632,10 +483,69 @@ export async function callToolCommand(
       timeout: options?.timeout,
     });
 
+    // Auto-screenshot if the tool renders a widget. Capture before printing
+    // so the screenshot path is part of the printed result — agents reading
+    // `--json` output get the path inside the JSON. Failures here don't fail
+    // the tool call; the result is still printed and a warning is logged.
+    let screenshot: {
+      path: string;
+      width: number;
+      height: number;
+      view: string;
+    } | null = null;
+    let screenshotError: string | null = null;
+    if (options?.screenshot !== false) {
+      const tool = session.tools.find((t) => t.name === toolName);
+      const resourceUri = detectToolResourceUri(tool);
+      if (resourceUri) {
+        console.error(
+          formatInfo(`Capturing widget screenshot (${resourceUri})...`)
+        );
+        try {
+          const shot = await captureToolScreenshot(
+            {
+              session,
+              toolName,
+              toolArgs: args,
+              toolOutput: callResult,
+              resourceUri,
+            },
+            options?.screenshotOutput
+              ? { output: options.screenshotOutput }
+              : {}
+          );
+          screenshot = {
+            path: shot.outputPath,
+            width: shot.width,
+            height: shot.height,
+            view: shot.view,
+          };
+        } catch (err: any) {
+          screenshotError = err?.message ?? String(err);
+        }
+      }
+    }
+
     if (options?.json) {
       console.log(formatJson(callResult));
     } else {
       console.log(formatToolCall(callResult));
+    }
+
+    if (screenshot) {
+      // Always announce the screenshot on stderr so `--json` stdout stays a
+      // clean CallToolResult — agents piping JSON shouldn't have to filter
+      // status lines out of their parse target.
+      console.error(
+        formatSuccess(
+          `Saved widget screenshot: ${screenshot.path} (${screenshot.width}×${screenshot.height})`
+        )
+      );
+    }
+    if (screenshotError) {
+      console.error(
+        formatWarning(`Skipped widget screenshot: ${screenshotError}`)
+      );
     }
 
     if (callResult.isError) {
@@ -999,6 +909,8 @@ export async function interactiveCommand(options: {
               )
             );
           } else if (command === "call" && arg) {
+            // TODO(mcp-1566): mirror the auto widget-screenshot flow from
+            // `client tools call` here. Skipped for now to keep the REPL terse.
             // Prompt for arguments
             rl.question(
               "Arguments (JSON, or press Enter for none): ",
@@ -1186,7 +1098,15 @@ export function createClientCommand(): Command {
     .option("--session <name>", "Use specific session")
     .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
     .option("--json", "Output as JSON")
-    .action(callToolCommand);
+    .option(
+      "--no-screenshot",
+      "Skip the auto-screenshot for tools that render a widget"
+    )
+    .option(
+      "--screenshot-output <path>",
+      "Output PNG path for the widget screenshot (defaults to ./<view>-<timestamp>.png)"
+    )
+    .action((name, args, opts) => callToolCommand(name, args, opts));
   toolsCommand
     .command("describe <name>")
     .description("Show tool details and schema")

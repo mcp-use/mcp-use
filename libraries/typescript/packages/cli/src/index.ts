@@ -13,6 +13,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
 import { createClientCommand } from "./commands/client.js";
+import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createServersCommand } from "./commands/servers.js";
@@ -3060,7 +3061,8 @@ program
     });
   });
 
-// Client command
+// Client command — pass the CLI bin path so `tools call` can auto-spawn a dev
+// server for widget-screenshot capture, mirroring `mcp-use screenshot`.
 program.addCommand(createClientCommand());
 
 // Deployments command
@@ -3071,6 +3073,10 @@ program.addCommand(createServersCommand());
 
 // Skills command
 program.addCommand(createSkillsCommand());
+
+// Screenshot command — pass the path to this CLI bin so auto-spawned dev
+// servers can re-invoke the same binary (works in both dev/tsx + bundled cjs).
+program.addCommand(createScreenshotCommand());
 
 // Generate types command
 program
