@@ -38,16 +38,16 @@ export {
   getPackageVersion,
 } from "./utils.js";
 
-// Re-export from browser telemetry for shared/isomorphic modules
-// Browser telemetry is isomorphic - works in both browser and Node.js
-// (Node.js-specific telemetry with posthog-node is only used when directly imported)
+// Re-export telemetry utilities
+// Node.js implementation is used as the base and swapped with browser implementation
+// in browser bundles via tsup's telemetry-browser-substitution plugin.
 export {
   Telemetry,
   Tel,
   setTelemetrySource,
   isBrowserEnvironment,
-} from "./telemetry-browser.js";
+} from "./telemetry-node.js";
 
-export type { RuntimeEnvironment } from "./telemetry-browser.js";
+export type { RuntimeEnvironment } from "./telemetry-node.js";
 
 export { telFetch } from "./tel-fetch.js";

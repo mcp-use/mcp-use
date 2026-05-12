@@ -48,6 +48,7 @@ export {
 
 // Export telemetry utilities
 export {
+  Tel,
   setTelemetrySource,
   Telemetry,
   telFetch,
