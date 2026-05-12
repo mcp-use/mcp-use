@@ -43,10 +43,9 @@ function isAccessible(p: string): boolean {
 
 function findOnPath(binary: string): string | null {
   const PATH = process.env.PATH ?? "";
-  const sep = process.platform === "win32" ? ";" : ":";
-  for (const dir of PATH.split(sep)) {
+  for (const dir of PATH.split(":")) {
     if (!dir) continue;
-    const candidate = path.join(dir, binary);
+    const candidate = path.posix.join(dir, binary);
     if (isAccessible(candidate)) return candidate;
   }
   return null;
