@@ -31,6 +31,7 @@ interface ScreenshotOptions {
   delay?: string;
   quiet?: boolean;
   timeout: string;
+  cdpUrl?: string;
 }
 
 interface ScreenshotBundle {
@@ -76,6 +77,12 @@ export interface CaptureToolScreenshotOptions {
   timeoutMs?: number;
   inspector?: string;
   quiet?: boolean;
+  /**
+   * Pre-existing CDP WebSocket URL. When set, the screenshot is captured via
+   * the remote browser instead of spawning a local Chrome. The inspector URL
+   * must be reachable from that remote browser.
+   */
+  cdpUrl?: string;
 }
 
 export interface CaptureToolScreenshotResult {
@@ -102,7 +109,7 @@ export async function captureToolScreenshot(
   const timeoutMs = options.timeoutMs ?? 30000;
   const delayMs = options.delayMs ?? 0;
 
-  const chromePath = resolveChromePath();
+  const chromePath = options.cdpUrl ? undefined : resolveChromePath();
   const view = extractViewName(inputs.resourceUri);
 
   const devOptions: ScreenshotOptions = {
@@ -144,6 +151,7 @@ export async function captureToolScreenshot(
       timeoutMs,
       outputPath,
       chromePath,
+      cdpUrl: options.cdpUrl,
       delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
       bundle,
     });
@@ -502,6 +510,7 @@ export async function screenshotCommand(
         timeoutMs: navTimeout,
         inspector: options.inspector,
         quiet: options.quiet,
+        cdpUrl: options.cdpUrl,
       }
     );
 
@@ -563,6 +572,10 @@ export function createScreenshotCommand(): Command {
       "0"
     )
     .option("--timeout <ms>", "Navigation + readiness timeout in ms.", "30000")
+    .option(
+      "--cdp-url <url>",
+      "Connect to an existing CDP WebSocket (ws:// or wss://) instead of spawning local Chrome. Useful for hosted browsers like Notte."
+    )
     .option("--quiet", "Suppress dev-server output.")
     .action(async (args: string[], opts: ScreenshotOptions) => {
       await screenshotCommand(opts, args);
