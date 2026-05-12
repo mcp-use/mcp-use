@@ -204,10 +204,7 @@ async function probeServer(url: string, timeoutMs = 1500): Promise<boolean> {
 /**
  * Wait until `/inspector/health` reports ready, polling every 200ms.
  */
-async function waitForHealth(
-  url: string,
-  timeoutMs = 15000
-): Promise<boolean> {
+async function waitForHealth(url: string, timeoutMs = 15000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await probeServer(url)) return true;
@@ -292,9 +289,7 @@ async function ensureDevServer(
   const port = await getFreePort();
   const url = `http://localhost:${port}`;
   if (!options.quiet) {
-    console.error(
-      formatInfo(`Starting inspector on port ${port}…`)
-    );
+    console.error(formatInfo(`Starting inspector on port ${port}…`));
   }
 
   const inspectorCli = resolveInspectorCli();
@@ -324,9 +319,7 @@ async function ensureDevServer(
   const ready = await waitForHealth(url);
   if (!ready) {
     child.kill("SIGTERM");
-    throw new Error(
-      `Inspector failed to come up on ${url} within 15s.`
-    );
+    throw new Error(`Inspector failed to come up on ${url} within 15s.`);
   }
   return { url, child };
 }
