@@ -27,7 +27,7 @@ import { loadConfigFile } from "./config-file.js";
 import type { BaseConnector } from "./connectors/base.js";
 import { logger } from "./logging.js";
 import { MCPSession } from "./session.js";
-import { Telemetry } from "./telemetry/telemetry-node.js";
+import { Tel } from "./telemetry/telemetry-node.js";
 import { getPackageVersion } from "./version.js";
 
 function trackNodeClientInit(
@@ -42,7 +42,7 @@ function trackNodeClientInit(
   const hasElicitationCallback = !!(
     callbacks.onElicitation ?? callbacks.elicitationCallback
   );
-  Telemetry.getInstance()
+  Tel.getInstance()
     .trackMCPClientInit({
       codeMode,
       sandbox: false,

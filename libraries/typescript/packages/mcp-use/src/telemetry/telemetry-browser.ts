@@ -682,5 +682,5 @@ export const Tel = Telemetry;
  * @param source - Identifier to persist and include with subsequent telemetry events
  */
 export function setTelemetrySource(source: string): void {
-  Telemetry.getInstance().setSource(source);
+  Tel.getInstance().setSource(source);
 }

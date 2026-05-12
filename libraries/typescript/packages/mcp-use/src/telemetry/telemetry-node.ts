@@ -197,7 +197,7 @@ type PostHogNodeClient = {
  * Uses posthog-node for telemetry, require("crypto") for secure random strings,
  * and filesystem for user ID persistence.
  *
- * Usage: Telemetry.getInstance().trackMCPClientInit(...)
+ * Usage: Tel.getInstance().trackMCPClientInit(...)
  */
 export class Telemetry {
   private static instance: Telemetry | null = null;
@@ -814,5 +814,5 @@ export const Tel = Telemetry;
  * Convenience function to set telemetry source globally
  */
 export function setTelemetrySource(source: string): void {
-  Telemetry.getInstance().setSource(source);
+  Tel.getInstance().setSource(source);
 }
