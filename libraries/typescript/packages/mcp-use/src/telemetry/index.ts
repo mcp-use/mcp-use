@@ -43,6 +43,7 @@ export {
 // in browser bundles via tsup's telemetry-browser-substitution plugin.
 export {
   Telemetry,
+  Tel,
   setTelemetrySource,
   isBrowserEnvironment,
 } from "./telemetry-node.js";
