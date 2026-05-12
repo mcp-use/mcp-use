@@ -192,7 +192,7 @@ type PostHogBrowserClient = {
  * Uses posthog-js for telemetry, window.crypto for secure random strings,
  * and localStorage for user ID persistence.
  *
- * Usage: Telemetry.getInstance().trackMCPClientInit(...)
+ * Usage: Tel.getInstance().trackMCPClientInit(...)
  */
 export class Telemetry {
   private static instance: Telemetry | null = null;

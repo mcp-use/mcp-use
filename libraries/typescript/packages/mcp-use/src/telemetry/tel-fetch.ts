@@ -13,7 +13,7 @@ export const telFetch: PostHogFetchFn = async (url, options) => {
       return res as Awaited<ReturnType<PostHogFetchFn>>;
     }
   } catch {
-    // Tel must not log or break the host app
+    // Telemetry must not log or break the host app
   }
   return {
     status: 200,

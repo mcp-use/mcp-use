@@ -32,7 +32,7 @@ export type { StoredState } from "./auth/types.js";
 export { Logger, logger } from "./logging.js";
 export type { LogLevel } from "./logging.js";
 
-// Re-export telemetry utilities
+// Export browser telemetry (browser-specific implementation)
 export {
   Tel,
   Telemetry,

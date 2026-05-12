@@ -13,7 +13,7 @@ export { useMcp } from "./useMcp.js";
 // Re-export auth callback handler for OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
 
-// Re-export telemetry utilities
+// Re-export browser telemetry (browser-specific implementation)
 export {
   Tel,
   Telemetry,
