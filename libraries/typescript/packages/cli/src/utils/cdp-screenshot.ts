@@ -12,7 +12,14 @@ export interface CaptureScreenshotOptions {
   waitForSelector: string;
   timeoutMs: number;
   outputPath: string;
-  chromePath: string;
+  /** Path to local Chrome. Required unless `cdpUrl` is supplied. */
+  chromePath?: string;
+  /**
+   * Pre-existing CDP WebSocket URL (ws:// or wss://). When set, no local
+   * Chrome is spawned — we connect directly to this endpoint. Useful for
+   * driving a hosted Chromium (e.g. Notte) in sandboxed environments.
+   */
+  cdpUrl?: string;
   /** Extra wait after the readiness selector matches, to let animations settle. */
   delayMs?: number;
   /**
@@ -147,57 +154,43 @@ function waitForDevToolsUrl(
 }
 
 /**
- * Headlessly render `url` in the user's Chrome and write a PNG to disk.
+ * Headlessly render `url` and write a PNG to disk.
  *
- * Implementation:
- *   1. Spawn Chrome with `--headless=new --remote-debugging-port=0` and a
- *      throwaway `--user-data-dir`.
- *   2. Parse the WebSocket URL from stderr.
- *   3. Open a tab via Target.createTarget, attach in flat mode.
- *   4. Apply viewport + prefers-color-scheme via Emulation.* commands.
- *   5. Page.navigate, then poll Runtime.evaluate for `waitForSelector`.
- *   6. Page.captureScreenshot, write PNG, clean up.
+ * Two modes, selected by whether `opts.cdpUrl` is provided:
+ *   - **Remote** (`cdpUrl` set): connect directly to an existing CDP
+ *     WebSocket. No Chrome process is spawned.
+ *   - **Local** (`chromePath` set): spawn Chrome with
+ *     `--headless=new --remote-debugging-port=0` + throwaway user-data-dir
+ *     and parse the WebSocket URL from stderr.
+ *
+ * After the WebSocket is connected, the flow is identical:
+ *   - Open a tab via Target.createTarget, attach in flat mode.
+ *   - Apply viewport + prefers-color-scheme via Emulation.* commands.
+ *   - Page.navigate, then poll Runtime.evaluate for `waitForSelector`.
+ *   - Page.captureScreenshot, write PNG, clean up.
  */
 export async function captureScreenshot(
   opts: CaptureScreenshotOptions
 ): Promise<void> {
-  const userDataDir = mkdtempSync(path.join(os.tmpdir(), "mcp-use-chrome-"));
-  const chromeArgs = [
-    "--headless=new",
-    "--remote-debugging-port=0",
-    `--user-data-dir=${userDataDir}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-extensions",
-    "--disable-gpu",
-    "--hide-scrollbars",
-    "--mute-audio",
-    `--window-size=${opts.width},${opts.height}`,
-    "about:blank",
-  ];
-
-  const child = spawn(opts.chromePath, chromeArgs, {
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  // Drain stdout so Chrome doesn't block on a full pipe.
-  child.stdout?.resume();
-
+  let userDataDir: string | undefined;
+  let child: ChildProcess | undefined;
   let cdp: CdpClient | undefined;
   let cleanedUp = false;
   const cleanup = () => {
     if (cleanedUp) return;
     cleanedUp = true;
     cdp?.close();
-    if (!child.killed) {
+    if (child && !child.killed) {
       try {
         child.kill("SIGTERM");
       } catch {
         // Ignore.
       }
+      const localChild = child;
       const killTimer = setTimeout(() => {
-        if (!child.killed) {
+        if (!localChild.killed) {
           try {
-            child.kill("SIGKILL");
+            localChild.kill("SIGKILL");
           } catch {
             // Ignore.
           }
@@ -205,15 +198,47 @@ export async function captureScreenshot(
       }, 2000);
       killTimer.unref();
     }
-    try {
-      rmSync(userDataDir, { recursive: true, force: true });
-    } catch {
-      // Ignore.
+    if (userDataDir) {
+      try {
+        rmSync(userDataDir, { recursive: true, force: true });
+      } catch {
+        // Ignore.
+      }
     }
   };
 
   try {
-    const wsUrl = await waitForDevToolsUrl(child);
+    let wsUrl: string;
+    if (opts.cdpUrl) {
+      wsUrl = opts.cdpUrl;
+    } else {
+      if (!opts.chromePath) {
+        throw new Error(
+          "captureScreenshot requires either `cdpUrl` or `chromePath`"
+        );
+      }
+      userDataDir = mkdtempSync(path.join(os.tmpdir(), "mcp-use-chrome-"));
+      const chromeArgs = [
+        "--headless=new",
+        "--remote-debugging-port=0",
+        `--user-data-dir=${userDataDir}`,
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-extensions",
+        "--disable-gpu",
+        "--hide-scrollbars",
+        "--mute-audio",
+        `--window-size=${opts.width},${opts.height}`,
+        "about:blank",
+      ];
+      child = spawn(opts.chromePath, chromeArgs, {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      // Drain stdout so Chrome doesn't block on a full pipe.
+      child.stdout?.resume();
+      wsUrl = await waitForDevToolsUrl(child);
+    }
+
     const ws = new WebSocket(wsUrl);
     await new Promise<void>((resolve, reject) => {
       const onOpen = () => {
@@ -230,14 +255,70 @@ export async function captureScreenshot(
 
     cdp = new CdpClient(ws);
 
-    const { targetId } = await cdp.send<{ targetId: string }>(
-      "Target.createTarget",
-      { url: "about:blank" }
-    );
-    const { sessionId } = await cdp.send<{ sessionId: string }>(
-      "Target.attachToTarget",
-      { targetId, flatten: true }
-    );
+    // We need a flat-mode sessionId attached to a page target. The two CDP
+    // endpoints we support reach this differently:
+    //
+    //   Local Chrome: we create a fresh target and attach to it explicitly.
+    //
+    //   Remote endpoint (e.g. Notte): the endpoint is a browser-level WS
+    //   with a pre-existing page, and explicit Target.attachToTarget is
+    //   refused for security. Instead we ask for auto-attach in flat mode
+    //   and pick up the sessionId from the resulting Target.attachedToTarget
+    //   event. We attach the event listener BEFORE sending setAutoAttach so
+    //   we don't race the event for already-existing targets.
+    let sessionId: string;
+    if (opts.cdpUrl) {
+      const attachPromise = new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                "Timed out waiting for Target.attachedToTarget event from remote CDP"
+              )
+            ),
+          10_000
+        );
+        const onMessage = (data: WebSocket.RawData) => {
+          try {
+            const msg = JSON.parse(data.toString()) as {
+              method?: string;
+              params?: {
+                sessionId?: string;
+                targetInfo?: { type?: string };
+              };
+            };
+            if (
+              msg.method === "Target.attachedToTarget" &&
+              msg.params?.targetInfo?.type === "page" &&
+              typeof msg.params.sessionId === "string"
+            ) {
+              clearTimeout(timer);
+              ws.off("message", onMessage);
+              resolve(msg.params.sessionId);
+            }
+          } catch {
+            // Ignore non-JSON or unrelated messages.
+          }
+        };
+        ws.on("message", onMessage);
+      });
+      await cdp.send("Target.setAutoAttach", {
+        autoAttach: true,
+        waitForDebuggerOnStart: false,
+        flatten: true,
+      });
+      sessionId = await attachPromise;
+    } else {
+      const { targetId } = await cdp.send<{ targetId: string }>(
+        "Target.createTarget",
+        { url: "about:blank" }
+      );
+      const attach = await cdp.send<{ sessionId: string }>(
+        "Target.attachToTarget",
+        { targetId, flatten: true }
+      );
+      sessionId = attach.sessionId;
+    }
 
     await cdp.send("Page.enable", {}, sessionId);
     await cdp.send(
