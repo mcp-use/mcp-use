@@ -5,9 +5,9 @@
 
 feat(cli, inspector): add `mcp-use screenshot` for visual feedback loops on MCP Apps views (MCP-1566)
 
-`mcp-use screenshot --tool <name> --args '<json>'` calls the tool and renders the result headlessly, saving a PNG of the resulting view.
+`mcp-use screenshot --tool <name> key=value [key2=value2 ...]` calls the tool and renders the result headlessly, saving a PNG of the resulting view. Use `key:=<json>` for nested values, or pass a single JSON object for the legacy form.
 
-The CLI auto-spawns `mcp-use dev` if no server is detected, drives the user's existing Chrome / Chromium / Edge / Brave install via the Chrome DevTools Protocol at a new chromeless `/inspector/preview/:view` route inside the inspector SPA, and tears the dev server down on exit. Output defaults to `./<view>-<timestamp>.png` in cwd.
+The CLI always spawns a fresh `@mcp-use/inspector` standalone server on a free port (no reuse of whatever happens to be on `localhost:3000`, which could be an unrelated Vite/dev server) and tears it down on exit. It drives the user's existing Chrome / Chromium / Edge / Brave install via the Chrome DevTools Protocol at the new chromeless `/inspector/preview/:view` route inside the inspector SPA. Pass `--inspector <url>` to point at an existing inspector instance; the URL is probed strictly (must return `{ status: "ok" }` JSON on `/inspector/health`) so unrelated servers can't be misidentified. The screenshot pipeline no longer requires being in a project with an MCP server entry — any directory works. Output defaults to `./<view>-<timestamp>.png` in cwd.
 
 No additional install step or peer dependency is required — the command uses your system Chrome. The browser path is auto-detected on macOS / Linux / Windows; override with `MCP_USE_CHROME_PATH`, `PUPPETEER_EXECUTABLE_PATH`, or `CHROME_PATH` if needed.
 

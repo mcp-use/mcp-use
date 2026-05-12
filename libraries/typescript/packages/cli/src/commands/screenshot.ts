@@ -3,12 +3,14 @@ import { Command } from "commander";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
 import { captureScreenshot } from "../utils/cdp-screenshot.js";
 import { resolveChromePath } from "../utils/chrome-path.js";
-import { formatError, formatInfo } from "../utils/format.js";
+import { formatError, formatInfo, formatSchema } from "../utils/format.js";
+import { parseToolArgs } from "../utils/parse-args.js";
 import {
   activeSessions,
   cleanupAndExit,
@@ -18,7 +20,6 @@ import {
 
 interface ScreenshotOptions {
   tool?: string;
-  args?: string;
   width: string;
   height: string;
   inspector?: string;
@@ -63,7 +64,6 @@ export interface CaptureToolScreenshotInputs {
   toolArgs: Record<string, unknown>;
   toolOutput: unknown;
   resourceUri: string;
-  cliBin: string;
 }
 
 export interface CaptureToolScreenshotOptions {
@@ -116,7 +116,7 @@ export async function captureToolScreenshot(
 
   let devHandle: DevServerHandle | undefined;
   try {
-    devHandle = await ensureDevServer(devOptions, inputs.cliBin);
+    devHandle = await ensureDevServer(devOptions);
 
     const resourceContents = await inputs.session.readResource(
       inputs.resourceUri
@@ -175,7 +175,13 @@ function getFreePort(): Promise<number> {
 }
 
 /**
- * Probe a server's `/inspector/health` endpoint. Returns true if it responds 200 within the timeout.
+ * Probe a server's `/inspector/health` endpoint. Returns true only if it
+ * responds with the inspector's JSON payload (`{ status: "ok" }`).
+ *
+ * A bare `res.ok` check is not enough: a Vite/SPA dev server happily returns
+ * 200 + HTML for any unknown path (SPA fallback), which would be misidentified
+ * as a valid inspector and later cause a silent timeout when the preview
+ * route is missing.
  */
 async function probeServer(url: string, timeoutMs = 1500): Promise<boolean> {
   const controller = new AbortController();
@@ -183,7 +189,11 @@ async function probeServer(url: string, timeoutMs = 1500): Promise<boolean> {
   try {
     const u = new URL("/inspector/health", url);
     const res = await fetch(u, { signal: controller.signal });
-    return res.ok;
+    if (!res.ok) return false;
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) return false;
+    const body = (await res.json()) as { status?: string };
+    return body?.status === "ok";
   } catch {
     return false;
   } finally {
@@ -192,12 +202,16 @@ async function probeServer(url: string, timeoutMs = 1500): Promise<boolean> {
 }
 
 /**
- * Wait until `/inspector/health` reports ready, polling every second.
+ * Wait until `/inspector/health` reports ready, polling every 200ms.
  */
-async function waitForHealth(url: string, maxAttempts = 60): Promise<boolean> {
-  for (let i = 0; i < maxAttempts; i++) {
+async function waitForHealth(
+  url: string,
+  timeoutMs = 15000
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     if (await probeServer(url)) return true;
-    await new Promise((r) => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 200));
   }
   return false;
 }
@@ -208,50 +222,93 @@ interface DevServerHandle {
 }
 
 /**
- * Resolve a usable inspector host: probe `--inspector` if given, else probe localhost:3000,
- * else spawn `mcp-use dev` on a free port and wait for readiness. The inspector host
- * is where the `/inspector/preview/:view` SPA route renders the captured view.
+ * Resolve the path to `@mcp-use/inspector`'s standalone CLI entry. Throws
+ * with a clear message when the inspector package can't be located — that
+ * usually means the workspace hasn't been installed/built.
+ *
+ * We can't use `require.resolve('@mcp-use/inspector')` because the inspector
+ * package's `exports` field only declares an `import` condition, so CJS
+ * resolution fails. Subpath resolution (`/dist/cli.js`, `/package.json`)
+ * also fails because neither is listed in `exports`. So we walk up from
+ * both the current module and the CWD looking for the installed package.
+ */
+function resolveInspectorCli(): string {
+  const candidateRoots = new Set<string>();
+  // CJS: __dirname is defined; ESM: derive from import.meta.url.
+  const moduleDir =
+    typeof __dirname !== "undefined"
+      ? __dirname
+      : path.dirname(new URL(import.meta.url).pathname);
+  candidateRoots.add(moduleDir);
+  candidateRoots.add(process.cwd());
+
+  for (const start of candidateRoots) {
+    let dir = start;
+    while (true) {
+      const candidate = path.join(
+        dir,
+        "node_modules",
+        "@mcp-use",
+        "inspector",
+        "dist",
+        "cli.js"
+      );
+      if (existsSync(candidate)) return candidate;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  throw new Error(
+    "Could not locate `@mcp-use/inspector` in node_modules. Install the inspector package or pass --inspector <url> to use an existing instance."
+  );
+}
+
+/**
+ * Resolve a usable inspector host:
+ *
+ *   - When `--inspector <url>` is given, probe it (strict: must return the
+ *     inspector's JSON health payload) and use it.
+ *   - Otherwise, always spawn a fresh `@mcp-use/inspector` on a free port.
+ *
+ * Note: we no longer try to reuse a server on `localhost:3000`. A Vite-only
+ * dev server (or any unrelated 200-returning service) would otherwise be
+ * misidentified and cause silent rendering failures. Always-spawn keeps
+ * behavior predictable and decoupled from whatever else is running locally.
  */
 async function ensureDevServer(
-  options: ScreenshotOptions,
-  cliBin: string
+  options: ScreenshotOptions
 ): Promise<DevServerHandle> {
   if (options.inspector) {
     const ok = await probeServer(options.inspector);
     if (!ok) {
       throw new Error(
-        `Inspector at ${options.inspector} did not respond on /inspector/health`
+        `Inspector at ${options.inspector} did not respond on /inspector/health with status:"ok"`
       );
     }
     return { url: options.inspector };
-  }
-
-  const localUrl = "http://localhost:3000";
-  if (await probeServer(localUrl)) {
-    return { url: localUrl };
   }
 
   const port = await getFreePort();
   const url = `http://localhost:${port}`;
   if (!options.quiet) {
     console.error(
-      formatInfo(
-        `Starting dev server on port ${port} (no running server detected)…`
-      )
+      formatInfo(`Starting inspector on port ${port}…`)
     );
   }
 
+  const inspectorCli = resolveInspectorCli();
   const child = spawn(
     process.execPath,
-    [cliBin, "dev", "--no-open", "--no-hmr", "--port", String(port)],
+    [inspectorCli, "--port", String(port), "--no-open"],
     {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, MCP_USE_CLI_DEV: "1" },
+      env: { ...process.env, MCP_INSPECTOR_MODE: "standalone" },
     }
   );
 
-  const prefix = chalk.gray("[dev]");
+  const prefix = chalk.gray("[inspector]");
   if (!options.quiet) {
     child.stdout?.on("data", (d: Buffer) => {
       process.stderr.write(`${prefix} ${d}`);
@@ -268,7 +325,7 @@ async function ensureDevServer(
   if (!ready) {
     child.kill("SIGTERM");
     throw new Error(
-      `Dev server failed to come up on ${url} within 60s. Check that you're in a project with an MCP server entry.`
+      `Inspector failed to come up on ${url} within 15s.`
     );
   }
   return { url, child };
@@ -349,14 +406,16 @@ async function resolveSessionForScreenshot(
 
 export async function screenshotCommand(
   options: ScreenshotOptions,
-  cliBin: string
+  argsList: string[] | undefined
 ): Promise<void> {
   let exitCode = 0;
 
   try {
     if (!options.tool) {
       console.error(
-        formatError("--tool <name> is required (optionally with --args).")
+        formatError(
+          "--tool <name> is required (optionally with key=value args)."
+        )
       );
       exitCode = 1;
       return;
@@ -399,9 +458,37 @@ export async function screenshotCommand(
       );
     }
 
-    const toolArgs: Record<string, unknown> = options.args
-      ? JSON.parse(options.args)
-      : {};
+    let toolArgs: Record<string, unknown> = {};
+    if (argsList && argsList.length > 0) {
+      try {
+        toolArgs = parseToolArgs(
+          argsList,
+          tool.inputSchema as Parameters<typeof parseToolArgs>[1]
+        );
+      } catch (err) {
+        console.error(
+          formatError(err instanceof Error ? err.message : String(err))
+        );
+        console.log("");
+        console.log(formatInfo("Usage:"));
+        console.log(
+          `  npx mcp-use screenshot --tool ${options.tool} key=value [key2=value2 ...]`
+        );
+        console.log(
+          `  npx mcp-use screenshot --tool ${options.tool} nested:='{"a":1}'   # JSON value`
+        );
+        console.log(
+          `  npx mcp-use screenshot --tool ${options.tool} '{"key":"value"}'   # full JSON object`
+        );
+        if (tool.inputSchema) {
+          console.log("");
+          console.log(formatInfo("Tool schema:"));
+          console.log(formatSchema(tool.inputSchema));
+        }
+        exitCode = 1;
+        return;
+      }
+    }
     const toolOutput = await session.callTool(options.tool, toolArgs);
 
     const result = await captureToolScreenshot(
@@ -411,7 +498,6 @@ export async function screenshotCommand(
         toolArgs,
         toolOutput,
         resourceUri,
-        cliBin,
       },
       {
         width,
@@ -438,16 +524,19 @@ export async function screenshotCommand(
   }
 }
 
-export function createScreenshotCommand(cliBin: string): Command {
+export function createScreenshotCommand(): Command {
   return new Command("screenshot")
     .description(
       "Render an MCP Apps view headlessly and save a PNG by calling a tool and rendering its UI resource with the result."
+    )
+    .argument(
+      "[args...]",
+      "Tool args as key=value pairs (use key:=<json> for nested values, or pass a single JSON object)."
     )
     .option(
       "--tool <name>",
       "Tool to call. Its UI resource is rendered with the result."
     )
-    .option("--args <json>", "JSON-encoded arguments for the tool call.")
     .option("--width <px>", "Browser viewport width in pixels.", "800")
     .option("--height <px>", "Browser viewport height in pixels.", "600")
     .option(
@@ -482,7 +571,7 @@ export function createScreenshotCommand(cliBin: string): Command {
     )
     .option("--timeout <ms>", "Navigation + readiness timeout in ms.", "30000")
     .option("--quiet", "Suppress dev-server output.")
-    .action(async (opts: ScreenshotOptions) => {
-      await screenshotCommand(opts, cliBin);
+    .action(async (args: string[], opts: ScreenshotOptions) => {
+      await screenshotCommand(opts, args);
     });
 }

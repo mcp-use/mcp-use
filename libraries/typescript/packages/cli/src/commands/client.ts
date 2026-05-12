@@ -423,8 +423,7 @@ export async function callToolCommand(
     json?: boolean;
     screenshot?: boolean;
     screenshotOutput?: string;
-  },
-  cliBin?: string
+  }
 ): Promise<void> {
   try {
     const result = await getOrRestoreSession(options?.session || null);
@@ -495,7 +494,7 @@ export async function callToolCommand(
       view: string;
     } | null = null;
     let screenshotError: string | null = null;
-    if (options?.screenshot !== false && cliBin) {
+    if (options?.screenshot !== false) {
       const tool = session.tools.find((t) => t.name === toolName);
       const resourceUri = detectToolResourceUri(tool);
       if (resourceUri) {
@@ -510,7 +509,6 @@ export async function callToolCommand(
               toolArgs: args,
               toolOutput: callResult,
               resourceUri,
-              cliBin,
             },
             options?.screenshotOutput
               ? { output: options.screenshotOutput }
@@ -1040,7 +1038,7 @@ export async function interactiveCommand(options: {
 /**
  * Create the client command group
  */
-export function createClientCommand(cliBin: string): Command {
+export function createClientCommand(): Command {
   const clientCommand = new Command("client").description(
     "Interactive MCP client for terminal usage"
   );
@@ -1108,7 +1106,7 @@ export function createClientCommand(cliBin: string): Command {
       "--screenshot-output <path>",
       "Output PNG path for the widget screenshot (defaults to ./<view>-<timestamp>.png)"
     )
-    .action((name, args, opts) => callToolCommand(name, args, opts, cliBin));
+    .action((name, args, opts) => callToolCommand(name, args, opts));
   toolsCommand
     .command("describe <name>")
     .description("Show tool details and schema")

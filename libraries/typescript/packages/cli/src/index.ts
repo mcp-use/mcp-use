@@ -3063,7 +3063,7 @@ program
 
 // Client command — pass the CLI bin path so `tools call` can auto-spawn a dev
 // server for widget-screenshot capture, mirroring `mcp-use screenshot`.
-program.addCommand(createClientCommand(process.argv[1] ?? __filename));
+program.addCommand(createClientCommand());
 
 // Deployments command
 program.addCommand(createDeploymentsCommand());
@@ -3076,7 +3076,7 @@ program.addCommand(createSkillsCommand());
 
 // Screenshot command — pass the path to this CLI bin so auto-spawned dev
 // servers can re-invoke the same binary (works in both dev/tsx + bundled cjs).
-program.addCommand(createScreenshotCommand(process.argv[1] ?? __filename));
+program.addCommand(createScreenshotCommand());
 
 // Generate types command
 program
