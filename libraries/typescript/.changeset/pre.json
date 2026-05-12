@@ -17,6 +17,7 @@
     "cli-tool-call-key-value-args",
     "dependabot-1e0b22ca",
     "expose-response-helpers",
+    "feat-screenshot-cli-mcp-1566",
     "node-oauth-cli-flow",
     "node-oauth-force-refresh-and-xss",
     "node-oauth-pending-flow-fix",
