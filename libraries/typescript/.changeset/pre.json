@@ -22,6 +22,7 @@
     "node-oauth-force-refresh-and-xss",
     "node-oauth-pending-flow-fix",
     "oauth-session-store-extract",
+    "resolve-duplicate-exports",
     "resolve-unlisted-deps",
     "server-cli-connect-hint"
   ]
