@@ -674,6 +674,8 @@ export class Telemetry {
 // ============================================================================
 // Convenience Alias and Functions
 // ============================================================================
+/** @alias */
+export const Tel = Telemetry;
 /**
  * Set the global telemetry source used to tag telemetry events.
  *

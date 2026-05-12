@@ -807,6 +807,9 @@ export class Telemetry {
 // ============================================================================
 // Convenience Alias and Functions
 // ============================================================================
+/** @alias */
+export const Tel = Telemetry;
+
 /**
  * Convenience function to set telemetry source globally
  */
