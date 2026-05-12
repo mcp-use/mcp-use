@@ -73,6 +73,14 @@ export function useChatMessages({
   const [rateLimitInfo, setRateLimitInfo] = useState<{
     loginUrl: string;
   } | null>(null);
+  // Surfaced when the chat backend (cloud.mcp-use) reports a 401 originating
+  // from the upstream MCP server (token expired/revoked). Distinct from
+  // `rateLimitInfo` (429 → Manufact account login) — here the user must
+  // re-run the MCP server's OAuth flow.
+  const [mcpAuthRequired, setMcpAuthRequired] = useState<{
+    mcpServerUrl: string;
+    message?: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
@@ -222,6 +230,20 @@ export function useChatMessages({
               prev.filter((m) => m.id !== `assistant-${Date.now()}`)
             );
             return;
+          }
+          if (response.status === 401) {
+            const errBody = await response.json().catch(() => null);
+            if (errBody?.error === "mcp_auth_required") {
+              setMcpAuthRequired({
+                mcpServerUrl:
+                  (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
+                message: errBody.message as string | undefined,
+              });
+              setMessages((prev) =>
+                prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+              );
+              return;
+            }
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -548,10 +570,15 @@ export function useChatMessages({
   const clearMessages = useCallback(() => {
     setMessages([]);
     setRateLimitInfo(null);
+    setMcpAuthRequired(null);
   }, []);
 
   const clearRateLimitInfo = useCallback(() => {
     setRateLimitInfo(null);
+  }, []);
+
+  const clearMcpAuthRequired = useCallback(() => {
+    setMcpAuthRequired(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -597,9 +624,11 @@ export function useChatMessages({
     isLoading,
     attachments,
     rateLimitInfo,
+    mcpAuthRequired,
     sendMessage,
     clearMessages,
     clearRateLimitInfo,
+    clearMcpAuthRequired,
     setMessages,
     stop,
     addAttachment,
