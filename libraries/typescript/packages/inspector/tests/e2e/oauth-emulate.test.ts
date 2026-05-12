@@ -34,7 +34,7 @@ test.beforeEach(async ({ page, context }) => {
   await page.evaluate(() => localStorage.clear());
 });
 
-for (const connectionType of ["Direct", "Via Proxy"] as ConnectionType[]) {
+function describeOAuthFlow(connectionType: ConnectionType): void {
   test.describe(`OAuth flow via emulate Google (${connectionType})`, () => {
     test("completes OAuth and reaches ready state", async ({ page }) => {
       await page.getByTestId("connection-form-url-input").fill(fixture.mcpUrl);
@@ -68,3 +68,6 @@ for (const connectionType of ["Direct", "Via Proxy"] as ConnectionType[]) {
     });
   });
 }
+
+describeOAuthFlow("Direct");
+describeOAuthFlow("Via Proxy");
