@@ -23,6 +23,13 @@ export interface CaptureScreenshotOptions {
   /** Extra wait after the readiness selector matches, to let animations settle. */
   delayMs?: number;
   /**
+   * Device pixel ratio applied via `Emulation.setDeviceMetricsOverride`. The
+   * viewport stays `width × height` in CSS pixels but the resulting PNG is
+   * `(width × dsf) × (height × dsf)` device pixels — same convention as
+   * Playwright/Puppeteer. Defaults to 1.
+   */
+  deviceScaleFactor?: number;
+  /**
    * Optional pre-render bundle. When provided, it is JSON-serialized and
    * assigned to `globalThis.__mcpUsePreviewBundle` before any document
    * scripts run. The inspector preview route reads this global and renders
@@ -326,7 +333,7 @@ export async function captureScreenshot(
       {
         width: opts.width,
         height: opts.height,
-        deviceScaleFactor: 1,
+        deviceScaleFactor: opts.deviceScaleFactor ?? 1,
         mobile: false,
       },
       sessionId

@@ -49,6 +49,7 @@ import {
   createClientScreenshotCommand,
   createPerClientScreenshotCommand,
   detectToolResourceUri,
+  parseDeviceScaleFactor,
 } from "./screenshot.js";
 
 /**
@@ -528,6 +529,7 @@ export async function callToolCommand(
     json?: boolean;
     screenshot?: boolean;
     screenshotOutput?: string;
+    screenshotDeviceScaleFactor?: string;
   }
 ): Promise<void> {
   try {
@@ -605,6 +607,18 @@ export async function callToolCommand(
           formatInfo(`Capturing widget screenshot (${resourceUri})...`)
         );
         try {
+          const screenshotOpts: {
+            output?: string;
+            deviceScaleFactor?: number;
+          } = {};
+          if (options?.screenshotOutput) {
+            screenshotOpts.output = options.screenshotOutput;
+          }
+          if (options?.screenshotDeviceScaleFactor) {
+            screenshotOpts.deviceScaleFactor = parseDeviceScaleFactor(
+              options.screenshotDeviceScaleFactor
+            );
+          }
           const shot = await captureToolScreenshot(
             {
               session,
@@ -613,9 +627,7 @@ export async function callToolCommand(
               toolOutput: callResult,
               resourceUri,
             },
-            options?.screenshotOutput
-              ? { output: options.screenshotOutput }
-              : {}
+            screenshotOpts
           );
           screenshot = {
             path: shot.outputPath,
@@ -1192,6 +1204,10 @@ export function createPerClientCommand(name: string): Command {
     .option(
       "--screenshot-output <path>",
       "Output PNG path for the widget screenshot (defaults to ./<view>-<timestamp>.png)"
+    )
+    .option(
+      "--screenshot-device-scale-factor <n>",
+      "Device pixel ratio for the auto-screenshot (e.g. 2 for Retina). Defaults to 1."
     )
     .action((tool, args, options) =>
       callToolCommand(name, tool, args, options)

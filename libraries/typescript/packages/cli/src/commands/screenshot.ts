@@ -32,6 +32,7 @@ interface ScreenshotOptions {
   timeout: string;
   cdpUrl?: string;
   header?: string[];
+  deviceScaleFactor?: string;
 }
 
 interface ScreenshotContext {
@@ -121,6 +122,12 @@ export interface CaptureToolScreenshotOptions {
    * must be reachable from that remote browser.
    */
   cdpUrl?: string;
+  /**
+   * Device pixel ratio for rendering. Defaults to 1. With a value of 2 the
+   * resulting PNG is (width × 2) × (height × 2) device pixels (Retina-style
+   * capture). Forwarded to `Emulation.setDeviceMetricsOverride`.
+   */
+  deviceScaleFactor?: number;
 }
 
 export interface CaptureToolScreenshotResult {
@@ -192,6 +199,7 @@ export async function captureToolScreenshot(
       cdpUrl: options.cdpUrl,
       delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
       bundle,
+      deviceScaleFactor: options.deviceScaleFactor,
     });
 
     return { outputPath, width, height, view };
@@ -404,6 +412,25 @@ export function parseDimension(raw: string, name: string): number {
   return n;
 }
 
+/**
+ * Parse `--device-scale-factor <n>`. Allows fractional values (e.g. 1.5) and
+ * caps at 4 to avoid accidental 16x-pixel screenshots (memory + disk).
+ */
+export function parseDeviceScaleFactor(raw: string): number {
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    throw new Error(
+      `--device-scale-factor must be a positive number (got "${raw}")`
+    );
+  }
+  if (n > 4) {
+    throw new Error(
+      `--device-scale-factor must be <= 4 to avoid excessive pixel counts (got "${raw}")`
+    );
+  }
+  return n;
+}
+
 const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
 
 /**
@@ -504,6 +531,9 @@ export async function screenshotCommand(
     const height = parseDimension(options.height, "height");
     const navTimeout = parseInt(options.timeout, 10) || 30000;
     const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
+    const deviceScaleFactor = options.deviceScaleFactor
+      ? parseDeviceScaleFactor(options.deviceScaleFactor)
+      : undefined;
 
     // Resolve session before spawning the dev server so auth issues fail fast.
     const session = await resolveSessionForScreenshot(
@@ -583,6 +613,7 @@ export async function screenshotCommand(
         inspector: options.inspector,
         quiet: options.quiet,
         cdpUrl: options.cdpUrl,
+        deviceScaleFactor,
       }
     );
 
@@ -615,6 +646,10 @@ function withCommonScreenshotOptions(cmd: Command): Command {
     )
     .option("--width <px>", "Browser viewport width in pixels.", "800")
     .option("--height <px>", "Browser viewport height in pixels.", "600")
+    .option(
+      "--device-scale-factor <n>",
+      "Device pixel ratio for rendering (e.g. 2 for Retina). Output PNG is (width × dsf) × (height × dsf). Must be > 0 and <= 4."
+    )
     .option(
       "--inspector <url>",
       "Inspector host that serves /inspector/preview/:view. When omitted, auto-spawns `@mcp-use/inspector` on a free port."

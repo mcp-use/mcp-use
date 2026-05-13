@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   detectToolResourceUri,
   extractViewName,
+  parseDeviceScaleFactor,
   parseDimension,
   parseHeaderArg,
   parseHeaderArgs,
@@ -53,6 +54,36 @@ describe("parseDimension", () => {
     expect(() => parseDimension("0", "width")).toThrow(/positive integer/);
     expect(() => parseDimension("-1", "width")).toThrow(/positive integer/);
     expect(() => parseDimension("abc", "width")).toThrow(/positive integer/);
+  });
+});
+
+describe("parseDeviceScaleFactor", () => {
+  it("parses positive integers", () => {
+    expect(parseDeviceScaleFactor("1")).toBe(1);
+    expect(parseDeviceScaleFactor("2")).toBe(2);
+    expect(parseDeviceScaleFactor("3")).toBe(3);
+  });
+
+  it("parses fractional values", () => {
+    expect(parseDeviceScaleFactor("1.5")).toBe(1.5);
+    expect(parseDeviceScaleFactor("2.75")).toBe(2.75);
+  });
+
+  it("accepts the upper bound of 4", () => {
+    expect(parseDeviceScaleFactor("4")).toBe(4);
+  });
+
+  it("rejects zero, negatives, NaN", () => {
+    expect(() => parseDeviceScaleFactor("0")).toThrow(/positive number/);
+    expect(() => parseDeviceScaleFactor("-1")).toThrow(/positive number/);
+    expect(() => parseDeviceScaleFactor("-0.5")).toThrow(/positive number/);
+    expect(() => parseDeviceScaleFactor("abc")).toThrow(/positive number/);
+    expect(() => parseDeviceScaleFactor("")).toThrow(/positive number/);
+  });
+
+  it("rejects values above 4", () => {
+    expect(() => parseDeviceScaleFactor("5")).toThrow(/<= 4/);
+    expect(() => parseDeviceScaleFactor("100")).toThrow(/<= 4/);
   });
 });
 

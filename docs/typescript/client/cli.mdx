@@ -167,7 +167,7 @@ npx mcp-use client screenshot \
   --tool show-board boardId=demo
 ```
 
-Common flags (both forms): `--width`, `--height`, `--theme light|dark`, `--output <path>`, `--wait-for <selector>`, `--delay <ms>`, `--timeout <ms>`, `--inspector <url>`, `--cdp-url <ws-url>`, `--quiet`. Run `mcp-use client screenshot --help` for the full list.
+Common flags (both forms): `--width`, `--height`, `--device-scale-factor <n>` (e.g. `2` for Retina; defaults to `1`), `--theme light|dark`, `--output <path>`, `--wait-for <selector>`, `--delay <ms>`, `--timeout <ms>`, `--inspector <url>`, `--cdp-url <ws-url>`, `--quiet`. Run `mcp-use client screenshot --help` for the full list.
 
 <Note>
 `-H/--header` only applies to the ad-hoc form. The saved-server form carries the server's auth (OAuth or `--auth <token>` from `connect`) automatically.
@@ -206,6 +206,7 @@ Per-server commands accept these flags where they make sense:
 - `--timeout <ms>`: Request timeout (on `tools call`).
 - `--no-screenshot`: Skip the auto-screenshot capture for tools that render a widget (on `tools call`).
 - `--screenshot-output <path>`: Override the screenshot output path.
+- `--screenshot-device-scale-factor <n>`: Device pixel ratio for the auto-screenshot (e.g. `2` for Retina). Defaults to `1`. The dedicated `mcp-use client screenshot` command exposes the same knob as `--device-scale-factor <n>`.
 
 ## Storage
 
