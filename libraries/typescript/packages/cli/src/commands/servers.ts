@@ -318,9 +318,11 @@ async function deleteServerCommand(
 }
 
 export function createServersCommand(): Command {
-  const serversCommand = new Command("servers").description(
-    "Manage cloud servers (Git-backed deploy targets)"
-  );
+  const serversCommand = new Command("servers")
+    .description("Manage cloud servers (Git-backed deploy targets)")
+    .showHelpAfterError(
+      "(Run `mcp-use servers --help` to see available commands)"
+    );
 
   serversCommand
     .command("list")

@@ -107,9 +107,11 @@ async function addSkillsToProject(projectPath: string): Promise<void> {
 }
 
 export function createSkillsCommand(): Command {
-  const skills = new Command("skills").description(
-    "Manage mcp-use AI agent skills"
-  );
+  const skills = new Command("skills")
+    .description("Manage mcp-use AI agent skills")
+    .showHelpAfterError(
+      "(Run `mcp-use skills --help` to see available commands)"
+    );
 
   const installAction = async (options: { path: string }) => {
     const projectPath = resolve(options.path);

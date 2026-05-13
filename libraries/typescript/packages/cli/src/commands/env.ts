@@ -193,9 +193,9 @@ async function removeEnvCommand(
 }
 
 export function createEnvCommand(): Command {
-  const envCommand = new Command("env").description(
-    "Manage environment variables for a server"
-  );
+  const envCommand = new Command("env")
+    .description("Manage environment variables for a server")
+    .showHelpAfterError("(Run `mcp-use env --help` to see available commands)");
 
   envCommand
     .command("list")

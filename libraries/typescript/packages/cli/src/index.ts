@@ -12,7 +12,14 @@ import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
-import { createClientCommand } from "./commands/client.js";
+import {
+  PER_CLIENT_SCOPES,
+  RESERVED_CLIENT_SUBCOMMANDS,
+  createClientCommand,
+  createPerClientCommand,
+} from "./commands/client.js";
+import { getSession } from "./utils/session-storage.js";
+import { formatError } from "./utils/format.js";
 import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
@@ -42,7 +49,8 @@ const packageVersion = packageJson.version || "unknown";
 program
   .name("mcp-use")
   .description("Create and run MCP servers with ui resources widgets")
-  .version(packageVersion);
+  .version(packageVersion)
+  .showHelpAfterError("(Run `mcp-use --help` to see available commands)");
 
 /**
  * Helper to display all package versions
@@ -3121,4 +3129,79 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
   await notifyIfUpdateAvailable(projectPath);
 });
 
-program.parse();
+/**
+ * Per-server routing for `mcp-use client <name> ...`.
+ *
+ * Commander doesn't natively dispatch on a dynamic positional that precedes a
+ * subcommand group. So we intercept here: if the token after `client` isn't a
+ * reserved subcommand (`connect`, `list`, `help`) or a flag, treat it as a
+ * saved-server name and parse the remainder against a per-server command tree.
+ */
+const argv = process.argv;
+// `client` is only valid as a subcommand at argv[2] (node + script + first
+// user token). Don't use `indexOf`, since the literal string "client" can
+// also appear later in argv as someone's argument value.
+const clientIdx = argv[2] === "client" ? 2 : -1;
+const perClientName =
+  clientIdx !== -1 &&
+  argv.length > clientIdx + 1 &&
+  !argv[clientIdx + 1].startsWith("-") &&
+  !RESERVED_CLIENT_SUBCOMMANDS.has(argv[clientIdx + 1])
+    ? argv[clientIdx + 1]
+    : null;
+
+if (perClientName) {
+  // Catch a common mistake: user typed `mcp-use client tools call X` and
+  // forgot the server name. Commander would otherwise route this as if
+  // "tools" were the server name and complain about an unknown command.
+  if (PER_CLIENT_SCOPES.has(perClientName)) {
+    const rest = argv.slice(clientIdx + 1).join(" ");
+    console.error(formatError("Missing server name."));
+    console.error("");
+    console.error(
+      `'${perClientName}' is a per-server subcommand, not a server name. ` +
+        `Address it through a saved server:`
+    );
+    console.error("");
+    console.error(`  mcp-use client <name> ${rest}`);
+    console.error("");
+    console.error("See your saved servers with:");
+    console.error("  mcp-use client list");
+    process.exit(1);
+  }
+
+  const rest = argv.slice(clientIdx + 2);
+  // Bare `mcp-use client <name>` (or with `--help`/`-h`) defaults to
+  // commander's help for the per-server tree. That help is only useful when
+  // the server actually exists — for an unknown name it leaks the subcommand
+  // surface instead of telling the user how to save the server. Intercept
+  // the no-subcommand path and check existence first.
+  const isHelpOnly =
+    rest.length === 0 ||
+    (rest.length === 1 && (rest[0] === "--help" || rest[0] === "-h"));
+
+  (async () => {
+    if (isHelpOnly) {
+      const config = await getSession(perClientName);
+      if (!config) {
+        console.error(formatError(`Server '${perClientName}' not found.`));
+        console.error("");
+        console.error("Connect to an MCP server and save it under this name:");
+        console.error(`  mcp-use client connect ${perClientName} <url>`);
+        console.error("");
+        console.error("See your saved servers with:");
+        console.error("  mcp-use client list");
+        process.exit(1);
+      }
+    }
+    await createPerClientCommand(perClientName).parseAsync(rest, {
+      from: "user",
+    });
+  })().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(formatError(message));
+    process.exit(1);
+  });
+} else {
+  program.parse();
+}

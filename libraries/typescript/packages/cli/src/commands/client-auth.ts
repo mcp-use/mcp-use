@@ -5,33 +5,24 @@ import {
   formatSuccess,
 } from "../utils/format.js";
 import { buildOAuthProvider } from "../utils/oauth.js";
-import { getActiveSession, getSession } from "../utils/session-storage.js";
+import { getSession } from "../utils/session-storage.js";
 
 async function resolveSession(
-  sessionArg: string | undefined
+  name: string
 ): Promise<{ name: string; url: string } | null> {
-  let name = sessionArg;
-  if (!name) {
-    const active = await getActiveSession();
-    if (!active) {
-      console.error(formatError("No active session"));
-      return null;
-    }
-    name = active.name;
-  }
   const config = await getSession(name);
   if (!config) {
-    console.error(formatError(`Session '${name}' not found`));
+    console.error(formatError(`Server '${name}' not found`));
     return null;
   }
   if (config.type !== "http") {
-    console.error(formatError("Auth commands only apply to HTTP sessions"));
+    console.error(formatError("Auth commands only apply to HTTP servers"));
     return null;
   }
   if (config.authMode !== "oauth") {
     console.error(
       formatError(
-        `Session '${name}' was not authenticated via OAuth (authMode=${config.authMode ?? "bearer"})`
+        `Server '${name}' was not authenticated via OAuth (authMode=${config.authMode ?? "bearer"})`
       )
     );
     return null;
@@ -62,17 +53,18 @@ function decodeJwtExp(token: string): number | null {
   }
 }
 
-export async function authStatusCommand(sessionArg?: string): Promise<void> {
-  const target = await resolveSession(sessionArg);
+export async function authStatusCommand(name: string): Promise<void> {
+  const target = await resolveSession(name);
   if (!target) {
     process.exit(1);
   }
-  const provider = await buildOAuthProvider(target.url);
+  const { name: serverName, url } = target;
+  const provider = await buildOAuthProvider(url);
   const tokens = await provider.tokens();
 
   const fields: Record<string, string> = {
-    session: target.name,
-    url: target.url,
+    server: serverName,
+    url,
     tokens: tokens?.access_token ? "present" : "missing",
   };
   if (tokens?.scope) fields.scope = tokens.scope;
@@ -87,12 +79,13 @@ export async function authStatusCommand(sessionArg?: string): Promise<void> {
   if (!tokens?.access_token) process.exit(1);
 }
 
-export async function authRefreshCommand(sessionArg?: string): Promise<void> {
-  const target = await resolveSession(sessionArg);
+export async function authRefreshCommand(name: string): Promise<void> {
+  const target = await resolveSession(name);
   if (!target) {
     process.exit(1);
   }
-  const provider = await buildOAuthProvider(target.url);
+  const { name: serverName, url } = target;
+  const provider = await buildOAuthProvider(url);
   const refreshed = await provider.forceRefresh();
   if (!refreshed) {
     console.error(
@@ -101,9 +94,7 @@ export async function authRefreshCommand(sessionArg?: string): Promise<void> {
       )
     );
     console.error(
-      formatInfo(
-        `Run: mcp-use client connect ${target.url} --name ${target.name}`
-      )
+      formatInfo(`Run: mcp-use client connect ${serverName} ${url}`)
     );
     process.exit(1);
   }
@@ -117,17 +108,18 @@ export async function authRefreshCommand(sessionArg?: string): Promise<void> {
   );
 }
 
-export async function authLogoutCommand(sessionArg?: string): Promise<void> {
-  const target = await resolveSession(sessionArg);
+export async function authLogoutCommand(name: string): Promise<void> {
+  const target = await resolveSession(name);
   if (!target) {
     process.exit(1);
   }
-  const provider = await buildOAuthProvider(target.url);
+  const { name: serverName, url } = target;
+  const provider = await buildOAuthProvider(url);
   await provider.invalidateCredentials("all");
-  console.log(formatSuccess(`Removed tokens for ${target.url}`));
+  console.log(formatSuccess(`Removed tokens for ${url}`));
   console.log(
     formatInfo(
-      `Session '${target.name}' kept; reconnect with \`mcp-use client connect\`.`
+      `Server '${serverName}' kept; reconnect with \`mcp-use client connect\`.`
     )
   );
 }

@@ -524,9 +524,11 @@ async function startDeploymentCommand(deploymentId: string): Promise<void> {
 }
 
 export function createDeploymentsCommand(): Command {
-  const deploymentsCommand = new Command("deployments").description(
-    "Manage cloud deployments"
-  );
+  const deploymentsCommand = new Command("deployments")
+    .description("Manage cloud deployments")
+    .showHelpAfterError(
+      "(Run `mcp-use deployments --help` to see available commands)"
+    );
 
   deploymentsCommand
     .command("list")
