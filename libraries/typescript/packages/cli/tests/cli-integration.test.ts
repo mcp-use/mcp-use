@@ -163,9 +163,7 @@ describe("CLI Integration Tests", () => {
       expect(result.exitCode).toBe(1);
       const output = result.stdout + result.stderr;
       expect(output).toMatch(/Server 'does-not-exist' not found/);
-      expect(output).toContain(
-        "mcp-use client connect does-not-exist <url>"
-      );
+      expect(output).toContain("mcp-use client connect does-not-exist <url>");
       // The per-server commander help leaks subcommand names like "tools",
       // "resources", "prompts" — make sure we suppressed it for an unknown
       // server. ("Commands:" is commander's help section header.)
@@ -178,9 +176,7 @@ describe("CLI Integration Tests", () => {
       expect(result.exitCode).toBe(1);
       const output = result.stdout + result.stderr;
       expect(output).toMatch(/Server 'does-not-exist' not found/);
-      expect(output).toContain(
-        "mcp-use client connect does-not-exist <url>"
-      );
+      expect(output).toContain("mcp-use client connect does-not-exist <url>");
     });
   });
 

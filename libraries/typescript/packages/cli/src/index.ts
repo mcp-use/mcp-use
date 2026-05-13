@@ -19,6 +19,7 @@ import {
   createPerClientCommand,
 } from "./commands/client.js";
 import { getSession } from "./utils/session-storage.js";
+import { formatError } from "./utils/format.js";
 import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
@@ -3137,7 +3138,10 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
  * saved-server name and parse the remainder against a per-server command tree.
  */
 const argv = process.argv;
-const clientIdx = argv.indexOf("client", 2);
+// `client` is only valid as a subcommand at argv[2] (node + script + first
+// user token). Don't use `indexOf`, since the literal string "client" can
+// also appear later in argv as someone's argument value.
+const clientIdx = argv[2] === "client" ? 2 : -1;
 const perClientName =
   clientIdx !== -1 &&
   argv.length > clientIdx + 1 &&
@@ -3152,7 +3156,7 @@ if (perClientName) {
   // "tools" were the server name and complain about an unknown command.
   if (PER_CLIENT_SCOPES.has(perClientName)) {
     const rest = argv.slice(clientIdx + 1).join(" ");
-    console.error(chalk.red(`✖ Missing server name.`));
+    console.error(formatError("Missing server name."));
     console.error("");
     console.error(
       `'${perClientName}' is a per-server subcommand, not a server name. ` +
@@ -3180,7 +3184,7 @@ if (perClientName) {
     if (isHelpOnly) {
       const config = await getSession(perClientName);
       if (!config) {
-        console.error(chalk.red(`✖ Server '${perClientName}' not found.`));
+        console.error(formatError(`Server '${perClientName}' not found.`));
         console.error("");
         console.error("Connect to an MCP server and save it under this name:");
         console.error(`  mcp-use client connect ${perClientName} <url>`);

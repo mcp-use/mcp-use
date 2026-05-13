@@ -32,11 +32,13 @@ export interface SessionStorage {
 
 const SESSION_FILE_PATH = join(homedir(), ".mcp-use", "cli-sessions.json");
 
+let _dirEnsured = false;
 async function ensureSessionDir(): Promise<void> {
-  const dir = join(homedir(), ".mcp-use");
-  if (!existsSync(dir)) {
-    await mkdir(dir, { recursive: true });
-  }
+  if (_dirEnsured) return;
+  // `mkdir({ recursive: true })` is a no-op when the dir already exists, so
+  // we don't need a separate `existsSync` check.
+  await mkdir(join(homedir(), ".mcp-use"), { recursive: true });
+  _dirEnsured = true;
 }
 
 /**

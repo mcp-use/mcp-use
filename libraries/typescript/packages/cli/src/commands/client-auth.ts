@@ -58,12 +58,13 @@ export async function authStatusCommand(name: string): Promise<void> {
   if (!target) {
     process.exit(1);
   }
-  const provider = await buildOAuthProvider(target!.url);
+  const { name: serverName, url } = target;
+  const provider = await buildOAuthProvider(url);
   const tokens = await provider.tokens();
 
   const fields: Record<string, string> = {
-    server: target!.name,
-    url: target!.url,
+    server: serverName,
+    url,
     tokens: tokens?.access_token ? "present" : "missing",
   };
   if (tokens?.scope) fields.scope = tokens.scope;
@@ -83,7 +84,8 @@ export async function authRefreshCommand(name: string): Promise<void> {
   if (!target) {
     process.exit(1);
   }
-  const provider = await buildOAuthProvider(target!.url);
+  const { name: serverName, url } = target;
+  const provider = await buildOAuthProvider(url);
   const refreshed = await provider.forceRefresh();
   if (!refreshed) {
     console.error(
@@ -92,7 +94,7 @@ export async function authRefreshCommand(name: string): Promise<void> {
       )
     );
     console.error(
-      formatInfo(`Run: mcp-use client connect ${target!.name} ${target!.url}`)
+      formatInfo(`Run: mcp-use client connect ${serverName} ${url}`)
     );
     process.exit(1);
   }
@@ -111,12 +113,13 @@ export async function authLogoutCommand(name: string): Promise<void> {
   if (!target) {
     process.exit(1);
   }
-  const provider = await buildOAuthProvider(target!.url);
+  const { name: serverName, url } = target;
+  const provider = await buildOAuthProvider(url);
   await provider.invalidateCredentials("all");
-  console.log(formatSuccess(`Removed tokens for ${target!.url}`));
+  console.log(formatSuccess(`Removed tokens for ${url}`));
   console.log(
     formatInfo(
-      `Server '${target!.name}' kept; reconnect with \`mcp-use client connect\`.`
+      `Server '${serverName}' kept; reconnect with \`mcp-use client connect\`.`
     )
   );
 }
