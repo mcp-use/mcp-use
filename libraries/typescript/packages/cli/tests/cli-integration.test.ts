@@ -18,6 +18,10 @@ import { tmpdir } from "node:os";
 const CLI_PATH = join(__dirname, "../dist/index.cjs");
 const TEST_TIMEOUT = 30000;
 
+// Isolated HOME so spawned CLI subprocesses never read or write the real
+// ~/.mcp-use directory while tests run.
+const FAKE_HOME = mkdtempSync(join(tmpdir(), "mcp-cli-home-"));
+
 /**
  * Run a CLI command and capture output
  */
@@ -27,7 +31,12 @@ async function runCLI(
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve, reject) => {
     const proc = spawn("node", [CLI_PATH, ...args], {
-      env: { ...process.env, NO_COLOR: "1" }, // Disable colors for easier testing
+      env: {
+        ...process.env,
+        NO_COLOR: "1", // Disable colors for easier testing
+        HOME: FAKE_HOME,
+        USERPROFILE: FAKE_HOME,
+      },
     });
 
     let stdout = "";
@@ -81,6 +90,7 @@ describe("CLI Integration Tests", () => {
     if (testDir) {
       rmSync(testDir, { recursive: true, force: true });
     }
+    rmSync(FAKE_HOME, { recursive: true, force: true });
   });
 
   describe("Help Commands", () => {
