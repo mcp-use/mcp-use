@@ -10,5 +10,7 @@ client was rendering both, so every call to a structured-output tool printed
 the JSON payload twice.
 
 `mcp-use client <name> tools call ...` now treats `structuredContent` as the
-canonical form: when it's present, the content block is suppressed and only
-the structured JSON is shown.
+canonical form: when it's present, duplicate `TextContent` blocks are
+suppressed and only the structured JSON is shown. Non-text content blocks
+(image, resource) are still rendered alongside the structured payload — they
+carry information the structured form doesn't.

@@ -147,7 +147,7 @@ export async function getOrRestoreSession(
     activeSessions.set(sessionName, { client, session });
     return { name: sessionName, session };
   } catch (error: any) {
-    console.error(formatError(`Failed to restore client: ${error.message}`));
+    console.error(formatError(`Failed to restore server: ${error.message}`));
     return null;
   }
 }

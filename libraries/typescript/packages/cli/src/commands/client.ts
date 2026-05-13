@@ -137,6 +137,26 @@ export async function connectCommand(
   const sessionName: string = name as string;
   const target: string = urlOrCommand as string;
 
+  // Reject names that collide with per-server scope tokens. If someone saved a
+  // server as `tools`, every `mcp-use client tools ...` invocation would be
+  // intercepted by the "missing server name" routing in index.ts and the
+  // saved entry would be unreachable. Fail fast at save time instead.
+  if (PER_CLIENT_SCOPES.has(sessionName)) {
+    console.error(
+      formatError(
+        `'${sessionName}' is a reserved name and can't be used for a saved server.`
+      )
+    );
+    console.error("");
+    console.error(
+      `Reserved names: ${Array.from(PER_CLIENT_SCOPES).sort().join(", ")}`
+    );
+    console.error("");
+    console.error("Pick a different name, e.g.:");
+    console.error(`  mcp-use client connect my-${sessionName} ${target}`);
+    await cleanupAndExit(1);
+  }
+
   try {
     const client = new MCPClient();
     let session: MCPSession;

@@ -3197,7 +3197,11 @@ if (perClientName) {
     await createPerClientCommand(perClientName).parseAsync(rest, {
       from: "user",
     });
-  })();
+  })().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(formatError(message));
+    process.exit(1);
+  });
 } else {
   program.parse();
 }

@@ -190,11 +190,16 @@ export function formatToolCall(result: CallToolResult): string {
   const { isError, structuredContent } = result;
   const hasStructured =
     structuredContent !== undefined && structuredContent !== null;
-  // Per MCP spec, when a tool returns structuredContent it SHOULD also serialize
-  // the same JSON into a TextContent block for backwards compatibility. Treat
-  // structuredContent as the canonical form and skip the content blocks in
-  // that case so we don't print the same payload twice.
-  const showContent = !hasStructured && !!result.content?.length;
+  // Per MCP spec, when a tool returns structuredContent it SHOULD also
+  // serialize the same JSON into a TextContent block for backwards
+  // compatibility. Treat structuredContent as canonical and drop the text
+  // duplicate. Non-text blocks (image/resource markers) are kept — they carry
+  // information the structured payload doesn't, even though the terminal can
+  // only render them as placeholders.
+  const visibleContent = (result.content ?? []).filter(
+    (item) => !hasStructured || item.type !== "text"
+  );
+  const hasVisibleContent = visibleContent.length > 0;
 
   if (isError) {
     lines.push(chalk.red("✗ Tool execution failed"));
@@ -204,12 +209,12 @@ export function formatToolCall(result: CallToolResult): string {
     lines.push("");
   }
 
-  if (showContent) {
+  if (hasVisibleContent) {
     if (isError) {
       lines.push(chalk.red.bold("Error details:"));
     }
-    result.content.forEach((item, index) => {
-      if (result.content.length > 1) {
+    visibleContent.forEach((item, index) => {
+      if (visibleContent.length > 1) {
         lines.push(chalk.bold(`Content ${index + 1}:`));
       }
 
@@ -232,7 +237,7 @@ export function formatToolCall(result: CallToolResult): string {
         lines.push(chalk.gray(`[Unknown content type: ${item.type}]`));
       }
 
-      if (index < result.content.length - 1) {
+      if (index < visibleContent.length - 1) {
         lines.push("");
       }
     });
@@ -245,7 +250,7 @@ export function formatToolCall(result: CallToolResult): string {
     lines.push(formatJson(structuredContent));
   }
 
-  if (isError && !showContent && !hasStructured) {
+  if (isError && !hasVisibleContent && !hasStructured) {
     lines.push(chalk.gray("(no error details provided by server)"));
   }
 
