@@ -20,7 +20,6 @@ import {
 } from "./commands/client.js";
 import { getSession } from "./utils/session-storage.js";
 import { formatError } from "./utils/format.js";
-import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createServersCommand } from "./commands/servers.js";
@@ -3069,8 +3068,9 @@ program
     });
   });
 
-// Client command — pass the CLI bin path so `tools call` can auto-spawn a dev
-// server for widget-screenshot capture, mirroring `mcp-use screenshot`.
+// Client command. The screenshot subcommand lives under `client`:
+//  - `mcp-use client screenshot --mcp <url>` for ad-hoc/programmatic use
+//  - `mcp-use client <name> screenshot` for saved servers (uses their auth)
 program.addCommand(createClientCommand());
 
 // Deployments command
@@ -3081,10 +3081,6 @@ program.addCommand(createServersCommand());
 
 // Skills command
 program.addCommand(createSkillsCommand());
-
-// Screenshot command — pass the path to this CLI bin so auto-spawned dev
-// servers can re-invoke the same binary (works in both dev/tsx + bundled cjs).
-program.addCommand(createScreenshotCommand());
 
 // Generate types command
 program

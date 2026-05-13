@@ -24,6 +24,12 @@ interface ScreenshotOptions {
   height: string;
   inspector?: string;
   mcp?: string;
+  /**
+   * Saved-server name. Not a user-facing flag — populated internally by
+   * `createPerClientScreenshotCommand(name)` so the per-client subcommand
+   * `mcp-use client <name> screenshot` reuses the same code path as the
+   * ad-hoc `mcp-use client screenshot --mcp <url>` form.
+   */
   session?: string;
   theme: "light" | "dark";
   output?: string;
@@ -406,8 +412,9 @@ const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
  * Resolve an authenticated MCPSession for the screenshot run.
  *
  * Resolution order:
- *  1. `--session <name>` → restore that saved server (errors if not found)
- *  2. `--mcp <url>` → open an unauthenticated ad-hoc session at that URL
+ *  1. `options.session` → restore that saved server (set by the per-client
+ *     subcommand `mcp-use client <name> screenshot`).
+ *  2. `--mcp <url>` → open an unauthenticated ad-hoc session at that URL.
  */
 async function resolveSessionForScreenshot(
   options: ScreenshotOptions,
@@ -438,7 +445,7 @@ async function resolveSessionForScreenshot(
 
   console.error(
     formatError(
-      "No MCP target. Pass --session <name> (a saved server) or --mcp <url> (ad-hoc)."
+      "No MCP target. Pass --mcp <url> for an ad-hoc connection, or use `mcp-use client <name> screenshot` for a saved server."
     )
   );
   return null;
@@ -446,7 +453,10 @@ async function resolveSessionForScreenshot(
 
 export async function screenshotCommand(
   options: ScreenshotOptions,
-  argsList: string[] | undefined
+  argsList: string[] | undefined,
+  invocation: { usagePrefix: string } = {
+    usagePrefix: "mcp-use client screenshot",
+  }
 ): Promise<void> {
   let exitCode = 0;
 
@@ -466,7 +476,7 @@ export async function screenshotCommand(
       if (!options.mcp) {
         console.error(
           formatError(
-            "--header is only supported with --mcp <url>. Saved sessions (use --session) carry their own auth from `mcp-use client connect`."
+            "--header is only supported with --mcp <url>. Saved servers carry their own auth from `mcp-use client connect`."
           )
         );
         exitCode = 1;
@@ -534,13 +544,13 @@ export async function screenshotCommand(
         console.log("");
         console.log(formatInfo("Usage:"));
         console.log(
-          `  npx mcp-use screenshot --tool ${options.tool} key=value [key2=value2 ...]`
+          `  npx ${invocation.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
         );
         console.log(
-          `  npx mcp-use screenshot --tool ${options.tool} nested:='{"a":1}'   # JSON value`
+          `  npx ${invocation.usagePrefix} --tool ${options.tool} nested:='{"a":1}'   # JSON value`
         );
         console.log(
-          `  npx mcp-use screenshot --tool ${options.tool} '{"key":"value"}'   # full JSON object`
+          `  npx ${invocation.usagePrefix} --tool ${options.tool} '{"key":"value"}'   # full JSON object`
         );
         if (tool.inputSchema) {
           console.log("");
@@ -587,11 +597,13 @@ export async function screenshotCommand(
   }
 }
 
-export function createScreenshotCommand(): Command {
-  return new Command("screenshot")
-    .description(
-      "Render an MCP Apps view headlessly and save a PNG by calling a tool and rendering its UI resource with the result."
-    )
+/**
+ * Apply the screenshot flags that are common to both the ad-hoc top-level form
+ * (`mcp-use client screenshot`) and the per-server form
+ * (`mcp-use client <name> screenshot`).
+ */
+function withCommonScreenshotOptions(cmd: Command): Command {
+  return cmd
     .argument(
       "[args...]",
       "Tool args as key=value pairs (use key:=<json> for nested values, or pass a single JSON object)."
@@ -604,21 +616,7 @@ export function createScreenshotCommand(): Command {
     .option("--height <px>", "Browser viewport height in pixels.", "600")
     .option(
       "--inspector <url>",
-      "Inspector host that serves /inspector/preview/:view. When omitted, probes localhost:3000 then auto-spawns `mcp-use dev`."
-    )
-    .option(
-      "--session <name>",
-      "Saved server name (from `mcp-use client connect <name> <url>`)."
-    )
-    .option(
-      "--mcp <url>",
-      "Ad-hoc MCP server URL (escape hatch). Use when you don't have a saved server. No authentication unless --header is supplied."
-    )
-    .option(
-      "-H, --header <header>",
-      'HTTP header to send to the --mcp <url> server, formatted "Key: Value". Repeatable. Use to pass an Authorization bearer token or other auth headers when screenshotting an authenticated MCP server.',
-      collectHeader,
-      [] as string[]
+      "Inspector host that serves /inspector/preview/:view. When omitted, auto-spawns `@mcp-use/inspector` on a free port."
     )
     .option(
       "--theme <light|dark>",
@@ -643,8 +641,59 @@ export function createScreenshotCommand(): Command {
       "--cdp-url <url>",
       "Connect to an existing CDP WebSocket (ws:// or wss://) instead of spawning local Chrome. Useful for hosted browsers like Notte."
     )
-    .option("--quiet", "Suppress dev-server output.")
-    .action(async (args: string[], opts: ScreenshotOptions) => {
-      await screenshotCommand(opts, args);
+    .option("--quiet", "Suppress dev-server output.");
+}
+
+/**
+ * Top-level ad-hoc form: `mcp-use client screenshot --mcp <url> --tool <name>`.
+ *
+ * Doesn't take a saved-server positional. The MCP server is supplied inline
+ * via `--mcp`, and authenticated servers can be reached with repeatable
+ * `-H, --header` flags. This is the programmatic entry point for one-off or
+ * automated screenshot runs that don't want to first `mcp-use client connect`.
+ */
+export function createClientScreenshotCommand(): Command {
+  const cmd = withCommonScreenshotOptions(
+    new Command("screenshot").description(
+      "Render an MCP Apps view headlessly and save a PNG. Connects to an MCP server inline via --mcp; for a saved server, use `mcp-use client <name> screenshot`."
+    )
+  )
+    .option(
+      "--mcp <url>",
+      "Ad-hoc MCP server URL. Required for the top-level form. No authentication unless --header is supplied."
+    )
+    .option(
+      "-H, --header <header>",
+      'HTTP header to send to the --mcp <url> server, formatted "Key: Value". Repeatable. Use to pass an Authorization bearer token or other auth headers when screenshotting an authenticated MCP server.',
+      collectHeader,
+      [] as string[]
+    );
+
+  cmd.action(async (args: string[], opts: ScreenshotOptions) => {
+    await screenshotCommand(opts, args, {
+      usagePrefix: "mcp-use client screenshot",
     });
+  });
+
+  return cmd;
+}
+
+/**
+ * Per-server form: `mcp-use client <name> screenshot --tool <name>`. The saved
+ * server's auth (OAuth or bearer) is reused — no `--mcp`/`--header` flags.
+ */
+export function createPerClientScreenshotCommand(name: string): Command {
+  const cmd = withCommonScreenshotOptions(
+    new Command("screenshot").description(
+      `Render an MCP Apps view headlessly using the saved server '${name}'.`
+    )
+  );
+
+  cmd.action(async (args: string[], opts: ScreenshotOptions) => {
+    await screenshotCommand({ ...opts, session: name }, args, {
+      usagePrefix: `mcp-use client ${name} screenshot`,
+    });
+  });
+
+  return cmd;
 }
