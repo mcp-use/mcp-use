@@ -37,6 +37,12 @@ export {
 } from "./oauth-proxy.js";
 
 export {
+  createInMemoryStateStore,
+  DEFAULT_OAUTH_STATE_TTL_MS,
+  type OAuthStateRecord,
+  type OAuthStateStore,
+} from "./state-store.js";
+export {
   getAuth,
   hasAnyScope,
   hasScope,

@@ -23,11 +23,16 @@ Common proxy targets: **Google, GitHub, Okta, Azure AD (Microsoft Entra ID), Aut
 ## How it works
 
 1. Your server exposes a `/register` endpoint that returns the configured `clientId`.
-2. The MCP client runs PKCE authorization against the upstream using that `clientId`.
-3. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
-4. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
+2. At `/authorize`, your server stores the MCP client's `redirect_uri` and `state`, then forwards the request upstream with its own `/oauth/callback` as `redirect_uri` and a server-minted `state`.
+3. The upstream provider redirects to your server's `/oauth/callback`. The server looks up the original client `redirect_uri` and 302s the client with the authorization code and original `state`.
+4. At `/token`, your server injects the `clientId`/`clientSecret` and overrides `redirect_uri` so the upstream's redirect-uri match succeeds.
+5. On each `/mcp/*` request, your server verifies the bearer token via `verifyToken`.
 
-Your server holds the client credentials and mediates every token exchange. Tokens are passed through  -  the proxy does not mint its own.
+<Note>
+  **You register only one redirect URI upstream:** `https://<your-server>/oauth/callback`. The proxy then brokers the redirect to whichever MCP client started the flow — every new client (inspector, agent, IDE, prod deployment) works without extra provider config.
+</Note>
+
+The proxy holds your client credentials and mediates every token exchange. Tokens are passed through — the proxy does not mint its own.
 
 ## Quick start (Google)
 
@@ -84,6 +89,14 @@ oauthProxy({
 
   // Optional: extra authorize-request params (e.g. audience, access_type, prompt)
   extraAuthorizeParams: { access_type: "offline", prompt: "consent" },
+
+  // Optional: allowlist of client redirect URIs. When unset (default), any
+  // client redirect_uri is accepted. Set this in production to prevent the
+  // proxy from being abused as an open redirect.
+  allowedClientRedirectUris: [
+    "https://my-app.example.com/oauth/callback",
+    "http://localhost:3000/oauth/callback",
+  ],
 
   // Optional: custom user info extractor
   // Default pulls sub/email/name/picture and parses `scope` into scopes[].

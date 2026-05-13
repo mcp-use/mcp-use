@@ -12,10 +12,13 @@ In the [Auth0 Dashboard](https://manage.auth0.com):
 
 1. Go to **Applications → Create Application**
 2. Choose **Regular Web Application**
-3. Under **Allowed Callback URLs**, add your MCP client's redirect URI, e.g.:
+3. Under **Allowed Callback URLs**, add the **MCP server's** OAuth callback:
    ```
-   http://localhost:3000/inspector/oauth/callback
+   http://localhost:3000/oauth/callback
    ```
+   You register the server's callback URL here — not the MCP client's. The
+   proxy brokers the redirect back to whichever client started the flow, so
+   each new client (inspector, agent, IDE) works without extra Auth0 config.
 4. Save changes and copy the **Client ID** and **Client Secret**
 
 ### 2. Create an API
@@ -52,12 +55,16 @@ Server starts on port 3000. Open `http://localhost:3000/inspector` to test the O
 ## OAuth Flow
 
 ```
-Client → /register         → receives pre-registered client_id
-Client → /authorize        → MCP server redirects to Auth0 /authorize
-Auth0  → redirect_uri      → returns authorization code to client
-Client → /token            → MCP server injects credentials, forwards to Auth0
-Auth0  → access_token (JWT)→ returned to client
-Client → /mcp/...          → MCP server verifies JWT via Auth0 JWKS
+Client → /register             → receives pre-registered client_id
+Client → /authorize            → MCP server stores client's redirect_uri,
+                                  forwards to Auth0 with the server's own
+                                  /oauth/callback as redirect_uri
+Auth0  → <server>/oauth/callback → MCP server looks up the original client
+                                    redirect_uri and 302s with the auth code
+Client → /token                → MCP server injects credentials and overrides
+                                  redirect_uri, forwards to Auth0
+Auth0  → access_token (JWT)    → returned to client
+Client → /mcp/...              → MCP server verifies JWT via Auth0 JWKS
 ```
 
 ## Available Tools

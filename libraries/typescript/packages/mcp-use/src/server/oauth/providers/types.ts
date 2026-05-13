@@ -103,6 +103,16 @@ export interface OAuthProxy extends OAuthProvider {
    * Extra parameters to include in authorize requests
    */
   extraAuthorizeParams?: Record<string, string>;
+
+  /**
+   * Optional allowlist for client `redirect_uri` values passed to `/authorize`.
+   *
+   * When unset, the proxy accepts any client redirect URI (the developer-
+   * friendly default). When set, only exact matches are accepted; any other
+   * value is rejected with `400 invalid_request`. Use this in production to
+   * close the open-redirect vector created by brokering the upstream callback.
+   */
+  allowedClientRedirectUris?: string[];
 }
 
 /**

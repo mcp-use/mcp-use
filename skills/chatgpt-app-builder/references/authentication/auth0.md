@@ -99,7 +99,7 @@ Use a standard Auth0 **Regular Web Application** — no Early Access required. Y
 ### Setup
 
 1. **Auth0 Dashboard → Applications → Create Application** — choose **Regular Web Application**.
-2. Under **Allowed Callback URLs**, add your MCP client's redirect URI (e.g. `http://localhost:3000/inspector/oauth/callback`).
+2. Under **Allowed Callback URLs**, add the **MCP server's** OAuth callback URL (e.g. `http://localhost:3000/oauth/callback`). The proxy brokers the redirect back to whichever MCP client started the flow, so this is the only URL you ever need to register at Auth0.
 3. Copy the **Client ID** and **Client Secret**.
 4. **APIs → Create API** — set an identifier (e.g. `https://my-mcp-api/`), leave signing as RS256. This is required so Auth0 issues **JWT** access tokens instead of opaque tokens.
 

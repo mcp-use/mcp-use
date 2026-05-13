@@ -5,9 +5,16 @@
  * Unlike the DCR-direct auth0/ example, this works without Auth0's Early Access DCR feature.
  *
  * The MCP server mediates the entire OAuth flow:
- *   /register → returns pre-registered client_id
- *   /authorize → redirects to Auth0 with injected params
- *   /token → forwards to Auth0 with injected client credentials
+ *   /register        → returns the pre-registered client_id
+ *   /authorize       → stores the client redirect_uri, forwards to Auth0 with
+ *                       <server>/oauth/callback as redirect_uri
+ *   /oauth/callback  → restores the original client URI and 302s with the code
+ *   /token           → forwards to Auth0 with injected client credentials and
+ *                       overrides redirect_uri to <server>/oauth/callback
+ *
+ * Register `<server>/oauth/callback` in Auth0's Allowed Callback URLs — the
+ * proxy then brokers the redirect to whichever MCP client started the flow,
+ * so individual clients don't need to be registered upstream.
  *
  * Environment variables:
  *   AUTH0_DOMAIN         (required) e.g. my-tenant.us.auth0.com
@@ -46,6 +53,14 @@ const server = new MCPServer({
     clientSecret,
     scopes: ["openid", "email", "profile"],
     extraAuthorizeParams: { audience },
+    // In production, set `allowedClientRedirectUris` to gate which client
+    // callback URLs the proxy will redirect to. Unset accepts any URL —
+    // fine for local development, but an open-redirect risk if exposed.
+    //
+    // allowedClientRedirectUris: [
+    //   "https://my-app.example.com/oauth/callback",
+    //   "http://localhost:3000/inspector/oauth/callback",
+    // ],
     verifyToken: jwksVerifier({
       jwksUrl: `https://${domain}/.well-known/jwks.json`,
       issuer: `https://${domain}/`,

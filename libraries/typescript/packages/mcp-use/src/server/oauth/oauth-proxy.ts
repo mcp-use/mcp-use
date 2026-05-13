@@ -84,6 +84,18 @@ export interface OAuthProxyConfig {
    * If not provided, extracts standard OIDC claims (sub, email, name, picture).
    */
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
+
+  /**
+   * Optional allowlist for client `redirect_uri` values passed to `/authorize`.
+   *
+   * When unset, any client redirect URI is accepted (developer-friendly
+   * default). When set, only exact matches are accepted; other values are
+   * rejected with `400 invalid_request`. Set this in production to prevent
+   * the proxy from being abused as an open redirect.
+   *
+   * @example ["https://my-app.example.com/oauth/callback", "http://localhost:3000/oauth/callback"]
+   */
+  allowedClientRedirectUris?: string[];
 }
 
 /**
@@ -230,6 +242,7 @@ export function oauthProxy(config: OAuthProxyConfig): OAuthProxy {
     clientId: config.clientId,
     clientSecret: config.clientSecret,
     extraAuthorizeParams: config.extraAuthorizeParams,
+    allowedClientRedirectUris: config.allowedClientRedirectUris,
 
     // OAuthProvider interface implementation
     getIssuer: () => config.issuer,

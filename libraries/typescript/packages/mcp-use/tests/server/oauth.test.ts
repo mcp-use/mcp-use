@@ -9,9 +9,16 @@ import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBearerAuthMiddleware } from "../../src/server/oauth/middleware.js";
-import { setupOAuthRoutes } from "../../src/server/oauth/routes.js";
+import {
+  setupOAuthRoutes,
+  createCallbackHandler,
+} from "../../src/server/oauth/routes.js";
 import { setupOAuthForServer } from "../../src/server/oauth/setup.js";
 import { oauthProxy } from "../../src/server/oauth/oauth-proxy.js";
+import {
+  createInMemoryStateStore,
+  DEFAULT_OAUTH_STATE_TTL_MS,
+} from "../../src/server/oauth/state-store.js";
 
 // A stub verifier that accepts any token. Used in tests that don't exercise
 // the verification path (routes, metadata, registration).
@@ -126,11 +133,13 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(200);
     expect(data.access_token).toBe("abc");
     expect(tokenSpy).toHaveBeenCalledTimes(1);
-    // Verify that client credentials were injected
+    // Verify that client credentials were injected and that the
+    // proxy overrides the client-supplied redirect_uri so the upstream's
+    // redirect-uri match (against what was sent at /authorize) succeeds.
     expect(tokenSpy.mock.calls[0][0].body).toMatchObject({
       grant_type: "authorization_code",
       code: "code-123",
-      redirect_uri: "http://localhost:3000/callback",
+      redirect_uri: `${svc.baseUrl}/oauth/callback`,
       client_id: "my-client-id",
       client_secret: "my-client-secret",
     });
@@ -378,5 +387,195 @@ describe("server OAuth integration", () => {
     expect(registration.client_id).toBe("pre-registered-client-id");
     expect(registration.client_name).toBe("My MCP Client");
     expect(registration.token_endpoint_auth_method).toBe("client_secret_post");
+  });
+
+  it("swaps redirect_uri and state to proxy values at /authorize", async () => {
+    const app = new Hono();
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "upstream-client-id",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const params = new URLSearchParams({
+      client_id: "ignored-stale-dcr-id",
+      redirect_uri: "http://localhost:5173/inspector/oauth/callback",
+      response_type: "code",
+      code_challenge: "challenge-123",
+      state: "client-state-xyz",
+      scope: "openid",
+    });
+
+    const response = await fetch(`${svc.baseUrl}/authorize?${params}`, {
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(302);
+    const upstreamUrl = new URL(response.headers.get("location")!);
+    expect(upstreamUrl.origin + upstreamUrl.pathname).toBe(
+      "https://issuer.example.com/oauth/authorize"
+    );
+    expect(upstreamUrl.searchParams.get("redirect_uri")).toBe(
+      `${svc.baseUrl}/oauth/callback`
+    );
+    expect(upstreamUrl.searchParams.get("client_id")).toBe("upstream-client-id");
+    // The forwarded state is the proxy's minted value, not the client's.
+    const proxyState = upstreamUrl.searchParams.get("state");
+    expect(proxyState).toBeTruthy();
+    expect(proxyState).not.toBe("client-state-xyz");
+  });
+
+  it("brokers the upstream callback back to the original client URI", async () => {
+    const store = createInMemoryStateStore();
+    const handler = createCallbackHandler(store);
+    const app = new Hono();
+    app.get("/oauth/callback", handler);
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    store.set(
+      "proxy-state-1",
+      {
+        clientRedirectUri: "http://localhost:5173/inspector/oauth/callback",
+        clientState: "client-state-xyz",
+      },
+      DEFAULT_OAUTH_STATE_TTL_MS
+    );
+
+    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    callbackUrl.searchParams.set("code", "auth-code-abc");
+    callbackUrl.searchParams.set("state", "proxy-state-1");
+
+    const response = await fetch(callbackUrl.toString(), {
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(302);
+    const target = new URL(response.headers.get("location")!);
+    expect(`${target.origin}${target.pathname}`).toBe(
+      "http://localhost:5173/inspector/oauth/callback"
+    );
+    expect(target.searchParams.get("code")).toBe("auth-code-abc");
+    expect(target.searchParams.get("state")).toBe("client-state-xyz");
+  });
+
+  it("propagates upstream errors back to the client redirect URI", async () => {
+    const store = createInMemoryStateStore();
+    const app = new Hono();
+    app.get("/oauth/callback", createCallbackHandler(store));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    store.set(
+      "proxy-state-err",
+      {
+        clientRedirectUri: "http://localhost:5173/cb",
+        clientState: "s",
+      },
+      DEFAULT_OAUTH_STATE_TTL_MS
+    );
+
+    const url = new URL(`${svc.baseUrl}/oauth/callback`);
+    url.searchParams.set("state", "proxy-state-err");
+    url.searchParams.set("error", "access_denied");
+    url.searchParams.set("error_description", "user declined");
+
+    const response = await fetch(url.toString(), { redirect: "manual" });
+    expect(response.status).toBe(302);
+
+    const target = new URL(response.headers.get("location")!);
+    expect(target.searchParams.get("error")).toBe("access_denied");
+    expect(target.searchParams.get("error_description")).toBe("user declined");
+    expect(target.searchParams.get("state")).toBe("s");
+    expect(target.searchParams.get("code")).toBeNull();
+  });
+
+  it("rejects unknown or replayed state values at /oauth/callback", async () => {
+    const store = createInMemoryStateStore();
+    const app = new Hono();
+    app.get("/oauth/callback", createCallbackHandler(store));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    store.set(
+      "proxy-state-one-shot",
+      { clientRedirectUri: "http://localhost:5173/cb" },
+      DEFAULT_OAUTH_STATE_TTL_MS
+    );
+
+    const url = `${svc.baseUrl}/oauth/callback?state=proxy-state-one-shot&code=c`;
+    const first = await fetch(url, { redirect: "manual" });
+    expect(first.status).toBe(302);
+
+    const replay = await fetch(url, { redirect: "manual" });
+    expect(replay.status).toBe(400);
+
+    const unknown = await fetch(`${svc.baseUrl}/oauth/callback?state=nope&code=c`, {
+      redirect: "manual",
+    });
+    expect(unknown.status).toBe(400);
+  });
+
+  it("expires state records after the TTL", async () => {
+    vi.useFakeTimers();
+    try {
+      const store = createInMemoryStateStore();
+      store.set(
+        "expiring",
+        { clientRedirectUri: "http://localhost:5173/cb" },
+        1000
+      );
+      vi.advanceTimersByTime(1001);
+      expect(store.get("expiring")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("rejects /authorize redirect_uris not in allowedClientRedirectUris", async () => {
+    const app = new Hono();
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "id",
+      verifyToken: stubVerifyToken,
+      allowedClientRedirectUris: ["http://localhost:3000/oauth/callback"],
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const accepted = new URLSearchParams({
+      client_id: "id",
+      redirect_uri: "http://localhost:3000/oauth/callback",
+      response_type: "code",
+      code_challenge: "c",
+    });
+    const acceptedRes = await fetch(`${svc.baseUrl}/authorize?${accepted}`, {
+      redirect: "manual",
+    });
+    expect(acceptedRes.status).toBe(302);
+
+    const rejected = new URLSearchParams({
+      client_id: "id",
+      redirect_uri: "http://attacker.example.com/cb",
+      response_type: "code",
+      code_challenge: "c",
+    });
+    const rejectedRes = await fetch(`${svc.baseUrl}/authorize?${rejected}`);
+    expect(rejectedRes.status).toBe(400);
+    const body = await rejectedRes.json();
+    expect(body.error).toBe("invalid_request");
   });
 });
