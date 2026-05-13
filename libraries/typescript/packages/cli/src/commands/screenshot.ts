@@ -372,7 +372,7 @@ const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
  * Resolve an authenticated MCPSession for the screenshot run.
  *
  * Resolution order:
- *  1. `--session <name>` → restore that named client (errors if not found)
+ *  1. `--session <name>` → restore that saved server (errors if not found)
  *  2. `--mcp <url>` → open an unauthenticated ad-hoc session at that URL
  */
 async function resolveSessionForScreenshot(
@@ -402,7 +402,7 @@ async function resolveSessionForScreenshot(
 
   console.error(
     formatError(
-      "No MCP target. Pass --session <name> (a saved client) or --mcp <url> (ad-hoc)."
+      "No MCP target. Pass --session <name> (a saved server) or --mcp <url> (ad-hoc)."
     )
   );
   return null;
@@ -550,11 +550,11 @@ export function createScreenshotCommand(): Command {
     )
     .option(
       "--session <name>",
-      "Saved client name (from `mcp-use client connect <name> <url>`)."
+      "Saved server name (from `mcp-use client connect <name> <url>`)."
     )
     .option(
       "--mcp <url>",
-      "Ad-hoc MCP server URL (escape hatch). Use when you don't have a saved client. No authentication."
+      "Ad-hoc MCP server URL (escape hatch). Use when you don't have a saved server. No authentication."
     )
     .option(
       "--theme <light|dark>",

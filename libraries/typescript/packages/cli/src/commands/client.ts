@@ -79,17 +79,17 @@ export async function connectCommand(
 ): Promise<void> {
   // `connect` requires both <name> and <url>. Commander's default missing-arg
   // error ("missing required argument 'url'") is confusing when users pass a
-  // URL as the only positional — they don't realize the client needs a name.
+  // URL as the only positional — they don't realize the server needs a name.
   // Catch the common shapes here and give a tailored fix-it message.
   if (!name || !urlOrCommand) {
     const looksLikeUrl = !!name && /^https?:\/\//i.test(name);
 
     if (looksLikeUrl && !urlOrCommand && !options.stdio) {
-      console.error(formatError("Missing client name."));
+      console.error(formatError("Missing server name."));
       console.error("");
       console.error(
         formatInfo(
-          "Each saved client needs a short name you'll use to address it later."
+          "Each saved server needs a short name you'll use to address it later."
         )
       );
       console.error("");
@@ -261,7 +261,7 @@ export async function disconnectCommand(name: string): Promise<void> {
       activeSessions.delete(name);
       console.log(formatSuccess(`Disconnected from ${name}`));
     } else {
-      console.log(formatInfo(`Client '${name}' is not connected`));
+      console.log(formatInfo(`Server '${name}' is not connected`));
     }
   } catch (error: any) {
     console.error(formatError(`Failed to disconnect: ${error.message}`));
@@ -276,7 +276,7 @@ export async function listClientsCommand(): Promise<void> {
 
     if (sessions.length === 0) {
       if (isStdoutTty()) {
-        console.log(formatInfo("No saved clients"));
+        console.log(formatInfo("No saved servers"));
         console.log(
           formatInfo(
             "Connect to a server with: npx mcp-use client connect <name> <url>"
@@ -288,7 +288,7 @@ export async function listClientsCommand(): Promise<void> {
 
     const tty = isStdoutTty();
     if (tty) {
-      console.log(formatHeader("Saved Clients:"));
+      console.log(formatHeader("Saved Servers:"));
       console.log("");
     }
 
@@ -311,7 +311,7 @@ export async function listClientsCommand(): Promise<void> {
       ])
     );
   } catch (error: any) {
-    console.error(formatError(`Failed to list clients: ${error.message}`));
+    console.error(formatError(`Failed to list servers: ${error.message}`));
     await cleanupAndExit(1);
   }
   await cleanupAndExit(0);
@@ -1001,14 +1001,14 @@ export async function interactiveCommand(name: string): Promise<void> {
 
 /**
  * Top-level `client` command. Exposes only commands that do not target an
- * existing named client: `connect` (which creates one) and `list`. Per-client
+ * existing saved server: `connect` (which creates one) and `list`. Per-server
  * operations live under `createPerClientCommand(<name>)` and are routed by
  * `index.ts` based on the positional after `client`.
  */
 export function createClientCommand(): Command {
   const clientCommand = new Command("client")
     .description(
-      "Interactive MCP client for terminal usage. Use `mcp-use client <name> ...` to run commands against a saved client."
+      "Interactive MCP client for terminal usage. Use `mcp-use client <name> ...` to run commands against a saved server."
     )
     .showHelpAfterError(
       "(Run `mcp-use client --help` to see available commands)"
@@ -1017,7 +1017,7 @@ export function createClientCommand(): Command {
   clientCommand
     .command("connect [name] [url]")
     .description(
-      "Connect to an MCP server and save it as a named client. Use the name to address it in later commands (e.g. `mcp-use client <name> tools list`)."
+      "Connect to an MCP server and save it under a short name. Use the name to address it in later commands (e.g. `mcp-use client <name> tools list`)."
     )
     .option("--stdio", "Use stdio connector instead of HTTP")
     .option("--auth <token>", "Static Bearer token (skips OAuth)")
@@ -1033,32 +1033,32 @@ export function createClientCommand(): Command {
 
   clientCommand
     .command("list")
-    .description("List saved clients")
+    .description("List saved servers")
     .action(listClientsCommand);
 
   return clientCommand;
 }
 
 /**
- * Build the per-client command subtree for a given client name. The name is
- * captured in each action closure so subcommand definitions stay free of an
- * extra positional argument.
+ * Build the per-server command subtree for a given saved-server name. The
+ * name is captured in each action closure so subcommand definitions stay
+ * free of an extra positional argument.
  */
 export function createPerClientCommand(name: string): Command {
   const cmd = new Command(`mcp-use client ${name}`)
-    .description(`Commands for client '${name}'`)
+    .description(`Commands for server '${name}'`)
     .showHelpAfterError(
       `(Run \`mcp-use client ${name} --help\` to see available commands)`
     );
 
   cmd
     .command("disconnect")
-    .description("Disconnect from this client")
+    .description("Disconnect from this server")
     .action(() => disconnectCommand(name));
 
   cmd
     .command("interactive")
-    .description("Start interactive REPL mode for this client")
+    .description("Start interactive REPL mode for this server")
     .action(() => interactiveCommand(name));
 
   const toolsCommand = new Command("tools")
@@ -1142,13 +1142,13 @@ export function createPerClientCommand(name: string): Command {
   cmd.addCommand(promptsCommand);
 
   const authCommand = new Command("auth")
-    .description("Manage OAuth tokens for HTTP clients")
+    .description("Manage OAuth tokens for HTTP servers")
     .showHelpAfterError(
       `(Run \`mcp-use client ${name} auth --help\` to see available actions)`
     );
   authCommand
     .command("status")
-    .description("Show OAuth token status for this client")
+    .description("Show OAuth token status for this server")
     .action(() => authStatusCommand(name));
   authCommand
     .command("refresh")
@@ -1156,7 +1156,7 @@ export function createPerClientCommand(name: string): Command {
     .action(() => authRefreshCommand(name));
   authCommand
     .command("logout")
-    .description("Remove stored OAuth tokens for this client's URL")
+    .description("Remove stored OAuth tokens for this server's URL")
     .action(() => authLogoutCommand(name));
   cmd.addCommand(authCommand);
 

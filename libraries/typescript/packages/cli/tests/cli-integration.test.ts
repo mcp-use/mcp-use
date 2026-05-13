@@ -134,17 +134,17 @@ describe("CLI Integration Tests", () => {
     });
   });
 
-  describe("Client Management", () => {
-    it("should list clients when none exist", async () => {
+  describe("Server Management", () => {
+    it("should list servers when none exist", async () => {
       const result = await runCLI(["client", "list"]);
 
       // Non-TTY (piped) stdout: gh-style empty output, just a clean exit.
-      // Decorative "No saved clients" message is suppressed for agents/scripts.
+      // Decorative "No saved servers" message is suppressed for agents/scripts.
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe("");
     });
 
-    it("should error when invoking tools on an unknown client", async () => {
+    it("should error when invoking tools on an unknown server", async () => {
       const result = await runCLI([
         "client",
         "does-not-exist",
@@ -155,6 +155,32 @@ describe("CLI Integration Tests", () => {
       expect(result.exitCode).toBe(1);
       const output = result.stdout + result.stderr;
       expect(output).toMatch(/not found|Connection failed/i);
+    });
+
+    it("should suggest connect when bare `client <name>` targets an unknown server", async () => {
+      const result = await runCLI(["client", "does-not-exist"]);
+
+      expect(result.exitCode).toBe(1);
+      const output = result.stdout + result.stderr;
+      expect(output).toMatch(/Server 'does-not-exist' not found/);
+      expect(output).toContain(
+        "mcp-use client connect does-not-exist <url>"
+      );
+      // The per-server commander help leaks subcommand names like "tools",
+      // "resources", "prompts" — make sure we suppressed it for an unknown
+      // server. ("Commands:" is commander's help section header.)
+      expect(output).not.toMatch(/^Commands:/m);
+    });
+
+    it("should also suggest connect when `client <name> --help` targets an unknown server", async () => {
+      const result = await runCLI(["client", "does-not-exist", "--help"]);
+
+      expect(result.exitCode).toBe(1);
+      const output = result.stdout + result.stderr;
+      expect(output).toMatch(/Server 'does-not-exist' not found/);
+      expect(output).toContain(
+        "mcp-use client connect does-not-exist <url>"
+      );
     });
   });
 
@@ -203,13 +229,13 @@ describe("CLI Integration Tests", () => {
 
       expect(result.exitCode).not.toBe(0);
       const output = result.stderr + result.stdout;
-      expect(output).toMatch(/Missing client name/i);
+      expect(output).toMatch(/Missing server name/i);
       expect(output).toContain("https://mcp.example.com/mcp");
       expect(output).toMatch(/mcp-use client connect <name>/i);
     });
 
     it("should handle invalid JSON in tool call", async () => {
-      // Goes through the per-client routing even though the client doesn't
+      // Goes through the per-server routing even though the server doesn't
       // exist — just verifies the command structure parses.
       const result = await runCLI([
         "client",

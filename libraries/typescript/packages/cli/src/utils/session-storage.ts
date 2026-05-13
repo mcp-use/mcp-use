@@ -40,10 +40,10 @@ async function ensureSessionDir(): Promise<void> {
 }
 
 /**
- * Load persisted clients from disk.
+ * Load persisted servers from disk.
  *
  * Tolerates older files that include an `activeSession` field — the field is
- * silently dropped. The CLI no longer tracks an active client; every command
+ * silently dropped. The CLI no longer tracks an active server; every command
  * names its target explicitly.
  */
 export async function loadSessions(): Promise<SessionStorage> {

@@ -18,6 +18,7 @@ import {
   createClientCommand,
   createPerClientCommand,
 } from "./commands/client.js";
+import { getSession } from "./utils/session-storage.js";
 import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
@@ -3128,12 +3129,12 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
 });
 
 /**
- * Per-client routing for `mcp-use client <name> ...`.
+ * Per-server routing for `mcp-use client <name> ...`.
  *
  * Commander doesn't natively dispatch on a dynamic positional that precedes a
  * subcommand group. So we intercept here: if the token after `client` isn't a
  * reserved subcommand (`connect`, `list`, `help`) or a flag, treat it as a
- * client name and parse the remainder against a per-client command tree.
+ * saved-server name and parse the remainder against a per-server command tree.
  */
 const argv = process.argv;
 const clientIdx = argv.indexOf("client", 2);
@@ -3147,26 +3148,52 @@ const perClientName =
 
 if (perClientName) {
   // Catch a common mistake: user typed `mcp-use client tools call X` and
-  // forgot the client name. Commander would otherwise route this as if
-  // "tools" were the client name and complain about an unknown command.
+  // forgot the server name. Commander would otherwise route this as if
+  // "tools" were the server name and complain about an unknown command.
   if (PER_CLIENT_SCOPES.has(perClientName)) {
     const rest = argv.slice(clientIdx + 1).join(" ");
-    console.error(chalk.red(`✖ Missing client name.`));
+    console.error(chalk.red(`✖ Missing server name.`));
     console.error("");
     console.error(
-      `'${perClientName}' is a per-client subcommand, not a client name. ` +
-        `Address it through a saved client:`
+      `'${perClientName}' is a per-server subcommand, not a server name. ` +
+        `Address it through a saved server:`
     );
     console.error("");
     console.error(`  mcp-use client <name> ${rest}`);
     console.error("");
-    console.error("See your saved clients with:");
+    console.error("See your saved servers with:");
     console.error("  mcp-use client list");
     process.exit(1);
   }
-  createPerClientCommand(perClientName).parseAsync(argv.slice(clientIdx + 2), {
-    from: "user",
-  });
+
+  const rest = argv.slice(clientIdx + 2);
+  // Bare `mcp-use client <name>` (or with `--help`/`-h`) defaults to
+  // commander's help for the per-server tree. That help is only useful when
+  // the server actually exists — for an unknown name it leaks the subcommand
+  // surface instead of telling the user how to save the server. Intercept
+  // the no-subcommand path and check existence first.
+  const isHelpOnly =
+    rest.length === 0 ||
+    (rest.length === 1 && (rest[0] === "--help" || rest[0] === "-h"));
+
+  (async () => {
+    if (isHelpOnly) {
+      const config = await getSession(perClientName);
+      if (!config) {
+        console.error(chalk.red(`✖ Server '${perClientName}' not found.`));
+        console.error("");
+        console.error("Connect to an MCP server and save it under this name:");
+        console.error(`  mcp-use client connect ${perClientName} <url>`);
+        console.error("");
+        console.error("See your saved servers with:");
+        console.error("  mcp-use client list");
+        process.exit(1);
+      }
+    }
+    await createPerClientCommand(perClientName).parseAsync(rest, {
+      from: "user",
+    });
+  })();
 } else {
   program.parse();
 }

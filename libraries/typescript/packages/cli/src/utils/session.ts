@@ -58,7 +58,7 @@ export async function cleanupAndExit(code: number): Promise<never> {
  * have expired and can't be refreshed, prompts to re-auth on TTY or prints
  * a clear `connect` command to re-run on non-TTY.
  *
- * `sessionName` is required — there is no implicit "active" client.
+ * `sessionName` is required — there is no implicit "active" server.
  */
 export async function getOrRestoreSession(
   sessionName: string
@@ -70,7 +70,7 @@ export async function getOrRestoreSession(
 
   const config = await getSession(sessionName);
   if (!config) {
-    console.error(formatError(`Client '${sessionName}' not found`));
+    console.error(formatError(`Server '${sessionName}' not found`));
     console.error(
       formatInfo(
         `Connect with: npx mcp-use client connect ${sessionName} <url>`
@@ -125,7 +125,7 @@ export async function getOrRestoreSession(
         isUnauthorized(err)
       ) {
         const reAuth = await promptYesNo(
-          `! Tokens for client '${sessionName}' expired and could not refresh. Re-authenticate now?`,
+          `! Tokens for server '${sessionName}' expired and could not refresh. Re-authenticate now?`,
           true
         );
         if (!reAuth) {

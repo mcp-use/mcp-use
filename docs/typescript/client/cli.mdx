@@ -4,7 +4,7 @@ description: Use MCP servers directly from the terminal with the mcp-use CLI cli
 icon: "terminal"
 ---
 
-The mcp-use CLI client lets you interact with MCP servers directly from your terminal — no code required. Connect to a server, save it as a **named client**, and run tool/resource/prompt commands against that name.
+The mcp-use CLI client lets you interact with MCP servers directly from your terminal — no code required. Connect to a server, save it under a **short name**, and run tool/resource/prompt commands against that name.
 
 ## Installation
 
@@ -17,17 +17,17 @@ npx mcp-use client --help
 ## Quick Start
 
 ```bash
-# Connect once and save the client under a name of your choice
+# Connect once and save the server under a name of your choice
 npx mcp-use client connect manufact https://mcp.manufact.com
 
-# Every subsequent command names the client it operates on
+# Every subsequent command names the server it operates on
 npx mcp-use client manufact tools list
 npx mcp-use client manufact tools call read_file path=/tmp/test.txt
 npx mcp-use client manufact interactive
 ```
 
 <Note>
-There is no "active" client. Every per-client command takes the client name as its first positional argument: `mcp-use client <name> <scope> <action>`.
+There is no "active" server. Every per-server command takes the server name as its first positional argument: `mcp-use client <name> <scope> <action>`.
 </Note>
 
 ## Command Structure
@@ -36,11 +36,11 @@ The CLI has two top-level shapes under `mcp-use client`:
 
 | Shape | Purpose |
 |-------|---------|
-| `mcp-use client connect <name> <url>` | Create a new named client |
-| `mcp-use client list` | List saved clients |
-| `mcp-use client <name> <scope> <action>` | Run a command against a named client |
+| `mcp-use client connect <name> <url>` | Save an MCP server under a short name |
+| `mcp-use client list` | List saved servers |
+| `mcp-use client <name> <scope> <action>` | Run a command against a saved server |
 
-The per-client scopes are:
+The per-server scopes are:
 
 | Scope | Actions |
 |-------|---------|
@@ -71,14 +71,14 @@ npx mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /t
 
 The string after the name is parsed as `command args...`.
 
-## Listing Saved Clients
+## Listing Saved Servers
 
 ```bash
 npx mcp-use client list
 ```
 
 ```
-Saved Clients:
+Saved Servers:
 
 ┌──────────┬───────┬─────────────────────────────┬────────────────┐
 │ Name     │ Type  │ Target                      │ Server         │
@@ -131,7 +131,7 @@ npx mcp-use client manufact prompts get greeting '{"name":"Alice"}' --json
 
 ## Auth (OAuth)
 
-For HTTP clients that authenticated via OAuth:
+For HTTP servers that authenticated via OAuth:
 
 ```bash
 npx mcp-use client manufact auth status   # show token state + expiry
@@ -141,7 +141,7 @@ npx mcp-use client manufact auth logout   # remove stored tokens
 
 ## Interactive Mode
 
-A REPL for one specific client:
+A REPL for one specific server:
 
 ```bash
 npx mcp-use client manufact interactive
@@ -166,7 +166,7 @@ npx mcp-use client manufact disconnect
 
 ## Global Flags
 
-Per-client commands accept these flags where they make sense:
+Per-server commands accept these flags where they make sense:
 
 - `--json`: Output results as JSON (on `list`/`call`/`read`/`get`).
 - `--timeout <ms>`: Request timeout (on `tools call`).
@@ -175,7 +175,7 @@ Per-client commands accept these flags where they make sense:
 
 ## Storage
 
-Saved clients are persisted in `~/.mcp-use/cli-sessions.json`:
+Saved servers are persisted in `~/.mcp-use/cli-sessions.json`:
 
 ```json
 {

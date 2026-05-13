@@ -12,17 +12,17 @@ async function resolveSession(
 ): Promise<{ name: string; url: string } | null> {
   const config = await getSession(name);
   if (!config) {
-    console.error(formatError(`Client '${name}' not found`));
+    console.error(formatError(`Server '${name}' not found`));
     return null;
   }
   if (config.type !== "http") {
-    console.error(formatError("Auth commands only apply to HTTP clients"));
+    console.error(formatError("Auth commands only apply to HTTP servers"));
     return null;
   }
   if (config.authMode !== "oauth") {
     console.error(
       formatError(
-        `Client '${name}' was not authenticated via OAuth (authMode=${config.authMode ?? "bearer"})`
+        `Server '${name}' was not authenticated via OAuth (authMode=${config.authMode ?? "bearer"})`
       )
     );
     return null;
@@ -62,7 +62,7 @@ export async function authStatusCommand(name: string): Promise<void> {
   const tokens = await provider.tokens();
 
   const fields: Record<string, string> = {
-    client: target!.name,
+    server: target!.name,
     url: target!.url,
     tokens: tokens?.access_token ? "present" : "missing",
   };
@@ -116,7 +116,7 @@ export async function authLogoutCommand(name: string): Promise<void> {
   console.log(formatSuccess(`Removed tokens for ${target!.url}`));
   console.log(
     formatInfo(
-      `Client '${target!.name}' kept; reconnect with \`mcp-use client connect\`.`
+      `Server '${target!.name}' kept; reconnect with \`mcp-use client connect\`.`
     )
   );
 }

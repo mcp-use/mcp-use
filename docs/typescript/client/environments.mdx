@@ -507,17 +507,17 @@ npx mcp-use client my-server interactive
 Top-level shapes:
 
 ```bash
-# Create a named client
+# Save an MCP server under a short name
 npx mcp-use client connect <name> <url>
 
-# List saved clients
+# List saved servers
 npx mcp-use client list
 
-# Run any command against a named client
+# Run any command against a saved server
 npx mcp-use client <name> <scope> <action> [args...]
 ```
 
-The per-client scopes are `tools`, `resources`, `prompts`, `auth`, plus the top-level `interactive` and `disconnect`:
+The per-server scopes are `tools`, `resources`, `prompts`, `auth`, plus the top-level `interactive` and `disconnect`:
 
 ```bash
 # Tools
@@ -533,18 +533,18 @@ npx mcp-use client my-server resources read <uri>
 npx mcp-use client my-server prompts list
 npx mcp-use client my-server prompts get <prompt> [args]
 
-# Auth (OAuth clients only)
+# Auth (OAuth servers only)
 npx mcp-use client my-server auth status
 npx mcp-use client my-server auth refresh
 npx mcp-use client my-server auth logout
 
-# Interactive mode for one client
+# Interactive mode for one server
 npx mcp-use client my-server interactive
 ```
 
-### Managing Multiple Clients
+### Managing Multiple Servers
 
-Saved clients are persisted to `~/.mcp-use/cli-sessions.json`:
+Saved servers are persisted to `~/.mcp-use/cli-sessions.json`:
 
 ```bash
 # Connect to multiple servers
@@ -559,11 +559,11 @@ npx mcp-use client server1 tools list
 npx mcp-use client server2 tools list
 ```
 
-There is no "active" client — every command names its target explicitly.
+There is no "active" server — every command names its target explicitly.
 
 ### Interactive Mode
 
-For exploration and testing, drop into a REPL against a specific client:
+For exploration and testing, drop into a REPL against a specific server:
 
 ```bash
 npx mcp-use client my-server interactive
@@ -583,7 +583,7 @@ Use the CLI in automation scripts with the `--json` flag for machine-readable ou
 ```bash
 #!/bin/bash
 
-# Connect to server (creates a saved client named "automation")
+# Connect to server (saves it under the name "automation")
 npx mcp-use client connect automation http://localhost:3000/mcp
 
 # Get data as JSON and process with jq
