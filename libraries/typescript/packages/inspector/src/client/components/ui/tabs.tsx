@@ -279,6 +279,8 @@ interface TabsTriggerProps {
   showDot?: boolean;
   /** When true, the label stays visible even when the tab bar is collapsed */
   alwaysExpanded?: boolean;
+  /** Optional badge element rendered next to the icon, always visible even when collapsed */
+  badge?: React.ReactNode;
 }
 
 // conditional tooltip wrapper if collapsed
@@ -328,6 +330,7 @@ const TabsTrigger = React.forwardRef<
       title: titleProp,
       showDot = false,
       alwaysExpanded = false,
+      badge,
       ...props
     },
     ref
@@ -378,6 +381,7 @@ const TabsTrigger = React.forwardRef<
               )}
             />
           )}
+          {badge}
           {showDot && (
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-orange-500 dark:bg-orange-400 border-2 border-white dark:border-zinc-900 rounded-full transition-opacity duration-300 z-10 animate-status-pulse-orange" />
           )}
