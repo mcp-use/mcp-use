@@ -12,7 +12,12 @@ import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
 import { loginCommand, logoutCommand, whoamiCommand } from "./commands/auth.js";
-import { createClientCommand } from "./commands/client.js";
+import {
+  PER_CLIENT_SCOPES,
+  RESERVED_CLIENT_SUBCOMMANDS,
+  createClientCommand,
+  createPerClientCommand,
+} from "./commands/client.js";
 import { createScreenshotCommand } from "./commands/screenshot.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
@@ -42,7 +47,8 @@ const packageVersion = packageJson.version || "unknown";
 program
   .name("mcp-use")
   .description("Create and run MCP servers with ui resources widgets")
-  .version(packageVersion);
+  .version(packageVersion)
+  .showHelpAfterError("(Run `mcp-use --help` to see available commands)");
 
 /**
  * Helper to display all package versions
@@ -3121,4 +3127,46 @@ program.hook("preAction", async (_thisCommand, actionCommand) => {
   await notifyIfUpdateAvailable(projectPath);
 });
 
-program.parse();
+/**
+ * Per-client routing for `mcp-use client <name> ...`.
+ *
+ * Commander doesn't natively dispatch on a dynamic positional that precedes a
+ * subcommand group. So we intercept here: if the token after `client` isn't a
+ * reserved subcommand (`connect`, `list`, `help`) or a flag, treat it as a
+ * client name and parse the remainder against a per-client command tree.
+ */
+const argv = process.argv;
+const clientIdx = argv.indexOf("client", 2);
+const perClientName =
+  clientIdx !== -1 &&
+  argv.length > clientIdx + 1 &&
+  !argv[clientIdx + 1].startsWith("-") &&
+  !RESERVED_CLIENT_SUBCOMMANDS.has(argv[clientIdx + 1])
+    ? argv[clientIdx + 1]
+    : null;
+
+if (perClientName) {
+  // Catch a common mistake: user typed `mcp-use client tools call X` and
+  // forgot the client name. Commander would otherwise route this as if
+  // "tools" were the client name and complain about an unknown command.
+  if (PER_CLIENT_SCOPES.has(perClientName)) {
+    const rest = argv.slice(clientIdx + 1).join(" ");
+    console.error(chalk.red(`✖ Missing client name.`));
+    console.error("");
+    console.error(
+      `'${perClientName}' is a per-client subcommand, not a client name. ` +
+        `Address it through a saved client:`
+    );
+    console.error("");
+    console.error(`  mcp-use client <name> ${rest}`);
+    console.error("");
+    console.error("See your saved clients with:");
+    console.error("  mcp-use client list");
+    process.exit(1);
+  }
+  createPerClientCommand(perClientName).parseAsync(argv.slice(clientIdx + 2), {
+    from: "user",
+  });
+} else {
+  program.parse();
+}

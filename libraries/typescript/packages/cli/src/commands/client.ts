@@ -27,10 +27,8 @@ import {
   runOAuthFlow,
 } from "../utils/oauth.js";
 import {
-  getActiveSession,
   listAllSessions,
   saveSession,
-  setActiveSession,
   updateSessionInfo,
 } from "../utils/session-storage.js";
 import {
@@ -46,26 +44,99 @@ import {
 } from "./client-auth.js";
 import { captureToolScreenshot, detectToolResourceUri } from "./screenshot.js";
 
+/**
+ * Reserved top-level subcommands under `mcp-use client`. Any other token in
+ * that position is treated as a client name and routed via
+ * `createPerClientCommand`. Keep this in sync with the subcommands registered
+ * in `createClientCommand` below, plus commander's built-in help tokens.
+ */
+export const RESERVED_CLIENT_SUBCOMMANDS = new Set(["connect", "list", "help"]);
+
+/**
+ * Per-client scope tokens that live under `mcp-use client <name> ...`. When a
+ * user types one of these in the client-name slot (e.g.
+ * `mcp-use client tools call foo`), they almost certainly forgot the client
+ * name — route to a tailored error instead of "unknown command".
+ */
+export const PER_CLIENT_SCOPES = new Set([
+  "tools",
+  "resources",
+  "prompts",
+  "auth",
+  "disconnect",
+  "interactive",
+]);
+
 export async function connectCommand(
-  urlOrCommand: string,
+  name: string | undefined,
+  urlOrCommand: string | undefined,
   options: {
-    name?: string;
     stdio?: boolean;
     auth?: string;
     oauth?: boolean;
     authTimeout?: string;
   }
 ): Promise<void> {
-  try {
-    const sessionName = options.name || `session-${Date.now()}`;
+  // `connect` requires both <name> and <url>. Commander's default missing-arg
+  // error ("missing required argument 'url'") is confusing when users pass a
+  // URL as the only positional — they don't realize the client needs a name.
+  // Catch the common shapes here and give a tailored fix-it message.
+  if (!name || !urlOrCommand) {
+    const looksLikeUrl = !!name && /^https?:\/\//i.test(name);
 
+    if (looksLikeUrl && !urlOrCommand && !options.stdio) {
+      console.error(formatError("Missing client name."));
+      console.error("");
+      console.error(
+        formatInfo(
+          "Each saved client needs a short name you'll use to address it later."
+        )
+      );
+      console.error("");
+      console.error("Try:");
+      console.error(`  mcp-use client connect <name> ${name}`);
+      console.error("");
+      console.error("Example:");
+      console.error(`  mcp-use client connect my-server ${name}`);
+      console.error("  mcp-use client my-server tools list");
+    } else if (name && !urlOrCommand) {
+      console.error(
+        formatError(options.stdio ? "Missing <command>." : "Missing <url>.")
+      );
+      console.error("");
+      console.error(formatInfo("Usage:"));
+      console.error(
+        options.stdio
+          ? `  mcp-use client connect ${name} "<command>" --stdio`
+          : `  mcp-use client connect ${name} <url>`
+      );
+    } else {
+      console.error(formatError("Missing required arguments: <name> <url>."));
+      console.error("");
+      console.error(formatInfo("Usage:"));
+      console.error("  mcp-use client connect <name> <url>");
+      console.error("");
+      console.error("Example:");
+      console.error(
+        "  mcp-use client connect manufact https://mcp.manufact.com/mcp"
+      );
+    }
+    await cleanupAndExit(1);
+  }
+
+  // Narrow for TS: the validation block above exits on missing args. The
+  // `await cleanupAndExit` doesn't propagate `never` through control flow,
+  // so assert here once instead of sprinkling `!` everywhere.
+  const sessionName: string = name as string;
+  const target: string = urlOrCommand as string;
+
+  try {
     const client = new MCPClient();
     let session: MCPSession;
     const cliClientInfo = getCliClientInfo();
 
     if (options.stdio) {
-      // Parse stdio command
-      const parts = urlOrCommand.split(" ");
+      const parts = target.split(" ");
       const command = parts[0];
       const args = parts.slice(1);
 
@@ -81,7 +152,6 @@ export async function connectCommand(
 
       session = await client.createSession(sessionName);
 
-      // Save session config
       await saveSession(sessionName, {
         type: "stdio",
         command,
@@ -89,8 +159,7 @@ export async function connectCommand(
         lastUsed: new Date().toISOString(),
       });
     } else {
-      // HTTP connection
-      console.error(formatInfo(`Connecting to ${urlOrCommand}...`));
+      console.error(formatInfo(`Connecting to ${target}...`));
 
       // Static --auth bypasses OAuth entirely. `--no-oauth` disables auto-OAuth
       // on 401 (commander maps `--no-oauth` to options.oauth === false).
@@ -100,13 +169,13 @@ export async function connectCommand(
         const authTimeoutMs = options.authTimeout
           ? Number.parseInt(options.authTimeout, 10)
           : undefined;
-        authProvider = await buildOAuthProvider(urlOrCommand, {
+        authProvider = await buildOAuthProvider(target, {
           ...(authTimeoutMs ? { authTimeoutMs } : {}),
         });
       }
 
       client.addServer(sessionName, {
-        url: urlOrCommand,
+        url: target,
         ...(authProvider
           ? { authProvider }
           : options.auth
@@ -124,29 +193,25 @@ export async function connectCommand(
               "Server requires authentication. Starting OAuth flow."
             )
           );
-          await runOAuthFlow(authProvider, urlOrCommand);
+          await runOAuthFlow(authProvider, target);
           console.error(formatSuccess("Authentication successful"));
-          // Provider has tokens now; the SDK will pick them up on retry.
           session = await client.createSession(sessionName);
         } else {
           throw err;
         }
       }
 
-      // Save session config
       await saveSession(sessionName, {
         type: "http",
-        url: urlOrCommand,
+        url: target,
         authMode: authProvider ? "oauth" : options.auth ? "bearer" : undefined,
         authToken: authProvider ? undefined : options.auth,
         lastUsed: new Date().toISOString(),
       });
     }
 
-    // Store in memory
     activeSessions.set(sessionName, { client, session });
 
-    // Update session info
     const serverInfo = session.serverInfo;
     const capabilities = session.serverCapabilities;
 
@@ -154,8 +219,7 @@ export async function connectCommand(
       await updateSessionInfo(sessionName, serverInfo, capabilities);
     }
 
-    // Display connection info
-    console.log(formatSuccess(`Connected to ${sessionName}`));
+    console.log(formatSuccess(`Connected as '${sessionName}'`));
 
     if (serverInfo) {
       console.log("");
@@ -175,7 +239,6 @@ export async function connectCommand(
       console.log(`  ${caps || "none"}`);
     }
 
-    // Count available resources
     const tools = session.tools;
     console.log("");
     console.log(
@@ -190,40 +253,15 @@ export async function connectCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * Disconnect command
- */
-export async function disconnectCommand(
-  sessionName?: string,
-  options?: { all?: boolean }
-): Promise<void> {
+export async function disconnectCommand(name: string): Promise<void> {
   try {
-    if (options?.all) {
-      // Disconnect all sessions
-      for (const [name, { client }] of activeSessions.entries()) {
-        await client.closeAllSessions();
-        activeSessions.delete(name);
-        console.log(formatSuccess(`Disconnected from ${name}`));
-      }
-      await cleanupAndExit(0);
-    }
-
-    if (!sessionName) {
-      const active = await getActiveSession();
-      if (!active) {
-        console.error(formatError("No active session to disconnect"));
-        await cleanupAndExit(0);
-      }
-      sessionName = active!.name;
-    }
-
-    const sessionData = activeSessions.get(sessionName);
+    const sessionData = activeSessions.get(name);
     if (sessionData) {
       await sessionData.client.closeAllSessions();
-      activeSessions.delete(sessionName);
-      console.log(formatSuccess(`Disconnected from ${sessionName}`));
+      activeSessions.delete(name);
+      console.log(formatSuccess(`Disconnected from ${name}`));
     } else {
-      console.log(formatInfo(`Session '${sessionName}' is not connected`));
+      console.log(formatInfo(`Client '${name}' is not connected`));
     }
   } catch (error: any) {
     console.error(formatError(`Failed to disconnect: ${error.message}`));
@@ -232,19 +270,16 @@ export async function disconnectCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * List sessions command
- */
-export async function listSessionsCommand(): Promise<void> {
+export async function listClientsCommand(): Promise<void> {
   try {
     const sessions = await listAllSessions();
 
     if (sessions.length === 0) {
       if (isStdoutTty()) {
-        console.log(formatInfo("No saved sessions"));
+        console.log(formatInfo("No saved clients"));
         console.log(
           formatInfo(
-            "Connect to a server with: npx mcp-use client connect <url>"
+            "Connect to a server with: npx mcp-use client connect <name> <url>"
           )
         );
       }
@@ -253,12 +288,12 @@ export async function listSessionsCommand(): Promise<void> {
 
     const tty = isStdoutTty();
     if (tty) {
-      console.log(formatHeader("Saved Sessions:"));
+      console.log(formatHeader("Saved Clients:"));
       console.log("");
     }
 
     const tableData = sessions.map((s) => ({
-      name: s.isActive ? chalk.green.bold(`${s.name} *`) : s.name,
+      name: s.name,
       type: s.config.type,
       target:
         s.config.type === "http"
@@ -275,41 +310,19 @@ export async function listSessionsCommand(): Promise<void> {
         { key: "server", header: "Server" },
       ])
     );
-
-    if (tty) {
-      console.log("");
-      console.log(chalk.gray("* = active session"));
-    }
   } catch (error: any) {
-    console.error(formatError(`Failed to list sessions: ${error.message}`));
+    console.error(formatError(`Failed to list clients: ${error.message}`));
     await cleanupAndExit(1);
   }
   await cleanupAndExit(0);
 }
 
-/**
- * Switch session command
- */
-export async function switchSessionCommand(name: string): Promise<void> {
+export async function listToolsCommand(
+  name: string,
+  options: { json?: boolean }
+): Promise<void> {
   try {
-    await setActiveSession(name);
-    console.log(formatSuccess(`Switched to session '${name}'`));
-  } catch (error: any) {
-    console.error(formatError(`Failed to switch session: ${error.message}`));
-    await cleanupAndExit(1);
-  }
-  await cleanupAndExit(0);
-}
-
-/**
- * List tools command
- */
-export async function listToolsCommand(options: {
-  session?: string;
-  json?: boolean;
-}): Promise<void> {
-  try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -367,15 +380,12 @@ export async function listToolsCommand(options: {
   await cleanupAndExit(0);
 }
 
-/**
- * Describe tool command
- */
 export async function describeToolCommand(
-  toolName: string,
-  options: { session?: string }
+  name: string,
+  toolName: string
 ): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -411,14 +421,11 @@ export async function describeToolCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * Call tool command
- */
 export async function callToolCommand(
+  name: string,
   toolName: string,
   argsList?: string[],
   options?: {
-    session?: string;
     timeout?: number;
     json?: boolean;
     screenshot?: boolean;
@@ -426,7 +433,7 @@ export async function callToolCommand(
   }
 ): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options?.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -436,7 +443,6 @@ export async function callToolCommand(
     const tools = session.tools;
     const tool = tools.find((t) => t.name === toolName);
 
-    // Parse arguments: key=value pairs, key:=jsonvalue, or a single JSON object
     let args: Record<string, unknown> = {};
     if (argsList && argsList.length > 0) {
       try {
@@ -446,13 +452,13 @@ export async function callToolCommand(
         console.log("");
         console.log(formatInfo("Usage:"));
         console.log(
-          `  npx mcp-use client tools call ${toolName} key=value [key2=value2 ...]`
+          `  npx mcp-use client ${name} tools call ${toolName} key=value [key2=value2 ...]`
         );
         console.log(
-          `  npx mcp-use client tools call ${toolName} nested:='{"a":1}'   # JSON value`
+          `  npx mcp-use client ${name} tools call ${toolName} nested:='{"a":1}'   # JSON value`
         );
         console.log(
-          `  npx mcp-use client tools call ${toolName} '{"key":"value"}'   # full JSON object`
+          `  npx mcp-use client ${name} tools call ${toolName} '{"key":"value"}'   # full JSON object`
         );
         if (tool?.inputSchema) {
           console.log("");
@@ -469,7 +475,7 @@ export async function callToolCommand(
       console.log("");
       console.log(formatInfo("Provide arguments as key=value pairs:"));
       console.log(
-        `  npx mcp-use client tools call ${toolName} key=value [key2=value2 ...]`
+        `  npx mcp-use client ${name} tools call ${toolName} key=value [key2=value2 ...]`
       );
       console.log("");
       console.log(formatInfo("Tool schema:"));
@@ -477,7 +483,6 @@ export async function callToolCommand(
       await cleanupAndExit(1);
     }
 
-    // Call the tool
     console.error(formatInfo(`Calling tool '${toolName}'...`));
     const callResult = await session.callTool(toolName, args, {
       timeout: options?.timeout,
@@ -565,15 +570,12 @@ export async function callToolCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * List resources command
- */
-export async function listResourcesCommand(options: {
-  session?: string;
-  json?: boolean;
-}): Promise<void> {
+export async function listResourcesCommand(
+  name: string,
+  options: { json?: boolean }
+): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -614,15 +616,13 @@ export async function listResourcesCommand(options: {
   await cleanupAndExit(0);
 }
 
-/**
- * Read resource command
- */
 export async function readResourceCommand(
+  name: string,
   uri: string,
-  options: { session?: string; json?: boolean }
+  options: { json?: boolean }
 ): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -644,18 +644,15 @@ export async function readResourceCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * Subscribe to resource command
- */
 export async function subscribeResourceCommand(
-  uri: string,
-  options: { session?: string }
+  name: string,
+  uri: string
 ): Promise<void> {
   // Subscribe is intentionally long-lived: it keeps the process alive to
   // receive notifications until Ctrl+C. Don't run cleanupAndExit on the
   // success path — only on error.
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -665,7 +662,6 @@ export async function subscribeResourceCommand(
     await session.subscribeToResource(uri);
     console.log(formatSuccess(`Subscribed to resource: ${uri}`));
 
-    // Set up notification handler
     session.on("notification", async (notification) => {
       if (notification.method === "notifications/resources/updated") {
         console.log("");
@@ -676,7 +672,6 @@ export async function subscribeResourceCommand(
 
     console.log(formatInfo("Listening for updates... (Press Ctrl+C to stop)"));
 
-    // Keep process alive
     await new Promise(() => {});
   } catch (error: any) {
     console.error(
@@ -686,15 +681,12 @@ export async function subscribeResourceCommand(
   }
 }
 
-/**
- * Unsubscribe from resource command
- */
 export async function unsubscribeResourceCommand(
-  uri: string,
-  options: { session?: string }
+  name: string,
+  uri: string
 ): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -712,15 +704,12 @@ export async function unsubscribeResourceCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * List prompts command
- */
-export async function listPromptsCommand(options: {
-  session?: string;
-  json?: boolean;
-}): Promise<void> {
+export async function listPromptsCommand(
+  name: string,
+  options: { json?: boolean }
+): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
@@ -769,23 +758,20 @@ export async function listPromptsCommand(options: {
   await cleanupAndExit(0);
 }
 
-/**
- * Get prompt command
- */
 export async function getPromptCommand(
+  name: string,
   promptName: string,
   argsList?: string[],
-  options?: { session?: string; json?: boolean }
+  options?: { json?: boolean }
 ): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options?.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) {
       await cleanupAndExit(1);
     }
 
     const { session } = result!;
 
-    // Parse arguments: key=value pairs or a single JSON object
     let args: Record<string, string> = {};
     if (argsList && argsList.length > 0) {
       try {
@@ -795,10 +781,10 @@ export async function getPromptCommand(
         console.log("");
         console.log(formatInfo("Usage:"));
         console.log(
-          `  npx mcp-use client prompts get ${promptName} key=value [key2=value2 ...]`
+          `  npx mcp-use client ${name} prompts get ${promptName} key=value [key2=value2 ...]`
         );
         console.log(
-          `  npx mcp-use client prompts get ${promptName} '{"key":"value"}'   # full JSON object`
+          `  npx mcp-use client ${name} prompts get ${promptName} '{"key":"value"}'   # full JSON object`
         );
         await cleanupAndExit(1);
       }
@@ -831,14 +817,9 @@ export async function getPromptCommand(
   await cleanupAndExit(0);
 }
 
-/**
- * Interactive mode command
- */
-export async function interactiveCommand(options: {
-  session?: string;
-}): Promise<void> {
+export async function interactiveCommand(name: string): Promise<void> {
   try {
-    const result = await getOrRestoreSession(options.session || null);
+    const result = await getOrRestoreSession(name);
     if (!result) return;
 
     const { name: sessionName, session } = result;
@@ -863,10 +844,6 @@ export async function interactiveCommand(options: {
       chalk.gray("  prompts list            - List available prompts")
     );
     console.log(chalk.gray("  prompts get <name>      - Get a prompt"));
-    console.log(chalk.gray("  sessions list           - List all sessions"));
-    console.log(
-      chalk.gray("  sessions switch <name>  - Switch to another session")
-    );
     console.log(
       chalk.gray("  exit, quit              - Exit interactive mode")
     );
@@ -911,7 +888,6 @@ export async function interactiveCommand(options: {
           } else if (command === "call" && arg) {
             // TODO(mcp-1566): mirror the auto widget-screenshot flow from
             // `client tools call` here. Skipped for now to keep the REPL terse.
-            // Prompt for arguments
             rl.question(
               "Arguments (JSON, or press Enter for none): ",
               async (argsInput) => {
@@ -996,22 +972,10 @@ export async function interactiveCommand(options: {
               )
             );
           }
-        } else if (scope === "sessions") {
-          if (command === "list") {
-            await listSessionsCommand();
-          } else if (command === "switch" && arg) {
-            console.log(
-              formatWarning(
-                "Session switching in interactive mode will be available in a future version"
-              )
-            );
-          } else {
-            console.error(formatError("Invalid command. Try: sessions list"));
-          }
         } else {
           console.error(
             formatError(
-              "Unknown command. Type a valid scope: tools, resources, prompts, sessions"
+              "Unknown command. Type a valid scope: tools, resources, prompts"
             )
           );
         }
@@ -1036,18 +1000,25 @@ export async function interactiveCommand(options: {
 }
 
 /**
- * Create the client command group
+ * Top-level `client` command. Exposes only commands that do not target an
+ * existing named client: `connect` (which creates one) and `list`. Per-client
+ * operations live under `createPerClientCommand(<name>)` and are routed by
+ * `index.ts` based on the positional after `client`.
  */
 export function createClientCommand(): Command {
-  const clientCommand = new Command("client").description(
-    "Interactive MCP client for terminal usage"
-  );
+  const clientCommand = new Command("client")
+    .description(
+      "Interactive MCP client for terminal usage. Use `mcp-use client <name> ...` to run commands against a saved client."
+    )
+    .showHelpAfterError(
+      "(Run `mcp-use client --help` to see available commands)"
+    );
 
-  // Connection commands
   clientCommand
-    .command("connect <url>")
-    .description("Connect to an MCP server")
-    .option("--name <name>", "Session name")
+    .command("connect [name] [url]")
+    .description(
+      "Connect to an MCP server and save it as a named client. Use the name to address it in later commands (e.g. `mcp-use client <name> tools list`)."
+    )
     .option("--stdio", "Use stdio connector instead of HTTP")
     .option("--auth <token>", "Static Bearer token (skips OAuth)")
     .option(
@@ -1061,41 +1032,50 @@ export function createClientCommand(): Command {
     .action(connectCommand);
 
   clientCommand
-    .command("disconnect [session]")
-    .description("Disconnect from a session")
-    .option("--all", "Disconnect all sessions")
-    .action(disconnectCommand);
-
-  // Sessions scope
-  const sessionsCommand = new Command("sessions").description(
-    "Manage CLI sessions"
-  );
-  sessionsCommand
     .command("list")
-    .description("List all saved sessions")
-    .action(listSessionsCommand);
-  sessionsCommand
-    .command("switch <name>")
-    .description("Switch to a different session")
-    .action(switchSessionCommand);
-  clientCommand.addCommand(sessionsCommand);
+    .description("List saved clients")
+    .action(listClientsCommand);
 
-  // Tools scope
-  const toolsCommand = new Command("tools").description(
-    "Interact with MCP tools"
-  );
+  return clientCommand;
+}
+
+/**
+ * Build the per-client command subtree for a given client name. The name is
+ * captured in each action closure so subcommand definitions stay free of an
+ * extra positional argument.
+ */
+export function createPerClientCommand(name: string): Command {
+  const cmd = new Command(`mcp-use client ${name}`)
+    .description(`Commands for client '${name}'`)
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} --help\` to see available commands)`
+    );
+
+  cmd
+    .command("disconnect")
+    .description("Disconnect from this client")
+    .action(() => disconnectCommand(name));
+
+  cmd
+    .command("interactive")
+    .description("Start interactive REPL mode for this client")
+    .action(() => interactiveCommand(name));
+
+  const toolsCommand = new Command("tools")
+    .description("Interact with MCP tools")
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} tools --help\` to see available actions)`
+    );
   toolsCommand
     .command("list")
     .description("List available tools")
-    .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
-    .action(listToolsCommand);
+    .action((options) => listToolsCommand(name, options));
   toolsCommand
-    .command("call <name> [args...]")
+    .command("call <tool> [args...]")
     .description(
       "Call a tool. Args as key=value pairs (use key:=<json> for nested values, or pass a JSON object)"
     )
-    .option("--session <name>", "Use specific session")
     .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
     .option("--json", "Output as JSON")
     .option(
@@ -1106,86 +1086,79 @@ export function createClientCommand(): Command {
       "--screenshot-output <path>",
       "Output PNG path for the widget screenshot (defaults to ./<view>-<timestamp>.png)"
     )
-    .action((name, args, opts) => callToolCommand(name, args, opts));
+    .action((tool, args, options) =>
+      callToolCommand(name, tool, args, options)
+    );
   toolsCommand
-    .command("describe <name>")
+    .command("describe <tool>")
     .description("Show tool details and schema")
-    .option("--session <name>", "Use specific session")
-    .action(describeToolCommand);
-  clientCommand.addCommand(toolsCommand);
+    .action((tool) => describeToolCommand(name, tool));
+  cmd.addCommand(toolsCommand);
 
-  // Resources scope
-  const resourcesCommand = new Command("resources").description(
-    "Interact with MCP resources"
-  );
+  const resourcesCommand = new Command("resources")
+    .description("Interact with MCP resources")
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} resources --help\` to see available actions)`
+    );
   resourcesCommand
     .command("list")
     .description("List available resources")
-    .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
-    .action(listResourcesCommand);
+    .action((options) => listResourcesCommand(name, options));
   resourcesCommand
     .command("read <uri>")
     .description("Read a resource by URI")
-    .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
-    .action(readResourceCommand);
+    .action((uri, options) => readResourceCommand(name, uri, options));
   resourcesCommand
     .command("subscribe <uri>")
     .description("Subscribe to resource updates")
-    .option("--session <name>", "Use specific session")
-    .action(subscribeResourceCommand);
+    .action((uri) => subscribeResourceCommand(name, uri));
   resourcesCommand
     .command("unsubscribe <uri>")
     .description("Unsubscribe from resource updates")
-    .option("--session <name>", "Use specific session")
-    .action(unsubscribeResourceCommand);
-  clientCommand.addCommand(resourcesCommand);
+    .action((uri) => unsubscribeResourceCommand(name, uri));
+  cmd.addCommand(resourcesCommand);
 
-  // Prompts scope
-  const promptsCommand = new Command("prompts").description(
-    "Interact with MCP prompts"
-  );
+  const promptsCommand = new Command("prompts")
+    .description("Interact with MCP prompts")
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} prompts --help\` to see available actions)`
+    );
   promptsCommand
     .command("list")
     .description("List available prompts")
-    .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
-    .action(listPromptsCommand);
+    .action((options) => listPromptsCommand(name, options));
   promptsCommand
-    .command("get <name> [args...]")
+    .command("get <prompt> [args...]")
     .description(
       "Get a prompt. Args as key=value pairs (or pass a JSON object)"
     )
-    .option("--session <name>", "Use specific session")
     .option("--json", "Output as JSON")
-    .action(getPromptCommand);
-  clientCommand.addCommand(promptsCommand);
+    .action((prompt, args, options) =>
+      getPromptCommand(name, prompt, args, options)
+    );
+  cmd.addCommand(promptsCommand);
 
-  // Interactive mode
-  clientCommand
-    .command("interactive")
-    .description("Start interactive REPL mode")
-    .option("--session <name>", "Use specific session")
-    .action(interactiveCommand);
-
-  // Auth scope (OAuth introspection / refresh / logout)
-  const authCommand = new Command("auth").description(
-    "Manage OAuth tokens for HTTP sessions"
-  );
+  const authCommand = new Command("auth")
+    .description("Manage OAuth tokens for HTTP clients")
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} auth --help\` to see available actions)`
+    );
   authCommand
-    .command("status [session]")
-    .description("Show OAuth token status for a session")
-    .action(authStatusCommand);
+    .command("status")
+    .description("Show OAuth token status for this client")
+    .action(() => authStatusCommand(name));
   authCommand
-    .command("refresh [session]")
+    .command("refresh")
     .description("Force-refresh the OAuth access token")
-    .action(authRefreshCommand);
+    .action(() => authRefreshCommand(name));
   authCommand
-    .command("logout [session]")
-    .description("Remove stored OAuth tokens for the session's URL")
-    .action(authLogoutCommand);
-  clientCommand.addCommand(authCommand);
+    .command("logout")
+    .description("Remove stored OAuth tokens for this client's URL")
+    .action(() => authLogoutCommand(name));
+  cmd.addCommand(authCommand);
 
-  return clientCommand;
+  return cmd;
 }

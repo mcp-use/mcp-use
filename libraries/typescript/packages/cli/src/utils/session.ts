@@ -9,7 +9,7 @@ import {
   promptYesNo,
   runOAuthFlow,
 } from "./oauth.js";
-import { getActiveSession, getSession } from "./session-storage.js";
+import { getSession } from "./session-storage.js";
 
 export const activeSessions = new Map<
   string,
@@ -57,24 +57,12 @@ export async function cleanupAndExit(code: number): Promise<never> {
  * Get or restore a session by name. For OAuth-mode sessions whose tokens
  * have expired and can't be refreshed, prompts to re-auth on TTY or prints
  * a clear `connect` command to re-run on non-TTY.
+ *
+ * `sessionName` is required — there is no implicit "active" client.
  */
 export async function getOrRestoreSession(
-  sessionName: string | null
+  sessionName: string
 ): Promise<{ name: string; session: MCPSession } | null> {
-  if (!sessionName) {
-    const active = await getActiveSession();
-    if (!active) {
-      console.error(
-        formatError("No active session. Connect to a server first.")
-      );
-      console.error(
-        formatInfo("Use: npx mcp-use client connect <url> --name <name>")
-      );
-      return null;
-    }
-    sessionName = active.name;
-  }
-
   if (activeSessions.has(sessionName)) {
     const { session } = activeSessions.get(sessionName)!;
     return { name: sessionName, session };
@@ -82,7 +70,12 @@ export async function getOrRestoreSession(
 
   const config = await getSession(sessionName);
   if (!config) {
-    console.error(formatError(`Session '${sessionName}' not found`));
+    console.error(formatError(`Client '${sessionName}' not found`));
+    console.error(
+      formatInfo(
+        `Connect with: npx mcp-use client connect ${sessionName} <url>`
+      )
+    );
     return null;
   }
 
@@ -132,14 +125,14 @@ export async function getOrRestoreSession(
         isUnauthorized(err)
       ) {
         const reAuth = await promptYesNo(
-          `! Tokens for session '${sessionName}' expired and could not refresh. Re-authenticate now?`,
+          `! Tokens for client '${sessionName}' expired and could not refresh. Re-authenticate now?`,
           true
         );
         if (!reAuth) {
           console.error(formatError(`Tokens expired and could not refresh.`));
           console.error(
             formatInfo(
-              `Run: mcp-use client connect ${config.url} --name ${sessionName}`
+              `Run: mcp-use client connect ${sessionName} ${config.url}`
             )
           );
           return null;
@@ -152,10 +145,9 @@ export async function getOrRestoreSession(
     }
 
     activeSessions.set(sessionName, { client, session });
-    console.error(formatInfo(`Reconnected to session '${sessionName}'`));
     return { name: sessionName, session };
   } catch (error: any) {
-    console.error(formatError(`Failed to restore session: ${error.message}`));
+    console.error(formatError(`Failed to restore client: ${error.message}`));
     return null;
   }
 }

@@ -90,14 +90,11 @@ describe("CLI Integration Tests", () => {
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Interactive MCP client");
       expect(result.stdout).toContain("connect");
-      expect(result.stdout).toContain("tools");
-      expect(result.stdout).toContain("resources");
-      expect(result.stdout).toContain("prompts");
-      expect(result.stdout).toContain("sessions");
+      expect(result.stdout).toContain("list");
     });
 
-    it("should show tools help", async () => {
-      const result = await runCLI(["client", "tools", "--help"]);
+    it("should show per-client tools help", async () => {
+      const result = await runCLI(["client", "ci-test", "tools", "--help"]);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Interact with MCP tools");
@@ -106,8 +103,8 @@ describe("CLI Integration Tests", () => {
       expect(result.stdout).toContain("describe");
     });
 
-    it("should show resources help", async () => {
-      const result = await runCLI(["client", "resources", "--help"]);
+    it("should show per-client resources help", async () => {
+      const result = await runCLI(["client", "ci-test", "resources", "--help"]);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Interact with MCP resources");
@@ -117,42 +114,37 @@ describe("CLI Integration Tests", () => {
       expect(result.stdout).toContain("unsubscribe");
     });
 
-    it("should show prompts help", async () => {
-      const result = await runCLI(["client", "prompts", "--help"]);
+    it("should show per-client prompts help", async () => {
+      const result = await runCLI(["client", "ci-test", "prompts", "--help"]);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("Interact with MCP prompts");
       expect(result.stdout).toContain("list");
       expect(result.stdout).toContain("get");
     });
-
-    it("should show sessions help", async () => {
-      const result = await runCLI(["client", "sessions", "--help"]);
-
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("Manage CLI sessions");
-      expect(result.stdout).toContain("list");
-      expect(result.stdout).toContain("switch");
-    });
   });
 
-  describe("Session Management", () => {
-    it("should list sessions when none exist", async () => {
-      const result = await runCLI(["client", "sessions", "list"]);
+  describe("Client Management", () => {
+    it("should list clients when none exist", async () => {
+      const result = await runCLI(["client", "list"]);
 
       // Non-TTY (piped) stdout: gh-style empty output, just a clean exit.
-      // Decorative "No saved sessions" message is suppressed for agents/scripts.
+      // Decorative "No saved clients" message is suppressed for agents/scripts.
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe("");
     });
 
-    it("should show error when no active session for tools list", async () => {
-      const result = await runCLI(["client", "tools", "list"]);
+    it("should error when invoking tools on an unknown client", async () => {
+      const result = await runCLI([
+        "client",
+        "does-not-exist",
+        "tools",
+        "list",
+      ]);
 
-      // Command may exit with 0 or 1 depending on session state
-      // Just verify it mentions no session or connection error
+      expect(result.exitCode).toBe(1);
       const output = result.stdout + result.stderr;
-      expect(output).toMatch(/No active session|not found|Connection failed/i);
+      expect(output).toMatch(/not found|Connection failed/i);
     });
   });
 
@@ -161,9 +153,8 @@ describe("CLI Integration Tests", () => {
       const result = await runCLI([
         "client",
         "connect",
-        "http://invalid-host-12345.local:9999/mcp",
-        "--name",
         "test-invalid",
+        "http://invalid-host-12345.local:9999/mcp",
       ]);
 
       expect(result.exitCode).toBe(1);
@@ -174,24 +165,7 @@ describe("CLI Integration Tests", () => {
     // These tests would be better suited for e2e tests
   });
 
-  describe("Output Formats", () => {
-    it("should support --json flag for sessions list", async () => {
-      // Note: This would need sessions to exist
-      const result = await runCLI(["client", "sessions", "list", "--json"]);
-
-      // Command may work with or without --json flag depending on implementation
-      // Just verify it doesn't crash
-      expect([0, 1]).toContain(result.exitCode);
-    });
-  });
-
   describe("Error Handling", () => {
-    it("should show error for invalid command", async () => {
-      const result = await runCLI(["client", "invalid-command"]);
-
-      expect(result.exitCode).not.toBe(0);
-    });
-
     it("should show error for missing required arguments", async () => {
       const result = await runCLI(["client", "connect"]);
 
@@ -200,18 +174,42 @@ describe("CLI Integration Tests", () => {
       expect(output).toMatch(/error/i);
     });
 
-    it("should handle invalid JSON in tool call", async () => {
-      // This would need an active session, but we can test the command structure
+    it("should error when connect is missing the url positional", async () => {
+      const result = await runCLI(["client", "connect", "only-name"]);
+
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stderr + result.stdout;
+      expect(output).toMatch(/error/i);
+      expect(output).toMatch(/Missing <url>/i);
+      expect(output).toContain("mcp-use client connect only-name <url>");
+    });
+
+    it("should explain that a name is needed when only a URL is provided", async () => {
       const result = await runCLI([
         "client",
+        "connect",
+        "https://mcp.example.com/mcp",
+      ]);
+
+      expect(result.exitCode).not.toBe(0);
+      const output = result.stderr + result.stdout;
+      expect(output).toMatch(/Missing client name/i);
+      expect(output).toContain("https://mcp.example.com/mcp");
+      expect(output).toMatch(/mcp-use client connect <name>/i);
+    });
+
+    it("should handle invalid JSON in tool call", async () => {
+      // Goes through the per-client routing even though the client doesn't
+      // exist — just verifies the command structure parses.
+      const result = await runCLI([
+        "client",
+        "ci-test",
         "tools",
         "call",
         "test_tool",
         "invalid-json",
       ]);
 
-      // May fail for various reasons (no session, invalid JSON, etc.)
-      // Just verify command doesn't crash
       const output = result.stdout + result.stderr;
       expect(output.length).toBeGreaterThan(0);
     });
@@ -219,19 +217,16 @@ describe("CLI Integration Tests", () => {
 
   describe("Stdio Server Connection", () => {
     it("should accept stdio flag syntax", async () => {
-      // This will fail without the actual server, but tests argument parsing
       const result = await runCLI([
         "client",
         "connect",
-        "--stdio",
-        "echo test",
-        "--name",
         "stdio-test",
+        "echo test",
+        "--stdio",
       ]);
 
-      // Will fail to connect but should parse arguments correctly
+      // Will fail to connect but should parse arguments correctly.
       expect(result.exitCode).toBe(1);
-      // The error should be about connection, not argument parsing
       expect(result.stderr).not.toContain("Unknown option");
     });
   });
