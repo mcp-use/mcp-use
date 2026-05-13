@@ -44,7 +44,12 @@ import {
   authRefreshCommand,
   authLogoutCommand,
 } from "./client-auth.js";
-import { captureToolScreenshot, detectToolResourceUri } from "./screenshot.js";
+import {
+  captureToolScreenshot,
+  createClientScreenshotCommand,
+  createPerClientScreenshotCommand,
+  detectToolResourceUri,
+} from "./screenshot.js";
 
 /**
  * Reserved top-level subcommands under `mcp-use client`. Any other token in
@@ -56,6 +61,7 @@ export const RESERVED_CLIENT_SUBCOMMANDS = new Set([
   "connect",
   "list",
   "remove",
+  "screenshot",
   "help",
 ]);
 
@@ -72,6 +78,7 @@ export const PER_CLIENT_SCOPES = new Set([
   "auth",
   "disconnect",
   "interactive",
+  "screenshot",
 ]);
 
 export async function connectCommand(
@@ -1134,6 +1141,8 @@ export function createClientCommand(): Command {
     )
     .action(removeClientCommand);
 
+  clientCommand.addCommand(createClientScreenshotCommand());
+
   return clientCommand;
 }
 
@@ -1257,6 +1266,8 @@ export function createPerClientCommand(name: string): Command {
     .description("Remove stored OAuth tokens for this server's URL")
     .action(() => authLogoutCommand(name));
   cmd.addCommand(authCommand);
+
+  cmd.addCommand(createPerClientScreenshotCommand(name));
 
   return cmd;
 }

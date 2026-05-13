@@ -32,12 +32,14 @@ There is no "active" server. Every per-server command takes the server name as i
 
 ## Command Structure
 
-The CLI has two top-level shapes under `mcp-use client`:
+The CLI has these top-level shapes under `mcp-use client`:
 
 | Shape | Purpose |
 |-------|---------|
 | `mcp-use client connect <name> <url>` | Save an MCP server under a short name |
 | `mcp-use client list` | List saved servers |
+| `mcp-use client remove <name>` | Remove a saved server |
+| `mcp-use client screenshot --mcp <url> --tool <name>` | Ad-hoc widget screenshot — no saved server needed |
 | `mcp-use client <name> <scope> <action>` | Run a command against a saved server |
 
 The per-server scopes are:
@@ -48,6 +50,7 @@ The per-server scopes are:
 | `resources` | `list`, `read <uri>`, `subscribe <uri>`, `unsubscribe <uri>` |
 | `prompts` | `list`, `get <prompt> [args...]` |
 | `auth` | `status`, `refresh`, `logout` |
+| `screenshot` | `--tool <name> [args...]` — render a widget headlessly with the saved server's auth |
 | (top-level) | `interactive`, `disconnect` |
 
 ## Connecting
@@ -138,6 +141,37 @@ npx mcp-use client manufact auth status   # show token state + expiry
 npx mcp-use client manufact auth refresh  # force-refresh access token
 npx mcp-use client manufact auth logout   # remove stored tokens
 ```
+
+## Screenshot
+
+Render an MCP Apps widget headlessly and save a PNG. There are two forms.
+
+**Saved-server form** — reuses the auth from `mcp-use client connect`:
+
+```bash
+npx mcp-use client manufact screenshot --tool show-board
+npx mcp-use client manufact screenshot --tool show-board boardId=demo
+npx mcp-use client manufact screenshot --tool show-board --output ./out.png
+```
+
+**Ad-hoc form** — connects to an MCP server inline. Useful for one-off captures or programmatic/CI use that doesn't want to first save a server:
+
+```bash
+# Public server
+npx mcp-use client screenshot --mcp https://mcp.example.com --tool show-board
+
+# Authenticated server (curl-style -H, repeatable)
+npx mcp-use client screenshot \
+  --mcp https://mcp.example.com \
+  -H "Authorization: Bearer $TOKEN" \
+  --tool show-board boardId=demo
+```
+
+Common flags (both forms): `--width`, `--height`, `--theme light|dark`, `--output <path>`, `--wait-for <selector>`, `--delay <ms>`, `--timeout <ms>`, `--inspector <url>`, `--cdp-url <ws-url>`, `--quiet`. Run `mcp-use client screenshot --help` for the full list.
+
+<Note>
+`-H/--header` only applies to the ad-hoc form. The saved-server form carries the server's auth (OAuth or `--auth <token>` from `connect`) automatically.
+</Note>
 
 ## Interactive Mode
 
