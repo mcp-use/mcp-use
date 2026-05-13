@@ -3,6 +3,8 @@ import {
   detectToolResourceUri,
   extractViewName,
   parseDimension,
+  parseHeaderArg,
+  parseHeaderArgs,
   timestampSuffix,
 } from "../src/commands/screenshot.js";
 
@@ -91,5 +93,76 @@ describe("detectToolResourceUri", () => {
         },
       })
     ).toBe("ui://widget/preferred.html");
+  });
+});
+
+describe("parseHeaderArg", () => {
+  it("splits on the first colon", () => {
+    expect(parseHeaderArg("Authorization: Bearer xyz")).toEqual([
+      "Authorization",
+      "Bearer xyz",
+    ]);
+  });
+
+  it("trims whitespace around key and value", () => {
+    expect(parseHeaderArg("  X-Api-Key  :   abc123 ")).toEqual([
+      "X-Api-Key",
+      "abc123",
+    ]);
+  });
+
+  it("preserves colons inside the value", () => {
+    expect(parseHeaderArg("X-Date: 2024-01-01T12:00:00Z")).toEqual([
+      "X-Date",
+      "2024-01-01T12:00:00Z",
+    ]);
+  });
+
+  it("accepts no whitespace after the colon", () => {
+    expect(parseHeaderArg("Authorization:Bearer xyz")).toEqual([
+      "Authorization",
+      "Bearer xyz",
+    ]);
+  });
+
+  it("allows an empty value", () => {
+    expect(parseHeaderArg("X-Empty:")).toEqual(["X-Empty", ""]);
+  });
+
+  it("errors when there is no colon", () => {
+    expect(() => parseHeaderArg("Authorization Bearer xyz")).toThrow(
+      /Expected "Key: Value"/
+    );
+  });
+
+  it("errors when the key is empty", () => {
+    expect(() => parseHeaderArg(": value")).toThrow(/Header name is empty/);
+  });
+});
+
+describe("parseHeaderArgs", () => {
+  it("returns an empty record for no args", () => {
+    expect(parseHeaderArgs([])).toEqual({});
+  });
+
+  it("collects multiple headers into a record", () => {
+    expect(
+      parseHeaderArgs(["Authorization: Bearer xyz", "X-Trace-Id: abc"])
+    ).toEqual({
+      Authorization: "Bearer xyz",
+      "X-Trace-Id": "abc",
+    });
+  });
+
+  it("later values for the same key override earlier ones", () => {
+    expect(parseHeaderArgs(["X-Key: first", "X-Key: second"])).toEqual({
+      "X-Key": "second",
+    });
+  });
+
+  it("propagates parse errors", () => {
+    expect(() =>
+      parseHeaderArgs(["Authorization: Bearer xyz", "no-colon"])
+    ).toThrow(/Expected "Key: Value"/);
   });
 });
