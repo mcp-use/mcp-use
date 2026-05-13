@@ -1,5 +1,137 @@
 # @mcp-use/cli
 
+## 3.2.0-canary.10
+
+### Minor Changes
+
+- 64f74d2: feat(cli)!: drop the "active session" model — every `client` command now takes a name
+
+  The CLI client used to track an implicit "active session" that you switched
+  between with `client sessions switch`. Per-command flags like `--session` and
+  `--name` were sprinkled around to override it. The active state was hidden,
+  easy to get wrong, and forced every subcommand to handle "no session" as a
+  real case.
+
+  It's gone. The client name is now a required positional, and every
+  per-client command lives under `mcp-use client <name> <scope> <action>`:
+
+  ```bash
+  # Before
+  mcp-use client connect https://mcp.manufact.com --name manufact
+  mcp-use client tools list
+  mcp-use client tools call read_file path=/x --session manufact
+  mcp-use client sessions list
+  mcp-use client sessions switch other-server
+  mcp-use client disconnect --all
+
+  # After
+  mcp-use client connect manufact https://mcp.manufact.com
+  mcp-use client manufact tools list
+  mcp-use client manufact tools call read_file path=/x
+  mcp-use client list
+  mcp-use client other-server <action>   # name addresses any saved client directly
+  mcp-use client manufact disconnect     # disconnect one at a time
+  ```
+
+  **Breaking changes:**
+  - `client connect <url> --name <name>` → `client connect <name> <url>` (name is required, positional).
+  - `--session <name>` is removed from every per-client subcommand; the name comes from the path instead.
+  - `client sessions list` → `client list`.
+  - `client sessions switch` is removed — there is no active client to switch.
+  - `client disconnect --all` is removed; disconnect each client by name.
+  - `mcp-use screenshot` no longer falls back to the active session; pass `--session <name>` or `--mcp <url>` explicitly.
+
+  Existing `~/.mcp-use/cli-sessions.json` files keep working; the now-unused
+  `activeSession` field is silently ignored on load.
+
+  The CLI also gives clearer feedback for the common shape mistakes the new
+  syntax invites — passing only a URL to `connect`, forgetting the client
+  name before a per-client scope (`mcp-use client tools call foo`), or
+  typing an unknown subcommand — instead of the bare commander defaults.
+
+### Patch Changes
+
+- 64f74d2: feat(cli): add `mcp-use client remove <name>` to drop a saved server
+
+  Saved servers could be added (`client connect`) and listed (`client list`),
+  but the only way to delete one was to hand-edit
+  `~/.mcp-use/cli-sessions.json`. `client remove <name>` now does this: it
+  errors if no server by that name exists, closes any in-process connection,
+  deletes the entry, and — for OAuth-authenticated servers — also revokes
+  the stored tokens for that URL. If another saved server still points at
+  the same URL the tokens are kept (they're URL-keyed, so wiping them would
+  break the sibling); the CLI prints which sibling is keeping them alive.
+
+- 64f74d2: refactor(cli): user-facing copy now calls saved entries "servers" instead of "clients"
+
+  The CLI itself is the MCP client; the things it connects to are MCP
+  servers. The old copy referred to saved connections as "saved clients" /
+  "named clients", which is backwards and confused users.
+
+  User-facing strings (help text, error messages, table headers, REPL
+  prompts, docs) now consistently say "server" / "saved server". The
+  `mcp-use client` command name is unchanged — it's still the entry point
+  for client-side operations — so this is purely a wording change and no
+  scripts break.
+
+- 64f74d2: fix(cli): reject saved-server names that collide with per-server scope tokens
+
+  `mcp-use client <name> ...` routes any name that isn't a reserved subcommand
+  (`connect`, `list`, `remove`, `help`) to the per-server command tree. If a
+  user saved a server under one of the scope names — `tools`, `resources`,
+  `prompts`, `auth`, `disconnect`, `interactive` — every invocation against
+  that name would instead be caught by the "missing server name" routing and
+  the saved entry would be unreachable.
+
+  `client connect` now refuses those names up front with the list of reserved
+  names and a suggested rename, instead of silently saving an entry that can
+  never be addressed.
+
+- 64f74d2: fix(cli): show a "not found, here's how to connect" message instead of the per-server help when `mcp-use client <name>` targets an unknown server
+
+  Running `mcp-use client <name>` with no subcommand used to fall through to
+  commander's per-server help — listing `tools`, `resources`, `prompts`, etc.
+  That help is only useful once the server actually exists; for a name the
+  user hasn't connected yet it just leaks the subcommand surface without
+  telling them how to make the name resolve.
+
+  When the name doesn't match a saved server, the CLI now prints the
+  `client connect <name> <url>` hint (plus a pointer to `client list`) and
+  exits non-zero. The per-server help is still shown when the server exists.
+
+- 64f74d2: fix(cli): stop auto-opening the browser during OAuth flows
+
+  When an `mcp-use client` command needed to authenticate against an OAuth
+  server it would launch the user's browser via the `open` package on TTYs,
+  and only print the URL when stdout wasn't a TTY. That was surprising in two
+  directions: scripts that did happen to inherit a TTY got pop-up windows, and
+  the heuristic missed plenty of agentic/CI environments that _do_ keep a TTY
+  attached. The CLI now always prints the authorization URL and waits on the
+  loopback callback — the user opens the link themselves whenever it's
+  convenient. (Other CLI surfaces that intentionally open a browser, like
+  `mcp-use deploy --open` and the auth login flow, are unchanged.)
+
+- 64f74d2: fix(cli): tests no longer touch the developer's real `~/.mcp-use` directory
+
+  Two leaks are closed:
+  - `session-storage.test.ts` computed its target path from `os.homedir()` and `rmSync`'d it in `beforeEach`/`afterEach`, so running `pnpm test` during local development deleted any saved clients on disk. The tests now mock `node:os.homedir` to a per-process temp directory.
+  - `cli-integration.test.ts` spawned the real CLI as a subprocess and so read the developer's real `cli-sessions.json` when running `client list`. `runCLI` now sets `HOME` (and `USERPROFILE`) to an isolated temp dir for every spawn.
+
+- 64f74d2: fix(cli): stop printing tool results twice when servers return structuredContent
+
+  Per the MCP spec, a tool that returns `structuredContent` SHOULD also serialize
+  the same JSON into a `TextContent` block for backwards compatibility. The
+  client was rendering both, so every call to a structured-output tool printed
+  the JSON payload twice.
+
+  `mcp-use client <name> tools call ...` now treats `structuredContent` as the
+  canonical form: when it's present, duplicate `TextContent` blocks are
+  suppressed and only the structured JSON is shown. Non-text content blocks
+  (image, resource) are still rendered alongside the structured payload — they
+  carry information the structured form doesn't.
+  - mcp-use@1.28.0-canary.10
+  - @mcp-use/inspector@6.0.0-canary.10
+
 ## 3.2.0-canary.9
 
 ### Patch Changes
