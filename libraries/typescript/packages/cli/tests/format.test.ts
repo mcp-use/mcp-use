@@ -216,9 +216,11 @@ describe("Format Utilities", () => {
       expect(formatted).toContain("no error details provided by server");
     });
 
-    it("should include structuredContent on failure", () => {
+    it("should prefer structuredContent over text content on failure", () => {
       const result = {
-        content: [{ type: "text", text: "Boom" }],
+        content: [
+          { type: "text", text: '{"code":"E_FAIL","retryable":false}' },
+        ],
         isError: true,
         structuredContent: { code: "E_FAIL", retryable: false },
       } as unknown as CallToolResult;
@@ -226,23 +228,29 @@ describe("Format Utilities", () => {
       const formatted = formatToolCall(result);
 
       expect(formatted).toContain("Tool execution failed");
-      expect(formatted).toContain("Boom");
       expect(formatted).toContain("Structured error data:");
       expect(formatted).toContain("E_FAIL");
       expect(formatted).toContain("retryable");
+      // Text content is the spec-required JSON duplicate — should be suppressed
+      // so we don't print the same payload twice.
+      expect(formatted).not.toContain("Error details:");
     });
 
-    it("should include structuredContent on success", () => {
+    it("should prefer structuredContent over text content on success", () => {
       const result = {
-        content: [{ type: "text", text: "ok" }],
+        content: [{ type: "text", text: '{"items":3}' }],
         isError: false,
         structuredContent: { items: 3 },
       } as unknown as CallToolResult;
 
       const formatted = formatToolCall(result);
 
-      expect(formatted).toContain("Structured content:");
       expect(formatted).toContain("items");
+      expect(formatted).not.toContain("Structured content:");
+      // Only the structured form should appear — the text block is the JSON
+      // serialization duplicate per MCP spec.
+      const occurrences = formatted.match(/items/g) ?? [];
+      expect(occurrences.length).toBe(1);
     });
 
     it("should handle image content", () => {

@@ -188,9 +188,13 @@ export function formatJson(data: any, pretty = true): string {
 export function formatToolCall(result: CallToolResult): string {
   const lines: string[] = [];
   const { isError, structuredContent } = result;
-  const hasContent = !!result.content?.length;
   const hasStructured =
     structuredContent !== undefined && structuredContent !== null;
+  // Per MCP spec, when a tool returns structuredContent it SHOULD also serialize
+  // the same JSON into a TextContent block for backwards compatibility. Treat
+  // structuredContent as the canonical form and skip the content blocks in
+  // that case so we don't print the same payload twice.
+  const showContent = !hasStructured && !!result.content?.length;
 
   if (isError) {
     lines.push(chalk.red("✗ Tool execution failed"));
@@ -200,7 +204,7 @@ export function formatToolCall(result: CallToolResult): string {
     lines.push("");
   }
 
-  if (hasContent) {
+  if (showContent) {
     if (isError) {
       lines.push(chalk.red.bold("Error details:"));
     }
@@ -235,14 +239,13 @@ export function formatToolCall(result: CallToolResult): string {
   }
 
   if (hasStructured) {
-    if (hasContent) lines.push("");
-    lines.push(
-      chalk.bold(isError ? "Structured error data:" : "Structured content:")
-    );
+    if (isError) {
+      lines.push(chalk.bold("Structured error data:"));
+    }
     lines.push(formatJson(structuredContent));
   }
 
-  if (isError && !hasContent && !hasStructured) {
+  if (isError && !showContent && !hasStructured) {
     lines.push(chalk.gray("(no error details provided by server)"));
   }
 
