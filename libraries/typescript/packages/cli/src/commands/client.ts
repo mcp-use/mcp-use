@@ -27,7 +27,9 @@ import {
   runOAuthFlow,
 } from "../utils/oauth.js";
 import {
+  getSession,
   listAllSessions,
+  removeSession,
   saveSession,
   updateSessionInfo,
 } from "../utils/session-storage.js";
@@ -50,7 +52,12 @@ import { captureToolScreenshot, detectToolResourceUri } from "./screenshot.js";
  * `createPerClientCommand`. Keep this in sync with the subcommands registered
  * in `createClientCommand` below, plus commander's built-in help tokens.
  */
-export const RESERVED_CLIENT_SUBCOMMANDS = new Set(["connect", "list", "help"]);
+export const RESERVED_CLIENT_SUBCOMMANDS = new Set([
+  "connect",
+  "list",
+  "remove",
+  "help",
+]);
 
 /**
  * Per-client scope tokens that live under `mcp-use client <name> ...`. When a
@@ -265,6 +272,70 @@ export async function disconnectCommand(name: string): Promise<void> {
     }
   } catch (error: any) {
     console.error(formatError(`Failed to disconnect: ${error.message}`));
+    await cleanupAndExit(1);
+  }
+  await cleanupAndExit(0);
+}
+
+export async function removeClientCommand(name: string): Promise<void> {
+  try {
+    const config = await getSession(name);
+    if (!config) {
+      console.error(formatError(`Server '${name}' not found`));
+      console.error("");
+      console.error("See your saved servers with:");
+      console.error("  mcp-use client list");
+      await cleanupAndExit(1);
+    }
+
+    const sessionData = activeSessions.get(name);
+    if (sessionData) {
+      await sessionData.client.closeAllSessions();
+      activeSessions.delete(name);
+    }
+
+    // OAuth tokens are keyed by URL hash, not by saved-server name, so two
+    // saved entries pointing at the same URL share one token store. Only
+    // wipe the tokens when this entry is the last one using the URL.
+    const isOAuthHttp =
+      config!.type === "http" &&
+      config!.authMode === "oauth" &&
+      typeof config!.url === "string";
+    const sharedUrlSibling = isOAuthHttp
+      ? (await listAllSessions()).find(
+          (s) =>
+            s.name !== name &&
+            s.config.type === "http" &&
+            s.config.url === config!.url
+        )
+      : undefined;
+
+    await removeSession(name);
+    console.log(formatSuccess(`Removed saved server '${name}'`));
+
+    if (isOAuthHttp) {
+      if (sharedUrlSibling) {
+        console.log(
+          formatInfo(
+            `OAuth tokens for ${config!.url} were kept because saved server '${sharedUrlSibling.name}' still uses that URL.`
+          )
+        );
+      } else {
+        try {
+          const provider = await buildOAuthProvider(config!.url!);
+          await provider.invalidateCredentials("all");
+          console.log(formatInfo(`Removed OAuth tokens for ${config!.url}`));
+        } catch (error: any) {
+          console.error(
+            formatWarning(
+              `Saved entry removed, but failed to clear OAuth tokens for ${config!.url}: ${error.message}`
+            )
+          );
+        }
+      }
+    }
+  } catch (error: any) {
+    console.error(formatError(`Failed to remove server: ${error.message}`));
     await cleanupAndExit(1);
   }
   await cleanupAndExit(0);
@@ -1035,6 +1106,13 @@ export function createClientCommand(): Command {
     .command("list")
     .description("List saved servers")
     .action(listClientsCommand);
+
+  clientCommand
+    .command("remove <name>")
+    .description(
+      "Remove a saved server. Also clears any OAuth tokens for that URL, unless another saved server still uses it."
+    )
+    .action(removeClientCommand);
 
   return clientCommand;
 }

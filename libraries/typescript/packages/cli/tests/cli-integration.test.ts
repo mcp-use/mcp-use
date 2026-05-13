@@ -178,6 +178,110 @@ describe("CLI Integration Tests", () => {
       expect(output).toMatch(/Server 'does-not-exist' not found/);
       expect(output).toContain("mcp-use client connect does-not-exist <url>");
     });
+
+    describe("remove", () => {
+      // Write the sessions file directly so we don't need a live MCP server
+      // just to test the remove path.
+      const sessionsFile = join(FAKE_HOME, ".mcp-use", "cli-sessions.json");
+
+      function writeSessions(sessions: Record<string, unknown>) {
+        mkdirSync(join(FAKE_HOME, ".mcp-use"), { recursive: true });
+        writeFileSync(
+          sessionsFile,
+          JSON.stringify({ sessions }, null, 2),
+          "utf-8"
+        );
+      }
+
+      function readSessions(): Record<string, unknown> {
+        return JSON.parse(readFileSync(sessionsFile, "utf-8")).sessions ?? {};
+      }
+
+      it("removes a saved server", async () => {
+        writeSessions({
+          "to-remove": {
+            type: "http",
+            url: "http://localhost:3000/mcp",
+            authMode: "bearer",
+            lastUsed: new Date().toISOString(),
+          },
+          keeper: {
+            type: "http",
+            url: "http://localhost:4000/mcp",
+            authMode: "bearer",
+            lastUsed: new Date().toISOString(),
+          },
+        });
+
+        const result = await runCLI(["client", "remove", "to-remove"]);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toMatch(/Removed saved server 'to-remove'/);
+
+        const remaining = readSessions();
+        expect(remaining["to-remove"]).toBeUndefined();
+        expect(remaining["keeper"]).toBeDefined();
+      });
+
+      it("errors when the server does not exist", async () => {
+        writeSessions({});
+
+        const result = await runCLI(["client", "remove", "ghost"]);
+
+        expect(result.exitCode).toBe(1);
+        const output = result.stdout + result.stderr;
+        expect(output).toMatch(/Server 'ghost' not found/);
+        expect(output).toContain("mcp-use client list");
+      });
+
+      it("clears OAuth tokens when no other saved server uses the URL", async () => {
+        writeSessions({
+          "oauth-srv": {
+            type: "http",
+            url: "https://example.com/mcp",
+            authMode: "oauth",
+            lastUsed: new Date().toISOString(),
+          },
+        });
+
+        const result = await runCLI(["client", "remove", "oauth-srv"]);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toMatch(/Removed saved server 'oauth-srv'/);
+        expect(result.stdout).toMatch(
+          /Removed OAuth tokens for https:\/\/example\.com\/mcp/
+        );
+        expect(readSessions()["oauth-srv"]).toBeUndefined();
+      });
+
+      it("keeps OAuth tokens when another saved server shares the URL", async () => {
+        writeSessions({
+          "oauth-srv": {
+            type: "http",
+            url: "https://example.com/mcp",
+            authMode: "oauth",
+            lastUsed: new Date().toISOString(),
+          },
+          "oauth-backup": {
+            type: "http",
+            url: "https://example.com/mcp",
+            authMode: "oauth",
+            lastUsed: new Date().toISOString(),
+          },
+        });
+
+        const result = await runCLI(["client", "remove", "oauth-srv"]);
+
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout).toMatch(/Removed saved server 'oauth-srv'/);
+        expect(result.stdout).toMatch(
+          /OAuth tokens .* were kept because saved server 'oauth-backup' still uses that URL/
+        );
+        const remaining = readSessions();
+        expect(remaining["oauth-srv"]).toBeUndefined();
+        expect(remaining["oauth-backup"]).toBeDefined();
+      });
+    });
   });
 
   describe("Connection", () => {
