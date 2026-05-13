@@ -1,5 +1,8 @@
-import { parseDataUrl } from "../messageFormat";
 import { parseSSE } from "../sse";
+import {
+  partitionToolContent,
+  toolImageFollowupHeader,
+} from "../toolResultParts";
 import type {
   ContentPart,
   LlmStreamEvent,
@@ -40,18 +43,31 @@ function toOpenAIContent(content: string | ContentPart[]): unknown {
   });
 }
 
-function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
+export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
   const out: unknown[] = [];
   for (const m of messages) {
     if (m.role === "tool") {
+      // OpenAI's tool role only accepts string content; forward image bytes as
+      // a follow-up user turn so vision-capable models can see them.
+      const { text, imageParts } = partitionToolContent(m.content);
       out.push({
         role: "tool",
         tool_call_id: m.toolCallId,
-        content:
-          typeof m.content === "string"
-            ? m.content
-            : JSON.stringify(m.toolResult ?? m.content),
+        content: text || "[image content; see next message]",
       });
+      if (imageParts.length > 0) {
+        const userParts: unknown[] = [
+          {
+            type: "text",
+            text: toolImageFollowupHeader(m.toolName, imageParts.length),
+          },
+          ...imageParts.map((p) => ({
+            type: "image_url",
+            image_url: { url: p.url },
+          })),
+        ];
+        out.push({ role: "user", content: userParts });
+      }
       continue;
     }
     if (m.role === "assistant") {
@@ -74,8 +90,6 @@ function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
     }
     out.push({ role: m.role, content: toOpenAIContent(m.content) });
   }
-  // Data URLs in images stay as-is; OpenAI accepts them.
-  void parseDataUrl; // silence unused import warning (shared helper lives here for anthropic)
   return out;
 }
 

@@ -1,4 +1,5 @@
 import { chat, streamChat } from "./providers";
+import { toolResultToContent } from "./toolResultParts";
 import type {
   LlmStreamEvent,
   ProviderConfig,
@@ -102,16 +103,9 @@ export async function* runToolLoop(
           error: err instanceof Error ? err.message : String(err),
         };
       }
-      // Normalize result for transmission back to the model. We strip `_meta`
-      // (inspector-specific) while preserving `content` / `structuredContent`.
-      const normalized = stripMeta(result);
-      const payloadText =
-        typeof normalized === "string"
-          ? normalized
-          : JSON.stringify(normalized);
       messages.push({
         role: "tool",
-        content: payloadText,
+        content: toolResultToContent(result),
         toolCallId: tc.id,
         toolName: tc.name,
         toolResult: result,
@@ -126,14 +120,6 @@ export async function* runToolLoop(
       };
     }
   }
-}
-
-function stripMeta(value: unknown): unknown {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const { _meta: _ignored, ...rest } = value as Record<string, unknown>;
-    return rest;
-  }
-  return value;
 }
 
 /**
@@ -187,11 +173,9 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
         args: tc.args,
         result,
       });
-      const payloadText =
-        typeof result === "string" ? result : JSON.stringify(stripMeta(result));
       messages.push({
         role: "tool",
-        content: payloadText,
+        content: toolResultToContent(result),
         toolCallId: tc.id,
         toolName: tc.name,
         toolResult: result,
