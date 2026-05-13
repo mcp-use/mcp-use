@@ -18,6 +18,7 @@
     "dependabot-1e0b22ca",
     "expose-response-helpers",
     "feat-screenshot-cli-mcp-1566",
+    "improve-inspector-scrollbars",
     "node-oauth-cli-flow",
     "node-oauth-force-refresh-and-xss",
     "node-oauth-pending-flow-fix",

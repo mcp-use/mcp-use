@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 6.0.0-canary.9
+
+### Patch Changes
+
+- 4cc5436: Improve dark mode scrollbar styling and hover visibility in the Inspector UI.
+  - mcp-use@1.28.0-canary.9
+
 ## 6.0.0-canary.8
 
 ### Patch Changes
