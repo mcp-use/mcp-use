@@ -24,6 +24,7 @@
     "oauth-session-store-extract",
     "resolve-duplicate-exports",
     "resolve-unlisted-deps",
+    "screenshot-mcp-headers",
     "server-cli-connect-hint"
   ]
 }
