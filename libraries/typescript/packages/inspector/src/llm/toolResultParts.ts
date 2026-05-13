@@ -77,7 +77,9 @@ function blockToPart(block: McpContentBlock): ContentPart | null {
   switch (block.type) {
     case "text": {
       const text = (block as McpContentText).text;
-      return typeof text === "string" && text.length > 0 ? makeText(text) : null;
+      return typeof text === "string" && text.length > 0
+        ? makeText(text)
+        : null;
     }
     case "image": {
       const b = block as McpContentImage;
@@ -121,7 +123,9 @@ function blockToPart(block: McpContentBlock): ContentPart | null {
       // Unknown block type — emit a short marker rather than stringifying the
       // whole thing (which may contain base64 payloads we want to keep out of
       // the text channel).
-      return makeText(`[unsupported tool content block: ${String(block.type)}]`);
+      return makeText(
+        `[unsupported tool content block: ${String(block.type)}]`
+      );
     }
   }
 }
@@ -153,9 +157,7 @@ export function extractToolResultParts(result: unknown): ContentPart[] {
     if (r.structuredContent !== undefined) {
       try {
         parts.push(
-          makeText(
-            `structuredContent: ${JSON.stringify(r.structuredContent)}`
-          )
+          makeText(`structuredContent: ${JSON.stringify(r.structuredContent)}`)
         );
       } catch {
         // ignore — non-serializable structuredContent is exotic enough that we

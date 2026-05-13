@@ -72,9 +72,10 @@ function toGeminiParts(content: string | ContentPart[]): unknown[] {
   return parts;
 }
 
-function buildGeminiToolResponse(
-  content: string | ContentPart[]
-): { response: Record<string, unknown>; imageParts: ContentPart[] } {
+function buildGeminiToolResponse(content: string | ContentPart[]): {
+  response: Record<string, unknown>;
+  imageParts: ContentPart[];
+} {
   // `functionResponse.response` must be an object; for a JSON-stringified
   // result we parse it back so Gemini sees the structured shape.
   if (typeof content === "string") {

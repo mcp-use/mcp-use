@@ -9,18 +9,14 @@ import type { ProviderMessage } from "../types";
 // tool, followed by a tool result containing an MCP image content block.
 function buildImageToolMessages(): ProviderMessage[] {
   const result = {
-    content: [
-      { type: "image", data: "AAAA", mimeType: "image/png" },
-    ],
+    content: [{ type: "image", data: "AAAA", mimeType: "image/png" }],
   };
   return [
     { role: "user", content: "describe the image" },
     {
       role: "assistant",
       content: "",
-      toolCalls: [
-        { id: "call_1", name: "fetch-image", args: {} },
-      ],
+      toolCalls: [{ id: "call_1", name: "fetch-image", args: {} }],
     },
     {
       role: "tool",
@@ -41,9 +37,7 @@ describe("Anthropic: tool_result content", () => {
     expect(block.type).toBe("tool_result");
     expect(block.tool_use_id).toBe("call_1");
     expect(Array.isArray(block.content)).toBe(true);
-    const imageBlock = (block.content as any[]).find(
-      (b) => b.type === "image"
-    );
+    const imageBlock = (block.content as any[]).find((b) => b.type === "image");
     expect(imageBlock).toBeDefined();
     expect(imageBlock.source.type).toBe("base64");
     expect(imageBlock.source.media_type).toBe("image/png");
@@ -117,9 +111,7 @@ describe("Google: functionResponse + follow-up user with inlineData", () => {
 
     const trailingUser = out[out.length - 1];
     expect(trailingUser.role).toBe("user");
-    const inline = trailingUser.parts.find(
-      (p: any) => p.inlineData
-    );
+    const inline = trailingUser.parts.find((p: any) => p.inlineData);
     expect(inline.inlineData.mimeType).toBe("image/png");
     expect(inline.inlineData.data).toBe("AAAA");
   });

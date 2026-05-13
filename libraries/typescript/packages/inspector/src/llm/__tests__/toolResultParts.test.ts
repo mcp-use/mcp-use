@@ -30,9 +30,7 @@ describe("extractToolResultParts", () => {
 
   it("extracts image blocks with data, mimeType, and synthesized data URL", () => {
     const parts = extractToolResultParts({
-      content: [
-        { type: "image", data: "AAAA", mimeType: "image/jpeg" },
-      ],
+      content: [{ type: "image", data: "AAAA", mimeType: "image/jpeg" }],
     });
     expect(parts).toHaveLength(1);
     const img = parts[0] as ImageContentPart;
@@ -129,9 +127,7 @@ describe("extractToolResultParts", () => {
 
   it("emits a resource_link marker with name + uri", () => {
     const parts = extractToolResultParts({
-      content: [
-        { type: "resource_link", uri: "app://doc", name: "doc" },
-      ],
+      content: [{ type: "resource_link", uri: "app://doc", name: "doc" }],
     });
     expect(parts).toEqual([
       { type: "text", text: '[resource_link "doc": app://doc]' },
