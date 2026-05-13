@@ -32,6 +32,40 @@ interface ScreenshotOptions {
   quiet?: boolean;
   timeout: string;
   cdpUrl?: string;
+  header?: string[];
+}
+
+/**
+ * Curl-style `Key: Value` parser. Splits on the first `:` so values may
+ * contain colons, and trims both sides so `Authorization:Bearer xyz` and
+ * `Authorization: Bearer xyz` are equivalent.
+ */
+export function parseHeaderArg(raw: string): [string, string] {
+  const idx = raw.indexOf(":");
+  if (idx === -1) {
+    throw new Error(
+      `Invalid --header value "${raw}". Expected "Key: Value" (e.g. "Authorization: Bearer xyz").`
+    );
+  }
+  const key = raw.slice(0, idx).trim();
+  const value = raw.slice(idx + 1).trim();
+  if (!key) {
+    throw new Error(`Invalid --header value "${raw}". Header name is empty.`);
+  }
+  return [key, value];
+}
+
+export function parseHeaderArgs(args: string[]): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const raw of args) {
+    const [key, value] = parseHeaderArg(raw);
+    headers[key] = value;
+  }
+  return headers;
+}
+
+function collectHeader(value: string, previous: string[] = []): string[] {
+  return previous.concat([value]);
 }
 
 interface ScreenshotBundle {
@@ -376,7 +410,8 @@ const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
  *  2. `--mcp <url>` → open an unauthenticated ad-hoc session at that URL
  */
 async function resolveSessionForScreenshot(
-  options: ScreenshotOptions
+  options: ScreenshotOptions,
+  headers: Record<string, string> | undefined
 ): Promise<MCPSession | null> {
   if (options.session) {
     const result = await getOrRestoreSession(options.session);
@@ -387,6 +422,7 @@ async function resolveSessionForScreenshot(
     const client = new MCPClient();
     client.addServer(AD_HOC_SESSION_NAME, {
       url: options.mcp,
+      ...(headers ? { headers } : {}),
       clientInfo: getCliClientInfo(),
     });
     try {
@@ -425,6 +461,28 @@ export async function screenshotCommand(
       return;
     }
 
+    let headers: Record<string, string> | undefined;
+    if (options.header && options.header.length > 0) {
+      if (!options.mcp) {
+        console.error(
+          formatError(
+            "--header is only supported with --mcp <url>. Saved sessions (use --session) carry their own auth from `mcp-use client connect`."
+          )
+        );
+        exitCode = 1;
+        return;
+      }
+      try {
+        headers = parseHeaderArgs(options.header);
+      } catch (err) {
+        console.error(
+          formatError(err instanceof Error ? err.message : String(err))
+        );
+        exitCode = 1;
+        return;
+      }
+    }
+
     try {
       resolveChromePath();
     } catch (err) {
@@ -441,7 +499,7 @@ export async function screenshotCommand(
     const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
 
     // Resolve session before spawning the dev server so auth issues fail fast.
-    const session = await resolveSessionForScreenshot(options);
+    const session = await resolveSessionForScreenshot(options, headers);
     if (!session) {
       exitCode = 1;
       return;
@@ -554,7 +612,13 @@ export function createScreenshotCommand(): Command {
     )
     .option(
       "--mcp <url>",
-      "Ad-hoc MCP server URL (escape hatch). Use when you don't have a saved server. No authentication."
+      "Ad-hoc MCP server URL (escape hatch). Use when you don't have a saved server. No authentication unless --header is supplied."
+    )
+    .option(
+      "-H, --header <header>",
+      'HTTP header to send to the --mcp <url> server, formatted "Key: Value". Repeatable. Use to pass an Authorization bearer token or other auth headers when screenshotting an authenticated MCP server.',
+      collectHeader,
+      [] as string[]
     )
     .option(
       "--theme <light|dark>",

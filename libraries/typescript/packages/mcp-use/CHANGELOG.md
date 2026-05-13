@@ -1,5 +1,34 @@
 # mcp-use
 
+## 1.28.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [4cc5436]
+  - @mcp-use/inspector@6.0.0-canary.9
+  - @mcp-use/cli@3.2.0-canary.9
+
+## 1.28.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [77b2a04]
+  - @mcp-use/cli@3.2.0-canary.8
+  - @mcp-use/inspector@6.0.0-canary.8
+
+## 1.28.0-canary.7
+
+### Patch Changes
+
+- 097f57c: Resolved duplicate exports flagged by Knip.
+  - Annotated the `Tel` alias for `Telemetry` with the `@alias` directive so Knip no longer flags it as a duplicate export. The alias remains available for consumers.
+  - Unified the canonical source path for `Telemetry`, `Tel`, `setTelemetrySource`, and `isBrowserEnvironment` in `src/telemetry/index.ts`. The Node implementation is now the default and is swapped for the browser implementation in browser bundles via the existing tsup substitution plugin.
+  - Removed the redundant default export of `JsonRpcLoggerView` in `@mcp-use/inspector`. The named export is unchanged.
+
+- Updated dependencies [097f57c]
+  - @mcp-use/inspector@6.0.0-canary.7
+  - @mcp-use/cli@3.2.0-canary.7
+
 ## 1.28.0-canary.6
 
 ### Patch Changes

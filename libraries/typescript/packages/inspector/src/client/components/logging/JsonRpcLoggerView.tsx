@@ -344,5 +344,3 @@ export function JsonRpcLoggerView({
     </div>
   );
 }
-
-export default JsonRpcLoggerView;

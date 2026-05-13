@@ -18,11 +18,14 @@
     "dependabot-1e0b22ca",
     "expose-response-helpers",
     "feat-screenshot-cli-mcp-1566",
+    "improve-inspector-scrollbars",
     "node-oauth-cli-flow",
     "node-oauth-force-refresh-and-xss",
     "node-oauth-pending-flow-fix",
     "oauth-session-store-extract",
+    "resolve-duplicate-exports",
     "resolve-unlisted-deps",
+    "screenshot-mcp-headers",
     "server-cli-connect-hint"
   ]
 }
