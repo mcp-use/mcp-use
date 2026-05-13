@@ -1141,9 +1141,6 @@ export function createClientCommand(): Command {
     )
     .action(removeClientCommand);
 
-  // Ad-hoc screenshot form: `mcp-use client screenshot --mcp <url> --tool <name>`.
-  // No saved-server positional — handy for one-off captures and programmatic
-  // use that doesn't want to first run `mcp-use client connect`.
   clientCommand.addCommand(createClientScreenshotCommand());
 
   return clientCommand;
@@ -1270,7 +1267,6 @@ export function createPerClientCommand(name: string): Command {
     .action(() => authLogoutCommand(name));
   cmd.addCommand(authCommand);
 
-  // Per-server screenshot: reuses the saved server's auth (no --mcp/--header).
   cmd.addCommand(createPerClientScreenshotCommand(name));
 
   return cmd;

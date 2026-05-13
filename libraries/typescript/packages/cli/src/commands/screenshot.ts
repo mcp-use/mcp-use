@@ -24,13 +24,6 @@ interface ScreenshotOptions {
   height: string;
   inspector?: string;
   mcp?: string;
-  /**
-   * Saved-server name. Not a user-facing flag — populated internally by
-   * `createPerClientScreenshotCommand(name)` so the per-client subcommand
-   * `mcp-use client <name> screenshot` reuses the same code path as the
-   * ad-hoc `mcp-use client screenshot --mcp <url>` form.
-   */
-  session?: string;
   theme: "light" | "dark";
   output?: string;
   waitFor?: string;
@@ -39,6 +32,11 @@ interface ScreenshotOptions {
   timeout: string;
   cdpUrl?: string;
   header?: string[];
+}
+
+interface ScreenshotContext {
+  sessionName?: string;
+  usagePrefix: string;
 }
 
 /**
@@ -412,16 +410,17 @@ const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
  * Resolve an authenticated MCPSession for the screenshot run.
  *
  * Resolution order:
- *  1. `options.session` → restore that saved server (set by the per-client
+ *  1. `sessionName` → restore that saved server (passed in by the per-client
  *     subcommand `mcp-use client <name> screenshot`).
  *  2. `--mcp <url>` → open an unauthenticated ad-hoc session at that URL.
  */
 async function resolveSessionForScreenshot(
   options: ScreenshotOptions,
+  sessionName: string | undefined,
   headers: Record<string, string> | undefined
 ): Promise<MCPSession | null> {
-  if (options.session) {
-    const result = await getOrRestoreSession(options.session);
+  if (sessionName) {
+    const result = await getOrRestoreSession(sessionName);
     return result?.session ?? null;
   }
 
@@ -454,9 +453,7 @@ async function resolveSessionForScreenshot(
 export async function screenshotCommand(
   options: ScreenshotOptions,
   argsList: string[] | undefined,
-  invocation: { usagePrefix: string } = {
-    usagePrefix: "mcp-use client screenshot",
-  }
+  context: ScreenshotContext
 ): Promise<void> {
   let exitCode = 0;
 
@@ -509,7 +506,11 @@ export async function screenshotCommand(
     const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
 
     // Resolve session before spawning the dev server so auth issues fail fast.
-    const session = await resolveSessionForScreenshot(options, headers);
+    const session = await resolveSessionForScreenshot(
+      options,
+      context.sessionName,
+      headers
+    );
     if (!session) {
       exitCode = 1;
       return;
@@ -544,13 +545,13 @@ export async function screenshotCommand(
         console.log("");
         console.log(formatInfo("Usage:"));
         console.log(
-          `  npx ${invocation.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
+          `  npx ${context.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
         );
         console.log(
-          `  npx ${invocation.usagePrefix} --tool ${options.tool} nested:='{"a":1}'   # JSON value`
+          `  npx ${context.usagePrefix} --tool ${options.tool} nested:='{"a":1}'   # JSON value`
         );
         console.log(
-          `  npx ${invocation.usagePrefix} --tool ${options.tool} '{"key":"value"}'   # full JSON object`
+          `  npx ${context.usagePrefix} --tool ${options.tool} '{"key":"value"}'   # full JSON object`
         );
         if (tool.inputSchema) {
           console.log("");
@@ -690,7 +691,8 @@ export function createPerClientScreenshotCommand(name: string): Command {
   );
 
   cmd.action(async (args: string[], opts: ScreenshotOptions) => {
-    await screenshotCommand({ ...opts, session: name }, args, {
+    await screenshotCommand(opts, args, {
+      sessionName: name,
       usagePrefix: `mcp-use client ${name} screenshot`,
     });
   });
