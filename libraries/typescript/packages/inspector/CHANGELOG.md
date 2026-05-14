@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 6.0.1-canary.2
+
+### Patch Changes
+
+- 81cebc7: Remove 18 unused inspector source files flagged by the TypeScript workspace Knip check, and stop generating the unused client-side `version.ts` (the client reads the version from the `window.__INSPECTOR_VERSION__` global injected by the server).
+  - mcp-use@1.28.1-canary.2
+
 ## 6.0.1-canary.1
 
 ### Patch Changes
