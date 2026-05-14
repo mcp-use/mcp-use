@@ -1,5 +1,354 @@
 # @mcp-use/cli
 
+## 3.2.0
+
+### Minor Changes
+
+- 46caf80: feat(cli): borderless aligned-columns table rendering, gh/kubectl style
+
+  Replaced the box-drawing ASCII table in `mcp-use client {tools,resources,prompts,sessions} list` with a borderless layout: UPPERCASE bold headers, two-space gutter between columns, ANSI-stripped width math, ellipsis truncation for long descriptions, sized to the terminal width (or 100 cols). Tool rows now also show a `MODE` column (read-only / write / destructive, derived from the tool's MCP annotations) and an `ARGS` column (required/total).
+
+  When stdout is not a TTY (pipes, agents, CI), every list command instead emits tab-separated values with no header, no decorative banners, and no ANSI — matching how the GitHub CLI behaves. This makes the CLI directly parseable by AI agents and shell pipelines.
+
+- 46caf80: feat(cli)!: drop the "active session" model — every `client` command now takes a name
+
+  The CLI client used to track an implicit "active session" that you switched
+  between with `client sessions switch`. Per-command flags like `--session` and
+  `--name` were sprinkled around to override it. The active state was hidden,
+  easy to get wrong, and forced every subcommand to handle "no session" as a
+  real case.
+
+  It's gone. The client name is now a required positional, and every
+  per-client command lives under `mcp-use client <name> <scope> <action>`:
+
+  ```bash
+  # Before
+  mcp-use client connect https://mcp.manufact.com --name manufact
+  mcp-use client tools list
+  mcp-use client tools call read_file path=/x --session manufact
+  mcp-use client sessions list
+  mcp-use client sessions switch other-server
+  mcp-use client disconnect --all
+
+  # After
+  mcp-use client connect manufact https://mcp.manufact.com
+  mcp-use client manufact tools list
+  mcp-use client manufact tools call read_file path=/x
+  mcp-use client list
+  mcp-use client other-server <action>   # name addresses any saved client directly
+  mcp-use client manufact disconnect     # disconnect one at a time
+  ```
+
+  **Breaking changes:**
+  - `client connect <url> --name <name>` → `client connect <name> <url>` (name is required, positional).
+  - `--session <name>` is removed from every per-client subcommand; the name comes from the path instead.
+  - `client sessions list` → `client list`.
+  - `client sessions switch` is removed — there is no active client to switch.
+  - `client disconnect --all` is removed; disconnect each client by name.
+  - `mcp-use screenshot` no longer falls back to the active session; pass `--session <name>` or `--mcp <url>` explicitly.
+
+  Existing `~/.mcp-use/cli-sessions.json` files keep working; the now-unused
+  `activeSession` field is silently ignored on load.
+
+  The CLI also gives clearer feedback for the common shape mistakes the new
+  syntax invites — passing only a URL to `connect`, forgetting the client
+  name before a per-client scope (`mcp-use client tools call foo`), or
+  typing an unknown subcommand — instead of the bare commander defaults.
+
+- 46caf80: feat(cli): add `--device-scale-factor <n>` to `mcp-use client screenshot` (both ad-hoc and per-server forms) and `--screenshot-device-scale-factor <n>` to `mcp-use client <name> tools call` for capturing high-DPI widget screenshots (e.g. Retina-style 2x). Defaults to 1, so existing behavior is unchanged. Accepts fractional values; bounded to (0, 4].
+- 46caf80: feat(cli)!: make widget screenshot opt-in on `mcp-use client <name> tools call`. The `--no-screenshot` flag is replaced by `--screenshot`. By default, tool calls no longer capture a PNG of any rendered widget; when a tool declares a UI resource and `--screenshot` is omitted, the CLI prints a hint suggesting the flag. Passing `--screenshot-output` or `--screenshot-device-scale-factor` implies `--screenshot`. Breaking: scripts/agents relying on auto-capture must add `--screenshot`.
+- 46caf80: feat(cli): move `screenshot` under `client` and require an explicit session name
+
+  The standalone `mcp-use screenshot` command has been folded into `mcp-use client`, with two forms:
+  - **Saved-server form:** `mcp-use client <name> screenshot --tool <tool>` reuses the auth from `mcp-use client connect`. The `--session` flag is gone — the server name is now the explicit positional that every other `mcp-use client <name> ...` command already takes.
+  - **Ad-hoc form:** `mcp-use client screenshot --mcp <url> --tool <tool>` keeps `-H/--header` for authenticating one-off captures. Useful for programmatic / CI use that doesn't want to first save a server with `mcp-use client connect`.
+
+  **Breaking changes:**
+  - `mcp-use screenshot ...` no longer exists. Use `mcp-use client <name> screenshot ...` (saved server) or `mcp-use client screenshot --mcp <url> ...` (ad-hoc).
+  - The `--session <name>` flag is removed. The saved-server name is the positional in `mcp-use client <name> screenshot`.
+  - `screenshot` is now a reserved name and can't be used as a saved-server name.
+
+  This mirrors the rest of the `mcp-use client` surface after the removal of the implicit "active session" model — every per-server command takes the server name as its first positional argument.
+
+- 46caf80: feat(cli): accept `key=value` args for `client tools call` and `client prompts get`
+
+  Previously the only way to pass arguments to a tool or prompt was a single
+  JSON-encoded string, which is brittle for both humans (shell escaping) and
+  agents (extra JSON-stringify step, easy to get wrong). Now each argument is a
+  variadic positional in `key=value` form, with types coerced from the tool's
+  input schema (`number`, `integer`, `boolean`, `array`, `object`, `string`,
+  nullable unions). For nested objects or arrays, `key:=<json>` (httpie-style)
+  forces the value to be parsed as JSON.
+
+  ```bash
+  # Before
+  mcp-use client tools call greet '{"name":"world","count":3,"enabled":true}'
+
+  # After
+  mcp-use client tools call greet name=world count=3 enabled=true
+
+  # Nested values
+  mcp-use client tools call create-doc title=hello meta:='{"tags":["a","b"]}'
+  ```
+
+  The legacy single-JSON-object form is still accepted for backward
+  compatibility (a single positional starting with `{` is parsed as a JSON
+  object), and a leading `--` on a key is stripped if present (`--name=world`
+  works the same as `name=world`). The same syntax applies to
+  `mcp-use client prompts get`. Error messages now show usage examples and the
+  target tool's schema so agents can self-correct.
+
+- 46caf80: feat(cli, inspector): add `mcp-use screenshot` for visual feedback loops on MCP Apps views (MCP-1566)
+
+  `mcp-use screenshot --tool <name> key=value [key2=value2 ...]` calls the tool and renders the result headlessly, saving a PNG of the resulting view. Use `key:=<json>` for nested values, or pass a single JSON object for the legacy form.
+
+  The CLI always spawns a fresh `@mcp-use/inspector` standalone server on a free port (no reuse of whatever happens to be on `localhost:3000`, which could be an unrelated Vite/dev server) and tears it down on exit. It drives the user's existing Chrome / Chromium / Edge / Brave install via the Chrome DevTools Protocol at the new chromeless `/inspector/preview/:view` route inside the inspector SPA. Pass `--inspector <url>` to point at an existing inspector instance; the URL is probed strictly (must return `{ status: "ok" }` JSON on `/inspector/health`) so unrelated servers can't be misidentified. The screenshot pipeline no longer requires being in a project with an MCP server entry — any directory works. Output defaults to `./<view>-<timestamp>.png` in cwd.
+
+  No additional install step or peer dependency is required — the command uses your system Chrome. The browser path is auto-detected on macOS / Linux / Windows; override with `MCP_USE_CHROME_PATH`, `PUPPETEER_EXECUTABLE_PATH`, or `CHROME_PATH` if needed.
+
+  The inspector exposes a new internal `<ViewPreview>` component and a `/preview/:view` client-side route. `MCPAppsRenderer` gains an optional `onReady` callback used by the preview route to drive the readiness signal (`body[data-view-ready="true"]`) that the screenshot command waits for before capturing.
+
+  **Session-aware authentication.** Screenshot now reuses sessions saved by `mcp-use client connect`, so a single OAuth flow covers every subsequent screenshot of that server. Replace `--auth <token>` with `--session <name>` (defaults to the active session); `--mcp <url>` remains as an unauthenticated escape hatch. The OAuth token never enters the browser — the CLI calls the tool, reads the widget resource, and injects the result into Chrome via CDP `Page.addScriptToEvaluateOnNewDocument` (as `globalThis.__mcpUsePreviewBundle`). The preview route detects the global and renders inline, skipping the browser-side MCP connection entirely.
+
+  **Breaking:** `mcp-use screenshot` flags `--auth` and `--header` are removed. Use `mcp-use client connect <url> --name <name>` (with OAuth) once, then `mcp-use screenshot --tool <name>`.
+
+  **Auto-screenshot in `client tools call`.** When `mcp-use client tools call <name>` invokes a tool that declares a UI resource (`_meta.ui.resourceUri` or `openai/outputTemplate`), the CLI now automatically captures a widget screenshot using the same pipeline as `mcp-use screenshot`. The tool result is reused (no double tool-call) and the dev server is auto-spawned if needed. Pass `--no-screenshot` to opt out, or `--screenshot-output <path>` to override the default `./<view>-<timestamp>.png` path. Screenshot failures print a warning but don't fail the tool call.
+
+  **Remote browser via `--cdp-url`.** `mcp-use screenshot` now accepts `--cdp-url <ws-or-wss-url>` to connect to an existing Chrome DevTools Protocol endpoint instead of spawning local Chrome. Useful for hosted Chromium providers (e.g. Notte) so the screenshot pipeline can run in sandboxes without a local browser install. When `--cdp-url` is set, the CLI skips Chrome resolution entirely and uses `Target.setAutoAttach` (rather than the local path's explicit `Target.attachToTarget`, which some hosted providers forbid) to pick up the existing page session. Combine with `--inspector <url>` pointing at a publicly reachable preview deployment so the remote browser can load the widget bundle. The local-Chrome path is unchanged when `--cdp-url` is omitted.
+
+- 46caf80: feat(auth): Node OAuth client provider + CLI OAuth flow
+
+  Adds a real OAuth flow to the `mcp-use` CLI. `mcp-use client connect <url>`
+  against an OAuth-protected MCP server now opens a browser, captures the
+  authorization code via a localhost loopback, persists tokens to
+  `~/.mcp-use/oauth/<urlHash>/`, and silently refreshes them on subsequent
+  commands — no flag plumbing.
+
+  New on `mcp-use`:
+  - `mcp-use/auth/node` entrypoint exporting `NodeOAuthClientProvider`,
+    `FileKVStore`, the `KVStore` type, and re-exporting the SDK's `auth` and
+    `UnauthorizedError`.
+  - `NodeOAuthClientProvider` implements `OAuthClientProvider`, owns the
+    loopback callback server (preferred port 33418, walks up to 33427 on
+    conflict, persisted across runs), and exposes `getAuthorizationCode()`
+    for the orchestrator pattern in `useMcp.ts`.
+  - `FileKVStore` writes tokens, client info, and code verifiers to one file
+    per key under `~/.mcp-use/oauth/<urlHash>/` with `0o600` perms and atomic
+    rename on write.
+
+  New on `@mcp-use/cli`:
+  - `mcp-use client connect <url>` auto-runs OAuth on `UnauthorizedError`
+    when no `--auth` is supplied. New flags: `--no-oauth`, `--auth-timeout`.
+  - `mcp-use client auth status|refresh|logout [session]` for token
+    introspection, forced refresh, and revocation. (No `auth login` — that's
+    what `connect` is for.)
+  - Follow-up commands (`tools list`, etc.) on OAuth sessions transparently
+    refresh expiring JWTs. If the refresh token itself is dead, the CLI
+    prompts to re-auth on TTY or prints the exact `connect` command to run
+    on non-TTY.
+
+- 46caf80: feat(cli): add `--header` / `-H` to `mcp-use screenshot` for authenticated `--mcp <url>` servers
+
+  `mcp-use screenshot --mcp <url>` now accepts repeatable `-H, --header "Key: Value"` flags (curl-style), letting you screenshot authenticated MCP servers without first running `mcp-use client connect`. The most common use is a static bearer token:
+
+  ```
+  mcp-use screenshot --tool show-board \
+    --mcp https://my-mcp.example.com/mcp \
+    -H "Authorization: Bearer $TOKEN"
+  ```
+
+  Headers are only honored with `--mcp <url>`; passing `--header` alongside `--session` (or the active saved session) errors with a clear message, since saved sessions already carry their own OAuth/bearer auth from `mcp-use client connect`. Header values are split on the first `:` only, so colons inside the value (e.g. ISO timestamps) are preserved. Whitespace around key and value is trimmed.
+
+### Patch Changes
+
+- 46caf80: Remove unused dependencies and devDependencies flagged by `knip`.
+  - Root: drop `lint-staged` and `typescript-eslint` (unused; ESLint config uses `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` directly, and Husky pre-commit runs `pnpm format`/`lint:fix` directly without lint-staged). Removed the stale root `lint-staged` config block.
+  - `@mcp-use/cli`: drop `globby`, `ws`, `@types/ws` (no source references; `globby` was explicitly replaced by Node built-ins). Removed `globby` from `tsup.config.ts` `noExternal`.
+  - `create-mcp-use-app`: drop `fs-extra` and `@types/fs-extra` (no source references).
+  - `mcp-use`: drop `ws`, `@types/ws`, `@antfu/eslint-config`, `@langchain/anthropic` (devDep — already an optional peer; only referenced as a string for dynamic import), `eslint-plugin-format`, `lint-staged`. Removed the stale package-level `lint-staged` config block.
+  - `knip.json`: ignore `@mcp-use/inspector` for the `cli` package (resolved dynamically via `createRequire().resolve` to read its `package.json`).
+
+  `pnpm knip:deps` now reports 0 unused (dev)dependencies. `pnpm install --frozen-lockfile`, `pnpm lint`, and `pnpm build` all succeed.
+
+- 46caf80: fix(cli): exit cleanly after `client` subcommands so headless agents don't hang
+
+  Each `mcp-use client` subcommand spins up a fresh `MCPClient` + HTTP/SSE
+  transport per process invocation but never closed it before returning, so
+  the underlying socket kept the Node event loop alive and the CLI process
+  hung after `tools list`, `tools call`, `resources read`, etc. — making the
+  client unusable for headless / agent-driven flows.
+
+  Each one-shot subcommand now closes its in-memory sessions and exits at
+  the end. Long-running commands (`subscribe`, `interactive`) are unchanged
+  and still keep the loop alive until Ctrl+C / `quit`.
+
+- 46caf80: feat(cli): add `mcp-use client remove <name>` to drop a saved server
+
+  Saved servers could be added (`client connect`) and listed (`client list`),
+  but the only way to delete one was to hand-edit
+  `~/.mcp-use/cli-sessions.json`. `client remove <name>` now does this: it
+  errors if no server by that name exists, closes any in-process connection,
+  deletes the entry, and — for OAuth-authenticated servers — also revokes
+  the stored tokens for that URL. If another saved server still points at
+  the same URL the tokens are kept (they're URL-keyed, so wiping them would
+  break the sibling); the CLI prints which sibling is keeping them alive.
+
+- 46caf80: refactor(cli): user-facing copy now calls saved entries "servers" instead of "clients"
+
+  The CLI itself is the MCP client; the things it connects to are MCP
+  servers. The old copy referred to saved connections as "saved clients" /
+  "named clients", which is backwards and confused users.
+
+  User-facing strings (help text, error messages, table headers, REPL
+  prompts, docs) now consistently say "server" / "saved server". The
+  `mcp-use client` command name is unchanged — it's still the entry point
+  for client-side operations — so this is purely a wording change and no
+  scripts break.
+
+- 46caf80: fix(cli): reject saved-server names that collide with per-server scope tokens
+
+  `mcp-use client <name> ...` routes any name that isn't a reserved subcommand
+  (`connect`, `list`, `remove`, `help`) to the per-server command tree. If a
+  user saved a server under one of the scope names — `tools`, `resources`,
+  `prompts`, `auth`, `disconnect`, `interactive` — every invocation against
+  that name would instead be caught by the "missing server name" routing and
+  the saved entry would be unreachable.
+
+  `client connect` now refuses those names up front with the list of reserved
+  names and a suggested rename, instead of silently saving an entry that can
+  never be addressed.
+
+- 46caf80: fix(cli): show a "not found, here's how to connect" message instead of the per-server help when `mcp-use client <name>` targets an unknown server
+
+  Running `mcp-use client <name>` with no subcommand used to fall through to
+  commander's per-server help — listing `tools`, `resources`, `prompts`, etc.
+  That help is only useful once the server actually exists; for a name the
+  user hasn't connected yet it just leaks the subcommand surface without
+  telling them how to make the name resolve.
+
+  When the name doesn't match a saved server, the CLI now prints the
+  `client connect <name> <url>` hint (plus a pointer to `client list`) and
+  exits non-zero. The per-server help is still shown when the server exists.
+
+- 46caf80: fix(cli): stop auto-opening the browser during OAuth flows
+
+  When an `mcp-use client` command needed to authenticate against an OAuth
+  server it would launch the user's browser via the `open` package on TTYs,
+  and only print the URL when stdout wasn't a TTY. That was surprising in two
+  directions: scripts that did happen to inherit a TTY got pop-up windows, and
+  the heuristic missed plenty of agentic/CI environments that _do_ keep a TTY
+  attached. The CLI now always prints the authorization URL and waits on the
+  loopback callback — the user opens the link themselves whenever it's
+  convenient. (Other CLI surfaces that intentionally open a browser, like
+  `mcp-use deploy --open` and the auth login flow, are unchanged.)
+
+- 46caf80: fix(cli): don't auto-open a browser for OAuth in non-TTY contexts
+
+  When `mcp-use client connect` (or a session restore) hits an OAuth flow,
+  the CLI used to launch the user's browser unconditionally. That's the
+  right call from an interactive terminal, but surprising when an LLM
+  agent or a CI script runs the same command — the agent has no way to
+  "see" the browser, and the user gets an unexpected window.
+
+  `stdout.isTTY` now gates the browser launch:
+  - TTY: opens the browser as before.
+  - Non-TTY: prints the authorization URL to stderr and waits on the
+    loopback callback, so the caller (human or agent) can hand the URL
+    off however it wants.
+
+  The leading "→ Opening browser to authenticate..." message is also
+  adjusted to "→ OAuth authentication required." in non-TTY mode so the
+  log doesn't claim a browser was opened when it wasn't.
+
+- 46caf80: chore(cli): rename "mcp-use cloud" to "Manufact cloud" in login command output
+
+  `mcp-use login --help` now says "Login to Manufact cloud" and the body banner reads "Logging in to Manufact cloud..." — matching the existing wording used by `logout` and `deploy`.
+
+- 46caf80: fix(cli): tests no longer touch the developer's real `~/.mcp-use` directory
+
+  Two leaks are closed:
+  - `session-storage.test.ts` computed its target path from `os.homedir()` and `rmSync`'d it in `beforeEach`/`afterEach`, so running `pnpm test` during local development deleted any saved clients on disk. The tests now mock `node:os.homedir` to a per-process temp directory.
+  - `cli-integration.test.ts` spawned the real CLI as a subprocess and so read the developer's real `cli-sessions.json` when running `client list`. `runCLI` now sets `HOME` (and `USERPROFILE`) to an isolated temp dir for every spawn.
+
+- 46caf80: fix(cli): stop printing tool results twice when servers return structuredContent
+
+  Per the MCP spec, a tool that returns `structuredContent` SHOULD also serialize
+  the same JSON into a `TextContent` block for backwards compatibility. The
+  client was rendering both, so every call to a structured-output tool printed
+  the JSON payload twice.
+
+  `mcp-use client <name> tools call ...` now treats `structuredContent` as the
+  canonical form: when it's present, duplicate `TextContent` blocks are
+  suppressed and only the structured JSON is shown. Non-text content blocks
+  (image, resource) are still rendered alongside the structured payload — they
+  carry information the structured form doesn't.
+
+- 46caf80: fix(cli): surface tool call error details in `client tools call`
+
+  Previously when a tool call returned `isError: true`, the CLI showed
+  only "✗ Tool execution failed" without making it clear that the
+  following content was the error message — and printed nothing at all
+  when the server returned no content. Both human users and agent
+  callers had no way to debug what went wrong.
+
+  The output now labels the error content explicitly ("Error details:"),
+  colors text content red, surfaces `structuredContent` when present,
+  and falls back to "(no error details provided by server)" if the
+  server returned neither. Connection-level failures (caught Errors)
+  now also print any attached `data` payload.
+
+- 46caf80: fix(cli): exit non-zero when `client tools call` returns `isError: true`
+
+  `mcp-use client tools call <tool>` printed "✗ Tool execution failed"
+  but still exited 0, so headless agents and shell pipelines couldn't
+  distinguish a successful tool call from a failed one. The command now
+  exits 1 when the tool result has `isError: true`, in both default and
+  `--json` output modes. The result content is still printed first so the
+  failure detail remains visible.
+
+- 46caf80: fix(auth): handle SDK-initiated OAuth redirect on 401 in CLI connect
+
+  The SDK's `StreamableHTTPClientTransport` auto-calls `auth()` on a 401, which
+  in turn calls our `redirectToAuthorization()` — binding the loopback and
+  opening the browser before the transport throws. Two fixes so the CLI's
+  `connect` command picks up where the SDK left off instead of dying:
+  - `NodeOAuthClientProvider` exposes `hasPendingFlow` so orchestrators can
+    detect that the SDK already kicked off the flow and skip straight to
+    `getAuthorizationCode()` (calling `auth()` again would throw "an
+    authorization is already in progress").
+  - `mcp-use client connect`'s `runOAuthFlow` uses `hasPendingFlow` to skip
+    the duplicate `auth()` call, and `isUnauthorized` now also matches the
+    rewrapped 401 that `HttpConnector` throws (plain `Error` with `code = 401`).
+
+  Without these, the first connect to an OAuth-protected server printed
+  "Authentication required" and `process.exit(1)`'d before the browser
+  callback returned — leaving the user staring at a "connection refused"
+  loopback page.
+
+- 46caf80: fix(cli): error when `client screenshot` omits required tool arguments
+
+  `mcp-use client screenshot --tool <tool>` (and `mcp-use client <name>
+screenshot --tool <tool>`) silently produced a blank PNG and exited 0
+  when the target tool declared required arguments but none were passed.
+  The command now mirrors `client tools call`: it prints "This tool
+  requires arguments." along with the tool schema and exits 1, before
+  launching the inspector or browser.
+
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+- Updated dependencies [46caf80]
+  - mcp-use@1.28.0
+  - @mcp-use/inspector@6.0.0
+
 ## 3.2.0-canary.15
 
 ### Patch Changes
