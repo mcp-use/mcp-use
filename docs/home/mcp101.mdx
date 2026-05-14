@@ -132,9 +132,41 @@ See [TypeScript Prompts](/typescript/server/prompts) and [Python Prompts](/pytho
 
 ### MCP Apps
 
-Beyond tools and resources, mcp-use supports **MCP Apps**  -  interactive UI widgets that run directly inside Claude, ChatGPT, and other MCP clients. A tool returns a widget instead of plain text, and the client renders it.
+**MCP Apps** is the official standard for interactive UI widgets in the MCP ecosystem. Instead of returning plain text, a tool returns a rendered widget - a React component that runs directly inside Claude, ChatGPT, or any MCP-compatible client. Write the widget once and it works everywhere.
 
-See [MCP Apps](/typescript/server/mcp-apps).
+```typescript
+import { MCPServer, widget } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool({
+  name: "get_weather",
+  description: "Get weather for a city",
+  schema: z.object({ city: z.string() }),
+  widget: "weather-display", // references resources/weather-display/widget.tsx
+}, async ({ city }) => {
+  return widget({
+    props: { city, temperature: 22, conditions: "Sunny" },
+    message: `Weather in ${city}: Sunny, 22°C`,
+  });
+});
+```
+
+Widgets live in a `resources/` folder and are auto-discovered - no manual registration needed. They communicate with the server over JSON-RPC and have full access to MCP tools and resources from the client side.
+
+<CardGroup cols={2}>
+  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/server/mcp-apps">
+    Widgets, auto-discovery, props, and client-side hooks.
+  </Card>
+  <Card title="Creating an MCP Apps Server" icon="circle-play" href="/typescript/server/creating-mcp-apps-server">
+    Step-by-step: scaffold and ship your first widget.
+  </Card>
+  <Card title="Building ChatGPT Apps" icon="message-square" href="/guides/chatgpt-apps-flow">
+    Ship an MCP App to ChatGPT specifically.
+  </Card>
+  <Card title="Debugging Widgets" icon="bug-play" href="/inspector/debugging-chatgpt-apps">
+    Use the Inspector to test and debug your widgets.
+  </Card>
+</CardGroup>
 
 ## MCP Client
 
