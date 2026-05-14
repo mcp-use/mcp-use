@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.28.1-canary.0
+
+### Patch Changes
+
+- ef32a50: Remove unused internal source files flagged by the TypeScript workspace Knip check.
+  - @mcp-use/cli@3.2.1-canary.0
+  - @mcp-use/inspector@6.0.1-canary.0
+
 ## 1.28.0
 
 ### Minor Changes
