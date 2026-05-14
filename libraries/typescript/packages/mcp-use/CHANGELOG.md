@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.28.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [fb50dbb]
+  - @mcp-use/cli@3.2.0-canary.11
+  - @mcp-use/inspector@6.0.0-canary.11
+
 ## 1.28.0-canary.10
 
 ### Patch Changes
