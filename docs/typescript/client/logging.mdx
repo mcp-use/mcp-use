@@ -4,32 +4,6 @@ description: "Handle server log messages in the TypeScript client"
 icon: "file-text"
 ---
 
-MCP servers can send structured log messages to connected clients. The TypeScript client exposes these through a logging callback.
-
-<Note>
-Logging callback support is currently available in the **Python client**. See [Python Client Logging](/python/client/logging) for the reference implementation.
-
-TypeScript support is in progress  -  [open an issue](https://github.com/mcp-use/mcp-use) to track or contribute.
-</Note>
-
-## Understanding MCP Logging
-
-MCP defines a dedicated logging channel separate from notifications. Servers use it to send structured diagnostic output without cluttering the main protocol stream.
-
-**Log levels**: `debug`, `info`, `warning`, `error`
-
-## Python Reference
-
-For teams using both SDKs, the Python API looks like this:
-
-```python
-from mcp_use import MCPClient
-
-async def handle_logs(params):
-    print(f"[{params.level.upper()}] {params.message}")
-
-client = MCPClient(config, logging_callback=handle_logs)
-await client.create_all_sessions()
-```
-
-See [Python Client Logging](/python/client/logging) for full details.
+<Warning>
+Logging callbacks are not yet supported in the TypeScript client. See the [Python client logging](/python/client/logging) documentation if you need this feature.
+</Warning>
