@@ -8,6 +8,7 @@
     "mcp-use": "1.28.0"
   },
   "changesets": [
+    "inspector-skipped-log-wording",
     "quiet-files-cleanup"
   ]
 }
