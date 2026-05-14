@@ -204,9 +204,9 @@ Per-server commands accept these flags where they make sense:
 
 - `--json`: Output results as JSON (on `list`/`call`/`read`/`get`).
 - `--timeout <ms>`: Request timeout (on `tools call`).
-- `--no-screenshot`: Skip the auto-screenshot capture for tools that render a widget (on `tools call`).
-- `--screenshot-output <path>`: Override the screenshot output path.
-- `--screenshot-device-scale-factor <n>`: Device pixel ratio for the auto-screenshot (e.g. `2` for Retina). Defaults to `1`. The dedicated `mcp-use client screenshot` command exposes the same knob as `--device-scale-factor <n>`.
+- `--screenshot`: Capture a PNG screenshot of the rendered widget (on `tools call`, when the tool declares a UI resource). Opt-in — when omitted, the CLI prints a hint suggesting this flag.
+- `--screenshot-output <path>`: Override the screenshot output path. Implies `--screenshot`.
+- `--screenshot-device-scale-factor <n>`: Device pixel ratio for the widget screenshot (e.g. `2` for Retina). Defaults to `1`. Implies `--screenshot`. The dedicated `mcp-use client screenshot` command exposes the same knob as `--device-scale-factor <n>`.
 
 ## Storage
 

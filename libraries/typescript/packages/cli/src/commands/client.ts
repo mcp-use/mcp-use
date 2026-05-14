@@ -588,10 +588,18 @@ export async function callToolCommand(
       timeout: options?.timeout,
     });
 
-    // Auto-screenshot if the tool renders a widget. Capture before printing
-    // so the screenshot path is part of the printed result — agents reading
-    // `--json` output get the path inside the JSON. Failures here don't fail
-    // the tool call; the result is still printed and a warning is logged.
+    // Screenshot is opt-in via --screenshot. Any of the screenshot-related
+    // flags also implies opt-in so users don't have to pass `--screenshot`
+    // alongside `--screenshot-output`. Capture before printing so the path is
+    // part of the printed result — agents reading `--json` output get it
+    // inside the JSON. Failures don't fail the tool call.
+    const toolWithMeta = session.tools.find((t) => t.name === toolName);
+    const resourceUri = detectToolResourceUri(toolWithMeta);
+    const wantsScreenshot =
+      options?.screenshot === true ||
+      options?.screenshotOutput !== undefined ||
+      options?.screenshotDeviceScaleFactor !== undefined;
+
     let screenshot: {
       path: string;
       width: number;
@@ -599,10 +607,9 @@ export async function callToolCommand(
       view: string;
     } | null = null;
     let screenshotError: string | null = null;
-    if (options?.screenshot !== false) {
-      const tool = session.tools.find((t) => t.name === toolName);
-      const resourceUri = detectToolResourceUri(tool);
-      if (resourceUri) {
+    let widgetHintUri: string | null = null;
+    if (resourceUri) {
+      if (wantsScreenshot) {
         console.error(
           formatInfo(`Capturing widget screenshot (${resourceUri})...`)
         );
@@ -638,6 +645,8 @@ export async function callToolCommand(
         } catch (err: any) {
           screenshotError = err?.message ?? String(err);
         }
+      } else {
+        widgetHintUri = resourceUri;
       }
     }
 
@@ -660,6 +669,13 @@ export async function callToolCommand(
     if (screenshotError) {
       console.error(
         formatWarning(`Skipped widget screenshot: ${screenshotError}`)
+      );
+    }
+    if (widgetHintUri) {
+      console.error(
+        formatInfo(
+          `This tool renders a widget (${widgetHintUri}). Re-run with --screenshot to save a PNG of it.`
+        )
       );
     }
 
@@ -1198,16 +1214,16 @@ export function createPerClientCommand(name: string): Command {
     .option("--timeout <ms>", "Request timeout in milliseconds", parseInt)
     .option("--json", "Output as JSON")
     .option(
-      "--no-screenshot",
-      "Skip the auto-screenshot for tools that render a widget"
+      "--screenshot",
+      "Capture a PNG screenshot of the rendered widget for tools that declare a UI resource"
     )
     .option(
       "--screenshot-output <path>",
-      "Output PNG path for the widget screenshot (defaults to ./<view>-<timestamp>.png)"
+      "Output PNG path for the widget screenshot (implies --screenshot; defaults to ./<view>-<timestamp>.png)"
     )
     .option(
       "--screenshot-device-scale-factor <n>",
-      "Device pixel ratio for the auto-screenshot (e.g. 2 for Retina). Defaults to 1."
+      "Device pixel ratio for the widget screenshot (implies --screenshot; e.g. 2 for Retina). Defaults to 1."
     )
     .action((tool, args, options) =>
       callToolCommand(name, tool, args, options)
