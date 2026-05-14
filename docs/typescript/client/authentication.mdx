@@ -210,19 +210,18 @@ const client = MCPClient.fromDict(config)
 The mcp-use CLI client supports bearer token authentication for connecting to secured MCP servers:
 
 ```bash
-# Connect with bearer token
-npx mcp-use client connect https://api.example.com/mcp \
-  --name my-server \
+# Connect with bearer token, saved under the name "my-server"
+npx mcp-use client connect my-server https://api.example.com/mcp \
   --auth sk-your-api-key
 
-# List tools (uses saved authentication)
-npx mcp-use client tools list
+# List tools on that saved server
+npx mcp-use client my-server tools list
 
 # Call a tool
-npx mcp-use client tools call send_email '{"to":"user@example.com"}'
+npx mcp-use client my-server tools call send_email to=user@example.com
 
 # Disconnect
-npx mcp-use client disconnect my-server
+npx mcp-use client my-server disconnect
 ```
 
 The CLI automatically saves authentication tokens in `~/.mcp-use/cli-sessions.json` for future sessions.

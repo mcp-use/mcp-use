@@ -1,5 +1,135 @@
 # @mcp-use/inspector
 
+## 6.0.0-canary.15
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.15
+
+## 6.0.0-canary.14
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.14
+
+## 6.0.0-canary.13
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.13
+
+## 6.0.0-canary.12
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.12
+
+## 6.0.0-canary.11
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.11
+
+## 6.0.0-canary.10
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.10
+
+## 6.0.0-canary.9
+
+### Patch Changes
+
+- 4cc5436: Improve dark mode scrollbar styling and hover visibility in the Inspector UI.
+  - mcp-use@1.28.0-canary.9
+
+## 6.0.0-canary.8
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.8
+
+## 6.0.0-canary.7
+
+### Patch Changes
+
+- 097f57c: Resolved duplicate exports flagged by Knip.
+  - Annotated the `Tel` alias for `Telemetry` with the `@alias` directive so Knip no longer flags it as a duplicate export. The alias remains available for consumers.
+  - Unified the canonical source path for `Telemetry`, `Tel`, `setTelemetrySource`, and `isBrowserEnvironment` in `src/telemetry/index.ts`. The Node implementation is now the default and is swapped for the browser implementation in browser bundles via the existing tsup substitution plugin.
+  - Removed the redundant default export of `JsonRpcLoggerView` in `@mcp-use/inspector`. The named export is unchanged.
+
+- Updated dependencies [097f57c]
+  - mcp-use@1.28.0-canary.7
+
+## 6.0.0-canary.6
+
+### Minor Changes
+
+- ce16171: feat(cli, inspector): add `mcp-use screenshot` for visual feedback loops on MCP Apps views (MCP-1566)
+
+  `mcp-use screenshot --tool <name> key=value [key2=value2 ...]` calls the tool and renders the result headlessly, saving a PNG of the resulting view. Use `key:=<json>` for nested values, or pass a single JSON object for the legacy form.
+
+  The CLI always spawns a fresh `@mcp-use/inspector` standalone server on a free port (no reuse of whatever happens to be on `localhost:3000`, which could be an unrelated Vite/dev server) and tears it down on exit. It drives the user's existing Chrome / Chromium / Edge / Brave install via the Chrome DevTools Protocol at the new chromeless `/inspector/preview/:view` route inside the inspector SPA. Pass `--inspector <url>` to point at an existing inspector instance; the URL is probed strictly (must return `{ status: "ok" }` JSON on `/inspector/health`) so unrelated servers can't be misidentified. The screenshot pipeline no longer requires being in a project with an MCP server entry — any directory works. Output defaults to `./<view>-<timestamp>.png` in cwd.
+
+  No additional install step or peer dependency is required — the command uses your system Chrome. The browser path is auto-detected on macOS / Linux / Windows; override with `MCP_USE_CHROME_PATH`, `PUPPETEER_EXECUTABLE_PATH`, or `CHROME_PATH` if needed.
+
+  The inspector exposes a new internal `<ViewPreview>` component and a `/preview/:view` client-side route. `MCPAppsRenderer` gains an optional `onReady` callback used by the preview route to drive the readiness signal (`body[data-view-ready="true"]`) that the screenshot command waits for before capturing.
+
+  **Session-aware authentication.** Screenshot now reuses sessions saved by `mcp-use client connect`, so a single OAuth flow covers every subsequent screenshot of that server. Replace `--auth <token>` with `--session <name>` (defaults to the active session); `--mcp <url>` remains as an unauthenticated escape hatch. The OAuth token never enters the browser — the CLI calls the tool, reads the widget resource, and injects the result into Chrome via CDP `Page.addScriptToEvaluateOnNewDocument` (as `globalThis.__mcpUsePreviewBundle`). The preview route detects the global and renders inline, skipping the browser-side MCP connection entirely.
+
+  **Breaking:** `mcp-use screenshot` flags `--auth` and `--header` are removed. Use `mcp-use client connect <url> --name <name>` (with OAuth) once, then `mcp-use screenshot --tool <name>`.
+
+  **Auto-screenshot in `client tools call`.** When `mcp-use client tools call <name>` invokes a tool that declares a UI resource (`_meta.ui.resourceUri` or `openai/outputTemplate`), the CLI now automatically captures a widget screenshot using the same pipeline as `mcp-use screenshot`. The tool result is reused (no double tool-call) and the dev server is auto-spawned if needed. Pass `--no-screenshot` to opt out, or `--screenshot-output <path>` to override the default `./<view>-<timestamp>.png` path. Screenshot failures print a warning but don't fail the tool call.
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.6
+
+## 6.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+- Updated dependencies [25a906a]
+  - mcp-use@1.28.0-canary.5
+
+## 5.0.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [dc71f7f]
+  - mcp-use@1.27.2-canary.4
+
+## 5.0.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [5bb6d47]
+  - mcp-use@1.27.2-canary.3
+
+## 5.0.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [79a3f4c]
+  - mcp-use@1.27.2-canary.2
+
+## 5.0.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [2810bf6]
+  - mcp-use@1.27.2-canary.1
+
+## 5.0.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [549f50c]
+  - mcp-use@1.27.2-canary.0
+
 ## 5.0.1
 
 ### Patch Changes

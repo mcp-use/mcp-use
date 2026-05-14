@@ -8,7 +8,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  noExternal: ["chalk", "open", "globby"],
+  noExternal: ["chalk", "open"],
   shims: true,
   // Copy the Next.js runtime shim loader/register scripts into dist/shims/.
   // These must stay as standalone .mjs files so Node can load them via
