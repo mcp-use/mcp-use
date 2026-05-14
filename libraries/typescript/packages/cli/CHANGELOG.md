@@ -1,5 +1,15 @@
 # @mcp-use/cli
 
+## 3.2.0-canary.15
+
+### Patch Changes
+
+- c3da11e: chore(cli): rename "mcp-use cloud" to "Manufact cloud" in login command output
+
+  `mcp-use login --help` now says "Login to Manufact cloud" and the body banner reads "Logging in to Manufact cloud..." — matching the existing wording used by `logout` and `deploy`.
+  - mcp-use@1.28.0-canary.15
+  - @mcp-use/inspector@6.0.0-canary.15
+
 ## 3.2.0-canary.14
 
 ### Minor Changes
