@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v6.0.0" description="May 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=6.0.0&title=Widget%20preview%20route%20%26%20dark-mode%20scrollbars&date=2026-05&lang=inspector" alt="Release 6.0.0" />
+  </Frame>
+  ## Widget preview route & dark-mode scrollbars
+  Major release paired with `mcp-use` v1.28.0: new `ViewPreview` component and `/preview/:view` client-side route that back the `mcp-use client screenshot` CLI pipeline, dark-mode aware scrollbars across the UI, and a cleanup of duplicate Knip-flagged exports.
+
+- **New**: `<ViewPreview>` internal component and `/preview/:view` client-side route — a chromeless surface the CLI screenshot pipeline drives via CDP. `MCPAppsRenderer` gains an optional `onReady` callback that the preview route uses to signal `body[data-view-ready="true"]`, which the CLI waits for before capturing. The preview route detects `globalThis.__mcpUsePreviewBundle` (injected by the CLI via CDP `Page.addScriptToEvaluateOnNewDocument`) and renders the widget inline, skipping the browser-side MCP connection entirely (`#1432`)
+- **Enhancement**: dark-mode aware scrollbars styled to match the inspector theme, with improved hover visibility (`#1484`)
+- **Fix**: removed the redundant default export of `JsonRpcLoggerView`; the named export is unchanged (`#1453`)
+- **Update**: Updated mcp-use to v1.28.0
+</Update>
+
 <Update label="v5.0.1" description="May 2026">
   ## MCP App width fix in chat
   Patch release paired with `mcp-use` v1.27.1: MCP App width is pinned in chat so only height responds to widget-reported sizes.
