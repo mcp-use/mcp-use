@@ -1,6 +1,6 @@
 ---
 title: "MCP Concepts"
-description: "The Model Context Protocol  -  architecture, primitives, and how mcp-use fits in"
+description: "The Model Context Protocol - architecture, primitives, and how mcp-use fits in"
 icon: "brain"
 ---
 
@@ -11,101 +11,114 @@ mcp-use is a fullstack MCP (Model Context Protocol) framework for Python and Typ
 - Python: `pip install mcp-use` (agent also requires a LangChain LLM provider, e.g. `pip install langchain-openai`)
 - TypeScript: `npm install mcp-use`
 
-**Core classes:**
-- `MCPServer`  -  build an MCP server that exposes tools, resources, and prompts
-- `MCPClient`  -  connect to one or more MCP servers programmatically
-- `MCPAgent`  -  LLM-powered agent that uses MCPClient to call tools (requires LangChain)
+**Core classes:** `MCPServer`, `MCPClient`, `MCPAgent`
 
 **Key imports:**
 - Python server: `from mcp_use import MCPServer`
 - Python client/agent: `from mcp_use import MCPClient, MCPAgent`
 - TypeScript server: `import { MCPServer } from "mcp-use/server"`
 - TypeScript client/agent: `import { MCPClient, MCPAgent } from "mcp-use"`
-
-**TypeScript tool definition:**
-```typescript
-server.tool({ name: "my_tool", description: "...", schema: z.object({ ... }) }, async (args) => { ... })
-```
-
-**Python tool definition:**
-```python
-@server.tool()
-def my_tool(city: str) -> str:
-    """Tool description"""
-    return result
-```
 </Visibility>
 
 ## What is MCP?
 
-The **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools, data sources, and services. Instead of custom integrations for every API, MCP provides a universal interface that any LLM host can speak.
+The **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools, data sources, and services. It defines a common language between AI applications and the servers that expose capabilities to them — so any MCP-compatible client can talk to any MCP-compatible server without custom integration code.
 
 ## Architecture
 
 MCP uses a client-server model with three roles:
 
-| Role | Description |
-|------|-------------|
-| **MCP Host** | The AI-powered application  -  your product, Claude Desktop, Cursor |
-| **MCP Client** | Runs inside the host; manages communication with MCP servers |
-| **MCP Server** | Exposes tools, resources, and prompts to connected clients |
+| Role | Responsibility |
+|------|---------------|
+| **Host** | The AI-powered application (your product, Claude Desktop, Cursor, ChatGPT) |
+| **Client** | Runs inside the host; discovers and calls capabilities on MCP servers |
+| **Server** | Exposes tools, resources, and prompts to any connected client |
 
 ```
-MCP Host
-└─ MCP Client ── MCP Server A (GitHub)
-              ├─ MCP Server B (Database)
-              └─ MCP Server C (Custom API)
+Host
+└─ Client ── Server A  (filesystem, database, API...)
+          ├─ Server B
+          └─ Server C
 ```
 
-The client queries each server for available capabilities, then routes model requests to the right server.
+A single host can connect to many servers simultaneously. The client discovers what each server exposes, then routes the model's requests to the right one.
+
+With mcp-use, `MCPClient` handles this layer. See [Client Configuration](/typescript/client/client-configuration) and [Connection Types](/python/client/connection-types).
 
 ## Server Primitives
 
 MCP servers expose three primitives:
 
-| Primitive | Controlled by | Description | Example |
-|-----------|--------------|-------------|---------|
-| **Tools** | Model | Functions the LLM calls to take actions | API calls, database writes |
-| **Resources** | Application | Read-only data the client can access | File contents, query results |
-| **Prompts** | User | Reusable prompt templates | Slash commands, menu options |
+| Primitive | Controlled by | Purpose |
+|-----------|--------------|---------|
+| **Tools** | Model | Functions the LLM calls to take actions |
+| **Resources** | Application | Read-only data the client fetches on demand |
+| **Prompts** | User | Reusable prompt templates and slash commands |
 
 ### Tools
 
-Functions the model can invoke. The server executes them and returns results  -  API calls, computations, file writes, etc.
+The most common primitive. The model decides when to call a tool and with what arguments — the server executes it and returns a result.
+
+<CodeGroup>
+```typescript TypeScript
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool({
+  name: "get_weather",
+  description: "Get weather for a city",
+  schema: z.object({ city: z.string() }),
+}, async ({ city }) => {
+  return text(`Sunny, 22°C in ${city}`);
+});
+```
+```python Python
+@server.tool()
+def get_weather(city: str) -> str:
+    """Get weather for a city"""
+    return f"Sunny, 22°C in {city}"
+```
+</CodeGroup>
+
+See [TypeScript Tools](/typescript/server/tools) and [Python Tools](/python/server/tools).
 
 ### Resources
 
-Read-only data sources. Each resource has a unique URI (`file:///example.txt`, `db://users/123`), a display name, and optional MIME type. The client fetches them on demand.
+Read-only data identified by a URI (`file:///example.txt`, `db://users/123`). The client application decides when to fetch them — not the model. Useful for surfacing context like file contents or query results.
+
+See [TypeScript Resources](/typescript/server/resources) and [Python Resources](/python/server/resources).
 
 ### Prompts
 
-Templated instructions managed by the server. Useful for consistency and for providing the model with structured context.
+Templated instructions the user can invoke (think slash commands). The server defines the template; the client presents it to the user.
+
+See [TypeScript Prompts](/typescript/server/prompts) and [Python Prompts](/python/server/prompts).
 
 ## Client Primitives
 
-MCP clients can implement additional primitives that reverse the flow:
+Clients can implement additional primitives that reverse the flow — the server initiates a request back through the client:
 
-| Primitive | Flow | Description |
-|-----------|------|-------------|
-| **Sampling** | Server → LLM | Server requests an LLM completion from the client |
+| Primitive | Flow | Purpose |
+|-----------|------|---------|
+| **Sampling** | Server → LLM | Server asks the client to run an LLM completion |
 | **Elicitation** | Server → User | Server asks the user for input mid-workflow |
-| **Roots** | Server → Filesystem | Server requests access to specific files or directories |
+| **Roots** | Server → Filesystem | Server requests access to specific paths |
 
-## mcp-use
+These are less common but enable powerful patterns like servers that don't bundle their own LLM, or human-in-the-loop workflows.
 
-mcp-use is a fullstack MCP framework for building **MCP Servers**, **MCP Clients**, **MCP Agents**, and **MCP Apps** in Python and TypeScript.
+See [Sampling](/typescript/client/sampling) and [Elicitation](/typescript/client/elicitation).
 
-<CardGroup cols={2}>
-  <Card title="Build an MCP Server" icon="server" href="/python/server/index">
-    Expose tools, resources, and prompts to any AI agent.
-  </Card>
-  <Card title="Build an MCP Client" icon="router" href="/python/client/client-configuration">
-    Connect to any MCP server programmatically.
-  </Card>
-  <Card title="Build an MCP Agent" icon="brain" href="/python/agent/agent-configuration">
-    AI agents that use MCP servers to complete tasks.
-  </Card>
-  <Card title="Build an MCP App" icon="app-window-mac" href="/typescript/server/mcp-apps">
-    Interactive widgets that run in Claude and ChatGPT.
-  </Card>
-</CardGroup>
+## Agents and mcp-use
+
+An **MCP Agent** combines an LLM with an MCP client: the model reasons about a task, selects tools, calls them through the client, and iterates until done. mcp-use ships a full agent implementation for both Python and TypeScript on top of LangChain.
+
+```python
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+client = MCPClient({"mcpServers": {"fs": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]}}})
+agent = MCPAgent(llm=ChatOpenAI(model="gpt-5.5"), client=client)
+result = await agent.run("List all files")
+```
+
+See [Python Agent](/python/agent/agent-configuration) and [TypeScript Agent](/typescript/agent/index).
