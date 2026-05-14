@@ -19,6 +19,7 @@
     "cli-oauth-no-auto-open",
     "cli-oauth-non-tty-no-browser",
     "cli-screenshot-device-scale-factor",
+    "cli-screenshot-opt-in",
     "cli-screenshot-under-client",
     "cli-sessions-test-temp-dir",
     "cli-tool-call-dedupe-structured",
