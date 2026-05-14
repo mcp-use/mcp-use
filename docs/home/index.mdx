@@ -222,7 +222,7 @@ mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP 
     from mcp_use import MCPAgent, MCPClient
 
     client = MCPClient.from_dict({ "mcpServers": { "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] } } })
-    agent = MCPAgent(llm=ChatOpenAI(model="gpt-4.1"), client=client)
+    agent = MCPAgent(llm=ChatOpenAI(model="gpt-5.5"), client=client)
     result = await agent.run("List all files in the directory")
     ```
 
