@@ -9,6 +9,7 @@ import type { Hono as HonoType, Context, Next } from "hono";
 import { setupOAuthRoutes, isOAuthProxy } from "./routes.js";
 import { createBearerAuthMiddleware } from "./middleware.js";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
+import type { ResolvedRouteConfig } from "../utils/routes.js";
 
 /**
  * OAuth setup state
@@ -39,6 +40,7 @@ export async function setupOAuthForServer(
   app: HonoType,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
+  routeConfig: ResolvedRouteConfig,
   state: OAuthSetupState
 ): Promise<OAuthSetupState> {
   if (state.complete) {
@@ -52,7 +54,13 @@ export async function setupOAuthForServer(
   const middleware = createBearerAuthMiddleware(oauth, baseUrl);
 
   // Setup OAuth routes
-  setupOAuthRoutes(app, oauth, baseUrl);
+  setupOAuthRoutes(
+    app,
+    oauth,
+    baseUrl,
+    routeConfig.oauthBasePath,
+    routeConfig.mcpBasePath
+  );
 
   if (proxyMode) {
     console.log(
@@ -67,8 +75,10 @@ export async function setupOAuthForServer(
   console.log("[OAuth] Metadata endpoints: /.well-known/*");
 
   // Apply bearer auth to all /mcp routes
-  app.use("/mcp/*", middleware);
-  console.log("[OAuth] Bearer authentication enabled on /mcp routes");
+  app.use(`${routeConfig.mcpBasePath}/*`, middleware);
+  console.log(
+    `[OAuth] Bearer authentication enabled on ${routeConfig.mcpBasePath} routes`
+  );
 
   return {
     provider: oauth,

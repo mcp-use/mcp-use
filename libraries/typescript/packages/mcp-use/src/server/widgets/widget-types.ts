@@ -22,6 +22,10 @@ export interface ServerConfig {
   buildId?: string;
   /** Path to favicon file relative to public directory (optional) */
   favicon?: string;
+  /** Base route for widgets */
+  widgetsBasePath?: string;
+  /** Base route for public static files */
+  publicBasePath?: string;
   /** Whether public routes have been set up and in what mode (optional) */
   publicRoutesMode?: "dev" | "production" | null;
   /** Pre-created HTTP server for Vite HMR WebSocket support (optional, Node.js only) */
@@ -37,6 +41,8 @@ export interface ServerConfig {
 export interface MountWidgetsOptions {
   /** Base route for widgets (defaults to '/mcp-use/widgets') */
   baseRoute?: string;
+  /** Base route for public static files (defaults to '/mcp-use/public') */
+  publicBasePath?: string;
   /** Resources directory path (defaults to 'resources') */
   resourcesDir?: string;
 }

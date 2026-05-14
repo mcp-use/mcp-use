@@ -1157,8 +1157,10 @@ export default {
       }
 
       // Post-process HTML for static deployments (e.g., Supabase)
-      // If MCP_SERVER_URL is set, inject window globals at build time
-      const mcpServerUrl = process.env.MCP_SERVER_URL;
+      // MCP_WIDGET_ASSETS_URL is the canonical variable.
+      // TODO(v2): Remove MCP_SERVER_URL fallback after deprecation window.
+      const mcpServerUrl =
+        process.env.MCP_WIDGET_ASSETS_URL || process.env.MCP_SERVER_URL;
       if (mcpServerUrl) {
         try {
           const htmlPath = path.join(outDir, "index.html");
@@ -1194,7 +1196,9 @@ export default {
 
           await fs.writeFile(htmlPath, html, "utf8");
           console.log(
-            chalk.gray(`    → Injected MCP_SERVER_URL into ${widgetName}`)
+            chalk.gray(
+              `    → Injected MCP_WIDGET_ASSETS_URL/MCP_SERVER_URL into ${widgetName}`
+            )
           );
         } catch (error) {
           console.warn(

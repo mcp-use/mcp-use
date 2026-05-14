@@ -92,6 +92,7 @@ export async function mountWidgetsDev(
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
   const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const publicBasePath = options?.publicBasePath || "/mcp-use/public";
   // Resolution order for the widgets directory:
   //   1. Caller-supplied `options.resourcesDir`
   //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
@@ -313,7 +314,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${publicBasePath}/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -556,7 +557,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${publicBasePath}/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -700,7 +701,9 @@ if (container && Component) {
             html = processWidgetHtml(
               html,
               widgetName,
-              serverConfig.serverBaseUrl
+              serverConfig.serverBaseUrl,
+              baseRoute,
+              publicBasePath
             );
           } catch (e) {
             console.warn(
@@ -1384,7 +1387,7 @@ export default PostHog;
   // Serve static files from public directory in dev mode
   // Only set up if not already configured (e.g., in constructor)
   if (!serverConfig.publicRoutesMode) {
-    setupPublicRoutes(app, false);
+    setupPublicRoutes(app, false, publicBasePath);
     setupFaviconRoute(app, serverConfig.favicon, false);
   }
 

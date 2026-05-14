@@ -74,6 +74,7 @@ export {
  *
  * @param options - Configuration options
  * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+ * @param options.publicBasePath - Base route for public static files (defaults to '/mcp-use/public')
  * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
  * @returns Promise that resolves when all widgets are mounted
  */
@@ -81,6 +82,7 @@ export async function mountWidgets(
   server: MCPServer,
   options?: {
     baseRoute?: string;
+    publicBasePath?: string;
     resourcesDir?: string;
   }
 ): Promise<void> {
@@ -92,6 +94,10 @@ export async function mountWidgets(
     cspUrls: getCSPUrls(),
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,
+    widgetsBasePath:
+      options?.baseRoute || (server as any).routeConfig?.widgetsBasePath,
+    publicBasePath:
+      options?.publicBasePath || (server as any).routeConfig?.publicBasePath,
     publicRoutesMode: (server as any).publicRoutesMode,
     /** Pre-created HTTP server for Vite HMR WebSocket support */
     httpServer: (server as any)._httpServer as
@@ -127,7 +133,10 @@ export async function mountWidgets(
   if (isProductionMode() || isDeno) {
     console.log("[WIDGETS] Mounting widgets in production mode");
     // Setup routes first for production
-    setupWidgetRoutes(app, serverConfig);
+    setupWidgetRoutes(app, serverConfig, {
+      baseRoute: options?.baseRoute,
+      publicBasePath: options?.publicBasePath,
+    });
     (server as any).publicRoutesMode = "production";
     await mountWidgetsProduction(app, serverConfig, registerWidget, options);
   } else {

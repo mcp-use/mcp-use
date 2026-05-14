@@ -127,8 +127,10 @@ export async function startServer(
   options?: {
     onDenoRequest?: (req: Request) => Request | Promise<Request>;
     onDenoResponse?: (res: Response) => Response | Promise<Response>;
+    mcpBasePath?: string;
   }
 ): Promise<HttpServerHandle> {
+  const mcpBasePath = options?.mcpBasePath || "/mcp";
   if (isDeno) {
     // Deno runtime
     const corsHeaders = getDenoCorsHeaders();
@@ -164,7 +166,7 @@ export async function startServer(
     console.log(`[SERVER] Listening`);
     console.log(
       chalk.gray(
-        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}${mcpBasePath}`
       )
     );
     return {
@@ -182,10 +184,10 @@ export async function startServer(
       },
       (_info: any) => {
         console.log(`[SERVER] Listening on http://${host}:${port}`);
-        console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
+        console.log(`[MCP] Endpoints: http://${host}:${port}${mcpBasePath}`);
         console.log(
           chalk.gray(
-            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}${mcpBasePath}`
           )
         );
       }

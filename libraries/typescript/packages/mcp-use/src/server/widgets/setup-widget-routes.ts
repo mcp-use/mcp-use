@@ -30,10 +30,16 @@ import type { ServerConfig } from "./widget-types.js";
  */
 export function setupWidgetRoutes(
   app: HonoType,
-  serverConfig: ServerConfig
+  serverConfig: ServerConfig,
+  options?: {
+    baseRoute?: string;
+    publicBasePath?: string;
+  }
 ): void {
+  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const publicBasePath = options?.publicBasePath || "/mcp-use/public";
   // Serve static assets (JS, CSS) from the assets directory
-  app.get("/mcp-use/widgets/:widget/assets/*", async (c: Context) => {
+  app.get(`${baseRoute}/:widget/assets/*`, async (c: Context) => {
     const widget = c.req.param("widget")!;
     const assetFile = c.req.path.split("/assets/")[1];
     const assetPath = pathHelpers.join(
@@ -62,7 +68,7 @@ export function setupWidgetRoutes(
   });
 
   // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
-  app.get("/mcp-use/widgets/assets/*", async (c: Context) => {
+  app.get(`${baseRoute}/assets/*`, async (c: Context) => {
     const assetFile = c.req.path.split("/assets/")[1];
     // Try to find which widget this asset belongs to by checking all widget directories
     const widgetsDir = pathHelpers.join(
@@ -98,7 +104,7 @@ export function setupWidgetRoutes(
 
   // Serve each widget's index.html at its route
   // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
-  app.get("/mcp-use/widgets/:widget", async (c: Context) => {
+  app.get(`${baseRoute}/:widget`, async (c: Context) => {
     const widget = c.req.param("widget")!;
     const filePath = pathHelpers.join(
       getCwd(),
@@ -112,7 +118,13 @@ export function setupWidgetRoutes(
     try {
       let html = await fsHelpers.readFileSync(filePath, "utf8");
       // Process HTML with base URL injection and path conversion
-      html = processWidgetHtml(html, widget, serverConfig.serverBaseUrl);
+      html = processWidgetHtml(
+        html,
+        widget,
+        serverConfig.serverBaseUrl,
+        baseRoute,
+        publicBasePath
+      );
       return c.html(html);
     } catch {
       return c.notFound();
@@ -120,7 +132,7 @@ export function setupWidgetRoutes(
   });
 
   // Serve static files from public directory (production mode)
-  setupPublicRoutes(app, true);
+  setupPublicRoutes(app, true, publicBasePath);
 
   // Setup favicon route at server root (production mode)
   setupFaviconRoute(app, serverConfig.favicon, true);

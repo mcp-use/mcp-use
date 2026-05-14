@@ -310,7 +310,9 @@ export function getContentType(filename: string): string {
 export function processWidgetHtml(
   html: string,
   widgetName: string,
-  baseUrl: string
+  baseUrl: string,
+  widgetsBasePath: string = "/mcp-use/widgets",
+  publicBasePath: string = "/mcp-use/public"
 ): string {
   let processedHtml = html;
 
@@ -349,11 +351,11 @@ export function processWidgetHtml(
     // Replace relative paths that start with /mcp-use for scripts and CSS with absolute URLs
     processedHtml = processedHtml.replace(
       /src="\/mcp-use\/widgets\/([^"]+)"/g,
-      `src="${baseUrl}/mcp-use/widgets/$1"`
+      `src="${baseUrl}${widgetsBasePath}/$1"`
     );
     processedHtml = processedHtml.replace(
       /href="\/mcp-use\/widgets\/([^"]+)"/g,
-      `href="${baseUrl}/mcp-use/widgets/$1"`
+      `href="${baseUrl}${widgetsBasePath}/$1"`
     );
 
     // Add window.__getFile and window.__mcpPublicUrl to head
@@ -361,7 +363,7 @@ export function processWidgetHtml(
     const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}${widgetsBasePath}/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}${publicBasePath}";</script>`
     );
   }
 
@@ -404,7 +406,12 @@ export function createWidgetRegistration(
         [key: string]: unknown;
       },
   html: string,
-  serverConfig: { serverBaseUrl: string; cspUrls: string[] },
+  serverConfig: {
+    serverBaseUrl: string;
+    cspUrls: string[];
+    widgetsBasePath?: string;
+    publicBasePath?: string;
+  },
   isDev: boolean = false
 ): {
   name: string;
@@ -711,7 +718,12 @@ export async function registerWidgetFromTemplate(
   widgetName: string,
   htmlPath: string,
   metadata: Record<string, unknown>,
-  serverConfig: { serverBaseUrl: string; cspUrls: string[] },
+  serverConfig: {
+    serverBaseUrl: string;
+    cspUrls: string[];
+    widgetsBasePath?: string;
+    publicBasePath?: string;
+  },
   registerWidget: import("./widget-types.js").RegisterWidgetCallback,
   isDev: boolean = false
 ): Promise<void> {
@@ -722,7 +734,13 @@ export async function registerWidgetFromTemplate(
   }
 
   // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  html = processWidgetHtml(
+    html,
+    widgetName,
+    serverConfig.serverBaseUrl,
+    serverConfig.widgetsBasePath || "/mcp-use/widgets",
+    serverConfig.publicBasePath || "/mcp-use/public"
+  );
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
@@ -759,10 +777,11 @@ export async function registerWidgetFromTemplate(
  */
 export function setupPublicRoutes(
   app: HonoType,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  publicBasePath: string = "/mcp-use/public"
 ): void {
-  app.get("/mcp-use/public/*", async (c: Context) => {
-    const filePath = c.req.path.replace("/mcp-use/public/", "");
+  app.get(`${publicBasePath}/*`, async (c: Context) => {
+    const filePath = c.req.path.replace(`${publicBasePath}/`, "");
     const basePath = useDistDirectory ? "dist/public" : "public";
     const fullPath = pathHelpers.join(getCwd(), basePath, filePath);
 

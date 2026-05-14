@@ -5,6 +5,7 @@
 // Common types
 export {
   ServerConfig,
+  RouteConfig,
   InputDefinition,
   ResourceAnnotations,
   OptionalizeUndefinedFields,

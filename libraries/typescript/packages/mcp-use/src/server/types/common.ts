@@ -36,6 +36,45 @@ export type InferZodInput<S> = S extends z.ZodTypeAny
   ? OptionalizeUndefinedFields<z.infer<S>>
   : Record<string, any>;
 
+/**
+ * Configurable HTTP mount paths for MCP server components.
+ *
+ * These values control where routes are mounted on the server.
+ * They do not change the externally advertised public URL (`baseUrl` / `MCP_URL`).
+ */
+export interface RouteConfig {
+  /**
+   * Base path for MCP HTTP transport endpoints.
+   * @default "/mcp"
+   */
+  mcpBasePath?: string;
+  /**
+   * Base path for SSE-compatible transport endpoint.
+   * @default "/sse"
+   */
+  sseBasePath?: string;
+  /**
+   * Base path for widget pages and built widget assets.
+   * @default "/mcp-use/widgets"
+   */
+  widgetsBasePath?: string;
+  /**
+   * Base path for static public files.
+   * @default "/mcp-use/public"
+   */
+  publicBasePath?: string;
+  /**
+   * Base path for inspector UI.
+   * @default "/inspector"
+   */
+  inspectorBasePath?: string;
+  /**
+   * Prefix for OAuth endpoints (authorize/token/register/.well-known/*).
+   * @default ""
+   */
+  oauthBasePath?: string;
+}
+
 export interface ServerConfig {
   /**
    * Unique identifier for the MCP server .
@@ -72,6 +111,18 @@ export interface ServerConfig {
    * @example "https://api.example.com/mcp"
    */
   baseUrl?: string;
+  /**
+   * Route mount configuration for MCP endpoints, widgets, public files, inspector, and OAuth.
+   *
+   * Defaults preserve existing behavior:
+   * - mcpBasePath: "/mcp"
+   * - sseBasePath: "/sse"
+   * - widgetsBasePath: "/mcp-use/widgets"
+   * - publicBasePath: "/mcp-use/public"
+   * - inspectorBasePath: "/inspector"
+   * - oauthBasePath: ""
+   */
+  routes?: RouteConfig;
   /**
    * Custom CORS options for the server.
    *

@@ -109,10 +109,12 @@ import {
   isProductionMode as isProductionModeHelper,
   logRegisteredItems as logRegisteredItemsHelper,
   parseTemplateUri as parseTemplateUriHelper,
+  resolveRouteConfig,
   rewriteSupabaseRequest,
   startServer,
 } from "./utils/index.js";
 import type { WithMcpUse } from "./utils/hono-proxy.js";
+import type { ResolvedRouteConfig } from "./utils/routes.js";
 import type {
   McpMiddlewareEntry,
   McpMiddlewareFn,
@@ -332,6 +334,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * Used for generating widget URLs and OAuth callbacks.
    */
   public serverBaseUrl?: string;
+  public routeConfig: ResolvedRouteConfig;
 
   /**
    * Optional favicon URL to display in inspector and documentation.
@@ -2367,6 +2370,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
+    this.routeConfig = resolveRouteConfig(config.routes);
 
     // Auto-select favicon from icons array if not explicitly provided
     if (config.favicon) {
@@ -2379,14 +2383,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Helper to convert relative icon paths to absolute URLs
     const processIconUrls = (
       icons: ServerConfig["icons"],
-      baseUrl?: string
+      baseUrl?: string,
+      publicBasePath: string = this.routeConfig.publicBasePath
     ) => {
       if (!icons || !baseUrl) return icons;
       return icons.map((icon) => ({
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}${publicBasePath}/${icon.src}`,
       }));
     };
 
@@ -2439,7 +2444,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       !isProductionModeHelper() &&
       !isDeno
     ) {
-      setupPublicRoutes(this.app, false); // Dev mode (public/)
+      setupPublicRoutes(this.app, false, this.routeConfig.publicBasePath); // Dev mode (public/)
       setupFaviconRoute(this.app, this.favicon, false);
       this.publicRoutesMode = "dev";
     }
@@ -2651,14 +2656,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Helper to convert relative icon paths to absolute URLs
     const processIconUrls = (
       icons: ServerConfig["icons"],
-      baseUrl?: string
+      baseUrl?: string,
+      publicBasePath: string = this.routeConfig.publicBasePath
     ) => {
       if (!icons || !baseUrl) return icons;
       return icons.map((icon) => ({
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}${publicBasePath}/${icon.src}`,
       }));
     };
 
@@ -3720,7 +3726,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this, // Pass the MCPServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.routeConfig
     );
 
     this.mcpMounted = result.mcpMounted;
@@ -3905,12 +3912,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
+        this.routeConfig,
         this.oauthSetupState
       );
     }
 
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
+      baseRoute: this.routeConfig.widgetsBasePath,
+      publicBasePath: this.routeConfig.publicBasePath,
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
@@ -3953,6 +3962,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverHost,
       {
         onDenoRequest: rewriteSupabaseRequest,
+        mcpBasePath: this.routeConfig.mcpBasePath,
       }
     );
     this._httpServerClose = httpHandle.close;
@@ -4034,13 +4044,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
+        this.routeConfig,
         this.oauthSetupState
       );
     }
 
     console.log("[MCP] Mounting widgets");
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
+      baseRoute: this.routeConfig.widgetsBasePath,
+      publicBasePath: this.routeConfig.publicBasePath,
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
@@ -4148,7 +4160,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.app,
       this.serverHost,
       this.serverPort,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.routeConfig.mcpBasePath,
+      this.routeConfig.inspectorBasePath
     );
 
     if (mounted) {

@@ -183,8 +183,9 @@ mcp-use build --no-typecheck
 ```
 
 <Tip>
-  Use the `MCP_SERVER_URL` environment variable during build to configure widget
-  asset paths for static deployments (e.g., Supabase Storage).
+  Use the `MCP_WIDGET_ASSETS_URL` environment variable during build to configure widget
+  asset paths for static deployments (e.g., Supabase Storage). `MCP_SERVER_URL` remains
+  as a backwards-compatible alias and is planned for removal in v2.
 </Tip>
 
 ---
@@ -684,11 +685,12 @@ The CLI automatically adds `.mcp-use/` to your `.gitignore` as this file contain
 
 ### Development & Build
 
-| Variable         | Description                       | Default     |
-| ---------------- | --------------------------------- | ----------- |
-| `PORT`           | Server port                       | 3000        |
-| `NODE_ENV`       | Environment mode                  | development |
-| `MCP_SERVER_URL` | Server URL for widget asset paths | -           |
+| Variable                | Description                                                                 | Default     |
+| ----------------------- | --------------------------------------------------------------------------- | ----------- |
+| `PORT`                  | Server port                                                                 | 3000        |
+| `NODE_ENV`              | Environment mode                                                            | development |
+| `MCP_WIDGET_ASSETS_URL` | Canonical server URL used during build for widget asset path HTML injection | -           |
+| `MCP_SERVER_URL`        | Deprecated alias for `MCP_WIDGET_ASSETS_URL` (to be removed in v2)         | -           |
 
 **Examples:**
 
@@ -696,7 +698,10 @@ The CLI automatically adds `.mcp-use/` to your `.gitignore` as this file contain
 # Custom port
 PORT=8080 mcp-use dev
 
-# Production build with custom MCP URL
+# Production build with custom widget assets URL (preferred)
+MCP_WIDGET_ASSETS_URL=https://myserver.com mcp-use build
+
+# Backwards-compatible alias (deprecated, to be removed in v2)
 MCP_SERVER_URL=https://myserver.com mcp-use build
 ```
 

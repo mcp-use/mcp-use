@@ -19,6 +19,7 @@ import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
+import { joinRoute } from "../utils/routes.js";
 
 /**
  * Type guard to check if oauth config is a proxy
@@ -194,13 +195,34 @@ export function createTokenHandler(
 export function setupOAuthRoutes(
   app: Hono,
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string
+  baseUrl: string,
+  oauthBasePath: string = "",
+  mcpBasePath: string = "/mcp"
 ): void {
   const proxyMode = isOAuthProxy(oauth);
+  const authorizePath = joinRoute(oauthBasePath, "/authorize");
+  const tokenPath = joinRoute(oauthBasePath, "/token");
+  const registerPath = joinRoute(oauthBasePath, "/register");
+  const oauthWellKnownPath = joinRoute(
+    oauthBasePath,
+    "/.well-known/oauth-authorization-server"
+  );
+  const oidcWellKnownPath = joinRoute(
+    oauthBasePath,
+    "/.well-known/openid-configuration"
+  );
+  const protectedResourcePath = joinRoute(
+    oauthBasePath,
+    "/.well-known/oauth-protected-resource"
+  );
+  const mcpScopedProtectedResourcePath = joinRoute(
+    oauthBasePath,
+    `/.well-known/oauth-protected-resource${mcpBasePath}`
+  );
   // Enable CORS for all OAuth-related endpoints
   // This is required for browser-based MCP clients to discover OAuth metadata
   app.use(
-    "/.well-known/*",
+    joinRoute(oauthBasePath, "/.well-known/*"),
     cors({
       origin: "*", // Allow all origins for metadata discovery
       allowMethods: ["GET", "OPTIONS"],
@@ -214,7 +236,7 @@ export function setupOAuthRoutes(
   // In DCR-direct mode: dormant (clients reach upstream directly)
   // In proxy mode: active (handles OAuth flow through the proxy)
   app.use(
-    "/authorize",
+    authorizePath,
     cors({
       origin: "*",
       allowMethods: ["GET", "POST", "OPTIONS"],
@@ -223,7 +245,7 @@ export function setupOAuthRoutes(
     })
   );
   app.use(
-    "/token",
+    tokenPath,
     cors({
       origin: "*",
       allowMethods: ["POST", "OPTIONS"],
@@ -234,9 +256,9 @@ export function setupOAuthRoutes(
 
   // Mount /authorize and /token handlers
   const handleAuthorize = createAuthorizeHandler(oauth);
-  app.get("/authorize", handleAuthorize);
-  app.post("/authorize", handleAuthorize);
-  app.post("/token", createTokenHandler(oauth));
+  app.get(authorizePath, handleAuthorize);
+  app.post(authorizePath, handleAuthorize);
+  app.post(tokenPath, createTokenHandler(oauth));
 
   // In proxy mode, add /register endpoint that returns the configured clientId
   // This allows MCP clients to "register" even though the client is pre-registered
@@ -244,7 +266,7 @@ export function setupOAuthRoutes(
     const proxy = oauth as OAuthProxy;
 
     app.use(
-      "/register",
+      registerPath,
       cors({
         origin: "*",
         allowMethods: ["POST", "OPTIONS"],
@@ -253,7 +275,7 @@ export function setupOAuthRoutes(
       })
     );
 
-    app.post("/register", async (c: Context) => {
+    app.post(registerPath, async (c: Context) => {
       const body = await c.req.json().catch(() => ({}));
 
       // Return a fake registration response with the configured clientId
@@ -292,9 +314,9 @@ export function setupOAuthRoutes(
 
       return c.json({
         issuer: baseUrl,
-        authorization_endpoint: `${baseUrl}/authorize`,
-        token_endpoint: `${baseUrl}/token`,
-        registration_endpoint: `${baseUrl}/register`,
+        authorization_endpoint: `${baseUrl}${authorizePath}`,
+        token_endpoint: `${baseUrl}${tokenPath}`,
+        registration_endpoint: `${baseUrl}${registerPath}`,
         scopes_supported: oauth.getScopesSupported(),
         response_types_supported: ["code"],
         grant_types_supported: oauth.getGrantTypesSupported(),
@@ -344,14 +366,8 @@ export function setupOAuthRoutes(
   };
 
   // Register the handler for both OAuth and OpenID Connect discovery endpoints
-  app.get(
-    "/.well-known/oauth-authorization-server",
-    handleAuthorizationServerMetadata
-  );
-  app.get(
-    "/.well-known/openid-configuration",
-    handleAuthorizationServerMetadata
-  );
+  app.get(oauthWellKnownPath, handleAuthorizationServerMetadata);
+  app.get(oidcWellKnownPath, handleAuthorizationServerMetadata);
 
   /**
    * OAuth Protected Resource Metadata
@@ -360,7 +376,7 @@ export function setupOAuthRoutes(
    * DCR-direct mode: Points to the actual OAuth provider.
    * Proxy mode: Points to the local server (which proxies to upstream).
    */
-  app.get("/.well-known/oauth-protected-resource", (c: Context) => {
+  app.get(protectedResourcePath, (c: Context) => {
     // In proxy mode, the authorization server is the local proxy
     const authServer = proxyMode ? baseUrl : oauth.getIssuer();
 
@@ -378,11 +394,11 @@ export function setupOAuthRoutes(
 
   // Path-scoped protected resource metadata per RFC 9728 — declares that the
   // `/mcp` path specifically is the protected resource.
-  app.get("/.well-known/oauth-protected-resource/mcp", (c: Context) => {
+  app.get(mcpScopedProtectedResourcePath, (c: Context) => {
     const authServer = proxyMode ? baseUrl : oauth.getIssuer();
 
     return c.json({
-      resource: `${baseUrl}/mcp`,
+      resource: `${baseUrl}${mcpBasePath}`,
       authorization_servers: [authServer],
       scopes_supported: oauth.getScopesSupported(),
       bearer_methods_supported: ["header"],

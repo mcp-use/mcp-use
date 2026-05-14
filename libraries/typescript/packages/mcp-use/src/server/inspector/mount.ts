@@ -36,7 +36,9 @@ export async function mountInspectorUI(
   app: HonoType,
   serverHost: string,
   serverPort: number | undefined,
-  isProduction: boolean
+  isProduction: boolean,
+  mcpBasePath: string = "/mcp",
+  inspectorBasePath: string = "/inspector"
 ): Promise<boolean> {
   // In production, only mount if build manifest says so
   if (isProduction) {
@@ -57,7 +59,7 @@ export async function mountInspectorUI(
     const { mountInspector } = await import("@mcp-use/inspector");
     // Auto-connect to the local MCP server at /mcp (SSE endpoint)
     // Use JSON config to specify SSE transport type
-    const mcpUrl = `http://${serverHost}:${serverPort}/mcp`; // Also available at /sse
+    const mcpUrl = `http://${serverHost}:${serverPort}${mcpBasePath}`; // Also available at /sse
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
@@ -72,8 +74,23 @@ export async function mountInspectorUI(
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
     });
+    if (inspectorBasePath !== "/inspector") {
+      // The inspector package currently mounts fixed routes under /inspector.
+      // Expose configured path as a compatibility alias.
+      app.get(`${inspectorBasePath}`, (c) => {
+        const q = c.req.url.includes("?")
+          ? c.req.url.substring(c.req.url.indexOf("?"))
+          : "";
+        return c.redirect(`/inspector${q}`);
+      });
+      app.get(`${inspectorBasePath}/*`, (c) => {
+        const current = new URL(c.req.url);
+        const suffix = current.pathname.substring(inspectorBasePath.length);
+        return c.redirect(`/inspector${suffix}${current.search}`);
+      });
+    }
     console.log(
-      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`
+      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}${inspectorBasePath}`
     );
     return true;
   } catch (err) {
