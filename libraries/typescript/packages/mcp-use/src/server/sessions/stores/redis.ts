@@ -26,19 +26,6 @@ import type { SessionStore } from "./index.js";
 import type { SessionMetadata } from "../session-manager.js";
 
 /**
- * Check if Redis is available as an optional dependency
- * @returns true if Redis can be imported, false otherwise
- */
-export async function isRedisAvailable(): Promise<boolean> {
-  try {
-    await import("redis");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Redis client interface - compatible with node-redis v5+ and ioredis
  */
 export interface RedisClient {

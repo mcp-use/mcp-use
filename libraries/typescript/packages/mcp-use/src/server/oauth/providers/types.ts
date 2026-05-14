@@ -211,14 +211,3 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   audience?: string;
 }
 
-/**
- * Union type of all OAuth provider configurations
- */
-type OAuthConfig =
-  | SupabaseOAuthConfig
-  | Auth0OAuthConfig
-  | ClerkOAuthConfig
-  | KeycloakOAuthConfig
-  | WorkOSOAuthConfig
-  | BetterAuthOAuthConfig
-  | CustomOAuthConfig;

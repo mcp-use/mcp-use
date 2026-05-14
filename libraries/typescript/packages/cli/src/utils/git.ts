@@ -91,7 +91,7 @@ async function gitCommandOrThrow(
 /**
  * Check if directory is a git repository
  */
-export async function isGitRepo(cwd: string = process.cwd()): Promise<boolean> {
+async function isGitRepo(cwd: string = process.cwd()): Promise<boolean> {
   const result = await gitCommand(["rev-parse", "--is-inside-work-tree"], cwd);
   return result === "true";
 }
@@ -99,7 +99,7 @@ export async function isGitRepo(cwd: string = process.cwd()): Promise<boolean> {
 /**
  * Get git remote URL
  */
-export async function getRemoteUrl(
+async function getRemoteUrl(
   cwd: string = process.cwd()
 ): Promise<string | null> {
   return gitCommand(["config", "--get", "remote.origin.url"], cwd);
@@ -108,7 +108,7 @@ export async function getRemoteUrl(
 /**
  * Parse GitHub owner and repo from remote URL
  */
-export function parseGitHubUrl(
+function parseGitHubUrl(
   url: string
 ): { owner: string; repo: string } | null {
   // Handle both SSH and HTTPS URLs
@@ -131,7 +131,7 @@ export function parseGitHubUrl(
 /**
  * Get current branch
  */
-export async function getCurrentBranch(
+async function getCurrentBranch(
   cwd: string = process.cwd()
 ): Promise<string | null> {
   return gitCommand(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
@@ -140,7 +140,7 @@ export async function getCurrentBranch(
 /**
  * Get current commit SHA
  */
-export async function getCommitSha(
+async function getCommitSha(
   cwd: string = process.cwd()
 ): Promise<string | null> {
   return gitCommand(["rev-parse", "HEAD"], cwd);
@@ -149,7 +149,7 @@ export async function getCommitSha(
 /**
  * Get current commit message
  */
-export async function getCommitMessage(
+async function getCommitMessage(
   cwd: string = process.cwd()
 ): Promise<string | null> {
   return gitCommand(["log", "-1", "--pretty=%B"], cwd);

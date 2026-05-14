@@ -6,7 +6,7 @@
 /**
  * Normalize handler function to a comparable string
  */
-export function normalizeHandler(handler: unknown): string {
+function normalizeHandler(handler: unknown): string {
   if (typeof handler === "function") {
     return handler.toString().replace(/\s+/g, " ").trim();
   }
@@ -28,14 +28,6 @@ function isDebugLoggingEnabled(): boolean {
 interface Registration<TConfig, THandler> {
   config: TConfig;
   handler: THandler;
-}
-
-/**
- * Registered reference that can be updated or removed
- */
-interface RegisteredRef {
-  update?: (updates: any) => void;
-  remove: () => void;
 }
 
 /**

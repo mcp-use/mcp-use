@@ -164,7 +164,7 @@ export interface UserContext {
  * Handles the ChatGPT `openai/*` key convention and returns `undefined`
  * when no recognisable user metadata is present.
  */
-export function normalizeUserContext(
+function normalizeUserContext(
   rawMeta: Record<string, unknown> | undefined
 ): UserContext | undefined {
   if (!rawMeta) return undefined;
@@ -273,7 +273,7 @@ export function findSessionContext(
 /**
  * Send a progress notification
  */
-export async function sendProgressNotification(
+async function sendProgressNotification(
   sendNotification:
     | ((notification: {
         method: string;
@@ -305,7 +305,7 @@ export async function sendProgressNotification(
 /**
  * Wrap a promise with a timeout
  */
-export async function withTimeout<T>(
+async function withTimeout<T>(
   promise: Promise<T>,
   timeout: number | undefined,
   errorMessage: string
@@ -332,7 +332,7 @@ interface ParsedElicitParams {
 /**
  * Parse elicit() method parameters handling multiple overload signatures
  */
-export function parseElicitParams(
+function parseElicitParams(
   messageOrParams: string | ElicitFormParams | ElicitUrlParams,
   schemaOrUrlOrOptions?: z.ZodObject<any> | string | ElicitOptions,
   maybeOptions?: ElicitOptions
@@ -592,7 +592,7 @@ export function createElicitMethod(
 /**
  * Create the reportProgress() method for enhanced context
  */
-export function createReportProgressMethod(
+function createReportProgressMethod(
   progressToken: number | undefined,
   sendNotification:
     | ((notification: {
@@ -636,7 +636,7 @@ type LogLevel = keyof typeof LOG_LEVELS;
 /**
  * Valid log levels according to RFC 5424
  */
-export const VALID_LOG_LEVELS: readonly LogLevel[] = [
+const VALID_LOG_LEVELS: readonly LogLevel[] = [
   "debug",
   "info",
   "notice",
@@ -657,7 +657,7 @@ export function isValidLogLevel(level: string): level is LogLevel {
 /**
  * Check if a message level meets the minimum log level threshold
  */
-export function shouldLogMessage(
+function shouldLogMessage(
   messageLevel: string,
   minLevel: string | undefined
 ): boolean {

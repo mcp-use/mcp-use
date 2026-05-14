@@ -39,15 +39,6 @@ import { generateWidgetUri } from "./widgets/widget-helpers.js";
 import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
-// Import and re-export tool context types for public API
-import type {
-  ElicitFormParams,
-  ElicitOptions,
-  ElicitUrlParams,
-  SampleOptions,
-  ToolContext,
-} from "./types/tool-context.js";
-
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
 import { requestLogger } from "./logging.js";

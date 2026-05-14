@@ -8,12 +8,6 @@ const DropdownMenu: typeof DropdownMenuPrimitive.Root =
 const DropdownMenuTrigger: typeof DropdownMenuPrimitive.Trigger =
   DropdownMenuPrimitive.Trigger;
 
-const DropdownMenuGroup: typeof DropdownMenuPrimitive.Group =
-  DropdownMenuPrimitive.Group;
-
-const DropdownMenuPortal: typeof DropdownMenuPrimitive.Portal =
-  DropdownMenuPrimitive.Portal;
-
 const DropdownMenuSub: typeof DropdownMenuPrimitive.Sub =
   DropdownMenuPrimitive.Sub;
 
@@ -126,34 +120,6 @@ function DropdownMenuItem({
 }
 DropdownMenuItem.displayName = DropdownMenuPrimitive.Item.displayName;
 
-function DropdownMenuCheckboxItem({
-  ref,
-  className,
-  children,
-  checked,
-  ...props
-}: React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem> & {
-  ref?: React.RefObject<React.ElementRef<
-    typeof DropdownMenuPrimitive.CheckboxItem
-  > | null>;
-}) {
-  return (
-    <DropdownMenuPrimitive.CheckboxItem
-      ref={ref}
-      className={cn(
-        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        className
-      )}
-      checked={checked}
-      {...props}
-    >
-      {children}
-    </DropdownMenuPrimitive.CheckboxItem>
-  );
-}
-DropdownMenuCheckboxItem.displayName =
-  DropdownMenuPrimitive.CheckboxItem.displayName;
-
 function DropdownMenuRadioItem({
   ref,
   className,
@@ -224,31 +190,14 @@ function DropdownMenuSeparator({
 }
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-function DropdownMenuShortcut({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLSpanElement>) {
-  return (
-    <span
-      className={cn("ml-auto text-xs tracking-widest opacity-60", className)}
-      {...props}
-    />
-  );
-}
-DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
-
 export {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,

@@ -36,21 +36,6 @@ const TableBody = React.forwardRef<
 ));
 TableBody.displayName = "TableBody";
 
-const TableFooter = React.forwardRef<
-  React.ElementRef<"tfoot">,
-  React.ComponentPropsWithoutRef<"tfoot">
->(({ className, ...props }, ref) => (
-  <tfoot
-    ref={ref}
-    className={cn(
-      "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
-      className
-    )}
-    {...props}
-  />
-));
-TableFooter.displayName = "TableFooter";
-
 const TableRow = React.forwardRef<
   React.ElementRef<"tr">,
   React.ComponentPropsWithoutRef<"tr">
@@ -93,25 +78,11 @@ const TableCell = React.forwardRef<
 ));
 TableCell.displayName = "TableCell";
 
-const TableCaption = React.forwardRef<
-  React.ElementRef<"caption">,
-  React.ComponentPropsWithoutRef<"caption">
->(({ className, ...props }, ref) => (
-  <caption
-    ref={ref}
-    className={cn("mt-4 text-sm text-muted-foreground", className)}
-    {...props}
-  />
-));
-TableCaption.displayName = "TableCaption";
-
 export {
   Table,
   TableHeader,
   TableBody,
-  TableFooter,
   TableHead,
   TableRow,
   TableCell,
-  TableCaption,
 };

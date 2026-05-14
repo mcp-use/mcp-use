@@ -82,7 +82,7 @@ export const PER_CLIENT_SCOPES = new Set([
   "screenshot",
 ]);
 
-export async function connectCommand(
+async function connectCommand(
   name: string | undefined,
   urlOrCommand: string | undefined,
   options: {
@@ -288,7 +288,7 @@ export async function connectCommand(
   await cleanupAndExit(0);
 }
 
-export async function disconnectCommand(name: string): Promise<void> {
+async function disconnectCommand(name: string): Promise<void> {
   try {
     const sessionData = activeSessions.get(name);
     if (sessionData) {
@@ -305,7 +305,7 @@ export async function disconnectCommand(name: string): Promise<void> {
   await cleanupAndExit(0);
 }
 
-export async function removeClientCommand(name: string): Promise<void> {
+async function removeClientCommand(name: string): Promise<void> {
   try {
     const config = await getSession(name);
     if (!config) {
@@ -369,7 +369,7 @@ export async function removeClientCommand(name: string): Promise<void> {
   await cleanupAndExit(0);
 }
 
-export async function listClientsCommand(): Promise<void> {
+async function listClientsCommand(): Promise<void> {
   try {
     const sessions = await listAllSessions();
 
@@ -416,7 +416,7 @@ export async function listClientsCommand(): Promise<void> {
   await cleanupAndExit(0);
 }
 
-export async function listToolsCommand(
+async function listToolsCommand(
   name: string,
   options: { json?: boolean }
 ): Promise<void> {
@@ -479,7 +479,7 @@ export async function listToolsCommand(
   await cleanupAndExit(0);
 }
 
-export async function describeToolCommand(
+async function describeToolCommand(
   name: string,
   toolName: string
 ): Promise<void> {
@@ -520,7 +520,7 @@ export async function describeToolCommand(
   await cleanupAndExit(0);
 }
 
-export async function callToolCommand(
+async function callToolCommand(
   name: string,
   toolName: string,
   argsList?: string[],
@@ -696,7 +696,7 @@ export async function callToolCommand(
   await cleanupAndExit(0);
 }
 
-export async function listResourcesCommand(
+async function listResourcesCommand(
   name: string,
   options: { json?: boolean }
 ): Promise<void> {
@@ -742,7 +742,7 @@ export async function listResourcesCommand(
   await cleanupAndExit(0);
 }
 
-export async function readResourceCommand(
+async function readResourceCommand(
   name: string,
   uri: string,
   options: { json?: boolean }
@@ -770,7 +770,7 @@ export async function readResourceCommand(
   await cleanupAndExit(0);
 }
 
-export async function subscribeResourceCommand(
+async function subscribeResourceCommand(
   name: string,
   uri: string
 ): Promise<void> {
@@ -807,7 +807,7 @@ export async function subscribeResourceCommand(
   }
 }
 
-export async function unsubscribeResourceCommand(
+async function unsubscribeResourceCommand(
   name: string,
   uri: string
 ): Promise<void> {
@@ -830,7 +830,7 @@ export async function unsubscribeResourceCommand(
   await cleanupAndExit(0);
 }
 
-export async function listPromptsCommand(
+async function listPromptsCommand(
   name: string,
   options: { json?: boolean }
 ): Promise<void> {
@@ -884,7 +884,7 @@ export async function listPromptsCommand(
   await cleanupAndExit(0);
 }
 
-export async function getPromptCommand(
+async function getPromptCommand(
   name: string,
   promptName: string,
   argsList?: string[],
@@ -943,7 +943,7 @@ export async function getPromptCommand(
   await cleanupAndExit(0);
 }
 
-export async function interactiveCommand(name: string): Promise<void> {
+async function interactiveCommand(name: string): Promise<void> {
   try {
     const result = await getOrRestoreSession(name);
     if (!result) return;

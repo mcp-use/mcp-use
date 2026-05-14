@@ -13,34 +13,8 @@ import { mountWidgetsDev } from "./mount-widgets-dev.js";
 import { mountWidgetsProduction } from "./mount-widgets-production.js";
 import { setupWidgetRoutes } from "./setup-widget-routes.js";
 
-export { mountWidgetsDev } from "./mount-widgets-dev.js";
-
-export { mountWidgetsProduction } from "./mount-widgets-production.js";
-
-export { setupWidgetRoutes } from "./setup-widget-routes.js";
-
 export {
-  createUIResourceFromDefinition,
-  buildWidgetUrl,
-  createExternalUrlResource,
-  createRawHtmlResource,
-  createRemoteDomResource,
-  createAppsSdkResource,
-} from "./mcp-ui-adapter.js";
-
-export {
-  generateWidgetUri,
-  slugifyWidgetName,
-  convertPropsToInputs,
-  applyDefaultProps,
   readBuildManifest,
-  createWidgetUIResource,
-  getContentType,
-  processWidgetHtml,
-  createWidgetRegistration,
-  ensureWidgetMetadata,
-  readWidgetHtml,
-  registerWidgetFromTemplate,
   setupPublicRoutes,
   setupFaviconRoute,
 } from "./widget-helpers.js";

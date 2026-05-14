@@ -7,7 +7,7 @@ import { basename, join, resolve } from "node:path";
 
 // Known safe entries that may exist in a directory without considering it "non-empty"
 // Mirrors create-next-app behavior for common init artifacts
-export const SAFE_DIR_ENTRIES = new Set([
+const SAFE_DIR_ENTRIES = new Set([
   ".claude",
   ".cursor",
   ".DS_Store",

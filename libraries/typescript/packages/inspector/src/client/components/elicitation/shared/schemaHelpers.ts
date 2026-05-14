@@ -3,7 +3,7 @@ interface EnumChoice {
   title?: string;
 }
 
-export function isEnumChoice(value: unknown): value is EnumChoice {
+function isEnumChoice(value: unknown): value is EnumChoice {
   if (!value || typeof value !== "object") return false;
   const maybeChoice = value as { const?: unknown; title?: unknown };
   return (

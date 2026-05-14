@@ -110,39 +110,6 @@ function hasInlineUIResource(toolResult?: any): boolean {
 }
 
 /**
- * Extract resource URI for a detected widget protocol
- */
-export function extractWidgetResourceUri(
-  protocol: WidgetProtocol,
-  toolMeta?: Record<string, any>,
-  toolResult?: any
-): string | null {
-  if (!protocol) return null;
-
-  if (protocol === "mcp-apps") {
-    return toolMeta?.ui?.resourceUri || null;
-  }
-
-  if (protocol === "chatgpt-app") {
-    return toolMeta?.["openai/outputTemplate"] || null;
-  }
-
-  if (protocol === "mcp-ui") {
-    // Find the first ui:// resource in content
-    const resource = toolResult?.content?.find(
-      (item: any) =>
-        item.type === "resource" &&
-        item.resource?.uri?.startsWith("ui://") &&
-        item.resource?.mimeType !== "text/html+skybridge" &&
-        item.resource?.mimeType !== "text/html;profile=mcp-app"
-    );
-    return resource?.resource?.uri || null;
-  }
-
-  return null;
-}
-
-/**
  * Extract resource URI for a specific protocol (used when toggling between protocols)
  *
  * @param protocol - The specific protocol to get URI for
@@ -162,20 +129,3 @@ export function getResourceUriForProtocol(
   return null;
 }
 
-/**
- * Check if a tool has widget support that can be pre-rendered
- * (detected from metadata before tool execution)
- *
- * Returns true for MCP Apps and ChatGPT Apps (detected from metadata)
- * Returns false for MCP-UI (requires result to detect)
- *
- * @param toolMeta - Tool metadata from tool definition (_meta field)
- * @returns True if the widget can be pre-rendered before tool execution completes
- */
-export function canPreRenderWidget(toolMeta?: Record<string, any>): boolean {
-  if (!toolMeta) return false;
-
-  const protocol = detectWidgetProtocol(toolMeta, undefined);
-  // mcp-ui requires result to detect, so it cannot be pre-rendered
-  return protocol !== null && protocol !== "mcp-ui";
-}

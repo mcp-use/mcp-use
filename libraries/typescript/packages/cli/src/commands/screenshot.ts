@@ -483,7 +483,7 @@ async function resolveSessionForScreenshot(
   return null;
 }
 
-export async function screenshotCommand(
+async function screenshotCommand(
   options: ScreenshotOptions,
   argsList: string[] | undefined,
   context: ScreenshotContext

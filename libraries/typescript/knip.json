@@ -15,8 +15,7 @@
         "tests/servers/**/*.ts",
         "tests/docs/**/*.ts"
       ],
-      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreUnresolved": ["./version.js", "../version.js", "./src/version.js"]
+      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
     },
     "packages/cli": {
       "project": ["src/**/*.ts", "tests/**/*.ts"],

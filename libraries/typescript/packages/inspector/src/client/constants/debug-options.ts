@@ -96,18 +96,3 @@ function getTimezoneOptions() {
  */
 export const TIMEZONE_OPTIONS = getTimezoneOptions();
 
-/**
- * CSP mode options with descriptions
- */
-export const CSP_MODE_OPTIONS = [
-  {
-    value: "strict" as const,
-    label: "Strict",
-    description: "Enforce CSP as specified by widget",
-  },
-  {
-    value: "permissive" as const,
-    label: "Permissive",
-    description: "Relaxed CSP for development",
-  },
-] as const;

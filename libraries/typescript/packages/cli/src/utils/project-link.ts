@@ -1,8 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-export const MCP_USE_DIR = ".mcp-use";
-export const MCP_USE_DIR_PROJECT = "project.json";
+const MCP_USE_DIR = ".mcp-use";
+const MCP_USE_DIR_PROJECT = "project.json";
 
 interface ProjectLink {
   deploymentId: string;
@@ -13,7 +13,7 @@ interface ProjectLink {
 }
 
 // Get .mcp-use directory path
-export function getMcpUseDirectory(cwd: string): string {
+function getMcpUseDirectory(cwd: string): string {
   return path.join(cwd, MCP_USE_DIR);
 }
 

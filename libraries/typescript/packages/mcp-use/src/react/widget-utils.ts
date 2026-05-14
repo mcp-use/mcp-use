@@ -2,34 +2,7 @@
  * Shared utilities for widget hooks
  */
 
-import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import type { CallToolResponse } from "./widget-types.js";
-
-type Provider = "openai" | "mcp-apps" | "mcp-ui";
-
-/**
- * Detect the current provider environment
- */
-export function getProvider(): Provider {
-  if (typeof window === "undefined") {
-    return "mcp-ui";
-  }
-
-  // Check for OpenAI Apps SDK
-  if (window.openai) {
-    return "openai";
-  }
-
-  // Check for MCP Apps bridge (in iframe)
-  if (window !== window.parent) {
-    const bridge = getMcpAppsBridge();
-    if (bridge.isConnected()) {
-      return "mcp-apps";
-    }
-  }
-
-  return "mcp-ui";
-}
 
 /**
  * Normalize callTool response from different providers into a consistent format.

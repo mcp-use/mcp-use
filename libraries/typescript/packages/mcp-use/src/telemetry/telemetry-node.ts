@@ -135,15 +135,6 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
   return cachedEnvironment;
 }
 
-/**
- * Indicates whether the current runtime is a browser environment.
- *
- * @returns `true` if running in a browser environment, `false` otherwise.
- */
-export function isBrowserEnvironment(): boolean {
-  return false; // Node.js implementation - never browser
-}
-
 // Simple Scarf event logger implementation
 class ScarfEventLogger {
   private endpoint: string;

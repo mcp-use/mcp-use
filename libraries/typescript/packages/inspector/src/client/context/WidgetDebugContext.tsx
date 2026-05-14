@@ -352,30 +352,3 @@ export const DEVICE_VIEWPORT_CONFIGS = {
   custom: { width: 768, height: 1024, name: "Custom" },
 } as const;
 
-/**
- * Safe area presets for common devices
- */
-export const SAFE_AREA_PRESETS = {
-  none: { top: 0, right: 0, bottom: 0, left: 0, name: "None" },
-  iphone_notch: {
-    top: 47,
-    right: 0,
-    bottom: 34,
-    left: 0,
-    name: "iPhone Notch",
-  },
-  iphone_island: {
-    top: 59,
-    right: 0,
-    bottom: 34,
-    left: 0,
-    name: "Dynamic Island",
-  },
-  android_gesture: {
-    top: 24,
-    right: 0,
-    bottom: 48,
-    left: 0,
-    name: "Android Gesture",
-  },
-} as const;

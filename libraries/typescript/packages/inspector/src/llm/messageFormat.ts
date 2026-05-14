@@ -154,15 +154,6 @@ export function extractSystem(messages: ProviderMessage[]): {
   };
 }
 
-/** Turn a content field into plain text (for providers that only take text). */
-export function contentToText(content: string | ContentPart[]): string {
-  if (typeof content === "string") return content;
-  return content
-    .map((p) => (p.type === "text" ? p.text : ""))
-    .filter(Boolean)
-    .join("\n");
-}
-
 /** Parse a `data:...;base64,...` URL. */
 export function parseDataUrl(
   url: string

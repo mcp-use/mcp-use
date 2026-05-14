@@ -142,7 +142,7 @@ function wrapAnsiLine(line: string, maxWidth: number): string[] {
   return result;
 }
 
-export function printBox(
+function printBox(
   content: string,
   title?: string,
   language?: string,
@@ -194,7 +194,7 @@ export function printBox(
 /**
  * Extract code from tool input if present
  */
-export function extractCodeFromToolInput(input: unknown): string | null {
+function extractCodeFromToolInput(input: unknown): string | null {
   if (typeof input === "object" && input !== null && "code" in input) {
     const inputObj = input as Record<string, unknown>;
     return typeof inputObj.code === "string" ? inputObj.code : null;
@@ -222,7 +222,7 @@ function isExecuteCodeResult(obj: unknown): obj is ExecuteCodeResult {
 /**
  * Parse execute_code tool result
  */
-export function parseExecuteCodeResult(
+function parseExecuteCodeResult(
   output: unknown
 ): ExecuteCodeResult | null {
   try {
@@ -246,7 +246,7 @@ export function parseExecuteCodeResult(
 /**
  * Render content with appropriate formatting
  */
-export function renderContent(content: unknown): string {
+function renderContent(content: unknown): string {
   if (content === null || content === undefined) {
     return "null";
   }
@@ -261,7 +261,7 @@ export function renderContent(content: unknown): string {
 /**
  * Unwrap tool input if it's wrapped in an "input" field with JSON string
  */
-export function unwrapToolInput(input: unknown): unknown {
+function unwrapToolInput(input: unknown): unknown {
   // Check if input has an "input" field that's a JSON string
   if (typeof input === "object" && input !== null && "input" in input) {
     const inputObj = input as Record<string, unknown>;
@@ -281,7 +281,7 @@ export function unwrapToolInput(input: unknown): unknown {
 /**
  * Handle tool start event with pretty printing
  */
-export function handleToolStart(event: StreamEvent) {
+function handleToolStart(event: StreamEvent) {
   const toolName = event.name || "unknown";
   let input = event.data?.input || {};
 
@@ -307,7 +307,7 @@ export function handleToolStart(event: StreamEvent) {
 /**
  * Extract content from LangChain ToolMessage structure
  */
-export function extractToolMessageContent(
+function extractToolMessageContent(
   output: unknown
 ): { toolName: string; status: string; content: unknown } | null {
   try {
@@ -352,7 +352,7 @@ export function extractToolMessageContent(
 /**
  * Format search_tools result as a tree structure
  */
-export function formatSearchToolsAsTree(
+function formatSearchToolsAsTree(
   tools: Array<{ server: string; name: string; description?: string }>,
   meta?: { total_tools?: number; namespaces?: string[]; result_count?: number },
   query?: string
@@ -483,7 +483,7 @@ export function formatSearchToolsAsTree(
 /**
  * Handle tool end event with pretty printing
  */
-export function handleToolEnd(event: StreamEvent) {
+function handleToolEnd(event: StreamEvent) {
   const output = event.data?.output;
 
   // First, try to extract from LangChain ToolMessage structure if present

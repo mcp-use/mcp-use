@@ -11,11 +11,6 @@ export interface PendingSamplingRequest {
   toolName?: string; // Track which tool triggered this sampling request
 }
 
-interface SamplingRequestWithHandlers extends PendingSamplingRequest {
-  resolve: (result: CreateMessageResult) => void;
-  reject: (error: Error) => void;
-}
-
 // Default sampling response for quick approval
 export const DEFAULT_SAMPLING_RESPONSE: CreateMessageResult = {
   model: "stub-model",

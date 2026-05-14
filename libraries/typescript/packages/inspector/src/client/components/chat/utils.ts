@@ -28,14 +28,14 @@ const SUPPORTED_IMAGE_TYPES = [
 /**
  * Validates if a file is an acceptable image type
  */
-export function isValidImageType(file: File): boolean {
+function isValidImageType(file: File): boolean {
   return SUPPORTED_IMAGE_TYPES.includes(file.type);
 }
 
 /**
  * Validates if a file is within size limits
  */
-export function isValidFileSize(file: File): boolean {
+function isValidFileSize(file: File): boolean {
   return file.size <= MAX_FILE_SIZE;
 }
 
@@ -50,7 +50,7 @@ export function isValidTotalSize(attachments: MessageAttachment[]): boolean {
 /**
  * Reads a file and converts it to base64
  */
-export function readFileAsBase64(file: File): Promise<string> {
+function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 

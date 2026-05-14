@@ -47,7 +47,7 @@ export function isOAuthDiscoveryFailure(error: Error | unknown): boolean {
   );
 }
 
-export function deriveOAuthProxyUrl(gatewayUrl?: string): string | undefined {
+function deriveOAuthProxyUrl(gatewayUrl?: string): string | undefined {
   if (!gatewayUrl) {
     return undefined;
   }

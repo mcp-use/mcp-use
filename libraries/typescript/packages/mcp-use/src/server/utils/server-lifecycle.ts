@@ -56,7 +56,7 @@ export function applyDenoCorsHeaders(response: Response): Response {
  *
  * @returns Function that rewrites Supabase paths to actual route paths
  */
-export function createSupabasePathRewriter(): (pathname: string) => string {
+function createSupabasePathRewriter(): (pathname: string) => string {
   return (pathname: string): string => {
     let newPathname = pathname;
 

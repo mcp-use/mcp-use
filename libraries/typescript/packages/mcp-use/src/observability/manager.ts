@@ -278,27 +278,3 @@ export class ObservabilityManager {
   }
 }
 
-// Singleton instance for easy access
-let defaultManager: ObservabilityManager | null = null;
-
-/**
- * Get the default ObservabilityManager instance.
- * @returns The default ObservabilityManager instance (singleton).
- */
-export function getDefaultManager(): ObservabilityManager {
-  if (!defaultManager) {
-    defaultManager = new ObservabilityManager();
-  }
-  return defaultManager;
-}
-
-/**
- * Create a new ObservabilityManager instance.
- * @param config Configuration options
- * @returns A new ObservabilityManager instance.
- */
-export function createManager(
-  config: ObservabilityConfig = {}
-): ObservabilityManager {
-  return new ObservabilityManager(config);
-}

@@ -1,7 +1,6 @@
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
-  ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
 
 export interface PendingElicitationRequest {
@@ -11,13 +10,3 @@ export interface PendingElicitationRequest {
   serverName: string;
   toolName?: string; // Track which tool triggered this elicitation request
 }
-
-interface ElicitationRequestWithHandlers extends PendingElicitationRequest {
-  resolve: (result: ElicitResult) => void;
-  reject: (error: Error) => void;
-}
-
-// Default elicitation response for quick acceptance (cancel action)
-export const DEFAULT_ELICITATION_CANCEL: ElicitResult = {
-  action: "cancel",
-};

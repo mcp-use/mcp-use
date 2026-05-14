@@ -168,15 +168,6 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
   return cachedEnvironment;
 }
 
-/**
- * Determines whether the current runtime is a browser.
- *
- * @returns `true` if the runtime is a browser, `false` otherwise.
- */
-export function isBrowserEnvironment(): boolean {
-  return getRuntimeEnvironment() === "browser";
-}
-
 // PostHog types for Browser
 type PostHogBrowserClient = {
   capture: (eventName: string, properties?: Record<string, any>) => void;
