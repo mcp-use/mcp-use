@@ -235,9 +235,8 @@ mcp-use start --mcp-dir src/mcp
 </Note>
 
 <Note>
-  The inspector is build-time-gated in production. If you want it available on
-  `start`, rebuild with `mcp-use build --with-inspector` first; there is no
-  `--with-inspector` flag on `start` itself.
+  The inspector is not available in production builds. If you want it, rebuild
+  with the `--with-inspector` flag.
 </Note>
 
 <Tip>
