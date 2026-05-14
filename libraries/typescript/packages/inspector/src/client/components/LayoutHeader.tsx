@@ -888,7 +888,7 @@ export function LayoutHeader({
                           activeTab === tab.id
                             ? "dark:bg-black"
                             : "dark:bg-zinc-700",
-                          "ml-1 bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                          "shrink-0 ml-1 bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
                         )}
                       >
                         {count}
@@ -965,7 +965,7 @@ export function LayoutHeader({
                             activeTab === tab.id
                               ? " dark:bg-black "
                               : "dark:bg-zinc-700",
-                            "ml-1 bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
+                            "shrink-0 ml-1 bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
                           )}
                         >
                           {count}
