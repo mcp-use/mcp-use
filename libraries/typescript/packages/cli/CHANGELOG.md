@@ -1,5 +1,16 @@
 # @mcp-use/cli
 
+## 3.2.0-canary.12
+
+### Minor Changes
+
+- 2ef0a90: feat(cli): add `--device-scale-factor <n>` to `mcp-use client screenshot` (both ad-hoc and per-server forms) and `--screenshot-device-scale-factor <n>` to `mcp-use client <name> tools call` for capturing high-DPI widget screenshots (e.g. Retina-style 2x). Defaults to 1, so existing behavior is unchanged. Accepts fractional values; bounded to (0, 4].
+
+### Patch Changes
+
+- mcp-use@1.28.0-canary.12
+- @mcp-use/inspector@6.0.0-canary.12
+
 ## 3.2.0-canary.11
 
 ### Minor Changes
