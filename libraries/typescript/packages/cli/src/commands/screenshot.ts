@@ -602,7 +602,7 @@ export async function screenshotCommand(
       console.log("");
       console.log(formatInfo("Provide arguments as key=value pairs:"));
       console.log(
-        `  npx ${invocation.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
+        `  npx ${context.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
       );
       console.log("");
       console.log(formatInfo("Tool schema:"));
