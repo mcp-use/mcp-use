@@ -22,7 +22,7 @@ async function serializeBody(body: BodyInit): Promise<any> {
   return body;
 }
 
-export interface BrowserOAuthOptions {
+interface BrowserOAuthOptions {
   storageKeyPrefix?: string;
   clientName?: string;
   clientUri?: string;

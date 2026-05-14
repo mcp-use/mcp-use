@@ -17,7 +17,7 @@ import {
   useState,
 } from "react";
 
-export type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
+type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
 
 export interface CspViolation {
   directive: string;
@@ -37,7 +37,7 @@ export interface WidgetDeclaredCsp {
   baseUriDomains?: string[];
 }
 
-export interface WidgetInfo {
+interface WidgetInfo {
   toolName: string;
   protocol: WidgetProtocol;
   hostContext?: any;
@@ -350,32 +350,4 @@ export const DEVICE_VIEWPORT_CONFIGS = {
   tablet: { width: 820, height: 1180, name: "iPad Air" },
   desktop: { width: 1440, height: 900, name: "Desktop" },
   custom: { width: 768, height: 1024, name: "Custom" },
-} as const;
-
-/**
- * Safe area presets for common devices
- */
-export const SAFE_AREA_PRESETS = {
-  none: { top: 0, right: 0, bottom: 0, left: 0, name: "None" },
-  iphone_notch: {
-    top: 47,
-    right: 0,
-    bottom: 34,
-    left: 0,
-    name: "iPhone Notch",
-  },
-  iphone_island: {
-    top: 59,
-    right: 0,
-    bottom: 34,
-    left: 0,
-    name: "Dynamic Island",
-  },
-  android_gesture: {
-    top: 24,
-    right: 0,
-    bottom: 48,
-    left: 0,
-    name: "Android Gesture",
-  },
 } as const;

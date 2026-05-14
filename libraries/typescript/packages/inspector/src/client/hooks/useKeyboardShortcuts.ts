@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export interface KeyboardShortcutHandlers {
+interface KeyboardShortcutHandlers {
   onToolsTab?: () => void;
   onPromptsTab?: () => void;
   onResourcesTab?: () => void;

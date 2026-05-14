@@ -16,7 +16,7 @@ interface InspectorMessagePart {
   };
 }
 
-export interface InspectorMessageLike {
+interface InspectorMessageLike {
   role: "user" | "assistant";
   content: unknown;
   attachments?: InspectorAttachment[];
@@ -152,15 +152,6 @@ export function extractSystem(messages: ProviderMessage[]): {
     system: sys.length > 0 ? sys.join("\n\n") : undefined,
     rest,
   };
-}
-
-/** Turn a content field into plain text (for providers that only take text). */
-export function contentToText(content: string | ContentPart[]): string {
-  if (typeof content === "string") return content;
-  return content
-    .map((p) => (p.type === "text" ? p.text : ""))
-    .filter(Boolean)
-    .join("\n");
 }
 
 /** Parse a `data:...;base64,...` URL. */

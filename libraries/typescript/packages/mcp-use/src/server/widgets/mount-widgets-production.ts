@@ -18,7 +18,7 @@ import type {
 /**
  * Configuration for production widget mounting
  */
-export type MountWidgetsProductionOptions = MountWidgetsOptions;
+type MountWidgetsProductionOptions = MountWidgetsOptions;
 
 /**
  * Mount pre-built widgets from dist/resources/widgets/ directory in production mode

@@ -6,11 +6,11 @@ import type {
   ProviderTool,
 } from "./types";
 
-export interface ToolCallFn {
+interface ToolCallFn {
   (name: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
-export interface ToolLoopParams {
+interface ToolLoopParams {
   config: ProviderConfig;
   /** Initial conversation history + the user turn that triggers the run. */
   messages: ProviderMessage[];

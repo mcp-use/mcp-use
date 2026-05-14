@@ -4,7 +4,7 @@ import {
   sendNotificationToSession as sendNotificationToSessionHelper,
 } from "../sessions/notifications.js";
 
-export interface NotificationServerContext {
+interface NotificationServerContext {
   sessions: Map<string, SessionData>;
 }
 

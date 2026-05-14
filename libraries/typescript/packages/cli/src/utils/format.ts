@@ -29,14 +29,14 @@ function truncateCell(s: string, width: number): string {
   return plain.slice(0, width - 1) + "…";
 }
 
-export interface TableColumn {
+interface TableColumn {
   key: string;
   header: string;
   width?: number;
   truncate?: boolean;
 }
 
-export interface FormatTableOptions {
+interface FormatTableOptions {
   /**
    * Force TSV output regardless of TTY detection. When undefined, auto-detects:
    * non-TTY stdout (pipes, agents, CI) gets TSV; TTY gets the borderless table.

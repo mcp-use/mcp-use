@@ -396,38 +396,4 @@ const TabsTrigger = React.forwardRef<
 );
 TabsTrigger.displayName = "TabsTrigger";
 
-interface TabsContentProps {
-  children: React.ReactNode;
-  value: string;
-  className?: string;
-}
-
-function TabsContent({
-  ref,
-  children,
-  value,
-  className,
-  ...props
-}: TabsContentProps & { ref?: React.RefObject<HTMLDivElement | null> }) {
-  const { activeValue } = useTabs();
-  const isActive = activeValue === value;
-
-  if (!isActive) return null;
-
-  return (
-    <div
-      ref={ref}
-      role="tabpanel"
-      className={cn(
-        "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-}
-TabsContent.displayName = "TabsContent";
-
-export { Tabs, TabsContent, TabsList, TabsTrigger, useTabs, useTabsList };
+export { Tabs, TabsList, TabsTrigger };

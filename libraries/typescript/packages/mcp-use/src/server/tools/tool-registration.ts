@@ -30,7 +30,7 @@ import {
 /**
  * Interface representing the server context needed for tool registration
  */
-export interface ToolServerContext<_HasOAuth extends boolean = false> {
+interface ToolServerContext<_HasOAuth extends boolean = false> {
   /** Official MCP Server instance */
   server: {
     registerTool: (

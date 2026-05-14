@@ -3,7 +3,7 @@ import type { OAuthClientInformation } from "@modelcontextprotocol/sdk/shared/au
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
 
-export type OAuthClientConfig = {
+type OAuthClientConfig = {
   name?: string;
   version?: string;
   uri?: string;
@@ -47,7 +47,7 @@ export function isOAuthDiscoveryFailure(error: Error | unknown): boolean {
   );
 }
 
-export function deriveOAuthProxyUrl(gatewayUrl?: string): string | undefined {
+function deriveOAuthProxyUrl(gatewayUrl?: string): string | undefined {
   if (!gatewayUrl) {
     return undefined;
   }

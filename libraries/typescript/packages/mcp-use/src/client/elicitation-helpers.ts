@@ -26,7 +26,7 @@ export type ElicitValidationResult = {
   errors?: string[];
 };
 
-export type ElicitParams = ElicitRequestFormParams | ElicitRequestURLParams;
+type ElicitParams = ElicitRequestFormParams | ElicitRequestURLParams;
 
 function hasRequestedSchema(
   params: ElicitParams

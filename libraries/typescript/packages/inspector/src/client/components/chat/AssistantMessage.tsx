@@ -33,7 +33,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export interface AssistantMessageProps {
+interface AssistantMessageProps {
   content: string;
   timestamp?: Date | number;
   /** Internal: indicates the message is currently being streamed */
