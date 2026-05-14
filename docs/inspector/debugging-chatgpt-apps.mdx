@@ -623,6 +623,7 @@ Your ChatGPT App needs an MCP server that exposes tools and optionally widgets:
 
 ```typescript
 import { MCPServer } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
   name: "my-chatgpt-app",
@@ -630,17 +631,14 @@ const server = new MCPServer({
 });
 
 // Add a tool that returns a widget
-server.addTool({
+server.tool({
   name: "create_dashboard",
   description: "Create an interactive dashboard",
-  inputSchema: {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      data: { type: "object" },
-    },
-  },
-  handler: async (args) => {
+  schema: z.object({
+    title: z.string(),
+    data: z.object({}).passthrough(),
+  }),
+}, async (args) => {
     // Return widget URI in metadata
     return {
       contents: [
