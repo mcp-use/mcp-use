@@ -351,4 +351,3 @@ export const DEVICE_VIEWPORT_CONFIGS = {
   desktop: { width: 1440, height: 900, name: "Desktop" },
   custom: { width: 768, height: 1024, name: "Custom" },
 } as const;
-

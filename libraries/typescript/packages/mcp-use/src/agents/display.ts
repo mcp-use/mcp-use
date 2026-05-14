@@ -222,9 +222,7 @@ function isExecuteCodeResult(obj: unknown): obj is ExecuteCodeResult {
 /**
  * Parse execute_code tool result
  */
-function parseExecuteCodeResult(
-  output: unknown
-): ExecuteCodeResult | null {
+function parseExecuteCodeResult(output: unknown): ExecuteCodeResult | null {
   try {
     // If output is a string, try to parse it as JSON
     if (typeof output === "string") {

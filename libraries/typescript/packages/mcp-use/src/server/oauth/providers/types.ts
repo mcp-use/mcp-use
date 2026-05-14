@@ -210,4 +210,3 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   /** Audience for JWT verification */
   audience?: string;
 }
-

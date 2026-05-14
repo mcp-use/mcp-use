@@ -691,4 +691,3 @@ export function getMcpAppsBridge(): McpAppsBridge {
   }
   return bridgeInstance;
 }
-

@@ -277,4 +277,3 @@ export class ObservabilityManager {
     return "ObservabilityManager(no handlers)";
   }
 }
-

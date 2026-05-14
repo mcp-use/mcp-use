@@ -128,4 +128,3 @@ export function getResourceUriForProtocol(
   }
   return null;
 }
-

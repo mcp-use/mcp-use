@@ -108,9 +108,7 @@ async function getRemoteUrl(
 /**
  * Parse GitHub owner and repo from remote URL
  */
-function parseGitHubUrl(
-  url: string
-): { owner: string; repo: string } | null {
+function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   // Handle both SSH and HTTPS URLs
   // SSH: git@github.com:owner/repo.git
   // HTTPS: https://github.com/owner/repo.git

@@ -95,4 +95,3 @@ function getTimezoneOptions() {
  * Generated dynamically from Intl.supportedValuesOf("timeZone")
  */
 export const TIMEZONE_OPTIONS = getTimezoneOptions();
-

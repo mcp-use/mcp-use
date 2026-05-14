@@ -9,7 +9,4 @@
 import "./langfuse.js";
 
 // Export the manager and its utilities
-export {
-  type ObservabilityConfig,
-  ObservabilityManager,
-} from "./manager.js";
+export { type ObservabilityConfig, ObservabilityManager } from "./manager.js";
