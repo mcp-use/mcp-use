@@ -18,7 +18,7 @@ A production-ready example of an MCP server with Auth0 OAuth 2.1 authentication,
 
 1. **Auth0 Account**: Sign up at [auth0.com](https://auth0.com) (free tier available)
 2. **Auth0 CLI**: Install the [Auth0 CLI](https://auth0.github.io/auth0-cli/) for configuration
-3. **Node.js**: Version 18 or higher
+3. **Node.js**: Version 20.19 or higher, or 22.12 or higher
 4. **jq**: JSON processor for CLI scripts ([installation instructions](https://jqlang.org/download/))
 
 ## Setup
