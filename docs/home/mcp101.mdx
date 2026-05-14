@@ -144,6 +144,39 @@ The **[MCP Inspector](/inspector/index)** is a good concrete example: it is an M
 
 With mcp-use, `MCPClient` gives you a programmatic MCP client in Python and TypeScript:
 
+<CodeGroup>
+```typescript TypeScript
+import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    everything: { command: "npx", args: ["-y", "@modelcontextprotocol/server-everything"] }
+  }
+});
+
+await client.createAllSessions();
+const session = client.getSession("everything");
+const tools = await session.listTools();
+const result = await session.callTool("add", { a: 1, b: 2 });
+await client.closeAllSessions();
+```
+```python Python
+from mcp_use import MCPClient
+
+client = MCPClient({
+    "mcpServers": {
+        "everything": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-everything"] }
+    }
+})
+
+await client.create_all_sessions()
+session = client.get_session("everything")
+tools = await session.list_tools()
+result = await session.call_tool("add", {"a": 1, "b": 2})
+await client.close_all_sessions()
+```
+</CodeGroup>
+
 See [TypeScript Client](/typescript/client/client-configuration) and [Python Client](/python/client/client-configuration).
 
 ### Client Primitives
