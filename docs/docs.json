@@ -30,6 +30,16 @@
   "icons": {
     "library": "lucide"
   },
+  "banner": {
+    "content": "Launch Week 1 is here. See everything we shipped. [Read more →](https://manufact.com/launchweek/1)",
+    "dismissible": true,
+    "type": "info"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
   "navigation": {
     "anchors": [
       {
