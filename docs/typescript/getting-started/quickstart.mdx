@@ -30,15 +30,19 @@ Building such agents is easy with **mcp-use**, all you need is an LLM and the MC
 
 <CodeGroup>
 ```bash yarn
-yarn add mcp-use
+yarn add mcp-use @langchain/openai
 ```
 ```bash npm
-npm install mcp-use
+npm install mcp-use @langchain/openai
 ```
 ```bash pnpm
-pnpm add mcp-use
+pnpm add mcp-use @langchain/openai
 ```
 </CodeGroup>
+
+<Note>
+The agent requires a LangChain LLM provider package. The examples use `@langchain/openai` — swap for `@langchain/anthropic`, `@langchain/google-genai`, or `@langchain/groq` as needed.
+</Note>
 
 Here's a simple example to get you started for an agent with **browser tools** support.
 
