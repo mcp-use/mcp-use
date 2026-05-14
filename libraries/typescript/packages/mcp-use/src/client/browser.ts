@@ -84,6 +84,9 @@ export class BrowserMCPClient extends BaseMCPClient {
       globalDefaults
     );
 
+    // Client-level capabilities (mirrors the wire format)
+    const capabilities = this.config.capabilities;
+
     // Root clientInfo as fallback when server config omits it
     const clientInfo = normalizeClientInfo(
       serverConfig.clientInfo ?? this.config.clientInfo
@@ -108,6 +111,7 @@ export class BrowserMCPClient extends BaseMCPClient {
       gatewayUrl,
       serverId,
       reconnectionOptions,
+      capabilities,
     };
 
     logger.debug(

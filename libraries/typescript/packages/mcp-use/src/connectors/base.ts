@@ -107,6 +107,15 @@ export interface ConnectorInitOptions {
     reconnectionDelayGrowFactor?: number;
     maxRetries?: number;
   };
+  /**
+   * Client capabilities advertised in the MCP initialize handshake. Mirrors
+   * the wire format — provide any subset of `roots`, `sampling`,
+   * `elicitation`, `extensions` (SEP-1724), etc. Merged with the SDK
+   * passthrough at `clientOptions.capabilities`, and the connector's
+   * auto-managed fields (`roots`, plus `sampling`/`elicitation` when their
+   * callbacks are registered) override anything supplied here.
+   */
+  capabilities?: Record<string, unknown>;
 }
 
 /**

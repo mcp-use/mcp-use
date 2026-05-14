@@ -89,6 +89,7 @@ export class StdioConnector extends BaseConnector {
         ...(this.opts.clientOptions || {}),
         capabilities: {
           ...(this.opts.clientOptions?.capabilities || {}),
+          ...(this.opts.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
           // Add sampling capability if callback is provided
           ...((this.opts.onSampling ?? this.opts.samplingCallback)

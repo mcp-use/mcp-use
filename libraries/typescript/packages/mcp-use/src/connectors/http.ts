@@ -113,6 +113,7 @@ export class HttpConnector extends BaseConnector {
       ...(this.opts.clientOptions || {}),
       capabilities: {
         ...(this.opts.clientOptions?.capabilities || {}),
+        ...(this.opts.capabilities || {}),
         roots: { listChanged: true },
         ...(this.opts.onSampling ? { sampling: {} } : {}),
         ...((this.opts.onElicitation ?? this.opts.elicitationCallback)

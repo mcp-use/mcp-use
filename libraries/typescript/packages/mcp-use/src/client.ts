@@ -517,6 +517,7 @@ export class MCPClient extends BaseMCPClient {
       serverConfig as CallbackConfig,
       this._globalCallbacks
     );
+    const capabilities = this.config.capabilities;
     const merged = {
       ...serverConfig,
       clientInfo: serverConfig.clientInfo ?? this.config.clientInfo,
@@ -537,6 +538,7 @@ export class MCPClient extends BaseMCPClient {
         onSampling: resolved.onSampling,
         onElicitation: resolved.onElicitation,
         onNotification: resolved.onNotification,
+        capabilities,
       });
     }
 
@@ -544,6 +546,7 @@ export class MCPClient extends BaseMCPClient {
       onSampling: resolved.onSampling,
       onElicitation: resolved.onElicitation,
       onNotification: resolved.onNotification,
+      capabilities,
     });
   }
 

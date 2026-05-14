@@ -124,6 +124,34 @@ export type ServerConfig = StdioServerConfig | HttpServerConfig;
 export interface MCPClientConfigShape extends CallbackConfig {
   /** Default clientInfo for all servers; overridable per server. */
   clientInfo?: ClientInfo;
+  /**
+   * Client capabilities advertised in the MCP initialize handshake. Mirrors
+   * the wire format — provide any subset of `roots`, `sampling`,
+   * `elicitation`, `extensions` (SEP-1724), etc.
+   *
+   * Capabilities describe what the client implementation can do, so they
+   * are configured once here rather than per-server.
+   *
+   * The connector auto-manages `roots`, `sampling`, and `elicitation` based
+   * on which callbacks are registered; values supplied here for those
+   * specific keys may be overridden. For everything else (notably
+   * `extensions`), the values pass through unchanged.
+   *
+   * The `mcpApps()` helper returns the canonical SEP-1865 extension fragment.
+   *
+   * @example
+   * ```ts
+   * import { mcpApps } from "mcp-use";
+   *
+   * new MCPClient({
+   *   capabilities: {
+   *     extensions: mcpApps(),
+   *   },
+   *   mcpServers: { ... },
+   * });
+   * ```
+   */
+  capabilities?: Record<string, unknown>;
   mcpServers?: Record<string, ServerConfig>;
 }
 

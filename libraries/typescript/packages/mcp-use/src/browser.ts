@@ -45,3 +45,10 @@ export type {
 
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./version.js";
+
+// SEP-1724 extension capability helpers
+export {
+  MCP_APPS_EXTENSION_ID,
+  MCP_APPS_MIME_TYPE,
+  mcpApps,
+} from "./extensions.js";
