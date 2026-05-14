@@ -26,6 +26,20 @@ AI models are powerful in isolation, but they can't act on the world without int
 
 The **Model Context Protocol (MCP)** is an open standard (introduced by Anthropic in late 2024) that solves this. It defines a common language between AI applications and the servers that expose capabilities to them - so any MCP-compatible client can talk to any MCP-compatible server without custom integration code. Build a server once, and it works with Claude, ChatGPT, Cursor, or any other MCP host.
 
+Chat interfaces are becoming how most products are used. The major AI platforms now ship official MCP stores where you can publish your server and reach users directly inside their chat interface - no app install, no separate login.
+
+<CardGroup cols={3}>
+  <Card title="Claude" img="/images/stores/claude.png" href="https://claude.ai/integrations">
+    Publish to Anthropic's MCP integrations directory.
+  </Card>
+  <Card title="ChatGPT" img="/images/stores/chat.png" href="https://chatgpt.com/gpts">
+    Reach users through the ChatGPT connector store.
+  </Card>
+  <Card title="Cursor" img="/images/stores/cursor.png" href="https://cursor.com/mcp">
+    List your server in Cursor's MCP marketplace.
+  </Card>
+</CardGroup>
+
 ## Architecture
 
 MCP uses a client-server model with three roles:
