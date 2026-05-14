@@ -237,7 +237,7 @@ export async function loginCommand(options?: {
       await deleteConfig();
     }
 
-    console.log(chalk.cyan.bold("Logging in to mcp-use cloud...\n"));
+    console.log(chalk.cyan.bold("Logging in to Manufact cloud...\n"));
 
     const authBaseUrl = await getAuthBaseUrl();
 

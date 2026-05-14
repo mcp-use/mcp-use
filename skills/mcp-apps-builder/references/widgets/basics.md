@@ -614,7 +614,7 @@ export default function GoodWidget() {
 
 ## Testing Widgets
 
-Use the inspector to test widgets during development:
+### Option 1: Inspector (interactive)
 
 1. Start dev server: `npm run dev`
 2. Open inspector: `http://localhost:3000/inspector`
@@ -626,6 +626,28 @@ Use the inspector to test widgets during development:
 - Change widget code → Auto-reload
 - Adjust props schema → Update tool call input
 - Test edge cases (empty lists, missing optional props)
+
+### Option 2: Headless screenshot (agent-friendly)
+
+For visual feedback loops where you want to verify a widget change without leaving the terminal — call the tool, save a PNG, eyeball it, edit, repeat:
+
+```bash
+# Saved-server form (assumes you ran `mcp-use client connect dev <url>` once)
+npx mcp-use client dev screenshot --tool get-weather city=Tokyo \
+  --width 800 --height 600 --theme light \
+  --output ./weather.png
+
+# Ad-hoc form — no saved server, pass auth headers inline if needed
+npx mcp-use client screenshot --mcp http://localhost:3000/mcp \
+  --tool get-weather city=Tokyo
+```
+
+- Args are `key=value` pairs, `key:='<json>'` for nested values, or one full JSON object
+- The saved-server form reuses the auth from `mcp-use client connect` (OAuth or `--auth <token>`); the ad-hoc form accepts `-H "Header: value"` (repeatable) for authenticated servers
+- Add `--device-scale-factor 2` for Retina output
+- For sandboxed environments without a local Chrome, point `--cdp-url <ws>` at a hosted Chromium (e.g. Notte) and `--inspector <publicly-reachable-url>` at a deployed inspector
+
+Equivalently, `mcp-use client <name> tools call <tool> ... --screenshot` calls the tool *and* saves a widget PNG in one step — useful for one-shot verification.
 
 ---
 

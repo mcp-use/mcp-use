@@ -189,6 +189,38 @@ Load these before diving into tools/resources/widgets sections.
 
 ---
 
+### 🔁 Testing from the Terminal (Agent Feedback Loops)
+**When:** You want to verify a tool or widget *without* the inspector UI — the canonical flow for AI agents iterating on MCP servers.
+
+- **`mcp-use client`** — drives MCP servers from the terminal. Auto-runs OAuth on 401, persists saved servers under a short name, and one-shot subcommands exit cleanly so they're safe to spawn from harnesses.
+
+  ```bash
+  npx mcp-use client connect dev http://localhost:3000/mcp
+  npx mcp-use client dev tools list
+  npx mcp-use client dev tools call get-weather city=Tokyo --screenshot
+  ```
+
+  Every per-server command takes the saved name as its first positional arg (`mcp-use client <name> <scope> <action>`) — there is no "active session". Args use `key=value` (with `key:='<json>'` for nested values) or a single JSON object. When a tool renders a widget, pass `--screenshot` to also save a PNG (`./<view>-<timestamp>.png` by default, or override with `--screenshot-output <path>`).
+
+- **`mcp-use client screenshot`** — headless render of a widget tool to a PNG. Use this when you want to visually verify a widget change without opening the inspector, especially in loops where you call a tool, screenshot, eyeball the output, and edit. Two forms:
+
+  ```bash
+  # Saved-server form — reuses the auth from `mcp-use client connect`
+  npx mcp-use client dev screenshot --tool get-weather city=Tokyo \
+    --width 800 --height 600 --theme light \
+    --output ./weather.png
+
+  # Ad-hoc form — connect inline (use -H for headers on authenticated servers)
+  npx mcp-use client screenshot --mcp http://localhost:3000/mcp \
+    --tool get-weather city=Tokyo
+  ```
+
+  Add `--device-scale-factor 2` for Retina output, or `--cdp-url <ws>` plus `--inspector <publicly-reachable-url>` to drive a remote Chromium (e.g. Notte) from a sandbox without a local Chrome install.
+
+Both commands are documented in full at [docs/typescript/client/cli](https://docs.mcp-use.com/typescript/client/cli).
+
+---
+
 ## Decision Tree
 
 ```
@@ -219,6 +251,10 @@ What do you need?
 │  └─> widgets/model-context.md
 ├─ Upload/download files in a widget
 │  └─> widgets/files.md (ChatGPT Apps SDK only)
+│
+├─ Verify a tool or widget from the terminal (agent feedback loop)
+│  └─> See "Testing from the Terminal" above — `mcp-use client` for tool runs,
+│      `mcp-use client <server> screenshot --tool <tool>` for headless widget PNGs
 │
 └─ Deploy to production
    └─> deployment.md (cloud deploy, self-hosting, Docker)
@@ -385,3 +421,5 @@ server.listen();
 - `server.use('mcp:tools/call', fn)` - MCP middleware (tools, resources, prompts, list ops)
 - `server.use('mcp:*', fn)` - Catch-all MCP middleware
 - `server.use(fn)` - HTTP middleware (Hono)
+
+
