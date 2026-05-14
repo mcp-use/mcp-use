@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
 
-export interface CaptureScreenshotOptions {
+interface CaptureScreenshotOptions {
   url: string;
   width: number;
   height: number;

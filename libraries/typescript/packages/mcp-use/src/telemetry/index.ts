@@ -13,24 +13,6 @@ export {
   ClientRemoveServerEvent,
 } from "./events.js";
 
-export type {
-  MCPAgentExecutionEventData,
-  ServerRunEventData,
-  ServerInitializeEventData,
-  ServerToolCallEventData,
-  ServerResourceCallEventData,
-  ServerPromptCallEventData,
-  ServerContextEventData,
-  MCPClientInitEventData,
-  ConnectorInitEventData,
-  ClientAddServerEventInput,
-  ClientRemoveServerEventInput,
-  Tool,
-  Resource,
-  Prompt,
-  Content,
-} from "./events.js";
-
 export {
   extractModelInfo,
   getModelName,
@@ -47,7 +29,5 @@ export {
   setTelemetrySource,
   isBrowserEnvironment,
 } from "./telemetry-node.js";
-
-export type { RuntimeEnvironment } from "./telemetry-node.js";
 
 export { telFetch } from "./tel-fetch.js";

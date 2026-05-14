@@ -215,7 +215,7 @@ export function normalizeUserContext(
 /**
  * Result of session context lookup
  */
-export interface SessionContextResult {
+interface SessionContextResult {
   requestContext: Context | undefined;
   session: SessionData | undefined;
   progressToken: number | undefined;
@@ -323,7 +323,7 @@ export async function withTimeout<T>(
 /**
  * Parsed elicit parameters
  */
-export interface ParsedElicitParams {
+interface ParsedElicitParams {
   sdkParams: ElicitRequestFormParams | ElicitRequestURLParams;
   zodSchema: z.ZodObject<any> | null;
   options: ElicitOptions | undefined;

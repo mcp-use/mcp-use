@@ -16,7 +16,7 @@ interface InspectorMessagePart {
   };
 }
 
-export interface InspectorMessageLike {
+interface InspectorMessageLike {
   role: "user" | "assistant";
   content: unknown;
   attachments?: InspectorAttachment[];

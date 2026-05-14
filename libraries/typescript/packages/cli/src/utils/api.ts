@@ -51,7 +51,7 @@ interface AuthTestWireResponse {
 
 // ── Server creation ────────────────────────────────────────────────
 
-export interface CreateServerBody {
+interface CreateServerBody {
   type: "github";
   organizationId: string;
   installationId: string;
@@ -68,13 +68,13 @@ export interface CreateServerBody {
   region?: string;
 }
 
-export interface CreateServerResponse {
+interface CreateServerResponse {
   server: { id: string; slug: string | null };
   deploymentId: string | null;
 }
 
 /** Connected GitHub repository (subset of OpenAPI server payload). */
-export interface CloudServerConnectedRepository {
+interface CloudServerConnectedRepository {
   id: string;
   repoFullName: string;
   productionBranch: string;
@@ -86,7 +86,7 @@ export interface CloudServerConnectedRepository {
 }
 
 /** Server record from `GET /servers` or `GET /servers/{id}` (fields used by CLI). */
-export interface CloudServer {
+interface CloudServer {
   id: string;
   slug: string | null;
   organizationId: string;
@@ -117,7 +117,7 @@ export interface CloudServer {
 
 // ── Deployments ────────────────────────────────────────────────────
 
-export interface CreateDeploymentInput {
+interface CreateDeploymentInput {
   serverId: string;
   name?: string;
   branch?: string;
@@ -127,7 +127,7 @@ export interface CreateDeploymentInput {
   prNumber?: number;
 }
 
-export interface CreateDeploymentResponse {
+interface CreateDeploymentResponse {
   id: string;
 }
 
@@ -156,7 +156,7 @@ export interface Deployment {
   mcpUrl?: string;
 }
 
-export interface BuildLogsResponse {
+interface BuildLogsResponse {
   logs: string;
   offset: number;
   totalLength: number;
@@ -177,7 +177,7 @@ export interface GitHubConnectionStatus {
   installations?: GitHubInstallation[];
 }
 
-export interface GitHubRepo {
+interface GitHubRepo {
   id: number;
   name: string;
   full_name: string;
@@ -187,7 +187,7 @@ export interface GitHubRepo {
   };
 }
 
-export interface GitHubReposResponse {
+interface GitHubReposResponse {
   user: {
     login: string;
     id: number;
@@ -211,14 +211,14 @@ export interface EnvVariable {
   updatedAt: string;
 }
 
-export interface CreateEnvVariableBody {
+interface CreateEnvVariableBody {
   key: string;
   value: string;
   environments?: EnvEnvironment[];
   sensitive?: boolean;
 }
 
-export interface UpdateEnvVariableBody {
+interface UpdateEnvVariableBody {
   value?: string;
   environments?: EnvEnvironment[];
   sensitive?: boolean;

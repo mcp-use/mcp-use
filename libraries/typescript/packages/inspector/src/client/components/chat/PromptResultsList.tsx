@@ -2,7 +2,7 @@ import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { MessageSquare, X } from "lucide-react";
 import { Button } from "../ui/button";
 
-export interface PromptResultsListProps {
+interface PromptResultsListProps {
   promptResults: PromptResult[];
   onDeletePromptResult: (index: number) => void;
 }

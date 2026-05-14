@@ -11,7 +11,7 @@ export interface PendingSamplingRequest {
   toolName?: string; // Track which tool triggered this sampling request
 }
 
-export interface SamplingRequestWithHandlers extends PendingSamplingRequest {
+interface SamplingRequestWithHandlers extends PendingSamplingRequest {
   resolve: (result: CreateMessageResult) => void;
   reject: (error: Error) => void;
 }

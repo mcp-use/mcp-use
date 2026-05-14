@@ -63,7 +63,7 @@ export function sanitizePackageName(raw: string): string {
 // `displayName` is the human-facing label (kept pretty when possible);
 // `packageName` is the npm-safe identifier flowed into package.json AND
 // any template files that embed it as a string literal (e.g. index.ts).
-export type ProjectInfo = {
+type ProjectInfo = {
   useCurrentDir: boolean;
   projectPath: string;
   displayName: string;

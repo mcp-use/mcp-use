@@ -1,4 +1,4 @@
-export interface EnumChoice {
+interface EnumChoice {
   const: string;
   title?: string;
 }

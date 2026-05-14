@@ -26,7 +26,7 @@ export interface SessionConfig {
   capabilities?: Record<string, unknown>;
 }
 
-export interface SessionStorage {
+interface SessionStorage {
   sessions: Record<string, SessionConfig>;
 }
 

@@ -32,7 +32,7 @@ export function seededRandom(seed: number, index: number = 0): number {
   return x - Math.floor(x);
 }
 
-export interface RandomGradientBackgroundProps {
+interface RandomGradientBackgroundProps {
   className?: string;
   children?: ReactNode;
   grayscaled?: boolean;

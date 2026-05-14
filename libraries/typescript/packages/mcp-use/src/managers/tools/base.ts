@@ -1,6 +1,5 @@
 import type { CallbackManagerForToolRun } from "@langchain/core/callbacks/manager";
 import type {
-  ToolParams,
   ToolRunnableConfig,
   ToolSchemaBase,
 } from "@langchain/core/tools";
@@ -9,19 +8,12 @@ import type z from "zod";
 import type { IServerManager } from "../types.js";
 import { StructuredTool } from "@langchain/core/tools";
 
-export type ToolOutputT = any;
+type ToolOutputT = any;
 export type SchemaOutputT<T extends ToolSchemaBase> = T extends z.ZodSchema
   ? z.output<T>
   : T extends JSONSchema
     ? unknown
     : never;
-
-export interface MCPServerToolOptions extends ToolParams {
-  name?: string;
-  description?: string;
-  returnDirect?: boolean;
-  sandboxId?: string;
-}
 
 export class MCPServerTool<
   SchemaT extends ToolSchemaBase,

@@ -692,12 +692,3 @@ export function getMcpAppsBridge(): McpAppsBridge {
   return bridgeInstance;
 }
 
-/**
- * Type exports
- */
-export type {
-  HostContext,
-  ToolInputNotification,
-  ToolInputPartialNotification,
-  ToolResultNotification,
-};

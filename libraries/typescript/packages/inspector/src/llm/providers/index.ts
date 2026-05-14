@@ -8,14 +8,14 @@ import * as anthropic from "./anthropic";
 import * as google from "./google";
 import * as openai from "./openai";
 
-export interface ChatParams {
+interface ChatParams {
   config: ProviderConfig;
   messages: ProviderMessage[];
   tools?: ProviderTool[];
   signal?: AbortSignal;
 }
 
-export interface ChatResult {
+interface ChatResult {
   text: string;
   toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
 }

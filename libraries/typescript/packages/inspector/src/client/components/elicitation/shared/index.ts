@@ -5,4 +5,3 @@ export {
   getSingleSelectChoices,
   isEnumChoice,
 } from "./schemaHelpers";
-export type { EnumChoice } from "./schemaHelpers";

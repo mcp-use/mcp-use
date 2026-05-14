@@ -13,15 +13,9 @@ import { mountWidgetsDev } from "./mount-widgets-dev.js";
 import { mountWidgetsProduction } from "./mount-widgets-production.js";
 import { setupWidgetRoutes } from "./setup-widget-routes.js";
 
-export {
-  mountWidgetsDev,
-  type MountWidgetsDevOptions,
-} from "./mount-widgets-dev.js";
+export { mountWidgetsDev } from "./mount-widgets-dev.js";
 
-export {
-  mountWidgetsProduction,
-  type MountWidgetsProductionOptions,
-} from "./mount-widgets-production.js";
+export { mountWidgetsProduction } from "./mount-widgets-production.js";
 
 export { setupWidgetRoutes } from "./setup-widget-routes.js";
 
@@ -32,7 +26,6 @@ export {
   createRawHtmlResource,
   createRemoteDomResource,
   createAppsSdkResource,
-  type UrlConfig,
 } from "./mcp-ui-adapter.js";
 
 export {
@@ -50,21 +43,9 @@ export {
   registerWidgetFromTemplate,
   setupPublicRoutes,
   setupFaviconRoute,
-  type WidgetServerConfig,
 } from "./widget-helpers.js";
 
-export {
-  uiResourceRegistration,
-  type UIResourceServer,
-} from "./ui-resource-registration.js";
-
-export {
-  type ServerConfig,
-  type MountWidgetsOptions,
-  type RegisterWidgetCallback,
-  type UpdateWidgetToolCallback,
-  type RemoveWidgetToolCallback,
-} from "./widget-types.js";
+export { uiResourceRegistration } from "./ui-resource-registration.js";
 
 /**
  * Mount widget files - automatically chooses between dev and production mode

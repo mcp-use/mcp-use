@@ -54,4 +54,4 @@ export {
 export type { AuthInfo } from "./utils.js";
 
 // Export setup
-export { setupOAuthForServer, type OAuthSetupState } from "./setup.js";
+export { setupOAuthForServer } from "./setup.js";

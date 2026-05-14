@@ -14,7 +14,7 @@ interface GeneratePropsParams {
   propsSchema?: any;
 }
 
-export interface GeneratedProp {
+interface GeneratedProp {
   key: string;
   value: string;
 }

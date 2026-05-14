@@ -95,7 +95,7 @@ function secureRandomString(): string {
   return Math.random().toString(36).substring(2, 15);
 }
 
-export type RuntimeEnvironment = "browser" | "unknown";
+type RuntimeEnvironment = "browser" | "unknown";
 
 type StorageCapability = "localStorage" | "session-only";
 

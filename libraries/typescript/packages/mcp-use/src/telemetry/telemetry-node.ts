@@ -51,7 +51,7 @@ function secureRandomString(): string {
   }
 }
 
-export type RuntimeEnvironment =
+type RuntimeEnvironment =
   | "node"
   | "cloudflare-workers"
   | "edge"

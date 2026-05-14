@@ -17,7 +17,7 @@ import {
   useState,
 } from "react";
 
-export type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
+type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
 
 export interface CspViolation {
   directive: string;
@@ -37,7 +37,7 @@ export interface WidgetDeclaredCsp {
   baseUriDomains?: string[];
 }
 
-export interface WidgetInfo {
+interface WidgetInfo {
   toolName: string;
   protocol: WidgetProtocol;
   hostContext?: any;

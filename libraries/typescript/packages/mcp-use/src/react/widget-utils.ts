@@ -5,7 +5,7 @@
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import type { CallToolResponse } from "./widget-types.js";
 
-export type Provider = "openai" | "mcp-apps" | "mcp-ui";
+type Provider = "openai" | "mcp-apps" | "mcp-ui";
 
 /**
  * Detect the current provider environment

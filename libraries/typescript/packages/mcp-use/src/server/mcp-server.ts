@@ -48,14 +48,6 @@ import type {
   ToolContext,
 } from "./types/tool-context.js";
 
-export type {
-  ElicitFormParams,
-  ElicitOptions,
-  ElicitUrlParams,
-  SampleOptions,
-  ToolContext,
-};
-
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
 import { requestLogger } from "./logging.js";
@@ -4166,7 +4158,7 @@ export type MCPServer<HasOAuth extends boolean = false> =
   MCPServerClass<HasOAuth>;
 
 // Interface to properly type the MCPServer constructor with OAuth overloads
-export interface MCPServerConstructor {
+interface MCPServerConstructor {
   // Overload: when OAuth is configured, return McpServerInstance<true>
   new (
     config: ServerConfig & { oauth: NonNullable<ServerConfig["oauth"]> }

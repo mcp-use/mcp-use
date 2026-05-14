@@ -49,7 +49,7 @@ function getCacheKey(key: string): string {
   return `mcp_inspector_telemetry_${key}`;
 }
 
-export type InspectorMode = "standalone" | "embedded" | "cloud";
+type InspectorMode = "standalone" | "embedded" | "cloud";
 
 /**
  * Detect the inspector deployment mode from the runtime config injected by the

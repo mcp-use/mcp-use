@@ -7,18 +7,11 @@
 export {
   convertZodSchemaToParams,
   createParamsSchema,
-  type InputDefinition,
 } from "./schema-helpers.js";
 
-export {
-  toolRegistration,
-  type ToolServerContext,
-} from "./tool-registration.js";
+export { toolRegistration } from "./tool-registration.js";
 
 export {
-  type SessionData,
-  type SessionContextResult,
-  type ParsedElicitParams,
   findSessionContext,
   sendProgressNotification,
   withTimeout,
@@ -30,11 +23,3 @@ export {
   createClientCapabilityChecker,
   supportsApps,
 } from "./tool-execution-helpers.js";
-
-// Re-export types from the types module for backward compatibility
-export type {
-  SampleOptions,
-  ElicitOptions,
-  ElicitFormParams,
-  ElicitUrlParams,
-} from "../types/index.js";

@@ -13,7 +13,7 @@ import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 /**
  * OAuth setup state
  */
-export interface OAuthSetupState {
+interface OAuthSetupState {
   provider?: OAuthProvider | OAuthProxy;
   middleware?: (c: Context, next: Next) => Promise<Response | void>;
   complete: boolean;

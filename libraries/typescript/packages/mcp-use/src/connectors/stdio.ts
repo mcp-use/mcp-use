@@ -10,7 +10,7 @@ import { StdioConnectionManager } from "../task_managers/stdio.js";
 import { BaseConnector } from "./base.js";
 import type { ClientInfo } from "./http.js";
 
-export interface StdioConnectorOptions extends ConnectorInitOptions {
+interface StdioConnectorOptions extends ConnectorInitOptions {
   clientInfo?: ClientInfo;
 }
 

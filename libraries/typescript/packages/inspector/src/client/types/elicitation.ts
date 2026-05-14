@@ -12,7 +12,7 @@ export interface PendingElicitationRequest {
   toolName?: string; // Track which tool triggered this elicitation request
 }
 
-export interface ElicitationRequestWithHandlers extends PendingElicitationRequest {
+interface ElicitationRequestWithHandlers extends PendingElicitationRequest {
   resolve: (result: ElicitResult) => void;
   reject: (error: Error) => void;
 }

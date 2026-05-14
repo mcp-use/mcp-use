@@ -4,7 +4,7 @@ import path from "node:path";
 export const MCP_USE_DIR = ".mcp-use";
 export const MCP_USE_DIR_PROJECT = "project.json";
 
-export interface ProjectLink {
+interface ProjectLink {
   deploymentId: string;
   deploymentName: string;
   deploymentUrl?: string;

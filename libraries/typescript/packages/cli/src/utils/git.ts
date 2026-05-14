@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-export interface GitInfo {
+interface GitInfo {
   isGitRepo: boolean;
   remoteUrl?: string;
   owner?: string;

@@ -21,7 +21,7 @@ import { toResourceTemplateCompleteCallbacks } from "../utils/completion-helpers
 // Export subscription management
 export { ResourceSubscriptionManager } from "./subscriptions.js";
 
-export interface ResourceServerContext {
+interface ResourceServerContext {
   server: {
     registerResource(
       name: string,
@@ -186,7 +186,7 @@ export function registerResource(
   return this;
 }
 
-export interface ResourceTemplateServerContext {
+interface ResourceTemplateServerContext {
   server: {
     registerResource(
       name: string,

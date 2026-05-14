@@ -123,7 +123,7 @@ export interface UserInfo {
 /**
  * Base configuration for all OAuth providers
  */
-export interface BaseOAuthConfig {
+interface BaseOAuthConfig {
   provider: string;
   scopesSupported?: string[];
 }
@@ -214,7 +214,7 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
 /**
  * Union type of all OAuth provider configurations
  */
-export type OAuthConfig =
+type OAuthConfig =
   | SupabaseOAuthConfig
   | Auth0OAuthConfig
   | ClerkOAuthConfig

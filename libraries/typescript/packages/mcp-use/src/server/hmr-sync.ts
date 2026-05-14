@@ -25,7 +25,7 @@ function isDebugLoggingEnabled(): boolean {
 /**
  * Registration entry with config and handler
  */
-export interface Registration<TConfig, THandler> {
+interface Registration<TConfig, THandler> {
   config: TConfig;
   handler: THandler;
 }
@@ -33,7 +33,7 @@ export interface Registration<TConfig, THandler> {
 /**
  * Registered reference that can be updated or removed
  */
-export interface RegisteredRef {
+interface RegisteredRef {
   update?: (updates: any) => void;
   remove: () => void;
 }
@@ -41,7 +41,7 @@ export interface RegisteredRef {
 /**
  * Session context for HMR operations
  */
-export interface SessionContext {
+interface SessionContext {
   sessionId: string;
   /** Get the refs map for this primitive type */
   getRefs: () => Map<string, any> | undefined;
@@ -52,7 +52,7 @@ export interface SessionContext {
 /**
  * Changes detected during sync
  */
-export interface SyncChanges {
+interface SyncChanges {
   added: string[];
   removed: string[];
   updated: string[];
@@ -61,7 +61,7 @@ export interface SyncChanges {
 /**
  * Options for syncing a primitive type
  */
-export interface SyncOptions<TConfig, THandler> {
+interface SyncOptions<TConfig, THandler> {
   /** Name of the primitive type for logging */
   primitiveName: string;
   /** Current registrations map */
@@ -102,7 +102,7 @@ export interface SyncOptions<TConfig, THandler> {
 /**
  * Result of syncing a primitive type
  */
-export interface SyncResult<TConfig, THandler> {
+interface SyncResult<TConfig, THandler> {
   changes: SyncChanges;
   updatedRegistrations: Map<string, Registration<TConfig, THandler>>;
 }

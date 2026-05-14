@@ -98,7 +98,7 @@ export function detectToolResourceUri(
   );
 }
 
-export interface CaptureToolScreenshotInputs {
+interface CaptureToolScreenshotInputs {
   session: MCPSession;
   toolName: string;
   toolArgs: Record<string, unknown>;
@@ -106,7 +106,7 @@ export interface CaptureToolScreenshotInputs {
   resourceUri: string;
 }
 
-export interface CaptureToolScreenshotOptions {
+interface CaptureToolScreenshotOptions {
   width?: number;
   height?: number;
   theme?: "light" | "dark";
@@ -130,7 +130,7 @@ export interface CaptureToolScreenshotOptions {
   deviceScaleFactor?: number;
 }
 
-export interface CaptureToolScreenshotResult {
+interface CaptureToolScreenshotResult {
   outputPath: string;
   width: number;
   height: number;
