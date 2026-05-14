@@ -4,10 +4,10 @@ description: "Use any OAuth provider that supports Dynamic Client Registration w
 icon: "code"
 ---
 
-Use `oauthCustomProvider` when your identity provider supports Dynamic Client Registration (DCR) and advertises a `registration_endpoint` in its OAuth metadata. Clients will discover the endpoints and register themselves directly with the upstream — your server only verifies the resulting tokens.
+Use `oauthCustomProvider` when your identity provider supports Dynamic Client Registration (DCR) and advertises a `registration_endpoint` in its OAuth metadata. Clients will discover the endpoints and register themselves directly with the upstream  -  your server only verifies the resulting tokens.
 
 <Note>
-  If your provider **doesn't** support DCR — Google, GitHub, Okta, Azure AD, or any provider where you register an app in a dashboard and receive a fixed `clientId`/`clientSecret` — use [`oauthProxy`](/typescript/server/authentication/providers/oauth-proxy) instead.
+  If your provider **doesn't** support DCR  -  Google, GitHub, Okta, Azure AD, or any provider where you register an app in a dashboard and receive a fixed `clientId`/`clientSecret`  -  use [`oauthProxy`](/typescript/server/authentication/providers/oauth-proxy) instead.
 </Note>
 
 ## Quick start
@@ -59,7 +59,7 @@ oauthCustomProvider({
   authEndpoint: "https://auth.example.com/oauth/authorize",
   tokenEndpoint: "https://auth.example.com/oauth/token",
 
-  // Required: Token verification — must return { payload: Record<string, unknown> }
+  // Required: Token verification  -  must return { payload: Record<string, unknown> }
   async verifyToken(token: string) {
     const { payload } = await jwtVerify(token, JWKS, { issuer: "..." });
     return { payload: payload as Record<string, unknown> };
@@ -111,11 +111,11 @@ server.tool(
 
 ## Resources
 
-- [jose library](https://github.com/panva/jose) — JWT verification
+- [jose library](https://github.com/panva/jose)  -  JWT verification
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [OIDC Specification](https://openid.net/specs/openid-connect-core-1_0.html)
 
 ## Next Steps
 
-- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) — For providers without DCR support
-- [User Context](/typescript/server/authentication/user-context) — Access user information in tools
+- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy)  -  For providers without DCR support
+- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools

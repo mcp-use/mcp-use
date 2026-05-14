@@ -318,7 +318,7 @@ Log levels follow [RFC 5424](https://datatracker.ietf.org/doc/html/rfc5424#secti
 
 ### Client-Controlled Filtering
 
-Clients can set a minimum log level via `logging/setLevel`. When a client sets the level to `warning`, the server automatically suppresses `debug`, `info`, and `notice` messages — only `warning` and above are sent:
+Clients can set a minimum log level via `logging/setLevel`. When a client sets the level to `warning`, the server automatically suppresses `debug`, `info`, and `notice` messages  -  only `warning` and above are sent:
 
 ```
 Client → Server:  logging/setLevel { level: "warning" }
@@ -328,7 +328,7 @@ Server → Client:  ✓ ctx.warning("...")   # sent
 Server → Client:  ✓ ctx.error("...")     # sent
 ```
 
-This filtering happens automatically — you don't need to check the level yourself. Just call `ctx.log()` at the appropriate level and the server handles the rest.
+This filtering happens automatically  -  you don't need to check the level yourself. Just call `ctx.log()` at the appropriate level and the server handles the rest.
 
 <Tip>
 The default level is `debug` (all messages sent). Clients opt in to filtering by calling `logging/setLevel`.

@@ -87,7 +87,7 @@ server.tool(
         z.object({ fruit: z.string(), color: z.string() })
       ),
     }),
-    // Widget config — sets up metadata at registration time for Inspector and ChatGPT
+    // Widget config  -  sets up metadata at registration time for Inspector and ChatGPT
     widget: {
       name: "product-search-result",  // Must match resources/product-search-result/ folder
       invoking: "Searching...",        // Status text shown while the tool is running
@@ -99,22 +99,22 @@ server.tool(
       (f) => !query || f.fruit.toLowerCase().includes(query.toLowerCase())
     );
 
-    // widget() — returns runtime data for the widget
+    // widget()  -  returns runtime data for the widget
     return widget({
       props: { query: query ?? "", results },  // Widget-only data (useWidget().props); becomes structuredContent for hosts
       output: text(`Found ${results.length} fruits matching "${query ?? "all"}"`),  // What the model sees in the conversation
-      // metadata: { ... } — optional; extra data for useWidget().metadata (cursors, timestamps, etc.)
+      // metadata: { ... }  -  optional; extra data for useWidget().metadata (cursors, timestamps, etc.)
     });
   }
 );
 ```
 
 **Summary:**
-- `widget: { name, invoking, invoked }` — Configures which widget to render and status messages
-- `widget({ props, output })` — `props` go to the widget via `useWidget().props`; `output` is shown to the model
+- `widget: { name, invoking, invoked }`  -  Configures which widget to render and status messages
+- `widget({ props, output })`  -  `props` go to the widget via `useWidget().props`; `output` is shown to the model
 
 <Note>
-**ChatGPT and MCP catalogs**: Many hosts require `annotations.readOnlyHint`, `annotations.openWorldHint`, and `annotations.destructiveHint` (each an explicit boolean) on every tool, and recommend an `outputSchema` when the tool returns structured content—including widget tools, where `widget()` exposes `props` as `structuredContent` unless your `output` helper supplies its own.
+**ChatGPT and MCP catalogs**: Many hosts require `annotations.readOnlyHint`, `annotations.openWorldHint`, and `annotations.destructiveHint` (each an explicit boolean) on every tool, and recommend an `outputSchema` when the tool returns structured content - including widget tools, where `widget()` exposes `props` as `structuredContent` unless your `output` helper supplies its own.
 </Note>
 
 ## Step 3: Understand the Widget Component
@@ -122,7 +122,7 @@ server.tool(
 The template already includes `resources/product-search-result/widget.tsx`. It receives `props` from the tool's `widget({ props })` return via `useWidget()`:
 
 ```tsx
-// resources/product-search-result/widget.tsx (simplified — template has full implementation)
+// resources/product-search-result/widget.tsx (simplified  -  template has full implementation)
 import React from "react";
 import { useWidget } from "mcp-use/react";
 
@@ -134,7 +134,7 @@ type ProductSearchResultProps = {
 const ProductSearchResult: React.FC = () => {
   const { props, isPending } = useWidget<ProductSearchResultProps>();
 
-  // Widget renders before tool completes — always check isPending first
+  // Widget renders before tool completes  -  always check isPending first
   if (isPending) {
     return <div className="animate-pulse p-4">Loading...</div>;
   }
@@ -327,7 +327,7 @@ Create a `.env` file:
 ```env
 # Server port (default: 3000)
 PORT=3000
-# Production base URL; used for CSP and widget asset URLs — required for production
+# Production base URL; used for CSP and widget asset URLs  -  required for production
 MCP_URL=https://your-server.com
 # Environment mode (development | production)
 NODE_ENV=production

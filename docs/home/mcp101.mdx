@@ -1,6 +1,6 @@
 ---
 title: "MCP Concepts"
-description: "The Model Context Protocol — architecture, primitives, and how mcp-use fits in"
+description: "The Model Context Protocol  -  architecture, primitives, and how mcp-use fits in"
 icon: "brain"
 ---
 
@@ -12,9 +12,9 @@ mcp-use is a fullstack MCP (Model Context Protocol) framework for Python and Typ
 - TypeScript: `npm install mcp-use`
 
 **Core classes:**
-- `MCPServer` — build an MCP server that exposes tools, resources, and prompts
-- `MCPClient` — connect to one or more MCP servers programmatically
-- `MCPAgent` — LLM-powered agent that uses MCPClient to call tools (requires LangChain)
+- `MCPServer`  -  build an MCP server that exposes tools, resources, and prompts
+- `MCPClient`  -  connect to one or more MCP servers programmatically
+- `MCPAgent`  -  LLM-powered agent that uses MCPClient to call tools (requires LangChain)
 
 **Key imports:**
 - Python server: `from mcp_use import MCPServer`
@@ -46,7 +46,7 @@ MCP uses a client-server model with three roles:
 
 | Role | Description |
 |------|-------------|
-| **MCP Host** | The AI-powered application — your product, Claude Desktop, Cursor |
+| **MCP Host** | The AI-powered application  -  your product, Claude Desktop, Cursor |
 | **MCP Client** | Runs inside the host; manages communication with MCP servers |
 | **MCP Server** | Exposes tools, resources, and prompts to connected clients |
 
@@ -71,7 +71,7 @@ MCP servers expose three primitives:
 
 ### Tools
 
-Functions the model can invoke. The server executes them and returns results — API calls, computations, file writes, etc.
+Functions the model can invoke. The server executes them and returns results  -  API calls, computations, file writes, etc.
 
 ### Resources
 

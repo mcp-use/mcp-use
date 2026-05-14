@@ -1,13 +1,13 @@
 ---
 title: "OAuth Proxy"
-description: "Bridge providers that don't support Dynamic Client Registration — Google, GitHub, Okta, Azure AD, and others — to your MCP server"
+description: "Bridge providers that don't support Dynamic Client Registration  -  Google, GitHub, Okta, Azure AD, and others  -  to your MCP server"
 icon: "shuffle"
 ---
 
 Use `oauthProxy` when your identity provider doesn't support Dynamic Client Registration (DCR). You register a single application in the provider's dashboard, hand the `clientId` / `clientSecret` to the MCP server, and the server mediates the OAuth flow so every MCP client can authenticate without registering itself upstream.
 
 <Note>
-  If your provider supports DCR (Auth0, Better Auth, Keycloak, WorkOS, Supabase, or any provider that advertises a `registration_endpoint`), prefer a [remote auth provider](/typescript/server/authentication/index#remote-auth-built-in) instead — clients register directly with the upstream and the server only verifies tokens.
+  If your provider supports DCR (Auth0, Better Auth, Keycloak, WorkOS, Supabase, or any provider that advertises a `registration_endpoint`), prefer a [remote auth provider](/typescript/server/authentication/index#remote-auth-built-in) instead  -  clients register directly with the upstream and the server only verifies tokens.
 </Note>
 
 ## When to use OAuth Proxy
@@ -27,7 +27,7 @@ Common proxy targets: **Google, GitHub, Okta, Azure AD (Microsoft Entra ID), Aut
 3. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
 4. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
 
-Your server holds the client credentials and mediates every token exchange. Tokens are passed through — the proxy does not mint its own.
+Your server holds the client credentials and mediates every token exchange. Tokens are passed through  -  the proxy does not mint its own.
 
 ## Quick start (Google)
 
@@ -69,7 +69,7 @@ oauthProxy({
   clientId: process.env.CLIENT_ID!,
   clientSecret: process.env.CLIENT_SECRET, // optional for public clients
 
-  // Required: token verifier — resolves to { payload } or throws
+  // Required: token verifier  -  resolves to { payload } or throws
   verifyToken: jwksVerifier({
     jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
     issuer: "https://accounts.google.com",
@@ -109,10 +109,10 @@ verifyToken: jwksVerifier({
 });
 ```
 
-For non-JWT providers (e.g. GitHub opaque tokens), write a custom `verifyToken` function — see the [GitHub example](#github-opaque-tokens) below.
+For non-JWT providers (e.g. GitHub opaque tokens), write a custom `verifyToken` function  -  see the [GitHub example](#github-opaque-tokens) below.
 
 <Note>
-  Any `verifyToken` function — including the one returned by `jwksVerifier` — **must resolve to `{ payload: Record<string, unknown> }`** or throw on an invalid token. The proxy surfaces `payload` to `getUserInfo` and to `ctx.auth`.
+  Any `verifyToken` function  -  including the one returned by `jwksVerifier`  -  **must resolve to `{ payload: Record<string, unknown> }`** or throw on an invalid token. The proxy surfaces `payload` to `getUserInfo` and to `ctx.auth`.
 </Note>
 
 ## Provider examples
@@ -256,7 +256,7 @@ server.tool(
 );
 ```
 
-The upstream access token is available as `ctx.auth.accessToken` — use it to call provider APIs on behalf of the user:
+The upstream access token is available as `ctx.auth.accessToken`  -  use it to call provider APIs on behalf of the user:
 
 ```typescript
 server.tool(
@@ -276,11 +276,11 @@ server.tool(
 ## Resources
 
 - [Runnable `auth0-proxy` example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0-proxy)
-- [jose library](https://github.com/panva/jose) — JWT / JWKS verification
+- [jose library](https://github.com/panva/jose)  -  JWT / JWKS verification
 - [OAuth 2.1 Specification](https://oauth.net/2.1/)
 - [PKCE (RFC 7636)](https://datatracker.ietf.org/doc/html/rfc7636)
 
 ## Next Steps
 
-- [Custom Provider (DCR)](/typescript/server/authentication/providers/custom) — Use a provider that supports Dynamic Client Registration
-- [User Context](/typescript/server/authentication/user-context) — Access user information in tools
+- [Custom Provider (DCR)](/typescript/server/authentication/providers/custom)  -  Use a provider that supports Dynamic Client Registration
+- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools

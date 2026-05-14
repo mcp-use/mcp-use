@@ -50,10 +50,10 @@ function MyWidget() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Model-visible by default — ChatGPT will include the file in context
+    // Model-visible by default  -  ChatGPT will include the file in context
     const { fileId } = await upload(file);
 
-    // Upload privately — model won't see it
+    // Upload privately  -  model won't see it
     const { fileId: privateFileId } = await upload(file, { modelVisible: false });
   }
 
@@ -72,19 +72,19 @@ function MyWidget() {
 
 ## Model visibility
 
-By default, every uploaded file is tracked in widget state under `imageIds`. ChatGPT reads this field to include the file in the model's conversation context on future turns — the model can then reference the content of the uploaded image.
+By default, every uploaded file is tracked in widget state under `imageIds`. ChatGPT reads this field to include the file in the model's conversation context on future turns  -  the model can then reference the content of the uploaded image.
 
 Pass `{ modelVisible: false }` when you want to upload a file for widget-only use without exposing it to the model:
 
 ```tsx
-// User uploads a private reference image — widget uses it, model doesn't see it
+// User uploads a private reference image  -  widget uses it, model doesn't see it
 const { fileId } = await upload(referenceFile, { modelVisible: false });
 const { downloadUrl } = await getDownloadUrl({ fileId });
 // Use downloadUrl for <img src={...} /> in the widget only
 ```
 
 <Note>
-`imageIds` state is preserved across `setWidgetState` calls — uploading a file won't wipe other widget state.
+`imageIds` state is preserved across `setWidgetState` calls  -  uploading a file won't wipe other widget state.
 </Note>
 ```
 
@@ -162,7 +162,7 @@ function FileWidget() {
 ```
 
 <Note>
-Download URLs are **temporary** (typically valid for 5 minutes). Do not store the URL — call `getDownloadUrl` each time you need to display or fetch the file. Store the `fileId` in widget state instead.
+Download URLs are **temporary** (typically valid for 5 minutes). Do not store the URL  -  call `getDownloadUrl` each time you need to display or fetch the file. Store the `fileId` in widget state instead.
 </Note>
 
 ## Detection logic
@@ -200,5 +200,5 @@ try {
 
 ## Related
 
-- [`useWidget()`](./usewidget) — Access widget props and state
-- [`<ModelContext />`](./modelcontext) — Annotate UI state for the model
+- [`useWidget()`](./usewidget)  -  Access widget props and state
+- [`<ModelContext />`](./modelcontext)  -  Annotate UI state for the model

@@ -14,7 +14,7 @@ View the source code for this module on GitHub: <a href='https://github.com/mcp-
 Utilities for producing MCP-compliant JSON Schemas.
 
 Pydantic represents ``Optional[T]`` as ``\{"anyOf": [\{"type": "T"\}, \{"type":
-"null"\}]\}``.  While valid JSON Schema, this is not idiomatic MCP — the protocol
+"null"\}]\}``.  While valid JSON Schema, this is not idiomatic MCP  -  the protocol
 signals optionality by omitting the property from the ``required`` array.  The
 ``anyOf``/null pattern also confuses several MCP clients (e.g. the Inspector)
 which fail to render descriptions for those fields.
@@ -33,7 +33,7 @@ Return *schema* with nullable ``anyOf`` patterns simplified.
     has no ``properties`` key (or it is empty), the original dict is returned
     as-is since there is nothing to transform.
 
-    Only touches ``properties`` of the top-level object schema — nested
+    Only touches ``properties`` of the top-level object schema  -  nested
     ``$defs`` and deeply nested objects are left as-is since MCP tool schemas
     are typically flat.
 
