@@ -30,7 +30,7 @@ const client = new MCPClient({
 })
 await client.createAllSessions()
 
-const llm = new ChatOpenAI({ model: 'gpt-5.1' })
+const llm = new ChatOpenAI({ model: 'gpt-4o' })
 
 const agent = new MCPAgent({
   llm,
