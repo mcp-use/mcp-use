@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
-  "name": "mcp_use",
+  "name": "mcp-use",
   "colors": {
     "primary": "#0C0C0C",
     "light": "#ffffff",
@@ -796,6 +796,10 @@
             "href": "https://mcp-use.com"
           },
           {
+            "label": "Manufact Cloud",
+            "href": "https://manufact.com"
+          },
+          {
             "label": "GitHub",
             "href": "https://github.com/mcp-use"
           }
@@ -805,16 +809,20 @@
         "header": "Resources",
         "items": [
           {
+            "label": "TypeScript Docs",
+            "href": "https://mcp-use.com/docs/typescript/server/index"
+          },
+          {
+            "label": "Python Docs",
+            "href": "https://mcp-use.com/docs/python/getting-started/quickstart"
+          },
+          {
             "label": "Examples",
             "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
           },
           {
-            "label": "MCP Servers",
-            "href": "https://github.com/punkpeye/awesome-mcp-servers"
-          },
-          {
-            "label": "LangChain Docs",
-            "href": "https://python.langchain.com/"
+            "label": "Blog",
+            "href": "https://manufact.com/blog"
           }
         ]
       },
@@ -852,9 +860,9 @@
     "metatags": {
       "charset": "UTF-8",
       "viewport": "width=device-width, initial-scale=1.0",
-      "description": "mcp_use is an open source library that enables developers to connect any LLM to any MCP server, allowing the creation of custom agents with tool access without relying on closed-source clients.",
-      "keywords": "MCP, Model Context Protocol, LLM, AI agents, open source, API integration, Claude, ChatGPT, artificial intelligence, custom agents, tool access",
-      "author": "mcp-use Team",
+      "description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
+      "keywords": "MCP, Model Context Protocol, LLM, AI agents, open source, API integration, Claude, ChatGPT, artificial intelligence, tool access",
+      "author": "Manufact Team",
       "robots": "index, follow",
       "googlebot": "index, follow",
       "google": "notranslate",
@@ -865,8 +873,8 @@
       "format-detection": "telephone=no",
       "referrer": "origin",
       "language": "en",
-      "copyright": "Copyright 2025 mcp-use",
-      "reply-to": "dev@mcp-use.com",
+      "copyright": "Copyright 2026 Manufact",
+      "reply-to": "dev@manufact.com",
       "distribution": "global",
       "coverage": "Worldwide",
       "category": "Technology",
@@ -880,25 +888,25 @@
       "msapplication-TileColor": "#1a1a1a",
       "msapplication-TileImage": "/images/mstile-144x144.png",
       "msapplication-config": "/browserconfig.xml",
-      "og:title": "mcp-use - Connect Any LLM to Any MCP Server",
+      "og:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:type": "website",
       "og:url": "https://mcp-use.com",
       "og:image": "https://raw.githubusercontent.com/mcp-use/mcp-use/refs/heads/main/static/og_image_docs.jpg",
-      "og:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "og:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:site_name": "mcp-use",
       "og:locale": "en_US",
       "twitter:card": "summary_large_image",
-      "twitter:site": "@mcpuse",
-      "twitter:creator": "@mcpuse",
-      "twitter:title": "mcp-use - Connect Any LLM to Any MCP Server",
-      "twitter:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "twitter:site": "@manufact",
+      "twitter:creator": "@manufact",
+      "twitter:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
+      "twitter:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "twitter:image": "https://raw.githubusercontent.com/mcp-use/mcp-use/refs/heads/main/static/og_image_docs.jpg",
-      "twitter:image:alt": "mcp-use logo and interface showing LLM to MCP server connections",
+      "twitter:image:alt": "mcp-use logo and interface showing MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "article:published_time": "2024-12-01T00:00:00+00:00",
-      "article:modified_time": "2025-06-16T00:00:00+00:00",
-      "article:author": "mcp-use Team",
+      "article:modified_time": "2026-05-14T00:00:00+00:00",
+      "article:author": "Manufact Team",
       "article:section": "Technology",
-      "article:tag": "MCP, LLM, AI, open source, developers, API"
+      "article:tag": "MCP, MCP Servers, MCP Apps, ChatGPT, Claude, AI Agents, open source, developers, API"
     }
   }
 }
