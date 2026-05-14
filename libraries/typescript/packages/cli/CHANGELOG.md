@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 3.2.1-canary.3
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [680ef2f]
+  - mcp-use@1.28.1-canary.3
+  - @mcp-use/inspector@6.0.1-canary.3
+
 ## 3.2.1-canary.2
 
 ### Patch Changes

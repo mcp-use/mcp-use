@@ -10,6 +10,7 @@
   "changesets": [
     "clean-inspector-files",
     "inspector-skipped-log-wording",
+    "prune-unused-exports",
     "quiet-files-cleanup"
   ]
 }
