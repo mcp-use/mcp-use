@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
- * Generates src/client/utils/version.ts with the current package version.
+ * Generates src/server/version.ts with the current package version.
  * Run this before build to ensure the version is embedded in the compiled output.
+ *
+ * The client reads the version from the `window.__INSPECTOR_VERSION__` global
+ * injected by the server, so a client-side version.ts is not generated.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -10,7 +13,6 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packagePath = join(__dirname, "../package.json");
-const clientOutputPath = join(__dirname, "../src/client/utils/version.ts");
 const serverOutputPath = join(__dirname, "../src/server/version.ts");
 
 const pkg = JSON.parse(readFileSync(packagePath, "utf-8"));
@@ -29,6 +31,5 @@ export function getInspectorVersion(): string {
 }
 `;
 
-writeFileSync(clientOutputPath, content);
 writeFileSync(serverOutputPath, content);
 console.log(`Generated version.ts with version: ${pkg.version}`);
