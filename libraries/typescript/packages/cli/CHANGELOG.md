@@ -1,5 +1,20 @@
 # @mcp-use/cli
 
+## 3.2.0-canary.13
+
+### Patch Changes
+
+- 03612f1: fix(cli): error when `client screenshot` omits required tool arguments
+
+  `mcp-use client screenshot --tool <tool>` (and `mcp-use client <name>
+screenshot --tool <tool>`) silently produced a blank PNG and exited 0
+  when the target tool declared required arguments but none were passed.
+  The command now mirrors `client tools call`: it prints "This tool
+  requires arguments." along with the tool schema and exits 1, before
+  launching the inspector or browser.
+  - mcp-use@1.28.0-canary.13
+  - @mcp-use/inspector@6.0.0-canary.13
+
 ## 3.2.0-canary.12
 
 ### Minor Changes

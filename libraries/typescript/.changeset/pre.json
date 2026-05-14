@@ -36,6 +36,7 @@
     "resolve-duplicate-exports",
     "resolve-unlisted-deps",
     "screenshot-mcp-headers",
+    "screenshot-required-args",
     "server-cli-connect-hint"
   ]
 }
