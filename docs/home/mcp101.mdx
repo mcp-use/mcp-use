@@ -22,7 +22,9 @@ mcp-use is a fullstack MCP (Model Context Protocol) framework for Python and Typ
 
 ## What is MCP?
 
-The **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools, data sources, and services. It defines a common language between AI applications and the servers that expose capabilities to them  -  so any MCP-compatible client can talk to any MCP-compatible server without custom integration code.
+AI models are powerful in isolation, but they can't act on the world without integrations - access to files, databases, APIs, browsers, and services. Traditionally, every team built these integrations from scratch, creating a fragmented ecosystem of one-off connectors.
+
+The **Model Context Protocol (MCP)** is an open standard (introduced by Anthropic in late 2024) that solves this. It defines a common language between AI applications and the servers that expose capabilities to them - so any MCP-compatible client can talk to any MCP-compatible server without custom integration code. Build a server once, and it works with Claude, ChatGPT, Cursor, or any other MCP host.
 
 ## Architecture
 
