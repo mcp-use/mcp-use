@@ -125,9 +125,9 @@ agent = MCPAgent(llm=llm, client=client)
 For MCP tools to work properly, your chosen model **must support tool calling**. Most modern LLMs support this:
 
 ✅ **Supported Models:**
-- OpenAI: GPT-4, GPT-4o, GPT-3.5 Turbo
-- Anthropic: Claude 3+ series
-- Google: Gemini Pro, Gemini Flash
+- OpenAI: gpt-4.1, gpt-4.1-mini
+- Anthropic: claude-opus-4-7, claude-sonnet-4-6
+- Google: gemini-2.5-pro, gemini-2.5-flash
 - Groq: Llama 3.1, Mixtral models
 - Most recent open-source models
 
@@ -197,8 +197,8 @@ Consider your use case when selecting models:
 
 | Use Case | Recommended Models | Reason |
 |----------|-------------------|--------|
-| Development/Testing | GPT-3.5 Turbo, Claude Haiku | Lower cost, good performance |
-| Production/Complex | GPT-4o, Claude Sonnet | Best performance |
+| Development/Testing | gpt-4.1-mini, claude-sonnet-4-6 | Lower cost, good performance |
+| Production/Complex | gpt-4.1, claude-opus-4-7 | Best performance |
 | High Volume | Groq models | Fast inference, competitive pricing |
 | Privacy/Local | Ollama models | No API costs, data stays local |
 
