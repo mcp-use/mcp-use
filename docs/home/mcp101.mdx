@@ -84,11 +84,49 @@ See [TypeScript Tools](/typescript/server/tools) and [Python Tools](/python/serv
 
 Read-only data identified by a URI (`file:///example.txt`, `db://users/123`). The client application decides when to fetch them — not the model. Useful for surfacing context like file contents or query results.
 
+<CodeGroup>
+```typescript TypeScript
+server.resource({
+  name: "app_config",
+  uri: "config://application",
+  description: "Current application settings",
+}, async () => ({
+  contents: [{ uri: "config://application", text: '{"env":"production"}' }]
+}));
+```
+```python Python
+@server.resource(uri="config://application", name="app_config")
+def app_config() -> str:
+    """Current application settings"""
+    return '{"env": "production"}'
+```
+</CodeGroup>
+
 See [TypeScript Resources](/typescript/server/resources) and [Python Resources](/python/server/resources).
 
 ### Prompts
 
 Templated instructions the user can invoke (think slash commands). The server defines the template; the client presents it to the user.
+
+<CodeGroup>
+```typescript TypeScript
+import { z } from "zod";
+
+server.prompt({
+  name: "code_review",
+  description: "Generate a code review prompt",
+  schema: z.object({ language: z.string(), focus: z.string().default("general") }),
+}, async ({ language, focus }) => ({
+  messages: [{ role: "user", content: `Review this ${language} code for ${focus}.` }]
+}));
+```
+```python Python
+@server.prompt(name="code_review", description="Generate a code review prompt")
+def code_review(language: str, focus: str = "general") -> str:
+    """Generate a code review prompt"""
+    return f"Review this {language} code for {focus}."
+```
+</CodeGroup>
 
 See [TypeScript Prompts](/typescript/server/prompts) and [Python Prompts](/python/server/prompts).
 
