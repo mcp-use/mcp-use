@@ -58,7 +58,7 @@ async def main():
     tools = await adapter.create_tools(client)
 
     # Initialize your language model
-    model = init_chat_model("gpt-4o", temperature=0.5)
+    model = init_chat_model("gpt-5.5", temperature=0.5)
 
     # Create the agent
     agent = create_agent(

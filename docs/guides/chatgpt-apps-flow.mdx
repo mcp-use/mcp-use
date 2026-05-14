@@ -13,13 +13,13 @@ ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Serv
 <Info>
 This guide focuses on shipping an MCP App to ChatGPT specifically. For the general reference on widgets, props, CSP, and auto-discovery across clients, see [MCP Apps](/typescript/server/mcp-apps).
 
-**Best Practice**: Build widgets once with the MCP Apps stack — they run in ChatGPT, Claude, and any MCP-compatible client from a single codebase.
+**Best Practice**: Build widgets once with the MCP Apps stack  -  they run in ChatGPT, Claude, and any MCP-compatible client from a single codebase.
 
 </Info>
 
 ## Introduction
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools—all within the ChatGPT interface.
+ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools - all within the ChatGPT interface.
 
 Widgets transform static responses into interactive experiences:
 
@@ -250,7 +250,7 @@ mcp-use eliminates all the manual setup and provides a zero-config development e
 With mcp-use, you get:
 
 1. **Single Command Setup**: `npx create-mcp-use-app my-app --template mcp-apps`
-2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder—they're automatically registered
+2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder - they're automatically registered
 3. **Built-in Bundling**: Hot reload and production builds work out of the box
 4. **Pre-built React Hooks**: Use `useWidget()` for props, state, tool calls, and display modes; [streaming tool input](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for live previews when the host supports it (MCP Apps / Inspector)
 5. **Automatic CSP Configuration**: Content Security Policy is configured automatically
@@ -385,7 +385,7 @@ server.tool(
 server.start();
 ```
 
-That's it! No build configuration, no custom hooks, no manual mounting—just write your widget and mcp-use handles the rest.
+That's it! No build configuration, no custom hooks, no manual mounting - just write your widget and mcp-use handles the rest.
 
 ## Widget Interaction Flow
 
@@ -650,7 +650,7 @@ const WeatherWidget: React.FC = () => {
 export default WeatherWidget;
 ```
 
-No build configuration needed—auto-bundled on `npm run dev`!
+No build configuration needed - auto-bundled on `npm run dev`!
 
   </Tab>
 </Tabs>

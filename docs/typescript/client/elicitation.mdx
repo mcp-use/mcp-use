@@ -221,7 +221,7 @@ function MyComponent() {
 
 mcp-use provides helpers so you don't have to hand-roll defaults, validation, or result building. Import them (and types) from `mcp-use` or `mcp-use/client`. For a typed callback without importing the SDK, use `OnElicitationCallback` from `mcp-use`.
 
-- **Defaults**: `getDefaults(params)` — default values from the request schema; `applyDefaults(params, partial?)` — merge partial content with defaults; `acceptWithDefaults(params)` — return an accept result using schema defaults.
+- **Defaults**: `getDefaults(params)`  -  default values from the request schema; `applyDefaults(params, partial?)`  -  merge partial content with defaults; `acceptWithDefaults(params)`  -  return an accept result using schema defaults.
 - **Result builders**: `accept(content)`, `decline(reason?)`, `cancel()`, `reject(reason?)` (reject is an alias for decline).
 - **Validation**: `validate(params, content)` returns `{ valid: boolean; errors?: string[] }` (Zod-based; uses `requestedSchema`). Types: `ElicitContent`, `ElicitValidationResult`.
 

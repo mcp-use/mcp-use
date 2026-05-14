@@ -19,26 +19,26 @@ Before your MCP server will work, configure these in the [Supabase Dashboard](ht
   </Step>
   <Step title="Enable a sign-in method">
     Users must be signed in before they can consent. Pick one under **Authentication → Sign In / Providers**:
-    - **Anonymous sign-ins** — one-click guest sessions, ideal for demos
-    - **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.) — for real apps
+    - **Anonymous sign-ins**  -  one-click guest sessions, ideal for demos
+    - **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.)  -  for real apps
   </Step>
   <Step title="Copy your keys">
     From **Project Settings**:
     - **Project ID** (General)
-    - **Publishable key** — `sb_publishable_...` (API Keys). Used by *your* consent route and by tools that call Supabase — not by the provider itself.
+    - **Publishable key**  -  `sb_publishable_...` (API Keys). Used by *your* consent route and by tools that call Supabase  -  not by the provider itself.
   </Step>
 </Steps>
 
 ## Host the consent UI
 
-Supabase redirects the browser to the consent screen URL you configured above. Your route signs the user in, loads the authorization details with the Supabase JS SDK, and submits the approve/deny decision back to Supabase — mcp-use is not involved in this step.
+Supabase redirects the browser to the consent screen URL you configured above. Your route signs the user in, loads the authorization details with the Supabase JS SDK, and submits the approve/deny decision back to Supabase  -  mcp-use is not involved in this step.
 
-Don't want to build it from scratch? Start from the [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template) — it has sign-in, consent, and approve/deny already wired up. Or follow Supabase's [OAuth Server — Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started) to roll your own.
+Don't want to build it from scratch? Start from the [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template)  -  it has sign-in, consent, and approve/deny already wired up. Or follow Supabase's [OAuth Server  -  Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started) to roll your own.
 
 ## Environment variables
 
 ```bash
-# Required — read by oauthSupabaseProvider()
+# Required  -  read by oauthSupabaseProvider()
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
 
 # Used by your consent UI and by tools calling Supabase REST/APIs.
@@ -68,7 +68,7 @@ oauthSupabaseProvider({
   // Required (or set MCP_USE_OAUTH_SUPABASE_PROJECT_ID)
   projectId: "your-project-id",
 
-  // Skip JWT verification — development only
+  // Skip JWT verification  -  development only
   verifyJwt: process.env.NODE_ENV === "production",
 
   // Override advertised scopes
@@ -77,7 +77,7 @@ oauthSupabaseProvider({
 ```
 
 <Tip>
-  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint — the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
+  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint  -  the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
 </Tip>
 
 ## Accessing user info in tools
@@ -127,11 +127,11 @@ server.tool(
 
 ## Resources
 
-- [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template) — starter template with the consent UI already wired up
-- [Supabase OAuth Server — Getting Started](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
-- [Supabase OAuth Server — MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)
+- [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template)  -  starter template with the consent UI already wired up
+- [Supabase OAuth Server  -  Getting Started](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
+- [Supabase OAuth Server  -  MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)
 - [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context) — Access user information in tools
+- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools

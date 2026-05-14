@@ -4,11 +4,11 @@ icon: "/images/mcp_use.svg"
 mode: "frame"
 ---
 
-<div style={{display: 'none'}}>
-> For the complete documentation index, see [llms.txt](https://manufact.com/docs/llms.txt).
-</div>
-
 import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
+
+<Visibility for="agents">
+For the complete documentation index, see [llms.txt](https://mcp-use.com/docs/llms.txt).
+</Visibility>
 
 <div className="px-4 py-8 mt-24 lg:pb-24 max-w-5xl mx-auto">
 
@@ -29,7 +29,7 @@ import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
 
 <p className="max-w-2xl mx-auto px-4 mt-6 text-center">
   <p className='text-xl'>The fullstack MCP framework</p>
-  <p className='mt-3'>Build <b>MCP Apps</b> for ChatGPT / Claude and <b>MCP Servers</b> for AI Agents — in <b>TypeScript</b> and <b>Python</b>.</p>
+  <p className='mt-3'>Build <b>MCP Apps</b> for ChatGPT / Claude and <b>MCP Servers</b> for AI Agents  -  in <b>TypeScript</b> and <b>Python</b>.</p>
 </p>
 
 <div className="mt-10 grid sm:grid-cols-3 gap-4 max-w-2xl mx-auto text-center text-sm">
@@ -55,7 +55,7 @@ import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
     title="Build an MCP App"
     description="Interactive widgets that run in Claude, ChatGPT, and any MCP client."
     leftHref="/typescript/server/mcp-apps"
-    rightHref="/python/server/mcp-apps"
+    rightHref="/python/server/index"
     leftLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
     rightLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
   />
@@ -131,7 +131,7 @@ server.run(transport="streamable-http", port=8000)
 
 ## MCP Apps
 
-MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients — write once, run everywhere.
+MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and other MCP clients  -  write once, run everywhere.
 
 ```typescript
 import { MCPServer, widget } from "mcp-use/server";
@@ -154,7 +154,7 @@ server.tool({
 await server.listen(3000);
 ```
 
-Widgets in `resources/` are **auto-discovered** — no manual registration needed.
+Widgets in `resources/` are **auto-discovered**  -  no manual registration needed.
 
 <CardGroup cols={2}>
   <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/server/mcp-apps">
@@ -211,14 +211,14 @@ npx @mcp-use/cli login
 npx @mcp-use/cli deploy
 ```
 
-Or connect a GitHub repo on [manufact.com](https://manufact.com) — production-ready with observability, metrics, logs, and branch deployments.
+Or connect a GitHub repo on [manufact.com](https://manufact.com)  -  production-ready with observability, metrics, logs, and branch deployments.
 
 ## Also: MCP Agent & MCP Client
 
 mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP Agent** and **MCP Client** implementation.
 
 <AccordionGroup>
-  <Accordion title="MCP Agent — Build AI agents that use MCP servers" icon="brain">
+  <Accordion title="MCP Agent  -  Build AI agents that use MCP servers" icon="brain">
     Connect any LLM (OpenAI, Anthropic, Google, LangChain) to any MCP server.
 
     ```python
@@ -226,7 +226,7 @@ mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP 
     from mcp_use import MCPAgent, MCPClient
 
     client = MCPClient.from_dict({ "mcpServers": { "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] } } })
-    agent = MCPAgent(llm=ChatOpenAI(model="gpt-4o"), client=client)
+    agent = MCPAgent(llm=ChatOpenAI(model="gpt-5.5"), client=client)
     result = await agent.run("List all files in the directory")
     ```
 
@@ -236,7 +236,7 @@ mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP 
     </CardGroup>
   </Accordion>
 
-  <Accordion title="MCP Client — Connect to any MCP server programmatically" icon="router">
+  <Accordion title="MCP Client  -  Connect to any MCP server programmatically" icon="router">
     Fully spec-compliant: tools, resources, prompts, sampling, elicitation, logging, notifications.
 
     ```typescript

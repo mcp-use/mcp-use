@@ -21,7 +21,7 @@ const server = new MCPServer({
 })
 
 // Add your tools, resources, prompts...
-server.addTool(/* ... */)
+server.tool(/* ... */)
 
 // Start the server
 server.listen(3000)
@@ -318,7 +318,7 @@ MCP_URL=https://abc123.ngrok.io npx @mcp-use/cli dev
 
 2. **`devMode` is enabled automatically** in development, so MCP Apps widgets use same-origin sandboxing (no `sandbox-{hostname}` subdomain required).
 
-3. **Vite HMR works through the proxy** — a WebSocket proxy forwards HMR connections from the main HTTP server to Vite's internal port automatically.
+3. **Vite HMR works through the proxy**  -  a WebSocket proxy forwards HMR connections from the main HTTP server to Vite's internal port automatically.
 
 See the [CLI Environment Variables](/inspector/cli#mcp_url) documentation for more details on `MCP_URL`.
 

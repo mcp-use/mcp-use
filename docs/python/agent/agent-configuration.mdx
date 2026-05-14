@@ -83,14 +83,14 @@ from langchain_openai import ChatOpenAI
 
 # Basic configuration
 agent = MCPAgent(
-    llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
+    llm=ChatOpenAI(model="gpt-5.5", temperature=0.7),
     client=MCPClient.from_config_file("config.json"),
     max_steps=30
 )
 
 # Advanced configuration
 agent = MCPAgent(
-    llm=ChatOpenAI(model="gpt-4o", temperature=0.7),
+    llm=ChatOpenAI(model="gpt-5.5", temperature=0.7),
     client=MCPClient.from_config_file("config.json"),
     max_steps=30,
     server_name=None,
@@ -137,7 +137,7 @@ from mcp_use import MCPAgent, MCPClient
 async def main():
     client = MCPClient(config = {})
     agent = MCPAgent(
-        llm=ChatOpenAI(model="gpt-4o", temperature=0),
+        llm=ChatOpenAI(model="gpt-5.5", temperature=0),
         client=client,
     )
 
@@ -201,7 +201,7 @@ async def main():
     client = MCPClient(config)
 
     # Create LLM
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5.5")
 
     # Create agent with restricted tools
     agent = MCPAgent(
@@ -266,7 +266,7 @@ async def main():
     tools = await adapter.create_tools(client)
 
     # Use the tools with any LangChain agent
-    model = init_chat_model("gpt-4o", temperature=0.5)
+    model = init_chat_model("gpt-5.5", temperature=0.5)
 
     agent = create_agent(
         model=model,
@@ -512,7 +512,7 @@ agent = MCPAgent(
 
 # Configure retry behavior (if supported by LLM)
 llm = ChatOpenAI(
-    model="gpt-4o",
+    model="gpt-5.5",
     max_retries=3,
     retry_delay=2
 )

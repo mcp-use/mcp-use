@@ -4,10 +4,6 @@ description: "Get started with mcp-use in minutes"
 icon: "rocket"
 ---
 
-<div style={{display: 'none'}}>
-> For the complete documentation index, see [llms.txt](https://manufact.com/docs/llms.txt).
-</div>
-
 **mcp-use** is a unified MCP framework to build **MCP servers**, **MCP clients** and **MCP Agents**.
 
 ```mermaid
@@ -34,15 +30,19 @@ Building such agents is easy with **mcp-use**, all you need is an LLM and the MC
 
 <CodeGroup>
 ```bash yarn
-yarn add mcp-use
+yarn add mcp-use @langchain/openai
 ```
 ```bash npm
-npm install mcp-use
+npm install mcp-use @langchain/openai
 ```
 ```bash pnpm
-pnpm add mcp-use
+pnpm add mcp-use @langchain/openai
 ```
 </CodeGroup>
+
+<Note>
+The agent requires a LangChain LLM provider package. The examples use `@langchain/openai`  -  swap for `@langchain/anthropic`, `@langchain/google-genai`, or `@langchain/groq` as needed.
+</Note>
 
 Here's a simple example to get you started for an agent with **browser tools** support.
 
@@ -64,15 +64,15 @@ const client = new MCPClient({
 
 // Create agent with the client
 const agent = new MCPAgent({
-  llm: new ChatOpenAI({ model: 'gpt-5.1' }), // use your preferred LLM provider
+  llm: new ChatOpenAI({ model: "gpt-5.5" }), // use your preferred LLM provider
   client,
   maxSteps: 30
 })
 
 // Run the query
-const result = await agent.run(
-    'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
-)
+const result = await agent.run({
+    prompt: 'Find the best restaurant in San Francisco USING GOOGLE SEARCH'
+})
 console.log(`\nResult: ${result}`)
 
 // Clean up

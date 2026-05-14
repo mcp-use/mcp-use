@@ -4,7 +4,7 @@ description: Intercept and process MCP requests with middleware
 icon: "layers"
 ---
 
-Middleware lets you intercept MCP operations to add logging, authentication, rate limiting, or any cross-cutting logic — without touching individual tool handlers.
+Middleware lets you intercept MCP operations to add logging, authentication, rate limiting, or any cross-cutting logic  -  without touching individual tool handlers.
 
 ## Quick Start
 
@@ -31,7 +31,7 @@ await server.listen();
 
 ## How It Works
 
-MCP middleware uses an **onion model** — each middleware wraps the next, with the handler at the center.
+MCP middleware uses an **onion model**  -  each middleware wraps the next, with the handler at the center.
 
 ```
 Request
@@ -75,7 +75,7 @@ Every middleware receives a `MiddlewareContext`:
 | Field | Type | Description |
 |-------|------|-------------|
 | `method` | `string` | MCP method name (e.g. `"tools/call"`) |
-| `params` | `Record<string, unknown>` | Request params — mutable, mutations flow downstream |
+| `params` | `Record<string, unknown>` | Request params  -  mutable, mutations flow downstream |
 | `session` | `{ sessionId: string } \| undefined` | Session ID (HTTP transports) |
 | `auth` | `AuthInfo \| undefined` | OAuth info when authentication is configured |
 | `state` | `Map<string, unknown>` | Shared state for passing data across middleware |
@@ -108,7 +108,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
     server.use("mcp:*", async (ctx, next) => {
       const start = Date.now();
       const result = await next();
-      console.log(`${ctx.method} — ${Date.now() - start}ms`);
+      console.log(`${ctx.method}  -  ${Date.now() - start}ms`);
       return result;
     });
     ```
@@ -174,7 +174,7 @@ server.use("mcp:tools/call", async (ctx, next) => {
 Middleware executes in registration order. Earlier middleware wraps later ones.
 
 ```typescript
-server.use("mcp:*",         loggingMiddleware);  // 1. Outermost — sees everything
+server.use("mcp:*",         loggingMiddleware);  // 1. Outermost  -  sees everything
 server.use("mcp:tools/call", authMiddleware);    // 2. Rejects unauthorized early
 server.use("mcp:tools/call", rateLimitMiddleware); // 3. Limits request rate
 ```
@@ -188,10 +188,10 @@ server.use("mcp:tools/call", rateLimitMiddleware); // 3. Limits request rate
 `server.use()` handles both HTTP and MCP middleware. The `mcp:` prefix distinguishes them:
 
 ```typescript
-// MCP middleware — intercepts MCP operations
+// MCP middleware  -  intercepts MCP operations
 server.use("mcp:tools/call", async (ctx, next) => { ... });
 
-// HTTP middleware — intercepts HTTP requests (existing Hono behavior)
+// HTTP middleware  -  intercepts HTTP requests (existing Hono behavior)
 server.use("/api/*", someHttpMiddleware);
 server.use(someHonoMiddleware);
 ```
@@ -202,10 +202,10 @@ HTTP middleware runs at the HTTP layer (before the MCP protocol). MCP middleware
 
 ## Best Practices
 
-- **Single responsibility** — each middleware does one thing
-- **Fail fast** — reject invalid requests before expensive operations
-- **Always call `next()`** — unless intentionally short-circuiting
-- **Re-raise exceptions** — if you catch errors to log them, always re-throw
+- **Single responsibility**  -  each middleware does one thing
+- **Fail fast**  -  reject invalid requests before expensive operations
+- **Always call `next()`**  -  unless intentionally short-circuiting
+- **Re-raise exceptions**  -  if you catch errors to log them, always re-throw
 
 ```typescript
 server.use("mcp:tools/call", async (ctx, next) => {

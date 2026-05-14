@@ -4,7 +4,7 @@ description: "Keep the AI model aware of what the user is currently viewing in y
 icon: "brain"
 ---
 
-`ModelContext` and `modelContext` let your widget push contextual descriptions to the AI model so it can reason about what the user is currently seeing — without requiring an explicit tool call or storing it in developer-managed state.
+`ModelContext` and `modelContext` let your widget push contextual descriptions to the AI model so it can reason about what the user is currently seeing  -  without requiring an explicit tool call or storing it in developer-managed state.
 
 <Info>
 Both APIs feed into a single hierarchical context string that is sent to the host via `ui/update-model-context` (MCP Apps) or `setWidgetState` (ChatGPT Apps SDK) whenever the node tree changes. Updates are batched automatically.
@@ -27,7 +27,7 @@ Declarative React component that registers a context annotation for as long as i
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
 | `content` | `string` | Yes | The description the model should see. |
-| `children` | `ReactNode` | No | Optional. If provided, this component becomes a scope boundary — any nested `<ModelContext>` components become children in the tree. |
+| `children` | `ReactNode` | No | Optional. If provided, this component becomes a scope boundary  -  any nested `<ModelContext>` components become children in the tree. |
 
 ### Basic usage
 
@@ -37,7 +37,7 @@ import { ModelContext } from "mcp-use/react";
 function WeatherCard({ city, temp }: Props) {
   return (
     <>
-      {/* Leaf annotation — no children needed */}
+      {/* Leaf annotation  -  no children needed */}
       <ModelContext content={`Showing weather for ${city}: ${temp}°C`} />
       <div className="card">
         {city}: {temp}°C
@@ -68,7 +68,7 @@ The model receives:
 
 ### Siblings
 
-Multiple `<ModelContext>` at the same level in the component tree are siblings — they produce a flat list at that depth:
+Multiple `<ModelContext>` at the same level in the component tree are siblings  -  they produce a flat list at that depth:
 
 ```tsx
 function Dashboard() {
@@ -107,13 +107,13 @@ Children are optional. A self-closing tag registers a leaf annotation:
 
 ## `modelContext` API
 
-Module-level imperative API. Works anywhere — event handlers, plain functions, outside React. Entries registered via this API are always root-level nodes (no parent in the tree).
+Module-level imperative API. Works anywhere  -  event handlers, plain functions, outside React. Entries registered via this API are always root-level nodes (no parent in the tree).
 
 ### Methods
 
 | Method | Description |
 |--------|-------------|
-| `modelContext.set(key, content)` | Register or update a named context entry. The `key` is a stable identifier — calling `set` with the same key overwrites the previous value. |
+| `modelContext.set(key, content)` | Register or update a named context entry. The `key` is a stable identifier  -  calling `set` with the same key overwrites the previous value. |
 | `modelContext.remove(key)` | Remove a previously registered entry by key. |
 | `modelContext.clear()` | Remove all entries (both component-based and imperative). |
 
@@ -174,7 +174,7 @@ Updates are **batched via `queueMicrotask`**, so rapid mount/unmount cycles with
 | API | Purpose |
 |-----|---------|
 | `setState` | Explicit developer-managed state (cart items, form values, filters). The developer decides what to include. |
-| `<ModelContext>` / `modelContext.set()` | Declarative annotations about what the user is *currently seeing*. Set it and forget it — the framework handles the rest. |
+| `<ModelContext>` / `modelContext.set()` | Declarative annotations about what the user is *currently seeing*. Set it and forget it  -  the framework handles the rest. |
 
 The `__model_context` key is automatically filtered from the `state` value returned by `useWidget`, so it never appears in your code.
 
@@ -233,5 +233,5 @@ export default function ProductWidget() {
 
 ## Related
 
-- [`useWidget()`](./usewidget) — Access widget props and state
-- [`<McpUseProvider />`](./mcpuseprovider) — Widget root provider
+- [`useWidget()`](./usewidget)  -  Access widget props and state
+- [`<McpUseProvider />`](./mcpuseprovider)  -  Widget root provider

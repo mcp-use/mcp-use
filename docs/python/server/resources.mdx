@@ -66,7 +66,7 @@ If your URI contains `{param}` placeholders, the resource is registered as a **t
 
 ## Static Resources
 
-Resources without URI parameters are static — they always return at the same URI:
+Resources without URI parameters are static  -  they always return at the same URI:
 
 ```python
 from datetime import datetime
@@ -162,7 +162,7 @@ Clients can subscribe to resources and receive notifications when they change. T
 3. All subscribed clients receive a `notifications/resources/updated` notification
 4. Clients re-read the resource to get the new content
 
-MCPServer handles subscribe/unsubscribe tracking automatically — you just need to call `notify_resource_updated()` when your resource changes.
+MCPServer handles subscribe/unsubscribe tracking automatically  -  you just need to call `notify_resource_updated()` when your resource changes.
 
 ### Example
 
@@ -185,7 +185,7 @@ async def update_price(new_price: float) -> str:
 When a client subscribes to `data://price` and then any client calls `update_price`, all subscribers receive the notification and can re-read the resource.
 
 <Note>
-Subscriptions are session-scoped — they're automatically cleaned up when a client disconnects. If the server restarts, clients need to re-subscribe.
+Subscriptions are session-scoped  -  they're automatically cleaned up when a client disconnects. If the server restarts, clients need to re-subscribe.
 </Note>
 
 ## Common MIME Types

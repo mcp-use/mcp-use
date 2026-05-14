@@ -243,7 +243,7 @@ async function onSampling(
   } else if (params.modelPreferences?.intelligencePriority > 0.8) {
     modelName = "gpt-4";
   } else if (params.modelPreferences?.speedPriority > 0.8) {
-    modelName = "gpt-3.5-turbo";
+    modelName = "gpt-5.5-mini";
   }
 
   const lastMessage = params.messages[params.messages.length - 1];

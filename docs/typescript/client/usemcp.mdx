@@ -180,7 +180,7 @@ function ServerStatus({ serverId }) {
 ```typescript
 interface McpClientProviderProps {
   // Default OAuth callback URL for all servers (can be overridden per-server via callbackUrl)
-  // Useful when your app is mounted at a sub-path — e.g. set to "/myapp/oauth/callback"
+  // Useful when your app is mounted at a sub-path  -  e.g. set to "/myapp/oauth/callback"
   // so the OAuth redirect lands on the correct route.
   // Defaults to /oauth/callback on the current origin.
   defaultCallbackUrl?: string;
@@ -366,7 +366,7 @@ addServer("slack", {
   name: "Slack",
   oauth: {
     clientId: "my-preregistered-client-id",
-    clientSecret: "my-preregistered-client-secret", // optional — for confidential clients without PKCE
+    clientSecret: "my-preregistered-client-secret", // optional  -  for confidential clients without PKCE
     scope: "openid profile email",
   },
 });
@@ -381,7 +381,7 @@ Create an OAuth callback route to handle OAuth redirects.
 By default, `McpClientProvider` expects the callback at `/oauth/callback` on the current origin. If your app is mounted at a sub-path, set `defaultCallbackUrl` to match your actual route:
 
 ```typescript
-// App mounted at /myapp — callback route is /myapp/oauth/callback
+// App mounted at /myapp  -  callback route is /myapp/oauth/callback
 <McpClientProvider
   defaultCallbackUrl={`${window.location.origin}/myapp/oauth/callback`}
 >

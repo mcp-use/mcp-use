@@ -18,13 +18,13 @@ mcp_use leverages LangChain's architecture to support any LLM that implements th
 
 <CardGroup cols={2}>
   <Card title="OpenAI" icon="robot">
-    GPT-4, GPT-4o, GPT-3.5 Turbo
+    GPT-4.1, GPT-4.1-mini
   </Card>
   <Card title="Anthropic" icon="anthropic">
-    Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
+    claude-opus-4-7, claude-sonnet-4-6
   </Card>
   <Card title="Google" icon="google">
-    Gemini Pro, Gemini Flash, PaLM
+    gemini-3.1-pro, gemini-3.1-flash
   </Card>
   <Card title="Open Source" icon="code">
     Llama, Mistral, CodeLlama via various providers
@@ -41,7 +41,7 @@ from mcp_use import MCPAgent, MCPClient
 
 # Initialize OpenAI model
 llm = ChatOpenAI(
-    model="gpt-4o",
+    model="gpt-5.5",
     temperature=0.7,
     api_key="your-api-key"  # Or set OPENAI_API_KEY env var
 )
@@ -75,7 +75,7 @@ from mcp_use import MCPAgent, MCPClient
 
 # Initialize Gemini model
 llm = ChatGoogleGenerativeAI(
-    model="gemini-pro",
+    model="gemini-3.1-flash",
     temperature=0.7,
     google_api_key="your-api-key"  # Or set GOOGLE_API_KEY env var
 )
@@ -92,7 +92,7 @@ from mcp_use import MCPAgent, MCPClient
 
 # Initialize Groq model
 llm = ChatGroq(
-    model="llama-3.1-70b-versatile",
+    model="llama-4-scout-17b-16e-instruct",
     temperature=0.7,
     api_key="your-api-key"  # Or set GROQ_API_KEY env var
 )
@@ -125,9 +125,9 @@ agent = MCPAgent(llm=llm, client=client)
 For MCP tools to work properly, your chosen model **must support tool calling**. Most modern LLMs support this:
 
 ✅ **Supported Models:**
-- OpenAI: GPT-4, GPT-4o, GPT-3.5 Turbo
-- Anthropic: Claude 3+ series
-- Google: Gemini Pro, Gemini Flash
+- OpenAI: gpt-5.5, gpt-5.5-mini
+- Anthropic: claude-opus-4-7, claude-sonnet-4-6
+- Google: gemini-3.1-pro, gemini-3.1-flash
 - Groq: Llama 3.1, Mixtral models
 - Most recent open-source models
 
@@ -156,13 +156,13 @@ Different tasks benefit from different temperature settings:
 
 ```python
 # For precise, deterministic tasks
-llm = ChatOpenAI(model="gpt-4o", temperature=0.1)
+llm = ChatOpenAI(model="gpt-5.5", temperature=0.1)
 
 # For creative tasks
-llm = ChatOpenAI(model="gpt-4o", temperature=0.8)
+llm = ChatOpenAI(model="gpt-5.5", temperature=0.8)
 
 # Balanced approach (recommended)
-llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+llm = ChatOpenAI(model="gpt-5.5", temperature=0.7)
 ```
 
 ### Model-Specific Parameters
@@ -172,7 +172,7 @@ Each provider has unique parameters you can configure:
 ```python
 # OpenAI with custom parameters
 llm = ChatOpenAI(
-    model="gpt-4o",
+    model="gpt-5.5",
     temperature=0.7,
     max_tokens=4000,
     top_p=0.9,
@@ -197,8 +197,8 @@ Consider your use case when selecting models:
 
 | Use Case | Recommended Models | Reason |
 |----------|-------------------|--------|
-| Development/Testing | GPT-3.5 Turbo, Claude Haiku | Lower cost, good performance |
-| Production/Complex | GPT-4o, Claude Sonnet | Best performance |
+| Development/Testing | gpt-5.5-mini, claude-sonnet-4-6 | Lower cost, good performance |
+| Production/Complex | gpt-5.5, claude-opus-4-7 | Best performance |
 | High Volume | Groq models | Fast inference, competitive pricing |
 | Privacy/Local | Ollama models | No API costs, data stays local |
 
@@ -207,7 +207,7 @@ Consider your use case when selecting models:
 ```python
 # Set reasonable token limits
 llm = ChatOpenAI(
-    model="gpt-4o",
+    model="gpt-5.5",
     max_tokens=2000,  # Limit response length
     temperature=0.7
 )
@@ -237,7 +237,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load environment variables
 
 # Now LangChain will automatically use the keys
-llm = ChatOpenAI(model="gpt-4o")  # No need to pass api_key
+llm = ChatOpenAI(model="gpt-5.5")  # No need to pass api_key
 ```
 
 ## Advanced Integration
@@ -272,11 +272,11 @@ Switch between models dynamically:
 ```python
 def get_model_for_task(task_type: str):
     if task_type == "complex_reasoning":
-        return ChatOpenAI(model="gpt-4o", temperature=0.1)
+        return ChatOpenAI(model="gpt-5.5", temperature=0.1)
     elif task_type == "creative":
         return ChatAnthropic(model="claude-sonnet-4-6", temperature=0.8)
     else:
-        return ChatOpenAI(model="gpt-3.5-turbo", temperature=0.7)
+        return ChatOpenAI(model="gpt-5.5-mini", temperature=0.7)
 
 # Use different models for different tasks
 llm = get_model_for_task("complex_reasoning")

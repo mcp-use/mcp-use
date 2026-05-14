@@ -100,7 +100,7 @@ uv pip install openai
         ]
 
         response = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.5",
             messages=messages,
             tools=openai_tools
         )
@@ -158,7 +158,7 @@ uv pip install openai
 
         ```python
         second_response = openai.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5.5",
             messages=messages,
             tools=openai_tools
         )
@@ -218,7 +218,7 @@ async def main():
         # Use tools with OpenAI's SDK (not agent in this case)
         openai = OpenAI()
         messages = [{"role": "user", "content": "Please tell me the cheapest hotel for two people in Trapani."}]
-        response = openai.chat.completions.create(model="gpt-4o", messages=messages, tools=openai_tools)
+        response = openai.chat.completions.create(model="gpt-5.5", messages=messages, tools=openai_tools)
 
         response_message = response.choices[0].message
         messages.append(response_message)
@@ -256,7 +256,7 @@ async def main():
             messages.append({"tool_call_id": tool_call.id, "role": "tool", "name": function_name, "content": content})
 
         # Send the tool result back to the model
-        second_response = openai.chat.completions.create(model="gpt-4o", messages=messages, tools=openai_tools)
+        second_response = openai.chat.completions.create(model="gpt-5.5", messages=messages, tools=openai_tools)
         final_message = second_response.choices[0].message
         print("\n--- Final response from the model ---")
         print(final_message.content)

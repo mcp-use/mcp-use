@@ -10,7 +10,7 @@ icon: "/images/icons/better-auth.svg"
   If you are using the older **Better Auth MCP plugin**, note that it is deprecated in favor of the OAuth Provider approach. For legacy MCP adapter users, Better Auth provides a dedicated [mcp-use adapter](https://better-auth.com/docs/plugins/mcp#framework-adapters).
 </Note>
 
-The Better Auth provider turns your mcp-use server into an OAuth 2.1 authorization server using Better Auth's [OAuth Provider plugin](https://better-auth.com/docs/plugins/oauth-provider). Better Auth handles the full OAuth flow (authorization, token issuance, JWKS) — mcp-use only verifies the resulting JWTs.
+The Better Auth provider turns your mcp-use server into an OAuth 2.1 authorization server using Better Auth's [OAuth Provider plugin](https://better-auth.com/docs/plugins/oauth-provider). Better Auth handles the full OAuth flow (authorization, token issuance, JWKS)  -  mcp-use only verifies the resulting JWTs.
 
 ## Install
 
@@ -114,7 +114,7 @@ await server.listen(3000);
 Better Auth requires a login page (where users authenticate) and a consent page (where users approve requested scopes):
 
 ```typescript
-// Sign-in page — redirects to your social provider
+// Sign-in page  -  redirects to your social provider
 server.app.get("/sign-in", (c) => {
   const queryString = new URL(c.req.url).search;
   return c.html(`<!DOCTYPE html>
@@ -140,7 +140,7 @@ server.app.get("/sign-in", (c) => {
 </html>`);
 });
 
-// Consent page — lets the user approve or deny requested scopes
+// Consent page  -  lets the user approve or deny requested scopes
 server.app.get("/consent", (c) => {
   const url = new URL(c.req.url);
   const scope = url.searchParams.get("scope") || "openid";
