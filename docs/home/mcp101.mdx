@@ -22,7 +22,7 @@ mcp-use is a fullstack MCP (Model Context Protocol) framework for Python and Typ
 
 ## What is MCP?
 
-The **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools, data sources, and services. It defines a common language between AI applications and the servers that expose capabilities to them — so any MCP-compatible client can talk to any MCP-compatible server without custom integration code.
+The **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools, data sources, and services. It defines a common language between AI applications and the servers that expose capabilities to them  -  so any MCP-compatible client can talk to any MCP-compatible server without custom integration code.
 
 ## Architecture
 
@@ -55,7 +55,7 @@ An MCP server exposes three primitives:
 
 ### Tools
 
-The most common primitive. The model decides when to call a tool and with what arguments — the server executes it and returns a result.
+The most common primitive. The model decides when to call a tool and with what arguments  -  the server executes it and returns a result.
 
 <CodeGroup>
 ```typescript TypeScript
@@ -82,7 +82,7 @@ See [TypeScript Tools](/typescript/server/tools) and [Python Tools](/python/serv
 
 ### Resources
 
-Read-only data identified by a URI (`file:///example.txt`, `db://users/123`). The client application decides when to fetch them — not the model. Useful for surfacing context like file contents or query results.
+Read-only data identified by a URI (`file:///example.txt`, `db://users/123`). The client application decides when to fetch them  -  not the model. Useful for surfacing context like file contents or query results.
 
 <CodeGroup>
 ```typescript TypeScript
@@ -132,13 +132,13 @@ See [TypeScript Prompts](/typescript/server/prompts) and [Python Prompts](/pytho
 
 ### MCP Apps
 
-Beyond tools and resources, mcp-use supports **MCP Apps** — interactive UI widgets that run directly inside Claude, ChatGPT, and other MCP clients. A tool returns a widget instead of plain text, and the client renders it.
+Beyond tools and resources, mcp-use supports **MCP Apps**  -  interactive UI widgets that run directly inside Claude, ChatGPT, and other MCP clients. A tool returns a widget instead of plain text, and the client renders it.
 
 See [MCP Apps](/typescript/server/mcp-apps).
 
 ## MCP Client
 
-Any application that speaks the MCP protocol is an MCP client — Claude Desktop, Cursor, ChatGPT, or your own product. Clients connect to servers, list their capabilities, and call tools on behalf of the model or user.
+Any application that speaks the MCP protocol is an MCP client  -  Claude Desktop, Cursor, ChatGPT, or your own product. Clients connect to servers, list their capabilities, and call tools on behalf of the model or user.
 
 The **[MCP Inspector](/inspector/index)** is a good concrete example: it is an MCP client that connects to any server and lets you browse tools, call them manually, inspect resources, and monitor the protocol exchange in real time. It ships built-in with every mcp-use server at `/inspector`.
 
@@ -148,7 +148,7 @@ See [TypeScript Client](/typescript/client/client-configuration) and [Python Cli
 
 ### Client Primitives
 
-Clients can also implement primitives that reverse the flow — the server initiates a request back through the client:
+Clients can also implement primitives that reverse the flow  -  the server initiates a request back through the client:
 
 | Primitive | Flow | Purpose |
 |-----------|------|---------|
