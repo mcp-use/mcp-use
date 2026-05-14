@@ -252,11 +252,9 @@ What do you need?
 ├─ Upload/download files in a widget
 │  └─> widgets/files.md (ChatGPT Apps SDK only)
 │
-├─ Verify a tool / widget from the terminal (no inspector UI)
-│  └─> `mcp-use client <name> tools call ... --screenshot`
-│
-├─ Headless visual feedback loop for widget iteration
-│  └─> `mcp-use client <name> screenshot --tool <name> key=value ...`
+├─ Verify a tool or widget from the terminal (agent feedback loop)
+│  └─> See "Testing from the Terminal" above — `mcp-use client` for tool runs,
+│      `mcp-use client <server> screenshot --tool <tool>` for headless widget PNGs
 │
 └─ Deploy to production
    └─> deployment.md (cloud deploy, self-hosting, Docker)
