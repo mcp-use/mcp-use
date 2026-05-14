@@ -18,17 +18,13 @@ npx mcp-use client --help
 
 ```bash
 # Connect once and save the server under a name of your choice
-npx mcp-use client connect manufact https://mcp.manufact.com
+npx mcp-use client connect manufact https://mcp.manufact.com/mcp
 
 # Every subsequent command names the server it operates on
 npx mcp-use client manufact tools list
 npx mcp-use client manufact tools call read_file path=/tmp/test.txt
 npx mcp-use client manufact interactive
 ```
-
-<Note>
-There is no "active" server. Every per-server command takes the server name as its first positional argument: `mcp-use client <name> <scope> <action>`.
-</Note>
 
 ## Command Structure
 
@@ -58,8 +54,10 @@ The per-server scopes are:
 ### HTTP Server
 
 ```bash
-npx mcp-use client connect manufact https://mcp.manufact.com
+npx mcp-use client connect manufact https://mcp.manufact.com/mcp
 ```
+
+Has a full OAuth 2.1 flow built in — the CLI handles the authentication flow for you.
 
 **Options:**
 - `--auth <token>`: Static Bearer token (skips OAuth).
@@ -83,12 +81,9 @@ npx mcp-use client list
 ```
 Saved Servers:
 
-┌──────────┬───────┬─────────────────────────────┬────────────────┐
-│ Name     │ Type  │ Target                      │ Server         │
-├──────────┼───────┼─────────────────────────────┼────────────────┤
-│ manufact │ http  │ https://mcp.manufact.com    │ manufact       │
-│ fs       │ stdio │ npx -y @mc...filesystem     │ fs-server      │
-└──────────┴───────┴─────────────────────────────┴────────────────┘
+NAME      TYPE   TARGET                         SERVER
+manufact  http   https://mcp.manufact.com/mcp   manufact-cloud
+fs        stdio  npx -y @mc...filesystem        fs-server
 ```
 
 ## Tools
@@ -217,10 +212,10 @@ Saved servers are persisted in `~/.mcp-use/cli-sessions.json`:
   "sessions": {
     "manufact": {
       "type": "http",
-      "url": "https://mcp.manufact.com",
+      "url": "https://mcp.manufact.com/mcp",
       "authMode": "oauth",
       "lastUsed": "2026-05-12T10:30:00Z",
-      "serverInfo": { "name": "manufact", "version": "1.0.0" }
+      "serverInfo": { "name": "manufact-cloud", "version": "1.0.0" }
     },
     "fs": {
       "type": "stdio",

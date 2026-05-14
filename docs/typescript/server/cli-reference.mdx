@@ -68,15 +68,17 @@ mcp-use dev [options]
 
 **Options:**
 
-| Option                    | Description                                                        | Default           |
-| ------------------------- | ------------------------------------------------------------------ | ----------------- |
-| `-p, --path <path>`       | Project directory                                                  | Current directory |
-| `--port <port>`           | Server port                                                        | 3000              |
-| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)          | -                 |
-| `--entry <file>`          | Explicit server entry file                                         | Auto-detected     |
-| `--widgets-dir <dir>`     | Path to widgets directory                                          | `resources`       |
-| `--no-open`               | Don't auto-open inspector                                          | false             |
-| `--no-hmr`                | Disable Hot Module Reloading                                       | false             |
+| Option                    | Description                                                                  | Default           |
+| ------------------------- | ---------------------------------------------------------------------------- | ----------------- |
+| `-p, --path <path>`       | Project directory                                                            | Current directory |
+| `--port <port>`           | Server port                                                                  | 3000              |
+| `--host <host>`           | Bind address; `0.0.0.0` listens on all interfaces                            | `0.0.0.0`         |
+| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)                    | -                 |
+| `--entry <file>`          | Explicit server entry file                                                   | Auto-detected     |
+| `--widgets-dir <dir>`     | Path to widgets directory                                                    | `resources`       |
+| `--no-open`               | Don't auto-open inspector                                                    | false             |
+| `--no-hmr`                | Disable Hot Module Reloading                                                 | false             |
+| `--tunnel`                | Expose the dev server through a public tunnel URL                            | false             |
 
 <Tip>
   Use `--mcp-dir` when your MCP server lives inside an existing project (e.g. a Next.js app).
@@ -104,6 +106,9 @@ mcp-use dev -p ./my-server
 
 # MCP server inside a Next.js app
 mcp-use dev --mcp-dir src/mcp
+
+# Share the dev server publicly (useful with ChatGPT/Claude remote MCP)
+mcp-use dev --tunnel
 ```
 
 #### Hot Module Reloading (HMR)
@@ -144,13 +149,16 @@ mcp-use build [options]
 
 **Options:**
 
-| Option                    | Description                                                        | Default           |
-| ------------------------- | ------------------------------------------------------------------ | ----------------- |
-| `-p, --path <path>`       | Project directory                                                  | Current directory |
-| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)          | -                 |
-| `--entry <file>`          | Explicit server entry file                                         | Auto-detected     |
-| `--widgets-dir <dir>`     | Path to widgets directory                                          | `resources`       |
-| `--with-inspector`        | Include inspector in build                                         | false             |
+| Option                    | Description                                                                  | Default           |
+| ------------------------- | ---------------------------------------------------------------------------- | ----------------- |
+| `-p, --path <path>`       | Project directory                                                            | Current directory |
+| `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)                    | -                 |
+| `--entry <file>`          | Explicit server entry file                                                   | Auto-detected     |
+| `--widgets-dir <dir>`     | Path to widgets directory                                                    | `resources`       |
+| `--with-inspector`        | Include inspector in build                                                   | false             |
+| `--inline`                | Inline all widget JS/CSS into HTML (required for the VS Code MCP Apps host)  | false             |
+| `--no-inline`             | Keep widget JS/CSS as separate files (default)                               | true              |
+| `--no-typecheck`          | Skip the `tsc --noEmit` typecheck step (faster builds; transpile-only)       | false             |
 
 **Examples:**
 
@@ -166,6 +174,12 @@ mcp-use build -p ./my-server
 
 # Build MCP server inside a Next.js app
 mcp-use build --mcp-dir src/mcp
+
+# Inline-bundled widgets for VS Code MCP Apps (CSP-locked host)
+mcp-use build --inline
+
+# Fastest build: skip the typecheck pass
+mcp-use build --no-typecheck
 ```
 
 <Tip>
@@ -189,6 +203,7 @@ mcp-use start [options]
 | ------------------------- | ------------------------------------------------------------------ | ----------------- |
 | `-p, --path <path>`       | Project directory                                                  | Current directory |
 | `--port <port>`           | Server port                                                        | 3000              |
+| `--entry <file>`          | Explicit server entry file (overrides the build manifest)          | Auto-detected     |
 | `--mcp-dir <dir>`         | Folder holding the MCP entry + resources (e.g. `src/mcp`)          | -                 |
 | `--tunnel`                | Expose via tunnel                                                  | false             |
 
@@ -235,14 +250,21 @@ mcp-use deploy [options]
 
 **Options:**
 
-| Option                | Description                       | Default        |
-| --------------------- | --------------------------------- | -------------- |
-| `--name <name>`       | Custom deployment name            | Auto-generated |
-| `--port <port>`       | Server port                       | 3000           |
-| `--runtime <runtime>` | Runtime: "node" or "python"       | "node"         |
-| `--open`              | Open deployment in browser        | false          |
-| `--env <key=value>`   | Environment variable (repeatable) | -              |
-| `--env-file <path>`   | Path to .env file                 | -              |
+| Option                  | Description                                                                          | Default        |
+| ----------------------- | ------------------------------------------------------------------------------------ | -------------- |
+| `--name <name>`         | Custom deployment name                                                               | Auto-generated |
+| `--port <port>`         | Server port                                                                          | 3000           |
+| `--runtime <runtime>`   | Runtime: `node` or `python`                                                          | Auto-detected  |
+| `--open`                | Open deployment in browser after a successful deploy                                 | false          |
+| `--env <key=value>`     | Environment variable (repeatable)                                                    | -              |
+| `--env-file <path>`     | Path to a `.env` file with environment variables                                     | -              |
+| `--new`                 | Force creation of a new deployment (don't reuse the project link)                    | false          |
+| `--root-dir <path>`     | Root directory inside the repo to deploy from (for monorepos)                        | Repo root      |
+| `--org <slug-or-id>`    | Deploy to a specific organization (by slug or ID)                                    | Active org     |
+| `-y, --yes`             | Skip confirmation prompts (for non-interactive / CI use)                             | false          |
+| `--region <region>`     | Deploy region: `US`, `EU`, or `APAC`                                                 | `US`           |
+| `--build-command <cmd>` | Custom build command (overrides auto-detection)                                      | Auto-detected  |
+| `--start-command <cmd>` | Custom start command (overrides auto-detection)                                      | Auto-detected  |
 
 **Examples:**
 
@@ -261,6 +283,15 @@ mcp-use deploy --env-file .env.production
 
 # Python runtime
 mcp-use deploy --runtime python
+
+# Monorepo: deploy a subdirectory
+mcp-use deploy --root-dir apps/mcp-server
+
+# Force a brand-new deployment instead of reusing the linked one
+mcp-use deploy --new --name my-server-v2
+
+# Non-interactive deploy to a specific org and region
+mcp-use deploy --org manufact-inc --region EU --yes
 ```
 
 **Deployment Process:**
@@ -316,6 +347,123 @@ mcp-use logout
 ```
 
 Removes authentication credentials from `~/.mcp-use/config.json`.
+
+---
+
+### Organization Commands
+
+Manage which Manufact Cloud organization the CLI talks to. Every `deploy`, `deployments`, and `servers` call resolves against the active org unless `--org` overrides it.
+
+```bash
+mcp-use org list       # List orgs you belong to (active marked with ←)
+mcp-use org current    # Show the currently active org
+mcp-use org switch     # Interactive picker that updates ~/.mcp-use/config.json
+```
+
+<Tip>
+  For non-interactive flows (CI, agents), pass `--org <slug|id|name>` directly to `login` / `deploy` / `servers ls` / `deployments ls` instead of switching state up-front.
+</Tip>
+
+---
+
+### Deployment Management
+
+The `deploy` command above creates a deployment; the `deployments` subcommand inspects and manages existing ones.
+
+```bash
+mcp-use deployments list                 # Aliased as `deployments ls`
+mcp-use deployments get <deployment-id>
+mcp-use deployments logs <deployment-id> [-b|--build] [-f|--follow]
+mcp-use deployments restart <deployment-id> [-f|--follow]
+mcp-use deployments stop <deployment-id>
+mcp-use deployments start <deployment-id>
+mcp-use deployments delete <deployment-id> [-y|--yes]   # alias: `rm`
+```
+
+| Subcommand | Description |
+| ---------- | ----------- |
+| `list` / `ls` | List deployments visible to the active org |
+| `get` | Show core details for one deployment |
+| `logs` | Tail runtime logs by default; pass `-b/--build` for build logs and `-f/--follow` to stream |
+| `restart` | Trigger a new deployment on the same server (with optional build-log follow) |
+| `stop` | Take a running deployment offline |
+| `start` | Bring a stopped deployment back online |
+| `delete` / `rm` | Delete a deployment (irreversible — prompts unless `-y` is passed) |
+
+---
+
+### Server Management
+
+`mcp-use servers` manages the Git-backed deploy targets that own one or more deployments.
+
+```bash
+mcp-use servers list [--org <slug-or-id>] [--limit <n>] [--skip <n>] [--sort <field:asc|desc>]
+mcp-use servers get <id-or-slug>
+mcp-use servers delete <server-id> [-y] [--org <slug-or-id>]   # alias: `rm`
+```
+
+Environment variables on a server are managed under `servers env`:
+
+```bash
+mcp-use servers env list --server <id> [--show-values]
+mcp-use servers env add --server <id> KEY=VALUE \
+  [--env production,preview,development] [--sensitive]
+mcp-use servers env update <var-id> --server <id> \
+  [--value <value>] [--env <envs>] [--sensitive|--no-sensitive]
+mcp-use servers env remove <var-id> --server <id>   # alias: `rm`
+```
+
+| Subcommand | Notes |
+| ---------- | ----- |
+| `env list` | Values are masked by default — pass `--show-values` to reveal non-sensitive ones |
+| `env add` | `--env` defaults to all three environments when omitted |
+| `env update` | Use `--no-sensitive` to unmark a previously-sensitive var |
+| `env remove` | Address the var by its UUID (find it via `env list`) |
+
+<Tip>
+  Use `mcp-use servers ls` to discover server IDs, then `mcp-use deployments ls` (or `get <id>`) to drill into individual deploys. The two commands are intentionally split: a server is a long-lived target; deployments are immutable builds against it.
+</Tip>
+
+---
+
+### Client Commands
+
+`mcp-use client` is the interactive MCP **client** that lives inside the same binary as the build/deploy commands above. Use it to drive a running MCP server from the terminal — call tools, read resources, get prompts, run OAuth flows, or capture a PNG of a widget for an agent's visual feedback loop.
+
+```bash
+# Save an MCP server under a short name
+mcp-use client connect <name> <url>           # OAuth or --auth <token> for bearer
+mcp-use client connect <name> "<cmd args>" --stdio
+
+# Per-server commands (every subcommand takes the name positional)
+mcp-use client <name> tools list
+mcp-use client <name> tools call <tool> [args...] [--screenshot]
+mcp-use client <name> resources list
+mcp-use client <name> prompts list
+mcp-use client <name> auth status
+mcp-use client <name> screenshot --tool <name> [args...]
+mcp-use client <name> interactive
+mcp-use client <name> disconnect
+
+# Ad-hoc widget screenshot, no saved server needed
+mcp-use client screenshot --mcp <url> --tool <name> [args...]
+
+# Manage saved servers
+mcp-use client list
+mcp-use client remove <name>
+```
+
+| Scope | Actions |
+| ----- | ------- |
+| `tools` | `list`, `call <tool> [args...]`, `describe <tool>` |
+| `resources` | `list`, `read <uri>`, `subscribe <uri>`, `unsubscribe <uri>` |
+| `prompts` | `list`, `get <prompt> [args...]` |
+| `auth` | `status`, `refresh`, `logout` (OAuth servers only) |
+| `screenshot` | Render the tool's UI resource headlessly and write a PNG |
+
+<Card title="Full Client CLI reference" icon="terminal" href="/typescript/client/cli">
+  Connect/list/remove, every scope, the arg-parsing rules, OAuth flows, ad-hoc vs. saved-server screenshot forms, `--cdp-url` for remote browsers, and storage layout. Read this if you're using `mcp-use client` from your terminal or from an agent harness.
+</Card>
 
 ---
 

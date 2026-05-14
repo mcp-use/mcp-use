@@ -2958,7 +2958,7 @@ program
 // Authentication commands
 program
   .command("login")
-  .description("Login to mcp-use cloud")
+  .description("Login to Manufact cloud")
   .option(
     "--api-key <key>",
     "Login with an API key directly (non-interactive, for CI/CD)"

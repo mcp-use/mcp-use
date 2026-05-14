@@ -517,12 +517,13 @@ npx mcp-use client list
 npx mcp-use client <name> <scope> <action> [args...]
 ```
 
-The per-server scopes are `tools`, `resources`, `prompts`, `auth`, plus the top-level `interactive` and `disconnect`:
+The per-server scopes are `tools`, `resources`, `prompts`, `auth`, and `screenshot`, plus the top-level `interactive` and `disconnect`:
 
 ```bash
 # Tools
 npx mcp-use client my-server tools list
 npx mcp-use client my-server tools call <tool> [args]
+npx mcp-use client my-server tools call <tool> [args] --screenshot   # widget PNG when the tool renders a UI resource
 npx mcp-use client my-server tools describe <tool>
 
 # Resources
@@ -538,9 +539,14 @@ npx mcp-use client my-server auth status
 npx mcp-use client my-server auth refresh
 npx mcp-use client my-server auth logout
 
+# Widget screenshot (saved-server form — reuses OAuth/bearer auth)
+npx mcp-use client my-server screenshot --tool <tool> [args]
+
 # Interactive mode for one server
 npx mcp-use client my-server interactive
 ```
+
+For ad-hoc screenshots against a server you haven't saved, use the top-level form with `--mcp <url>` and optional `-H` headers — see the [CLI Client guide](/typescript/client/cli#screenshot).
 
 ### Managing Multiple Servers
 
