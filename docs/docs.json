@@ -66,6 +66,33 @@
             ]
           },
           {
+            "group": "Dev Tools",
+            "icon": "wrench",
+            "expanded": false,
+            "pages": [
+              {
+                "group": "Inspector",
+                "icon": "bug-play",
+                "pages": [
+                  "inspector/index",
+                  "inspector/cli",
+                  "inspector/connection-settings",
+                  "inspector/url-parameters",
+                  "inspector/keyboard-shortcuts",
+                  "inspector/command-palette",
+                  "inspector/rpc-logging",
+                  "inspector/integration",
+                  "inspector/debugging-chatgpt-apps",
+                  "inspector/self-hosting",
+                  "inspector/development",
+                  "inspector/changelog"
+                ]
+              },
+              "typescript/server/cli-reference",
+              "tunneling/index"
+            ]
+          },
+          {
             "group": "Concepts",
             "icon": "brain",
             "pages": [
@@ -73,12 +100,11 @@
             ]
           },
           {
-            "group": "Dev Tools",
-            "icon": "wrench",
+            "group": "Libraries",
+            "icon": "library",
             "pages": [
-              "inspector/index",
-              "typescript/server/cli-reference",
-              "tunneling/index"
+              "home/redirects/python",
+              "home/redirects/typescript"
             ]
           }
         ]
@@ -235,7 +261,8 @@
                   "python/development/development",
                   "python/development/logging",
                   "python/development/security",
-                  "python/development/telemetry"
+                  "python/development/telemetry",
+                  "tunneling/index"
                 ]
               }
             ]
@@ -430,6 +457,20 @@
                 "pages": [
                   "python/changelog/changelog"
                 ]
+              },
+              {
+                "group": "Versions",
+                "pages": [
+                  "python/changelog/1_7_0",
+                  "python/changelog/1_6_0",
+                  "python/changelog/1_5_2",
+                  "python/changelog/1_5_0",
+                  "python/changelog/1_4_1",
+                  "python/changelog/1_4_0",
+                  "python/changelog/1_3_13",
+                  "python/changelog/1_3_12",
+                  "python/changelog/1_3_11"
+                ]
               }
             ]
           },
@@ -461,7 +502,8 @@
                 "pages": [
                   "typescript/getting-started/welcome",
                   "typescript/getting-started/quickstart",
-                  "typescript/getting-started/installation"
+                  "typescript/getting-started/installation",
+                  "typescript/changelog/changelog"
                 ]
               },
               {
@@ -646,7 +688,6 @@
               "inspector/index",
               "inspector/cli",
               "inspector/connection-settings",
-              "inspector/url-parameters",
               "inspector/keyboard-shortcuts",
               "inspector/command-palette",
               "inspector/rpc-logging",
