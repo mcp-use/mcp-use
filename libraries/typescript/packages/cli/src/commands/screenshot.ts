@@ -431,6 +431,12 @@ export function parseDeviceScaleFactor(raw: string): number {
   return n;
 }
 
+export function requiresArguments(inputSchema: unknown): boolean {
+  if (!inputSchema || typeof inputSchema !== "object") return false;
+  const required = (inputSchema as { required?: unknown }).required;
+  return Array.isArray(required) && required.length > 0;
+}
+
 const AD_HOC_SESSION_NAME = "__screenshot_ad_hoc__";
 
 /**
@@ -591,6 +597,18 @@ export async function screenshotCommand(
         exitCode = 1;
         return;
       }
+    } else if (requiresArguments(tool.inputSchema)) {
+      console.error(formatError("This tool requires arguments."));
+      console.log("");
+      console.log(formatInfo("Provide arguments as key=value pairs:"));
+      console.log(
+        `  npx ${context.usagePrefix} --tool ${options.tool} key=value [key2=value2 ...]`
+      );
+      console.log("");
+      console.log(formatInfo("Tool schema:"));
+      console.log(formatSchema(tool.inputSchema));
+      exitCode = 1;
+      return;
     }
     const toolOutput = await session.callTool(options.tool, toolArgs);
 

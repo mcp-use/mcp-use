@@ -6,6 +6,7 @@ import {
   parseDimension,
   parseHeaderArg,
   parseHeaderArgs,
+  requiresArguments,
   timestampSuffix,
 } from "../src/commands/screenshot.js";
 
@@ -84,6 +85,27 @@ describe("parseDeviceScaleFactor", () => {
   it("rejects values above 4", () => {
     expect(() => parseDeviceScaleFactor("5")).toThrow(/<= 4/);
     expect(() => parseDeviceScaleFactor("100")).toThrow(/<= 4/);
+  });
+});
+
+describe("requiresArguments", () => {
+  it("returns true when required is a non-empty array", () => {
+    expect(requiresArguments({ required: ["foo"] })).toBe(true);
+    expect(requiresArguments({ required: ["foo", "bar"] })).toBe(true);
+  });
+
+  it("returns false when required is missing, empty, or non-array", () => {
+    expect(requiresArguments({})).toBe(false);
+    expect(requiresArguments({ required: [] })).toBe(false);
+    expect(requiresArguments({ required: "foo" })).toBe(false);
+    expect(requiresArguments({ required: null })).toBe(false);
+  });
+
+  it("returns false for nullish or non-object input", () => {
+    expect(requiresArguments(undefined)).toBe(false);
+    expect(requiresArguments(null)).toBe(false);
+    expect(requiresArguments("not a schema")).toBe(false);
+    expect(requiresArguments(42)).toBe(false);
   });
 });
 
