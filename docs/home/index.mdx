@@ -4,10 +4,6 @@ icon: "/images/mcp_use.svg"
 mode: "frame"
 ---
 
-<div style={{display: 'none'}}>
-> For the complete documentation index, see [llms.txt](https://manufact.com/docs/llms.txt).
-</div>
-
 import { SimpleSplitCard } from '/snippets/simple-split-card.jsx'
 
 <div className="px-4 py-8 mt-24 lg:pb-24 max-w-5xl mx-auto">
@@ -226,7 +222,7 @@ mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP 
     from mcp_use import MCPAgent, MCPClient
 
     client = MCPClient.from_dict({ "mcpServers": { "fs": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"] } } })
-    agent = MCPAgent(llm=ChatOpenAI(model="gpt-4o"), client=client)
+    agent = MCPAgent(llm=ChatOpenAI(model="gpt-4.1"), client=client)
     result = await agent.run("List all files in the directory")
     ```
 

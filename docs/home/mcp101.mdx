@@ -4,6 +4,38 @@ description: "The Model Context Protocol — architecture, primitives, and how m
 icon: "brain"
 ---
 
+<Visibility for="agents">
+mcp-use is a fullstack MCP (Model Context Protocol) framework for Python and TypeScript.
+
+**Install:**
+- Python: `pip install mcp-use` (agent also requires a LangChain LLM provider, e.g. `pip install langchain-openai`)
+- TypeScript: `npm install mcp-use`
+
+**Core classes:**
+- `MCPServer` — build an MCP server that exposes tools, resources, and prompts
+- `MCPClient` — connect to one or more MCP servers programmatically
+- `MCPAgent` — LLM-powered agent that uses MCPClient to call tools (requires LangChain)
+
+**Key imports:**
+- Python server: `from mcp_use import MCPServer`
+- Python client/agent: `from mcp_use import MCPClient, MCPAgent`
+- TypeScript server: `import { MCPServer } from "mcp-use/server"`
+- TypeScript client/agent: `import { MCPClient, MCPAgent } from "mcp-use"`
+
+**TypeScript tool definition:**
+```typescript
+server.tool({ name: "my_tool", description: "...", schema: z.object({ ... }) }, async (args) => { ... })
+```
+
+**Python tool definition:**
+```python
+@server.tool()
+def my_tool(city: str) -> str:
+    """Tool description"""
+    return result
+```
+</Visibility>
+
 ## What is MCP?
 
 The **Model Context Protocol (MCP)** is an open standard for connecting AI models to external tools, data sources, and services. Instead of custom integrations for every API, MCP provides a universal interface that any LLM host can speak.
