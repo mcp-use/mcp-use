@@ -160,6 +160,15 @@ const tools = await session.listTools();
 const result = await session.callTool("add", { a: 1, b: 2 });
 await client.closeAllSessions();
 ```
+```typescript React
+import { useMcp } from "mcp-use/react";
+
+const { tools, callTool } = useMcp({
+  url: "http://localhost:3000/mcp"
+});
+
+const result = await callTool("add", { a: 1, b: 2 });
+```
 ```python Python
 from mcp_use import MCPClient
 
