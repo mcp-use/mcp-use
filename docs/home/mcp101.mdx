@@ -204,6 +204,37 @@ See [Sampling](/typescript/client/sampling) and [Elicitation](/typescript/client
 
 An MCP Agent wraps an LLM around an MCP client: the model reasons about a task, selects tools, calls them, and iterates until done. mcp-use ships a full agent implementation for Python and TypeScript built on LangChain.
 
+<CodeGroup>
+```typescript TypeScript
+import { MCPAgent, MCPClient } from "mcp-use";
+import { ChatOpenAI } from "@langchain/openai";
+
+const client = new MCPClient({
+  mcpServers: {
+    playwright: { command: "npx", args: ["@playwright/mcp@latest"] }
+  }
+});
+
+const agent = new MCPAgent({ llm: new ChatOpenAI({ model: "gpt-5.5" }), client });
+const result = await agent.run({ prompt: "Find the best restaurant in San Francisco" });
+await client.closeAllSessions();
+```
+```python Python
+from mcp_use import MCPAgent, MCPClient
+from langchain_openai import ChatOpenAI
+
+client = MCPClient({
+    "mcpServers": {
+        "playwright": { "command": "npx", "args": ["@playwright/mcp@latest"] }
+    }
+})
+
+agent = MCPAgent(llm=ChatOpenAI(model="gpt-5.5"), client=client)
+result = await agent.run("Find the best restaurant in San Francisco")
+await client.close_all_sessions()
+```
+</CodeGroup>
+
 See [Python Agent](/python/agent/agent-configuration) and [TypeScript Agent](/typescript/agent/index).
 
 ---
