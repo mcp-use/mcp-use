@@ -58,7 +58,7 @@ export type {
 
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
-import { requestLogger } from "./logging.js";
+import { createRequestLogger } from "./logging.js";
 import {
   getActiveSessions,
   sendNotification,
@@ -2424,7 +2424,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Create and configure Hono app with default middleware
-    this.app = createHonoApp(requestLogger, {
+    this.app = createHonoApp(createRequestLogger(this.routeConfig), {
       cors: this.config.cors,
       allowedOrigins: this.config.allowedOrigins,
     });

@@ -17,6 +17,7 @@ import type {
   UIResourceContent,
   UIResourceDefinition,
 } from "../types/resource.js";
+import { DEFAULT_ROUTES } from "../utils/routes.js";
 import { slugifyWidgetName } from "./widget-helpers.js";
 
 /**
@@ -26,6 +27,8 @@ export interface UrlConfig {
   baseUrl: string;
   port: number | string;
   buildId?: string;
+  /** Base path widgets are mounted at (defaults to `/mcp-use/widgets`). */
+  widgetsBasePath?: string;
 }
 
 /**
@@ -46,9 +49,11 @@ export function buildWidgetUrl(
   // Import slugifyWidgetName to ensure URL-safe widget routes
   // This must be imported dynamically to avoid circular dependencies
   const slugifiedWidget = slugifyWidgetName(widget);
+  const widgetsBasePath =
+    config.widgetsBasePath ?? DEFAULT_ROUTES.widgetsBasePath;
 
   const url = new URL(
-    `/mcp-use/widgets/${slugifiedWidget}`,
+    `${widgetsBasePath}/${slugifiedWidget}`,
     `${config.baseUrl}:${config.port}`
   );
 

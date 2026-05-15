@@ -210,6 +210,8 @@ export interface WidgetServerConfig {
   serverBaseUrl?: string;
   /** Build ID for cache busting */
   buildId?: string;
+  /** Base path widgets are mounted at (defaults to `/mcp-use/widgets`). */
+  widgetsBasePath?: string;
 }
 
 /**
@@ -575,6 +577,7 @@ export async function createWidgetUIResource(
     baseUrl: configBaseUrl,
     port: configPort,
     buildId: serverConfig.buildId,
+    widgetsBasePath: serverConfig.widgetsBasePath,
   };
 
   const uiResource = await createUIResourceFromDefinition(

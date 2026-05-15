@@ -42,6 +42,11 @@ export interface UIResourceServer {
   readonly serverHost: string;
   readonly serverPort?: number;
   readonly serverBaseUrl?: string;
+  readonly routeConfig?: {
+    widgetsBasePath?: string;
+    publicBasePath?: string;
+    [key: string]: unknown;
+  };
   /** Storage for widget definitions, used to inject metadata into tool responses */
   widgetDefinitions: Map<string, Record<string, unknown>>;
   /** Registrations storage for checking existing registrations (for HMR updates) */
@@ -274,6 +279,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     serverPort: server.serverPort || 3000,
     serverBaseUrl: server.serverBaseUrl,
     buildId: server.buildId,
+    widgetsBasePath: server.routeConfig?.widgetsBasePath,
   };
 
   // Per MCP Apps spec (SEP-1865): resource _meta.ui should contain CSP,

@@ -2140,11 +2140,14 @@ program
           const browserHost = normalizeBrowserHost(host);
           const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const routes = (runningServer as any)?.routeConfig;
+            const mcpBasePath = routes?.mcpBasePath ?? "/mcp";
+            const inspectorBasePath = routes?.inspectorBasePath ?? "/inspector";
+            const mcpEndpoint = `http://${browserHost}:${port}${mcpBasePath}`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${mcpBasePath}`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${inspectorBasePath}?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -2154,7 +2157,9 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(
+                chalk.whiteBright(`Tunnel:   ${tunnelUrl}${mcpBasePath}`)
+              );
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
             console.log(chalk.gray(`Watching for changes...\n`));
@@ -2174,12 +2179,16 @@ program
 
       // Log success when --no-open is used
       if (options.open === false) {
-        const mcpEndpoint = `http://${host}:${port}/mcp`;
+        const mcpBasePath =
+          (runningServer as any)?.routeConfig?.mcpBasePath ?? "/mcp";
+        const mcpEndpoint = `http://${host}:${port}${mcpBasePath}`;
         console.log(chalk.green.bold(`✓ Server ready`));
         console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
         if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+          console.log(
+            chalk.whiteBright(`Tunnel:   ${tunnelUrl}${mcpBasePath}`)
+          );
         }
         console.log(chalk.gray(`Watching for changes...\n`));
       }
@@ -2513,18 +2522,23 @@ program
         (globalThis as any).__mcpUseHmrMode = true;
 
         const browserHost = normalizeBrowserHost(host);
-        const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+        const routes = (runningServer as any)?.routeConfig;
+        const mcpBasePath = routes?.mcpBasePath ?? "/mcp";
+        const inspectorBasePath = routes?.inspectorBasePath ?? "/inspector";
+        const mcpEndpoint = `http://${browserHost}:${port}${mcpBasePath}`;
         const autoConnectEndpoint = tunnelUrl
-          ? `${tunnelUrl}/mcp`
+          ? `${tunnelUrl}${mcpBasePath}`
           : mcpEndpoint;
         console.log(chalk.green.bold(`✓ Restarted`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
         if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+          console.log(
+            chalk.whiteBright(`Tunnel:   ${tunnelUrl}${mcpBasePath}`)
+          );
         }
         console.log(
           chalk.whiteBright(
-            `Inspector: http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
+            `Inspector: http://${browserHost}:${port}${inspectorBasePath}?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
           )
         );
         console.log(chalk.gray(`Watching for changes...\n`));

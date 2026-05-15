@@ -8,6 +8,7 @@
 import type { Hono as HonoType } from "hono";
 import type { WidgetMetadata } from "../types/widget.js";
 import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+import { DEFAULT_ROUTES } from "../utils/routes.js";
 import { registerWidgetFromTemplate } from "./widget-helpers.js";
 import type {
   ServerConfig,
@@ -39,7 +40,7 @@ export async function mountWidgetsProduction(
   registerWidget: RegisterWidgetCallback,
   options?: MountWidgetsProductionOptions
 ): Promise<void> {
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const baseRoute = options?.baseRoute || DEFAULT_ROUTES.widgetsBasePath;
   const widgetsDir = pathHelpers.join(
     isDeno ? "." : getCwd(),
     "dist",
