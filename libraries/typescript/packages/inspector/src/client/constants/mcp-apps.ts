@@ -2,14 +2,19 @@
  * MCP Apps configuration constants
  */
 
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
+
 export const MCP_APPS_CONFIG = {
   /**
-   * API endpoints for widget operations
+   * API endpoints for widget operations. Computed lazily so the runtime
+   * `window.__MCP_INSPECTOR_BASE_PATH__` injected by the host is available.
    */
   API_ENDPOINTS: {
-    WIDGET_STORE: "/inspector/api/mcp-apps/widget/store",
+    get WIDGET_STORE(): string {
+      return inspectorUrl("/api/mcp-apps/widget/store");
+    },
     WIDGET_CONTENT: (toolCallId: string) =>
-      `/inspector/api/mcp-apps/widget-content/${toolCallId}`,
+      inspectorUrl(`/api/mcp-apps/widget-content/${toolCallId}`),
   },
 
   /**

@@ -150,16 +150,20 @@ async function findAvailablePort(
 async function waitForServer(
   port: number,
   host: string = "localhost",
-  maxAttempts = 30
+  maxAttempts = 30,
+  inspectorBasePath: string = "/inspector"
 ): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     const controller = new AbortController();
     try {
-      // Use /inspector/health endpoint for cleaner health checks
-      // This avoids 400 errors from the MCP endpoint which requires session headers
-      const response = await fetch(`http://${host}:${port}/inspector/health`, {
-        signal: controller.signal,
-      });
+      // Use <inspectorBasePath>/health for a cheap health probe. The MCP
+      // endpoint itself requires session headers, so /api/mcp would 400.
+      const response = await fetch(
+        `http://${host}:${port}${inspectorBasePath}/health`,
+        {
+          signal: controller.signal,
+        }
+      );
 
       if (response.ok) {
         return true;
@@ -2138,11 +2142,16 @@ program
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
+          const routes = (runningServer as any)?.routeConfig;
+          const mcpBasePath = routes?.mcpBasePath ?? "/mcp";
+          const inspectorBasePath = routes?.inspectorBasePath ?? "/inspector";
+          const ready = await waitForServer(
+            port,
+            browserHost,
+            30,
+            inspectorBasePath
+          );
           if (ready) {
-            const routes = (runningServer as any)?.routeConfig;
-            const mcpBasePath = routes?.mcpBasePath ?? "/mcp";
-            const inspectorBasePath = routes?.inspectorBasePath ?? "/inspector";
             const mcpEndpoint = `http://${browserHost}:${port}${mcpBasePath}`;
             const autoConnectEndpoint = tunnelUrl
               ? `${tunnelUrl}${mcpBasePath}`

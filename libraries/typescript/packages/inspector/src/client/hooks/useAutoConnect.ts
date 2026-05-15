@@ -2,6 +2,7 @@ import type { McpServer } from "mcp-use/react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
@@ -473,7 +474,7 @@ export function useAutoConnect({
     }
 
     // Fallback to config.json
-    fetch("/inspector/config.json")
+    fetch(inspectorUrl("/config.json"))
       .then((res) => res.json())
       .then((configData: { autoConnectUrl: string | null }) => {
         setConfigLoaded(true);

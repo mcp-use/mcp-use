@@ -1,6 +1,7 @@
 import type { BaseTelemetryEvent } from "./events.js";
 import { MCPInspectorOpenEvent } from "./events.js";
 import { getPackageVersion } from "./utils.js";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 
 // Environment detection function
 function isBrowserEnvironment(): boolean {
@@ -86,8 +87,8 @@ function isLocalStorageFunctional(): boolean {
 export class Telemetry {
   private static instance: Telemetry | null = null;
 
-  private readonly POSTHOG_PROXY_URL = "/inspector/api/tel/posthog";
-  private readonly SCARF_PROXY_URL = "/inspector/api/tel/scarf";
+  private readonly POSTHOG_PROXY_URL = inspectorUrl("/api/tel/posthog");
+  private readonly SCARF_PROXY_URL = inspectorUrl("/api/tel/scarf");
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;

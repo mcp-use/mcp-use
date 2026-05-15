@@ -74,20 +74,8 @@ export async function mountInspectorUI(
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
+      basePath: inspectorBasePath,
     });
-    if (inspectorBasePath !== DEFAULT_ROUTES.inspectorBasePath) {
-      // The inspector package currently mounts fixed routes under /inspector.
-      // Expose configured path as a compatibility alias via redirect.
-      const handleAlias = (c: import("hono").Context) => {
-        const url = new URL(c.req.url);
-        const suffix = url.pathname.slice(inspectorBasePath.length);
-        return c.redirect(
-          `${DEFAULT_ROUTES.inspectorBasePath}${suffix}${url.search}`
-        );
-      };
-      app.get(inspectorBasePath, handleAlias);
-      app.get(`${inspectorBasePath}/*`, handleAlias);
-    }
     console.log(
       `[INSPECTOR] UI available at http://${serverHost}:${serverPort}${inspectorBasePath}`
     );

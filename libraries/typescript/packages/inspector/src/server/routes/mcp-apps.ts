@@ -256,11 +256,17 @@ window.addEventListener('unhandledrejection', function(event) {
 </html>`;
 
 /**
- * Register MCP Apps routes on the provided Hono app
+ * Register MCP Apps routes on the provided Hono app.
+ *
+ * @param app - Hono app to register routes on.
+ * @param basePath - Inspector mount path (e.g. "/inspector" or "/debug").
  */
-export function registerMcpAppsRoutes(app: Hono) {
+export function registerMcpAppsRoutes(
+  app: Hono,
+  basePath: string = "/inspector"
+) {
   // Store widget data - reuses existing storeWidgetData function
-  app.post("/inspector/api/mcp-apps/widget/store", async (c) => {
+  app.post(`${basePath}/api/mcp-apps/widget/store`, async (c) => {
     try {
       const body = await c.req.json();
       const result = storeWidgetData({
@@ -286,7 +292,7 @@ export function registerMcpAppsRoutes(app: Hono) {
   });
 
   // Serve widget content with CSP metadata (SEP-1865)
-  app.get("/inspector/api/mcp-apps/widget-content/:toolId", async (c) => {
+  app.get(`${basePath}/api/mcp-apps/widget-content/:toolId`, async (c) => {
     try {
       const toolId = c.req.param("toolId");
       const cspModeParam = c.req.query("csp_mode") as
@@ -369,7 +375,7 @@ export function registerMcpAppsRoutes(app: Hono) {
   });
 
   // Serve sandbox proxy HTML
-  app.get("/inspector/api/mcp-apps/sandbox-proxy", (c) => {
+  app.get(`${basePath}/api/mcp-apps/sandbox-proxy`, (c) => {
     c.header("Content-Type", "text/html; charset=utf-8");
     c.header("Cache-Control", "no-cache, no-store, must-revalidate");
 

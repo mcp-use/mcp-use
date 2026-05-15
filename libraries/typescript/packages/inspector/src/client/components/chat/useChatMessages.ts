@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 import { convertPromptResultsToMessages } from "./conversion";
 import type {
   AuthConfig,
@@ -171,7 +172,7 @@ export function useChatMessages({
         const resolvedUrl =
           chatApiUrl ??
           (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
-          "/inspector/api/chat/stream";
+          inspectorUrl("/api/chat/stream");
 
         const serialisedMessages = [
           ...[...messages, ...userMessages].map((m) => ({

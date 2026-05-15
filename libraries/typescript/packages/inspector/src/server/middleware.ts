@@ -31,6 +31,11 @@ export function mountInspector(
     sandboxOrigin?: string | null;
     /** Port the host app listens on (embedded inspector); required for tunnel start */
     serverPort?: number;
+    /**
+     * Mount path for all inspector routes (UI + APIs). Defaults to "/inspector".
+     * Must start with "/" and have no trailing slash.
+     */
+    basePath?: string;
   }
 ): void {
   // Find the built client files
@@ -45,11 +50,14 @@ export function mountInspector(
     );
   }
 
+  const basePath = normalizeInspectorBasePath(config?.basePath);
+
   // Build runtime config to inject into the HTML
   const runtimeConfig = {
     devMode: config?.devMode,
     sandboxOrigin: config?.sandboxOrigin,
     inspectorMode: "embedded" as const,
+    basePath,
   };
 
   // If it's already a Hono app, register routes directly.
@@ -64,7 +72,7 @@ export function mountInspector(
   // Every Hono instance exposes `.fetch`, and Express apps don't, so the
   // duck-type check alone covers both shapes unambiguously.
   if (isHonoApp(app)) {
-    registerInspectorRoutes(app, config);
+    registerInspectorRoutes(app, { ...config, basePath });
     registerStaticRoutes(app, clientDistPath, runtimeConfig);
     return;
   }
@@ -73,7 +81,7 @@ export function mountInspector(
   const honoApp = new Hono();
 
   // Register routes on Hono app
-  registerInspectorRoutes(honoApp, config);
+  registerInspectorRoutes(honoApp, { ...config, basePath });
   registerStaticRoutes(honoApp, clientDistPath, runtimeConfig);
 
   // Convert all Hono routes to Express middleware
@@ -121,4 +129,17 @@ export function mountInspector(
 
 function isHonoApp(app: Express | Hono): app is Hono {
   return typeof (app as { fetch?: unknown }).fetch === "function";
+}
+
+/**
+ * Normalize a user-supplied inspector base path. Ensures it starts with `/`,
+ * has no trailing slash, and is not empty/root.
+ */
+function normalizeInspectorBasePath(input?: string): string {
+  const trimmed = (input ?? "/inspector").trim();
+  if (trimmed === "" || trimmed === "/") {
+    return "/inspector";
+  }
+  const prefixed = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return prefixed.replace(/\/+$/, "");
 }

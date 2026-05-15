@@ -26,6 +26,7 @@ import {
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 import {
   ArrowUpRight,
   Bell,
@@ -251,7 +252,7 @@ function TunnelBadge({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/inspector/api/dev/info");
+        const res = await fetch(inspectorUrl("/api/dev/info"));
         if (!res.ok || cancelled) return;
         const info = (await res.json()) as {
           fromCli?: boolean;
@@ -357,7 +358,7 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch("/inspector/api/dev/start-tunnel", {
+      const res = await fetch(inspectorUrl("/api/dev/start-tunnel"), {
         method: "POST",
       });
       if (!res.ok) {
@@ -387,7 +388,7 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch("/inspector/api/dev/stop-tunnel", {
+      const res = await fetch(inspectorUrl("/api/dev/stop-tunnel"), {
         method: "POST",
       });
       if (!res.ok) {

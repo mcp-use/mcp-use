@@ -41,6 +41,12 @@ interface RuntimeConfig {
   devMode?: boolean;
   /** Override sandbox origin for MCP Apps widgets behind reverse proxies */
   sandboxOrigin?: string | null;
+  /**
+   * Mount path the inspector is served from (e.g. "/inspector" or "/debug").
+   * Surfaced to the client as `window.__MCP_INSPECTOR_BASE_PATH__` so all
+   * frontend fetches can build absolute URLs against the configured mount.
+   */
+  basePath?: string;
   /** Relative path to the MCP proxy (e.g. "/inspector/api/proxy"). When set, the client uses it for autoProxyFallback. Omit when the proxy is not available (e.g. Python server serving inspector). */
   proxyUrl?: string | null;
   /** How the inspector is being served (standalone CLI, embedded in mcp-use, or cloud-hosted). Consumed by telemetry. */
@@ -81,6 +87,12 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
   if (config.sandboxOrigin) {
     scripts.push(
       `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+    );
+  }
+
+  if (config.basePath) {
+    scripts.push(
+      `<script>window.__MCP_INSPECTOR_BASE_PATH__ = ${JSON.stringify(config.basePath)};</script>`
     );
   }
 
@@ -130,6 +142,11 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
     if (config.sandboxOrigin) {
       scripts.push(
         `<script>window.__MCP_SANDBOX_ORIGIN__ = ${JSON.stringify(config.sandboxOrigin)};</script>`
+      );
+    }
+    if (config.basePath) {
+      scripts.push(
+        `<script>window.__MCP_INSPECTOR_BASE_PATH__ = ${JSON.stringify(config.basePath)};</script>`
       );
     }
     if (config.proxyUrl !== undefined) {
@@ -252,6 +269,7 @@ export function registerStaticRoutes(
   clientDistPath?: string,
   runtimeConfig?: RuntimeConfig
 ) {
+  const basePath = runtimeConfig?.basePath ?? "/inspector";
   // When the inspector's own server serves, the proxy is always available.
   // Default proxyUrl so the client can use it; callers may override with null to disable.
   // disableTelemetry is auto-populated from MCP_USE_ANONYMIZED_TELEMETRY=false so
@@ -259,10 +277,11 @@ export function registerStaticRoutes(
   // the in-browser posthog-js init triggered by `useMcp` hooks rendered inside.
   const effectiveConfig: RuntimeConfig = {
     ...runtimeConfig,
+    basePath,
     proxyUrl:
       runtimeConfig?.proxyUrl !== undefined
         ? runtimeConfig.proxyUrl
-        : "/inspector/api/proxy",
+        : `${basePath}/api/proxy`,
     disableTelemetry:
       runtimeConfig?.disableTelemetry ??
       process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false",
@@ -274,13 +293,18 @@ export function registerStaticRoutes(
 
     app.get("/", (c) => {
       const url = new URL(c.req.url);
-      return c.redirect(`/inspector${url.search}`);
+      return c.redirect(`${basePath}${url.search}`);
     });
 
-    app.get("/inspector", serveShell);
-    app.get("/inspector/*", serveShell);
-    app.post("/inspector/*", serveShell);
-    app.get("*", serveShell);
+    app.get(basePath, serveShell);
+    app.get(`${basePath}/*`, serveShell);
+    app.post(`${basePath}/*`, serveShell);
+    // Standalone CLI: keep SPA catch-all so root-level routes serve the
+    // inspector. Embedded mode passes a custom basePath and shouldn't shadow
+    // unrelated host routes.
+    if (basePath === "/inspector") {
+      app.get("*", serveShell);
+    }
     return;
   }
 
@@ -312,9 +336,9 @@ export function registerStaticRoutes(
     return;
   }
 
-  // Serve static assets from /inspector/assets/*
-  app.get("/inspector/assets/*", (c) => {
-    const path = c.req.path.replace("/inspector/assets/", "assets/");
+  // Serve static assets from <basePath>/assets/*
+  app.get(`${basePath}/assets/*`, (c) => {
+    const path = c.req.path.replace(`${basePath}/assets/`, "assets/");
     const fullPath = join(distPath, path);
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath);
@@ -325,18 +349,29 @@ export function registerStaticRoutes(
     return c.notFound();
   });
 
-  // Redirect root to /inspector preserving query parameters
+  // Redirect root to <basePath> preserving query parameters
   app.get("/", (c) => {
     const url = new URL(c.req.url);
     const queryString = url.search;
-    return c.redirect(`/inspector${queryString}`);
+    return c.redirect(`${basePath}${queryString}`);
   });
+
+  // Vite builds the inspector with `base: "/inspector"`, baking that path into
+  // the emitted index.html and JS chunk imports. When the host mounts the
+  // inspector at a different path, rewrite `/inspector/` references in the
+  // served HTML so the browser pulls assets from the active mount.
+  const rewriteAssetBase = (html: string): string =>
+    basePath === "/inspector"
+      ? html
+      : html
+          .replaceAll('"/inspector/', `"${basePath}/`)
+          .replaceAll("'/inspector/", `'${basePath}/`);
 
   const serveIndex = (c: any) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
       const content = injectRuntimeConfig(
-        readFileSync(indexPath, "utf-8"),
+        rewriteAssetBase(readFileSync(indexPath, "utf-8")),
         effectiveConfig
       );
       return c.html(content);
@@ -355,15 +390,23 @@ export function registerStaticRoutes(
     `);
   };
 
-  app.get("/inspector", serveIndex);
-  app.get("/inspector/*", serveIndex);
-  app.post("/inspector/*", serveIndex);
+  app.get(basePath, serveIndex);
+  app.get(`${basePath}/*`, serveIndex);
+  app.post(`${basePath}/*`, serveIndex);
+
+  // Default-base behavior: also serve the SPA for arbitrary unmatched routes
+  // (used by the standalone inspector CLI that runs at root). When the host
+  // remounts the inspector at a custom path, restrict the SPA to that mount
+  // so unrelated routes (including the old `/inspector/*`) fall through.
+  if (basePath !== "/inspector") {
+    return;
+  }
 
   app.get("*", (c) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
       const content = injectRuntimeConfig(
-        readFileSync(indexPath, "utf-8"),
+        rewriteAssetBase(readFileSync(indexPath, "utf-8")),
         effectiveConfig
       );
       return c.html(content);
@@ -398,6 +441,7 @@ export function registerStaticRoutesWithDevProxy(
   const distPath = clientDistPath || getClientDistPath();
   const isDev =
     process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
+  const basePath = runtimeConfig?.basePath ?? "/inspector";
 
   if (isDev) {
     console.warn(
@@ -409,8 +453,8 @@ export function registerStaticRoutesWithDevProxy(
 
       if (
         path.startsWith("/api/") ||
-        path.startsWith("/inspector/api/") ||
-        path === "/inspector/config.json"
+        path.startsWith(`${basePath}/api/`) ||
+        path === `${basePath}/config.json`
       ) {
         return c.notFound();
       }
