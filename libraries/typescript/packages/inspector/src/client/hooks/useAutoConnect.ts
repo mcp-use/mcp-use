@@ -296,17 +296,17 @@ export function useAutoConnect({
       // external provider and get CORS-blocked in the browser.
       //
       // However, skip the proxy when the inspector is served by the MCP server
-      // itself (same origin as the target URL): in that case /inspector/api/proxy
+      // itself (same origin as the target URL): in that case the inspector proxy
       // doesn't exist on the host and routing through it breaks direct connections.
       let proxyAddress: string | undefined;
       try {
         const targetOrigin = new URL(url).origin;
         const inspectorOrigin = window.location.origin;
         if (inspectorOrigin !== targetOrigin) {
-          proxyAddress = `${inspectorOrigin}/inspector/api/proxy`;
+          proxyAddress = `${inspectorOrigin}${inspectorUrl("/api/proxy")}`;
         }
       } catch {
-        proxyAddress = `${window.location.origin}/inspector/api/proxy`;
+        proxyAddress = `${window.location.origin}${inspectorUrl("/api/proxy")}`;
       }
 
       const proxyConfig: {

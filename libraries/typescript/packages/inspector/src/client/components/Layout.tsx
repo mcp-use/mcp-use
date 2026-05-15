@@ -25,6 +25,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
@@ -635,7 +636,7 @@ export function Layout({ children }: LayoutProps) {
           proxyAddress: string;
           headers?: Record<string, string>;
         } = {
-          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+          proxyAddress: `${window.location.origin}${inspectorUrl("/api/proxy")}`,
           ...(Object.keys(customHeaders).length > 0 && {
             headers: customHeaders,
           }),

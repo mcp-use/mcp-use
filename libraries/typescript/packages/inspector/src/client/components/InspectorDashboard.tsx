@@ -52,6 +52,7 @@ import {
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
@@ -300,7 +301,7 @@ export function InspectorDashboard() {
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
   const [maxTotalTimeout, setMaxTotalTimeout] = useState("60000");
   const [proxyAddress, setProxyAddress] = useState(
-    `${window.location.origin}/inspector/api/proxy`
+    `${window.location.origin}${inspectorUrl("/api/proxy")}`
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");

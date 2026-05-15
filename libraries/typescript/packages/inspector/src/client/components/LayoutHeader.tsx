@@ -277,12 +277,12 @@ function TunnelBadge({
   }, [setTunnelUrl]);
 
   /**
-   * Poll /inspector/api/dev/info until the new server is ready,
+   * Poll inspector /api/dev/info until the new server is ready,
    * then redirect the inspector to reconnect via sessionStorage.
    */
   const pollAndReconnect = async (expectTunnel: boolean) => {
     const port = window.location.port || "3000";
-    const infoUrl = `http://localhost:${port}/inspector/api/dev/info`;
+    const infoUrl = `${window.location.origin}${inspectorUrl("/api/dev/info")}`;
     const deadline = Date.now() + 90_000;
 
     setTunnelPhaseMessage(

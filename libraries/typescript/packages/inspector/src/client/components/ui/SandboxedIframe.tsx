@@ -21,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { getInspectorBasePath } from "@/client/lib/inspector-base-path";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../../constants/iframe";
 
 export interface SandboxedIframeHandle {
@@ -98,12 +99,14 @@ export const SandboxedIframe = forwardRef<
     const currentHost = window.location.hostname;
     const currentPort = window.location.port;
     const protocol = window.location.protocol;
+    const inspectorBasePath = getInspectorBasePath();
+    const sandboxProxyPath = `${inspectorBasePath}/api/mcp-apps/sandbox-proxy`;
 
     // Priority 1: Check for configured sandbox origin (injected at build time or runtime)
     const configuredSandboxOrigin = (window as any).__MCP_SANDBOX_ORIGIN__;
     if (configuredSandboxOrigin) {
       // Use fully configured origin (e.g., "https://sandbox-inspector.mcp-use.com")
-      return `${configuredSandboxOrigin}/inspector/api/mcp-apps/sandbox-proxy?v=${Date.now()}`;
+      return `${configuredSandboxOrigin.replace(/\/+$/, "")}${sandboxProxyPath}?v=${Date.now()}`;
     }
 
     let sandboxHost: string;
@@ -136,7 +139,7 @@ export const SandboxedIframe = forwardRef<
     }
 
     const portSuffix = currentPort ? `:${currentPort}` : "";
-    return `${protocol}//${sandboxHost}${portSuffix}/inspector/api/mcp-apps/sandbox-proxy?v=${Date.now()}`;
+    return `${protocol}//${sandboxHost}${portSuffix}${sandboxProxyPath}?v=${Date.now()}`;
   });
 
   const sandboxProxyOrigin = useMemo(() => {

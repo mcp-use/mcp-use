@@ -7,6 +7,7 @@ import { MCP_APPS_CONFIG } from "../constants/mcp-apps";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { inspectorUrl } from "@/client/lib/inspector-base-path";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
@@ -243,24 +244,19 @@ function OpenAIComponentRendererBase({
           },
         };
 
-        // Inspector API routes (/inspector/api/*) are always served by the same
+        // Inspector API routes are always served by the same
         // origin that hosts the inspector UI.  Use relative URLs so fetch targets
         // window.location.origin (the inspector) instead of the MCP server.
         // The previous logic mistakenly derived the base from the MCP server URL
         // (serverBaseUrl), which broke when the server ran on a different port.
-        const inspectorApiBase = "";
-
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
-        const storeResponse = await fetch(
-          `${inspectorApiBase}/inspector/api/resources/widget/store`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(widgetDataToStore),
-          }
-        );
+        const storeResponse = await fetch(inspectorUrl("/api/resources/widget/store"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(widgetDataToStore),
+        });
 
         if (!storeResponse.ok) {
           const errorData = await storeResponse
@@ -274,12 +270,9 @@ function OpenAIComponentRendererBase({
         if (cancelled) return;
 
         // Determine if the widget iframe will be same-origin with the inspector page.
-        // When inspectorApiBase matches window.location.origin (e.g. both http://localhost:3000),
-        // the iframe is same-origin and we can access its DOM for console interception & debug controls.
-        const computedIsSameOrigin = inspectorApiBase
-          ? typeof window !== "undefined" &&
-            inspectorApiBase === window.location.origin
-          : true;
+        // The inspector API is same-origin with the page, so we can access iframe DOM
+        // for console interception and debug controls.
+        const computedIsSameOrigin = true;
 
         // Batch all state updates in one synchronous block so React 18 batches a single re-render.
         // Avoids double application from StrictMode (cancelled guard above) and multiple
@@ -291,7 +284,7 @@ function OpenAIComponentRendererBase({
         // the store so that iframe fetch gets latest data. Changing URL would reload the iframe.
         if (!hasSetWidgetUrlRef.current) {
           hasSetWidgetUrlRef.current = true;
-          const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
+          const widgetUrl = `${inspectorUrl(`/api/resources/widget-content/${toolId}`)}?t=${Date.now()}`;
           setWidgetUrl(widgetUrl);
           // Register widget in debug context so CSP violations can be stored
           addWidget(toolId, { toolName, protocol: "chatgpt-app" });
