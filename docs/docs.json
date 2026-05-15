@@ -733,7 +733,7 @@
     },
     {
       "source": "/typescript/server/api-reference",
-      "destination": "/typescript/server/index"
+      "destination": "/typescript/server/index#mcpserver-api-reference"
     },
     {
       "source": "/typescript/development/security",
