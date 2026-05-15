@@ -133,7 +133,17 @@ interface BaseOAuthConfig {
  */
 export interface SupabaseOAuthConfig extends BaseOAuthConfig {
   provider: "supabase";
-  projectId: string;
+  /**
+   * Supabase project ID. Used to derive the default URL
+   * `https://${projectId}.supabase.co`. Ignored when `supabaseUrl` is set.
+   */
+  projectId?: string;
+  /**
+   * Explicit Supabase base URL. Overrides the projectId-derived hosted URL
+   * — required for self-hosted or local Supabase instances
+   * (e.g. `http://localhost:54321`).
+   */
+  supabaseUrl?: string;
   jwtSecret?: string;
   verifyJwt?: boolean;
 }

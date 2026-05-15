@@ -22,7 +22,15 @@ export class SupabaseOAuthProvider implements OAuthProvider {
 
   constructor(config: SupabaseOAuthConfig) {
     this.config = config;
-    this.supabaseUrl = `https://${config.projectId}.supabase.co`;
+    if (config.supabaseUrl) {
+      this.supabaseUrl = config.supabaseUrl.replace(/\/$/, "");
+    } else if (config.projectId) {
+      this.supabaseUrl = `https://${config.projectId}.supabase.co`;
+    } else {
+      throw new Error(
+        "Supabase OAuth provider requires either `supabaseUrl` or `projectId`."
+      );
+    }
     this.supabaseAuthUrl = `${this.supabaseUrl}/auth/v1`;
     this.issuer = `${this.supabaseUrl}/auth/v1`;
   }
