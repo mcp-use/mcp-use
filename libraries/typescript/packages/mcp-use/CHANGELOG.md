@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.29.0-canary.4
+
+### Minor Changes
+
+- f8a6a58: Add `supabaseUrl` override to `oauthSupabaseProvider` so it can point at a local or self-hosted Supabase instance (e.g. `http://localhost:54321`) instead of the hosted `https://${projectId}.supabase.co` URL. Configurable via the new `supabaseUrl` config option or `MCP_USE_OAUTH_SUPABASE_URL` environment variable; `projectId` is now optional when `supabaseUrl` is provided.
+
+### Patch Changes
+
+- @mcp-use/cli@3.2.1-canary.4
+- @mcp-use/inspector@7.0.0-canary.4
+
 ## 1.28.1-canary.3
 
 ### Patch Changes
