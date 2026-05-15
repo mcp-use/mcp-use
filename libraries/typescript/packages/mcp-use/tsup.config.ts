@@ -48,7 +48,6 @@ const sharedConfig: Partial<Options> = {
     "langchain",
     "@langfuse/langchain",
     // Keep optional display dependencies external (uses Node.js built-ins, incompatible with neutral platform)
-    "chalk",
     "cli-highlight",
     "supports-color",
     // Keep react-router-dom external (optional, for widgets)
@@ -59,6 +58,9 @@ const sharedConfig: Partial<Options> = {
     // Keep posthog-node external for browser builds (browser uses posthog-js)
     "posthog-node",
   ],
+  // Inline chalk: it's ESM-only (v5), so leaving it external breaks any CJS
+  // caller of the .cjs bundles. Same workaround the CLI uses. See MCP-2184.
+  noExternal: ["chalk"],
 };
 
 export default defineConfig([
