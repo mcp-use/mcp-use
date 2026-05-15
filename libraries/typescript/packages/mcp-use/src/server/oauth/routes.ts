@@ -19,7 +19,7 @@ import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
-import { joinRoute } from "../utils/routes.js";
+import { joinRoute, DEFAULT_ROUTES } from "../utils/routes.js";
 
 /**
  * Type guard to check if oauth config is a proxy
@@ -196,8 +196,8 @@ export function setupOAuthRoutes(
   app: Hono,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
-  oauthBasePath: string = "",
-  mcpBasePath: string = "/mcp"
+  oauthBasePath: string = DEFAULT_ROUTES.oauthBasePath,
+  mcpBasePath: string = DEFAULT_ROUTES.mcpBasePath
 ): void {
   const proxyMode = isOAuthProxy(oauth);
   const authorizePath = joinRoute(oauthBasePath, "/authorize");

@@ -9,7 +9,7 @@ export interface ResolvedRouteConfig {
   oauthBasePath: string;
 }
 
-const DEFAULT_ROUTES: ResolvedRouteConfig = {
+export const DEFAULT_ROUTES: ResolvedRouteConfig = {
   mcpBasePath: "/mcp",
   sseBasePath: "/sse",
   widgetsBasePath: "/mcp-use/widgets",
@@ -20,13 +20,12 @@ const DEFAULT_ROUTES: ResolvedRouteConfig = {
 
 function normalizePath(input: string, allowEmpty: boolean): string {
   const trimmed = input.trim();
-  if (allowEmpty && (trimmed === "" || trimmed === "/")) return "";
-  if (!trimmed) throw new Error("Route path cannot be empty");
-
-  const withLeadingSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
-  return withLeadingSlash.length > 1
-    ? withLeadingSlash.replace(/\/+$/, "")
-    : withLeadingSlash;
+  if (trimmed === "" || trimmed === "/") {
+    if (allowEmpty) return "";
+    throw new Error("Route path cannot be empty");
+  }
+  const prefixed = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return prefixed.replace(/\/+$/, "");
 }
 
 export function resolveRouteConfig(config?: RouteConfig): ResolvedRouteConfig {
@@ -62,8 +61,5 @@ export function resolveRouteConfig(config?: RouteConfig): ResolvedRouteConfig {
 
 export function joinRoute(basePath: string, subPath: string): string {
   if (!basePath) return normalizePath(subPath, false);
-  const base = normalizePath(basePath, false);
-  const child = normalizePath(subPath, false);
-  if (child === "/") return base;
-  return `${base}${child}`;
+  return `${normalizePath(basePath, false)}${normalizePath(subPath, false)}`;
 }

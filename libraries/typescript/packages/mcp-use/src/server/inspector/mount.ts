@@ -6,6 +6,7 @@
 
 import type { Hono as HonoType } from "hono";
 import { readBuildManifest } from "../widgets/index.js";
+import { DEFAULT_ROUTES } from "../utils/routes.js";
 
 /**
  * Mount MCP Inspector UI at /inspector
@@ -37,8 +38,8 @@ export async function mountInspectorUI(
   serverHost: string,
   serverPort: number | undefined,
   isProduction: boolean,
-  mcpBasePath: string = "/mcp",
-  inspectorBasePath: string = "/inspector"
+  mcpBasePath: string = DEFAULT_ROUTES.mcpBasePath,
+  inspectorBasePath: string = DEFAULT_ROUTES.inspectorBasePath
 ): Promise<boolean> {
   // In production, only mount if build manifest says so
   if (isProduction) {
@@ -74,20 +75,18 @@ export async function mountInspectorUI(
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
     });
-    if (inspectorBasePath !== "/inspector") {
+    if (inspectorBasePath !== DEFAULT_ROUTES.inspectorBasePath) {
       // The inspector package currently mounts fixed routes under /inspector.
-      // Expose configured path as a compatibility alias.
-      app.get(`${inspectorBasePath}`, (c) => {
-        const q = c.req.url.includes("?")
-          ? c.req.url.substring(c.req.url.indexOf("?"))
-          : "";
-        return c.redirect(`/inspector${q}`);
-      });
-      app.get(`${inspectorBasePath}/*`, (c) => {
-        const current = new URL(c.req.url);
-        const suffix = current.pathname.substring(inspectorBasePath.length);
-        return c.redirect(`/inspector${suffix}${current.search}`);
-      });
+      // Expose configured path as a compatibility alias via redirect.
+      const handleAlias = (c: import("hono").Context) => {
+        const url = new URL(c.req.url);
+        const suffix = url.pathname.slice(inspectorBasePath.length);
+        return c.redirect(
+          `${DEFAULT_ROUTES.inspectorBasePath}${suffix}${url.search}`
+        );
+      };
+      app.get(inspectorBasePath, handleAlias);
+      app.get(`${inspectorBasePath}/*`, handleAlias);
     }
     console.log(
       `[INSPECTOR] UI available at http://${serverHost}:${serverPort}${inspectorBasePath}`

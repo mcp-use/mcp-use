@@ -10,6 +10,7 @@ import type { Context, Hono as HonoType, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import { DEFAULT_ROUTES } from "../utils/routes.js";
 import {
   registerWidgetFromTemplate,
   setupFaviconRoute,
@@ -91,8 +92,9 @@ export async function mountWidgetsDev(
   options?: MountWidgetsDevOptions
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
-  const publicBasePath = options?.publicBasePath || "/mcp-use/public";
+  const baseRoute = options?.baseRoute || DEFAULT_ROUTES.widgetsBasePath;
+  const publicBasePath =
+    options?.publicBasePath || DEFAULT_ROUTES.publicBasePath;
   // Resolution order for the widgets directory:
   //   1. Caller-supplied `options.resourcesDir`
   //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir

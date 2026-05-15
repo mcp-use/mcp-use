@@ -13,6 +13,7 @@ import type {
   WidgetProps,
 } from "../types/index.js";
 import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import { DEFAULT_ROUTES } from "../utils/routes.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -311,8 +312,8 @@ export function processWidgetHtml(
   html: string,
   widgetName: string,
   baseUrl: string,
-  widgetsBasePath: string = "/mcp-use/widgets",
-  publicBasePath: string = "/mcp-use/public"
+  widgetsBasePath: string = DEFAULT_ROUTES.widgetsBasePath,
+  publicBasePath: string = DEFAULT_ROUTES.publicBasePath
 ): string {
   let processedHtml = html;
 
@@ -738,8 +739,8 @@ export async function registerWidgetFromTemplate(
     html,
     widgetName,
     serverConfig.serverBaseUrl,
-    serverConfig.widgetsBasePath || "/mcp-use/widgets",
-    serverConfig.publicBasePath || "/mcp-use/public"
+    serverConfig.widgetsBasePath || DEFAULT_ROUTES.widgetsBasePath,
+    serverConfig.publicBasePath || DEFAULT_ROUTES.publicBasePath
   );
 
   // Ensure metadata has proper fallbacks
@@ -778,7 +779,7 @@ export async function registerWidgetFromTemplate(
 export function setupPublicRoutes(
   app: HonoType,
   useDistDirectory: boolean = false,
-  publicBasePath: string = "/mcp-use/public"
+  publicBasePath: string = DEFAULT_ROUTES.publicBasePath
 ): void {
   app.get(`${publicBasePath}/*`, async (c: Context) => {
     const filePath = c.req.path.replace(`${publicBasePath}/`, "");

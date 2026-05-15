@@ -7,6 +7,7 @@
 import chalk from "chalk";
 import type { Hono as HonoType } from "hono";
 import { getEnv, isDeno } from "./runtime.js";
+import { DEFAULT_ROUTES } from "./routes.js";
 
 export function isProductionMode(): boolean {
   // Only check NODE_ENV - CLI commands set this explicitly
@@ -130,7 +131,7 @@ export async function startServer(
     mcpBasePath?: string;
   }
 ): Promise<HttpServerHandle> {
-  const mcpBasePath = options?.mcpBasePath || "/mcp";
+  const mcpBasePath = options?.mcpBasePath || DEFAULT_ROUTES.mcpBasePath;
   if (isDeno) {
     // Deno runtime
     const corsHeaders = getDenoCorsHeaders();

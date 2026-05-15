@@ -7,6 +7,7 @@
 
 import type { Hono as HonoType, Context } from "hono";
 import { pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+import { DEFAULT_ROUTES } from "../utils/routes.js";
 import {
   getContentType,
   processWidgetHtml,
@@ -36,8 +37,9 @@ export function setupWidgetRoutes(
     publicBasePath?: string;
   }
 ): void {
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
-  const publicBasePath = options?.publicBasePath || "/mcp-use/public";
+  const baseRoute = options?.baseRoute || DEFAULT_ROUTES.widgetsBasePath;
+  const publicBasePath =
+    options?.publicBasePath || DEFAULT_ROUTES.publicBasePath;
   // Serve static assets (JS, CSS) from the assets directory
   app.get(`${baseRoute}/:widget/assets/*`, async (c: Context) => {
     const widget = c.req.param("widget")!;
