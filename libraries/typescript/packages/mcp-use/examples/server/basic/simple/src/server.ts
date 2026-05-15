@@ -1,10 +1,21 @@
 import { MCPServer, text, object, markdown } from "mcp-use/server";
 import z from "zod";
 
+// Every mount path on this server is customized via the `routes` config:
+// MCP endpoints live under /api/*, the inspector at /debug, widgets at /ui/*,
+// and OAuth (if enabled) at /auth. Defaults preserve the original layout.
 const server = new MCPServer({
   name: "simple-example-server",
   version: "1.0.0",
   description: "A simple MCP server example",
+  routes: {
+    mcpBasePath: "/api/mcp",
+    sseBasePath: "/api/sse",
+    widgetsBasePath: "/ui/widgets",
+    publicBasePath: "/ui/static",
+    inspectorBasePath: "/debug",
+    oauthBasePath: "/auth",
+  },
 });
 
 server.tool(
@@ -35,5 +46,4 @@ server.prompt(
   async ({ name }) => text(`Hello, ${name}!`)
 );
 
-// Start the server (MCP endpoints auto-mounted at /mcp)
 await server.listen();
