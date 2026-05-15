@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+import { getInspectorBasePath } from "@/client/lib/inspector-base-path";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -98,7 +99,7 @@ function App() {
         <McpClientProvider
           storageProvider={storageProvider}
           enableRpcLogging={true}
-          defaultCallbackUrl={`${window.location.origin}/inspector/oauth/callback`}
+          defaultCallbackUrl={`${window.location.origin}${getInspectorBasePath()}/oauth/callback`}
           defaultAutoProxyFallback={
             proxyAddress ? { enabled: true, proxyAddress } : false
           }
@@ -207,7 +208,7 @@ function App() {
         >
           <InspectorProvider>
             <InspectorTabSync activeTabRef={activeTabRef} />
-            <Router basename="/inspector">
+            <Router basename={getInspectorBasePath()}>
               <Routes>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
                 <Route path="/preview/:view" element={<ViewPreview />} />
