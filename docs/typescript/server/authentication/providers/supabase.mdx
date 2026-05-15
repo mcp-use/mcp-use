@@ -38,8 +38,13 @@ Don't want to build it from scratch? Start from the [mcp-oauth-supabase-template
 ## Environment variables
 
 ```bash
-# Required — read by oauthSupabaseProvider()
+# Required (hosted Supabase) — read by oauthSupabaseProvider()
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
+
+# Optional override — point the provider at a self-hosted or local Supabase
+# instance (e.g. `supabase start`). Required instead of PROJECT_ID when you
+# aren't on supabase.co.
+# MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
 
 # Used by your consent UI and by tools calling Supabase REST/APIs.
 # Not read by oauthSupabaseProvider() itself.
@@ -65,8 +70,9 @@ await server.listen(3000);
 
 ```typescript
 oauthSupabaseProvider({
-  // Required (or set MCP_USE_OAUTH_SUPABASE_PROJECT_ID)
-  projectId: "your-project-id",
+  // Provide one of these (or set the matching env var):
+  projectId: "your-project-id",                 // hosted Supabase
+  // supabaseUrl: "http://localhost:54321",     // self-hosted / local
 
   // Skip JWT verification — development only
   verifyJwt: process.env.NODE_ENV === "production",
@@ -75,6 +81,28 @@ oauthSupabaseProvider({
   scopesSupported: ["openid", "profile", "email"],
 });
 ```
+
+### Self-hosted / local Supabase
+
+For `supabase start` or a self-hosted instance, point the provider at your base URL instead of a project ID:
+
+```typescript
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  oauth: oauthSupabaseProvider({
+    supabaseUrl: "http://localhost:54321",
+  }),
+});
+```
+
+Or via env var:
+
+```bash
+MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
+```
+
+`supabaseUrl` takes precedence over `projectId` when both are set. The provider derives the issuer and JWKS endpoint from this URL, so the local Supabase stack must expose `/auth/v1/.well-known/openid-configuration` (it does, by default).
 
 <Tip>
   New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint — the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
