@@ -1495,6 +1495,11 @@ export class MCPAgent {
         }
       }
 
+      // 4.5. Generate analysis summary
+      const analysisSummary = await this._generateAnalysisSummary(
+        accumulatedMessages
+      );
+
       // 5. Handle structured output if requested
       if (schema && finalOutput) {
         try {
@@ -1524,12 +1529,19 @@ export class MCPAgent {
         }
       }
 
-      // 6. Yield final result
+      // 6. Return final result with analysis summary
       logger.debug(
         `🎉 Agent execution complete in ${((Date.now() - startTime) / 1000).toFixed(2)} seconds`
       );
       success = true;
-      return (finalOutput || "No output generated") as string | T;
+
+      // Create final payload with output and analysis
+      const finalResult = (finalOutput || "No output generated") as string | T;
+      const finalPayload = {
+        output: finalResult,
+        analysis: analysisSummary,
+      };
+      return finalPayload as string | T;
     } catch (e) {
       logger.error(`❌ Error running query: ${e}`);
       if (initializedHere && manage) {
@@ -2048,6 +2060,43 @@ export class MCPAgent {
         logger.debug("🧹 Closing agent after streamEvents completion");
         await this.close();
       }
+    }
+  }
+
+  /**
+   * Generate a concise structural summary of the agent session.
+   *
+   * This method intercepts the accumulated messages at the State/Log Compilation step
+   * and invokes the LLM to produce a human-readable analysis summary without breaking
+   * the LangChain state graph orchestration.
+   *
+   * @param accumulatedMessages - Complete list of messages from the agent execution
+   * @returns A human-readable string summary, or a fallback message if generation fails
+   */
+  private async _generateAnalysisSummary(
+    accumulatedMessages: any[]
+  ): Promise<string> {
+    try {
+      const rawLogs = accumulatedMessages
+        .map(
+          (msg) =>
+            `${msg._getType?.() || msg.type || "message"}: ${this._normalizeOutput(msg.content)}`
+        )
+        .join("\n");
+
+      const prompt = `You are an analysis optimizer. Review the following raw data and tool execution logs from the agent session and generate a concise, human-readable structural summary of what was evaluated. Do not return raw JSON; provide clear insights about the workflow, tools used, and conclusions reached.\n\nLogs:\n${rawLogs}`;
+
+      // Invoke the existing LangChain LLM instance
+      const response = await this.llm!.invoke(prompt);
+      return typeof response === "string"
+        ? response
+        : (response as any).content || JSON.stringify(response);
+    } catch (error) {
+      // Graceful fallback to avoid breaking UI client updates
+      logger.debug(
+        `Summary generation unavailable: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return "Summary generation unavailable. Please review raw data logs.";
     }
   }
 

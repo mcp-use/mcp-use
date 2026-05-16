@@ -638,6 +638,46 @@ class MCPAgent:
 
         return enhanced_query
 
+    async def _generate_analysis_summary(self, accumulated_messages: list[BaseMessage]) -> str:
+        """Generate a concise structural summary of the agent session.
+
+        This method intercepts the accumulated messages at the State/Log Compilation step
+        and invokes the LLM to produce a human-readable analysis summary without breaking
+        the LangChain state graph orchestration.
+
+        Args:
+            accumulated_messages: Complete list of messages from the agent execution
+
+        Returns:
+            A human-readable string summary, or a fallback message if generation fails
+        """
+        try:
+            # Convert messages to readable text for LLM analysis
+            raw_logs_lines = []
+            for msg in accumulated_messages:
+                msg_type = msg.__class__.__name__ if msg else "unknown"
+                content = self._normalize_output(msg.content) if msg else ""
+                raw_logs_lines.append(f"{msg_type}: {content}")
+
+            raw_logs = "\n".join(raw_logs_lines)
+
+            prompt = (
+                "You are an analysis optimizer. Review the following raw data and "
+                "tool execution logs from the agent session and generate a concise, "
+                "human-readable structural summary of what was evaluated. "
+                "Do not return raw JSON; provide clear insights about the workflow, "
+                "tools used, and conclusions reached.\n\n"
+                f"Logs:\n{raw_logs}"
+            )
+
+            # Invoke the existing class LLM instance safely
+            response = await self.llm.ainvoke(prompt)
+            return response.content if hasattr(response, "content") else str(response)
+        except Exception as e:
+            # Graceful fallback: if the summary LLM call fails, don't crash the session
+            logger.debug(f"Summary generation unavailable: {e}")
+            return "Summary generation unavailable. Please review raw data logs."
+
     async def stream(
         self,
         query: QueryInput,
@@ -879,6 +919,9 @@ class MCPAgent:
             if self.memory_enabled and external_history is None:
                 self._conversation_history = [msg for msg in accumulated_messages if not isinstance(msg, SystemMessage)]
 
+            # 4.5. Generate analysis summary
+            analysis_summary = await self._generate_analysis_summary(accumulated_messages)
+
             # 5. Handle structured output if requested
             if output_schema and final_output:
                 try:
@@ -910,10 +953,17 @@ class MCPAgent:
                     logger.error(f"❌ Structured output failed: {e}")
                     raise RuntimeError(f"Failed to generate structured output: {str(e)}") from e
 
-            # 6. Yield final result
+            # 6. Yield final result with analysis summary
             logger.info(f"🎉 Agent execution complete in {time.time() - start_time:.2f} seconds")
             success = True
-            yield final_output or "No output generated"
+
+            # Create final payload with output and analysis
+            final_result = final_output or "No output generated"
+            final_payload = {
+                "output": final_result,
+                "analysis": analysis_summary,
+            }
+            yield final_payload
 
         except Exception as e:
             logger.error(f"❌ Error running query: {e}")
