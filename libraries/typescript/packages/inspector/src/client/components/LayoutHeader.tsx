@@ -66,6 +66,7 @@ import {
   MCPDeployClickEvent,
   Telemetry,
 } from "@/client/telemetry";
+import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
@@ -881,19 +882,6 @@ export function LayoutHeader({
                   }
                   const count = getTabCount(tab.id, selectedServer);
                   const showDot = shouldShowDot(tab.id, count, collapsed);
-                  const badge =
-                    count > 0 ? (
-                      <span
-                        className={cn(
-                          activeTab === tab.id
-                            ? "dark:bg-black"
-                            : "dark:bg-zinc-700",
-                          "shrink-0 ml-1 bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                        )}
-                      >
-                        {count}
-                      </span>
-                    ) : null;
 
                   return (
                     <TabsTrigger
@@ -902,7 +890,13 @@ export function LayoutHeader({
                       data-testid={`tab-${tab.id}`}
                       icon={tab.icon}
                       showDot={showDot}
-                      badge={badge}
+                      badge={
+                        <TabCountBadge
+                          count={count}
+                          isActive={activeTab === tab.id}
+                          size="sm"
+                        />
+                      }
                       alwaysExpanded={
                         "alwaysExpanded" in tab && tab.alwaysExpanded
                       }
@@ -958,19 +952,6 @@ export function LayoutHeader({
                     const tooltipText =
                       count > 0 ? `${tab.label} (${count})` : tab.label;
                     const showDot = shouldShowDot(tab.id, count, collapsed);
-                    const badge =
-                      count > 0 ? (
-                        <span
-                          className={cn(
-                            activeTab === tab.id
-                              ? " dark:bg-black "
-                              : "dark:bg-zinc-700",
-                            "shrink-0 ml-1 bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
-                          )}
-                        >
-                          {count}
-                        </span>
-                      ) : null;
 
                     return (
                       <TabsTrigger
@@ -979,7 +960,12 @@ export function LayoutHeader({
                         data-testid={`tab-${tab.id}`}
                         icon={tab.icon}
                         showDot={showDot}
-                        badge={badge}
+                        badge={
+                          <TabCountBadge
+                            count={count}
+                            isActive={activeTab === tab.id}
+                          />
+                        }
                         alwaysExpanded={
                           "alwaysExpanded" in tab && tab.alwaysExpanded
                         }
