@@ -43,7 +43,7 @@ export async function mountInspectorUI(
     const manifest = await readBuildManifest();
     if (!manifest?.includeInspector) {
       console.log(
-        "[INSPECTOR] Skipped in production (use --with-inspector flag during build)"
+        "[INSPECTOR] Skipped in production. To enable, rebuild with: mcp-use build --with-inspector"
       );
       return false;
     }
