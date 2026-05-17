@@ -265,10 +265,6 @@ function MCPAppsRendererBase({
           listingUiMeta || contentUiMeta
             ? { ...listingUiMeta, ...contentUiMeta }
             : undefined;
-        // const resourceMeta = {
-        //   ...contentMeta,
-        //   ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
-        // };
 
         // MCP Apps: Use ui.csp from resource per SEP-1865. Fallback to openai/widgetCSP
         // from tool metadata (transformed to camelCase) when resource lacks it.
@@ -657,30 +653,61 @@ function MCPAppsRendererBase({
       return {};
     };
 
-    bridge.onsizechange = ({ height }) => {
+    // FIX (SEP-1865): In inline mode, only apply height from onsizechange.
+    // Width is intentionally ignored — it stays pinned to inlineMaxWidth via
+    // iframeStyle so the widget never renders narrower than the chat column.
+    // Width-driven sizing is preserved for pip and fullscreen modes.
+    bridge.onsizechange = ({ width, height }) => {
       // Use ref so this closure always reads the current displayMode even
       // though it was captured when the bridge was first created.
-      if (displayModeRef.current !== "inline") return;
+      const currentMode = displayModeRef.current;
       const iframeEl = iframe;
-      if (!iframeEl || height === undefined) return;
+      if (!iframeEl) return;
 
       const style = getComputedStyle(iframeEl);
       const isBorderBox = style.boxSizing === "border-box";
 
-      let adjustedHeight = height;
-      if (isBorderBox) {
-        adjustedHeight +=
-          parseFloat(style.borderTopWidth) +
-          parseFloat(style.borderBottomWidth);
+      if (currentMode === "inline") {
+        // Inline mode: only apply height. Width is pinned by iframeStyle
+        // (width: 100%, maxWidth: inlineMaxWidth) and must not be overridden.
+        if (height === undefined) return;
+
+        let adjustedHeight = height;
+        if (isBorderBox) {
+          adjustedHeight +=
+            parseFloat(style.borderTopWidth) +
+            parseFloat(style.borderBottomWidth);
+        }
+
+        const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
+        const to: Keyframe = { height: `${adjustedHeight}px` };
+
+        iframeEl.style.height = `${adjustedHeight}px`;
+        setInlineHeight(adjustedHeight);
+
+        iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
+      } else {
+        // pip / fullscreen: allow both width and height changes from the widget.
+        if (width !== undefined) {
+          let adjustedWidth = width;
+          if (isBorderBox) {
+            adjustedWidth +=
+              parseFloat(style.borderLeftWidth) +
+              parseFloat(style.borderRightWidth);
+          }
+          iframeEl.style.width = `min(${adjustedWidth}px, 100%)`;
+        }
+
+        if (height !== undefined) {
+          let adjustedHeight = height;
+          if (isBorderBox) {
+            adjustedHeight +=
+              parseFloat(style.borderTopWidth) +
+              parseFloat(style.borderBottomWidth);
+          }
+          iframeEl.style.height = `${adjustedHeight}px`;
+        }
       }
-
-      const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
-      const to: Keyframe = { height: `${adjustedHeight}px` };
-
-      iframeEl.style.height = `${adjustedHeight}px`;
-      setInlineHeight(adjustedHeight);
-
-      iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
     };
 
     bridgeRef.current = bridge;
@@ -1085,10 +1112,15 @@ function MCPAppsRendererBase({
     return "flex group flex-1 items-center justify-center";
   })();
 
+  // FIX (SEP-1865): In inline mode, width is always 100% up to inlineMaxWidth
+  // (matching ChatGPT/Claude chat-column behaviour). Only height animates.
+  // Width-driven transitions are removed from inline to prevent the iframe
+  // from shrinking when a widget reports a smaller size via setSize/onsizechange.
   const iframeStyle: CSSProperties = {
     height: isFullscreen || isPip ? "100%" : `${inlineHeight}px`,
     width: "100%",
     maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
+    // Only animate height in inline mode — width is pinned and must not transition.
     transition: isFullscreen || isPip ? undefined : "height 300ms ease-out",
   };
 
