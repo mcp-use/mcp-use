@@ -67,7 +67,7 @@ type WeatherInfo = z.infer<typeof WeatherInfo>
 async function main() {
     // Setup client and agent
     const client = new MCPClient({ mcpServers: {...} })
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+    const llm = new ChatOpenAI({ model: "gpt-5.5" })
     const agent = new MCPAgent({ llm, client })
 
     // Get structured output

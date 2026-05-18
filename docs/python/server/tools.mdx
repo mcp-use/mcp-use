@@ -147,7 +147,7 @@ async def fetch_url(
 
 ## Using Context
 
-Access the MCP context for logging and progress reporting. Add a `Context` parameter — it's automatically excluded from the tool's input schema:
+Access the MCP context for logging and progress reporting. Add a `Context` parameter  -  it's automatically excluded from the tool's input schema:
 
 ```python
 from mcp_use.server import Context
@@ -188,13 +188,13 @@ How you declare a parameter determines whether it appears in the `required` arra
 ```python
 @server.tool()
 def example(
-    # Required — no default, goes into "required"
+    # Required  -  no default, goes into "required"
     name: Annotated[str, Field(description="User name")],
 
-    # Optional with default — NOT in "required", default shown in schema
+    # Optional with default  -  NOT in "required", default shown in schema
     limit: Annotated[int, Field(description="Max results")] = 10,
 
-    # Nullable — NOT in "required", type stays "string" (not anyOf)
+    # Nullable  -  NOT in "required", type stays "string" (not anyOf)
     company: Annotated[str | None, Field(description="Company filter")] = None,
 ) -> str: ...
 ```

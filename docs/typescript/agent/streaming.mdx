@@ -28,7 +28,7 @@ async function stepStreamingExample() {
     }
 
     const client = new MCPClient(config)
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+    const llm = new ChatOpenAI({ model: "gpt-5.5" })
     const agent = new MCPAgent({ llm, client })
 
     // Stream the agent's steps
@@ -70,7 +70,7 @@ async function basicStreamingExample() {
     }
 
     const client = new MCPClient(config)
-    const llm = new ChatOpenAI({ model: 'gpt-4o' })
+    const llm = new ChatOpenAI({ model: "gpt-5.5" })
     const agent = new MCPAgent({ llm, client })
 
     // Stream the agent's response
@@ -118,7 +118,7 @@ import { MCPAgent } from 'mcp-use'
 
 async function prettyStreamExample() {
     const agent = new MCPAgent({
-        llm: 'openai/gpt-4o',
+        llm: 'openai/gpt-5.5',
         mcpServers: {
             filesystem: {
                 command: 'npx',

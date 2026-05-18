@@ -46,10 +46,10 @@ tag: "New"
   ## ChatGPT App metadata & inspector MCP App width fix
   Patch release surfacing tool `outputSchema` in `tools/list`, adding tool annotations and `outputSchema` to the `create-mcp-use-app` mcp-apps template, and fixing MCP App width in inspector chat.
 
-- **Fix**: Forward `outputSchema` from tool definitions into the MCP SDK so `tools/list` exposes output JSON Schema for clients — required for ChatGPT App Store metadata validation (`#1466`)
+- **Fix**: Forward `outputSchema` from tool definitions into the MCP SDK so `tools/list` exposes output JSON Schema for clients  -  required for ChatGPT App Store metadata validation (`#1466`)
 - **New** (create-mcp-use-app): MCP tool `annotations` (`readOnlyHint`, `openWorldHint`, `destructiveHint`) and widget `outputSchema` in the `mcp-apps` template; tool annotations in the `starter` template; MCP Apps docs aligned with ChatGPT App Store metadata expectations (`#1466`)
-- **Fix** (@mcp-use/inspector): MCP App width is pinned in chat — only height responds to widget-reported sizes, so the chat panel no longer collapses when a widget reports narrower content (`#1462`) (see inspector changelog)
-- **Documentation**: Clerk and WorkOS OAuth example READMEs now link to live pages — Clerk Dashboard `/sign-in` (200 instead of 404) and WorkOS `/docs/authkit` (`#1470`)
+- **Fix** (@mcp-use/inspector): MCP App width is pinned in chat  -  only height responds to widget-reported sizes, so the chat panel no longer collapses when a widget reports narrower content (`#1462`) (see inspector changelog)
+- **Documentation**: Clerk and WorkOS OAuth example READMEs now link to live pages  -  Clerk Dashboard `/sign-in` (200 instead of 404) and WorkOS `/docs/authkit` (`#1470`)
 - **Update**: Updated @mcp-use/inspector to v5.0.1
 - **Update**: Updated @mcp-use/cli to v3.1.4
 - **Update**: Updated create-mcp-use-app to v0.14.11
@@ -62,10 +62,10 @@ tag: "New"
   ## Clerk OAuth, pre-registered client IDs & inspector providers
   Minor release adding a Clerk OAuth provider, pre-registered OAuth client credentials for proxy-mode flows, OpenRouter and OpenAI-compatible providers in the Inspector chat, browser-side telemetry env-var honoring, and a CLI fix for env propagation on redeploys.
 
-- **New**: `oauthClerkProvider` for using Clerk as an OAuth authorization server in MCP servers — DCR-direct mode where MCP clients register and authenticate directly with Clerk and the server verifies Clerk-issued JWTs via JWKS; default scopes are `["profile", "email", "offline_access"]` and `openid` is excluded by default because it requires OIDC to be explicitly enabled in the Clerk Dashboard (`#1429`)
-- **New**: Pre-registered OAuth client credentials in proxy mode — `UseMcpOptions` / `McpServerOptions` accept `oauth: { clientId?, clientSecret?, scope? }`; with `clientId` set, `BrowserOAuthClientProvider` returns it from `clientInformation()` so the SDK skips Dynamic Client Registration (required for providers like Slack or WorkOS that strip `registration_endpoint` from metadata); with `clientSecret` set, the SDK auto-switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post` (`#1400`)
-- **Fix**: `MCP_USE_ANONYMIZED_TELEMETRY=false` now disables the in-browser `useMcp` `posthog-js` init — the inspector server mirrors the env var into a per-page runtime flag (`window.__MCP_USE_ANONYMIZED_TELEMETRY__`) before the client bundle runs, so a single env var disables every telemetry path (Node-side, server-side proxy, and browser); the flag is page-scoped so unsetting the env var fully restores defaults on the next page load (`#1443`)
-- **Fix** (@mcp-use/cli): `mcp-use deploy --env`/`--env-file` propagates env vars on redeploys — previously only forwarded on initial server creation, now upserts each entry against the env-variables API (`PATCH` for existing keys, `POST` for new keys) before triggering the deployment (`#1433`)
+- **New**: `oauthClerkProvider` for using Clerk as an OAuth authorization server in MCP servers  -  DCR-direct mode where MCP clients register and authenticate directly with Clerk and the server verifies Clerk-issued JWTs via JWKS; default scopes are `["profile", "email", "offline_access"]` and `openid` is excluded by default because it requires OIDC to be explicitly enabled in the Clerk Dashboard (`#1429`)
+- **New**: Pre-registered OAuth client credentials in proxy mode  -  `UseMcpOptions` / `McpServerOptions` accept `oauth: { clientId?, clientSecret?, scope? }`; with `clientId` set, `BrowserOAuthClientProvider` returns it from `clientInformation()` so the SDK skips Dynamic Client Registration (required for providers like Slack or WorkOS that strip `registration_endpoint` from metadata); with `clientSecret` set, the SDK auto-switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post` (`#1400`)
+- **Fix**: `MCP_USE_ANONYMIZED_TELEMETRY=false` now disables the in-browser `useMcp` `posthog-js` init  -  the inspector server mirrors the env var into a per-page runtime flag (`window.__MCP_USE_ANONYMIZED_TELEMETRY__`) before the client bundle runs, so a single env var disables every telemetry path (Node-side, server-side proxy, and browser); the flag is page-scoped so unsetting the env var fully restores defaults on the next page load (`#1443`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy --env`/`--env-file` propagates env vars on redeploys  -  previously only forwarded on initial server creation, now upserts each entry against the env-variables API (`PATCH` for existing keys, `POST` for new keys) before triggering the deployment (`#1433`)
 - **Enhancement** (@mcp-use/inspector): OpenRouter and OpenAI-compatible providers in chat configuration; `Client ID` / `Client Secret` / `Scope` fields in the Authentication dialog (see inspector changelog)
 - **Update**: Updated @mcp-use/inspector to v5.0.0
 - **Update**: Updated @mcp-use/cli to v3.1.3
@@ -75,7 +75,7 @@ tag: "New"
   ## Debug log tiers & widget dev first render
   Patch release adding tiered `MCP_DEBUG_LEVEL` logging for MCP servers, pre-warming Vite widget entries in dev to avoid first-render 504s, and Inspector 3.0.2 (see inspector changelog).
 
-- **New**: `MCP_DEBUG_LEVEL` environment variable on MCP servers — `info` (default), `debug`, or `trace` — tiered framework logging with clearer precedence than legacy truthy `DEBUG` (`#1430`)
+- **New**: `MCP_DEBUG_LEVEL` environment variable on MCP servers  -  `info` (default), `debug`, or `trace`  -  tiered framework logging with clearer precedence than legacy truthy `DEBUG` (`#1430`)
 - **Fix**: Widget dev server pre-warms Vite entries before tool registration so the first widget render does not time out with HTTP 504 (`#1425`)
 - **Fix** (@mcp-use/inspector): Command palette e2e tests updated for the Settings dropdown trigger (`#1428`) (see inspector changelog)
 - **Update**: Updated @mcp-use/inspector to v3.0.2
@@ -89,7 +89,7 @@ tag: "New"
 
 - **Fix**: OAuth callback redirects back to the inspector with error parameters when authorization fails (user denies, server error) instead of surfacing a raw error page with stack traces; the inspector surfaces these as a persistent toast (`#1381`)
 - **Fix**: `SupabaseOAuthProvider` endpoint getters now return OAuth 2.1 paths (`/auth/v1/oauth/authorize`, `/auth/v1/oauth/token`) instead of the legacy `/auth/v1/authorize` and `/auth/v1/token` (`#1422`)
-- **Fix** (@mcp-use/cli): `mcp-use build` is non-fatal under the bun runtime — detects bun, skips `tsx/esm/api` type-generation with a warning, wraps the build in try/catch, and runs `tsc` via `process.execPath` instead of hardcoded `node` (`#1382`)
+- **Fix** (@mcp-use/cli): `mcp-use build` is non-fatal under the bun runtime  -  detects bun, skips `tsx/esm/api` type-generation with a warning, wraps the build in try/catch, and runs `tsc` via `process.execPath` instead of hardcoded `node` (`#1382`)
 - **Fix** (@mcp-use/cli): bundle each server entry with esbuild (`bundle: true`, `packages: "external"`) so extensionless relative TypeScript imports resolve under plain Node ESM without `ERR_MODULE_NOT_FOUND` (`#1357`)
 - **Fix** (create-mcp-use-app): allow `.` as project name to initialize in the current directory; errors if the directory is not empty (`#1413`)
 - **Enhancement** (@mcp-use/inspector): OAuth single-tab redirect, session-storage reconnect, Hono duck-type detection, widget z-index, free-tier embed UI, managed LLM embed chrome (see inspector changelog)
@@ -105,17 +105,17 @@ tag: "New"
   ## OAuth DCR-direct, Next.js drop-in & CLI 3.1
   Minor release refactoring built-in OAuth providers to DCR-direct by default, adding a Next.js MCP drop-in via `--mcp-dir`, CLI 3.1 with better org and session handling, and Inspector 3.0 (see inspector changelog).
 
-- **New**: `oauthProxy` helper for building proxy-mode providers (Google, GitHub, or any upstream authorization server that does not support Dynamic Client Registration) — complements the new DCR-direct default (`#1321`)
+- **New**: `oauthProxy` helper for building proxy-mode providers (Google, GitHub, or any upstream authorization server that does not support Dynamic Client Registration)  -  complements the new DCR-direct default (`#1321`)
 - **New**: `jwksVerifier` helper for JWKS-based token verification inside custom providers (`#1321`)
 - **New**: Auth0 OAuth proxy example under `examples/server/oauth/auth0-proxy` demonstrating the new proxy pattern
-- **Update**: Built-in providers (Auth0, WorkOS, Supabase, Keycloak, Better Auth) now only support DCR-direct — clients talk to upstream authorization servers directly, and provider configurations no longer accept `clientId` / `clientSecret` (`#1321`)
+- **Update**: Built-in providers (Auth0, WorkOS, Supabase, Keycloak, Better Auth) now only support DCR-direct  -  clients talk to upstream authorization servers directly, and provider configurations no longer accept `clientId` / `clientSecret` (`#1321`)
 - **Update**: `verifyToken` is now a required function on custom providers (`#1321`)
 - **Fix**: OAuth `authenticate()` preserves the pathname component (for example `/api/auth`) when the authorization server uses a `basePath`, instead of collapsing the URL to its origin (`#1360`)
-- **New**: Next.js drop-in — `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`), share `@/*` aliases, Tailwind, and the app's component library; the CLI auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected, loads the Next.js env cascade in the MCP server process, and widget builds fail fast when a widget transitively imports a server-only module (`#1332`)
+- **New**: Next.js drop-in  -  `mcp-use dev/build/start --mcp-dir <dir>` lets a Next.js app colocate an MCP server (default `src/mcp/`), share `@/*` aliases, Tailwind, and the app's component library; the CLI auto-shims Next.js server-runtime modules (`server-only`, `client-only`, `next/cache`, `next/headers`, `next/navigation`, `next/server`) when `next` is detected, loads the Next.js env cascade in the MCP server process, and widget builds fail fast when a widget transitively imports a server-only module (`#1332`)
 - **New** (@mcp-use/cli): `mcp-use login --org <slug|id|name>` for non-interactive org selection; login fails fast without a TTY and no `--org` instead of hanging on stdin (`#1379`)
 - **New** (@mcp-use/cli): ORG column in `mcp-use deployments list` output (`#1378`)
-- **Fix** (@mcp-use/cli): `mcp-use deploy --org <org>` now respects the flag when `.mcp-use/project.json` links to a server in a different org — CLI warns and creates a new server in the requested org instead of silently redeploying to the linked one (`#1380`)
-- **Fix** (@mcp-use/cli): `mcp-use login` validates the stored API key against the backend before short-circuiting with "already logged in"; expired or revoked keys drop into device-auth automatically, and authenticated commands (`whoami`, `org`, `servers`, `deployments`, `env`) funnel 401s through a shared handler with a "session expired — run `npx mcp-use login`" hint (`#1383`)
+- **Fix** (@mcp-use/cli): `mcp-use deploy --org <org>` now respects the flag when `.mcp-use/project.json` links to a server in a different org  -  CLI warns and creates a new server in the requested org instead of silently redeploying to the linked one (`#1380`)
+- **Fix** (@mcp-use/cli): `mcp-use login` validates the stored API key against the backend before short-circuiting with "already logged in"; expired or revoked keys drop into device-auth automatically, and authenticated commands (`whoami`, `org`, `servers`, `deployments`, `env`) funnel 401s through a shared handler with a "session expired  -  run `npx mcp-use login`" hint (`#1383`)
 - **Fix** (@mcp-use/cli): `mcp-use start` auto-discovers an available port when the default port is in use (`#1377`)
 - **Enhancement** (@mcp-use/inspector): Inline elicitation in the chat thread, Open Graph and Twitter Card meta tags on the hosted inspector (see inspector changelog)
 - **Enhancement** (create-mcp-use-app): Only copy the `mcp-apps-builder` skill into new projects; skip the deprecated `mcp-builder` and `chatgpt-app-builder` skills (`#1375`)
@@ -129,7 +129,7 @@ tag: "New"
   ## Landing deeplinks, `colorScheme` & Inspector 2.2
   Patch release adding optional `colorScheme` on `McpUseProvider`, a server landing deeplink to the hosted inspector, stronger deploy behavior in `@mcp-use/cli`, cloud server environment-variable commands, and Inspector 2.2 (see inspector changelog).
 
-- **New**: `colorScheme` on `McpUseProvider` (default `false`) — when `false`, `ThemeProvider` does not set `color-scheme` on the document root so transparent iframe backgrounds stay transparent; opt in with `true` for native scrollbars / `light-dark()` in widgets
+- **New**: `colorScheme` on `McpUseProvider` (default `false`)  -  when `false`, `ThemeProvider` does not set `color-scheme` on the document root so transparent iframe backgrounds stay transparent; opt in with `true` for native scrollbars / `light-dark()` in widgets
 - **Fix**: Server landing routes include a deeplink to open the MCP server in the hosted manufact inspector
 - **New** (@mcp-use/cli): `mcp-use servers env` subcommands to list, create, update, and delete environment variables on cloud servers (`#1372`)
 - **Fix** (@mcp-use/cli): `mcp-use deploy` surfaces failures from mutating git commands (init, commit, push), normalizes the default branch to `main` before push, verifies a commit exists, and shell-quotes commit messages (`#1354`)
@@ -141,9 +141,9 @@ tag: "New"
 
 <Update label="v1.24.1" description="April 2026">
   ## OAuth fetch cleanup when switching transports
-  Patch release fixing OAuth in the embedded inspector when switching from Via Proxy to Direct — `BrowserOAuthClientProvider` restores `window.fetch` when `useMcp` unmounts so a stale proxy interceptor cannot break direct flows.
+  Patch release fixing OAuth in the embedded inspector when switching from Via Proxy to Direct  -  `BrowserOAuthClientProvider` restores `window.fetch` when `useMcp` unmounts so a stale proxy interceptor cannot break direct flows.
 
-- **Fix**: Restore the `window.fetch` interceptor installed by `BrowserOAuthClientProvider` when `useMcp` unmounts — resolves "Protected resource does not match" after switching from Via Proxy to Direct
+- **Fix**: Restore the `window.fetch` interceptor installed by `BrowserOAuthClientProvider` when `useMcp` unmounts  -  resolves "Protected resource does not match" after switching from Via Proxy to Direct
 - **Fix** (@mcp-use/inspector): Same fetch lifecycle in the inspector client (see inspector changelog)
 - **Update**: Updated @mcp-use/inspector to v2.1.0
 - **Update**: Updated @mcp-use/cli to v3.0.1
@@ -156,11 +156,11 @@ tag: "New"
   ## OAuth scopes, telemetry & CLI 3
   Minor release for `mcp-use` with OAuth scope customization, telemetry, sub-path OAuth routing, and a Generative-AI JSON Schema fix; major `@mcp-use/cli` release with device-flow auth and manufact API alignment; Inspector 2.0 (see inspector changelog).
 
-- **New**: Configurable OAuth scopes — `scopesSupported` on shared OAuth config and built-in providers
+- **New**: Configurable OAuth scopes  -  `scopesSupported` on shared OAuth config and built-in providers
 - **Fix**: `CustomProviderConfig` matches documented fields (`jwksUrl`, `scopesSupported`, `userInfoEndpoint`, `clientId`, `clientSecret`, `mode`, `audience`); optional `getClientId()`, `getUserInfoEndpoint()`, and `getAudience()` on `OAuthProvider`; OAuth routes use those accessors instead of unsafe casts
 - **New**: Telemetry support with browser and Node implementations and related dependency updates
 - **New**: `defaultCallbackUrl` on `McpClientProvider` so OAuth redirect URLs stay correct when the UI is mounted under a path basename (for example embedded inspector at `/inspector`)
-- **Fix**: Google provider tool schemas — use `z.object({}).catchall()` instead of `z.record()` so emitted JSON Schema omits `propertyNames`, which Google's API rejects
+- **Fix**: Google provider tool schemas  -  use `z.object({}).catchall()` instead of `z.record()` so emitted JSON Schema omits `propertyNames`, which Google's API rejects
 - **Fix**: Windows path handling in server and tooling code paths
 - **Enhancement**: Several internal log lines moved from info to debug to reduce noise in normal operation
 - **Fix** (@mcp-use/inspector): OAuth callback URL when the inspector basename is `/inspector`; thinking indicator after streamed assistant messages; tab persistence across refresh (see inspector changelog)
@@ -175,7 +175,7 @@ tag: "New"
   ## Embedded inspector without LangChain
   Patch release fixing embedded inspector when the agent graph is not installed, and clearer diagnostics when mounting the inspector UI fails.
 
-- **Fix**: Export `telFetch` from `mcp-use/telemetry/tel-fetch` (tsup build) so inspector server code does not import the root `mcp-use` entry, which eagerly loads the agent stack — fixes embedded inspector when `langchain` is not installed
+- **Fix**: Export `telFetch` from `mcp-use/telemetry/tel-fetch` (tsup build) so inspector server code does not import the root `mcp-use` entry, which eagerly loads the agent stack  -  fixes embedded inspector when `langchain` is not installed
 - **Fix**: Log inspector UI mount failures in development or when `MCP_USE_DEBUG` is set (production remains quiet)
 - **Fix** (@mcp-use/inspector): `telFetch` import uses the telemetry subpath (see inspector changelog)
 - **Update**: Updated @mcp-use/inspector to v1.0.1
@@ -189,7 +189,7 @@ tag: "New"
   ## Better Auth, server metadata & Inspector 1.0
   Minor release adding a Better Auth OAuth provider, metadata-only client updates, dependency hardening, and a major Inspector release.
 
-- **New**: Better Auth OAuth provider for MCP servers — see authentication docs and `examples/server/oauth/better-auth`
+- **New**: Better Auth OAuth provider for MCP servers  -  see authentication docs and `examples/server/oauth/better-auth`
 - **New**: `updateServerMetadata()` on `McpClientProvider` updates display metadata without reconnecting; connection-affecting changes still use `updateServer()`
 - **Fix**: Windows-compatible ESM import paths for dev and tooling
 - **Enhancement** (@mcp-use/inspector): Stream protocol in chat, `disabledTools`, editable server aliases with shared display-name resolution, tab persistence and URL sync, tool-invocation serialization and screenshots (see inspector changelog)
@@ -205,7 +205,7 @@ tag: "New"
   ## Inspector dependency & bundling alignment
   Patch release adjusting how `@mcp-use/inspector` depends on `mcp-use` so bundling and shared types both work.
 
-- **Fix** (@mcp-use/inspector): Restore `mcp-use` as both a `dependency` and `peerDependency` — needed to bundle non-React subpaths (`mcp-use/auth`, `mcp-use/browser`) with transitive deps (e.g. LangChain), while `peerDependency` keeps `mcp-use`/`react` types aligned with the host app
+- **Fix** (@mcp-use/inspector): Restore `mcp-use` as both a `dependency` and `peerDependency`  -  needed to bundle non-React subpaths (`mcp-use/auth`, `mcp-use/browser`) with transitive deps (e.g. LangChain), while `peerDependency` keeps `mcp-use`/`react` types aligned with the host app
 - **Update**: Updated @mcp-use/inspector to v0.26.1
 - **Update**: Updated @mcp-use/cli to v2.21.2
 - **Update**: Updated create-mcp-use-app to v0.14.7
@@ -215,7 +215,7 @@ tag: "New"
   ## Type Compatibility & Peer Dependency Alignment
   Patch release focused on pnpm peer-variant type compatibility, inspector dependency alignment, and template dependency cleanup.
 
-- **Fix**: Resolved TypeScript nominal type conflicts when `mcp-use` is installed as multiple pnpm peer-variant copies — moved internal client-init tracking off class surface to avoid `.d.ts` incompatibilities
+- **Fix**: Resolved TypeScript nominal type conflicts when `mcp-use` is installed as multiple pnpm peer-variant copies  -  moved internal client-init tracking off class surface to avoid `.d.ts` incompatibilities
 - **Fix**: Reverted `stripInternal`/`@internal` approach that degraded downstream tool handler type inference; keeps type safety while preserving consumer inference behavior
 - **Fix** (@mcp-use/inspector): Moved `mcp-use` from `dependencies` to `peerDependencies` so consumers share a single `mcp-use` type instance (addresses TS2322 duplicate-type scenarios)
 - **Update** (@mcp-use/inspector): Upgraded `@mcp-ui/client` to v7; replaced removed legacy renderer path with sandboxed iframe handling for `ui://` resources and removed remote-dom usage
@@ -228,12 +228,12 @@ tag: "New"
   ## CLI Organizations, Non-Interactive Deploy & Typed Middleware
   Patch release with CLI org management, non-interactive deployments, improved middleware/tool context propagation, typed middleware ergonomics, and ErrorBoundary customization.
 
-- **New** (@mcp-use/cli): Organization commands — `mcp-use org list`, `mcp-use org switch`, `mcp-use org current`; login prompts for org selection when multiple; `whoami` shows active organization; org preference persisted in `~/.mcp-use/config.json`
+- **New** (@mcp-use/cli): Organization commands  -  `mcp-use org list`, `mcp-use org switch`, `mcp-use org current`; login prompts for org selection when multiple; `whoami` shows active organization; org preference persisted in `~/.mcp-use/config.json`
 - **Enhancement** (@mcp-use/cli): Deploy to a specific org with `mcp-use deploy --org <slug-or-id>`; all org-scoped API requests include `x-profile-id`
-- **New** (@mcp-use/cli): Non-interactive deploy with `-y` / `--yes` — skips confirmations; replaces “Press Enter” with polling; errors if not logged in (requires `mcp-use login`)
-- **Fix**: Context propagation into tool handlers — singleton AsyncLocalStorage via `globalThis`, safe Hono context extraction, and forwarding middleware `ctx.auth` / `ctx.state` into enhanced tool context
+- **New** (@mcp-use/cli): Non-interactive deploy with `-y` / `--yes`  -  skips confirmations; replaces “Press Enter” with polling; errors if not logged in (requires `mcp-use login`)
+- **Fix**: Context propagation into tool handlers  -  singleton AsyncLocalStorage via `globalThis`, safe Hono context extraction, and forwarding middleware `ctx.auth` / `ctx.state` into enhanced tool context
 - **Fix**: `ctx.auth` typing is now `AuthInfo | undefined` when OAuth isn’t configured (enables `if (!ctx.auth) ...` guards)
-- **Enhancement**: Typed MCP middleware context — `server.use("mcp:tools/call" | "mcp:resources/read" | "mcp:prompts/get", ...)` now narrows `ctx.params` to method-specific shapes; `mcp:*` remains generic
+- **Enhancement**: Typed MCP middleware context  -  `server.use("mcp:tools/call" | "mcp:resources/read" | "mcp:prompts/get", ...)` now narrows `ctx.params` to method-specific shapes; `mcp:*` remains generic
 - **Enhancement**: `outputSchema` tools can return response helpers (`text()`, `markdown()`, `mix()`, etc.) without type errors
 - **Enhancement**: `server.resourceTemplate()` supports an optional Zod `schema` to type `params` as `z.infer<schema>`
 - **Enhancement**: `ErrorBoundary` now supports `fallback` (node or `(error) => node`) and `onError` for reporting (default UI unchanged)
@@ -248,12 +248,12 @@ tag: "New"
   ## Vite 8, MCP Middleware & Model Context
   Minor release with Vite 8 across tooling, MCP operation middleware, files and model context APIs, elicit and adapter fixes, and Inspector tunnel controls.
 
-- **New**: MCP operation-level middleware — `server.use("mcp:*", ...)` and specific patterns (`mcp:tools/call`, `mcp:tools/list`, `mcp:resources/read`, `mcp:resources/list`, `mcp:prompts/get`, `mcp:prompts/list`) with typed `MiddlewareContext` (`method`, `params`, `session`, `auth`, `state`)
+- **New**: MCP operation-level middleware  -  `server.use("mcp:*", ...)` and specific patterns (`mcp:tools/call`, `mcp:tools/list`, `mcp:resources/read`, `mcp:resources/list`, `mcp:prompts/get`, `mcp:prompts/list`) with typed `MiddlewareContext` (`method`, `params`, `session`, `auth`, `state`)
 - **New**: `useFiles` React hook with `isSupported` and `modelVisible` for file attachments; `ModelContext` component and `modelContext` imperative API for server-side model context injection
 - **Enhancement**: Vite 8.0 with Rolldown bundler and `@vitejs/plugin-react` 6 across packages, examples, and CLI/inspector tooling
-- **Enhancement**: Conformance client — pass `reconnectionOptions` so SDK-level SSE reconnection behaves correctly when `autoReconnect` is disabled
-- **Fix**: Elicit — map `result.content` to `result.data` for Zod validation; spec-compliant clients use `content`; backward-compatible fallback to `data`
-- **Fix**: LangChainAdapter — tool name collisions when exposing resources/prompts as tools; `reserveName` resolves prefixed names with a numeric suffix when needed; prompt names sanitized like resource names
+- **Enhancement**: Conformance client  -  pass `reconnectionOptions` so SDK-level SSE reconnection behaves correctly when `autoReconnect` is disabled
+- **Fix**: Elicit  -  map `result.content` to `result.data` for Zod validation; spec-compliant clients use `content`; backward-compatible fallback to `data`
+- **Fix**: LangChainAdapter  -  tool name collisions when exposing resources/prompts as tools; `reserveName` resolves prefixed names with a numeric suffix when needed; prompt names sanitized like resource names
 - **Enhancement** (@mcp-use/inspector): Start/stop the `mcp-use dev` tunnel from the Inspector (see inspector changelog)
 - **Update**: Updated @mcp-use/inspector to v0.25.0
 - **Update**: Updated @mcp-use/cli to v2.20.0
@@ -263,11 +263,11 @@ tag: "New"
   ## Zod Peer Dep, Esbuild Build & Windows Fix
   Patch release with Zod peer dependency, esbuild transpilation, TypeGen Zod v4 fixes, and Windows path handling.
 
-- **Fix**: Move zod from dependencies to peerDependencies — prevents duplicate type trees when users have a different Zod v4 version; avoids type errors or OOM during `mcp-use build`
-- **Fix**: TypeGen crash with Zod v4 enum schemas — `zod-to-ts` now handles Zod v4 `ZodEnum` (`_def.entries`), `ZodDiscriminatedUnion`; CLI reports success/failure of type generation instead of silently failing
-- **Fix** (@mcp-use/cli): Windows crash in `mcp-use dev` and `mcp-use generate-types` — use `file://` URL in tsImport instead of raw OS paths (fixes `ERR_UNSUPPORTED_ESM_URL_SCHEME`)
-- **Fix**: Dependabot security alerts — updated flatted, tar, hono, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps
-- **Enhancement** (@mcp-use/cli): `mcp-use build` uses esbuild for transpilation instead of tsc — avoids OOM on complex type graphs (Zod v4, Prisma); type checking runs separately via `tsc --noEmit`; add `--no-typecheck` to skip type checking for faster builds
+- **Fix**: Move zod from dependencies to peerDependencies  -  prevents duplicate type trees when users have a different Zod v4 version; avoids type errors or OOM during `mcp-use build`
+- **Fix**: TypeGen crash with Zod v4 enum schemas  -  `zod-to-ts` now handles Zod v4 `ZodEnum` (`_def.entries`), `ZodDiscriminatedUnion`; CLI reports success/failure of type generation instead of silently failing
+- **Fix** (@mcp-use/cli): Windows crash in `mcp-use dev` and `mcp-use generate-types`  -  use `file://` URL in tsImport instead of raw OS paths (fixes `ERR_UNSUPPORTED_ESM_URL_SCHEME`)
+- **Fix**: Dependabot security alerts  -  updated flatted, tar, hono, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps
+- **Enhancement** (@mcp-use/cli): `mcp-use build` uses esbuild for transpilation instead of tsc  -  avoids OOM on complex type graphs (Zod v4, Prisma); type checking runs separately via `tsc --noEmit`; add `--no-typecheck` to skip type checking for faster builds
 - **Update**: Updated @mcp-use/inspector to v0.24.5
 - **Update**: Updated @mcp-use/cli to v2.19.0
 - **Update**: Updated create-mcp-use-app to v0.14.6
@@ -278,7 +278,7 @@ tag: "New"
   Patch release fixing request context propagation, CLI build hang, and stale monorepo references.
 
 - **Fix**: `ctx.auth` and other request context properties were `undefined` in tool callbacks; `mountMcp()` now wraps `transport.handleRequest()` with `runWithContext()` so `getRequestContext()` is populated
-- **Fix** (@mcp-use/cli): `mcp-use build` no longer hangs — add `process.exit(0)` on success (tsImport creates active handles)
+- **Fix** (@mcp-use/cli): `mcp-use build` no longer hangs  -  add `process.exit(0)` on success (tsImport creates active handles)
 - **Fix**: Update stale mcp-use-ts references in README badges, image URLs, eslint config to mcp-use monorepo
 - **Update**: Updated @mcp-use/inspector to v0.24.4
 - **Update**: Updated @mcp-use/cli to v2.18.3
@@ -288,7 +288,7 @@ tag: "New"
   ## Inspector Sandbox Host Fix
   Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
 
-- **Fix** (@mcp-use/inspector): Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
+- **Fix** (@mcp-use/inspector): Sandbox host derivation for cloud-embedded pages  -  apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
 - **Update**: Updated @mcp-use/inspector to v0.24.3
 - **Update**: Updated @mcp-use/cli to v2.18.2
 </Update>
@@ -297,7 +297,7 @@ tag: "New"
   ## Inspector Proxy Fix for Embedded Servers
   Patch release fixing inspector auto-connect when served from MCP server (Python, etc.).
 
-- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself — auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix** (@mcp-use/inspector): Skip proxy when inspector is served from the MCP server itself  -  auto-connect no longer routes through missing `/inspector/api/proxy` on embedded servers
 - **Fix** (@mcp-use/inspector): Detect proxy availability via runtime config injection; disable autoProxyFallback when no proxy is available
 - **Update**: Updated @mcp-use/inspector to v0.24.2
 - **Update**: Updated @mcp-use/cli to v2.18.1
@@ -323,15 +323,15 @@ tag: "New"
   ## Proxy Servers & Client Completion
   Minor release with server composition, client-side completion, user context, and Express middleware types.
 
-- **New**: `MCPServer.proxy()` for composing multiple MCP servers into a single aggregator — automatic orchestration, schema translation, namespacing, list-changed multiplexing
-- **New**: Client-side completion support — `complete()` on BaseConnector, MCPSession, and `useMcp`; `refreshResourceTemplates()`; prompt argument and resource template URI autocomplete
+- **New**: `MCPServer.proxy()` for composing multiple MCP servers into a single aggregator  -  automatic orchestration, schema translation, namespacing, list-changed multiplexing
+- **New**: Client-side completion support  -  `complete()` on BaseConnector, MCPSession, and `useMcp`; `refreshResourceTemplates()`; prompt argument and resource template URI autocomplete
 - **New**: `ctx.client.user()` for per-invocation end-user metadata (`subject`, `conversationId`) from tools/call params
 - **Enhancement**: `ctx.client.supportsApps()` now correctly returns true for MCP Apps clients (fixed ClientCapabilitiesSchema `extensions` stripping)
-- **Enhancement**: `autoReconnect` options — configurable health check interval, reconnection delay, timeout via `reconnectionOptions`
+- **Enhancement**: `autoReconnect` options  -  configurable health check interval, reconnection delay, timeout via `reconnectionOptions`
 - **Enhancement**: `sendFollowUpMessage` accepts `MessageContentBlock` arrays (text, image, resource blocks) per SEP-1865
-- **Enhancement**: Host info and capabilities — `hostInfo`, `hostCapabilities` in `useWidget`; `getHostInfo`, `getHostCapabilities` on `McpAppsBridge`
-- **Fix**: Express middleware types — proper TypeScript types for `server.use()` with Express middleware (auto-detected and adapted)
-- **Fix**: Session isolation — `findSessionContext` no longer falls back to arbitrary session, preventing metadata leakage
+- **Enhancement**: Host info and capabilities  -  `hostInfo`, `hostCapabilities` in `useWidget`; `getHostInfo`, `getHostCapabilities` on `McpAppsBridge`
+- **Fix**: Express middleware types  -  proper TypeScript types for `server.use()` with Express middleware (auto-detected and adapted)
+- **Fix**: Session isolation  -  `findSessionContext` no longer falls back to arbitrary session, preventing metadata leakage
 - **Fix**: Remove deprecated `@types/tar`; update tar to latest (cli, create-mcp-use-app)
 - **Update**: Updated @mcp-use/inspector to v0.24.0
 - **Update**: Updated @mcp-use/cli to v2.17.0
@@ -534,15 +534,15 @@ tag: "New"
 
 ### Resource Template Completion
 
-- **New**: Resource template variable completion — templates can define `callbacks.complete` per variable (string array or callback) for client-side autocomplete of URI template variables
+- **New**: Resource template variable completion  -  templates can define `callbacks.complete` per variable (string array or callback) for client-side autocomplete of URI template variables
 - **New**: `toResourceTemplateCompleteCallbacks` utility for normalizing completion definitions
 - **New**: MCP servers now publish completion capabilities
 
 ### HMR & Reverse Proxy Improvements
 
-- **New**: Custom HTTP route HMR — routes registered via `server.get()`, `server.post()`, etc. now hot-swap without restart
-- **New**: Widget tool protection during HMR — tools tagged with `_meta["mcp-use/widget"]` preserved during sync
-- **New**: Dynamic widget creation — `resources/` directory auto-created, dev server watches for new widgets even if none exist at startup
+- **New**: Custom HTTP route HMR  -  routes registered via `server.get()`, `server.post()`, etc. now hot-swap without restart
+- **New**: Widget tool protection during HMR  -  tools tagged with `_meta["mcp-use/widget"]` preserved during sync
+- **New**: Dynamic widget creation  -  `resources/` directory auto-created, dev server watches for new widgets even if none exist at startup
 - **New**: Vite HMR WebSocket proxy for hot-reload through reverse proxies (ngrok, E2B, Cloudflare tunnels)
 - **New**: `MCP_URL` environment variable can be pre-set by users for external proxy URLs; CLI will not overwrite it
 - **New**: `window.__mcpServerUrl` global injected into widget HTML for dynamic API URL construction

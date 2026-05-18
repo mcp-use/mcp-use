@@ -34,7 +34,7 @@ class WeatherInfo(BaseModel):
 async def main():
     # Setup client and agent
     client = MCPClient(config={"mcpServers": {...}})
-    llm = ChatOpenAI(model="gpt-4o")
+    llm = ChatOpenAI(model="gpt-5.5")
     agent = MCPAgent(llm=llm, client=client)
 
     # Get structured output

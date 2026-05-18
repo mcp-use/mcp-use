@@ -264,7 +264,7 @@ class SimpleServerManager(BaseServerManager):
 # 3. Pass your custom manager to the agent
 async def useCustomManager():
     agent = MCPAgent(
-        llm=ChatOpenAI(model="gpt-4o"),
+        llm=ChatOpenAI(model="gpt-5.5"),
         use_server_manager=True,
         server_manager=SimpleServerManager(),
     )

@@ -60,7 +60,7 @@ oauth: oauthWorkOSProvider({
 ```
 
 <Tip>
-If you need to call the WorkOS Management API from your tool handlers, store your API key in any env var you like (e.g. `WORKOS_API_KEY`) and read it inside the tool — it isn't part of the OAuth provider config.
+If you need to call the WorkOS Management API from your tool handlers, store your API key in any env var you like (e.g. `WORKOS_API_KEY`) and read it inside the tool  -  it isn't part of the OAuth provider config.
 </Tip>
 
 ## Accessing user info in tools
@@ -95,7 +95,7 @@ server.tool(
     description: 'Get documents for the authenticated organization',
   },
   async (_args, ctx) => {
-    // Custom claims come back as `unknown` — narrow before use
+    // Custom claims come back as `unknown`  -  narrow before use
     const orgId = ctx.auth.user.organization_id as string | undefined
 
     if (!orgId) {
@@ -119,4 +119,4 @@ server.tool(
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context) — Access user information in tools
+- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
