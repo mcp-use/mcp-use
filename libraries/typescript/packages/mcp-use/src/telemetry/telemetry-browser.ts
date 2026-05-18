@@ -95,7 +95,7 @@ function secureRandomString(): string {
   return Math.random().toString(36).substring(2, 15);
 }
 
-export type RuntimeEnvironment = "browser" | "unknown";
+type RuntimeEnvironment = "browser" | "unknown";
 
 type StorageCapability = "localStorage" | "session-only";
 
@@ -166,15 +166,6 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
     cachedEnvironment = detectRuntimeEnvironment();
   }
   return cachedEnvironment;
-}
-
-/**
- * Determines whether the current runtime is a browser.
- *
- * @returns `true` if the runtime is a browser, `false` otherwise.
- */
-export function isBrowserEnvironment(): boolean {
-  return getRuntimeEnvironment() === "browser";
 }
 
 // PostHog types for Browser

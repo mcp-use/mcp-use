@@ -1,5 +1,59 @@
 # mcp-use
 
+## 1.29.0-canary.5
+
+### Patch Changes
+
+- 273b5d7: Fix double slash in OAuth metadata proxy URL for DCR-direct providers (e.g. `oauthAuth0Provider`) by normalizing the issuer's trailing slash before appending `/.well-known/oauth-authorization-server`.
+  - @mcp-use/cli@3.2.1-canary.5
+  - @mcp-use/inspector@7.0.0-canary.5
+
+## 1.29.0-canary.4
+
+### Minor Changes
+
+- f8a6a58: Add `supabaseUrl` override to `oauthSupabaseProvider` so it can point at a local or self-hosted Supabase instance (e.g. `http://localhost:54321`) instead of the hosted `https://${projectId}.supabase.co` URL. Configurable via the new `supabaseUrl` config option or `MCP_USE_OAUTH_SUPABASE_URL` environment variable; `projectId` is now optional when `supabaseUrl` is provided.
+
+### Patch Changes
+
+- @mcp-use/cli@3.2.1-canary.4
+- @mcp-use/inspector@7.0.0-canary.4
+
+## 1.28.1-canary.3
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [680ef2f]
+  - @mcp-use/inspector@6.0.1-canary.3
+  - @mcp-use/cli@3.2.1-canary.3
+
+## 1.28.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [81cebc7]
+  - @mcp-use/inspector@6.0.1-canary.2
+  - @mcp-use/cli@3.2.1-canary.2
+
+## 1.28.1-canary.1
+
+### Patch Changes
+
+- c3a39cf: Clarify the "Inspector: Skipped in production" log so users don't try to pass `--with-inspector` to `mcp-use start`. The flag belongs to `mcp-use build`; the new log spells out the rebuild command.
+
+  Docs: added a short note under `start` in `cli-reference.mdx` pointing readers at `build --with-inspector` for production inspector access.
+  - @mcp-use/cli@3.2.1-canary.1
+  - @mcp-use/inspector@6.0.1-canary.1
+
+## 1.28.1-canary.0
+
+### Patch Changes
+
+- ef32a50: Remove unused internal source files flagged by the TypeScript workspace Knip check.
+  - @mcp-use/cli@3.2.1-canary.0
+  - @mcp-use/inspector@6.0.1-canary.0
+
 ## 1.28.0
 
 ### Minor Changes

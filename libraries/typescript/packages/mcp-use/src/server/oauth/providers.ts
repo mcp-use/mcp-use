@@ -20,7 +20,18 @@ import { getEnv } from "../utils/runtime.js";
  * Configuration for Supabase OAuth provider
  */
 export interface SupabaseProviderConfig {
-  projectId: string;
+  /**
+   * Supabase project ID. Used to derive the hosted URL
+   * `https://${projectId}.supabase.co`. Either `projectId` or `supabaseUrl`
+   * must be provided.
+   */
+  projectId?: string;
+  /**
+   * Explicit Supabase base URL. Overrides the projectId-derived hosted URL
+   * — use this for self-hosted or local Supabase instances
+   * (e.g. `http://localhost:54321`).
+   */
+  supabaseUrl?: string;
   jwtSecret?: string;
   verifyJwt?: boolean;
   scopesSupported?: string[];
@@ -77,7 +88,9 @@ export interface CustomProviderConfig {
  * Create a Supabase OAuth provider
  *
  * Supports zero-config setup via environment variables:
- * - MCP_USE_OAUTH_SUPABASE_PROJECT_ID (required)
+ * - MCP_USE_OAUTH_SUPABASE_PROJECT_ID (required unless `supabaseUrl` is set)
+ * - MCP_USE_OAUTH_SUPABASE_URL        (optional override — use for local /
+ *                                      self-hosted Supabase, e.g. http://localhost:54321)
  * - MCP_USE_OAUTH_SUPABASE_JWT_SECRET (optional)
  *
  * @param config - Optional Supabase configuration (overrides environment variables)
@@ -103,25 +116,40 @@ export interface CustomProviderConfig {
  *   })
  * });
  * ```
+ *
+ * @example Local Supabase via supabaseUrl override
+ * ```typescript
+ * const server = new MCPServer({
+ *   name: 'my-server',
+ *   version: '1.0.0',
+ *   oauth: oauthSupabaseProvider({
+ *     supabaseUrl: 'http://localhost:54321'
+ *   })
+ * });
+ * ```
  */
 export function oauthSupabaseProvider(
   config: Partial<SupabaseProviderConfig> = {}
 ): OAuthProvider {
   const projectId =
     config.projectId ?? getEnv("MCP_USE_OAUTH_SUPABASE_PROJECT_ID");
+  const supabaseUrl =
+    config.supabaseUrl ?? getEnv("MCP_USE_OAUTH_SUPABASE_URL");
   const jwtSecret =
     config.jwtSecret ?? getEnv("MCP_USE_OAUTH_SUPABASE_JWT_SECRET");
 
-  if (!projectId) {
+  if (!projectId && !supabaseUrl) {
     throw new Error(
-      "Supabase projectId is required. " +
-        "Set MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable or pass projectId in config."
+      "Supabase projectId or supabaseUrl is required. " +
+        "Set MCP_USE_OAUTH_SUPABASE_PROJECT_ID (hosted) or MCP_USE_OAUTH_SUPABASE_URL " +
+        "(self-hosted/local), or pass `projectId` / `supabaseUrl` in config."
     );
   }
 
   return new SupabaseOAuthProvider({
     provider: "supabase",
     projectId,
+    supabaseUrl,
     jwtSecret,
     verifyJwt: config.verifyJwt,
     scopesSupported: config.scopesSupported,

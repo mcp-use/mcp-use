@@ -6,12 +6,12 @@ import { useMemo } from "react";
 import type { DeviceType } from "../context/WidgetDebugContext";
 import { DEVICE_VIEWPORT_CONFIGS } from "../context/WidgetDebugContext";
 
-export interface ViewportDimensions {
+interface ViewportDimensions {
   maxWidth: number;
   maxHeight: number;
 }
 
-export interface CustomViewport {
+interface CustomViewport {
   width: number;
   height: number;
 }

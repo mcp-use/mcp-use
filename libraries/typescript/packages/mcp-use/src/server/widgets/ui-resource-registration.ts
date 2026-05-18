@@ -37,7 +37,7 @@ import {
  * It uses broad types to be compatible with the various wrapped method signatures
  * in MCPServer while still providing type safety at the call sites.
  */
-export interface UIResourceServer {
+interface UIResourceServer {
   readonly buildId?: string;
   readonly serverHost: string;
   readonly serverPort?: number;

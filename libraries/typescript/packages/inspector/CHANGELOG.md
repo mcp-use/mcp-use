@@ -1,5 +1,48 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [273b5d7]
+  - mcp-use@1.29.0-canary.5
+
+## 7.0.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f8a6a58]
+  - mcp-use@1.29.0-canary.4
+
+## 6.0.1-canary.3
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [680ef2f]
+  - mcp-use@1.28.1-canary.3
+
+## 6.0.1-canary.2
+
+### Patch Changes
+
+- 81cebc7: Remove 18 unused inspector source files flagged by the TypeScript workspace Knip check, and stop generating the unused client-side `version.ts` (the client reads the version from the `window.__INSPECTOR_VERSION__` global injected by the server).
+  - mcp-use@1.28.1-canary.2
+
+## 6.0.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3a39cf]
+  - mcp-use@1.28.1-canary.1
+
+## 6.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [ef32a50]
+  - mcp-use@1.28.1-canary.0
+
 ## 6.0.0
 
 ### Minor Changes

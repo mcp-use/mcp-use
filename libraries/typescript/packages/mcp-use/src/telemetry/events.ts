@@ -11,7 +11,7 @@ export abstract class BaseTelemetryEvent {
 /**
  * Tool info for telemetry - matches ToolDefinition from server/types/tool.ts
  */
-export interface Tool {
+interface Tool {
   name: string;
   title?: string | null;
   description?: string | null;
@@ -24,7 +24,7 @@ export interface Tool {
 /**
  * Resource info for telemetry - matches ResourceDefinition from server/types/resource.ts
  */
-export interface Resource {
+interface Resource {
   name: string;
   title?: string | null;
   description?: string | null;
@@ -37,7 +37,7 @@ export interface Resource {
 /**
  * Prompt info for telemetry - matches PromptDefinition from server/types/prompt.ts
  */
-export interface Prompt {
+interface Prompt {
   name: string;
   title?: string | null;
   description?: string | null;
@@ -48,7 +48,7 @@ export interface Prompt {
 /**
  * Content info for telemetry - matches MCP SDK content structure
  */
-export interface Content {
+interface Content {
   mime_type?: string | null;
   text?: string | null;
   blob?: string | null;
@@ -139,7 +139,7 @@ export class MCPAgentExecutionEvent extends BaseTelemetryEvent {
 // ServerRunEvent
 // ============================================================================
 
-export interface ServerRunEventData {
+interface ServerRunEventData {
   transport: string;
   toolsNumber: number;
   resourcesNumber: number;
@@ -593,7 +593,7 @@ export class ConnectorInitEvent extends BaseTelemetryEvent {
  * Raw input data for tracking server addition.
  * The event class will extract the necessary properties.
  */
-export interface ClientAddServerEventInput {
+interface ClientAddServerEventInput {
   serverName: string;
   serverConfig: Record<string, any>;
 }
@@ -635,7 +635,7 @@ export class ClientAddServerEvent extends BaseTelemetryEvent {
 /**
  * Raw input data for tracking server removal.
  */
-export interface ClientRemoveServerEventInput {
+interface ClientRemoveServerEventInput {
   serverName: string;
 }
 

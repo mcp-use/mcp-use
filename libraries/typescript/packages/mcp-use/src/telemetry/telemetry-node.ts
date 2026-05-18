@@ -51,7 +51,7 @@ function secureRandomString(): string {
   }
 }
 
-export type RuntimeEnvironment =
+type RuntimeEnvironment =
   | "node"
   | "cloudflare-workers"
   | "edge"
@@ -133,15 +133,6 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
     cachedEnvironment = detectRuntimeEnvironment();
   }
   return cachedEnvironment;
-}
-
-/**
- * Indicates whether the current runtime is a browser environment.
- *
- * @returns `true` if running in a browser environment, `false` otherwise.
- */
-export function isBrowserEnvironment(): boolean {
-  return false; // Node.js implementation - never browser
 }
 
 // Simple Scarf event logger implementation

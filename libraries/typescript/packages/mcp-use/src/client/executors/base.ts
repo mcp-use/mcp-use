@@ -16,7 +16,7 @@ export interface ToolSearchResult {
   input_schema?: Tool["inputSchema"];
 }
 
-export interface ToolSearchMeta {
+interface ToolSearchMeta {
   total_tools: number;
   namespaces: string[];
   result_count: number;

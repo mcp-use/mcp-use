@@ -14,7 +14,7 @@ A production-ready example of an MCP server with Clerk OAuth 2.0 authentication,
 ## Prerequisites
 
 1. **Clerk Account**: Sign up at [clerk.com](https://clerk.com)
-2. **Node.js**: Version 18 or higher
+2. **Node.js**: Version 20.19 or higher, or 22.12 or higher
 3. **Clerk Application**: Create an application in the [Clerk Dashboard](https://dashboard.clerk.com/sign-in)
 
 ## Setup

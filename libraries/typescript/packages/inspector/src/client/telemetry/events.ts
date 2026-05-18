@@ -3,7 +3,7 @@ export interface BaseTelemetryEvent {
   properties: Record<string, any>;
 }
 
-export interface MCPInspectorOpenEventData {
+interface MCPInspectorOpenEventData {
   serverUrl?: string;
   connectionCount?: number;
 }
@@ -20,7 +20,7 @@ export class MCPInspectorOpenEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPToolExecutionEventData {
+interface MCPToolExecutionEventData {
   toolName: string;
   serverId?: string;
   success: boolean;
@@ -43,7 +43,7 @@ export class MCPToolExecutionEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPResourceReadEventData {
+interface MCPResourceReadEventData {
   resourceUri: string;
   serverId?: string;
   success: boolean;
@@ -64,7 +64,7 @@ export class MCPResourceReadEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPPromptCallEventData {
+interface MCPPromptCallEventData {
   promptName: string;
   serverId?: string;
   success: boolean;
@@ -85,7 +85,7 @@ export class MCPPromptCallEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPServerConnectionEventData {
+interface MCPServerConnectionEventData {
   serverId: string;
   serverUrl: string;
   success: boolean;
@@ -108,7 +108,7 @@ export class MCPServerConnectionEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPChatMessageEventData {
+interface MCPChatMessageEventData {
   serverId?: string;
   provider:
     | "openai"
@@ -144,7 +144,7 @@ export class MCPChatMessageEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPServerAddedEventData {
+interface MCPServerAddedEventData {
   serverId: string;
   serverUrl: string;
   connectionType?: "http" | "sse";
@@ -165,7 +165,7 @@ export class MCPServerAddedEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPServerRemovedEventData {
+interface MCPServerRemovedEventData {
   serverId: string;
 }
 
@@ -180,7 +180,7 @@ export class MCPServerRemovedEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPCommandPaletteOpenEventData {
+interface MCPCommandPaletteOpenEventData {
   trigger: "keyboard" | "button";
 }
 
@@ -195,7 +195,7 @@ export class MCPCommandPaletteOpenEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPToolSavedEventData {
+interface MCPToolSavedEventData {
   toolName: string;
   serverId?: string;
 }
@@ -212,7 +212,7 @@ export class MCPToolSavedEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPTunnelActionEventData {
+interface MCPTunnelActionEventData {
   action: "start" | "stop";
   success: boolean;
   tunnelUrl?: string | null;
@@ -231,7 +231,7 @@ export class MCPTunnelActionEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPDeployClickEventData {
+interface MCPDeployClickEventData {
   referrer: string;
 }
 
@@ -246,7 +246,7 @@ export class MCPDeployClickEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPChatConfiguredEventData {
+interface MCPChatConfiguredEventData {
   provider: string;
   model: string;
 }
@@ -263,7 +263,7 @@ export class MCPChatConfiguredEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPTabNavigationEventData {
+interface MCPTabNavigationEventData {
   tab: string;
   previousTab: string | null;
 }
@@ -280,7 +280,7 @@ export class MCPTabNavigationEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPAddToClientEventData {
+interface MCPAddToClientEventData {
   client: string;
 }
 
@@ -295,7 +295,7 @@ export class MCPAddToClientEvent implements BaseTelemetryEvent {
   }
 }
 
-export interface MCPSessionDurationEventData {
+interface MCPSessionDurationEventData {
   durationSeconds: number;
   tabsVisited: number;
   toolsExecuted: number;

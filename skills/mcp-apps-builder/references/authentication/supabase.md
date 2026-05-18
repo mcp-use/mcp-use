@@ -59,7 +59,8 @@ JWT verification and `.well-known` passthrough are automatic. You still need to 
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `MCP_USE_OAUTH_SUPABASE_PROJECT_ID` | Yes | Your Supabase project ID |
+| `MCP_USE_OAUTH_SUPABASE_PROJECT_ID` | Yes (hosted) | Your Supabase project ID. Used to derive `https://<id>.supabase.co`. |
+| `MCP_USE_OAUTH_SUPABASE_URL` | Yes (self-hosted/local) | Explicit base URL — use for `supabase start` or self-hosted (e.g. `http://localhost:54321`). Overrides `PROJECT_ID` when both are set. |
 | `MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY` | Recommended | Publishable key (`sb_publishable_...`) — used by the consent UI and any tools calling Supabase REST/APIs |
 | `MCP_USE_OAUTH_SUPABASE_JWT_SECRET` | Only for legacy HS256 projects | JWT secret for HS256 verification |
 
@@ -86,6 +87,7 @@ Explicit config (overrides env vars):
 ```typescript
 oauth: oauthSupabaseProvider({
   projectId: "my-project-id",
+  // supabaseUrl: "http://localhost:54321",   // self-hosted / local override
   jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,  // legacy HS256 only
   verifyJwt: process.env.NODE_ENV === "production",
   scopesSupported: ["openid", "profile", "email"],
@@ -94,10 +96,13 @@ oauth: oauthSupabaseProvider({
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `projectId` | `string` | env var | Supabase project ID |
+| `projectId` | `string?` | env var | Supabase project ID — derives `https://<id>.supabase.co` |
+| `supabaseUrl` | `string?` | env var | Explicit base URL for self-hosted or local Supabase. Takes precedence over `projectId` when set. |
 | `jwtSecret` | `string?` | env var | JWT secret for HS256 tokens (legacy projects) |
 | `verifyJwt` | `boolean?` | `true` | Set `false` to skip JWT verification (**development only**) |
 | `scopesSupported` | `string[]?` | `["openid", "profile", "email"]` | Override advertised scopes |
+
+> One of `projectId` / `supabaseUrl` (or their env vars) is required. Use `supabaseUrl` for `supabase start` or any non-`supabase.co` deployment.
 
 ---
 
@@ -185,6 +190,10 @@ server.tool(
 # Required: Supabase project ID (Dashboard → Project Settings → General)
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
 
+# Self-hosted / local override — point at `supabase start` or your own host.
+# When set, this wins over PROJECT_ID. Omit on supabase.co.
+# MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
+
 # Recommended: Publishable key (Dashboard → Project Settings → API Keys)
 # Used by the consent UI and by tools calling Supabase REST/APIs
 MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
@@ -193,6 +202,16 @@ MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 # New projects use ES256 + JWKS — leave this unset
 # MCP_USE_OAUTH_SUPABASE_JWT_SECRET=your-jwt-secret
 ```
+
+### Local Supabase (`supabase start`)
+
+```typescript
+oauth: oauthSupabaseProvider({
+  supabaseUrl: "http://localhost:54321",
+})
+```
+
+The provider derives the issuer and JWKS endpoint from this URL — the local stack exposes `/auth/v1/.well-known/openid-configuration` out of the box, so no extra wiring is needed.
 
 ---
 

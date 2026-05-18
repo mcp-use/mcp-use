@@ -234,6 +234,11 @@ mcp-use start --mcp-dir src/mcp
   `.js` files.
 </Note>
 
+<Note>
+  The inspector is not available in production builds. If you want it, rebuild
+  with the `--with-inspector` flag.
+</Note>
+
 <Tip>
   `--tunnel` creates a public URL via Manufact Cloud  -  ideal for testing with ChatGPT, Claude, or any remote MCP client before you deploy. The subdomain persists across restarts (stored in `dist/mcp-use.json`). See the [Tunneling guide](/tunneling/index) for rate limits, expiry, and the standalone `npx @mcp-use/tunnel` command.
 </Tip>

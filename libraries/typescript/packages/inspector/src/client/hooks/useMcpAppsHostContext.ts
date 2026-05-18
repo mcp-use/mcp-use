@@ -9,7 +9,7 @@ import type { PlaygroundSettings } from "../context/WidgetDebugContext";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
 
-export interface HostContextParams {
+interface HostContextParams {
   theme: "light" | "dark";
   displayMode: DisplayMode;
   maxWidth: number;

@@ -7,7 +7,7 @@
  * separator lines, and multi-line `data:` fields.
  */
 
-export interface SseEvent {
+interface SseEvent {
   event?: string;
   data: string;
 }

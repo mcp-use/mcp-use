@@ -1,7 +1,5 @@
 import { logger } from "../logging.js";
 
-export type ConnectionType<T = any> = T;
-
 export abstract class ConnectionManager<T = any> {
   private _readyPromise!: Promise<void>;
   private _readyResolver!: () => void;

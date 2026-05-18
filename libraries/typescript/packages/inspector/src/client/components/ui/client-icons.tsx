@@ -27,44 +27,6 @@ export function VSCodeIcon({ className }: IconProps) {
 }
 
 /**
- * Renders the Gemini SVG icon.
- *
- * @param className - Optional CSS class applied to the root SVG element
- * @returns An SVG element depicting the Gemini icon, with `fill="currentColor"`
- */
-export function GeminiIcon({ className }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M12 0C5.383 0 0 5.383 0 12s5.383 12 12 12 12-5.383 12-12S18.617 0 12 0zm-.012 2.062L16.5 12l-4.512 9.938L7.476 12l4.512-9.938zM7.476 12L12 21.938 16.524 12 12 2.062 7.476 12z" />
-    </svg>
-  );
-}
-
-/**
- * Renders the Codex SVG icon.
- *
- * @param className - Optional CSS class applied to the root SVG element
- * @returns An SVG element rendering the Codex icon with currentColor fill
- */
-export function CodexIcon({ className }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z" />
-    </svg>
-  );
-}
-
-/**
  * Renders the Model Context Protocol (MCP) logo.
  */
 export function McpIcon({ className }: IconProps) {

@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/inspector",
   "type": "module",
-  "version": "6.0.0",
+  "version": "7.0.0-canary.5",
   "description": "MCP Inspector - A tool for inspecting and debugging MCP servers",
   "author": "",
   "license": "MIT",
@@ -40,7 +40,7 @@
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
-    "dev:client": "rm -rf node_modules/.vite && vite --port 3000",
+    "dev:client": "rimraf node_modules/.vite && vite --port 3000",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
     "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:cdn",
@@ -78,7 +78,7 @@
   },
   "peerDependencies": {
     "express": "^4.21.2 || ^5.0.0",
-    "mcp-use": ">=1.28.0-canary.5",
+    "mcp-use": ">=1.29.0-canary.4",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0",
     "react-router": "^7.12.0"

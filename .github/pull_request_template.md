@@ -12,6 +12,16 @@ Check all that apply:
 
 Describe the changes introduced by this PR in a concise manner.
 
+## Review Readiness
+
+Help maintainers review this quickly:
+
+- [ ] The PR is scoped to one issue or one clearly related change
+- [ ] The PR description explains the user-visible problem and the fix
+- [ ] The diff avoids unrelated formatting, generated files, and bulk rewrites
+- [ ] I verified the affected package/docs path with the commands listed below
+- [ ] I checked for existing open PRs that already solve the same issue
+
 ## Implementation Details
 
 1. List the specific implementation details

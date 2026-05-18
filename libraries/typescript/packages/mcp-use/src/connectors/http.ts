@@ -24,7 +24,7 @@ export type ClientInfo = {
   websiteUrl?: string;
 };
 
-export interface HttpConnectorOptions extends ConnectorInitOptions {
+interface HttpConnectorOptions extends ConnectorInitOptions {
   authToken?: string;
   fetch?: typeof fetch;
   headers?: Record<string, string>;

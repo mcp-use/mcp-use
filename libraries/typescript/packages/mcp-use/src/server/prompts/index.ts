@@ -10,7 +10,7 @@ import type {
 } from "../types.js";
 import { convertToolResultToPromptResult } from "./conversion.js";
 
-export interface PromptServerContext {
+interface PromptServerContext {
   server: {
     registerPrompt(
       name: string,
