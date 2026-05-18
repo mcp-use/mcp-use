@@ -11,6 +11,7 @@
     "clean-inspector-files",
     "cross-platform-clean-scripts",
     "fix-oauth-metadata-double-slash",
+    "inspector-mcp-reconnect-banner",
     "inspector-skipped-log-wording",
     "oauth-emulate-e2e",
     "prune-unused-exports",
