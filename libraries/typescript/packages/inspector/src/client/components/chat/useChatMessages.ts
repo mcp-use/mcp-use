@@ -77,7 +77,7 @@ export function useChatMessages({
   // from the upstream MCP server (token expired/revoked). Distinct from
   // `rateLimitInfo` (429 → Manufact account login) — here the user must
   // re-run the MCP server's OAuth flow.
-  const [mcpAuthRequired, setMcpAuthRequired] = useState<{
+  const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
     mcpServerUrl: string;
     message?: string;
   } | null>(null);
@@ -234,7 +234,7 @@ export function useChatMessages({
           if (response.status === 401) {
             const errBody = await response.json().catch(() => null);
             if (errBody?.error === "mcp_auth_required") {
-              setMcpAuthRequired({
+              setMcpServerAuthRequired({
                 mcpServerUrl:
                   (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
                 message: errBody.message as string | undefined,
@@ -567,15 +567,15 @@ export function useChatMessages({
   const clearMessages = useCallback(() => {
     setMessages([]);
     setRateLimitInfo(null);
-    setMcpAuthRequired(null);
+    setMcpServerAuthRequired(null);
   }, []);
 
   const clearRateLimitInfo = useCallback(() => {
     setRateLimitInfo(null);
   }, []);
 
-  const clearMcpAuthRequired = useCallback(() => {
-    setMcpAuthRequired(null);
+  const clearMcpServerAuthRequired = useCallback(() => {
+    setMcpServerAuthRequired(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -621,11 +621,11 @@ export function useChatMessages({
     isLoading,
     attachments,
     rateLimitInfo,
-    mcpAuthRequired,
+    mcpServerAuthRequired,
     sendMessage,
     clearMessages,
     clearRateLimitInfo,
-    clearMcpAuthRequired,
+    clearMcpServerAuthRequired,
     setMessages,
     stop,
     addAttachment,

@@ -264,13 +264,13 @@ export function ChatTab({
     ? undefined
     : serverSideChat.clearRateLimitInfo;
 
-  const mcpAuthRequired = effectiveClientSide
+  const mcpServerAuthRequired = effectiveClientSide
     ? null
-    : (serverSideChat.mcpAuthRequired ?? null);
+    : (serverSideChat.mcpServerAuthRequired ?? null);
 
-  const clearMcpAuthRequired = effectiveClientSide
+  const clearMcpServerAuthRequired = effectiveClientSide
     ? undefined
-    : serverSideChat.clearMcpAuthRequired;
+    : serverSideChat.clearMcpServerAuthRequired;
 
   const handleMcpReconnect = useCallback(async () => {
     try {
@@ -284,16 +284,16 @@ export function ChatTab({
       );
       return;
     }
-    clearMcpAuthRequired?.();
-  }, [connection, clearMcpAuthRequired]);
+    clearMcpServerAuthRequired?.();
+  }, [connection, clearMcpServerAuthRequired]);
 
-  const reconnectBannerNode = mcpAuthRequired ? (
+  const reconnectBannerNode = mcpServerAuthRequired ? (
     <McpReconnectBanner
       serverName={connection.name}
-      serverUrl={mcpAuthRequired.mcpServerUrl}
-      message={mcpAuthRequired.message}
+      serverUrl={mcpServerAuthRequired.mcpServerUrl}
+      message={mcpServerAuthRequired.message}
       onReconnect={handleMcpReconnect}
-      onDismiss={clearMcpAuthRequired}
+      onDismiss={clearMcpServerAuthRequired}
     />
   ) : null;
 
@@ -1184,7 +1184,7 @@ export function ChatTab({
       {llmConfig && (
         <ChatInputArea
           inputValue={inputValue}
-          isConnected={isConnected && !rateLimitInfo && !mcpAuthRequired}
+          isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
           isLoading={isLoading}
           textareaRef={textareaRef}
           promptsDropdownOpen={promptsDropdownOpen}
