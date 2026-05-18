@@ -30,7 +30,7 @@
   },
   "scripts": {
     "build": "npm run clean && tsup src/index.tsx --format esm && tsc --emitDeclarationOnly --declaration && npm run copy-templates",
-    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
     "copy-templates": "node scripts/copy-templates.js",
     "dev": "tsc --build --watch",
     "test": "vitest --run --passWithNoTests",
