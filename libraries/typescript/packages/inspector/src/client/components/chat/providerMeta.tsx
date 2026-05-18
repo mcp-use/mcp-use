@@ -1,5 +1,6 @@
 import type { ProviderName } from "@/llm/types";
 import { cn } from "@/client/lib/utils";
+import { useTheme } from "@/client/context/ThemeContext";
 
 // OpenRouter doesn't ship a logo on our provider CDN yet, so inline the
 // official mark as a data URL with a neutral gray fill.
@@ -26,13 +27,21 @@ export function getProviderLabel(provider: ProviderName): string {
   }
 }
 
-function getProviderIconSrc(provider: ProviderName): string | null {
+function getProviderIconSrc(
+  provider: ProviderName,
+  resolvedTheme: "light" | "dark"
+): string | null {
   switch (provider) {
     case "openai":
     case "anthropic":
     case "google":
-    case "ollama":
       return `https://inspector-cdn.mcp-use.com/providers/${provider}.png`;
+    case "ollama": {
+      // Ollama ships separate light/dark marks so the logo stays legible
+      // against the surrounding chrome in either theme.
+      const variant = resolvedTheme === "dark" ? "ollama_dark" : "ollama_light";
+      return `https://inspector-cdn.mcp-use.com/providers/${variant}.png`;
+    }
     case "openrouter":
       return OPENROUTER_ICON_URL;
     case "openai-compatible":
@@ -49,18 +58,26 @@ export function ProviderIcon({
   provider: ProviderName;
   className?: string;
 }) {
+  const { resolvedTheme } = useTheme();
+
   if (provider === "openai-compatible") {
     return null;
   }
 
-  const iconSrc = getProviderIconSrc(provider);
+  const iconSrc = getProviderIconSrc(provider, resolvedTheme);
 
   if (iconSrc) {
+    // Ollama's mark has its own padding and isn't circular, so render it a
+    // touch smaller and skip the rounded-full crop that suits the other marks.
+    const imgClasses =
+      provider === "ollama"
+        ? "h-3.5 w-3.5 object-contain"
+        : "h-4 w-4 rounded-full object-cover";
     return (
       <img
         src={iconSrc}
         alt={getProviderLabel(provider)}
-        className={cn("h-4 w-4 rounded-full object-cover", className)}
+        className={cn(imgClasses, className)}
       />
     );
   }

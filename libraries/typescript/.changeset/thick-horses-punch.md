@@ -2,4 +2,4 @@
 "@mcp-use/inspector": minor
 ---
 
-Integrated Ollama & LM Studio as an LLM provider for the inspector, featuring local model discovery, and streaming chat.
+Integrated Ollama as an LLM provider for the inspector, with local model discovery and streaming chat. Requests go directly to the Ollama daemon — set `OLLAMA_ORIGINS` if running the inspector from a non-localhost origin.

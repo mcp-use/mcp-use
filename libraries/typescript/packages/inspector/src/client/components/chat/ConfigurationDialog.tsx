@@ -41,8 +41,18 @@ import {
 } from "./types";
 import { getProviderLabel, ProviderIcon } from "./providerMeta";
 
-import { fetchLocalProvider } from "@/llm/providers/localProviderFetch";
 import { buildOllamaApiUrl } from "@/llm/providers/ollama/utils";
+
+class OllamaCorsError extends Error {
+  constructor(cause: unknown) {
+    super(
+      "Could not reach Ollama. If it's running, allow this origin by starting Ollama with " +
+        "`OLLAMA_ORIGINS=*` (or your inspector origin) and try again."
+    );
+    this.name = "OllamaCorsError";
+    this.cause = cause;
+  }
+}
 
 interface ModelOption {
   id: string;
@@ -252,14 +262,17 @@ async function fetchOllamaModels(
   baseUrl: string,
   apiKey: string
 ): Promise<ModelOption[]> {
-  const response = await fetchLocalProvider(
-    buildOllamaApiUrl(baseUrl, "/api/tags"),
-    {
+  let response: Response;
+  try {
+    response = await fetch(buildOllamaApiUrl(baseUrl, "/api/tags"), {
       headers: {
         ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
       },
-    }
-  );
+    });
+  } catch (error) {
+    // Browser CORS / network failures surface as TypeError with no detail
+    throw new OllamaCorsError(error);
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch Ollama models: ${response.statusText}`);
@@ -391,7 +404,7 @@ export function ConfigurationDialog({
   const baseUrlHelp =
     tempProvider === "openai-compatible"
       ? "Base URL of your OpenAI-compatible API. Local servers must have CORS enabled."
-      : `Defaults to ${getDefaultBaseUrl(tempProvider)}. You can also use a proxied or remote Ollama host here.`;
+      : null;
   const apiKeyHelp =
     tempProvider === "ollama"
       ? "Optional for local Ollama. Stored locally and never sent to our servers."
@@ -492,7 +505,9 @@ export function ConfigurationDialog({
                 placeholder={baseUrlPlaceholder}
                 data-testid="chat-config-base-url-input"
               />
-              <p className="text-xs text-muted-foreground">{baseUrlHelp}</p>
+              {baseUrlHelp && (
+                <p className="text-xs text-muted-foreground">{baseUrlHelp}</p>
+              )}
             </div>
           )}
 
