@@ -9,6 +9,7 @@
   },
   "changesets": [
     "clean-inspector-files",
+    "cross-platform-clean-scripts",
     "inspector-skipped-log-wording",
     "prune-unused-exports",
     "quiet-files-cleanup",
