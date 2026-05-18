@@ -10,6 +10,7 @@
   "changesets": [
     "clean-inspector-files",
     "cross-platform-clean-scripts",
+    "fix-oauth-metadata-double-slash",
     "inspector-skipped-log-wording",
     "prune-unused-exports",
     "quiet-files-cleanup",

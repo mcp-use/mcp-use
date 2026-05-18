@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.29.0-canary.5
+
+### Patch Changes
+
+- 273b5d7: Fix double slash in OAuth metadata proxy URL for DCR-direct providers (e.g. `oauthAuth0Provider`) by normalizing the issuer's trailing slash before appending `/.well-known/oauth-authorization-server`.
+  - @mcp-use/cli@3.2.1-canary.5
+  - @mcp-use/inspector@7.0.0-canary.5
+
 ## 1.29.0-canary.4
 
 ### Minor Changes
