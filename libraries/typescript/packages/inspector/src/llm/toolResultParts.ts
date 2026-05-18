@@ -183,7 +183,7 @@ export function extractToolResultParts(result: unknown): ContentPart[] {
  * lets callers preserve the legacy `content: string` shape for the common case
  * of text-only tool results.
  */
-export function collapseToString(parts: ContentPart[]): string | null {
+function collapseToString(parts: ContentPart[]): string | null {
   if (parts.length === 0) return "";
   if (parts.every((p) => p.type === "text")) {
     return parts.map((p) => (p as TextContentPart).text).join("\n");
