@@ -14,7 +14,6 @@ interface LLMConfig {
     | "anthropic"
     | "google"
     | "openrouter"
-    | "ollama"
     | "ollama";
   model: string;
   apiKey: string;
