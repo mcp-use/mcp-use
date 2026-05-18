@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.6
+
+### Patch Changes
+
+- 31f2104: Add Playwright e2e test covering the inspector's OAuth redirect flow against an emulated Google issuer (via `emulate`), exercising both "Direct" and "Via Proxy" connection types. Test-only — no runtime change.
+  - mcp-use@1.29.0-canary.6
+
 ## 7.0.0-canary.5
 
 ### Patch Changes

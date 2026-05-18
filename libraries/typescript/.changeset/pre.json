@@ -12,6 +12,7 @@
     "cross-platform-clean-scripts",
     "fix-oauth-metadata-double-slash",
     "inspector-skipped-log-wording",
+    "oauth-emulate-e2e",
     "prune-unused-exports",
     "quiet-files-cleanup",
     "supabase-oauth-url-override"
