@@ -308,10 +308,7 @@ export function setupOAuthRoutes(
     // DCR-direct mode: proxy to upstream
     try {
       const issuer = oauth.getIssuer();
-      const metadataUrl = new URL(
-        "/.well-known/oauth-authorization-server",
-        issuer
-      ).toString();
+      const metadataUrl = `${issuer.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
       console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
       const response = await fetch(metadataUrl);
 
