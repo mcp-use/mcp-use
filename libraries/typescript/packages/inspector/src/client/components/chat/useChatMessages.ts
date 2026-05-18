@@ -73,10 +73,6 @@ export function useChatMessages({
   const [rateLimitInfo, setRateLimitInfo] = useState<{
     loginUrl: string;
   } | null>(null);
-  // Surfaced when the chat backend (cloud.mcp-use) reports a 401 originating
-  // from the upstream MCP server (token expired/revoked). Distinct from
-  // `rateLimitInfo` (429 → Manufact account login) — here the user must
-  // re-run the MCP server's OAuth flow.
   const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
     mcpServerUrl: string;
     message?: string;
