@@ -245,8 +245,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     tempPassword,
     tempToken,
     getApiKeys,
-    getBaseUrls,
     saveApiKeys,
+    getBaseUrls,
     saveBaseUrls,
   ]);
 

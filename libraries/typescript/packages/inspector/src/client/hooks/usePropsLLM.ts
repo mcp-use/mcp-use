@@ -102,8 +102,8 @@ Example: {"query": "example search term", "results": [{"fruit": "Apple", "color"
             provider: llmConfig.provider,
             model: llmConfig.model,
             apiKey: llmConfig.apiKey,
-            baseUrl: llmConfig.baseUrl,
             temperature: llmConfig.temperature,
+            baseUrl: llmConfig.baseUrl,
           },
           messages,
         });
@@ -157,8 +157,8 @@ Based on this information, suggest 3-5 common customizable properties like theme
           provider: llmConfig.provider,
           model: llmConfig.model,
           apiKey: llmConfig.apiKey,
-          baseUrl: llmConfig.baseUrl,
           temperature: llmConfig.temperature,
+          baseUrl: llmConfig.baseUrl,
         },
         messages,
       });

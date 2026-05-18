@@ -37,8 +37,8 @@ export interface LLMConfig {
   provider: ProviderName;
   apiKey: string;
   model: string;
-  baseUrl?: string;
   temperature?: number;
+  baseUrl?: string;
 }
 
 export interface AuthConfig {

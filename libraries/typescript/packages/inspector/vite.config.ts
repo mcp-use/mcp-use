@@ -82,7 +82,6 @@ export default defineConfig({
         __dirname,
         "./src/client/stubs/posthog-node.js"
       ),
-
       "@scarf/scarf": path.resolve(
         __dirname,
         "./src/client/stubs/@scarf/scarf.js"
