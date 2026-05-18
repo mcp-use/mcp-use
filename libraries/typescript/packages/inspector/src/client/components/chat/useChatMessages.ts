@@ -239,9 +239,6 @@ export function useChatMessages({
                   (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
                 message: errBody.message as string | undefined,
               });
-              setMessages((prev) =>
-                prev.filter((m) => m.id !== `assistant-${Date.now()}`)
-              );
               return;
             }
           }

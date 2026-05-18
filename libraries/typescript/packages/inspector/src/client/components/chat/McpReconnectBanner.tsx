@@ -28,7 +28,14 @@ export function McpReconnectBanner({
     }
   }, [onReconnect]);
 
-  const label = serverName || new URL(serverUrl).host;
+  let label = serverName;
+  if (!label) {
+    try {
+      label = new URL(serverUrl).host;
+    } catch {
+      label = serverUrl;
+    }
+  }
 
   return (
     <div className="w-full flex justify-center items-center px-2 sm:px-4 mb-2">
