@@ -1,9 +1,12 @@
 export const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434";
 
 export function normalizeOllamaBaseUrl(baseUrl?: string): string {
-  const trimmed = (baseUrl || DEFAULT_OLLAMA_BASE_URL)
-    .trim()
-    .replace(/\/+$/, "");
+  const raw = (baseUrl || DEFAULT_OLLAMA_BASE_URL).trim();
+  let end = raw.length;
+  while (end > 0 && raw.charCodeAt(end - 1) === 47 /* '/' */) {
+    end--;
+  }
+  const trimmed = raw.slice(0, end);
 
   return trimmed.endsWith("/api") ? trimmed.slice(0, -4) : trimmed;
 }
