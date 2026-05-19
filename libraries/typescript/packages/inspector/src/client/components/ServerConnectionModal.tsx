@@ -113,7 +113,9 @@ export function ServerConnectionModal({
         setProxyAddress(proxyAddress);
       } else {
         setConnectionType("Direct");
-        setProxyAddress(`${window.location.origin}${inspectorPath("/inspector/api/proxy")}`);
+        setProxyAddress(
+          `${window.location.origin}${inspectorPath("/inspector/api/proxy")}`
+        );
       }
 
       // Convert headers from Record<string, string> to CustomHeader[]

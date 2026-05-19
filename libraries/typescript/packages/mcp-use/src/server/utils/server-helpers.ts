@@ -18,9 +18,7 @@ import { getEnv } from "./runtime.js";
 export function normalizeBasePath(input: string | undefined): string {
   if (input === undefined || input === "" || input === "/") return "";
   if (typeof input !== "string") {
-    throw new TypeError(
-      `[MCP] basePath must be a string, got ${typeof input}`
-    );
+    throw new TypeError(`[MCP] basePath must be a string, got ${typeof input}`);
   }
   if (!input.startsWith("/")) {
     throw new Error(

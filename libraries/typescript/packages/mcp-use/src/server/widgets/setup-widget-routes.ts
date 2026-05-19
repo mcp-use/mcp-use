@@ -34,33 +34,36 @@ export function setupWidgetRoutes(
 ): void {
   const basePath = serverConfig.basePath ?? "";
   // Serve static assets (JS, CSS) from the assets directory
-  app.get(`${basePath}/mcp-use/widgets/:widget/assets/*`, async (c: Context) => {
-    const widget = c.req.param("widget")!;
-    const assetFile = c.req.path.split("/assets/")[1];
-    const assetPath = pathHelpers.join(
-      getCwd(),
-      "dist",
-      "resources",
-      "widgets",
-      widget,
-      "assets",
-      assetFile
-    );
+  app.get(
+    `${basePath}/mcp-use/widgets/:widget/assets/*`,
+    async (c: Context) => {
+      const widget = c.req.param("widget")!;
+      const assetFile = c.req.path.split("/assets/")[1];
+      const assetPath = pathHelpers.join(
+        getCwd(),
+        "dist",
+        "resources",
+        "widgets",
+        widget,
+        "assets",
+        assetFile
+      );
 
-    try {
-      if (await fsHelpers.existsSync(assetPath)) {
-        const content = await fsHelpers.readFile(assetPath);
-        const contentType = getContentType(assetFile);
-        return new Response(content, {
-          status: 200,
-          headers: { "Content-Type": contentType },
-        });
+      try {
+        if (await fsHelpers.existsSync(assetPath)) {
+          const content = await fsHelpers.readFile(assetPath);
+          const contentType = getContentType(assetFile);
+          return new Response(content, {
+            status: 200,
+            headers: { "Content-Type": contentType },
+          });
+        }
+        return c.notFound();
+      } catch {
+        return c.notFound();
       }
-      return c.notFound();
-    } catch {
-      return c.notFound();
     }
-  });
+  );
 
   // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
   app.get(`${basePath}/mcp-use/widgets/assets/*`, async (c: Context) => {
@@ -113,7 +116,12 @@ export function setupWidgetRoutes(
     try {
       let html = await fsHelpers.readFileSync(filePath, "utf8");
       // Process HTML with base URL injection and path conversion
-      html = processWidgetHtml(html, widget, serverConfig.serverBaseUrl, basePath);
+      html = processWidgetHtml(
+        html,
+        widget,
+        serverConfig.serverBaseUrl,
+        basePath
+      );
       return c.html(html);
     } catch {
       return c.notFound();
