@@ -10,6 +10,7 @@
   "changesets": [
     "clean-inspector-files",
     "cross-platform-clean-scripts",
+    "fix-knip-tabcountbadge-barrel",
     "fix-oauth-metadata-double-slash",
     "inspector-mcp-reconnect-banner",
     "inspector-skipped-log-wording",

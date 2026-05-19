@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.9
+
+### Patch Changes
+
+- d08b524: Drop unused `TabCountBadge` re-export from the shared barrel; the only consumer imports it directly. Fixes Knip CI on canary.
+  - mcp-use@1.29.0-canary.9
+
 ## 7.0.0-canary.8
 
 ### Patch Changes
