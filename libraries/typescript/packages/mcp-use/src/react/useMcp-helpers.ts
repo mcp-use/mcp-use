@@ -3,6 +3,14 @@ import type { OAuthClientInformation } from "@modelcontextprotocol/sdk/shared/au
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
 
+/** Human-readable reason when MCP operations run before the client is usable. */
+export function formatMcpNotReadyReason(
+  state: string,
+  hasClient: boolean
+): string {
+  return !hasClient ? `client disconnected (state=${state})` : `state=${state}`;
+}
+
 type OAuthClientConfig = {
   name?: string;
   version?: string;
