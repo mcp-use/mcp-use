@@ -323,6 +323,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
+  /** Bumped at the start of each connect(); disconnect only clears clientRef if epoch unchanged. */
+  const connectEpochRef = useRef(0);
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
 
@@ -407,6 +409,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = null;
 
+      const epochAtStart = connectEpochRef.current;
       const clientToClose = clientRef.current;
       if (clientToClose) {
         try {
@@ -427,9 +430,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           if (!quiet) addLog("warn", "Error closing session:", err);
         }
       }
-      // Only clear if still the client we closed — a newer connect() may have
-      // replaced clientRef while closeSession was in flight (e.g. URL change).
-      if (clientRef.current === clientToClose) {
+      // Only clear if still the same client and connect epoch — a newer connect()
+      // may have reused the instance and bumped the epoch while closeSession was
+      // in flight (e.g. dashboard environment / URL change).
+      if (
+        clientRef.current === clientToClose &&
+        connectEpochRef.current === epochAtStart
+      ) {
         clientRef.current = null;
       }
 
@@ -501,11 +508,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
 
         // Clear client/auth refs to force fresh initialization with proxy.
-        // Keep externally provided auth providers intact.
-        const clientToClear = clientRef.current;
-        if (clientRef.current === clientToClear) {
-          clientRef.current = null;
-        }
+        // Keep externally provided auth providers intact. Synchronous clear;
+        // reconnect is deferred via setTimeout below, so no disconnect race.
+        clientRef.current = null;
         if (!providedAuthProvider) {
           authProviderRef.current = null;
         }
@@ -605,6 +610,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
 
     connectingRef.current = true;
+    connectEpochRef.current += 1;
     connectAttemptRef.current += 1;
     setError(undefined);
     setAuthUrl(undefined);
