@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.11
+
+### Patch Changes
+
+- 3fc04e5: Replace the trailing-slash regex in `normalizeOllamaBaseUrl` with an explicit linear scan. The regex was flagged by CodeQL as a polynomial regular expression on uncontrolled input; the new implementation is unambiguously linear and behaves identically.
+  - mcp-use@1.29.0-canary.11
+
 ## 7.0.0-canary.10
 
 ### Minor Changes
