@@ -9,12 +9,18 @@ const packageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
 );
 
-export default defineConfig({
-  // Relative base so the built inspector is portable: the embedding host
-  // serves it under whatever URL it wants and injects a runtime <base href>
-  // that the browser uses to resolve these relative asset paths. Vite's own
-  // dynamic chunk loader uses import.meta.url, so code-splitting still works.
-  base: "./",
+export default defineConfig(({ command }) => ({
+  // For the production build, ship the inspector with **relative** asset URLs
+  // (`./assets/...`) so it's portable: an embedding host can mount the bundle
+  // under any prefix and a runtime `<base href>` resolves the chunks
+  // correctly. Vite's own dynamic-chunk loader uses `import.meta.url`, so
+  // code-splitting keeps working.
+  //
+  // For `vite dev`, keep the historical `/inspector` mount so the standalone
+  // dev URL (http://localhost:3000/inspector) and the API-proxy rules below
+  // continue to work exactly as before — relative base in dev would shift
+  // the dev URL to `/` and break the workflow.
+  base: command === "build" ? "./" : "/inspector",
   plugins: [
     react(),
     tailwindcss(),
@@ -185,4 +191,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
