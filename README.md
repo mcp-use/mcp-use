@@ -350,6 +350,32 @@ main();
 
 [**→ Full TypeScript Agent Documentation**](./libraries/typescript/README.md#-quick-start)
 
+#### Guarding stdio MCP servers
+
+For local security checks before a stdio MCP server receives tool calls, wrap
+the server with [Armorer Guard](https://github.com/ArmorerLabs/Armorer-Guard):
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "armorer-guard",
+      "args": [
+        "mcp-proxy",
+        "--",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/tmp"
+      ]
+    }
+  }
+}
+```
+
+The proxy inspects tool-call arguments locally for prompt injection, credential
+leakage, exfiltration risk, and dangerous actions before forwarding safe calls.
+
 </details>
 
 <details>
