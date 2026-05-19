@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.8
+
+### Patch Changes
+
+- 64e2ae3: Keep per-tab count badges visible in collapsed header tabs and align them to the right of the tab label. Extract shared `TabCountBadge` styling for mobile and desktop tab rows.
+  - mcp-use@1.29.0-canary.8
+
 ## 7.0.0-canary.7
 
 ### Patch Changes

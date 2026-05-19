@@ -13,6 +13,7 @@
     "fix-oauth-metadata-double-slash",
     "inspector-mcp-reconnect-banner",
     "inspector-skipped-log-wording",
+    "inspector-tab-count-badge",
     "oauth-emulate-e2e",
     "prune-unused-exports",
     "quiet-files-cleanup",
