@@ -81,7 +81,7 @@ export const DEFAULT_MODELS: Record<ProviderName, string> = {
   ollama: "qwen3",
 };
 
-export const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
+const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
   ollama: DEFAULT_OLLAMA_BASE_URL,
 };
 
