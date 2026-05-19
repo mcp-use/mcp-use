@@ -35,7 +35,10 @@ export async function writeServerInfoFile(info: {
       inspectorUrl: `http://${info.host}:${info.port}${info.basePath}/inspector`,
       writtenAt: new Date().toISOString(),
     };
-    await writeFile(join(dir, "server-info.json"), JSON.stringify(payload, null, 2));
+    await writeFile(
+      join(dir, "server-info.json"),
+      JSON.stringify(payload, null, 2)
+    );
   } catch {
     // Best-effort — tooling falls back to /mcp and /inspector if the file is absent.
   }

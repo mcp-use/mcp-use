@@ -90,9 +90,7 @@ export class Telemetry {
   private readonly POSTHOG_PROXY_URL = inspectorPath(
     "/inspector/api/tel/posthog"
   );
-  private readonly SCARF_PROXY_URL = inspectorPath(
-    "/inspector/api/tel/scarf"
-  );
+  private readonly SCARF_PROXY_URL = inspectorPath("/inspector/api/tel/scarf");
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;

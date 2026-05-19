@@ -171,10 +171,7 @@ export function registerInspectorRoutes(
     // Use the runtime basePath so the inner fetch lands on the right URL
     // when the embedding host mounts the inspector under a prefix.
     return c.html(
-      generateWidgetContainerHtml(
-        `${config?.basePath ?? ""}/inspector`,
-        toolId
-      )
+      generateWidgetContainerHtml(`${config?.basePath ?? ""}/inspector`, toolId)
     );
   });
 

@@ -13,8 +13,7 @@ export const MCP_APPS_CONFIG = {
    * `window.__MCP_BASE_PATH__` has been read off the injected script.
    */
   API_ENDPOINTS: {
-    WIDGET_STORE: () =>
-      inspectorPath("/inspector/api/mcp-apps/widget/store"),
+    WIDGET_STORE: () => inspectorPath("/inspector/api/mcp-apps/widget/store"),
     WIDGET_CONTENT: (toolCallId: string) =>
       inspectorPath(`/inspector/api/mcp-apps/widget-content/${toolCallId}`),
   },

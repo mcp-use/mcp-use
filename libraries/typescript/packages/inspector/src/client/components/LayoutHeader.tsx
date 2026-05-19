@@ -358,9 +358,12 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch(inspectorPath("/inspector/api/dev/start-tunnel"), {
-        method: "POST",
-      });
+      const res = await fetch(
+        inspectorPath("/inspector/api/dev/start-tunnel"),
+        {
+          method: "POST",
+        }
+      );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.error((data as any).error || "Failed to start tunnel");
