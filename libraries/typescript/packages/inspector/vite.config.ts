@@ -10,7 +10,11 @@ const packageJson = JSON.parse(
 );
 
 export default defineConfig({
-  base: "/inspector",
+  // Relative base so the built inspector is portable: the embedding host
+  // serves it under whatever URL it wants and injects a runtime <base href>
+  // that the browser uses to resolve these relative asset paths. Vite's own
+  // dynamic chunk loader uses import.meta.url, so code-splitting still works.
+  base: "./",
   plugins: [
     react(),
     tailwindcss(),

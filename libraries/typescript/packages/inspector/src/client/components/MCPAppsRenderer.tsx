@@ -297,7 +297,7 @@ function MCPAppsRendererBase({
 
         // Store widget data
         const storeResponse = await fetch(
-          MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_STORE,
+          MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_STORE(),
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

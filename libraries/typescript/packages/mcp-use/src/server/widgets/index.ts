@@ -48,6 +48,7 @@ export async function mountWidgets(
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,
     publicRoutesMode: (server as any).publicRoutesMode,
+    basePath: (server as any).basePath ?? "",
     /** Pre-created HTTP server for Vite HMR WebSocket support */
     httpServer: (server as any)._httpServer as
       | import("http").Server

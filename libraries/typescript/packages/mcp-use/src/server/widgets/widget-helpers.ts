@@ -310,7 +310,8 @@ export function getContentType(filename: string): string {
 export function processWidgetHtml(
   html: string,
   widgetName: string,
-  baseUrl: string
+  baseUrl: string,
+  basePath: string = ""
 ): string {
   let processedHtml = html;
 
@@ -349,11 +350,11 @@ export function processWidgetHtml(
     // Replace relative paths that start with /mcp-use for scripts and CSS with absolute URLs
     processedHtml = processedHtml.replace(
       /src="\/mcp-use\/widgets\/([^"]+)"/g,
-      `src="${baseUrl}/mcp-use/widgets/$1"`
+      `src="${baseUrl}${basePath}/mcp-use/widgets/$1"`
     );
     processedHtml = processedHtml.replace(
       /href="\/mcp-use\/widgets\/([^"]+)"/g,
-      `href="${baseUrl}/mcp-use/widgets/$1"`
+      `href="${baseUrl}${basePath}/mcp-use/widgets/$1"`
     );
 
     // Add window.__getFile and window.__mcpPublicUrl to head
@@ -361,7 +362,7 @@ export function processWidgetHtml(
     const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}${basePath}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}${basePath}/mcp-use/public";</script>`
     );
   }
 
@@ -711,7 +712,7 @@ export async function registerWidgetFromTemplate(
   widgetName: string,
   htmlPath: string,
   metadata: Record<string, unknown>,
-  serverConfig: { serverBaseUrl: string; cspUrls: string[] },
+  serverConfig: { serverBaseUrl: string; cspUrls: string[]; basePath?: string },
   registerWidget: import("./widget-types.js").RegisterWidgetCallback,
   isDev: boolean = false
 ): Promise<void> {
@@ -722,7 +723,12 @@ export async function registerWidgetFromTemplate(
   }
 
   // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  html = processWidgetHtml(
+    html,
+    widgetName,
+    serverConfig.serverBaseUrl,
+    serverConfig.basePath ?? ""
+  );
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
@@ -759,12 +765,14 @@ export async function registerWidgetFromTemplate(
  */
 export function setupPublicRoutes(
   app: HonoType,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  basePath: string = ""
 ): void {
-  app.get("/mcp-use/public/*", async (c: Context) => {
-    const filePath = c.req.path.replace("/mcp-use/public/", "");
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, filePath);
+  const routePrefix = `${basePath}/mcp-use/public/`;
+  app.get(`${routePrefix}*`, async (c: Context) => {
+    const filePath = c.req.path.replace(routePrefix, "");
+    const fsBase = useDistDirectory ? "dist/public" : "public";
+    const fullPath = pathHelpers.join(getCwd(), fsBase, filePath);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {
@@ -804,15 +812,16 @@ export function setupPublicRoutes(
 export function setupFaviconRoute(
   app: HonoType,
   faviconPath: string | undefined,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  basePath: string = ""
 ): void {
   if (!faviconPath) {
     return; // No favicon configured
   }
 
-  app.get("/favicon.ico", async (c: Context) => {
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, faviconPath);
+  const handler = async (c: Context) => {
+    const fsBase = useDistDirectory ? "dist/public" : "public";
+    const fullPath = pathHelpers.join(getCwd(), fsBase, faviconPath);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {
@@ -830,5 +839,13 @@ export function setupFaviconRoute(
     } catch {
       return c.notFound();
     }
-  });
+  };
+
+  // Always serve at /favicon.ico so browsers' implicit root request works,
+  // and additionally under the basePath so links generated under the prefix
+  // continue to resolve.
+  app.get("/favicon.ico", handler);
+  if (basePath) {
+    app.get(`${basePath}/favicon.ico`, handler);
+  }
 }

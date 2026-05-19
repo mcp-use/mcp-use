@@ -44,6 +44,14 @@ export type InspectorRoutesConfig = {
   autoConnectUrl?: string | null;
   /** HTTP port the app listens on (embedded inspector); required for tunnel start */
   serverPort?: number;
+  /**
+   * Embedding host's mount prefix (no trailing slash). Used to construct
+   * absolute URLs that the browser will fetch back (e.g. inside the widget
+   * container HTML). Hono route registrations themselves use the bare
+   * `/inspector/...` paths since the embedding host mounts a sub-Hono at
+   * `basePath` and the prefix is composed automatically.
+   */
+  basePath?: string;
 };
 
 export function registerInspectorRoutes(
@@ -159,8 +167,15 @@ export function registerInspectorRoutes(
       );
     }
 
-    // Return a container page that will fetch and load the actual widget
-    return c.html(generateWidgetContainerHtml("/inspector", toolId));
+    // Return a container page that will fetch and load the actual widget.
+    // Use the runtime basePath so the inner fetch lands on the right URL
+    // when the embedding host mounts the inspector under a prefix.
+    return c.html(
+      generateWidgetContainerHtml(
+        `${config?.basePath ?? ""}/inspector`,
+        toolId
+      )
+    );
   });
 
   // Widget content endpoint - serves pre-fetched resource with injected OpenAI API

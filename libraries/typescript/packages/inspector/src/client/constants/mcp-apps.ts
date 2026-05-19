@@ -2,14 +2,21 @@
  * MCP Apps configuration constants
  */
 
+import { inspectorPath } from "../utils/basePath";
+
 export const MCP_APPS_CONFIG = {
   /**
    * API endpoints for widget operations
+   *
+   * Note: these are getters (not eager string literals) so they pick up the
+   * runtime basePath even if this module is imported before
+   * `window.__MCP_BASE_PATH__` has been read off the injected script.
    */
   API_ENDPOINTS: {
-    WIDGET_STORE: "/inspector/api/mcp-apps/widget/store",
+    WIDGET_STORE: () =>
+      inspectorPath("/inspector/api/mcp-apps/widget/store"),
     WIDGET_CONTENT: (toolCallId: string) =>
-      `/inspector/api/mcp-apps/widget-content/${toolCallId}`,
+      inspectorPath(`/inspector/api/mcp-apps/widget-content/${toolCallId}`),
   },
 
   /**

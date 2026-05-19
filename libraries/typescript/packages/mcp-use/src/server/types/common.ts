@@ -73,6 +73,21 @@ export interface ServerConfig {
    */
   baseUrl?: string;
   /**
+   * Mount every route the server registers under this path prefix.
+   *
+   * Affects the MCP transport (`/mcp`, `/sse`), the inspector UI, widget +
+   * public asset routes, OAuth flow + metadata endpoints, and the bearer-auth
+   * middleware. With `basePath: "/api"` the MCP transport is reachable at
+   * `/api/mcp`, the inspector at `/api/inspector`, etc.
+   *
+   * Must start with a `/` and must not end with one. An empty string or `"/"`
+   * means "no prefix" (the default).
+   *
+   * @example "/api"
+   * @example "/mcp-server"
+   */
+  basePath?: string;
+  /**
    * Custom CORS options for the server.
    *
    * By default, mcp-use enables permissive CORS (`origin: "*"`) for development ergonomics.

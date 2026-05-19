@@ -180,6 +180,31 @@ function normalizeBrowserHost(host: string): string {
   return host === "0.0.0.0" ? "localhost" : host;
 }
 
+/**
+ * Read the running server's basePath from `.mcp-use/server-info.json` if the
+ * server wrote one on startup. Returns "" when the file is missing or stale,
+ * which preserves the historical bare `/mcp` / `/inspector` behavior for
+ * servers configured without a basePath.
+ *
+ * The file is polled (not just read once) because `waitForServer` only
+ * confirms the HTTP port is open — server-info.json is written immediately
+ * before that point, so it should already exist by the time we read.
+ */
+async function readServerBasePath(projectPath: string): Promise<string> {
+  try {
+    const { readFile } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const raw = await readFile(
+      join(projectPath, ".mcp-use", "server-info.json"),
+      "utf-8"
+    );
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.basePath === "string" ? parsed.basePath : "";
+  } catch {
+    return "";
+  }
+}
+
 // Helper to run a command
 function runCommand(
   command: string,
@@ -1862,11 +1887,12 @@ program
           const browserHost = normalizeBrowserHost(host);
           const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const basePath = await readServerBasePath(projectPath);
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}/mcp`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}/mcp`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1876,7 +1902,9 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(
+                chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}/mcp`)
+              );
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
@@ -2136,11 +2164,12 @@ program
           const browserHost = normalizeBrowserHost(host);
           const ready = await waitForServer(port, browserHost);
           if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const basePath = await readServerBasePath(projectPath);
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}/mcp`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}/mcp`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -2150,7 +2179,9 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(
+                chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}/mcp`)
+              );
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
             console.log(chalk.gray(`Watching for changes...\n`));
