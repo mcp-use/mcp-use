@@ -198,11 +198,16 @@ export function setupOAuthRoutes(
   basePath: string = ""
 ): void {
   const proxyMode = isOAuthProxy(oauth);
+  // `baseUrl` is the server origin (no path); `basePath` is the externally-
+  // visible prefix the inner app is sub-mounted under. The combination is
+  // what goes into discovery metadata so clients land on the right paths.
+  // Route registrations themselves use bare paths — the sub-mount adds the
+  // prefix externally.
   const prefixedBaseUrl = `${baseUrl}${basePath}`;
   // Enable CORS for all OAuth-related endpoints
   // This is required for browser-based MCP clients to discover OAuth metadata
   app.use(
-    `${basePath}/.well-known/*`,
+    "/.well-known/*",
     cors({
       origin: "*", // Allow all origins for metadata discovery
       allowMethods: ["GET", "OPTIONS"],
@@ -216,7 +221,7 @@ export function setupOAuthRoutes(
   // In DCR-direct mode: dormant (clients reach upstream directly)
   // In proxy mode: active (handles OAuth flow through the proxy)
   app.use(
-    `${basePath}/authorize`,
+    "/authorize",
     cors({
       origin: "*",
       allowMethods: ["GET", "POST", "OPTIONS"],
@@ -225,7 +230,7 @@ export function setupOAuthRoutes(
     })
   );
   app.use(
-    `${basePath}/token`,
+    "/token",
     cors({
       origin: "*",
       allowMethods: ["POST", "OPTIONS"],
@@ -236,9 +241,9 @@ export function setupOAuthRoutes(
 
   // Mount /authorize and /token handlers
   const handleAuthorize = createAuthorizeHandler(oauth);
-  app.get(`${basePath}/authorize`, handleAuthorize);
-  app.post(`${basePath}/authorize`, handleAuthorize);
-  app.post(`${basePath}/token`, createTokenHandler(oauth));
+  app.get("/authorize", handleAuthorize);
+  app.post("/authorize", handleAuthorize);
+  app.post("/token", createTokenHandler(oauth));
 
   // In proxy mode, add /register endpoint that returns the configured clientId
   // This allows MCP clients to "register" even though the client is pre-registered
@@ -246,7 +251,7 @@ export function setupOAuthRoutes(
     const proxy = oauth as OAuthProxy;
 
     app.use(
-      `${basePath}/register`,
+      "/register",
       cors({
         origin: "*",
         allowMethods: ["POST", "OPTIONS"],
@@ -255,7 +260,7 @@ export function setupOAuthRoutes(
       })
     );
 
-    app.post(`${basePath}/register`, async (c: Context) => {
+    app.post("/register", async (c: Context) => {
       const body = await c.req.json().catch(() => ({}));
 
       // Return a fake registration response with the configured clientId
@@ -347,11 +352,11 @@ export function setupOAuthRoutes(
 
   // Register the handler for both OAuth and OpenID Connect discovery endpoints
   app.get(
-    `${basePath}/.well-known/oauth-authorization-server`,
+    "/.well-known/oauth-authorization-server",
     handleAuthorizationServerMetadata
   );
   app.get(
-    `${basePath}/.well-known/openid-configuration`,
+    "/.well-known/openid-configuration",
     handleAuthorizationServerMetadata
   );
 
@@ -362,7 +367,7 @@ export function setupOAuthRoutes(
    * DCR-direct mode: Points to the actual OAuth provider.
    * Proxy mode: Points to the local server (which proxies to upstream).
    */
-  app.get(`${basePath}/.well-known/oauth-protected-resource`, (c: Context) => {
+  app.get("/.well-known/oauth-protected-resource", (c: Context) => {
     // In proxy mode, the authorization server is the local proxy
     const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
 
@@ -380,17 +385,14 @@ export function setupOAuthRoutes(
 
   // Path-scoped protected resource metadata per RFC 9728 — declares that the
   // `/mcp` path specifically is the protected resource.
-  app.get(
-    `${basePath}/.well-known/oauth-protected-resource/mcp`,
-    (c: Context) => {
-      const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
+  app.get("/.well-known/oauth-protected-resource/mcp", (c: Context) => {
+    const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
 
-      return c.json({
-        resource: `${prefixedBaseUrl}/mcp`,
-        authorization_servers: [authServer],
-        scopes_supported: oauth.getScopesSupported(),
-        bearer_methods_supported: ["header"],
-      });
-    }
-  );
+    return c.json({
+      resource: `${prefixedBaseUrl}/mcp`,
+      authorization_servers: [authServer],
+      scopes_supported: oauth.getScopesSupported(),
+      bearer_methods_supported: ["header"],
+    });
+  });
 }

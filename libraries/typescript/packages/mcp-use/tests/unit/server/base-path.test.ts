@@ -107,6 +107,49 @@ describe("MCPServer basePath", () => {
 
       expect(response.status).toBe(200);
     });
+
+    it("auto-prefixes user-registered routes under basePath", async () => {
+      const server = new MCPServer({
+        name: "user-route-prefix",
+        version: "1.0.0",
+        basePath: "/api",
+      });
+
+      // User registers a custom route on `server.app`. With basePath set,
+      // this should be reachable at `${basePath}/health`, not at `/health`.
+      server.app.get("/health", (c) => c.text("ok"));
+
+      const handler = await server.getHandler();
+
+      const prefixed = await handler(new Request("http://localhost/api/health"));
+      expect(prefixed.status).toBe(200);
+      expect(await prefixed.text()).toBe("ok");
+
+      const root = await handler(new Request("http://localhost/health"));
+      expect(root.status).toBe(404);
+    });
+
+    it("serves root serverinfo with basePath-aware URLs", async () => {
+      const server = new MCPServer({
+        name: "serverinfo-base-path",
+        version: "1.0.0",
+        basePath: "/api",
+      });
+
+      const handler = await server.getHandler();
+      const response = await handler(
+        new Request("http://localhost/__mcp-use/serverinfo")
+      );
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        basePath: "/api",
+        mcpPath: "/api/mcp",
+        inspectorPath: "/api/inspector",
+        mcpUrl: "http://localhost/api/mcp",
+        inspectorUrl: "http://localhost/api/inspector",
+      });
+    });
   });
 
   describe("instance state", () => {

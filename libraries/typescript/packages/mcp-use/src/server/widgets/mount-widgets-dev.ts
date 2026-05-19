@@ -1382,10 +1382,13 @@ export default PostHog;
   app.use(`${baseRoute}/*`, viteMiddleware);
 
   // Serve static files from public directory in dev mode
-  // Only set up if not already configured (e.g., in constructor)
+  // Only set up if not already configured (e.g., in constructor).
+  // Favicon goes on the outer app so browsers' implicit `/favicon.ico`
+  // resolves regardless of basePath; falls back to inner when no outer.
   if (!serverConfig.publicRoutesMode) {
     setupPublicRoutes(app, false);
-    setupFaviconRoute(app, serverConfig.favicon, false);
+    const faviconHost = (serverConfig as any).rootApp ?? app;
+    setupFaviconRoute(faviconHost, serverConfig.favicon, false);
   }
 
   // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware

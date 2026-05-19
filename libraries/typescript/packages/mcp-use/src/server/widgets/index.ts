@@ -49,6 +49,12 @@ export async function mountWidgets(
     favicon: (server as any).favicon,
     publicRoutesMode: (server as any).publicRoutesMode,
     basePath: (server as any).basePath ?? "",
+    /**
+     * Outer Hono so widget setup can register favicon at root regardless of
+     * the basePath sub-mount. Falls back to `(server as any).app` when the
+     * server doesn't expose `_rootApp` (older instances, no basePath).
+     */
+    rootApp: (server as any)._rootApp ?? (server as any).app,
     /** Pre-created HTTP server for Vite HMR WebSocket support */
     httpServer: (server as any)._httpServer as
       | import("http").Server

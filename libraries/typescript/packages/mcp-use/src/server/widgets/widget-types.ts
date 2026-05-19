@@ -32,6 +32,14 @@ export interface ServerConfig {
    * Empty string means "no prefix".
    */
   basePath?: string;
+  /**
+   * Outer Hono receiving raw HTTP requests. When `basePath` is set, this
+   * differs from the inner `app` passed to widget mount helpers; favicon
+   * and other always-at-root routes register here. When `basePath` is
+   * unset, this is the same instance as the inner app.
+   * @internal
+   */
+  rootApp?: any;
 }
 
 /**

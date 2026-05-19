@@ -243,6 +243,39 @@ server.tool(
 
 ---
 
+## Mounting Under a Path Prefix
+
+Use the `basePath` server option to move every route mcp-use registers under a single prefix. Useful when the server lives behind a reverse proxy that namespaces paths, or when you want to host MCP alongside other routes on the same origin.
+
+```typescript
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  basePath: "/api",
+});
+```
+
+With `basePath: "/api"`:
+
+| Default | With prefix |
+|---|---|
+| `POST /mcp` | `POST /api/mcp` |
+| `GET /sse` | `GET /api/sse` |
+| `GET /inspector` | `GET /api/inspector` |
+| `/mcp-use/widgets/*` | `/api/mcp-use/widgets/*` |
+| `/.well-known/oauth-authorization-server` | `/api/.well-known/oauth-authorization-server` |
+| `/authorize`, `/token`, `/register` | `/api/authorize`, `/api/token`, `/api/register` |
+
+OAuth discovery metadata (`issuer`, `authorization_endpoint`, `token_endpoint`, etc.) is rebuilt to include the prefix, so standard OAuth 2.1 / RFC 9728 discovery works without extra config.
+
+**Rules:**
+- Must start with `/` and must not end with `/`
+- Empty string or `"/"` means "no prefix" (the default)
+- `/favicon.ico` stays at the root so browsers' implicit favicon request still resolves
+- Custom routes you register with `server.get(...)` or `server.app.get(...)` are **not** auto-prefixed — write them at the path you want them served from
+
+---
+
 ## Custom HTTP Endpoints
 
 You can mix MCP tools with custom HTTP routes:

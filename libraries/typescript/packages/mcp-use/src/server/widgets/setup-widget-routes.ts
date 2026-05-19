@@ -33,40 +33,42 @@ export function setupWidgetRoutes(
   serverConfig: ServerConfig
 ): void {
   const basePath = serverConfig.basePath ?? "";
+  // Register on the inner app at bare paths. When `basePath` is configured
+  // the inner app is sub-mounted under it externally, so these become
+  // `${basePath}/mcp-use/widgets/...` from the outside. `basePath` is still
+  // threaded into `processWidgetHtml` because emitted HTML needs absolute
+  // URLs that include the prefix.
   // Serve static assets (JS, CSS) from the assets directory
-  app.get(
-    `${basePath}/mcp-use/widgets/:widget/assets/*`,
-    async (c: Context) => {
-      const widget = c.req.param("widget")!;
-      const assetFile = c.req.path.split("/assets/")[1];
-      const assetPath = pathHelpers.join(
-        getCwd(),
-        "dist",
-        "resources",
-        "widgets",
-        widget,
-        "assets",
-        assetFile
-      );
+  app.get("/mcp-use/widgets/:widget/assets/*", async (c: Context) => {
+    const widget = c.req.param("widget")!;
+    const assetFile = c.req.path.split("/assets/")[1];
+    const assetPath = pathHelpers.join(
+      getCwd(),
+      "dist",
+      "resources",
+      "widgets",
+      widget,
+      "assets",
+      assetFile
+    );
 
-      try {
-        if (await fsHelpers.existsSync(assetPath)) {
-          const content = await fsHelpers.readFile(assetPath);
-          const contentType = getContentType(assetFile);
-          return new Response(content, {
-            status: 200,
-            headers: { "Content-Type": contentType },
-          });
-        }
-        return c.notFound();
-      } catch {
-        return c.notFound();
+    try {
+      if (await fsHelpers.existsSync(assetPath)) {
+        const content = await fsHelpers.readFile(assetPath);
+        const contentType = getContentType(assetFile);
+        return new Response(content, {
+          status: 200,
+          headers: { "Content-Type": contentType },
+        });
       }
+      return c.notFound();
+    } catch {
+      return c.notFound();
     }
-  );
+  });
 
   // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
-  app.get(`${basePath}/mcp-use/widgets/assets/*`, async (c: Context) => {
+  app.get("/mcp-use/widgets/assets/*", async (c: Context) => {
     const assetFile = c.req.path.split("/assets/")[1];
     // Try to find which widget this asset belongs to by checking all widget directories
     const widgetsDir = pathHelpers.join(
@@ -102,7 +104,7 @@ export function setupWidgetRoutes(
 
   // Serve each widget's index.html at its route
   // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
-  app.get(`${basePath}/mcp-use/widgets/:widget`, async (c: Context) => {
+  app.get("/mcp-use/widgets/:widget", async (c: Context) => {
     const widget = c.req.param("widget")!;
     const filePath = pathHelpers.join(
       getCwd(),
@@ -115,7 +117,10 @@ export function setupWidgetRoutes(
 
     try {
       let html = await fsHelpers.readFileSync(filePath, "utf8");
-      // Process HTML with base URL injection and path conversion
+      // Process HTML with base URL injection and path conversion.
+      // basePath still flows in here because emitted <script src>/<link href>
+      // URLs need to be absolute and include the prefix so the browser
+      // requests `${baseUrl}${basePath}/mcp-use/widgets/...`.
       html = processWidgetHtml(
         html,
         widget,
@@ -129,8 +134,12 @@ export function setupWidgetRoutes(
   });
 
   // Serve static files from public directory (production mode)
-  setupPublicRoutes(app, true, basePath);
+  setupPublicRoutes(app, true);
 
-  // Setup favicon route at server root (production mode)
-  setupFaviconRoute(app, serverConfig.favicon, true, basePath);
+  // Setup favicon at server root (production mode). Register on the outer
+  // app so browsers' implicit `GET /favicon.ico` always resolves — even
+  // when `basePath` is set and the inner app only handles prefixed
+  // requests. Falls back to the inner app when no outer is supplied.
+  const faviconHost = (serverConfig as any).rootApp ?? app;
+  setupFaviconRoute(faviconHost, serverConfig.favicon, true);
 }

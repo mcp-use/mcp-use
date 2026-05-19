@@ -146,23 +146,58 @@ async function findAvailablePort(
   throw new Error("No available ports found");
 }
 
-// Helper to check if server is ready
+type ServerInfo = {
+  basePath: string;
+  mcpPath?: string;
+  inspectorPath?: string;
+  mcpUrl?: string;
+  inspectorUrl?: string;
+};
+
+async function fetchServerInfo(
+  port: number,
+  host: string = "localhost",
+  signal?: AbortSignal
+): Promise<ServerInfo | null> {
+  const response = await fetch(`http://${host}:${port}/__mcp-use/serverinfo`, {
+    signal,
+  });
+  if (!response.ok) return null;
+
+  const parsed = await response.json();
+  return {
+    basePath: typeof parsed?.basePath === "string" ? parsed.basePath : "",
+    mcpPath: typeof parsed?.mcpPath === "string" ? parsed.mcpPath : undefined,
+    inspectorPath:
+      typeof parsed?.inspectorPath === "string"
+        ? parsed.inspectorPath
+        : undefined,
+    mcpUrl: typeof parsed?.mcpUrl === "string" ? parsed.mcpUrl : undefined,
+    inspectorUrl:
+      typeof parsed?.inspectorUrl === "string"
+        ? parsed.inspectorUrl
+        : undefined,
+  };
+}
+
+// Helper to check if server is ready and discover its externally-mounted paths.
 async function waitForServer(
   port: number,
   host: string = "localhost",
   maxAttempts = 30
-): Promise<boolean> {
+): Promise<ServerInfo | null> {
   for (let i = 0; i < maxAttempts; i++) {
     const controller = new AbortController();
     try {
-      // Use /inspector/health endpoint for cleaner health checks
-      // This avoids 400 errors from the MCP endpoint which requires session headers
+      const serverInfo = await fetchServerInfo(port, host, controller.signal);
+      if (serverInfo) return serverInfo;
+
+      // Back-compat for older servers without the discovery endpoint.
       const response = await fetch(`http://${host}:${port}/inspector/health`, {
         signal: controller.signal,
       });
-
       if (response.ok) {
-        return true;
+        return { basePath: "" };
       }
     } catch {
       // Server not ready yet
@@ -171,31 +206,13 @@ async function waitForServer(
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  return false;
+  return null;
 }
 
 // Helper to normalize host for browser connections
 // 0.0.0.0 is valid for server binding but browsers cannot connect to it
 function normalizeBrowserHost(host: string): string {
   return host === "0.0.0.0" ? "localhost" : host;
-}
-
-/**
- * Read the running server's basePath from `.mcp-use/server-info.json`. The
- * server writes this file before reporting ready, so it should already exist
- * by the time we read. Returns "" when missing or unparseable.
- */
-async function readServerBasePath(projectPath: string): Promise<string> {
-  try {
-    const raw = await readFile(
-      path.join(projectPath, ".mcp-use", "server-info.json"),
-      "utf-8"
-    );
-    const parsed = JSON.parse(raw);
-    return typeof parsed?.basePath === "string" ? parsed.basePath : "";
-  } catch {
-    return "";
-  }
 }
 
 // Helper to run a command
@@ -1878,9 +1895,9 @@ program
         if (options.open !== false) {
           const startTime = Date.now();
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
-          if (ready) {
-            const basePath = await readServerBasePath(projectPath);
+          const serverInfo = await waitForServer(port, browserHost);
+          if (serverInfo) {
+            const basePath = serverInfo.basePath;
             const mcpEndpoint = `http://${browserHost}:${port}${basePath}/mcp`;
             const autoConnectEndpoint = tunnelUrl
               ? `${tunnelUrl}${basePath}/mcp`
@@ -2155,9 +2172,9 @@ program
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
-          if (ready) {
-            const basePath = await readServerBasePath(projectPath);
+          const serverInfo = await waitForServer(port, browserHost);
+          if (serverInfo) {
+            const basePath = serverInfo.basePath;
             const mcpEndpoint = `http://${browserHost}:${port}${basePath}/mcp`;
             const autoConnectEndpoint = tunnelUrl
               ? `${tunnelUrl}${basePath}/mcp`

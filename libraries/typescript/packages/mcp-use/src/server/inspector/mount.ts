@@ -4,7 +4,7 @@
  * Handles mounting of the MCP Inspector UI at /inspector endpoint.
  */
 
-import { Hono, type Hono as HonoType } from "hono";
+import type { Hono as HonoType } from "hono";
 import { readBuildManifest } from "../widgets/index.js";
 
 /**
@@ -56,18 +56,24 @@ export async function mountInspectorUI(
   try {
     // @ts-ignore - Optional peer dependency, may not be installed during build
     const { mountInspector } = await import("@mcp-use/inspector");
-    // Auto-connect to the local MCP server at ${basePath}/mcp (SSE endpoint)
-    // Use JSON config to specify SSE transport type
-    const mcpUrl = `http://${serverHost}:${serverPort}${basePath}/mcp`; // Also available at ${basePath}/sse
+    // Auto-connect to the local MCP server. The transport lives at
+    // `${basePath}/mcp` externally; the inspector's auto-connect URL uses
+    // the externally-visible path because it's loaded by the user's
+    // browser, not internally.
+    const mcpUrl = `http://${serverHost}:${serverPort}${basePath}/mcp`;
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
       transportType: "sse",
       connectionType: "Direct",
     });
-    // mountInspector registers bare `/inspector/*` routes, so under a
-    // basePath we wrap it in a sub-Hono mounted at the prefix.
-    const inspectorOptions = {
+    // The inspector registers bare `/inspector/*` routes on whatever app
+    // we hand it. We're handing it the inner app, which is already
+    // sub-mounted under `basePath` by the MCPServer constructor — so the
+    // inspector composes to `${basePath}/inspector/*` externally without
+    // any wrapping here. `basePath` still flows in for URL emission
+    // (`<base href>`, `window.__MCP_BASE_PATH__`).
+    mountInspector(app, {
       autoConnectUrl: autoConnectConfig,
       // In dev mode, tell the inspector to use same-origin for MCP Apps sandbox.
       // This avoids requiring a sandbox-{hostname} subdomain that doesn't exist
@@ -75,14 +81,7 @@ export async function mountInspectorUI(
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
       basePath,
-    };
-    if (basePath) {
-      const inspectorApp = new Hono();
-      mountInspector(inspectorApp, inspectorOptions);
-      app.route(basePath, inspectorApp);
-    } else {
-      mountInspector(app, inspectorOptions);
-    }
+    });
     console.log(
       `[INSPECTOR] UI available at http://${serverHost}:${serverPort}${basePath}/inspector`
     );
