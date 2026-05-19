@@ -24,7 +24,7 @@ cp .env.example .env
 $EDITOR .env
 
 # If you changed openapi.yaml since last time, refresh the dereferenced file
-npm run load-spec
+npx tsx scripts/load-spec.ts   # or: npm run load-spec (add "load-spec": "tsx scripts/load-spec.ts" to package.json scripts)
 
 # Start hot-reload dev server
 rm -rf .mcp-use dist        # only if you've moved files or are seeing stale-cache errors
