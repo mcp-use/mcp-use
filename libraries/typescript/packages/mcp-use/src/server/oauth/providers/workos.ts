@@ -4,20 +4,16 @@
  * Implements OAuth authentication for WorkOS AuthKit.
  * Supports JWKS-based JWT verification with Dynamic Client Registration.
  *
- * WorkOS uses "direct" mode where MCP clients communicate directly with
- * WorkOS for OAuth flows (registration, authorization, token exchange).
- * The MCP server only verifies tokens issued by WorkOS.
+ * MCP clients discover WorkOS's OAuth endpoints via `.well-known`
+ * passthrough and communicate directly with WorkOS for registration,
+ * authorization, and token exchange. The MCP server only verifies
+ * tokens issued by WorkOS.
  *
  * Learn more: https://workos.com/docs/authkit/mcp
  */
 
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from "jose";
-import type {
-  OAuthProvider,
-  UserInfo,
-  WorkOSOAuthConfig,
-  OAuthMode,
-} from "./types.js";
+import type { OAuthProvider, UserInfo, WorkOSOAuthConfig } from "./types.js";
 
 export class WorkOSOAuthProvider implements OAuthProvider {
   private config: WorkOSOAuthConfig;
@@ -93,24 +89,17 @@ export class WorkOSOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["email", "offline_access", "openid", "profile"];
+    return (
+      this.config.scopesSupported ?? [
+        "email",
+        "offline_access",
+        "openid",
+        "profile",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {
     return ["authorization_code", "refresh_token"];
-  }
-
-  getMode(): OAuthMode {
-    // Always proxy — WorkOS is an external provider, so the MCP server must
-    // proxy OAuth metadata and endpoints to avoid browser CORS issues.
-    return "proxy";
-  }
-
-  getRegistrationEndpoint(): string | undefined {
-    // Only provide registration endpoint when NOT using a pre-registered client
-    if (this.config.clientId) {
-      return undefined; // No DCR when using pre-registered client
-    }
-    return `${this.issuer}/oauth2/register`;
   }
 }

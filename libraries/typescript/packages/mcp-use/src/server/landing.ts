@@ -2,7 +2,7 @@
  * Landing page generator for MCP server endpoints
  *
  * Generates SEO-friendly HTML with connection instructions for MCP servers
- * from Claude Code, Cursor, VS Code, and ChatGPT clients.
+ * from Claude Code, Cursor, VS Code, ChatGPT, and Manufact Inspector (hosted).
  */
 
 /**
@@ -79,6 +79,21 @@ function generateVSCodeInsidersDeepLink(url: string, name: string): string {
 function generateClaudeCommand(url: string, name: string): string {
   const sanitizedName = sanitizeServerName(name);
   return `claude mcp add --transport http "${sanitizedName}" ${url}`;
+}
+
+/** Hosted Manufact Inspector base (same as cloud deploy “Open in new tab”). */
+const MANUFACT_INSPECTOR_ORIGIN = "https://inspector.manufact.com";
+
+/**
+ * Deep link to hosted Manufact Inspector with this MCP server URL pre-filled
+ * and the Chat tab selected (`tab=chat`).
+ */
+function getManufactInspectorUrl(serverUrl: string): string {
+  const params = new URLSearchParams({
+    autoConnect: serverUrl,
+    tab: "chat",
+  });
+  return `${MANUFACT_INSPECTOR_ORIGIN}/inspector?${params.toString()}`;
 }
 
 const LOGO_SVG_PATHS = {
@@ -261,7 +276,7 @@ export interface LandingPageResource {
 
 /**
  * Generates an HTML landing page with connection instructions
- * for Claude Code, Cursor, VS Code, and ChatGPT.
+ * for Claude Code, Cursor, VS Code, ChatGPT, and Manufact Inspector.
  *
  * @param name - Server name
  * @param version - Server version
@@ -287,6 +302,7 @@ export function generateLandingPage(
   const vscodeDeepLink = generateVSCodeDeepLink(url, name);
   const vscodeInsidersDeepLink = generateVSCodeInsidersDeepLink(url, name);
   const claudeCommand = generateClaudeCommand(url, name);
+  const manufactInspectorUrl = getManufactInspectorUrl(url);
 
   const safeName = escapeHtml(name);
   const safeDescription = description ? escapeHtml(description) : "";
@@ -495,6 +511,29 @@ body {
 .footer-brand-link { display: inline-flex; align-items: center; gap: 0.5rem; font-family: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif; font-size: 1.5rem; font-weight: 600; color: #172037; text-decoration: none; }
 .footer-brand-link:hover { color: #0f172a; }
 .hero-url-block { display: flex; justify-content: center; margin: 0.75rem 0; }
+.hero-cta-row {
+  display: flex;
+  justify-content: center;
+  margin: 0.35rem 0 0.5rem;
+}
+.hero-primary-btn {
+  display: inline-block;
+  padding: 0.625rem 1.25rem;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  color: #fff;
+  border-radius: 9999px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12), 0 2px 8px rgba(15,23,42,0.15);
+  transition: background 0.15s;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+.hero-primary-btn:hover {
+  background: linear-gradient(180deg, #334155 0%, #1e293b 100%);
+  text-decoration: none;
+  color: #fff;
+}
 .hero-url-block .url-block { max-width: 100%; }
 .hero-url-block .url-box {
   font-size: 0.938rem;
@@ -664,6 +703,9 @@ a:hover { text-decoration: underline; }
               <div class="url-box" data-copy="${escapeHtml(url)}">${escapeHtml(url)}</div>
               <button type="button" class="copy-btn" data-copy="${escapeHtml(url)}" aria-label="Copy URL"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
             </div>
+          </div>
+          <div class="hero-cta-row">
+            <a href="${escapeHtml(manufactInspectorUrl)}" class="hero-primary-btn" target="_blank" rel="noopener noreferrer">Open in Inspector</a>
           </div>
           <div class="hero-powered">
             <span>Powered by</span>

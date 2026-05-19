@@ -71,10 +71,11 @@ export function LayoutContent({
         managedLlmConfig={
           embeddedConfig.managedLlmConfig ?? {
             provider: "anthropic",
-            model: "server-managed",
+            model: "claude-haiku-4-5",
             apiKey: "server-managed",
           }
         }
+        enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
         hideTitle={embeddedConfig.chatHideTitle}
         hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
         hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
@@ -120,7 +121,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ToolsTab
-            key={`tools-${selectedServer.id}-${selectedServer.state}`}
+            key={`tools-${selectedServer.id}`}
             ref={toolsSearchRef}
             tools={selectedServer.tools}
             callTool={selectedServer.callTool}
@@ -137,7 +138,7 @@ export function LayoutContent({
           className="h-full"
         >
           <PromptsTab
-            key={`prompts-${selectedServer.id}-${selectedServer.state}`}
+            key={`prompts-${selectedServer.id}`}
             ref={promptsSearchRef}
             prompts={selectedServer.prompts}
             callPrompt={(name, args) =>
@@ -165,7 +166,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ResourcesTab
-            key={`resources-${selectedServer.id}-${selectedServer.state}`}
+            key={`resources-${selectedServer.id}`}
             ref={resourcesSearchRef}
             resources={selectedServer.resources}
             readResource={selectedServer.readResource}
@@ -182,14 +183,26 @@ export function LayoutContent({
           className="h-full"
         >
           <ChatTab
-            key={`chat-${selectedServer.id}-${selectedServer.state}`}
+            key={`chat-${selectedServer.id}`}
             connection={selectedServer}
             isConnected={
               embeddedConfig.forceConnected || selectedServer.state === "ready"
             }
             prompts={selectedServer.prompts}
             serverId={selectedServer.id}
-            callPrompt={selectedServer.getPrompt}
+            callPrompt={(name, args) =>
+              selectedServer.getPrompt(
+                name,
+                args
+                  ? (Object.fromEntries(
+                      Object.entries(args).map(([k, v]) => [
+                        k,
+                        typeof v === "string" ? v : String(v ?? ""),
+                      ])
+                    ) as Record<string, string>)
+                  : undefined
+              )
+            }
             readResource={selectedServer.readResource}
             useClientSide={!embeddedConfig.chatApiUrl}
             chatApiUrl={embeddedConfig.chatApiUrl}
@@ -197,12 +210,16 @@ export function LayoutContent({
               embeddedConfig.managedLlmConfig ??
               (embeddedConfig.chatApiUrl
                 ? {
+                    // Stub surfaced on the chat badge. Mirrors the model the
+                    // hosted `/inspector/chat/stream` backend uses by default
+                    // (see cloud.mcp-use/src/lib/mcp-chat-stream.ts).
                     provider: "anthropic",
-                    model: "server-managed",
+                    model: "claude-haiku-4-5",
                     apiKey: "server-managed",
                   }
                 : undefined)
             }
+            enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
             hideTitle={embeddedConfig.chatHideTitle}
             hideModelBadge={
               embeddedConfig.chatHideModelBadge ?? !!embeddedConfig.chatApiUrl
@@ -218,6 +235,8 @@ export function LayoutContent({
             chatFollowups={embeddedConfig.chatFollowups}
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
+            streamProtocol={embeddedConfig.chatStreamProtocol}
+            credentials={embeddedConfig.chatCredentials}
           />
         </div>
       )}
@@ -227,7 +246,7 @@ export function LayoutContent({
           className="h-full"
         >
           <SamplingTab
-            key={`sampling-${selectedServer.id}-${selectedServer.state}`}
+            key={`sampling-${selectedServer.id}`}
             pendingRequests={selectedServer.pendingSamplingRequests}
             onApprove={selectedServer.approveSampling}
             onReject={selectedServer.rejectSampling}
@@ -243,7 +262,7 @@ export function LayoutContent({
           className="h-full"
         >
           <ElicitationTab
-            key={`elicitation-${selectedServer.id}-${selectedServer.state}`}
+            key={`elicitation-${selectedServer.id}`}
             pendingRequests={selectedServer.pendingElicitationRequests}
             onApprove={selectedServer.approveElicitation}
             onReject={selectedServer.rejectElicitation}
@@ -260,7 +279,7 @@ export function LayoutContent({
           className="h-full"
         >
           <NotificationsTab
-            key={`notifications-${selectedServer.id}-${selectedServer.state}`}
+            key={`notifications-${selectedServer.id}`}
             notifications={selectedServer.notifications}
             unreadCount={selectedServer.unreadNotificationCount}
             markNotificationRead={selectedServer.markNotificationRead}

@@ -1,15 +1,15 @@
 {
-  "name": "auth0-oauth-example",
+  "name": "supabase-oauth-example",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server example with Auth0 OAuth authentication",
+  "description": "MCP server example with Supabase OAuth authentication",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
     "server",
     "example",
-    "auth0",
+    "supabase",
     "oauth",
     "authentication"
   ],
@@ -20,6 +20,7 @@
     "start": "mcp-use start"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
     "mcp-use": "workspace:*"
   },
   "devDependencies": {

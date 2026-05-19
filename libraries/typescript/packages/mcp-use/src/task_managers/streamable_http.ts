@@ -58,7 +58,7 @@ export class StreamableHttpConnectionManager extends ConnectionManager<Streamabl
             // The SDK will handle this automatically when sessionId is cleared
             await this.reinitialize(transport);
 
-            logger.info(
+            logger.debug(
               `[StreamableHttp] Re-initialization successful, retrying request`
             );
 

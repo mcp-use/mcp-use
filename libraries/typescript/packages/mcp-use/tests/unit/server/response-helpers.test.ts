@@ -7,18 +7,18 @@ describe("widget() helper", () => {
       data: { foo: "bar" },
     });
 
-    expect(result).toHaveProperty("_meta");
     expect(result).toHaveProperty("content");
     expect(result).toHaveProperty("structuredContent");
+    expect(result.structuredContent).toEqual({ foo: "bar" });
   });
 
-  it("should store data in mcp-use/props metadata", () => {
+  it("should store data in structuredContent", () => {
     const testData = { foo: "bar", baz: 123 };
     const result = widget({
       data: testData,
     });
 
-    expect(result._meta?.["mcp-use/props"]).toEqual(testData);
+    expect(result.structuredContent).toEqual(testData);
   });
 
   it("should support props field as primary API", () => {
@@ -27,7 +27,6 @@ describe("widget() helper", () => {
       props: testData,
     });
 
-    expect(result._meta?.["mcp-use/props"]).toEqual(testData);
     expect(result.structuredContent).toEqual(testData);
   });
 
@@ -37,7 +36,7 @@ describe("widget() helper", () => {
       data: { from: "data" },
     });
 
-    expect(result._meta?.["mcp-use/props"]).toEqual({ from: "props" });
+    expect(result.structuredContent).toEqual({ from: "props" });
   });
 
   it("should use empty content when no message or output provided", () => {
@@ -88,23 +87,14 @@ describe("widget() helper", () => {
     expect(result.content[0].text).toBe("Custom message takes priority");
   });
 
-  it("should merge output._meta with widget metadata", () => {
-    const outputWithMeta = {
-      content: [{ type: "text" as const, text: "Test" }],
-      _meta: {
-        customField: "custom value",
-      },
-    };
-
+  it("should set _meta only when metadata config is provided", () => {
     const result = widget({
       data: { foo: "bar" },
-      output: outputWithMeta,
+      metadata: { customField: "custom value" },
     });
 
-    expect(result._meta).toMatchObject({
-      customField: "custom value",
-      "mcp-use/props": { foo: "bar" },
-    });
+    expect(result._meta).toEqual({ customField: "custom value" });
+    expect(result.structuredContent).toEqual({ foo: "bar" });
   });
 
   it("should pass data through in structuredContent when no output", () => {
@@ -146,13 +136,12 @@ describe("widget() helper", () => {
     expect(result.structuredContent).toEqual({ foo: "bar" });
   });
 
-  it("should always create _meta even with minimal config", () => {
+  it("should not create _meta with minimal config and no metadata", () => {
     const result = widget({
       data: {},
     });
 
-    expect(result._meta).toBeDefined();
-    expect(result._meta?.["mcp-use/props"]).toEqual({});
+    expect(result._meta).toBeUndefined();
   });
 
   it("should handle empty props/data", () => {
@@ -161,7 +150,7 @@ describe("widget() helper", () => {
       message: "Test",
     });
 
-    expect(result._meta?.["mcp-use/props"]).toEqual({});
+    expect(result._meta).toBeUndefined();
     expect(result.structuredContent).toBeUndefined();
   });
 });

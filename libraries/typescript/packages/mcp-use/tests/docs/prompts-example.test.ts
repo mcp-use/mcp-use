@@ -10,6 +10,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const promptServerPath = resolve(__dirname, "../servers/prompt_server.ts");
 
 describe("Documentation Example: Listing Prompts", () => {
   let client: MCPClient;
@@ -20,7 +21,7 @@ describe("Documentation Example: Listing Prompts", () => {
       mcpServers: {
         my_server: {
           command: "npx",
-          args: ["-y", "@modelcontextprotocol/server-everything"],
+          args: ["-y", "tsx", promptServerPath],
         },
       },
     };

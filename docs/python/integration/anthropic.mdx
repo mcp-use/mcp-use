@@ -1,7 +1,6 @@
 ---
 title: "Anthropic"
 description: "Use mcp-use tools, resources, and prompts directly with the Anthropic SDK"
-tag: "New"
 icon: "/images/anthropic.svg"
 ---
 
@@ -51,7 +50,7 @@ uv pip install anthropic
         Next, instantiate the `AnthropicMCPAdapter`. This adapter will be responsible for converting MCP constructs into a format Anthropic can understand.
 
         ```python
-        from mcp_use.adapters import AnthropicMCPAdapter
+        from mcp_use.agents.adapters import AnthropicMCPAdapter
 
         # Creates the adapter for Anthropic's format
         adapter = AnthropicMCPAdapter()
@@ -100,7 +99,7 @@ uv pip install anthropic
         ]
 
         response = anthropic.messages.create(
-            model="claude-3-opus-20240229",
+            model="claude-opus-4-7",
             messages=messages,
             tools=anthropic_tools,
             max_tokens=1024
@@ -166,7 +165,7 @@ uv pip install anthropic
             )
             # Get final response
             final_response = anthropic.messages.create(
-                model="claude-3-opus-20240229", max_tokens=1024, tools=anthropic_tools, messages=messages
+                model="claude-opus-4-7", max_tokens=1024, tools=anthropic_tools, messages=messages
             )
             print("\n--- Final response from the model ---")
             print(final_response.content[0].text)
@@ -186,7 +185,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 
 from mcp_use import MCPClient
-from mcp_use.adapters import AnthropicMCPAdapter
+from mcp_use.agents.adapters import AnthropicMCPAdapter
 
 # This example demonstrates how to use our integration
 # adapters to use MCP tools and convert to the right format.
@@ -221,7 +220,7 @@ async def main():
         # Initial request
         messages = [{"role": "user", "content": "Please could you give me the assistant prompt? My name is vincenzo"}]
         response = anthropic.messages.create(
-            model="claude-3-opus-20240229", tools=anthropic_tools, max_tokens=1024, messages=messages
+            model="claude-opus-4-7", tools=anthropic_tools, max_tokens=1024, messages=messages
         )
         messages.append({"role": response.role, "content": response.content})
 
@@ -273,7 +272,7 @@ async def main():
                 )
                 # Get final response
                 final_response = anthropic.messages.create(
-                    model="claude-3-opus-20240229", max_tokens=1024, tools=anthropic_tools, messages=messages
+                    model="claude-opus-4-7", max_tokens=1024, tools=anthropic_tools, messages=messages
                 )
                 print("\n--- Final response from the model ---")
                 print(final_response.content[0].text)

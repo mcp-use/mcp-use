@@ -22,10 +22,20 @@ interface RequestContextData {
 }
 
 /**
- * AsyncLocalStorage instance for storing request context
- * Each async operation chain maintains its own isolated context
+ * Singleton AsyncLocalStorage instance for storing request context.
+ *
+ * Uses `globalThis` to guarantee a single instance even when bundlers
+ * (tsup/esbuild) split this module into multiple chunks — dynamic imports
+ * from resources/, prompts/, and proxy handlers would otherwise get a
+ * different `AsyncLocalStorage` instance, causing `getRequestContext()`
+ * to return `undefined` in tool handlers.
  */
-const requestContextStorage = new AsyncLocalStorage<RequestContextData>();
+const STORAGE_KEY = "__mcp_use_request_context_storage__";
+
+const requestContextStorage: AsyncLocalStorage<RequestContextData> =
+  (globalThis as any)[STORAGE_KEY] ??
+  ((globalThis as any)[STORAGE_KEY] =
+    new AsyncLocalStorage<RequestContextData>());
 
 /**
  * Execute a function with a request context stored in AsyncLocalStorage

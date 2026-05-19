@@ -161,6 +161,9 @@ export function toolRegistration<
       title: toolDefinition.title,
       description: toolDefinition.description ?? "",
       inputSchema,
+      ...(toolDefinition.outputSchema
+        ? { outputSchema: toolDefinition.outputSchema }
+        : {}),
       annotations: toolDefinition.annotations,
       _meta: toolDefinition._meta,
     },

@@ -140,6 +140,7 @@ describe("HMR - syncRegistrationsFrom", () => {
         config: {
           name: "widget-tool",
           description: "A widget tool",
+          widget: { name: "widget-tool" },
         },
         handler: async () => ({ content: [] }),
       } as any);
@@ -196,11 +197,17 @@ describe("HMR - syncRegistrationsFrom", () => {
     });
 
     it("should inject new prompts into active sessions", () => {
+      const _registeredPrompts: Record<string, any> = {};
       const mockSession = {
         id: "test-session",
         server: {
-          _registeredPrompts: {},
+          _registeredPrompts,
           sendPromptListChanged: vi.fn(),
+          registerPrompt: vi.fn((name: string, config: any, handler: any) => {
+            const entry = { ...config, handler };
+            _registeredPrompts[name] = entry;
+            return entry;
+          }),
         } as any,
       };
 
@@ -268,11 +275,20 @@ describe("HMR - syncRegistrationsFrom", () => {
     });
 
     it("should inject new resources into active sessions", () => {
+      const _registeredResources: Record<string, any> = {};
       const mockSession = {
         id: "test-session",
         server: {
-          _registeredResources: {},
+          _registeredResources,
           sendResourceListChanged: vi.fn(),
+          registerResource: vi.fn(
+            (name: string, uri: string, config: any, handler: any) => {
+              const key = `${name}:${uri}`;
+              const entry = { ...config, uri, handler };
+              _registeredResources[key] = entry;
+              return entry;
+            }
+          ),
         } as any,
       };
 
@@ -444,19 +460,14 @@ describe("HMR - syncRegistrationsFrom", () => {
         server.syncRegistrationsFrom(otherServer);
       }).not.toThrow();
 
-      // Verify error was logged
+      // Verify error was logged (syncPrimitive format)
       const errors = getErrors();
       expect(
         errors.some((log) =>
-          log.includes('Failed to inject tool "tool-to-fail"')
+          log.includes('[HMR] Failed to add Tools "tool-to-fail"')
         )
       ).toBe(true);
       expect(errors.some((log) => log.includes("bad-session"))).toBe(true);
-      expect(
-        errors.some((log) =>
-          log.includes("Native server missing _registeredTools object")
-        )
-      ).toBe(true);
     });
   });
 

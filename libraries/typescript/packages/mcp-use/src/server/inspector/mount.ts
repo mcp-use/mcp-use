@@ -70,14 +70,19 @@ export async function mountInspectorUI(
       // This avoids requiring a sandbox-{hostname} subdomain that doesn't exist
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
+      serverPort: typeof serverPort === "number" ? serverPort : undefined,
     });
     console.log(
       `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`
     );
     return true;
-  } catch {
-    // Inspector package not installed, skip mounting silently
-    // This allows the server to work without the inspector in production
+  } catch (err) {
+    if (!isProduction || process.env.MCP_USE_DEBUG) {
+      console.warn(
+        "[INSPECTOR] Could not mount inspector UI:",
+        err instanceof Error ? err.message : err
+      );
+    }
     return false;
   }
 }

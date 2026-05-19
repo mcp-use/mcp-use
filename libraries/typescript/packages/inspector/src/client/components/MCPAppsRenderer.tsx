@@ -116,6 +116,10 @@ interface MCPAppsRendererProps {
   cancelled?: boolean;
   /** Called when the CSP mode changes after the widget is already loaded, requesting the tool to be re-executed. */
   onRerun?: () => void;
+  /** Called once when the iframe has loaded and the AppBridge handshake completes. Used by the preview/screenshot route. */
+  onReady?: () => void;
+  /** When true in fullscreen mode, suppresses the fullscreen navbar + top padding so the iframe fills the viewport edge-to-edge. Used by the preview/screenshot route. */
+  chromeless?: boolean;
 }
 
 function MCPAppsRendererBase({
@@ -138,6 +142,8 @@ function MCPAppsRendererBase({
   customProps,
   cancelled,
   onRerun,
+  onReady,
+  chromeless,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -651,46 +657,28 @@ function MCPAppsRendererBase({
       return {};
     };
 
-    bridge.onsizechange = ({ width, height }) => {
+    bridge.onsizechange = ({ height }) => {
       // Use ref so this closure always reads the current displayMode even
       // though it was captured when the bridge was first created.
       if (displayModeRef.current !== "inline") return;
       const iframeEl = iframe;
-      if (!iframeEl || (height === undefined && width === undefined)) return;
+      if (!iframeEl || height === undefined) return;
 
-      // Apply size changes with animation
       const style = getComputedStyle(iframeEl);
       const isBorderBox = style.boxSizing === "border-box";
 
-      let adjustedWidth = width;
       let adjustedHeight = height;
-
-      if (adjustedWidth !== undefined && isBorderBox) {
-        adjustedWidth +=
-          parseFloat(style.borderLeftWidth) +
-          parseFloat(style.borderRightWidth);
-      }
-      if (adjustedHeight !== undefined && isBorderBox) {
+      if (isBorderBox) {
         adjustedHeight +=
           parseFloat(style.borderTopWidth) +
           parseFloat(style.borderBottomWidth);
       }
 
-      const from: Keyframe = {};
-      const to: Keyframe = {};
+      const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
+      const to: Keyframe = { height: `${adjustedHeight}px` };
 
-      if (adjustedWidth !== undefined) {
-        from.width = `${iframeEl.offsetWidth}px`;
-        iframeEl.style.width = to.width = `min(${adjustedWidth}px, 100%)`;
-      }
-      if (adjustedHeight !== undefined) {
-        from.height = `${iframeEl.offsetHeight}px`;
-        iframeEl.style.height = to.height = `${adjustedHeight}px`;
-        // Persist in state so React uses this height when returning to inline
-        // mode (avoids snapping back to DEFAULT_HEIGHT and missing a resize
-        // event when the PiP container happens to be the same pixel height).
-        setInlineHeight(adjustedHeight);
-      }
+      iframeEl.style.height = `${adjustedHeight}px`;
+      setInlineHeight(adjustedHeight);
 
       iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
     };
@@ -1034,6 +1022,16 @@ function MCPAppsRendererBase({
   // even if the onLoad event was missed during a rapid remount/re-render cycle.
   const iframeEffectivelyReady = isReady || initCount > 0;
 
+  // Fire onReady once after the AppBridge handshake completes (initCount goes 0 → 1).
+  const readyFiredRef = useRef(false);
+  useEffect(() => {
+    if (readyFiredRef.current) return;
+    if (initCount > 0) {
+      readyFiredRef.current = true;
+      onReady?.();
+    }
+  }, [initCount, onReady]);
+
   useEffect(() => {
     if (!iframeEffectivelyReady || !showSpinner) return;
 
@@ -1091,10 +1089,7 @@ function MCPAppsRendererBase({
     height: isFullscreen || isPip ? "100%" : `${inlineHeight}px`,
     width: "100%",
     maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
-    transition:
-      isFullscreen || isPip
-        ? undefined
-        : "height 300ms ease-out, width 300ms ease-out",
+    transition: isFullscreen || isPip ? undefined : "height 300ms ease-out",
   };
 
   return (
@@ -1108,7 +1103,7 @@ function MCPAppsRendererBase({
             : undefined
         }
       >
-        {isFullscreen && (
+        {isFullscreen && !chromeless && (
           <FullscreenNavbar
             title={toolName}
             onClose={() => handleDisplayModeChange("inline")}
@@ -1132,7 +1127,7 @@ function MCPAppsRendererBase({
         <div
           className={cn(
             "flex-1 w-full h-full flex justify-center items-center relative",
-            isFullscreen && "pt-14",
+            isFullscreen && !chromeless && "pt-14",
             !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
           )}
         >
@@ -1142,7 +1137,7 @@ function MCPAppsRendererBase({
             </div>
           )}
           <div
-            className="relative w-full"
+            className="relative w-full h-full"
             style={{ maxWidth: iframeStyle.maxWidth }}
           >
             <div className="absolute -top-8 left-2 z-10 h-full">
@@ -1175,7 +1170,7 @@ function MCPAppsRendererBase({
                 displayMode === "fullscreen" && "w-full h-full rounded-none",
                 displayMode === "pip" && "w-full h-full",
                 displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
-                "overflow-hidden relative z-20",
+                "overflow-hidden",
                 prefersBorder && "border border-zinc-200 dark:border-zinc-700"
               )}
               style={iframeStyle}
@@ -1211,6 +1206,8 @@ function mcpAppsRendererAreEqual(
   if (prev.readResource !== next.readResource) return false;
   if (prev.onSendFollowUp !== next.onSendFollowUp) return false;
   if (prev.onRerun !== next.onRerun) return false;
+  if (prev.onReady !== next.onReady) return false;
+  if (prev.chromeless !== next.chromeless) return false;
   if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
   if (prev.className !== next.className) return false;
   if (prev.serverBaseUrl !== next.serverBaseUrl) return false;

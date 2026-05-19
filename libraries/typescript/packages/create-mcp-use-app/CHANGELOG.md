@@ -1,5 +1,131 @@
 # create-mcp-use-app
 
+## 0.14.12
+
+### Patch Changes
+
+- 46caf80: Remove unused dependencies and devDependencies flagged by `knip`.
+  - Root: drop `lint-staged` and `typescript-eslint` (unused; ESLint config uses `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` directly, and Husky pre-commit runs `pnpm format`/`lint:fix` directly without lint-staged). Removed the stale root `lint-staged` config block.
+  - `@mcp-use/cli`: drop `globby`, `ws`, `@types/ws` (no source references; `globby` was explicitly replaced by Node built-ins). Removed `globby` from `tsup.config.ts` `noExternal`.
+  - `create-mcp-use-app`: drop `fs-extra` and `@types/fs-extra` (no source references).
+  - `mcp-use`: drop `ws`, `@types/ws`, `@antfu/eslint-config`, `@langchain/anthropic` (devDep — already an optional peer; only referenced as a string for dynamic import), `eslint-plugin-format`, `lint-staged`. Removed the stale package-level `lint-staged` config block.
+  - `knip.json`: ignore `@mcp-use/inspector` for the `cli` package (resolved dynamically via `createRequire().resolve` to read its `package.json`).
+
+  `pnpm knip:deps` now reports 0 unused (dev)dependencies. `pnpm install --frozen-lockfile`, `pnpm lint`, and `pnpm build` all succeed.
+
+- 46caf80: Make `mcp-use/server` response helpers discoverable to humans and coding agents.
+  - **`MCPServer.tool()` JSDoc**: each `@example` block now includes the matching `import { ... } from "mcp-use/server"` line, plus a note that helpers (`text`, `object`, `image`, `markdown`, `html`, `error`, `widget`, …) are exported from `mcp-use/server`. Previously the examples called `text(...)` / `error(...)` with no import, so anyone reading the hover doc had no breadcrumb to the package.
+  - **`create-mcp-use-app` blank template**: the commented tool/resource/prompt blocks previously called `text(...)`, `object(...)`, and `z.object(...)` without showing where any of those came from — and the file's top-level imports never referenced them either. Each commented block now includes the relevant `import { ... } from "mcp-use/server"` / `import { z } from "zod"` lines inside the comment, alongside a leading note naming the available response helpers. The template stays truly blank (no tools registered) but the discovery path is now local to the file.
+
+## 0.14.12-canary.1
+
+### Patch Changes
+
+- 79a3f4c: Make `mcp-use/server` response helpers discoverable to humans and coding agents.
+  - **`MCPServer.tool()` JSDoc**: each `@example` block now includes the matching `import { ... } from "mcp-use/server"` line, plus a note that helpers (`text`, `object`, `image`, `markdown`, `html`, `error`, `widget`, …) are exported from `mcp-use/server`. Previously the examples called `text(...)` / `error(...)` with no import, so anyone reading the hover doc had no breadcrumb to the package.
+  - **`create-mcp-use-app` blank template**: the commented tool/resource/prompt blocks previously called `text(...)`, `object(...)`, and `z.object(...)` without showing where any of those came from — and the file's top-level imports never referenced them either. Each commented block now includes the relevant `import { ... } from "mcp-use/server"` / `import { z } from "zod"` lines inside the comment, alongside a leading note naming the available response helpers. The template stays truly blank (no tools registered) but the discovery path is now local to the file.
+
+## 0.14.12-canary.0
+
+### Patch Changes
+
+- 2810bf6: Remove unused dependencies and devDependencies flagged by `knip`.
+  - Root: drop `lint-staged` and `typescript-eslint` (unused; ESLint config uses `@typescript-eslint/eslint-plugin` and `@typescript-eslint/parser` directly, and Husky pre-commit runs `pnpm format`/`lint:fix` directly without lint-staged). Removed the stale root `lint-staged` config block.
+  - `@mcp-use/cli`: drop `globby`, `ws`, `@types/ws` (no source references; `globby` was explicitly replaced by Node built-ins). Removed `globby` from `tsup.config.ts` `noExternal`.
+  - `create-mcp-use-app`: drop `fs-extra` and `@types/fs-extra` (no source references).
+  - `mcp-use`: drop `ws`, `@types/ws`, `@antfu/eslint-config`, `@langchain/anthropic` (devDep — already an optional peer; only referenced as a string for dynamic import), `eslint-plugin-format`, `lint-staged`. Removed the stale package-level `lint-staged` config block.
+  - `knip.json`: ignore `@mcp-use/inspector` for the `cli` package (resolved dynamically via `createRequire().resolve` to read its `package.json`).
+
+  `pnpm knip:deps` now reports 0 unused (dev)dependencies. `pnpm install --frozen-lockfile`, `pnpm lint`, and `pnpm build` all succeed.
+
+## 0.14.11
+
+### Patch Changes
+
+- ca1b34f: Add MCP tool `annotations` (`readOnlyHint`, `openWorldHint`, `destructiveHint`) and widget `outputSchema` to the `mcp-apps` template; add annotations to the `starter` template; align MCP Apps docs with ChatGPT App Store metadata expectations.
+
+## 0.14.11-canary.0
+
+### Patch Changes
+
+- c40cd03: Add MCP tool `annotations` (`readOnlyHint`, `openWorldHint`, `destructiveHint`) and widget `outputSchema` to the `mcp-apps` template; add annotations to the `starter` template; align MCP Apps docs with ChatGPT App Store metadata expectations.
+
+## 0.14.10
+
+### Patch Changes
+
+- 806dbca: fix(cli): allow `.` as project name to initialize in current directory
+
+  When running `npx create-mcp-use-app .` in an empty directory, the CLI now
+  correctly initializes the project in the current directory instead of erroring
+  with "Directory already exists". Uses the directory name for `package.json` name
+  and display output. Errors if the directory is not empty.
+
+## 0.14.10-canary.0
+
+### Patch Changes
+
+- 8debc6c: fix(cli): allow `.` as project name to initialize in current directory
+
+  When running `npx create-mcp-use-app .` in an empty directory, the CLI now
+  correctly initializes the project in the current directory instead of erroring
+  with "Directory already exists". Uses the directory name for `package.json` name
+  and display output. Errors if the directory is not empty.
+
+## 0.14.9
+
+### Patch Changes
+
+- 1bdec92: Only copy the `mcp-apps-builder` skill into new projects; skip the deprecated `mcp-builder` and `chatgpt-app-builder` skills during setup.
+
+## 0.14.9-canary.0
+
+### Patch Changes
+
+- 7e62ad3: Only copy the `mcp-apps-builder` skill into new projects; skip the deprecated `mcp-builder` and `chatgpt-app-builder` skills during setup.
+
+## 0.14.8
+
+### Patch Changes
+
+- 6d7c4df: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+
+## 0.14.8-canary.0
+
+### Patch Changes
+
+- 1118308: Harden transitive dependencies: tighten root `pnpm` overrides (vite, axios, lodash, hono, brace-expansion, path-to-regexp, yaml) and refresh the lockfile so `pnpm audit` reports no known vulnerabilities; add a `lodash` override to the `mcp-apps` scaffold template for standalone installs.
+
+## 0.14.7
+
+### Patch Changes
+
+- 6255bbd: Clean up create-mcp-use-app template dependencies
+  - Remove unused deps from blank and starter templates: @openai/apps-sdk-ui, @tanstack/react-query, cors, express
+  - Remove build tool devDeps from all 3 templates (vite, @vitejs/plugin-react, @tailwindcss/vite) — these are provided by @mcp-use/cli
+  - Remove cargo-culted overrides (sugarss, lodash) from all 3 templates — no longer needed, zero audit vulnerabilities without them
+
+## 0.14.7-canary.0
+
+### Patch Changes
+
+- 3779b06: Clean up create-mcp-use-app template dependencies
+  - Remove unused deps from blank and starter templates: @openai/apps-sdk-ui, @tanstack/react-query, cors, express
+  - Remove build tool devDeps from all 3 templates (vite, @vitejs/plugin-react, @tailwindcss/vite) — these are provided by @mcp-use/cli
+  - Remove cargo-culted overrides (sugarss, lodash) from all 3 templates — no longer needed, zero audit vulnerabilities without them
+
+## 0.14.6
+
+### Patch Changes
+
+- ed0fadb: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+
+## 0.14.6-canary.0
+
+### Patch Changes
+
+- 98e09ce: Fix Dependabot security alerts by updating vulnerable dependencies across the monorepo. Added pnpm overrides for flatted, tar, hono, @hono/node-server, express-rate-limit, dompurify, minimatch, rollup, form-data, lodash, and other transitive deps. Bumped direct deps: hono to ^4.12.7 (mcp-use, inspector), tar to ^7.5.11 (cli, create-mcp-use-app). Pinned @modelcontextprotocol/sdk to ^1.25.2 in proxy example.
+
 ## 0.14.5
 
 ### Patch Changes

@@ -83,23 +83,39 @@ Load these before diving into tools/resources/widgets sections.
 ---
 
 ### 🔐 Adding Authentication?
-**When:** Protecting your server with OAuth (WorkOS, Supabase, or custom)
+**When:** Protecting your server with OAuth (Auth0, Better Auth, Clerk, WorkOS, Supabase, Keycloak, or any other provider)
 
 - **[overview.md](references/authentication/overview.md)**
-  - When: First time adding auth, understanding `ctx.auth`, or choosing a provider
-  - Covers: `oauth` config, user context shape, provider comparison, common mistakes
+  - When: First time adding auth, understanding `ctx.auth`, or choosing a provider / integration mode
+  - Covers: Remote auth vs OAuth proxy, `oauth` config, `ctx.auth` shape, provider comparison, common mistakes
+
+- **[auth0.md](references/authentication/auth0.md)**
+  - When: Using Auth0 — DCR (Early Access) or a standard Regular Web App via `oauthProxy`
+  - Covers: Setup for both modes, `extraAuthorizeParams.audience`, permissions via `rfc9068_profile_authz`
+
+- **[better-auth.md](references/authentication/better-auth.md)**
+  - When: Using Better Auth with the `@better-auth/oauth-provider` plugin (self-hosted OAuth 2.1)
+  - Covers: `oauthBetterAuthProvider`, auth URL / metadata routes, login and consent flows
+
+- **[clerk.md](references/authentication/clerk.md)**
+  - When: Using Clerk (DCR-based OAuth)
+  - Covers: `oauthClerkProvider`, enabling DCR, Frontend API URL, organization context
 
 - **[workos.md](references/authentication/workos.md)**
-  - When: Using WorkOS AuthKit for authentication
-  - Covers: Setup, env vars, DCR vs pre-registered, roles/permissions, WorkOS API calls
+  - When: Using WorkOS AuthKit (DCR only)
+  - Covers: Setup, env vars, roles/permissions, multi-tenant org filtering, WorkOS API calls
 
 - **[supabase.md](references/authentication/supabase.md)**
-  - When: Using Supabase for authentication
-  - Covers: Setup, env vars, HS256 vs ES256, RLS-aware API calls
+  - When: Using Supabase's OAuth 2.1 server
+  - Covers: Setup, publishable keys, ES256 vs HS256, hosting the consent UI, RLS-aware SDK calls
+
+- **[keycloak.md](references/authentication/keycloak.md)**
+  - When: Using Keycloak via native DCR
+  - Covers: DCR trusted hosts + web origins, audience enforcement, realm vs resource roles, userinfo
 
 - **[custom.md](references/authentication/custom.md)**
-  - When: Using any other identity provider (GitHub, Okta, Azure AD, Google, etc.)
-  - Covers: Custom verification, user info extraction, provider examples
+  - When: Any other provider — DCR-capable via `oauthCustomProvider`, or pre-registered (Google, GitHub, Okta, Azure AD) via `oauthProxy`
+  - Covers: `oauthCustomProvider`, `oauthProxy` + `jwksVerifier`, provider examples, opaque-token verification
 
 ---
 
@@ -126,6 +142,10 @@ Load these before diving into tools/resources/widgets sections.
   - When: Composing multiple MCP servers into one unified aggregator server
   - Covers: `server.proxy()`, config API, explicit sessions, sampling routing
 
+- **[architecture.md](references/foundations/architecture.md)**
+  - When: Adding cross-cutting logic (logging, auth checks, rate limiting, tool filtering) that spans multiple tools/resources
+  - Covers: `server.use('mcp:...')` middleware, `MiddlewareContext` (method, params, auth, state), pattern matching, HTTP vs MCP middleware
+
 ---
 
 ### 🎨 Building Visual Widgets (Interactive UI)?
@@ -151,6 +171,13 @@ Load these before diving into tools/resources/widgets sections.
   - When: Building complex widgets with async data, error boundaries, or performance optimizations
   - Covers: Loading states, error handling, memoization, code splitting
 
+- **[model-context.md](references/widgets/model-context.md)**
+  - When: Keeping the AI model aware of what the user is currently seeing (active tab, hovered item, selected product) without requiring tool calls
+  - Covers: `<ModelContext>` component, `modelContext.set/remove` imperative API, nesting, tree serialization, lifecycle rules
+- **[files.md](references/widgets/files.md)**
+  - When: Uploading or downloading files from within a widget (ChatGPT Apps SDK only)
+  - Covers: `useFiles()` hook, `isSupported` guard, model visibility (`modelVisible`), storing `fileId`, temporary download URLs
+
 ---
 
 ### 📚 Need Complete Examples?
@@ -159,6 +186,38 @@ Load these before diving into tools/resources/widgets sections.
 - **[common-patterns.md](references/patterns/common-patterns.md)**
   - End-to-end examples: weather app, todo list, recipe browser
   - Shows: Server code + widget code + best practices in context
+
+---
+
+### 🔁 Testing from the Terminal (Agent Feedback Loops)
+**When:** You want to verify a tool or widget *without* the inspector UI — the canonical flow for AI agents iterating on MCP servers.
+
+- **`mcp-use client`** — drives MCP servers from the terminal. Auto-runs OAuth on 401, persists saved servers under a short name, and one-shot subcommands exit cleanly so they're safe to spawn from harnesses.
+
+  ```bash
+  npx mcp-use client connect dev http://localhost:3000/mcp
+  npx mcp-use client dev tools list
+  npx mcp-use client dev tools call get-weather city=Tokyo --screenshot
+  ```
+
+  Every per-server command takes the saved name as its first positional arg (`mcp-use client <name> <scope> <action>`) — there is no "active session". Args use `key=value` (with `key:='<json>'` for nested values) or a single JSON object. When a tool renders a widget, pass `--screenshot` to also save a PNG (`./<view>-<timestamp>.png` by default, or override with `--screenshot-output <path>`).
+
+- **`mcp-use client screenshot`** — headless render of a widget tool to a PNG. Use this when you want to visually verify a widget change without opening the inspector, especially in loops where you call a tool, screenshot, eyeball the output, and edit. Two forms:
+
+  ```bash
+  # Saved-server form — reuses the auth from `mcp-use client connect`
+  npx mcp-use client dev screenshot --tool get-weather city=Tokyo \
+    --width 800 --height 600 --theme light \
+    --output ./weather.png
+
+  # Ad-hoc form — connect inline (use -H for headers on authenticated servers)
+  npx mcp-use client screenshot --mcp http://localhost:3000/mcp \
+    --tool get-weather city=Tokyo
+  ```
+
+  Add `--device-scale-factor 2` for Retina output, or `--cdp-url <ws>` plus `--inspector <publicly-reachable-url>` to drive a remote Chromium (e.g. Notte) from a sandbox without a local Chrome install.
+
+Both commands are documented in full at [docs/typescript/client/cli](https://docs.mcp-use.com/typescript/client/cli).
 
 ---
 
@@ -182,8 +241,20 @@ What do you need?
 ├─ Reusable prompt template
 │  └─> Use Prompt: server/prompts.md
 │
+├─ Cross-cutting logic (logging, auth checks, rate limiting, tool filtering)
+│  └─> Use Middleware: architecture.md#mcp-middleware
+│
 ├─ Visual/interactive UI
 │  └─> Use Widget: widgets/basics.md
+│
+├─ Keep model aware of what user is seeing in widget
+│  └─> widgets/model-context.md
+├─ Upload/download files in a widget
+│  └─> widgets/files.md (ChatGPT Apps SDK only)
+│
+├─ Verify a tool or widget from the terminal (agent feedback loop)
+│  └─> See "Testing from the Terminal" above — `mcp-use client` for tool runs,
+│      `mcp-use client <server> screenshot --tool <tool>` for headless widget PNGs
 │
 └─ Deploy to production
    └─> deployment.md (cloud deploy, self-hosting, Docker)
@@ -347,5 +418,8 @@ server.listen();
 - `server.proxy()` - Compose/Proxy multiple MCP servers
 - `server.uiResource()` - Define widget resource
 - `server.listen()` - Start server
+- `server.use('mcp:tools/call', fn)` - MCP middleware (tools, resources, prompts, list ops)
+- `server.use('mcp:*', fn)` - Catch-all MCP middleware
+- `server.use(fn)` - HTTP middleware (Hono)
 
 

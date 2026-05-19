@@ -27,6 +27,7 @@ export {
 export {
   ReadResourceCallback,
   ReadResourceTemplateCallback,
+  InferTemplateParams,
   ResourceTemplateConfig,
   ResourceTemplateDefinition,
   ResourceTemplateDefinitionWithoutCallback,

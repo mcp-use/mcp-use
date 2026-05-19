@@ -20,6 +20,7 @@ import type { McpServer } from "mcp-use/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { getServerDisplayName } from "@/client/utils/serverNames";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
 
@@ -110,7 +111,9 @@ export function ServerDropdown({
                   >
                     <ServerIcon server={connection} size="sm" />
                     <div className="flex items-center gap-2 flex-1">
-                      <div className="font-medium">{connection.name}</div>
+                      <div className="font-medium">
+                        {getServerDisplayName(connection)}
+                      </div>
                       <StatusDot status={connection.state} />
                     </div>
                     <div className="flex items-center gap-1">
@@ -182,9 +185,7 @@ export function ServerDropdown({
               <div className="flex items-center gap-2 flex-1">
                 <span className="truncate lg:max-w-[120px] xl:max-w-none">
                   {selectedServer
-                    ? selectedServer.serverInfo?.title ||
-                      selectedServer.serverInfo?.name ||
-                      selectedServer.name
+                    ? getServerDisplayName(selectedServer)
                     : "Select server to inspect"}
                 </span>
                 {selectedServer && (
@@ -287,9 +288,7 @@ export function ServerDropdown({
                   <ServerIcon server={connection} size="sm" />
                   <div className="flex items-center gap-2 flex-1">
                     <div className="font-medium">
-                      {connection.serverInfo?.title ||
-                        connection.serverInfo?.name ||
-                        connection.name}
+                      {getServerDisplayName(connection)}
                     </div>
                     <StatusDot status={connection.state} />
                   </div>

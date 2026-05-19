@@ -28,8 +28,10 @@ jobs:
       - name: Determine branch (manual trigger)
         if: github.event_name == 'workflow_dispatch'
         id: branch-info
+        env:
+          INPUT_BRANCH: ${{ github.event.inputs.branch }}
         run: |
-          BRANCH="${{ github.event.inputs.branch }}"
+          BRANCH="$INPUT_BRANCH"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "packages_published=true" >> $GITHUB_OUTPUT
           echo "✅ Manual deployment triggered for branch: $BRANCH"
@@ -125,20 +127,26 @@ jobs:
         if: |
           (github.event_name == 'workflow_dispatch') ||
           (github.event_name == 'workflow_run' && steps.validate-source.outputs.is_valid == 'true' && steps.check-marker.outputs.packages_published == 'true')
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BRANCH_INFO_BRANCH: ${{ steps.branch-info.outputs.branch }}
+          MARKER_INFO_BRANCH: ${{ steps.marker-info.outputs.branch }}
         run: |
           # Get branch from either manual trigger or automatic trigger
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            BRANCH="${{ steps.branch-info.outputs.branch }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            BRANCH="$BRANCH_INFO_BRANCH"
           else
-            BRANCH="${{ steps.marker-info.outputs.branch }}"
+            BRANCH="$MARKER_INFO_BRANCH"
           fi
           
           if [ "$BRANCH" = "canary" ]; then
             echo "service_id=${{ secrets.RAILWAY_SERVICE_ID_CANARY }}" >> $GITHUB_OUTPUT
             echo "environment=canary" >> $GITHUB_OUTPUT
+            ENVIRONMENT="canary"
           elif [ "$BRANCH" = "main" ]; then
             echo "service_id=${{ secrets.RAILWAY_SERVICE_ID_PROD }}" >> $GITHUB_OUTPUT
             echo "environment=production" >> $GITHUB_OUTPUT
+            ENVIRONMENT="production"
           else
             echo "⚠️ Unknown branch: $BRANCH, skipping deployment"
             echo "should_deploy=false" >> $GITHUB_OUTPUT
@@ -146,7 +154,7 @@ jobs:
           fi
           
           echo "should_deploy=true" >> $GITHUB_OUTPUT
-          echo "✅ Will deploy to ${{ steps.config.outputs.environment }} (branch: $BRANCH)"
+          echo "✅ Will deploy to $ENVIRONMENT (branch: $BRANCH)"
 
       - name: Checkout Repo
         if: steps.config.outputs.should_deploy == 'true'
@@ -159,16 +167,21 @@ jobs:
 
       - name: Deploy to Railway
         if: steps.config.outputs.should_deploy == 'true'
+        env:
+          SERVICE_ID: ${{ steps.config.outputs.service_id }}
+          ENVIRONMENT: ${{ steps.config.outputs.environment }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_BRANCH: ${{ github.event.inputs.branch }}
         run: |
-          if [ -z "${{ steps.config.outputs.service_id }}" ]; then
-            echo "⚠️ Service ID not configured for ${{ steps.config.outputs.environment }}, skipping deployment"
+          if [ -z "$SERVICE_ID" ]; then
+            echo "⚠️ Service ID not configured for $ENVIRONMENT, skipping deployment"
             exit 0
           fi
           
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "🚀 Manually deploying to Railway (${{ steps.config.outputs.environment }}) from latest commit on ${{ github.event.inputs.branch }}..."
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "🚀 Manually deploying to Railway ($ENVIRONMENT) from latest commit on $INPUT_BRANCH..."
           else
-            echo "🚀 Deploying to Railway (${{ steps.config.outputs.environment }}) after package publish..."
+            echo "🚀 Deploying to Railway ($ENVIRONMENT) after package publish..."
           fi
           
           docker run --rm \
@@ -176,5 +189,5 @@ jobs:
             -v "$PWD:/workspace" \
             -w /workspace \
             ghcr.io/railwayapp/cli:latest \
-            railway up --service=${{ steps.config.outputs.service_id }}
+            railway up --service=$SERVICE_ID
           echo "✅ Successfully deployed to Railway"

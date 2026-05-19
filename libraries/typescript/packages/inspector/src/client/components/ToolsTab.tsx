@@ -758,6 +758,7 @@ export function ToolsTab({
         .catch(() => {
           // Silently fail - telemetry should not break the application
         });
+      window.dispatchEvent(new Event("mcp-tool-executed"));
 
       // Widget resource was already fetched before tool execution (if applicable)
       // Now we just need to update the result with tool output
@@ -865,6 +866,7 @@ export function ToolsTab({
         .catch(() => {
           // Silently fail - telemetry should not break the application
         });
+      window.dispatchEvent(new Event("mcp-tool-executed"));
 
       const toolMeta =
         (selectedTool as any)?._meta || (selectedTool as any)?.metadata;

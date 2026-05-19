@@ -49,11 +49,10 @@ export class KeycloakOAuthProvider implements OAuthProvider {
     }
 
     try {
-      // Keycloak tokens can have multiple audiences
       const result = await jwtVerify(token, this.getJWKS(), {
         issuer: this.issuer,
-        // Don't verify audience if not specified
-        ...(this.config.clientId && { audience: this.config.clientId }),
+        // Only verify audience if explicitly configured (should be the MCP server URL)
+        ...(this.config.audience && { audience: this.config.audience }),
       });
       return result;
     } catch (error) {
@@ -68,17 +67,8 @@ export class KeycloakOAuthProvider implements OAuthProvider {
       | undefined;
     const realmRoles = (realmAccess?.roles as string[]) || [];
 
-    // Extract client roles (if clientId is specified)
-    const resourceAccess = payload.resource_access as
-      | Record<string, Record<string, unknown>>
-      | undefined;
-    const clientRoles =
-      (this.config.clientId &&
-        ((resourceAccess?.[this.config.clientId]?.roles as string[]) || [])) ||
-      [];
-
     // Combine all roles
-    const allRoles = [...realmRoles, ...clientRoles];
+    const allRoles = [...realmRoles];
 
     // Extract resource access for permissions
     const permissions: string[] = [];
@@ -128,7 +118,15 @@ export class KeycloakOAuthProvider implements OAuthProvider {
   }
 
   getScopesSupported(): string[] {
-    return ["openid", "profile", "email", "offline_access", "roles"];
+    return (
+      this.config.scopesSupported ?? [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+        "roles",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {

@@ -1,0 +1,105 @@
+---
+title: "Version 1.7.0"
+description: "CLI scaffolding, conformance tests, auto-retry ports, and full client conformance"
+icon: "rocket"
+og:image: "https://mcp-use.com/api/og/release?v=1.7.0"
+---
+
+import { Contributors } from '/snippets/contributors.jsx'
+
+<Card img="https://mcp-use.com/api/og/release?v=1.7.0" title="Release 1.7.0" href="https://github.com/mcp-use/mcp-use/releases/tag/python-v1.7.0">
+  This release adds the **create-mcp-use CLI** for scaffolding new projects, **conformance test infrastructure**, **auto-retry ports**, and achieves **100% client conformance (20/20)**.
+</Card>
+
+## New Features
+
+### create-mcp-use CLI
+**[PR #1097](https://github.com/mcp-use/mcp-use/pull/1097) by @renvins**
+
+Added a new `create-mcp-use` CLI with rich UI and automatic dependency installation for quickly scaffolding new MCP projects.
+
+### Auto-Retry Port Selection
+**[PR #1163](https://github.com/mcp-use/mcp-use/pull/1163) by @pietrozullo**
+
+When the default port is already in use, the server now automatically retries the next available port.
+
+### MCP Logs Only Mode
+**[PR #1164](https://github.com/mcp-use/mcp-use/pull/1164) by @pietrozullo**
+
+Added `mcp_logs_only` option to hide non-MCP HTTP access logs, reducing noise in production environments.
+
+### Server Icons Parameter
+**[PR #1147](https://github.com/mcp-use/mcp-use/pull/1147) by @pietrozullo**
+
+Added `icons` parameter to the `MCPServer` constructor for customizing server icons.
+
+### Conformance Test Infrastructure
+**[PR #1008](https://github.com/mcp-use/mcp-use/pull/1008) by @pietrozullo**
+
+Added conformance test infrastructure for verifying server and client protocol compliance.
+
+### Protocol Handlers
+**[PR #1004](https://github.com/mcp-use/mcp-use/pull/1004) by @pietrozullo**
+
+Added protocol handlers for logging, completions, subscriptions, and DNS protection.
+
+## Bug Fixes
+
+### Inspector Path Configuration
+**[PR #1176](https://github.com/mcp-use/mcp-use/pull/1176) by @pietrozullo**
+
+Fixed the server to respect the configured inspector path.
+
+### Simplified Optional Parameter Schema
+**[PR #1141](https://github.com/mcp-use/mcp-use/pull/1141) by @pietrozullo**
+
+Simplified tool JSON Schema generation for Optional parameters.
+
+### Memory Leak Prevention
+**[PR #1093](https://github.com/mcp-use/mcp-use/pull/1093) by @stakeswky**
+
+Switched to `WeakSet` for resource subscriptions to prevent memory leaks on client disconnect.
+
+### Debug Route Registration
+**[PR #1114](https://github.com/mcp-use/mcp-use/pull/1114) by @pietrozullo**
+
+Fixed debug routes to be registered when `debug=True` is passed to `run()`.
+
+### 100% Client Conformance (20/20)
+**[PR #1019](https://github.com/mcp-use/mcp-use/pull/1019) by @pietrozullo**
+
+Achieved 100% client conformance score by fixing SSE retry handling.
+
+### Deprecated streamablehttp_client Replaced
+**[PR #1017](https://github.com/mcp-use/mcp-use/pull/1017) by @pietrozullo**
+
+Replaced deprecated `streamablehttp_client` with `streamable_http_client`.
+
+### Improved Client Conformance
+**[PR #1011](https://github.com/mcp-use/mcp-use/pull/1011) by @pietrozullo**
+
+Improved client conformance with pre-registration, CIMD, and scope step-up support.
+
+### Verify Parameter Propagation
+**[PR #914](https://github.com/mcp-use/mcp-use/pull/914) by @pietrozullo**
+
+Fixed propagation of the `verify` parameter to `HTTPConnector`.
+
+### Documentation Fix
+**[PR #1108](https://github.com/mcp-use/mcp-use/pull/1108) by @Yuukidiv**
+
+Fixed incorrect parameter name in the quickstart server example.
+
+## Other Changes
+
+- Removed accidentally generated `python/python` directory ([#1148](https://github.com/mcp-use/mcp-use/pull/1148))
+- Added dependency policy and roadmap ([#1020](https://github.com/mcp-use/mcp-use/pull/1020))
+- Updated LangChain examples to use 1.0+ API ([#1022](https://github.com/mcp-use/mcp-use/pull/1022))
+- Added integration tests for resource subscriptions ([#1007](https://github.com/mcp-use/mcp-use/pull/1007))
+- Formatted adapter files for ruff 0.15 ([#1003](https://github.com/mcp-use/mcp-use/pull/1003))
+
+## Contributors
+
+Thank you to all contributors who made this release possible
+
+<Contributors users="pietrozullo,renvins,stakeswky,Yuukidiv" />

@@ -69,7 +69,7 @@ const client = new MCPClient({
   },
 });
 
-const llm = new ChatOpenAI({ model: "gpt-5.1" });
+const llm = new ChatOpenAI({ model: "gpt-5.5" });
 
 const agent = new MCPAgent({ llm, client, maxSteps: 50 });
 
@@ -103,9 +103,9 @@ The `MCPAgent` class orchestrates all agent functionality, managing LLM interact
 Native support for multiple LLM providers with a unified interface. Each provider is automatically detected and configured based on the LLM instance you provide.
 
 **Supported providers**:
-- OpenAI (GPT-3.5, GPT-4, GPT-4 Turbo)
-- Anthropic (Claude 3 family)
-- Google (Gemini models)
+- OpenAI (gpt-5.5, gpt-5.5-mini)
+- Anthropic (claude-opus-4-7, claude-sonnet-4-6)
+- Google (gemini-3.1-pro, gemini-3.1-flash)
 - Groq (Llama, Mixtral, and more)
 
 **Learn more**: [LLM Integration →](/typescript/agent/llm-integration)

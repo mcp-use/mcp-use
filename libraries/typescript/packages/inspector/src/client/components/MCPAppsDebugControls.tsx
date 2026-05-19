@@ -7,6 +7,7 @@ import {
   Copy,
   Maximize2,
   Monitor,
+  Moon,
   MousePointer2,
   PictureInPicture,
   Pointer,
@@ -15,6 +16,7 @@ import {
   ShieldOff,
   Smartphone,
   SquareDashedMousePointer,
+  Sun,
   Tablet,
   Trash2,
 } from "lucide-react";
@@ -29,6 +31,7 @@ import {
 import { useResourceProps, type PropPreset } from "../hooks/useResourceProps";
 import type { LLMConfig } from "./chat/types";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import { useTheme } from "@/client/context/ThemeContext";
 import { IframeConsole } from "./IframeConsole";
 import { PropsConfigDialog } from "./resources/PropsConfigDialog";
 import { JSONDisplay } from "./shared/JSONDisplay";
@@ -267,6 +270,7 @@ export function MCPAppsDebugControls({
   protocol = "mcp-apps",
   onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
+  const { resolvedTheme, setTheme } = useTheme();
   const { playground, updatePlaygroundSettings, widgets, clearCspViolations } =
     useWidgetDebug();
   const widget = widgets.get(toolCallId);
@@ -512,6 +516,34 @@ export function MCPAppsDebugControls({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Theme Toggle */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            data-testid="debugger-theme-button"
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+            onClick={() => {
+              const newTheme = resolvedTheme === "dark" ? "light" : "dark";
+              setTheme(newTheme);
+              if (onUpdateGlobals) {
+                onUpdateGlobals({ theme: newTheme });
+              }
+            }}
+          >
+            {resolvedTheme === "dark" ? (
+              <Moon className="size-3.5" />
+            ) : (
+              <Sun className="size-3.5" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          Theme: {resolvedTheme === "dark" ? "Dark" : "Light"}
+        </TooltipContent>
+      </Tooltip>
 
       {/* Locale */}
       <Dialog open={localeDialogOpen} onOpenChange={setLocaleDialogOpen}>

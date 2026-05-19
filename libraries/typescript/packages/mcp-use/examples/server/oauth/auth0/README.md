@@ -1,6 +1,6 @@
 # Auth0 OAuth MCP Server Example
 
-A production-ready example of an MCP server with Auth0 OAuth 2.1 authentication, demonstrating how to proxy OAuth flows, implement bearer token authentication, and enforce role-based access control (RBAC).
+A production-ready example of an MCP server with Auth0 OAuth 2.1 authentication, demonstrating how to implement bearer token authentication and enforce role-based access control (RBAC).
 
 ## Features
 
@@ -156,21 +156,21 @@ For detailed testing instructions, see [Testing Your MCP Server with MCP Inspect
 
 ### OAuth Flow Details
 
-The server implements the complete OAuth 2.1 flow:
+The server implements a DCR-direct OAuth flow — MCP clients communicate directly with Auth0 for all OAuth operations:
 
-1. **Authorization Request**: Client redirects to `/authorize`
-2. **Proxy to Auth0**: Server forwards to Auth0's authorization endpoint
-3. **User Authentication**: User logs in via Auth0's login page
-4. **Authorization Code**: Auth0 redirects back with code
-5. **Token Exchange**: Client exchanges code for access token at `/token`
+1. **Discovery**: Client fetches `/.well-known/oauth-protected-resource` from your MCP server to find Auth0
+2. **OAuth Metadata**: Client fetches Auth0's `/.well-known/oauth-authorization-server` directly from Auth0
+3. **Dynamic Client Registration**: Client registers itself directly with Auth0's `registration_endpoint`
+4. **User Authentication**: User logs in via Auth0's login page (direct to Auth0)
+5. **Token Exchange**: Client exchanges code for access token directly with Auth0
 6. **Bearer Token**: Client includes token in MCP requests via `Authorization: Bearer <token>` header
+
+Your MCP server only provides metadata endpoints and verifies tokens—it does not proxy OAuth requests.
 
 ### OAuth Endpoints
 
-- **Authorization**: `http://localhost:3000/authorize`
-- **Token Exchange**: `http://localhost:3000/token`
-- **Server Metadata**: `http://localhost:3000/.well-known/oauth-authorization-server`
-- **Resource Metadata**: `http://localhost:3000/.well-known/oauth-protected-resource/mcp`
+- **Resource Metadata**: `http://localhost:3000/.well-known/oauth-protected-resource`
+- **Auth0 Metadata (passthrough)**: `http://localhost:3000/.well-known/oauth-authorization-server`
 
 ## Available Tools
 
@@ -244,51 +244,47 @@ auth0-oauth/
 ### Authentication Flow
 
 ```
-┌─────────┐     ┌─────────────┐     ┌────────┐
-│ Client  │────▶│ MCP Server  │────▶│ Auth0  │
-│         │     │ (Proxy)     │     │        │
-└─────────┘     └─────────────┘     └────────┘
-     │                 │                  │
-     │  1. /authorize  │                  │
-     │────────────────▶│                  │
-     │                 │  2. Redirect     │
-     │                 │─────────────────▶│
-     │                 │                  │
-     │                 │  3. Login/Consent│
-     │                 │                  │
-     │  4. Code        │                  │
-     │◀────────────────┴──────────────────│
-     │                                    │
-     │  5. /token (code + PKCE verifier)  │
-     │───────────────────────────────────▶│
-     │                                    │
-     │  6. Access Token (with permissions)│
-     │◀───────────────────────────────────│
-     │                                    │
-     │  7. MCP Requests (Bearer Token)    │
-     │───────────────────────────────────▶│
-     │                                    │
-     │  8. JWKS Verification              │
-     │                 │─────────────────▶│
-     │                 │◀─────────────────│
-     │                                    │
-     │  9. Tool Response (if authorized)  │
-     │◀───────────────────────────────────│
+┌─────────────┐     ┌─────────────┐     ┌────────┐
+│ MCP Client  │     │  MCP Server │     │ Auth0  │
+└──────┬──────┘     └──────┬──────┘     └───┬────┘
+       │                   │                │
+       │ 1. Fetch resource metadata         │
+       │──────────────────▶│                │
+       │◀──────────────────│ (points to     │
+       │                   │  Auth0 issuer) │
+       │                                    │
+       │ 2. Fetch OAuth metadata (direct)   │
+       │───────────────────────────────────▶│
+       │◀───────────────────────────────────│
+       │                                    │
+       │ 3. Dynamic Client Registration (direct)
+       │───────────────────────────────────▶│
+       │◀───────────────────────────────────│
+       │                                    │
+       │ 4. Authorization + Token Exchange (direct)
+       │───────────────────────────────────▶│
+       │◀───────────────────────────────────│
+       │                                    │
+       │ 5. MCP Request + Bearer Token      │
+       │──────────────────▶│                │
+       │                   │ 6. Verify JWT  │
+       │                   │───────────────▶│
+       │                   │◀───────────────│
+       │                   │                │
+       │◀──────────────────│                │
+       │  7. Tool Response │                │
 ```
 
-### Bearer Token Middleware with JWT Verification
+### Bearer Token Verification
 
 All `/mcp/*` routes are protected with bearer authentication:
 
 1. Client includes `Authorization: Bearer <token>` header
-2. Middleware validates token format
-3. **JWT signature is verified** using Auth0's JWKS endpoint (when `VERIFY_JWT=true`)
-4. Token claims are validated (issuer, audience, expiration)
-5. User info and permissions are attached to request context
-6. Tools check required permissions before execution
-7. 403 response if permissions are insufficient
-
-**Security**: This example implements production-ready JWT verification by default. Set `VERIFY_JWT=false` only for development/testing.
+2. **JWT signature is verified** using Auth0's JWKS endpoint
+3. Token claims are validated (issuer, audience, expiration)
+4. User info and permissions are attached to request context via `ctx.auth`
+5. Tools check required permissions before execution
+6. 403 response if permissions are insufficient
 
 ## Advanced Topics
 
@@ -317,35 +313,15 @@ auth0 roles permissions add ROLE_ID --api-id "http://localhost:3000/" --permissi
 3. Add permission check in your tool:
 
 ```typescript
-server.tool({
-  name: "my-custom-tool",
-  description: "My custom tool (requires tool:custom)",
-  cb: async (_args: any, context: any) => {
-    const payload = context?.get?.("payload");
-    if (!hasPermissions(payload, ["tool:custom"])) {
-      return {
-        content: [{ type: "text", text: "Insufficient permissions" }],
-        isError: true,
-      };
+server.tool(
+  { name: "my-custom-tool", description: "My custom tool (requires tool:custom)" },
+  async (_args, ctx) => {
+    if (!ctx.auth.scopes?.includes("tool:custom")) {
+      return error("Insufficient permissions: requires tool:custom");
     }
     // ... tool implementation
-  },
-});
-```
-
-### Token Refresh
-
-Implement refresh token handling for long-lived sessions:
-
-```typescript
-server.post("/token", async (c) => {
-  const body = await c.req.parseBody();
-
-  if (body.grant_type === "refresh_token") {
-    // Forward refresh token request to Auth0
   }
-  // ... existing code
-});
+);
 ```
 
 ### Disabling JWT Verification (Development Only)

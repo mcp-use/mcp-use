@@ -4,6 +4,7 @@
  * Runtime-aware helpers for server startup, path rewriting, and CORS handling.
  */
 
+import chalk from "chalk";
 import type { Hono as HonoType } from "hono";
 import { getEnv, isDeno } from "./runtime.js";
 
@@ -101,6 +102,13 @@ export function rewriteSupabaseRequest(req: Request): Request {
   return req;
 }
 
+/** Handle to cleanly shut down the HTTP listener (Node) or no-op (Deno). */
+export type HttpServerHandle = {
+  close: () => Promise<void>;
+  /** Force-close all connections and stop listening immediately (Node 18.2+). */
+  forceClose: () => Promise<void>;
+};
+
 /**
  * Start the provided Hono application as an HTTP server for the current runtime.
  *
@@ -110,7 +118,7 @@ export function rewriteSupabaseRequest(req: Request): Request {
  * @param options - Optional runtime-specific hooks
  * @param options.onDenoRequest - Transform an incoming Deno `Request` before it is passed to the application
  * @param options.onDenoResponse - Transform a Deno `Response` before it is returned (if omitted, default CORS headers are applied)
- * @returns Nothing.
+ * @returns A handle whose {@link HttpServerHandle.close} stops the listener (Node); Deno returns a no-op close.
  */
 export async function startServer(
   app: HonoType,
@@ -120,7 +128,7 @@ export async function startServer(
     onDenoRequest?: (req: Request) => Request | Promise<Request>;
     onDenoResponse?: (res: Response) => Response | Promise<Response>;
   }
-): Promise<void> {
+): Promise<HttpServerHandle> {
   if (isDeno) {
     // Deno runtime
     const corsHeaders = getDenoCorsHeaders();
@@ -154,6 +162,15 @@ export async function startServer(
       }
     );
     console.log(`[SERVER] Listening`);
+    console.log(
+      chalk.gray(
+        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+      )
+    );
+    return {
+      close: async () => {},
+      forceClose: async () => {},
+    };
   } else {
     // Node.js runtime
     const { serve } = await import("@hono/node-server");
@@ -166,6 +183,11 @@ export async function startServer(
       (_info: any) => {
         console.log(`[SERVER] Listening on http://${host}:${port}`);
         console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
+        console.log(
+          chalk.gray(
+            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+          )
+        );
       }
     );
 
@@ -176,5 +198,20 @@ export async function startServer(
     if (wsProxySetup && server) {
       wsProxySetup(server);
     }
+
+    const nodeServer = server as import("node:http").Server;
+    return {
+      close: () =>
+        new Promise((resolve, reject) => {
+          nodeServer.close((err) => (err ? reject(err) : resolve()));
+        }),
+      forceClose: () =>
+        new Promise<void>((resolve) => {
+          if (typeof nodeServer.closeAllConnections === "function") {
+            nodeServer.closeAllConnections();
+          }
+          nodeServer.close(() => resolve());
+        }),
+    };
   }
 }

@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import MISSING, fields, is_dataclass
 from typing import Any, Literal, cast
 
 from mcp.server.elicitation import ElicitationResult, ElicitSchemaModelT
 from mcp.server.fastmcp import Context as FastMCPContext
-from mcp.types import CreateMessageResult, ListRootsResult, ModelPreferences, Root, SamplingMessage, TextContent
+from mcp.types import (
+    CreateMessageResult,
+    ElicitResult,
+    ListRootsResult,
+    ModelPreferences,
+    Root,
+    SamplingMessage,
+    TextContent,
+)
 from pydantic import BaseModel, Field, create_model
 from starlette.requests import Request
 
@@ -154,7 +163,33 @@ class Context(FastMCPContext):
         message: str,
         schema: type[ElicitSchemaModelT] | type[Any],
     ) -> ElicitationResult[ElicitSchemaModelT]:
-        """Support both Pydantic models and dataclasses for elicitation schemas."""
+        """Request structured user input via a form elicitation.
+
+        Supports both Pydantic models and dataclasses as schemas.
+
+        Args:
+            message: Human-readable prompt explaining what input is needed.
+            schema: A Pydantic model class or dataclass defining the form fields.
+
+        Returns:
+            An ``ElicitationResult`` with ``action`` ("accept", "decline", "cancel")
+            and typed ``data`` when accepted.
+
+        Example:
+            ```python
+            @dataclass
+            class ReleaseConfig:
+                version: str = "1.0.0"
+                environment: str = "staging"
+
+            @server.tool()
+            async def create_release(ctx: Context) -> str:
+                result = await ctx.elicit("Configure release", ReleaseConfig)
+                if result.action == "accept":
+                    return f"Releasing {result.data.version} to {result.data.environment}"
+                return "Cancelled"
+            ```
+        """
         _telemetry.track_server_context(context_type="elicit")
 
         schema_model, dataclass_schema = self._coerce_schema(schema)
@@ -164,6 +199,53 @@ class Context(FastMCPContext):
             result.data = dataclass_schema(**result.data.model_dump())
 
         return result
+
+    async def elicit_url(
+        self,
+        message: str,
+        url: str,
+        *,
+        elicitation_id: str | None = None,
+    ) -> ElicitResult:
+        """Redirect the user to an external URL for out-of-band interactions.
+
+        Use this for OAuth flows, credential collection, payment processing,
+        or any workflow that requires the user to interact with an external service.
+
+        Args:
+            message: Human-readable explanation of why the URL interaction is needed.
+            url: The URL the user should navigate to.
+            elicitation_id: Optional unique identifier for tracking. Auto-generated if omitted.
+
+        Returns:
+            An ``ElicitResult`` with ``action`` ("accept", "decline", "cancel").
+            URL mode never returns ``content``.
+
+        Example:
+            ```python
+            @server.tool()
+            async def authenticate(provider: str, ctx: Context) -> str:
+                result = await ctx.elicit_url(
+                    f"Sign in to {provider}",
+                    f"https://auth.example.com/login?provider={provider}",
+                )
+                if result.action == "accept":
+                    return "Authenticated!"
+                return "Authentication declined."
+            ```
+        """
+        _telemetry.track_server_context(context_type="elicit_url")
+
+        if elicitation_id is None:
+            elicitation_id = uuid.uuid4().hex
+
+        session = self.request_context.session
+        return await session.elicit_url(
+            message=message,
+            url=url,
+            elicitation_id=elicitation_id,
+            related_request_id=self.request_id,
+        )
 
     @staticmethod
     def _text_message(text: str) -> SamplingMessage:

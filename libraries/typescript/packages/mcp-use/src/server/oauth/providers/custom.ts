@@ -75,4 +75,12 @@ export class CustomOAuthProvider implements OAuthProvider {
       this.config.grantTypesSupported || ["authorization_code", "refresh_token"]
     );
   }
+
+  getUserInfoEndpoint(): string | undefined {
+    return this.config.userInfoEndpoint;
+  }
+
+  getAudience(): string | undefined {
+    return this.config.audience;
+  }
 }

@@ -9,3 +9,6 @@ export { mountInspector } from "./middleware.js";
 
 // Export browser-compatible chat utilities for client-side usage
 export { handleChatRequest, handleChatRequestStream } from "./shared-utils.js";
+
+/** Used by @mcp-use/cli dev restart (inspector tunnel stop before re-exec) */
+export { stopTunnel, getTunnelStatus } from "./tunnel.js";

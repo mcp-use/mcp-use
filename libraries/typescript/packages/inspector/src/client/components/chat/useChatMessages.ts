@@ -6,6 +6,7 @@ import type {
   LLMConfig,
   Message,
   MessageAttachment,
+  StreamProtocol,
 } from "./types";
 import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
 
@@ -27,6 +28,28 @@ interface UseChatMessagesProps {
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   /** Pre-populate the chat with messages from a previous session (e.g. when restoring history). */
   initialMessages?: Message[];
+  /** Tool names the user has disabled via the tool selector. Sent to the server so it can exclude them. */
+  disabledTools?: Set<string>;
+  /**
+   * Wire protocol used by the streaming endpoint.
+   * - `"sse"` (default): Inspector SSE protocol (`data: {"type":"text","content":"..."}\n\n`)
+   * - `"data-stream"`: Vercel AI SDK data-stream protocol (`0:"text"`, `9:{...}`, etc.)
+   */
+  streamProtocol?: StreamProtocol;
+  /** Credentials policy for the fetch request (e.g. `"include"` for cross-origin cookie auth). */
+  credentials?: RequestCredentials;
+  /** Extra headers to send with every streaming request. */
+  extraHeaders?: Record<string, string>;
+  /**
+   * Custom body builder. Receives the serialised messages array and returns the
+   * object that will be JSON-stringified as the request body.
+   * When omitted, the default body includes `mcpServerUrl`, `llmConfig`,
+   * `authConfig`, and `messages`.
+   * Use this to send only `{ messages }` to a server-managed backend.
+   */
+  body?: (
+    messages: Array<{ role: string; content: unknown; attachments?: unknown }>
+  ) => unknown;
 }
 
 export function useChatMessages({
@@ -38,10 +61,18 @@ export function useChatMessages({
   waitForChatApiUrl,
   widgetModelContexts,
   initialMessages,
+  disabledTools,
+  streamProtocol = "sse",
+  credentials,
+  extraHeaders,
+  body: bodyBuilder,
 }: UseChatMessagesProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    loginUrl: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
@@ -142,34 +173,56 @@ export function useChatMessages({
           (waitForChatApiUrl ? await waitForChatApiUrl() : undefined) ??
           "/inspector/api/chat/stream";
 
+        const serialisedMessages = [
+          ...[...messages, ...userMessages].map((m) => ({
+            role: m.role,
+            content:
+              m.content ||
+              (m.parts
+                ?.filter((p) => p.type === "text")
+                .map((p) => p.text)
+                .join("") ??
+                ""),
+            attachments: m.attachments,
+          })),
+          ...widgetContextMessages,
+        ];
+
         const response = await fetch(resolvedUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...extraHeaders,
           },
           signal: abortControllerRef.current.signal,
-          body: JSON.stringify({
-            mcpServerUrl,
-            llmConfig,
-            authConfig: authConfigWithTokens,
-            messages: [
-              ...[...messages, ...userMessages].map((m) => ({
-                role: m.role,
-                content:
-                  m.content ||
-                  (m.parts
-                    ?.filter((p) => p.type === "text")
-                    .map((p) => p.text)
-                    .join("") ??
-                    ""),
-                attachments: m.attachments,
-              })),
-              ...widgetContextMessages,
-            ],
-          }),
+          ...(credentials ? { credentials } : {}),
+          body: JSON.stringify(
+            bodyBuilder
+              ? bodyBuilder(serialisedMessages)
+              : {
+                  mcpServerUrl,
+                  llmConfig,
+                  authConfig: authConfigWithTokens,
+                  messages: serialisedMessages,
+                  ...(disabledTools && disabledTools.size > 0
+                    ? { disabledTools: [...disabledTools] }
+                    : {}),
+                }
+          ),
         });
 
         if (!response.ok) {
+          if (response.status === 429) {
+            const errBody = await response.json().catch(() => null);
+            if (errBody?.loginRequired && errBody?.loginUrl) {
+              setRateLimitInfo({ loginUrl: errBody.loginUrl as string });
+            }
+            // Remove the empty assistant message added optimistically
+            setMessages((prev) =>
+              prev.filter((m) => m.id !== `assistant-${Date.now()}`)
+            );
+            return;
+          }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
@@ -207,158 +260,209 @@ export function useChatMessages({
           throw new Error("No response body");
         }
 
+        // Shared helpers for updating the assistant message parts
+        const updateParts = () => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, parts: [...parts] }
+                : msg
+            )
+          );
+        };
+        const finalizeParts = () => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMessageId
+                ? { ...msg, parts: [...parts], content: "" }
+                : msg
+            )
+          );
+        };
+        const appendText = (text: string) => {
+          currentTextPart += text;
+          const lastPart = parts[parts.length - 1];
+          if (lastPart && lastPart.type === "text") {
+            lastPart.text = currentTextPart;
+          } else {
+            parts.push({ type: "text", text: currentTextPart });
+          }
+          updateParts();
+        };
+        const appendToolCall = (
+          toolName: string,
+          args: Record<string, unknown>
+        ) => {
+          if (currentTextPart) currentTextPart = "";
+          parts.push({
+            type: "tool-invocation",
+            toolInvocation: { toolName, args, state: "pending" },
+          });
+          updateParts();
+        };
+        const resolveToolResult = (
+          match:
+            | { by: "toolName"; toolName: string }
+            | { by: "index"; index: number },
+          result: unknown
+        ) => {
+          let toolPart: (typeof parts)[number] | undefined;
+          if (match.by === "toolName") {
+            toolPart = parts.find(
+              (p) =>
+                p.type === "tool-invocation" &&
+                p.toolInvocation?.toolName === match.toolName &&
+                !p.toolInvocation?.result
+            );
+          } else {
+            toolPart = parts[match.index];
+          }
+          if (toolPart?.toolInvocation) {
+            toolPart.toolInvocation.result = result;
+            toolPart.toolInvocation.state = (result as any)?.isError
+              ? "error"
+              : "result";
+            updateParts();
+          }
+        };
+
+        // data-stream protocol state: maps toolCallId → parts array index
+        const toolCallIdToIndex = new Map<string, number>();
+
         let buffer = "";
         while (true) {
-          // Check for abort
           if (abortControllerRef.current?.signal.aborted) {
             await reader.cancel();
             break;
           }
 
           const { done, value } = await reader.read();
-
           if (done) break;
 
-          // Decode the chunk and add to buffer
           buffer += decoder.decode(value, { stream: true });
-
-          // Process complete lines from buffer
           const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
             if (!line.trim()) continue;
 
-            // SSE format: lines start with "data: "
-            if (!line.startsWith("data: ")) continue;
-
             try {
-              const event = JSON.parse(line.slice(6)); // Remove "data: " prefix
-              console.log(
-                "[Client received event]",
-                event.type,
-                event.toolName || event.content?.slice?.(0, 30)
-              );
-
-              if (event.type === "message") {
-                // Initial assistant message - just log it
-                console.log("[Message started]", event.id);
-              } else if (event.type === "text") {
-                // Streaming text content from LLM
-                currentTextPart += event.content;
-
-                // Update or add text part
-                const lastPart = parts[parts.length - 1];
-                if (lastPart && lastPart.type === "text") {
-                  // Update existing text part
-                  lastPart.text = currentTextPart;
-                } else {
-                  // Add new text part
-                  parts.push({
-                    type: "text",
-                    text: currentTextPart,
-                  });
-                }
-                console.log(
-                  "[Parts after text]",
-                  parts.length,
-                  "parts, text length:",
-                  currentTextPart.length
-                );
-
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, parts: [...parts] }
-                      : msg
-                  )
-                );
-              } else if (event.type === "tool-call") {
-                // Tool invocation started - finalize current text and add tool part
-                if (currentTextPart) {
-                  currentTextPart = "";
+              if (streamProtocol === "data-stream") {
+                // Vercel AI SDK wire format: <code>:<json-value>
+                const colonIdx = line.indexOf(":");
+                if (colonIdx === -1) continue;
+                const code = line.slice(0, colonIdx);
+                const jsonPart = line.slice(colonIdx + 1);
+                let val: unknown;
+                try {
+                  val = JSON.parse(jsonPart);
+                } catch {
+                  continue;
                 }
 
-                parts.push({
-                  type: "tool-invocation",
-                  toolInvocation: {
-                    toolName: event.toolName,
-                    args: event.args,
-                    state: "pending",
-                  },
-                });
-                console.log(
-                  "[Parts after tool-call]",
-                  parts.length,
-                  "parts, tool:",
-                  event.toolName
-                );
-
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, parts: [...parts] }
-                      : msg
-                  )
-                );
-              } else if (event.type === "tool-result") {
-                // Tool invocation completed
-                const toolPart = parts.find(
-                  (p) =>
-                    p.type === "tool-invocation" &&
-                    p.toolInvocation?.toolName === event.toolName &&
-                    !p.toolInvocation?.result
-                );
-
-                if (toolPart && toolPart.toolInvocation) {
-                  toolPart.toolInvocation.result = event.result;
-                  // Check if result indicates an error
-                  toolPart.toolInvocation.state = event.result?.isError
-                    ? "error"
-                    : "result";
-                  console.log(
-                    "[Parts after tool-result]",
-                    parts.length,
-                    "parts, updated:",
-                    event.toolName
-                  );
-
-                  setMessages((prev) =>
-                    prev.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, parts: [...parts] }
-                        : msg
-                    )
-                  );
-                } else {
-                  console.warn(
-                    "[tool-result] Could not find matching tool part for",
-                    event.toolName
-                  );
-                }
-              } else if (event.type === "done") {
-                // Final update - use done data if available
-                console.log("[Done] Final parts:", parts.length);
-                setMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? {
-                          ...msg,
-                          parts: [...parts],
-                          content: "", // Clear content since we're using parts
+                switch (code) {
+                  case "0": {
+                    appendText(typeof val === "string" ? val : String(val));
+                    break;
+                  }
+                  case "9": {
+                    const tc = val as Record<string, unknown>;
+                    // Unwrap LangChain-style { input: "<json>" } args
+                    let args = (tc.args ?? {}) as Record<string, unknown>;
+                    if (
+                      typeof args.input === "string" &&
+                      Object.keys(args).length === 1
+                    ) {
+                      try {
+                        const parsed = JSON.parse(args.input);
+                        if (typeof parsed === "object" && parsed !== null)
+                          args = parsed;
+                      } catch {
+                        /* keep original */
+                      }
+                    }
+                    appendToolCall(String(tc.toolName ?? ""), args);
+                    if (tc.toolCallId) {
+                      toolCallIdToIndex.set(
+                        tc.toolCallId as string,
+                        parts.length - 1
+                      );
+                    }
+                    break;
+                  }
+                  case "a": {
+                    const tr = val as Record<string, unknown>;
+                    const idx = toolCallIdToIndex.get(tr.toolCallId as string);
+                    // Unwrap LangChain ToolMessage wrapper
+                    let result = tr.result;
+                    const lc = result as Record<string, unknown> | undefined;
+                    if (
+                      lc?.lc === 1 &&
+                      lc?.type === "constructor" &&
+                      (lc?.kwargs as any)?.content
+                    ) {
+                      const raw = (lc.kwargs as Record<string, unknown>)
+                        .content as string;
+                      if (typeof raw === "string") {
+                        try {
+                          result = JSON.parse(raw);
+                        } catch {
+                          result = raw;
                         }
-                      : msg
-                  )
-                );
-              } else if (event.type === "error") {
-                throw new Error(event.message || "Streaming error");
+                      }
+                    }
+                    if (idx !== undefined) {
+                      resolveToolResult({ by: "index", index: idx }, result);
+                    }
+                    break;
+                  }
+                  case "d": {
+                    finalizeParts();
+                    break;
+                  }
+                  case "3": {
+                    throw new Error(
+                      typeof val === "string" ? val : JSON.stringify(val)
+                    );
+                  }
+                  default:
+                    break;
+                }
+              } else {
+                // SSE format: lines start with "data: "
+                if (!line.startsWith("data: ")) continue;
+                const event = JSON.parse(line.slice(6));
+
+                if (event.type === "message") {
+                  // Stream start — no UI update needed
+                } else if (event.type === "text") {
+                  appendText(event.content);
+                } else if (event.type === "tool-call") {
+                  appendToolCall(event.toolName, event.args);
+                } else if (event.type === "tool-result") {
+                  resolveToolResult(
+                    { by: "toolName", toolName: event.toolName },
+                    event.result
+                  );
+                } else if (event.type === "done") {
+                  finalizeParts();
+                } else if (event.type === "error") {
+                  throw new Error(event.message || "Streaming error");
+                }
               }
             } catch (parseError) {
-              console.error(
-                "Failed to parse streaming event:",
-                parseError,
-                line
-              );
+              if (
+                parseError instanceof Error &&
+                parseError.message !== "Streaming error"
+              ) {
+                console.error(
+                  "Failed to parse streaming event:",
+                  parseError,
+                  line
+                );
+              } else {
+                throw parseError;
+              }
             }
           }
         }
@@ -432,11 +536,22 @@ export function useChatMessages({
       attachments,
       chatApiUrl,
       waitForChatApiUrl,
+      widgetModelContexts,
+      disabledTools,
+      streamProtocol,
+      credentials,
+      extraHeaders,
+      bodyBuilder,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setRateLimitInfo(null);
+  }, []);
+
+  const clearRateLimitInfo = useCallback(() => {
+    setRateLimitInfo(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -481,8 +596,10 @@ export function useChatMessages({
     messages,
     isLoading,
     attachments,
+    rateLimitInfo,
     sendMessage,
     clearMessages,
+    clearRateLimitInfo,
     setMessages,
     stop,
     addAttachment,

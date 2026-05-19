@@ -38,12 +38,12 @@ export class SupabaseOAuthProvider implements OAuthProvider {
 
   async verifyToken(token: string): Promise<any> {
     // Skip verification in development mode if configured
-    if (this.config.skipVerification) {
+    if (this.config.verifyJwt === false) {
       console.warn(
         "[Supabase OAuth] ⚠️  SKIPPING VERIFICATION (DEVELOPMENT MODE)"
       );
       console.warn(
-        "[Supabase OAuth]     This is NOT secure! Only use for testing!"
+        "[Supabase OAuth]     Enable verifyJwt: true for production"
       );
       const payload = decodeJwt(token);
       return { payload, protectedHeader: decodeProtectedHeader(token) };
@@ -109,15 +109,15 @@ export class SupabaseOAuthProvider implements OAuthProvider {
   }
 
   getAuthEndpoint(): string {
-    return `${this.supabaseAuthUrl}/authorize`;
+    return `${this.supabaseAuthUrl}/oauth/authorize`;
   }
 
   getTokenEndpoint(): string {
-    return `${this.supabaseAuthUrl}/token`;
+    return `${this.supabaseAuthUrl}/oauth/token`;
   }
 
   getScopesSupported(): string[] {
-    return [];
+    return this.config.scopesSupported ?? [];
   }
 
   getGrantTypesSupported(): string[] {

@@ -1,0 +1,135 @@
+export interface OAuthStaticConfig {
+  clientId?: string;
+  clientSecret?: string;
+  scope?: string;
+}
+
+interface ConnectionLike {
+  url?: string;
+  name?: string;
+  transportType?: "http" | "sse";
+  proxyConfig?: {
+    proxyAddress?: string;
+    headers?: Record<string, string>;
+    customHeaders?: Record<string, string>;
+  };
+  headers?: Record<string, string>;
+  customHeaders?: Record<string, string>;
+  oauth?: OAuthStaticConfig;
+}
+
+export interface EditableConnectionConfig {
+  url: string;
+  name?: string;
+  transportType: "http" | "sse";
+  proxyConfig?: {
+    proxyAddress?: string;
+    headers?: Record<string, string>;
+    customHeaders?: Record<string, string>;
+  };
+  headers?: Record<string, string>;
+  customHeaders?: Record<string, string>;
+  oauth?: OAuthStaticConfig;
+}
+
+/**
+ * Build an OAuth static-client config from raw form inputs, trimming whitespace
+ * and dropping empty fields. clientSecret is only kept when clientId is also set
+ * — a secret without a client_id has no meaning. Returns `undefined` when
+ * neither a client_id nor a scope is provided.
+ */
+export function buildOAuthStaticConfig(
+  clientId: string,
+  clientSecret: string,
+  scope: string
+): OAuthStaticConfig | undefined {
+  const trimmedClientId = clientId.trim();
+  const trimmedClientSecret = clientSecret.trim();
+  const trimmedScope = scope.trim();
+  if (!trimmedClientId && !trimmedScope) return undefined;
+  return {
+    ...(trimmedClientId ? { clientId: trimmedClientId } : {}),
+    ...(trimmedClientId && trimmedClientSecret
+      ? { clientSecret: trimmedClientSecret }
+      : {}),
+    ...(trimmedScope ? { scope: trimmedScope } : {}),
+  };
+}
+
+export function getStoredConnectionConfig<T>(id: string): T | null {
+  try {
+    const stored = localStorage.getItem("mcp-inspector-connections");
+    if (!stored) {
+      return null;
+    }
+
+    const allServers = JSON.parse(stored) as Record<string, T>;
+    return allServers[id] || null;
+  } catch {
+    return null;
+  }
+}
+
+function getComparableHeaders(
+  connection: ConnectionLike | EditableConnectionConfig
+): Record<string, string> {
+  const headers =
+    connection.proxyConfig?.headers ||
+    connection.proxyConfig?.customHeaders ||
+    connection.headers ||
+    connection.customHeaders ||
+    {};
+
+  return Object.fromEntries(
+    Object.entries(headers)
+      .filter(([name, value]) => name && value)
+      .map(([name, value]) => [name, String(value)])
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
+}
+
+function normalizeConnection(
+  connection: ConnectionLike | EditableConnectionConfig
+): {
+  url: string;
+  name: string;
+  transportType: "http" | "sse";
+  proxyAddress: string;
+  headers: Record<string, string>;
+  oauthClientId: string;
+  oauthClientSecret: string;
+  oauthScope: string;
+} {
+  const normalizedUrl = connection.url?.trim() || "";
+
+  return {
+    url: normalizedUrl,
+    name: connection.name?.trim() || normalizedUrl,
+    transportType: connection.transportType || "http",
+    proxyAddress: connection.proxyConfig?.proxyAddress?.trim() || "",
+    headers: getComparableHeaders(connection),
+    oauthClientId: connection.oauth?.clientId?.trim() || "",
+    oauthClientSecret: connection.oauth?.clientSecret?.trim() || "",
+    oauthScope: connection.oauth?.scope?.trim() || "",
+  };
+}
+
+export function isAliasOnlyConnectionUpdate(
+  current: ConnectionLike,
+  next: EditableConnectionConfig
+): boolean {
+  const currentConnection = normalizeConnection(current);
+  const nextConnection = normalizeConnection(next);
+
+  return (
+    currentConnection.url === nextConnection.url &&
+    currentConnection.transportType === nextConnection.transportType &&
+    currentConnection.proxyAddress === nextConnection.proxyAddress &&
+    JSON.stringify(currentConnection.headers) ===
+      JSON.stringify(nextConnection.headers) &&
+    currentConnection.oauthClientId === nextConnection.oauthClientId &&
+    currentConnection.oauthClientSecret === nextConnection.oauthClientSecret &&
+    currentConnection.oauthScope === nextConnection.oauthScope &&
+    currentConnection.name !== nextConnection.name
+  );
+}

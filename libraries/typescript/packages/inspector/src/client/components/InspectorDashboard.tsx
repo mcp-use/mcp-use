@@ -7,33 +7,60 @@ import {
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
 import { NotFound } from "@/client/components/ui/not-found";
-import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
+import { MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL } from "@/client/components/ui/random-gradient-background";
+import { MeshGradient } from "@paper-design/shaders-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { MCPServerAddedEvent, Telemetry } from "@/client/telemetry";
+import {
+  MCPServerAddedEvent,
+  MCPServerConnectionEvent,
+  MCPServerRemovedEvent,
+  Telemetry,
+} from "@/client/telemetry";
 import {
   CircleMinus,
   Copy,
   Info,
   Loader2,
   MoreVertical,
+  Play,
   RotateCcw,
   Settings,
+  Square,
 } from "lucide-react";
-import { useMcpClient, type McpServerOptions } from "mcp-use/react";
+import {
+  useMcpClient,
+  type McpServer,
+  type McpServerOptions,
+} from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import {
+  buildOAuthStaticConfig,
+  getStoredConnectionConfig,
+  isAliasOnlyConnectionUpdate,
+  type EditableConnectionConfig,
+  type OAuthStaticConfig,
+} from "@/client/utils/connectionUpdates";
+import {
+  getConfiguredServerAlias,
+  getServerDisplayName,
+} from "@/client/utils/serverNames";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
+import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { OpenApiConnectionForm } from "./OpenApiConnectionForm";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
+
+const CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY =
+  "mcp-inspector-connect-panel-mesh-animation-paused";
 
 /**
  * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
@@ -53,8 +80,59 @@ export function InspectorDashboard() {
     servers: connections,
     addServer,
     removeServer: removeConnection,
+    updateServerMetadata,
     updateServer,
   } = useMcpClient();
+
+  // Track which server connections have been reported to telemetry (dedup)
+  const reportedConnectionsRef = useRef<Set<string>>(new Set());
+
+  // Track server connection state transitions for telemetry
+  useEffect(() => {
+    connections.forEach((connection) => {
+      if (
+        connection.state === "ready" &&
+        !reportedConnectionsRef.current.has(connection.id)
+      ) {
+        reportedConnectionsRef.current.add(connection.id);
+        try {
+          Telemetry.getInstance()
+            .capture(
+              new MCPServerConnectionEvent({
+                serverId: connection.id,
+                serverUrl: connection.url,
+                success: true,
+                connectionType: "http",
+              })
+            )
+            .catch(() => {});
+        } catch {
+          // ignore telemetry errors
+        }
+      } else if (
+        connection.state === "failed" &&
+        reportedConnectionsRef.current.has(connection.id)
+      ) {
+        reportedConnectionsRef.current.delete(connection.id);
+      }
+    });
+  }, [connections]);
+
+  // Wrapper to track server removal in telemetry
+  const handleRemoveConnection = useCallback(
+    (connectionId: string) => {
+      try {
+        Telemetry.getInstance()
+          .capture(new MCPServerRemovedEvent({ serverId: connectionId }))
+          .catch(() => {});
+      } catch {
+        // ignore telemetry errors
+      }
+      reportedConnectionsRef.current.delete(connectionId);
+      removeConnection(connectionId);
+    },
+    [removeConnection]
+  );
 
   // Track concurrent updates to prevent race conditions
   const [updatingConnections, setUpdatingConnections] = useState<Set<string>>(
@@ -73,13 +151,17 @@ export function InspectorDashboard() {
       url: string,
       name?: string,
       proxyConfig?: any,
-      transportType?: "http" | "sse"
+      transportType?: "http" | "sse",
+      oauth?: OAuthStaticConfig
     ) => {
       addServer(url, {
         url,
         name,
         proxyConfig,
         transportType,
+        preventAutoAuth: true,
+        useRedirectFlow: true,
+        ...(oauth ? { oauth } : {}),
       });
     },
     [addServer]
@@ -95,6 +177,7 @@ export function InspectorDashboard() {
           headers?: Record<string, string>;
         };
         transportType?: "http" | "sse";
+        oauth?: OAuthStaticConfig;
       }
     ) => {
       // Check if already updating this connection
@@ -126,6 +209,20 @@ export function InspectorDashboard() {
       }
     },
     [updateServer]
+  );
+
+  const updateConnectionMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      try {
+        await updateServerMetadata(id, metadata);
+      } catch (error) {
+        console.error(
+          `[InspectorDashboard] Failed to update connection metadata for ${id}:`,
+          error
+        );
+      }
+    },
+    [updateServerMetadata]
   );
 
   const connectServer = useCallback(
@@ -196,6 +293,7 @@ export function InspectorDashboard() {
   }, []); // Only run once on mount
 
   // Form state
+  const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
   const [connectionType, setConnectionType] = useState("Direct");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
@@ -207,70 +305,64 @@ export function InspectorDashboard() {
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
-  const [redirectUrl, setRedirectUrl] = useState(
-    typeof window !== "undefined"
-      ? new URL("/inspector/oauth/callback", window.location.origin).toString()
-      : "/inspector/oauth/callback"
-  );
+  const [clientSecret, setClientSecret] = useState("");
   const [scope, setScope] = useState("");
 
-  // OpenAPI bridge
-  const [connectMode, setConnectMode] = useState<"url" | "openapi">("url");
-  const [isOpenApiLoading, setIsOpenApiLoading] = useState(false);
+  const connectFormGradientRef = useRef<HTMLDivElement>(null);
+  const [connectFormGradientSize, setConnectFormGradientSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
-  // Start an OpenAPI bridge server and auto-connect to it.
-  const startOpenApiBridge = useCallback(
-    async (spec: string) => {
-      setIsOpenApiLoading(true);
-      const toastId = toast.loading("Starting MCP server from OpenAPI spec...");
+  const measureConnectFormGradient = useCallback(() => {
+    if (connectFormGradientRef.current) {
+      const { width, height } =
+        connectFormGradientRef.current.getBoundingClientRect();
+      setConnectFormGradientSize({
+        width: Math.round(width),
+        height: Math.round(height),
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(measureConnectFormGradient);
+    const ro = new ResizeObserver(measureConnectFormGradient);
+    if (connectFormGradientRef.current) {
+      ro.observe(connectFormGradientRef.current);
+    }
+    window.addEventListener("resize", measureConnectFormGradient);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener("resize", measureConnectFormGradient);
+    };
+  }, [measureConnectFormGradient]);
+
+  const [meshAnimationPaused, setMeshAnimationPaused] = useState(() => {
+    try {
+      return (
+        localStorage.getItem(CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY) === "true"
+      );
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleMeshAnimationPaused = useCallback(() => {
+    setMeshAnimationPaused((prev) => {
+      const next = !prev;
       try {
-        const response = await fetch(
-          `${window.location.origin}/inspector/api/openapi/start`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ spec }),
-          }
+        localStorage.setItem(
+          CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY,
+          next ? "true" : "false"
         );
-        const data = await response.json();
-        if (!response.ok) {
-          toast.error(data.error || "Failed to start OpenAPI bridge", {
-            id: toastId,
-          });
-          return;
-        }
-        addServer(data.mcpUrl, {
-          url: data.mcpUrl,
-          name: `OpenAPI: ${data.serverName}`,
-          transportType: "http",
-          preventAutoAuth: true,
-          clientOptions: {
-            capabilities: {
-              extensions: {
-                "io.modelcontextprotocol/ui": {
-                  mimeTypes: ["text/html;profile=mcp-app"],
-                },
-              },
-            },
-          },
-        });
-        toast.success(
-          `Started "${data.serverName}" with ${data.toolCount} tools`,
-          { id: toastId }
-        );
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to start OpenAPI bridge",
-          { id: toastId }
-        );
-      } finally {
-        setIsOpenApiLoading(false);
+      } catch {
+        // ignore quota / private mode
       }
-    },
-    [addServer]
-  );
+      return next;
+    });
+  }, []);
 
   const handleAddConnection = useCallback(() => {
     if (!url.trim()) return;
@@ -326,12 +418,15 @@ export function InspectorDashboard() {
           }
         : undefined;
 
+    const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
+
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
       url: normalizedUrl,
-      name: normalizedUrl,
+      name: alias.trim() || normalizedUrl,
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
+      useRedirectFlow: true,
       clientOptions: {
         capabilities: {
           extensions: {
@@ -352,6 +447,7 @@ export function InspectorDashboard() {
       ...(Object.keys(headersObject).length > 0 && !proxyConfig
         ? { headers: headersObject }
         : {}),
+      ...(oauthConfig ? { oauth: oauthConfig } : {}),
     };
 
     // Add server directly - useMcp handles proxy fallback automatically via autoProxyFallback
@@ -373,18 +469,30 @@ export function InspectorDashboard() {
       });
 
     // Reset form
+    setAlias("");
     setUrl("");
     setCustomHeaders([]);
     setClientId("");
+    setClientSecret("");
     setScope("");
 
     toast.success("Server added successfully");
-  }, [url, connectionType, proxyAddress, customHeaders, addServer]);
+  }, [
+    url,
+    alias,
+    connectionType,
+    proxyAddress,
+    customHeaders,
+    clientId,
+    clientSecret,
+    scope,
+    addServer,
+  ]);
 
   const handleClearAllConnections = () => {
     // Remove all connections
     connections.forEach((connection) => {
-      removeConnection(connection.id);
+      handleRemoveConnection(connection.id);
     });
   };
 
@@ -440,7 +548,9 @@ export function InspectorDashboard() {
 
       const config = {
         url: connection.url,
-        name: connection.name,
+        ...(getConfiguredServerAlias(storedConfig || connection)
+          ? { name: getConfiguredServerAlias(storedConfig || connection) }
+          : {}),
         transportType: connection.transportType || "http",
         connectionType,
         proxyConfig,
@@ -464,16 +574,16 @@ export function InspectorDashboard() {
   };
 
   const handleUpdateConnection = useCallback(
-    (config: {
-      url: string;
-      name?: string;
-      transportType: "http" | "sse";
-      proxyConfig?: {
-        proxyAddress?: string;
-        headers?: Record<string, string>;
-      };
-    }) => {
+    (config: EditableConnectionConfig) => {
       if (!editingConnectionId) return;
+
+      const currentConnection =
+        getStoredConnectionConfig<EditableConnectionConfig>(
+          editingConnectionId
+        ) ||
+        connections.find(
+          (connection: McpServer) => connection.id === editingConnectionId
+        );
 
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
@@ -482,14 +592,23 @@ export function InspectorDashboard() {
           config.url,
           config.name,
           config.proxyConfig,
-          config.transportType
+          config.transportType,
+          config.oauth
         );
+      } else if (
+        currentConnection &&
+        isAliasOnlyConnectionUpdate(currentConnection, config)
+      ) {
+        updateConnectionMetadata(editingConnectionId, {
+          name: config.name || config.url,
+        });
       } else {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
           name: config.name,
           proxyConfig: config.proxyConfig,
           transportType: config.transportType,
+          oauth: config.oauth,
         });
       }
 
@@ -500,8 +619,10 @@ export function InspectorDashboard() {
     },
     [
       editingConnectionId,
+      connections,
       removeConnection,
       addConnection,
+      updateConnectionMetadata,
       updateConnectionConfig,
     ]
   );
@@ -668,9 +789,7 @@ export function InspectorDashboard() {
                       <div className="flex items-center gap-3">
                         <ServerIcon server={connection} size="md" />
                         <h4 className="font-semibold text-sm">
-                          {connection.serverInfo?.title ||
-                            connection.serverInfo?.name ||
-                            connection.name}
+                          {getServerDisplayName(connection)}
                         </h4>
                         <div className="flex items-center gap-2">
                           {updatingConnections.has(connection.id) ? (
@@ -819,7 +938,7 @@ export function InspectorDashboard() {
                             size="sm"
                             onClick={(e) =>
                               handleActionClick(e, () =>
-                                removeConnection(connection.id)
+                                handleRemoveConnection(connection.id)
                               )
                             }
                             className="h-8 w-8 p-0"
@@ -924,7 +1043,7 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeConnection(connection.id);
+                              handleRemoveConnection(connection.id);
                             }}
                             className="text-destructive focus:text-destructive"
                           >
@@ -958,9 +1077,28 @@ export function InspectorDashboard() {
                         >
                           <a
                             href={connection.authUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Store connection config so trySessionReconnect() can
+                              // resume after an OAuth redirect (when ?autoConnect is absent).
+                              try {
+                                sessionStorage.setItem(
+                                  INSPECTOR_RECONNECT_STORAGE_KEY,
+                                  JSON.stringify({
+                                    url: connection.url,
+                                    name:
+                                      connection.name ||
+                                      "Auto-connected Server",
+                                    transportType:
+                                      (connection as any).transportType ||
+                                      "http",
+                                    connectionType: "Direct",
+                                  })
+                                );
+                              } catch {
+                                /* sessionStorage unavailable — best-effort */
+                              }
+                            }}
                           >
                             Authenticate
                           </a>
@@ -984,75 +1122,91 @@ export function InspectorDashboard() {
         </div>
       </div>
 
-      <div className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex">
-        <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
-          {/* Tab selector */}
-          <div className="flex rounded-lg overflow-hidden border border-white/20">
-            <button
-              type="button"
-              onClick={() => setConnectMode("url")}
-              className={`flex-1 py-2 px-3 text-sm font-medium transition-colors cursor-pointer ${
-                connectMode === "url"
-                  ? "bg-white/20 text-white"
-                  : "bg-transparent text-white/60 hover:text-white/80"
-              }`}
-            >
-              MCP Server
-            </button>
-            <button
-              type="button"
-              onClick={() => setConnectMode("openapi")}
-              className={`flex-1 py-2 px-3 text-sm font-medium transition-colors cursor-pointer ${
-                connectMode === "openapi"
-                  ? "bg-white/20 text-white"
-                  : "bg-transparent text-white/60 hover:text-white/80"
-              }`}
-            >
-              OpenAPI Spec
-            </button>
-          </div>
-
-          {/* Both panels rendered, stacked in same grid cell — tallest sets height */}
-          <div className="grid [&>*]:col-start-1 [&>*]:row-start-1">
-            <div className={connectMode !== "url" ? "invisible pointer-events-none" : undefined}>
-              <ConnectionSettingsForm
-                transportType="SSE"
-                setTransportType={() => {}}
-                url={url}
-                setUrl={setUrl}
-                connectionType={connectionType}
-                setConnectionType={setConnectionType}
-                customHeaders={customHeaders}
-                setCustomHeaders={setCustomHeaders}
-                requestTimeout={requestTimeout}
-                setRequestTimeout={setRequestTimeout}
-                resetTimeoutOnProgress={resetTimeoutOnProgress}
-                setResetTimeoutOnProgress={setResetTimeoutOnProgress}
-                maxTotalTimeout={maxTotalTimeout}
-                setMaxTotalTimeout={setMaxTotalTimeout}
-                proxyAddress={proxyAddress}
-                setProxyAddress={setProxyAddress}
-                clientId={clientId}
-                setClientId={setClientId}
-                redirectUrl={redirectUrl}
-                setRedirectUrl={setRedirectUrl}
-                scope={scope}
-                setScope={setScope}
-                onConnect={handleAddConnection}
-                variant="styled"
-                showConnectButton={true}
-                showExportButton={true}
-              />
-            </div>
-            <div className={connectMode !== "openapi" ? "invisible pointer-events-none" : undefined}>
-              <OpenApiConnectionForm
-                onConnect={startOpenApiBridge}
-                isLoading={isOpenApiLoading}
-              />
-            </div>
-          </div>
+      <div
+        ref={connectFormGradientRef}
+        className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex"
+      >
+        <div className="absolute inset-0 z-0 overflow-hidden dark:opacity-60 pointer-events-none">
+          <MeshGradient
+            width={connectFormGradientSize?.width ?? 1280}
+            height={connectFormGradientSize?.height ?? 720}
+            colors={["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"]}
+            distortion={0.8}
+            swirl={0.1}
+            grainMixer={0}
+            grainOverlay={0.2}
+            speed={meshAnimationPaused ? 0 : 1}
+          />
         </div>
-        <RandomGradientBackground className="absolute inset-0" />
+        <div
+          className="absolute inset-0 z-[1] pointer-events-none opacity-[0.07] mix-blend-soft-light dark:opacity-[0.06]"
+          aria-hidden
+        >
+          <div
+            className="absolute inset-0 noise"
+            style={{
+              background: `url("${MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL}")`,
+              filter: "contrast(150%) brightness(550%)",
+            }}
+          />
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={toggleMeshAnimationPaused}
+              aria-label={
+                meshAnimationPaused
+                  ? "Enable background shader animation"
+                  : "Disable background shader animation"
+              }
+              className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
+            >
+              {meshAnimationPaused ? (
+                <Play className="h-3 w-3 ml-px" fill="currentColor" />
+              ) : (
+                <Square className="h-2.5 w-2.5" fill="currentColor" />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>
+              {meshAnimationPaused
+                ? "Enable shader animation"
+                : "Disable shader animation"}
+            </p>
+          </TooltipContent>
+        </Tooltip>
+        <div className="relative w-full max-w-xl mx-auto z-10 flex flex-col gap-3 rounded-3xl p-4 sm:p-6 bg-black/70 dark:bg-black/90 shadow-2xl shadow-black/50 backdrop-blur-md">
+          <ConnectionSettingsForm
+            alias={alias}
+            setAlias={setAlias}
+            url={url}
+            setUrl={setUrl}
+            connectionType={connectionType}
+            setConnectionType={setConnectionType}
+            customHeaders={customHeaders}
+            setCustomHeaders={setCustomHeaders}
+            requestTimeout={requestTimeout}
+            setRequestTimeout={setRequestTimeout}
+            resetTimeoutOnProgress={resetTimeoutOnProgress}
+            setResetTimeoutOnProgress={setResetTimeoutOnProgress}
+            maxTotalTimeout={maxTotalTimeout}
+            setMaxTotalTimeout={setMaxTotalTimeout}
+            proxyAddress={proxyAddress}
+            setProxyAddress={setProxyAddress}
+            clientId={clientId}
+            setClientId={setClientId}
+            clientSecret={clientSecret}
+            setClientSecret={setClientSecret}
+            scope={scope}
+            setScope={setScope}
+            onConnect={handleAddConnection}
+            variant="styled"
+            showConnectButton={true}
+            showExportButton={true}
+          />
+        </div>
       </div>
 
       {/* Connection Options Dialog */}

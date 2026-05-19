@@ -1,19 +1,14 @@
 // browser-provider.ts
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import {
-  discoverOAuthProtectedResourceMetadata,
-  discoverAuthorizationServerMetadata,
-  refreshAuthorization,
-} from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
-import type { AuthorizationServerMetadata } from "@modelcontextprotocol/sdk/shared/auth.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
-// Assuming StoredState is defined in ./types.js and includes fields for provider options
-import type { StoredState } from "./types.js"; // Adjust path if necessary
+import { LocalStorageKVStore } from "./kv-store.js";
+import { OAuthSessionStore } from "./oauth-session-store.js";
+import type { StoredState } from "./types.js";
 
 /**
  * Serialize request body for proxying
@@ -27,27 +22,48 @@ async function serializeBody(body: BodyInit): Promise<any> {
   return body;
 }
 
+export interface BrowserOAuthOptions {
+  storageKeyPrefix?: string;
+  clientName?: string;
+  clientUri?: string;
+  logoUri?: string;
+  callbackUrl?: string;
+  preventAutoAuth?: boolean;
+  useRedirectFlow?: boolean;
+  oauthProxyUrl?: string;
+  /** MCP proxy URL that client connected to (for resource field rewriting) */
+  connectionUrl?: string;
+  /**
+   * Pre-registered OAuth client information. When set, the SDK skips
+   * Dynamic Client Registration and uses this client_id directly.
+   * Required for proxy-mode auth servers (e.g. Slack, WorkOS proxy)
+   * that strip `registration_endpoint` from metadata.
+   */
+  staticClientInfo?: OAuthClientInformation;
+  /** OAuth scope string forwarded to the SDK via clientMetadata.scope. */
+  scope?: string;
+  onPopupWindow?: (
+    url: string,
+    features: string,
+    window: globalThis.Window | null
+  ) => void;
+}
+
 /**
  * Browser-compatible OAuth client provider for MCP using localStorage.
  */
 export class BrowserOAuthClientProvider implements OAuthClientProvider {
   readonly serverUrl: string;
-  readonly storageKeyPrefix: string;
-  readonly serverUrlHash: string;
-  readonly clientName: string;
-  readonly clientUri: string;
-  readonly logoUri: string;
-  readonly callbackUrl: string;
+  readonly staticClientInfo?: OAuthClientInformation;
+  private session: OAuthSessionStore;
+
+  // Browser-only state
   private preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
   private oauthProxyUrl?: string;
-  private connectionUrl?: string; // MCP proxy URL that client connected to
+  private connectionUrl?: string;
   private originalFetch?: typeof fetch;
-  private pendingCodeVerifier: string | null = null;
   private _lastOriginalResource: string | null = null;
-  private _cachedAuthServerUrl: string | null = null;
-  private _cachedMetadata: AuthorizationServerMetadata | null = null;
-  private _refreshPromise: Promise<OAuthTokens | null> | null = null;
   readonly onPopupWindow:
     | ((
         url: string,
@@ -56,44 +72,53 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       ) => void)
     | undefined;
 
-  constructor(
-    serverUrl: string,
-    options: {
-      storageKeyPrefix?: string;
-      clientName?: string;
-      clientUri?: string;
-      logoUri?: string;
-      callbackUrl?: string;
-      preventAutoAuth?: boolean;
-      useRedirectFlow?: boolean;
-      oauthProxyUrl?: string;
-      connectionUrl?: string; // MCP proxy URL that client connected to (for resource field rewriting)
-      onPopupWindow?: (
-        url: string,
-        features: string,
-        window: globalThis.Window | null
-      ) => void;
-    } = {}
-  ) {
+  constructor(serverUrl: string, options: BrowserOAuthOptions = {}) {
     this.serverUrl = serverUrl;
-    this.storageKeyPrefix = options.storageKeyPrefix || "mcp:auth";
-    this.serverUrlHash = this.hashString(serverUrl);
-    this.clientName = options.clientName || "mcp-use";
-    this.clientUri =
-      options.clientUri ||
-      (typeof window !== "undefined" ? window.location.origin : "");
-    this.logoUri = options.logoUri || "https://mcp-use.com/logo.png";
-    this.callbackUrl = sanitizeUrl(
-      options.callbackUrl ||
-        (typeof window !== "undefined"
-          ? new URL("/oauth/callback", window.location.origin).toString()
-          : "/oauth/callback")
+    this.session = new OAuthSessionStore(
+      serverUrl,
+      options,
+      new LocalStorageKVStore()
     );
     this.preventAutoAuth = options.preventAutoAuth;
     this.useRedirectFlow = options.useRedirectFlow;
     this.oauthProxyUrl = options.oauthProxyUrl;
     this.connectionUrl = options.connectionUrl;
+    this.staticClientInfo = options.staticClientInfo;
     this.onPopupWindow = options.onPopupWindow;
+  }
+
+  // --- Identity / key fields exposed for callback handling ---
+
+  get storageKeyPrefix(): string {
+    return this.session.storageKeyPrefix;
+  }
+
+  get serverUrlHash(): string {
+    return this.session.serverUrlHash;
+  }
+
+  get clientName(): string {
+    return this.session.clientName;
+  }
+
+  get clientUri(): string {
+    return this.session.clientUri;
+  }
+
+  get logoUri(): string {
+    return this.session.logoUri;
+  }
+
+  get callbackUrl(): string {
+    return this.session.callbackUrl;
+  }
+
+  get scope(): string | undefined {
+    return this.session.scope;
+  }
+
+  getKey(keySuffix: string): string {
+    return this.session.getKey(keySuffix);
   }
 
   /**
@@ -264,289 +289,84 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     }
   }
 
-  // --- SDK Interface Methods ---
+  // --- SDK Interface Methods (delegated) ---
 
   get redirectUrl(): string {
-    return sanitizeUrl(this.callbackUrl);
+    return this.session.redirectUrl;
   }
 
   get clientMetadata(): OAuthClientMetadata {
-    return {
-      redirect_uris: [this.redirectUrl],
-      token_endpoint_auth_method: "none", // Public client
-      grant_types: ["authorization_code", "refresh_token"],
-      response_types: ["code"],
-      client_name: this.clientName,
-      client_uri: this.clientUri,
-      logo_uri: this.logoUri,
-      // scope: 'openid profile email mcp', // Example scopes, adjust as needed
-    };
+    return this.session.clientMetadata;
+  }
+
+  tokens(): Promise<OAuthTokens | undefined> {
+    return this.session.tokens();
+  }
+
+  saveTokens(tokens: OAuthTokens): Promise<void> {
+    return this.session.saveTokens(tokens);
   }
 
   async clientInformation(): Promise<OAuthClientInformation | undefined> {
-    const key = this.getKey("client_info");
-    const data = localStorage.getItem(key);
-    if (!data) return undefined;
-    try {
-      // TODO: Add validation using a schema
-      const clientInfo = JSON.parse(data) as OAuthClientInformation & {
-        redirect_uris?: string[];
-      };
-      const storedRedirectUris = Array.isArray(clientInfo.redirect_uris)
-        ? clientInfo.redirect_uris
-        : [];
-      // length === 0 means the server didn't include redirect_uris in the
-      // registration response — skip the check rather than invalidating valid creds.
-      const hasMatchingRedirect =
-        storedRedirectUris.length === 0 ||
-        storedRedirectUris.includes(this.redirectUrl);
-
-      if (!hasMatchingRedirect) {
-        console.info(
-          `[${this.storageKeyPrefix}] Invalidating cached OAuth client info due to redirect URI mismatch.`
-        );
-        localStorage.removeItem(key);
-        localStorage.removeItem(this.getKey("tokens"));
-        localStorage.removeItem(this.getKey("last_auth_url"));
-        return undefined;
-      }
-
-      return clientInfo;
-    } catch (e) {
-      console.warn(
-        `[${this.storageKeyPrefix}] Failed to parse client information:`,
-        e
-      );
-      localStorage.removeItem(key);
-      return undefined;
-    }
+    // Pre-registered client info (proxy-mode servers like Slack/WorkOS proxy
+    // strip registration_endpoint, so DCR is not an option). When set, this
+    // bypasses any stored DCR result so a stale localStorage entry can't
+    // shadow the configured client_id.
+    if (this.staticClientInfo) return this.staticClientInfo;
+    return this.session.clientInformation();
   }
 
-  // NOTE: The SDK's auth() function uses this if dynamic registration is needed.
-  // Ensure your OAuthClientInformationFull matches the expected structure if DCR is used.
   async saveClientInformation(
-    clientInformation: OAuthClientInformation /* | OAuthClientInformationFull */
+    clientInformation: OAuthClientInformation
   ): Promise<void> {
-    const key = this.getKey("client_info");
-    // Cast needed if handling OAuthClientInformationFull specifically
-    localStorage.setItem(key, JSON.stringify(clientInformation));
+    // When a pre-registered client_id is configured, never persist DCR results
+    // — the static client_id is the source of truth.
+    if (this.staticClientInfo) return;
+    return this.session.saveClientInformation(clientInformation);
   }
 
-  async tokens(): Promise<OAuthTokens | undefined> {
-    const key = this.getKey("tokens");
-    const data = localStorage.getItem(key);
-    if (!data) return undefined;
-    try {
-      const tokens = JSON.parse(data) as OAuthTokens;
-      if (tokens.access_token && tokens.refresh_token) {
-        try {
-          const payload = JSON.parse(atob(tokens.access_token.split(".")[1]));
-          if (payload.exp && Date.now() >= (payload.exp - 30) * 1000) {
-            console.log("[tokens] Access token expiring soon, refreshing...");
-            const refreshed = await this._dedupedRefresh(tokens);
-            if (refreshed) {
-              console.log("[tokens] Refreshed successfully");
-              return refreshed;
-            }
-          }
-        } catch {
-          // Can't decode JWT, return as-is
-        }
-      }
-      return tokens;
-    } catch (e) {
-      console.warn(`[${this.storageKeyPrefix}] Failed to parse tokens:`, e);
-      localStorage.removeItem(key);
-      return undefined;
-    }
+  codeVerifier(): Promise<string> {
+    return this.session.codeVerifier();
   }
 
-  async saveTokens(tokens: OAuthTokens): Promise<void> {
-    const key = this.getKey("tokens");
-    localStorage.setItem(key, JSON.stringify(tokens));
-    // Clean up code verifier and last auth URL after successful token save
-    localStorage.removeItem(this.getKey("code_verifier"));
-    localStorage.removeItem(this.getKey("last_auth_url"));
-    this.pendingCodeVerifier = null;
+  saveCodeVerifier(codeVerifier: string): Promise<void> {
+    return this.session.saveCodeVerifier(codeVerifier);
   }
 
-  private async _refresh(tokens: OAuthTokens): Promise<OAuthTokens | null> {
-    try {
-      if (!this._cachedAuthServerUrl || !this._cachedMetadata) {
-        const resourceMetadata = await discoverOAuthProtectedResourceMetadata(
-          this.serverUrl
-        );
-        const authServerUrl = resourceMetadata.authorization_servers?.[0];
-        if (!authServerUrl) return null;
-        const metadata =
-          await discoverAuthorizationServerMetadata(authServerUrl);
-        if (!metadata) return null;
-        this._cachedAuthServerUrl = authServerUrl;
-        this._cachedMetadata = metadata as AuthorizationServerMetadata;
-      }
-
-      const clientInfo = await this.clientInformation();
-      if (!clientInfo) return null;
-
-      const newTokens = await refreshAuthorization(this._cachedAuthServerUrl, {
-        metadata: this._cachedMetadata,
-        clientInformation: clientInfo,
-        refreshToken: tokens.refresh_token!,
-      });
-      await this.saveTokens(newTokens);
-      return newTokens;
-    } catch {
-      return null;
-    }
-  }
-
-  private async _dedupedRefresh(
-    tokens: OAuthTokens
-  ): Promise<OAuthTokens | null> {
-    if (this._refreshPromise) return this._refreshPromise;
-    this._refreshPromise = this._refresh(tokens);
-    try {
-      return await this._refreshPromise;
-    } finally {
-      this._refreshPromise = null;
-    }
-  }
-
-  async invalidateCredentials(
+  invalidateCredentials(
     scope: "all" | "client" | "tokens" | "verifier"
   ): Promise<void> {
-    switch (scope) {
-      case "all":
-        localStorage.removeItem(this.getKey("tokens"));
-        localStorage.removeItem(this.getKey("client_info"));
-        localStorage.removeItem(this.getKey("code_verifier"));
-        localStorage.removeItem(this.getKey("last_auth_url"));
-        this.pendingCodeVerifier = null;
-        break;
-      case "client":
-        localStorage.removeItem(this.getKey("client_info"));
-        break;
-      case "tokens":
-        localStorage.removeItem(this.getKey("tokens"));
-        break;
-      case "verifier":
-        localStorage.removeItem(this.getKey("code_verifier"));
-        this.pendingCodeVerifier = null;
-        break;
-      default:
-        // Ignore invalid scope
-        break;
-    }
-  }
-
-  async saveCodeVerifier(codeVerifier: string): Promise<void> {
-    const key = this.getKey("code_verifier");
-    localStorage.setItem(key, codeVerifier);
-    this.pendingCodeVerifier = codeVerifier;
-  }
-
-  async codeVerifier(): Promise<string> {
-    const key = this.getKey("code_verifier");
-    const verifier = localStorage.getItem(key);
-    if (!verifier) {
-      throw new Error(
-        `[${this.storageKeyPrefix}] Code verifier not found in storage for key ${key}. Auth flow likely corrupted or timed out.`
-      );
-    }
-    // SDK's auth() retrieves this BEFORE exchanging code. Don't remove it here.
-    // It will be removed in saveTokens on success.
-    return verifier;
+    return this.session.invalidateCredentials(scope);
   }
 
   /**
-   * Generates and stores the authorization URL with state, without opening a popup.
-   * Used when preventAutoAuth is enabled to provide the URL for manual navigation.
-   * @param authorizationUrl The fully constructed authorization URL from the SDK.
-   * @returns The full authorization URL with state parameter.
+   * Generates and persists `StoredState` for an authorization request,
+   * applies browser-only resource rewriting, and returns the sanitized URL
+   * with the `state` param appended. Does NOT open a popup or redirect —
+   * use `redirectToAuthorization` for that.
    */
   async prepareAuthorizationUrl(authorizationUrl: URL): Promise<string> {
-    const originalResourceParam = authorizationUrl.searchParams.get("resource");
-    const looksLikeLocalProxyResource = Boolean(
-      originalResourceParam &&
-      (originalResourceParam.includes("/inspector/api/proxy") ||
-        originalResourceParam.includes("/api/proxy") ||
-        originalResourceParam.includes("localhost:3000"))
-    );
-    const matchesConnectionUrl = Boolean(
-      originalResourceParam &&
-      this.connectionUrl &&
-      originalResourceParam === this.connectionUrl
-    );
-    const shouldRewriteResource = Boolean(
-      originalResourceParam &&
-      (this._lastOriginalResource || this.serverUrl) &&
-      (matchesConnectionUrl || looksLikeLocalProxyResource)
-    );
-    const rewriteTargetResource = this._lastOriginalResource || this.serverUrl;
-
-    // If metadata resource was rewritten to the local proxy for SDK validation,
-    // restore the real MCP endpoint in the outbound authorize URL.
-    if (shouldRewriteResource && rewriteTargetResource) {
-      authorizationUrl.searchParams.set("resource", rewriteTargetResource);
-    }
-
-    // Generate a unique state parameter for this authorization request
-    const state = globalThis.crypto.randomUUID();
-    const stateKey = `${this.storageKeyPrefix}:state_${state}`;
-    const codeVerifierSnapshot =
-      this.pendingCodeVerifier ||
-      localStorage.getItem(this.getKey("code_verifier"));
-
-    // Store context needed by the callback handler, associated with the state param
-    const stateData: StoredState = {
-      serverUrlHash: this.serverUrlHash,
-      expiry: Date.now() + 1000 * 60 * 10, // State expires in 10 minutes
-      codeVerifier: codeVerifierSnapshot || undefined,
-      // Store provider options needed to reconstruct on callback
-      providerOptions: {
-        serverUrl: this.serverUrl,
-        storageKeyPrefix: this.storageKeyPrefix,
-        clientName: this.clientName,
-        clientUri: this.clientUri,
-        callbackUrl: this.callbackUrl,
-        // Include OAuth proxy settings so callback can bypass CORS for token exchange
+    this.rewriteResourceIfLocalProxy(authorizationUrl);
+    return this.session.storeAuthorizationState(authorizationUrl, {
+      extraProviderOptions: {
         oauthProxyUrl: this.oauthProxyUrl,
         connectionUrl: this.connectionUrl,
+        ...(this.staticClientInfo
+          ? { staticClientInfo: this.staticClientInfo }
+          : {}),
+        ...(this.scope ? { scope: this.scope } : {}),
       },
-      // Store flow type so callback knows how to handle the response
       flowType: this.useRedirectFlow ? "redirect" : "popup",
-      // Always store current URL so we can return to it after auth
-      // This is critical for popup flow when popup is blocked and user clicks link manually
       returnUrl:
         typeof window !== "undefined" ? window.location.href : undefined,
-    };
-
-    console.log(`[OAuth] Storing state key: ${stateKey}`);
-    localStorage.setItem(stateKey, JSON.stringify(stateData));
-
-    // Verify it was stored
-    const verified = localStorage.getItem(stateKey);
-    console.log(`[OAuth] State stored successfully: ${!!verified}`);
-
-    // Add the state parameter to the URL
-    authorizationUrl.searchParams.set("state", state);
-    const authUrlString = authorizationUrl.toString();
-
-    // Sanitize the authorization URL to prevent XSS attacks
-    const sanitizedAuthUrl = sanitizeUrl(authUrlString);
-    // Persist the exact auth URL in case the popup fails and manual navigation is needed
-    localStorage.setItem(this.getKey("last_auth_url"), sanitizedAuthUrl);
-
-    return sanitizedAuthUrl;
+    });
   }
 
   /**
    * Redirects the user agent to the authorization URL, storing necessary state.
-   * This now adheres to the SDK's void return type expectation for the interface.
    * @param authorizationUrl The fully constructed authorization URL from the SDK.
    */
   async redirectToAuthorization(authorizationUrl: URL): Promise<void> {
-    // Always prepare the authorization URL with state (stores it for manual auth)
     const sanitizedAuthUrl =
       await this.prepareAuthorizationUrl(authorizationUrl);
 
@@ -569,7 +389,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
     // Otherwise, use popup flow (legacy behavior)
     const popupFeatures =
-      "width=600,height=700,resizable=yes,scrollbars=yes,status=yes"; // Make configurable if needed
+      "width=600,height=700,resizable=yes,scrollbars=yes,status=yes";
     try {
       const popup = window.open(
         sanitizedAuthUrl,
@@ -577,7 +397,6 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         popupFeatures
       );
 
-      // If a callback is provided, invoke it after opening the popup
       if (this.onPopupWindow) {
         this.onPopupWindow(sanitizedAuthUrl, popupFeatures, popup);
       }
@@ -586,8 +405,6 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         console.warn(
           `[${this.storageKeyPrefix}] Popup likely blocked by browser. Manual navigation might be required using the stored URL.`
         );
-        // Cannot signal failure back via SDK auth() directly.
-        // useMcp will need to rely on timeout or manual trigger if stuck.
       } else {
         popup.focus();
         console.info(
@@ -599,13 +416,40 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         `[${this.storageKeyPrefix}] Error opening popup window:`,
         e
       );
-      // Cannot signal failure back via SDK auth() directly.
     }
-    // Regardless of popup success, the interface expects this method to initiate the redirect.
-    // If the popup failed, the user journey stops here until manual action or timeout.
   }
 
-  // --- Helper Methods ---
+  // --- Browser-only helpers ---
+
+  /**
+   * If the SDK-built authorization URL has a `resource` parameter pointing
+   * at the local inspector proxy (rather than the real MCP server), rewrite
+   * it to the original resource so the OAuth server's allowlist matches.
+   */
+  private rewriteResourceIfLocalProxy(url: URL): void {
+    const originalResourceParam = url.searchParams.get("resource");
+    const looksLikeLocalProxyResource = Boolean(
+      originalResourceParam &&
+      (originalResourceParam.includes("/inspector/api/proxy") ||
+        originalResourceParam.includes("/api/proxy") ||
+        originalResourceParam.includes("localhost:3000"))
+    );
+    const matchesConnectionUrl = Boolean(
+      originalResourceParam &&
+      this.connectionUrl &&
+      originalResourceParam === this.connectionUrl
+    );
+    const shouldRewriteResource = Boolean(
+      originalResourceParam &&
+      (this._lastOriginalResource || this.serverUrl) &&
+      (matchesConnectionUrl || looksLikeLocalProxyResource)
+    );
+    const rewriteTargetResource = this._lastOriginalResource || this.serverUrl;
+
+    if (shouldRewriteResource && rewriteTargetResource) {
+      url.searchParams.set("resource", rewriteTargetResource);
+    }
+  }
 
   /**
    * Retrieves the last URL passed to `redirectToAuthorization`. Useful for manual fallback.
@@ -632,8 +476,6 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         try {
           const item = localStorage.getItem(key);
           if (item) {
-            // Check if state belongs to this provider instance based on serverUrlHash
-            // We need to parse cautiously as the structure isn't guaranteed.
             const state = JSON.parse(item) as Partial<StoredState>;
             if (state.serverUrlHash === this.serverUrlHash) {
               keysToRemove.push(key);
@@ -644,8 +486,6 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             `[${this.storageKeyPrefix}] Error parsing state key ${key} during clearStorage:`,
             e
           );
-          // Optionally remove malformed keys
-          // keysToRemove.push(key);
         }
       }
     }
@@ -656,19 +496,5 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       count++;
     });
     return count;
-  }
-
-  private hashString(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash;
-    }
-    return Math.abs(hash).toString(16);
-  }
-
-  getKey(keySuffix: string): string {
-    return `${this.storageKeyPrefix}_${this.serverUrlHash}_${keySuffix}`;
   }
 }

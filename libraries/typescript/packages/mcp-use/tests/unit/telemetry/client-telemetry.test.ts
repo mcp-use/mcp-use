@@ -60,6 +60,7 @@ describe("MCPClient Telemetry Integration", () => {
     // Save original environment
     originalEnv = { ...process.env };
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
+    vi.resetModules();
     vi.clearAllMocks();
     mockCapture.mockClear();
   });
@@ -75,6 +76,7 @@ describe("MCPClient Telemetry Integration", () => {
       const { MCPClient } = await import("../../../src/client.js");
 
       new MCPClient();
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Verify telemetry was tracked via PostHog capture
       expect(mockCapture).toHaveBeenCalled();
@@ -96,6 +98,7 @@ describe("MCPClient Telemetry Integration", () => {
       const { MCPClient } = await import("../../../src/client.js");
 
       new MCPClient(undefined, { codeMode: true });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"
@@ -115,6 +118,7 @@ describe("MCPClient Telemetry Integration", () => {
           executor: "vm",
         },
       });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"
@@ -136,6 +140,7 @@ describe("MCPClient Telemetry Integration", () => {
       };
 
       new MCPClient(config);
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"
@@ -156,6 +161,7 @@ describe("MCPClient Telemetry Integration", () => {
 
       const samplingCallback = vi.fn();
       new MCPClient(undefined, { samplingCallback });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"
@@ -171,6 +177,7 @@ describe("MCPClient Telemetry Integration", () => {
 
       const elicitationCallback = vi.fn();
       new MCPClient(undefined, { elicitationCallback });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"
@@ -187,6 +194,7 @@ describe("MCPClient Telemetry Integration", () => {
       const samplingCallback = vi.fn();
       const elicitationCallback = vi.fn();
       new MCPClient(undefined, { samplingCallback, elicitationCallback });
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"
@@ -207,6 +215,7 @@ describe("MCPClient Telemetry Integration", () => {
       };
 
       MCPClient.fromDict(config);
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = mockCapture.mock.calls.find(
         (call) => call[0]?.event === "mcpclient_init"

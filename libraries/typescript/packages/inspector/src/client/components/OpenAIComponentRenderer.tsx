@@ -1128,7 +1128,7 @@ function OpenAIComponentRendererBase({
 
         <div
           className={cn(
-            "flex-1 w-full flex justify-center items-center relative z-10",
+            "flex-1 w-full flex justify-center items-center relative",
             displayMode === "fullscreen" && "pt-14",
             centerVertically && "items-center",
             displayMode === "inline" && (invoking || invoked) && "pt-8"

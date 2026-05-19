@@ -111,6 +111,10 @@ export interface McpClientContextType {
   /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
   removeServer: (id: string) => void;
+  updateServerMetadata: (
+    id: string,
+    metadata: { name: string }
+  ) => Promise<void>;
   updateServer: (
     id: string,
     options: Partial<McpServerOptions>
@@ -138,6 +142,7 @@ interface ServerConfig {
 interface McpServerWrapperProps {
   id: string;
   options: McpServerOptions;
+  defaultCallbackUrl?: string;
   defaultProxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
@@ -204,6 +209,7 @@ interface McpServerWrapperProps {
 function McpServerWrapper({
   id,
   options,
+  defaultCallbackUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback,
   clientInfo: providerClientInfo,
@@ -240,6 +246,8 @@ function McpServerWrapper({
     // Server-specific options take precedence over defaults
     return {
       ...rest,
+      // Use server-specific callbackUrl if provided, otherwise use provider default
+      callbackUrl: rest.callbackUrl || defaultCallbackUrl,
       // Use server-specific proxyConfig if provided, otherwise use default
       proxyConfig: rest.proxyConfig || defaultProxyConfig,
       // Use server-specific autoProxyFallback if provided, otherwise use default
@@ -690,6 +698,15 @@ export interface McpClientProviderProps {
   mcpServers?: Record<string, McpServerOptions>;
 
   /**
+   * Default OAuth callback URL for all servers.
+   * Can be overridden per-server via the callbackUrl option in addServer().
+   * Useful when the app is mounted at a sub-path (e.g. /inspector) so the
+   * OAuth redirect lands on the correct route without requiring a server-side
+   * redirect shim.
+   */
+  defaultCallbackUrl?: string;
+
+  /**
    * Default proxy configuration for all servers
    * Can be overridden per-server in addServer() options
    */
@@ -851,6 +868,7 @@ export interface McpClientProviderProps {
 export function McpClientProvider({
   children,
   mcpServers,
+  defaultCallbackUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback = true,
   clientInfo,
@@ -1087,6 +1105,8 @@ export function McpClientProvider({
         );
 
         if (
+          current.name === updatedServer.name &&
+          current.url === updatedServer.url &&
           current.state === updatedServer.state &&
           current.tools === updatedServer.tools &&
           current.resources === updatedServer.resources &&
@@ -1244,6 +1264,41 @@ export function McpClientProvider({
     [serverConfigs]
   );
 
+  const updateServerMetadata = useCallback(
+    async (id: string, metadata: { name: string }) => {
+      return new Promise<void>((resolve) => {
+        const currentConfig = serverConfigs.find((s) => s.id === id);
+        if (!currentConfig) {
+          providerLogger.warn(
+            `[McpClientProvider] Cannot update server metadata for "${id}" - not found`
+          );
+          resolve();
+          return;
+        }
+
+        const updatedOptions: McpServerOptions = {
+          ...currentConfig.options,
+          ...metadata,
+        };
+
+        setServers((prev) =>
+          prev.map((server) =>
+            server.id === id ? { ...server, name: metadata.name } : server
+          )
+        );
+
+        setServerConfigs((prev) => {
+          const updated = prev.map((s) =>
+            s.id === id ? { id, options: updatedOptions } : s
+          );
+          setTimeout(() => resolve(), 0);
+          return updated;
+        });
+      });
+    },
+    [serverConfigs]
+  );
+
   const getServer = useCallback(
     (id: string) => {
       return servers.find((s) => s.id === id);
@@ -1256,11 +1311,20 @@ export function McpClientProvider({
       servers,
       addServer,
       removeServer,
+      updateServerMetadata,
       updateServer,
       getServer,
       storageLoaded,
     }),
-    [servers, addServer, removeServer, updateServer, getServer, storageLoaded]
+    [
+      servers,
+      addServer,
+      removeServer,
+      updateServerMetadata,
+      updateServer,
+      getServer,
+      storageLoaded,
+    ]
   );
 
   // Strip `capabilities` from clientInfo — it is a provider-level default for
@@ -1306,6 +1370,7 @@ export function McpClientProvider({
           key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
           id={config.id}
           options={config.options}
+          defaultCallbackUrl={defaultCallbackUrl}
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
           clientInfo={clientInfoForWrapper}
@@ -1330,13 +1395,22 @@ export function McpClientProvider({
  *
  * @example
  * ```tsx
- * const { servers, addServer, removeServer, updateServer } = useMcpClient();
+ * const {
+ *   servers,
+ *   addServer,
+ *   removeServer,
+ *   updateServer,
+ *   updateServerMetadata,
+ * } = useMcpClient();
  *
  * // Add a server
  * addServer("linear", { url: "https://mcp.linear.app/sse" });
  *
- * // Update a server's configuration
- * await updateServer("linear", { name: "Linear Production" });
+ * // Update a server's configured display name without reconnecting
+ * await updateServerMetadata("linear", { name: "Linear Production" });
+ *
+ * // Update connection-affecting configuration and reconnect
+ * await updateServer("linear", { headers: { Authorization: "Bearer ..." } });
  *
  * // Access servers
  * servers.forEach(server => {

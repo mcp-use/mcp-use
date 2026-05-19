@@ -29,6 +29,7 @@ permissions:
 # 3. TypeScript Tests (runs if libraries/typescript/** changed)
 #    ├─ typescript-lint: ESLint checks
 #    ├─ typescript-build: Build all packages
+#    ├─ typescript-knip: Unused code/deps report (warning-only — never fails CI)
 #    ├─ typescript/mcp-use: Unit tests + agent integration tests (requires API keys)
 #    ├─ typescript/inspector: Unit tests for inspector package
 #    ├─ typescript/cli: Unit tests for CLI package
@@ -549,6 +550,8 @@ jobs:
     needs: python-lint
     name: "python-agent/${{ matrix.test }}"
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       fail-fast: false
       matrix:
@@ -571,6 +574,7 @@ jobs:
         run: |
           uv pip install --system .[dev,anthropic,openai,search,e2b]
       - name: Run agent test for ${{ matrix.test }}
+        if: env.OPENAI_API_KEY != ''
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           MCP_USE_ANONYMIZED_TELEMETRY: false
@@ -653,6 +657,8 @@ jobs:
     needs: typescript-lint
     name: "typescript/mcp-use (node-${{ matrix.node-version }})"
     runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     strategy:
       matrix:
         node-version: [20, 22]
@@ -680,6 +686,7 @@ jobs:
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter mcp-use --if-present test:unit
       - name: Run mcp-use Agent Integration Tests
+        if: env.OPENAI_API_KEY != ''
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
@@ -687,6 +694,41 @@ jobs:
           MCP_USE_LANGFUSE: true
           MCP_USE_ANONYMIZED_TELEMETRY: false
         run: pnpm --filter mcp-use --if-present test:integration:agent
+
+  typescript-knip:
+    needs: typescript-lint
+    name: typescript-knip (warning-only)
+    runs-on: ubuntu-latest
+    # Surface unused-code findings without failing the build. Tighten to
+    # `pnpm knip` (without --no-exit-code) once the baseline is cleaned up.
+    defaults:
+      run:
+        working-directory: libraries/typescript
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.6.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+      - name: Install Dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Run Knip (warning-only)
+        run: |
+          {
+            echo "## Knip Findings"
+            echo ""
+            echo "_Reported as warnings — tighten to fail CI once the baseline is clean._"
+            echo ""
+            echo '```'
+            pnpm exec knip --no-exit-code --no-progress
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   typescript-test-inspector:
     needs: typescript-lint
@@ -721,10 +763,11 @@ jobs:
 
   typescript-test-cli:
     needs: typescript-lint
-    name: "typescript/cli (node-${{ matrix.node-version }})"
-    runs-on: ubuntu-latest
+    name: "typescript/cli (${{ matrix.os }}, node-${{ matrix.node-version }})"
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         node-version: [20, 22]
     defaults:
       run:
@@ -745,6 +788,9 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build Packages
         run: pnpm build
+      - name: Verify CLI build artifact
+        shell: bash
+        run: test -f packages/cli/dist/index.cjs || { echo "::warning::dist/index.cjs missing after pnpm build, rebuilding CLI explicitly"; pnpm --filter @mcp-use/cli build; }
       - name: Run CLI Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false

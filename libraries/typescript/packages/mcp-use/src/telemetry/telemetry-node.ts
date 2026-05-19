@@ -28,6 +28,7 @@ import {
   createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "./utils.js";
+import { telFetch } from "./tel-fetch.js";
 
 /**
  * Produce a random identifier suitable for session or user IDs.
@@ -248,7 +249,7 @@ export class Telemetry {
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
       );
     } else {
-      logger.info(
+      logger.debug(
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
 
@@ -303,11 +304,13 @@ export class Telemetry {
       const posthogOptions: {
         host: string;
         disableGeoip: boolean;
+        fetch: typeof telFetch;
         flushAt?: number;
         flushInterval?: number;
       } = {
         host: this.HOST,
         disableGeoip: false,
+        fetch: telFetch,
       };
 
       if (isServerlessEnvironment) {
@@ -804,12 +807,7 @@ export class Telemetry {
 // ============================================================================
 // Convenience Alias and Functions
 // ============================================================================
-
-/**
- * Alias for Telemetry - shorter name for convenience
- *
- * Usage: Tel.getInstance().trackMCPClientInit(...)
- */
+/** @alias */
 export const Tel = Telemetry;
 
 /**

@@ -41,6 +41,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
   installFetchInterceptor?: () => void;
+  restoreFetch?: () => void;
   serverUrl?: string;
 };
 
@@ -110,7 +111,22 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     samplingCallback: samplingCallbackOption,
     onElicitation: onElicitationOption,
     elicitationCallback: elicitationCallbackOption,
+    oauth: oauthOptions,
   } = options;
+
+  const oauthClientId = oauthOptions?.clientId?.trim() || undefined;
+  const oauthClientSecret = oauthOptions?.clientSecret?.trim() || undefined;
+  const oauthScope = oauthOptions?.scope?.trim() || undefined;
+  const staticClientInfo = useMemo(
+    () =>
+      oauthClientId
+        ? {
+            client_id: oauthClientId,
+            ...(oauthClientSecret ? { client_secret: oauthClientSecret } : {}),
+          }
+        : undefined,
+    [oauthClientId, oauthClientSecret]
+  );
 
   // Create a per-instance logger so multiple useMcp instances don't clobber each other's log level.
   // Each instance gets its own named logger keyed by URL (or a fallback).
@@ -611,6 +627,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         gatewayUrl,
         onPopupWindow,
         installFetchInterceptor: true,
+        staticClientInfo,
+        scope: oauthScope,
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
@@ -1240,6 +1258,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.version,
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
+    staticClientInfo,
+    oauthScope,
     headers,
     transportType,
     preventAutoAuth,
@@ -1403,7 +1423,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             "info",
             "Using provided authProvider for manual authentication"
           );
-          const baseUrl = new URL(url).origin;
+          const parsedUrl = new URL(url);
+          const baseUrl =
+            parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
           await auth(authProviderRef.current, {
             serverUrl: baseUrl,
           });
@@ -1433,6 +1455,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             gatewayUrl,
             onPopupWindow,
             installFetchInterceptor: !gatewayUrl,
+            staticClientInfo,
+            scope: oauthScope,
           });
 
         if (oauthProxyUrl && !gatewayUrl) {
@@ -1452,7 +1476,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Generate a fresh authorization URL and redirect immediately
         // This will trigger the OAuth flow with the new provider
         // The provider will redirect/popup automatically since preventAutoAuth is false
-        const baseUrl = new URL(url).origin;
+        const parsedUrl = new URL(url);
+        const baseUrl =
+          parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
         try {
           await auth(freshAuthProvider, {
             serverUrl: baseUrl,
@@ -1509,6 +1535,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.name,
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
+    staticClientInfo,
+    oauthScope,
     callbackUrl,
     mergedClientInfo,
     providedAuthProvider,
@@ -2003,6 +2031,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         gatewayUrl,
         onPopupWindow,
         installFetchInterceptor: true,
+        staticClientInfo,
+        scope: oauthScope,
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
@@ -2020,6 +2050,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return () => {
       isMountedRef.current = false;
       addLog("debug", "useMcp unmounting, disconnecting.");
+
+      // Restore window.fetch if a proxy interceptor was installed.
+      // restoreFetch() is a no-op when no interceptor is active.
+      authProviderRef.current?.restoreFetch?.();
 
       // Clear OAuth state ONLY if we're in the middle of an OAuth flow
       // This prevents "code verifier not found" errors in StrictMode double-mounting
@@ -2053,6 +2087,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.version,
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
+    staticClientInfo,
+    oauthScope,
     useRedirectFlow,
     mergedClientInfo,
     effectiveOAuthUrl, // Triggers reconnection when proxy fallback changes OAuth URL

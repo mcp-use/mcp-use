@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "mcp-use": "workspace:*",
-    "@modelcontextprotocol/sdk": "latest",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "zod": "^3.24.1"
   },
   "devDependencies": {

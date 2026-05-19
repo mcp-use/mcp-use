@@ -20,10 +20,10 @@ const MCP_USE_DIR = ".mcp-use";
 export async function generateToolRegistryTypes(
   registrations: Map<string, { config: ToolDefinition; handler: ToolCallback }>,
   projectRoot: string = process.cwd()
-): Promise<void> {
+): Promise<boolean> {
   // Skip in production
   if (process.env.NODE_ENV === "production") {
-    return;
+    return true;
   }
 
   try {
@@ -96,11 +96,13 @@ export async function generateToolRegistryTypes(
         `[TypeGen] Generated ${TOOL_REGISTRY_FILENAME} with ${sortedTools.length} tool(s)`
       );
     }
+    return true;
   } catch (error) {
     // Don't crash the server if type generation fails
     console.warn(
       "[TypeGen] Failed to generate tool registry types:",
       error instanceof Error ? error.message : String(error)
     );
+    return false;
   }
 }

@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "almond",
-  "name": "mcp_use",
+  "name": "mcp-use",
   "colors": {
     "primary": "#0C0C0C",
     "light": "#ffffff",
@@ -30,6 +30,16 @@
   "icons": {
     "library": "lucide"
   },
+  "banner": {
+    "content": "Launch Week 1 is here. See everything we shipped. [Read more →](https://manufact.com/launchweek/1)",
+    "dismissible": true,
+    "type": "info"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
   "navigation": {
     "anchors": [
       {
@@ -50,11 +60,19 @@
             ]
           },
           {
-            "group": "Libraries",
-            "icon": "library",
+            "group": "MCP Apps",
+            "icon": "app-window-mac",
             "pages": [
-              "home/redirects/python",
-              "home/redirects/typescript"
+              "typescript/server/mcp-apps",
+              "typescript/server/creating-mcp-apps-server",
+              "guides/chatgpt-apps-flow"
+            ]
+          },
+          {
+            "group": "Templates",
+            "icon": "layout-template",
+            "pages": [
+              "home/templates"
             ]
           },
           {
@@ -80,16 +98,23 @@
                   "inspector/changelog"
                 ]
               },
+              "typescript/server/cli-reference",
               "tunneling/index"
             ]
           },
           {
-            "group": "Guides",
-            "icon": "",
+            "group": "Concepts",
+            "icon": "brain",
             "pages": [
-              "home/mcp101",
-              "typescript/server/creating-mcp-apps-server",
-              "guides/chatgpt-apps-flow"
+              "home/mcp101"
+            ]
+          },
+          {
+            "group": "Libraries",
+            "icon": "library",
+            "pages": [
+              "home/redirects/python",
+              "home/redirects/typescript"
             ]
           }
         ]
@@ -122,7 +147,8 @@
                     "pages": [
                       "python/server/compatibility",
                       "python/server/running",
-                      "python/server/sessions"
+                      "python/server/sessions",
+                      "python/server/fastapi_mount"
                     ]
                   },
                   {
@@ -223,19 +249,19 @@
                       "python/agent/interactive-chat-patterns"
                     ]
                   },
+                  {
+                    "group": "LLM Adapters",
+                    "icon": "plug-2",
+                    "pages": [
+                      "python/integration/langchain",
+                      "python/integration/openai",
+                      "python/integration/anthropic",
+                      "python/integration/google"
+                    ]
+                  },
                   "python/agent/server-manager",
                   "python/agent/building-custom-agents",
                   "python/agent/observability"
-                ]
-              },
-              {
-                "group": "Integrations",
-                "icon": "plug-2",
-                "pages": [
-                  "python/integration/langchain",
-                  "python/integration/openai",
-                  "python/integration/anthropic",
-                  "python/integration/google"
                 ]
               },
               {
@@ -445,6 +471,7 @@
               {
                 "group": "Versions",
                 "pages": [
+                  "python/changelog/1_7_0",
                   "python/changelog/1_6_0",
                   "python/changelog/1_5_2",
                   "python/changelog/1_5_0",
@@ -490,23 +517,96 @@
                 ]
               },
               {
-                "group": "MCP Agent",
-                "icon": "brain",
+                "group": "MCP Server",
+                "icon": "server",
                 "pages": [
-                  "typescript/agent/index",
-                  "typescript/agent/agent-configuration",
+                  "typescript/server/index",
+                  "typescript/server/configuration",
+                  "typescript/server/cli-reference",
+                  "typescript/server/examples",
                   {
-                    "group": "Core Concepts",
+                    "group": "Core Components",
                     "icon": "box",
                     "pages": [
-                      "typescript/agent/llm-integration",
-                      "typescript/agent/memory-management",
-                      "typescript/agent/server-manager",
-                      "typescript/agent/structured-output",
-                      "typescript/agent/streaming"
+                      "typescript/server/tools",
+                      "typescript/server/resources",
+                      "typescript/server/prompts"
                     ]
                   },
-                  "typescript/agent/observability"
+                  "typescript/server/response-helpers",
+                  {
+                    "group": "MCP Apps",
+                    "icon": "app-window-mac",
+                    "pages": [
+                      "typescript/server/mcp-apps",
+                      "typescript/server/creating-mcp-apps-server",
+                      "typescript/server/content-security-policy",
+                      "typescript/server/widget-components/usewidget",
+                      "typescript/server/widget-components/usecalltool",
+                      "typescript/server/widget-components/mcpuseprovider",
+                      "typescript/server/widget-components/widgetcontrols",
+                      "typescript/server/widget-components/errorboundary",
+                      "typescript/server/widget-components/image",
+                      "typescript/server/widget-components/themeprovider",
+                      "typescript/server/widget-components/modelcontext",
+                      "typescript/server/widget-components/usefiles"
+                    ]
+                  },
+                  {
+                    "group": "Session Management",
+                    "icon": "key-round",
+                    "pages": [
+                      "typescript/server/session-management",
+                      "typescript/server/session-management/memory-storage",
+                      "typescript/server/session-management/filesystem-storage",
+                      "typescript/server/session-management/redis-storage"
+                    ]
+                  },
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/server/middleware",
+                      "typescript/server/proxy",
+                      "typescript/server/elicitation",
+                      "typescript/server/sampling",
+                      "typescript/server/subscriptions",
+                      "typescript/server/notifications",
+                      "typescript/server/logging",
+                      "typescript/server/nextjs-drop-in"
+                    ]
+                  },
+                  {
+                    "group": "Authentication",
+                    "icon": "shield",
+                    "pages": [
+                      "typescript/server/authentication/index",
+                      "typescript/server/authentication/user-context",
+                      {
+                        "group": "OAuth Providers",
+                        "icon": "plug",
+                        "pages": [
+                          "typescript/server/authentication/providers/auth0",
+                          "typescript/server/authentication/providers/better-auth",
+                          "typescript/server/authentication/providers/clerk",
+                          "typescript/server/authentication/providers/keycloak",
+                          "typescript/server/authentication/providers/supabase",
+                          "typescript/server/authentication/providers/workos",
+                          "typescript/server/authentication/providers/oauth-proxy",
+                          "typescript/server/authentication/providers/custom"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "group": "Deployment",
+                    "icon": "rocket",
+                    "pages": [
+                      "typescript/server/deployment/mcp-use",
+                      "typescript/server/deployment/supabase",
+                      "typescript/server/deployment/google"
+                    ]
+                  }
                 ]
               },
               {
@@ -544,93 +644,23 @@
                 ]
               },
               {
-                "group": "MCP Server",
-                "icon": "server",
+                "group": "MCP Agent",
+                "icon": "brain",
                 "pages": [
-                  "typescript/server/index",
-                  "typescript/server/configuration",
-                  "typescript/server/cli-reference",
-                  "typescript/server/examples",
+                  "typescript/agent/index",
+                  "typescript/agent/agent-configuration",
                   {
-                    "group": "Core Components",
+                    "group": "Core Concepts",
                     "icon": "box",
                     "pages": [
-                      "typescript/server/tools",
-                      "typescript/server/resources",
-                      "typescript/server/prompts"
+                      "typescript/agent/llm-integration",
+                      "typescript/agent/memory-management",
+                      "typescript/agent/server-manager",
+                      "typescript/agent/structured-output",
+                      "typescript/agent/streaming"
                     ]
                   },
-                  "typescript/server/response-helpers",
-                  {
-                    "group": "MCP Apps",
-                    "icon": "app-window-mac",
-                    "pages": [
-                      "typescript/server/mcp-apps",
-                      "typescript/server/content-security-policy",
-                      "typescript/server/widget-components/usewidget",
-                      "typescript/server/widget-components/usecalltool",
-                      "typescript/server/widget-components/mcpuseprovider",
-                      "typescript/server/widget-components/widgetcontrols",
-                      "typescript/server/widget-components/errorboundary",
-                      "typescript/server/widget-components/image",
-                      "typescript/server/widget-components/themeprovider",
-                      {
-                        "group": "Deprecated",
-                        "icon": "archive",
-                        "pages": [
-                          "typescript/server/ui-widgets",
-                          "typescript/server/mcp-ui-resources"
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "group": "Session Management",
-                    "icon": "key-round",
-                    "pages": [
-                      "typescript/server/session-management",
-                      "typescript/server/session-management/memory-storage",
-                      "typescript/server/session-management/filesystem-storage",
-                      "typescript/server/session-management/redis-storage"
-                    ]
-                  },
-                  {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
-                    "pages": [
-                      "typescript/server/proxy",
-                      "typescript/server/elicitation",
-                      "typescript/server/sampling",
-                      "typescript/server/subscriptions",
-                      "typescript/server/notifications",
-                      "typescript/server/logging"
-                    ]
-                  },
-                  {
-                    "group": "Authentication",
-                    "icon": "shield",
-                    "pages": [
-                      "typescript/server/authentication/index",
-                      "typescript/server/authentication/user-context",
-                      {
-                        "group": "OAuth Providers",
-                        "icon": "plug",
-                        "pages": [
-                          "typescript/server/authentication/providers/workos",
-                          "typescript/server/authentication/providers/supabase"
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "group": "Deployment",
-                    "icon": "rocket",
-                    "pages": [
-                      "typescript/server/deployment/mcp-use",
-                      "typescript/server/deployment/supabase",
-                      "typescript/server/deployment/google"
-                    ]
-                  }
+                  "typescript/agent/observability"
                 ]
               },
               {
@@ -644,11 +674,6 @@
             ]
           },
           {
-            "tab": "API Reference",
-            "icon": "terminal",
-            "groups": []
-          },
-          {
             "tab": "Changelog",
             "icon": "history",
             "groups": [
@@ -656,31 +681,6 @@
                 "group": "Changelog",
                 "pages": [
                   "typescript/changelog/changelog"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Community",
-            "icon": "users",
-            "groups": [
-              {
-                "group": "Community",
-                "pages": [
-                  "python/community/showcase"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Blog",
-            "icon": "book",
-            "groups": [
-              {
-                "group": "Blog",
-                "pages": [
-                  "typescript/blog/client_side",
-                  "typescript/blog/client-vs-sdk"
                 ]
               }
             ]
@@ -720,6 +720,42 @@
     {
       "source": "/changelog",
       "destination": "/python/changelog/changelog"
+    },
+    {
+      "source": "/typescript/server/ui-widgets",
+      "destination": "/typescript/server/mcp-apps"
+    },
+    {
+      "source": "/typescript/server/mcp-ui-resources",
+      "destination": "/typescript/server/mcp-apps"
+    },
+    {
+      "source": "/typescript/server/comparison-with-other-implementations",
+      "destination": "/typescript/server/index"
+    },
+    {
+      "source": "/typescript/server/api-reference",
+      "destination": "/typescript/server/index"
+    },
+    {
+      "source": "/typescript/development/security",
+      "destination": "/python/development/security"
+    },
+    {
+      "source": "/python/blog/middleware",
+      "destination": "/python/server/middleware"
+    },
+    {
+      "source": "/python/server/auth",
+      "destination": "/python/server/auth/bearer"
+    },
+    {
+      "source": "/typescript/blog/client-vs-sdk",
+      "destination": "/typescript/client/index"
+    },
+    {
+      "source": "/typescript/blog/client_side",
+      "destination": "/inspector/index"
     }
   ],
   "logo": {
@@ -770,6 +806,10 @@
             "href": "https://mcp-use.com"
           },
           {
+            "label": "Manufact Cloud",
+            "href": "https://manufact.com"
+          },
+          {
             "label": "GitHub",
             "href": "https://github.com/mcp-use"
           }
@@ -779,16 +819,20 @@
         "header": "Resources",
         "items": [
           {
+            "label": "TypeScript Docs",
+            "href": "https://mcp-use.com/docs/typescript/server/index"
+          },
+          {
+            "label": "Python Docs",
+            "href": "https://mcp-use.com/docs/python/getting-started/quickstart"
+          },
+          {
             "label": "Examples",
             "href": "https://github.com/mcp-use/mcp-use/tree/main/examples"
           },
           {
-            "label": "MCP Servers",
-            "href": "https://github.com/punkpeye/awesome-mcp-servers"
-          },
-          {
-            "label": "LangChain Docs",
-            "href": "https://python.langchain.com/"
+            "label": "Blog",
+            "href": "https://manufact.com/blog"
           }
         ]
       },
@@ -817,7 +861,7 @@
   },
   "integrations": {
     "posthog": {
-      "apiKey": "phc_Ss9Lp8KP60Gh7ii8Ysx8cPl9WMKjh3oqgwZcQjR0BqV",
+      "apiKey": "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI",
       "apiHost": "https://eu.i.posthog.com",
       "sessionRecording": true
     }
@@ -826,9 +870,9 @@
     "metatags": {
       "charset": "UTF-8",
       "viewport": "width=device-width, initial-scale=1.0",
-      "description": "mcp_use is an open source library that enables developers to connect any LLM to any MCP server, allowing the creation of custom agents with tool access without relying on closed-source clients.",
-      "keywords": "MCP, Model Context Protocol, LLM, AI agents, open source, API integration, Claude, ChatGPT, artificial intelligence, custom agents, tool access",
-      "author": "mcp-use Team",
+      "description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
+      "keywords": "MCP, Model Context Protocol, LLM, AI agents, open source, API integration, Claude, ChatGPT, artificial intelligence, tool access",
+      "author": "Manufact Team",
       "robots": "index, follow",
       "googlebot": "index, follow",
       "google": "notranslate",
@@ -839,8 +883,8 @@
       "format-detection": "telephone=no",
       "referrer": "origin",
       "language": "en",
-      "copyright": "Copyright 2025 mcp-use",
-      "reply-to": "dev@mcp-use.com",
+      "copyright": "Copyright 2026 Manufact",
+      "reply-to": "dev@manufact.com",
       "distribution": "global",
       "coverage": "Worldwide",
       "category": "Technology",
@@ -854,25 +898,25 @@
       "msapplication-TileColor": "#1a1a1a",
       "msapplication-TileImage": "/images/mstile-144x144.png",
       "msapplication-config": "/browserconfig.xml",
-      "og:title": "mcp-use - Connect Any LLM to Any MCP Server",
+      "og:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:type": "website",
       "og:url": "https://mcp-use.com",
       "og:image": "https://raw.githubusercontent.com/mcp-use/mcp-use/refs/heads/main/static/og_image_docs.jpg",
-      "og:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "og:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "og:site_name": "mcp-use",
       "og:locale": "en_US",
       "twitter:card": "summary_large_image",
-      "twitter:site": "@mcpuse",
-      "twitter:creator": "@mcpuse",
-      "twitter:title": "mcp-use - Connect Any LLM to Any MCP Server",
-      "twitter:description": "Open source library enabling developers to connect any LLM to any MCP server. Build custom AI agents with tool access without vendor lock-in.",
+      "twitter:site": "@manufact",
+      "twitter:creator": "@manufact",
+      "twitter:title": "mcp-use - The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
+      "twitter:description": "The fullstack MCP framework to develop MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "twitter:image": "https://raw.githubusercontent.com/mcp-use/mcp-use/refs/heads/main/static/og_image_docs.jpg",
-      "twitter:image:alt": "mcp-use logo and interface showing LLM to MCP server connections",
+      "twitter:image:alt": "mcp-use logo and interface showing MCP Apps for ChatGPT / Claude and MCP Servers for AI Agents.",
       "article:published_time": "2024-12-01T00:00:00+00:00",
-      "article:modified_time": "2025-06-16T00:00:00+00:00",
-      "article:author": "mcp-use Team",
+      "article:modified_time": "2026-05-14T00:00:00+00:00",
+      "article:author": "Manufact Team",
       "article:section": "Technology",
-      "article:tag": "MCP, LLM, AI, open source, developers, API"
+      "article:tag": "MCP, MCP Servers, MCP Apps, ChatGPT, Claude, AI Agents, open source, developers, API"
     }
   }
 }

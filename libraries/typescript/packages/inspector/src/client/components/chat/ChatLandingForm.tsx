@@ -13,6 +13,7 @@ import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
+import { OPENROUTER_ICON_URL } from "./ConfigurationDialog";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
 import type { ToolInfo } from "./ToolSelector";
@@ -52,6 +53,13 @@ interface ChatLandingFormProps {
   quickQuestions?: string[];
   /** Called when a quick question is selected. */
   onQuickQuestionSelect?: (question: string) => void;
+  /**
+   * When set (hosted-managed mode), renders a "Manufact free tier" pill below
+   * the input instead of the provider/model badge. Ignores `hideModelBadge`.
+   */
+  freeTierInfo?: {
+    onLoginClick: () => void;
+  };
 }
 
 export function ChatLandingForm({
@@ -84,6 +92,7 @@ export function ChatLandingForm({
   hideServerUrl,
   quickQuestions = [],
   onQuickQuestionSelect,
+  freeTierInfo,
 }: ChatLandingFormProps) {
   // Can send if there's text, prompt results, or attachments
   const canSend =
@@ -181,7 +190,7 @@ export function ChatLandingForm({
               ))}
             </div>
           )}
-          {llmConfig && !hideModelBadge && (
+          {llmConfig && (!hideModelBadge || freeTierInfo) && (
             <div className="flex justify-center mt-4">
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -190,16 +199,24 @@ export function ChatLandingForm({
                     className="pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
                     onClick={() => onConfigDialogOpenChange(true)}
                   >
-                    <img
-                      src={`https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`}
-                      alt={llmConfig.provider}
-                      className="w-4 h-4 mr-0 rounded-full"
-                    />
+                    {llmConfig.provider !== "openai-compatible" && (
+                      <img
+                        src={
+                          llmConfig.provider === "openrouter"
+                            ? OPENROUTER_ICON_URL
+                            : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
+                        }
+                        alt={llmConfig.provider}
+                        className="w-4 h-4 mr-0 rounded-full"
+                      />
+                    )}
                     {llmConfig.provider}/{llmConfig.model}
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>Change API Key</p>
+                  <p>
+                    {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
+                  </p>
                 </TooltipContent>
               </Tooltip>
             </div>

@@ -1,3 +1,4 @@
+import { MCPAddToClientEvent, Telemetry } from "@/client/telemetry";
 import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
@@ -102,7 +103,18 @@ export function AddToClientDropdown({
 
   const { url, name, headers } = serverConfig;
 
+  const trackAddToClient = (client: string) => {
+    try {
+      Telemetry.getInstance()
+        .capture(new MCPAddToClientEvent({ client }))
+        .catch(() => {});
+    } catch {
+      // ignore telemetry errors
+    }
+  };
+
   const handleCursorClick = () => {
+    trackAddToClient("cursor");
     try {
       const deepLink = generateCursorDeepLink(url, name, headers);
       window.location.href = deepLink;
@@ -114,6 +126,7 @@ export function AddToClientDropdown({
   };
 
   const handleVSCodeClick = () => {
+    trackAddToClient("vscode");
     try {
       const deepLink = generateVSCodeDeepLink(url, name, headers);
       window.location.href = deepLink;
@@ -125,6 +138,7 @@ export function AddToClientDropdown({
   };
 
   const handleVSCodeInsidersClick = () => {
+    trackAddToClient("vscode-insiders");
     try {
       const deepLink = generateVSCodeInsidersDeepLink(url, name, headers);
       window.location.href = deepLink;
@@ -136,6 +150,7 @@ export function AddToClientDropdown({
   };
 
   const handleClaudeDesktopClick = () => {
+    trackAddToClient("claude-desktop");
     try {
       downloadMcpbFile(url, name, headers);
       onSuccess?.("Claude Desktop");
@@ -146,16 +161,19 @@ export function AddToClientDropdown({
   };
 
   const handleClaudeCodeClick = () => {
+    trackAddToClient("claude-code");
     setSelectedClient("claude-code");
     setShowModal(true);
   };
 
   const handleGeminiCLIClick = () => {
+    trackAddToClient("gemini-cli");
     setSelectedClient("gemini-cli");
     setShowModal(true);
   };
 
   const handleCodexCLIClick = () => {
+    trackAddToClient("codex-cli");
     setSelectedClient("codex-cli");
     setShowModal(true);
   };

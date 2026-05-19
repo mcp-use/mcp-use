@@ -1,48 +1,70 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+
+// Redirect ~/.mcp-use to a per-run temp dir so this test can never wipe the
+// developer's real `cli-sessions.json`. session-storage.ts derives its file
+// path from node:os.homedir(), so mocking that here is enough. vi.mock is
+// hoisted above imports, so the factory runs before session-storage loads.
+vi.mock("node:os", async (importActual) => {
+  const actual = await importActual<typeof import("node:os")>();
+  const fakeHome = actual.tmpdir
+    ? `${actual.tmpdir()}/mcp-use-cli-sessions-test-${process.pid}`
+    : `/tmp/mcp-use-cli-sessions-test-${process.pid}`;
+  return { ...actual, homedir: () => fakeHome };
+});
+
 import {
   saveSession,
   getSession,
-  getActiveSession,
-  setActiveSession,
   removeSession,
   listAllSessions,
   updateSessionInfo,
+  loadSessions,
   type SessionConfig,
 } from "../src/utils/session-storage.js";
 
-const TEST_SESSION_DIR = join(homedir(), ".mcp-use");
+const FAKE_HOME = homedir();
+const TEST_SESSION_DIR = join(FAKE_HOME, ".mcp-use");
 const TEST_SESSION_FILE = join(TEST_SESSION_DIR, "cli-sessions.json");
 
 describe("Session Storage", () => {
+  beforeAll(() => {
+    mkdirSync(TEST_SESSION_DIR, { recursive: true });
+  });
+
+  afterAll(() => {
+    rmSync(FAKE_HOME, { recursive: true, force: true });
+  });
+
   beforeEach(() => {
-    // Clean up before each test to ensure isolation
     if (existsSync(TEST_SESSION_FILE)) {
       rmSync(TEST_SESSION_FILE, { force: true });
     }
-    // Create test directory
     if (!existsSync(TEST_SESSION_DIR)) {
       mkdirSync(TEST_SESSION_DIR, { recursive: true });
     }
-    // Write empty session file
-    writeFileSync(
-      TEST_SESSION_FILE,
-      JSON.stringify({ activeSession: null, sessions: {} }),
-      "utf-8"
-    );
+    writeFileSync(TEST_SESSION_FILE, JSON.stringify({ sessions: {} }), "utf-8");
   });
 
   afterEach(() => {
-    // Clean up after each test
     if (existsSync(TEST_SESSION_FILE)) {
       rmSync(TEST_SESSION_FILE, { force: true });
     }
   });
 
   describe("saveSession", () => {
-    it("should save a new session", async () => {
+    it("saves a new session", async () => {
       const config: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -57,21 +79,7 @@ describe("Session Storage", () => {
       expect(retrieved?.url).toBe("http://localhost:3000/mcp");
     });
 
-    it("should set first session as active", async () => {
-      const config: SessionConfig = {
-        type: "http",
-        url: "http://localhost:3000/mcp",
-        lastUsed: new Date().toISOString(),
-      };
-
-      await saveSession("first-session", config);
-
-      const active = await getActiveSession();
-      expect(active).toBeDefined();
-      expect(active?.name).toBe("first-session");
-    });
-
-    it("should update lastUsed timestamp", async () => {
+    it("updates lastUsed timestamp on save", async () => {
       const config: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -84,7 +92,7 @@ describe("Session Storage", () => {
       expect(retrieved?.lastUsed).not.toBe("2020-01-01T00:00:00.000Z");
     });
 
-    it("should save stdio session configuration", async () => {
+    it("saves stdio session configuration", async () => {
       const config: SessionConfig = {
         type: "stdio",
         command: "npx",
@@ -107,12 +115,12 @@ describe("Session Storage", () => {
   });
 
   describe("getSession", () => {
-    it("should return null for non-existent session", async () => {
+    it("returns null for non-existent session", async () => {
       const session = await getSession("non-existent");
       expect(session).toBeNull();
     });
 
-    it("should retrieve saved session", async () => {
+    it("retrieves a saved session", async () => {
       const config: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -131,72 +139,8 @@ describe("Session Storage", () => {
     });
   });
 
-  describe("getActiveSession", () => {
-    it("should return null when no sessions exist", async () => {
-      const active = await getActiveSession();
-      expect(active).toBeNull();
-    });
-
-    it("should return active session", async () => {
-      const config: SessionConfig = {
-        type: "http",
-        url: "http://localhost:3000/mcp",
-        lastUsed: new Date().toISOString(),
-      };
-
-      await saveSession("test-session", config);
-      const active = await getActiveSession();
-
-      expect(active).toBeDefined();
-      expect(active?.name).toBe("test-session");
-      expect(active?.config.type).toBe("http");
-    });
-  });
-
-  describe("setActiveSession", () => {
-    it("should set active session", async () => {
-      const config1: SessionConfig = {
-        type: "http",
-        url: "http://localhost:3000/mcp",
-        lastUsed: new Date().toISOString(),
-      };
-      const config2: SessionConfig = {
-        type: "http",
-        url: "http://localhost:4000/mcp",
-        lastUsed: new Date().toISOString(),
-      };
-
-      await saveSession("session-1", config1);
-      await saveSession("session-2", config2);
-      await setActiveSession("session-2");
-
-      const active = await getActiveSession();
-      expect(active?.name).toBe("session-2");
-    });
-
-    it("should throw error for non-existent session", async () => {
-      await expect(setActiveSession("non-existent")).rejects.toThrow(
-        "Session 'non-existent' not found"
-      );
-    });
-
-    it("should update lastUsed when setting active", async () => {
-      const config: SessionConfig = {
-        type: "http",
-        url: "http://localhost:3000/mcp",
-        lastUsed: "2020-01-01T00:00:00.000Z",
-      };
-
-      await saveSession("test-session", config);
-      await setActiveSession("test-session");
-
-      const session = await getSession("test-session");
-      expect(session?.lastUsed).not.toBe("2020-01-01T00:00:00.000Z");
-    });
-  });
-
   describe("removeSession", () => {
-    it("should remove a session", async () => {
+    it("removes a session", async () => {
       const config: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -210,7 +154,7 @@ describe("Session Storage", () => {
       expect(retrieved).toBeNull();
     });
 
-    it("should update active session when removing active", async () => {
+    it("leaves other sessions intact", async () => {
       const config1: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -224,22 +168,20 @@ describe("Session Storage", () => {
 
       await saveSession("session-1", config1);
       await saveSession("session-2", config2);
-      await setActiveSession("session-1");
       await removeSession("session-1");
 
-      const active = await getActiveSession();
-      // Should switch to session-2 or be null if no sessions left
-      expect(active?.name).not.toBe("session-1");
+      expect(await getSession("session-1")).toBeNull();
+      expect(await getSession("session-2")).not.toBeNull();
     });
   });
 
   describe("listAllSessions", () => {
-    it("should return empty array when no sessions", async () => {
+    it("returns empty array when no sessions exist", async () => {
       const sessions = await listAllSessions();
       expect(sessions).toEqual([]);
     });
 
-    it("should list all sessions with active flag", async () => {
+    it("lists all saved sessions", async () => {
       const config1: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -253,21 +195,18 @@ describe("Session Storage", () => {
 
       await saveSession("session-1", config1);
       await saveSession("session-2", config2);
-      await setActiveSession("session-2");
 
       const sessions = await listAllSessions();
       expect(sessions).toHaveLength(2);
-
-      const active = sessions.find((s) => s.isActive);
-      expect(active?.name).toBe("session-2");
-
-      const inactive = sessions.find((s) => !s.isActive);
-      expect(inactive?.name).toBe("session-1");
+      expect(sessions.map((s) => s.name).sort()).toEqual([
+        "session-1",
+        "session-2",
+      ]);
     });
   });
 
   describe("updateSessionInfo", () => {
-    it("should update server info and capabilities", async () => {
+    it("updates server info and capabilities", async () => {
       const config: SessionConfig = {
         type: "http",
         url: "http://localhost:3000/mcp",
@@ -292,10 +231,36 @@ describe("Session Storage", () => {
       });
     });
 
-    it("should not fail for non-existent session", async () => {
+    it("does not throw for non-existent session", async () => {
       await expect(
         updateSessionInfo("non-existent", { name: "test-server" }, {})
       ).resolves.not.toThrow();
+    });
+  });
+
+  describe("legacy file compatibility", () => {
+    it("ignores legacy activeSession field on load", async () => {
+      // Older clients persisted `activeSession`. The new schema drops it but
+      // should still read the rest of the file.
+      writeFileSync(
+        TEST_SESSION_FILE,
+        JSON.stringify({
+          activeSession: "session-1",
+          sessions: {
+            "session-1": {
+              type: "http",
+              url: "http://localhost:3000/mcp",
+              lastUsed: new Date().toISOString(),
+            },
+          },
+        }),
+        "utf-8"
+      );
+
+      const storage = await loadSessions();
+      expect(storage.sessions["session-1"]).toBeDefined();
+      // activeSession is silently dropped on load.
+      expect((storage as any).activeSession).toBeUndefined();
     });
   });
 });

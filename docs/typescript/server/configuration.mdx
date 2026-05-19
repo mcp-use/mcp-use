@@ -75,11 +75,11 @@ The server reads the following environment variables at runtime:
 | `PORT` | HTTP server port | `3000` |
 | `HOST` | Bind hostname | `localhost` |
 | `MCP_URL` | Full public base URL (for widget/asset URLs) | `http://{HOST}:{PORT}` |
-| `NODE_ENV` | `production` disables dev features (inspector, type generation) | — |
-| `DEBUG` | Enables verbose debug logging | — |
-| `CSP_URLS` | Comma-separated extra URLs added to widget CSP `resource_domains` | — |
+| `NODE_ENV` | `production` disables dev features (inspector, type generation) |  -  |
+| `MCP_DEBUG_LEVEL` | Request log verbosity: `info`, `debug`, or `trace` | `info` |
+| `CSP_URLS` | Comma-separated extra URLs added to widget CSP `resource_domains` |  -  |
 
-**OAuth providers** also read zero-config env vars — see the OAuth docs for the full list.
+**OAuth providers** also read zero-config env vars  -  see the OAuth docs for the full list.
 
 ## Transport & Sessions
 
@@ -131,7 +131,7 @@ import { MCPServer, InMemorySessionStore } from 'mcp-use/server'
 const server = new MCPServer({
   name: 'my-server',
   version: '1.0.0',
-  sessionStore: new InMemorySessionStore(), // default — no config needed
+  sessionStore: new InMemorySessionStore(), // default  -  no config needed
 })
 ```
 
@@ -199,7 +199,7 @@ npm install redis
 import { MCPServer, RedisSessionStore, RedisStreamManager } from 'mcp-use/server'
 import { createClient } from 'redis'
 
-// Redis Pub/Sub requires a dedicated client — it cannot be shared
+// Redis Pub/Sub requires a dedicated client  -  it cannot be shared
 const redis = createClient({ url: process.env.REDIS_URL })
 const pubSubRedis = redis.duplicate()
 
@@ -271,7 +271,7 @@ Express middleware is detected by function signature (3-4 parameters) and patter
 By default, CORS is permissive (`origin: "*"`) for developer ergonomics. Set `cors` in the server config to restrict it.
 
 <Warning>
-The `cors` config option **replaces** the default CORS configuration entirely — there is no merge. If you override `cors`, include all headers your clients need (e.g. `mcp-session-id` in `exposeHeaders`).
+The `cors` config option **replaces** the default CORS configuration entirely  -  there is no merge. If you override `cors`, include all headers your clients need (e.g. `mcp-session-id` in `exposeHeaders`).
 </Warning>
 
 Default CORS configuration:
@@ -416,6 +416,6 @@ server.tool({
 
 - [Creating an MCP Server](./creating-mcp-apps-server) - Getting started
 - [OAuth / Authentication](./authentication) - Securing your server
-- [UI Widgets](./ui-widgets) - Interactive widget components
+- [UI Widgets](./mcp-apps) - Interactive widget components
 - [Content Security Policy](./content-security-policy) - Per-widget CSP configuration
 - [Deployment: Supabase](./deployment/supabase) - Full Supabase Edge Functions guide

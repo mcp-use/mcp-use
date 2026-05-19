@@ -4,11 +4,9 @@ description: Use MCP servers directly from the terminal with the mcp-use CLI cli
 icon: "terminal"
 ---
 
-The mcp-use CLI client allows you to interact with MCP servers directly from your terminal without writing any code. It provides a powerful command-line interface with scoped commands for tools, resources, prompts, and session management.
+The mcp-use CLI client lets you interact with MCP servers directly from your terminal — no code required. Connect to a server, save it under a **short name**, and run tool/resource/prompt commands against that name.
 
 ## Installation
-
-The CLI client is included with the `mcp-use` package:
 
 ```bash
 npm install -g mcp-use
@@ -18,395 +16,264 @@ npx mcp-use client --help
 
 ## Quick Start
 
-Connect to an MCP server and start using it:
-
 ```bash
-# Connect to an HTTP server
-npx mcp-use client connect http://localhost:3000/mcp --name my-server
+# Connect once and save the server under a name of your choice
+npx mcp-use client connect manufact https://mcp.manufact.com/mcp
 
-# List available tools
-npx mcp-use client tools list
-
-# Call a tool
-npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
-
-# Start interactive mode
-npx mcp-use client interactive
+# Every subsequent command names the server it operates on
+npx mcp-use client manufact tools list
+npx mcp-use client manufact tools call read_file path=/tmp/test.txt
+npx mcp-use client manufact interactive
 ```
 
 ## Command Structure
 
-The CLI client uses scoped commands organized by resource type:
+The CLI has these top-level shapes under `mcp-use client`:
 
-- **Connection Management**: `connect`, `disconnect`
-- **Sessions**: `sessions list`, `sessions switch`
-- **Tools**: `tools list`, `tools call`, `tools describe`
-- **Resources**: `resources list`, `resources read`, `resources subscribe`, `resources unsubscribe`
-- **Prompts**: `prompts list`, `prompts get`
-- **Interactive Mode**: `interactive`
+| Shape | Purpose |
+|-------|---------|
+| `mcp-use client connect <name> <url>` | Save an MCP server under a short name |
+| `mcp-use client list` | List saved servers |
+| `mcp-use client remove <name>` | Remove a saved server |
+| `mcp-use client screenshot --mcp <url> --tool <name>` | Ad-hoc widget screenshot — no saved server needed |
+| `mcp-use client <name> <scope> <action>` | Run a command against a saved server |
 
-## Connection Management
+The per-server scopes are:
 
-### Connect to a Server
+| Scope | Actions |
+|-------|---------|
+| `tools` | `list`, `call <tool> [args...]`, `describe <tool>` |
+| `resources` | `list`, `read <uri>`, `subscribe <uri>`, `unsubscribe <uri>` |
+| `prompts` | `list`, `get <prompt> [args...]` |
+| `auth` | `status`, `refresh`, `logout` |
+| `screenshot` | `--tool <name> [args...]` — render a widget headlessly with the saved server's auth |
+| (top-level) | `interactive`, `disconnect` |
 
-Connect to an HTTP MCP server:
+## Connecting
+
+### HTTP Server
 
 ```bash
-npx mcp-use client connect http://localhost:3000/mcp --name my-server
+npx mcp-use client connect manufact https://mcp.manufact.com/mcp
 ```
+
+Has a full OAuth 2.1 flow built in — the CLI handles the authentication flow for you.
 
 **Options:**
-- `--name <name>`: Session name (optional, auto-generated if not provided)
-- `--auth <token>`: Authentication token for Bearer auth
-- `--stdio`: Use stdio connector instead of HTTP (see below)
+- `--auth <token>`: Static Bearer token (skips OAuth).
+- `--no-oauth`: Don't auto-trigger OAuth on a 401; fail with the 401 instead.
+- `--auth-timeout <ms>`: OAuth loopback wait timeout (default 300000).
 
-### Connect to a Stdio Server
-
-Connect to a server using stdio transport:
+### Stdio Server
 
 ```bash
-npx mcp-use client connect --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp" --name fs-server
+npx mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
 ```
 
-The command after `--stdio` is parsed as: `command args...`
+The string after the name is parsed as `command args...`.
 
-### Disconnect from a Server
+## Listing Saved Servers
 
 ```bash
-# Disconnect from active session
-npx mcp-use client disconnect
-
-# Disconnect from specific session
-npx mcp-use client disconnect my-server
-
-# Disconnect all sessions
-npx mcp-use client disconnect --all
+npx mcp-use client list
 ```
 
-## Session Management
+```
+Saved Servers:
 
-Sessions are automatically saved to `~/.mcp-use/cli-sessions.json` and can be restored later.
+NAME      TYPE   TARGET                         SERVER
+manufact  http   https://mcp.manufact.com/mcp   manufact-cloud
+fs        stdio  npx -y @mc...filesystem        fs-server
+```
 
-### List Sessions
+## Tools
 
 ```bash
-npx mcp-use client sessions list
+# List
+npx mcp-use client manufact tools list
+npx mcp-use client manufact tools list --json
+
+# Describe (shows the input schema)
+npx mcp-use client manufact tools describe read_file
+
+# Call
+npx mcp-use client manufact tools call read_file path=/tmp/test.txt
+npx mcp-use client manufact tools call read_file '{"path":"/tmp/test.txt"}'
+npx mcp-use client manufact tools call read_file path=/tmp/test.txt --json
+npx mcp-use client manufact tools call slow_op --timeout 60000
 ```
 
-Output example:
-```
-Saved Sessions:
+**Arg syntax:**
+- `key=value` for simple strings/numbers/booleans (inferred from the tool schema).
+- `key:=<json>` to pass a JSON value (objects, arrays, etc.).
+- A single bare JSON object as the only arg works too: `'{"key":"value"}'`.
 
-┌──────────────┬────────┬─────────────────────────────┬────────────────┬──────────────┐
-│ Name         │ Type   │ Target                      │ Server         │ Status       │
-├──────────────┼────────┼─────────────────────────────┼────────────────┼──────────────┤
-│ my-server *  │ http   │ http://localhost:3000/mcp   │ my-mcp-server  │ connected    │
-│ fs-server    │ stdio  │ npx -y @mc...filesystem     │ fs-server      │ disconnected │
-└──────────────┴────────┴─────────────────────────────┴────────────────┴──────────────┘
-
-* = active session
-```
-
-### Switch Sessions
+## Resources
 
 ```bash
-npx mcp-use client sessions switch fs-server
+npx mcp-use client manufact resources list
+npx mcp-use client manufact resources read "file:///tmp/data.json"
+npx mcp-use client manufact resources subscribe "file:///tmp/data.json"
+npx mcp-use client manufact resources unsubscribe "file:///tmp/data.json"
 ```
 
-## Working with Tools
+`subscribe` keeps the process running and streams updates until Ctrl+C.
 
-### List Available Tools
+## Prompts
 
 ```bash
-# List tools from active session
-npx mcp-use client tools list
-
-# List tools from specific session
-npx mcp-use client tools list --session my-server
-
-# Output as JSON
-npx mcp-use client tools list --json
+npx mcp-use client manufact prompts list
+npx mcp-use client manufact prompts get greeting name=Alice
+npx mcp-use client manufact prompts get greeting '{"name":"Alice"}' --json
 ```
 
-### Describe a Tool
+## Auth (OAuth)
 
-View detailed information about a tool including its input schema:
+For HTTP servers that authenticated via OAuth:
 
 ```bash
-npx mcp-use client tools describe read_file
+npx mcp-use client manufact auth status   # show token state + expiry
+npx mcp-use client manufact auth refresh  # force-refresh access token
+npx mcp-use client manufact auth logout   # remove stored tokens
 ```
 
-Output example:
-```
-Tool: read_file
+## Screenshot
 
-Read the contents of a file from the filesystem
+Render an MCP Apps widget headlessly and save a PNG. There are two forms.
 
-Input Schema:
-path (string) *required
-  The path to the file to read
-encoding (string)
-  The text encoding to use (default: utf-8)
-```
-
-### Call a Tool
-
-Execute a tool with arguments:
+**Saved-server form** — reuses the auth from `mcp-use client connect`:
 
 ```bash
-# With JSON arguments
-npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
-
-# Without arguments (for tools that don't require them)
-npx mcp-use client tools call list_files
-
-# With timeout
-npx mcp-use client tools call slow_operation '{}' --timeout 60000
-
-# Output as JSON
-npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}' --json
+npx mcp-use client manufact screenshot --tool show-board
+npx mcp-use client manufact screenshot --tool show-board boardId=demo
+npx mcp-use client manufact screenshot --tool show-board --output ./out.png
 ```
 
-**Tips:**
-- Arguments must be valid JSON
-- If a tool requires arguments but none are provided, an error will show the schema
-- Use single quotes around JSON to avoid shell escaping issues
-
-## Working with Resources
-
-### List Available Resources
+**Ad-hoc form** — connects to an MCP server inline. Useful for one-off captures or programmatic/CI use that doesn't want to first save a server:
 
 ```bash
-# List resources from active session
-npx mcp-use client resources list
+# Public server
+npx mcp-use client screenshot --mcp https://mcp.example.com --tool show-board
 
-# Output as JSON
-npx mcp-use client resources list --json
+# Authenticated server (curl-style -H, repeatable)
+npx mcp-use client screenshot \
+  --mcp https://mcp.example.com \
+  -H "Authorization: Bearer $TOKEN" \
+  --tool show-board boardId=demo
 ```
 
-Output example:
-```
-Available Resources (3):
+Common flags (both forms): `--width`, `--height`, `--device-scale-factor <n>` (e.g. `2` for Retina; defaults to `1`), `--theme light|dark`, `--output <path>`, `--wait-for <selector>`, `--delay <ms>`, `--timeout <ms>`, `--inspector <url>`, `--cdp-url <ws-url>`, `--quiet`. Run `mcp-use client screenshot --help` for the full list.
 
-┌──────────────────────────────┬────────────────┬─────────────┐
-│ URI                          │ Name           │ Type        │
-├──────────────────────────────┼────────────────┼─────────────┤
-│ file:///tmp/data.json        │ Data File      │ text/json   │
-│ file:///tmp/config.yaml      │ Config         │ text/yaml   │
-│ file:///tmp/image.png        │ Screenshot     │ image/png   │
-└──────────────────────────────┴────────────────┴─────────────┘
-```
-
-### Read a Resource
-
-```bash
-npx mcp-use client resources read "file:///tmp/data.json"
-```
-
-### Subscribe to Resource Updates
-
-Subscribe to notifications when a resource changes:
-
-```bash
-npx mcp-use client resources subscribe "file:///tmp/data.json"
-```
-
-This will keep the process running and display updates as they arrive. Press Ctrl+C to stop.
-
-### Unsubscribe from Resource
-
-```bash
-npx mcp-use client resources unsubscribe "file:///tmp/data.json"
-```
-
-## Working with Prompts
-
-### List Available Prompts
-
-```bash
-npx mcp-use client prompts list
-```
-
-### Get a Prompt
-
-Retrieve a prompt with arguments:
-
-```bash
-# With arguments
-npx mcp-use client prompts get greeting '{"name": "Alice"}'
-
-# Without arguments
-npx mcp-use client prompts get daily_summary
-
-# Output as JSON
-npx mcp-use client prompts get greeting '{"name": "Alice"}' --json
-```
+<Note>
+`-H/--header` only applies to the ad-hoc form. The saved-server form carries the server's auth (OAuth or `--auth <token>` from `connect`) automatically.
+</Note>
 
 ## Interactive Mode
 
-Start an interactive REPL session for easier exploration:
+A REPL for one specific server:
 
 ```bash
-npx mcp-use client interactive
+npx mcp-use client manufact interactive
 ```
-
-In interactive mode, you can use shortened commands:
 
 ```
 mcp> tools list
 Available tools: read_file, write_file, list_directory
 
 mcp> tools call read_file
-Arguments (JSON, or press Enter for none): {"path": "/tmp/test.txt"}
-✓ Tool executed successfully
+Arguments (JSON, or press Enter for none): {"path":"/tmp/test.txt"}
 ...
-
-mcp> resources list
-Available resources: file:///tmp/data.json, file:///tmp/config.yaml
 
 mcp> exit
 ```
 
-**Available commands in interactive mode:**
-- `tools list` - List available tools
-- `tools call <name>` - Call a tool (will prompt for arguments)
-- `tools describe <name>` - Show tool details
-- `resources list` - List available resources
-- `resources read <uri>` - Read a resource
-- `prompts list` - List available prompts
-- `prompts get <name>` - Get a prompt (will prompt for arguments)
-- `sessions list` - List all sessions
-- `exit` or `quit` - Exit interactive mode
+## Disconnecting
+
+```bash
+npx mcp-use client manufact disconnect
+```
 
 ## Global Flags
 
-All commands support these global flags:
+Per-server commands accept these flags where they make sense:
 
-- `--session <name>`: Use a specific session instead of the active one
-- `--json`: Output results in JSON format
-- `--timeout <ms>`: Request timeout in milliseconds (for tool calls and resource operations)
+- `--json`: Output results as JSON (on `list`/`call`/`read`/`get`).
+- `--timeout <ms>`: Request timeout (on `tools call`).
+- `--screenshot`: Capture a PNG screenshot of the rendered widget (on `tools call`, when the tool declares a UI resource). Opt-in — when omitted, the CLI prints a hint suggesting this flag.
+- `--screenshot-output <path>`: Override the screenshot output path. Implies `--screenshot`.
+- `--screenshot-device-scale-factor <n>`: Device pixel ratio for the widget screenshot (e.g. `2` for Retina). Defaults to `1`. Implies `--screenshot`. The dedicated `mcp-use client screenshot` command exposes the same knob as `--device-scale-factor <n>`.
 
-Example:
-```bash
-npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}' \
-  --session my-server \
-  --json \
-  --timeout 10000
-```
+## Storage
 
-## Session Storage
-
-Sessions are stored in `~/.mcp-use/cli-sessions.json`:
+Saved servers are persisted in `~/.mcp-use/cli-sessions.json`:
 
 ```json
 {
-  "activeSession": "my-server",
   "sessions": {
-    "my-server": {
+    "manufact": {
       "type": "http",
-      "url": "http://localhost:3000/mcp",
-      "lastUsed": "2025-12-09T10:30:00Z",
-      "serverInfo": {
-        "name": "my-mcp-server",
-        "version": "1.0.0"
-      }
+      "url": "https://mcp.manufact.com/mcp",
+      "authMode": "oauth",
+      "lastUsed": "2026-05-12T10:30:00Z",
+      "serverInfo": { "name": "manufact-cloud", "version": "1.0.0" }
     },
-    "fs-server": {
+    "fs": {
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      "lastUsed": "2025-12-09T11:00:00Z"
+      "lastUsed": "2026-05-12T11:00:00Z"
     }
   }
 }
 ```
 
-You can manually edit this file to:
-- Change session names
-- Update connection details
-- Remove old sessions
+OAuth tokens live in `~/.mcp-use/oauth/<urlHash>/`, managed by the OAuth provider. Editing the JSON manually is fine — it just gets re-read on the next command.
 
-## Common Use Cases
+## Common Patterns
 
-### Debugging an MCP Server
+### Debugging a Dev Server
 
 ```bash
-# Connect to your development server
-npx mcp-use client connect http://localhost:3000/mcp --name dev
-
-# Explore available tools
-npx mcp-use client tools list
-
-# Test a specific tool
-npx mcp-use client tools describe my_tool
-npx mcp-use client tools call my_tool '{"param": "value"}'
+npx mcp-use client connect dev http://localhost:3000/mcp
+npx mcp-use client dev tools list
+npx mcp-use client dev tools describe my_tool
+npx mcp-use client dev tools call my_tool param=value
 ```
 
-### Working with Multiple Servers
+### Multiple Servers
 
 ```bash
-# Connect to multiple servers
-npx mcp-use client connect http://localhost:3000/mcp --name server1
-npx mcp-use client connect http://localhost:4000/mcp --name server2
+npx mcp-use client connect server1 http://localhost:3000/mcp
+npx mcp-use client connect server2 http://localhost:4000/mcp
 
-# List all sessions
-npx mcp-use client sessions list
-
-# Use tools from different servers
-npx mcp-use client tools list --session server1
-npx mcp-use client tools list --session server2
-
-# Switch between them
-npx mcp-use client sessions switch server2
+npx mcp-use client list
+npx mcp-use client server1 tools list
+npx mcp-use client server2 tools list
 ```
 
-### Scripting with the CLI
-
-Use the CLI in shell scripts:
+### Scripting
 
 ```bash
 #!/bin/bash
+npx mcp-use client connect script http://localhost:3000/mcp
 
-# Connect to server
-npx mcp-use client connect http://localhost:3000/mcp --name script-session
-
-# Get data as JSON
-DATA=$(npx mcp-use client tools call get_data '{}' --json)
-
-# Process with jq
+DATA=$(npx mcp-use client script tools call get_data --json)
 echo "$DATA" | jq '.content[0].text'
 
-# Disconnect
-npx mcp-use client disconnect script-session
-```
-
-### Testing Filesystem Server
-
-```bash
-# Connect to filesystem server
-npx mcp-use client connect --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp" --name fs
-
-# List files
-npx mcp-use client tools call list_directory '{"path": "/tmp"}'
-
-# Read a file
-npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
-
-# Write a file
-npx mcp-use client tools call write_file '{"path": "/tmp/hello.txt", "content": "Hello, World!"}'
+npx mcp-use client script disconnect
 ```
 
 ## Error Handling
 
-The CLI provides helpful error messages:
+### Client Not Found
 
-### No Active Session
 ```
-✗ Error: No active session. Connect to a server first.
-Use: npx mcp-use client connect <url> --name <name>
+✗ Error: Client 'manufact' not found
+ℹ Connect with: npx mcp-use client connect manufact <url>
 ```
 
 ### Tool Not Found
+
 ```
 ✗ Error: Tool 'invalid_tool' not found
 
@@ -416,59 +283,36 @@ Available tools:
   • list_directory
 ```
 
-### Invalid Arguments
-```
-✗ Error: This tool requires arguments. Provide them as a JSON string.
+### Missing Required Arguments
 
-Example:
-  npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
+```
+✗ Error: This tool requires arguments.
+
+Provide arguments as key=value pairs:
+  npx mcp-use client manufact tools call read_file key=value [key2=value2 ...]
 
 Tool schema:
 path (string) *required
   The path to the file to read
 ```
 
-## Tips and Best practices
+## Migration from the old `--session` model
 
-1. **Use Named Sessions**: Always provide a `--name` when connecting to make sessions easier to manage
-2. **Interactive Mode for Exploration**: Use interactive mode when exploring a new server
-3. **JSON Output for Scripts**: Use `--json` flag when using the CLI in scripts
-4. **Session Persistence**: Sessions are saved automatically, so you can disconnect and reconnect later
-5. **Multiple Terminals**: You can have multiple terminal windows with different active sessions
+Earlier versions of the CLI tracked an "active session" and let you omit the name in most commands (`mcp-use client tools list` would use whichever session you last connected to or switched to). That implicit state was confusing — what client am I currently aimed at? — so it was removed in favor of the explicit `<name>` positional.
 
-## Troubleshooting
+| Before | After |
+|--------|-------|
+| `mcp-use client connect <url> --name foo` | `mcp-use client connect foo <url>` |
+| `mcp-use client tools list` | `mcp-use client foo tools list` |
+| `mcp-use client tools call foo_tool ... --session foo` | `mcp-use client foo tools call foo_tool ...` |
+| `mcp-use client sessions list` | `mcp-use client list` |
+| `mcp-use client sessions switch foo` | *(removed — every command takes a name)* |
+| `mcp-use client disconnect` (implicit active) | `mcp-use client foo disconnect` |
+| `mcp-use client disconnect --all` | *(removed — disconnect one at a time)* |
 
-### Connection Issues
-
-**Problem**: Can't connect to HTTP server
-
-```bash
-✗ Error: Connection failed: fetch failed
-```
-
-**Solution**: Check that:
-- The server is running
-- The URL is correct
-- The server supports HTTP/SSE transport
-- Firewall isn't blocking the connection
-
-### Stdio Server Issues
-
-**Problem**: Stdio server fails to start
-
-**Solution**:
-- Ensure the command is available (`npx`, `node`, etc.)
-- Check that the server package is installed or accessible
-- Verify the arguments are correct
-
-### Session Not Found
-
-**Problem**: Session disappeared after restart
-
-**Solution**: Sessions are stored in `~/.mcp-use/cli-sessions.json`. If deleted, you'll need to reconnect.
+Existing `~/.mcp-use/cli-sessions.json` files keep working; the obsolete `activeSession` field is silently ignored on load.
 
 ## Next Steps
 
 - Learn about [MCP Agents](/typescript/agent) for programmatic access
 - Explore [Server Development](/typescript/server) to create your own MCP servers
-- Check out [Examples](/typescript/server/examples) for more use cases

@@ -22,6 +22,7 @@ import {
   isJsonRpcResponse,
 } from "../utils/jsonrpc-helpers.js";
 import { runWithContext } from "../context-storage.js";
+import { getDebugLevel } from "../logging.js";
 import { generateUUID } from "../utils/runtime.js";
 
 // ---------------------------------------------------------------------------
@@ -401,11 +402,15 @@ export async function mountMcp(
           sessionIdGenerator: () => sessionId,
 
           onsessioninitialized: async (sid: string) => {
-            console.log(`[MCP] Session re-initialized: ${sid}`);
+            if (getDebugLevel() !== "info") {
+              console.log(`[MCP] Session re-initialized: ${sid}`);
+            }
           },
 
           onsessionclosed: async (sid: string) => {
-            console.log(`[MCP] Session closed: ${sid}`);
+            if (getDebugLevel() !== "info") {
+              console.log(`[MCP] Session closed: ${sid}`);
+            }
             transports.delete(sid);
             await streamManager.delete(sid);
             await sessionStore.delete(sid);
@@ -513,7 +518,9 @@ export async function mountMcp(
         sessionIdGenerator: () => newSessionId,
 
         onsessioninitialized: async (sid: string) => {
-          console.log(`[MCP] Session initialized: ${sid}`);
+          if (getDebugLevel() !== "info") {
+            console.log(`[MCP] Session initialized: ${sid}`);
+          }
           transports.set(sid, transport);
 
           // Store full session data in memory (includes transport, server, context)
@@ -550,13 +557,7 @@ export async function mountMcp(
               metadata.protocolVersion = String(protocolVersion);
               await sessionStore.set(sid, metadata);
 
-              const debugEnv = process.env.DEBUG;
-              const isDebug =
-                debugEnv != null &&
-                debugEnv !== "" &&
-                debugEnv !== "0" &&
-                debugEnv.toLowerCase() !== "false";
-              if (isDebug) {
+              if (getDebugLevel() !== "info") {
                 console.log(
                   `[MCP] Captured client capabilities for session ${sid}:`,
                   clientCapabilities ? Object.keys(clientCapabilities) : "none"
@@ -586,7 +587,9 @@ export async function mountMcp(
         },
 
         onsessionclosed: async (sid: string) => {
-          console.log(`[MCP] Session closed: ${sid}`);
+          if (getDebugLevel() !== "info") {
+            console.log(`[MCP] Session closed: ${sid}`);
+          }
           transports.delete(sid);
 
           // Clean up stream manager

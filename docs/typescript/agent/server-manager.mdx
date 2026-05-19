@@ -70,7 +70,7 @@ const client = new MCPClient({
 
 // Enable Server Manager
 const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o' }),
+    llm: new ChatOpenAI({ model: "gpt-5.5" }),
     client,
     useServerManager: true  // This is the magic switch!
 })
@@ -119,7 +119,7 @@ async function demoServerManager() {
 
     // Agent with Server Manager
     const agent = new MCPAgent({
-        llm: new ChatOpenAI({ model: 'gpt-4o' }),
+        llm: new ChatOpenAI({ model: "gpt-5.5" }),
         client,
         useServerManager: true,
         verbose: true  // See the magic happen!

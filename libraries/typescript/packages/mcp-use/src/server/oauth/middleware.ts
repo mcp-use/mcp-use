@@ -6,17 +6,17 @@
  */
 
 import type { Context, Next } from "hono";
-import type { OAuthProvider } from "./providers/types.js";
+import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 
 /**
- * Create bearer authentication middleware for a given OAuth provider
+ * Create bearer authentication middleware for a given OAuth provider or proxy
  *
- * @param provider - The OAuth provider to use for token verification
+ * @param oauth - The OAuth provider or proxy to use for token verification
  * @param baseUrl - The base URL of the server (for WWW-Authenticate header)
  * @returns Hono middleware function
  */
 export function createBearerAuthMiddleware(
-  provider: OAuthProvider,
+  oauth: OAuthProvider | OAuthProxy,
   baseUrl?: string
 ) {
   return async (c: Context, next: Next) => {
@@ -61,12 +61,12 @@ export function createBearerAuthMiddleware(
     }
 
     try {
-      // Verify token using provider
-      const result = await provider.verifyToken(token);
+      // Verify token using provider/proxy
+      const result = await oauth.verifyToken(token);
       const payload = result.payload;
 
       // Extract user info from payload
-      const user = provider.getUserInfo(payload);
+      const user = await oauth.getUserInfo(payload);
 
       // Create complete auth object
       const scope = payload.scope as string | undefined;

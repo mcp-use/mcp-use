@@ -179,6 +179,12 @@ function ServerStatus({ serverId }) {
 
 ```typescript
 interface McpClientProviderProps {
+  // Default OAuth callback URL for all servers (can be overridden per-server via callbackUrl)
+  // Useful when your app is mounted at a sub-path  -  e.g. set to "/myapp/oauth/callback"
+  // so the OAuth redirect lands on the correct route.
+  // Defaults to /oauth/callback on the current origin.
+  defaultCallbackUrl?: string;
+
   // Default proxy configuration for all servers (can be overridden per-server)
   defaultProxyConfig?: {
     proxyAddress?: string;
@@ -242,6 +248,11 @@ interface McpServerOptions {
   useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
   callbackUrl?: string; // OAuth callback URL
   authProvider?: OAuthClientProvider; // Optional external OAuth provider (headless/custom runtimes)
+  oauth?: {
+    clientId?: string;     // Pre-registered OAuth client ID (skips Dynamic Client Registration)
+    clientSecret?: string; // Pre-registered client secret for confidential clients without PKCE
+    scope?: string;        // OAuth scopes string included in the authorize request
+  };
   clientInfo?: {
     name: string;
     version: string;
@@ -345,9 +356,40 @@ addServer("linear", {
 });
 ```
 
+**Pre-registered OAuth Client** (for servers without Dynamic Client Registration)
+
+Some MCP servers strip the `registration_endpoint` from their auth-server metadata, so Dynamic Client Registration is unavailable. Pre-register a client with the upstream provider and pass the credentials via `oauth`:
+
+```typescript
+addServer("slack", {
+  url: "https://mcp.slack.com/slack",
+  name: "Slack",
+  oauth: {
+    clientId: "my-preregistered-client-id",
+    clientSecret: "my-preregistered-client-secret", // optional  -  for confidential clients without PKCE
+    scope: "openid profile email",
+  },
+});
+```
+
+When `clientSecret` is set alongside `clientId`, the SDK switches token-endpoint authentication from `none` to `client_secret_basic` or `client_secret_post`, depending on what the auth server advertises in `token_endpoint_auth_methods_supported`. See [Authentication](/typescript/client/authentication#pre-registered-client-credentials) for details.
+
 ### OAuth Callback Page
 
-Create an OAuth callback route to handle OAuth redirects:
+Create an OAuth callback route to handle OAuth redirects.
+
+By default, `McpClientProvider` expects the callback at `/oauth/callback` on the current origin. If your app is mounted at a sub-path, set `defaultCallbackUrl` to match your actual route:
+
+```typescript
+// App mounted at /myapp  -  callback route is /myapp/oauth/callback
+<McpClientProvider
+  defaultCallbackUrl={`${window.location.origin}/myapp/oauth/callback`}
+>
+  <MyApp />
+</McpClientProvider>
+```
+
+Per-server `callbackUrl` in `addServer()` takes precedence over the provider default.
 
 ```typescript
 // app/oauth/callback/page.tsx (Next.js App Router)
@@ -741,6 +783,7 @@ const {
   addServer,
   removeServer,
   updateServer,
+  updateServerMetadata,
   getServer,
   storageLoaded,
 } = useMcpClient();
@@ -752,7 +795,10 @@ addServer("my-server", {
   headers: { Authorization: "Bearer key" },
 });
 
-// Update a server's configuration (disconnects and reconnects)
+// Update a server's display name without reconnecting
+await updateServerMetadata("my-server", { name: "Production API" });
+
+// Update connection-affecting configuration (disconnects and reconnects)
 await updateServer("my-server", {
   headers: { Authorization: "Bearer new-key" },
 });

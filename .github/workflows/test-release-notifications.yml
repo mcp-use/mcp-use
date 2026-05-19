@@ -1,0 +1,76 @@
+name: Test Release Notifications
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to test with (e.g. 1.7.0)"
+        required: true
+        default: "1.7.0"
+
+permissions:
+  contents: read
+  discussions: write
+
+jobs:
+  test-github-discussion:
+    name: Test GitHub Discussion
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare discussion body
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="python-v${VERSION}"
+          RELEASE_BODY=$(gh release view "$TAG_NAME" --json body -q '.body')
+
+          cat <<EOF > discussion_body.md
+          We've just published **Python v${VERSION}** to PyPI!
+
+          📦 \`pip install --upgrade mcp-use\`
+
+          ${RELEASE_BODY}
+
+          ---
+          📖 [Full changelog](https://mcp-use.com/python/changelog/${VERSION//./_})
+          🐙 [GitHub Release](https://github.com/mcp-use/mcp-use/releases/tag/${TAG_NAME})
+          EOF
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create discussion
+        uses: abirismyname/create-discussion@v2.1.0
+        with:
+          title: "🚀 Python v${{ github.event.inputs.version }} Released"
+          body-filepath: discussion_body.md
+          repository-id: R_kgDOOQKbDA
+          category-id: DIC_kwDOOQKbDM4CrC8-
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  test-discord-notification:
+    name: Test Discord Notification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Send Discord notification
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="python-v${VERSION}"
+          RELEASE_URL="https://github.com/mcp-use/mcp-use/releases/tag/${TAG_NAME}"
+          RELEASE_BODY=$(gh release view "$TAG_NAME" --json body -q '.body' | head -c 1800)
+
+          PAYLOAD=$(jq -n \
+            --arg title "Python v${VERSION}" \
+            --arg url "$RELEASE_URL" \
+            --arg desc "$RELEASE_BODY" \
+            '{embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
+
+          curl -sf -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK_URL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}

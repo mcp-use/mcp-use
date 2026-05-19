@@ -10,18 +10,21 @@ import type { OAuthProvider, UserInfo, Auth0OAuthConfig } from "./types.js";
 
 export class Auth0OAuthProvider implements OAuthProvider {
   private config: Auth0OAuthConfig;
+  private baseUrl: string;
   private issuer: string;
   private jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
 
   constructor(config: Auth0OAuthConfig) {
     this.config = config;
-    this.issuer = `https://${config.domain}`;
+    this.baseUrl = `https://${config.domain}`;
+    // Auth0 issuer always includes a trailing slash
+    this.issuer = `${this.baseUrl}/`;
   }
 
   private getJWKS(): ReturnType<typeof createRemoteJWKSet> {
     if (!this.jwks) {
       this.jwks = createRemoteJWKSet(
-        new URL(`${this.issuer}/.well-known/jwks.json`)
+        new URL(`${this.baseUrl}/.well-known/jwks.json`)
       );
     }
     return this.jwks;
@@ -84,15 +87,22 @@ export class Auth0OAuthProvider implements OAuthProvider {
   }
 
   getAuthEndpoint(): string {
-    return `${this.issuer}/authorize`;
+    return `${this.baseUrl}/authorize`;
   }
 
   getTokenEndpoint(): string {
-    return `${this.issuer}/oauth/token`;
+    return `${this.baseUrl}/oauth/token`;
   }
 
   getScopesSupported(): string[] {
-    return ["openid", "profile", "email", "offline_access"];
+    return (
+      this.config.scopesSupported ?? [
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+      ]
+    );
   }
 
   getGrantTypesSupported(): string[] {

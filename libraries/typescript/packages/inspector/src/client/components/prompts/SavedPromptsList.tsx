@@ -23,7 +23,7 @@ export function SavedPromptsList({
   savedPrompts,
   selectedPrompt,
   onLoadPrompt,
-  onDeletePrompt,
+  onDeletePrompt: _onDeletePrompt,
   focusedIndex,
 }: SavedPromptsListProps) {
   if (savedPrompts.length === 0) {

@@ -210,19 +210,18 @@ const client = MCPClient.fromDict(config)
 The mcp-use CLI client supports bearer token authentication for connecting to secured MCP servers:
 
 ```bash
-# Connect with bearer token
-npx mcp-use client connect https://api.example.com/mcp \
-  --name my-server \
+# Connect with bearer token, saved under the name "my-server"
+npx mcp-use client connect my-server https://api.example.com/mcp \
   --auth sk-your-api-key
 
-# List tools (uses saved authentication)
-npx mcp-use client tools list
+# List tools on that saved server
+npx mcp-use client my-server tools list
 
 # Call a tool
-npx mcp-use client tools call send_email '{"to":"user@example.com"}'
+npx mcp-use client my-server tools call send_email to=user@example.com
 
 # Disconnect
-npx mcp-use client disconnect my-server
+npx mcp-use client my-server disconnect
 ```
 
 The CLI automatically saves authentication tokens in `~/.mcp-use/cli-sessions.json` for future sessions.
@@ -391,21 +390,39 @@ sequenceDiagram
 
 ### OAuth Configuration Parameters (Browser Only)
 
-| Parameter        | Type    | Required | Description                                     |
-| ---------------- | ------- | -------- | ----------------------------------------------- |
-| `client_id`      | string  | No\*     | OAuth client ID (required if not using DCR)     |
-| `client_secret`  | string  | No       | OAuth client secret (required if not using DCR) |
-| `scope`          | string  | No       | OAuth scopes to request                         |
-| `callback_port`  | integer | No       | Port for OAuth callback (default: 8080)         |
-| `oauth_provider` | object  | No       | OAuth provider metadata                         |
+OAuth options are passed to `useMcp` (and to `addServer` on `McpClientProvider`) at the top level for transport/callback settings, plus a nested `oauth` object for pre-registered client credentials.
 
-\*Required unless using Dynamic Client Registration
+| Parameter             | Type    | Required | Description                                                                                  |
+| --------------------- | ------- | -------- | -------------------------------------------------------------------------------------------- |
+| `callbackUrl`         | string  | No       | OAuth redirect URL (defaults to `/oauth/callback` on the current origin)                     |
+| `useRedirectFlow`     | boolean | No       | Use full-page redirect instead of popup (default: `false`)                                   |
+| `preventAutoAuth`     | boolean | No       | Wait for `authenticate()` instead of auto-triggering OAuth (default: `true`)                 |
+| `oauth.clientId`      | string  | No\*     | Pre-registered OAuth client ID. When set, the SDK skips Dynamic Client Registration.         |
+| `oauth.clientSecret`  | string  | No       | Pre-registered OAuth client secret for confidential clients without PKCE. Requires `clientId`. |
+| `oauth.scope`         | string  | No       | OAuth scopes string included in the authorize request                                        |
 
-### Port Configuration
+### Pre-registered Client Credentials
 
-- **Default Port**: 8080
-- **Custom Ports**: Any available port (e.g., 8081, 8082, 3000)
-- **Port Conflicts**: mcp-use will check if the port is available before starting OAuth flow
+Some MCP servers strip the `registration_endpoint` from their auth-server metadata, which means Dynamic Client Registration is unavailable. For these servers, register a client with the provider yourself and pass the credentials through `oauth`:
+
+```typescript
+import { useMcp } from "mcp-use/react";
+
+const mcp = useMcp({
+  url: "https://mcp.example.com",
+  oauth: {
+    clientId: "my-preregistered-client-id",
+    clientSecret: "my-preregistered-client-secret",
+    scope: "openid profile email",
+  },
+});
+```
+
+When `clientSecret` is also set, the SDK auto-switches token-endpoint authentication from `none` to `client_secret_basic` or `client_secret_post` (whichever the auth server advertises in `token_endpoint_auth_methods_supported`). Drop `clientSecret` for public clients using PKCE.
+
+<Warning>
+  `clientSecret` is persisted in the browser's `localStorage` so it can be reused across page loads and during the OAuth callback. Only ship pre-registered secrets to first-party UIs where exposing the secret to the end user is acceptable.
+</Warning>
 
 ## Example Servers that support OAuth
 

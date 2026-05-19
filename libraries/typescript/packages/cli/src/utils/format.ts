@@ -1,70 +1,175 @@
 import chalk from "chalk";
 import type { CallToolResult } from "mcp-use/client";
 
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+const GUTTER = "  ";
+const MIN_TRUNCATABLE_WIDTH = 8;
+const DEFAULT_MAX_WIDTH = 100;
+
+function stripAnsi(s: string): string {
+  return s.replace(ANSI_RE, "");
+}
+
+function visibleWidth(s: string): number {
+  return stripAnsi(s).length;
+}
+
+function padCell(s: string, width: number): string {
+  const w = visibleWidth(s);
+  if (w >= width) return s;
+  return s + " ".repeat(width - w);
+}
+
+function truncateCell(s: string, width: number): string {
+  if (width <= 0) return "";
+  const plain = stripAnsi(s);
+  if (plain.length <= width) return s;
+  if (width === 1) return "…";
+  return plain.slice(0, width - 1) + "…";
+}
+
+export interface TableColumn {
+  key: string;
+  header: string;
+  width?: number;
+  truncate?: boolean;
+}
+
+export interface FormatTableOptions {
+  /**
+   * Force TSV output regardless of TTY detection. When undefined, auto-detects:
+   * non-TTY stdout (pipes, agents, CI) gets TSV; TTY gets the borderless table.
+   */
+  tsv?: boolean;
+  /**
+   * Maximum total line width for the table. Defaults to the terminal width
+   * (process.stdout.columns) or 100 when unavailable.
+   */
+  maxWidth?: number;
+}
+
 /**
- * Format data as a table with ASCII borders
+ * Render rows as either a borderless aligned-columns table (TTY, gh-style)
+ * or tab-separated values (non-TTY, machine-readable). Width math strips
+ * ANSI escape sequences so colored cells align correctly.
  */
 export function formatTable(
   data: Array<Record<string, any>>,
-  columns: Array<{ key: string; header: string; width?: number }>
+  columns: TableColumn[],
+  options: FormatTableOptions = {}
 ): string {
+  const tsv = options.tsv ?? !process.stdout.isTTY;
+
+  if (tsv) {
+    return data
+      .map((row) =>
+        columns
+          .map((c) =>
+            stripAnsi(String(row[c.key] ?? "")).replace(/[\t\r\n]+/g, " ")
+          )
+          .join("\t")
+      )
+      .join("\n");
+  }
+
   if (data.length === 0) {
     return chalk.gray("No items found");
   }
 
-  // Calculate column widths
-  const widths = columns.map((col) => {
-    const maxDataWidth = Math.max(
-      ...data.map((row) => String(row[col.key] || "").length)
-    );
-    const headerWidth = col.header.length;
-    return col.width || Math.max(maxDataWidth, headerWidth, 10);
+  const maxWidth =
+    options.maxWidth ?? process.stdout.columns ?? DEFAULT_MAX_WIDTH;
+
+  // Natural width = max(header width, widest cell), per column.
+  const natural = columns.map((col) => {
+    const headerW = col.header.length;
+    const dataW = data.reduce((m, row) => {
+      return Math.max(m, visibleWidth(String(row[col.key] ?? "")));
+    }, 0);
+    return Math.max(headerW, dataW);
   });
 
-  // Helper to create a row
-  const createRow = (values: string[], bold = false) => {
-    const cells = values.map((val, i) => {
-      const padded = val.padEnd(widths[i]);
-      return bold ? chalk.bold(padded) : padded;
-    });
-    return `│ ${cells.join(" │ ")} │`;
-  };
+  const widths = columns.map((c, i) => c.width ?? natural[i]);
+  const overhead = GUTTER.length * (columns.length - 1);
+  const totalWidth = () => widths.reduce((s, w) => s + w, 0) + overhead;
 
-  // Create separator line
-  const separator = (char: string) => {
-    const parts = widths.map((w) => char.repeat(w + 2));
-    if (char === "─") {
-      return `├${parts.join("┼")}┤`;
+  // If the natural layout overflows, squeeze truncatable columns proportionally
+  // to their natural size. Non-truncatable columns keep their full width.
+  if (totalWidth() > maxWidth) {
+    const truncIdxs = columns
+      .map((c, i) => (c.truncate ? i : -1))
+      .filter((i) => i >= 0);
+    if (truncIdxs.length > 0) {
+      const fixedSum = columns.reduce(
+        (s, c, i) => s + (c.truncate ? 0 : widths[i]),
+        0
+      );
+      const remaining = Math.max(
+        truncIdxs.length * MIN_TRUNCATABLE_WIDTH,
+        maxWidth - fixedSum - overhead
+      );
+      const truncSum = truncIdxs.reduce((s, i) => s + widths[i], 0) || 1;
+      let used = 0;
+      truncIdxs.forEach((i, idx) => {
+        if (idx === truncIdxs.length - 1) {
+          widths[i] = Math.max(MIN_TRUNCATABLE_WIDTH, remaining - used);
+        } else {
+          const share = Math.max(
+            MIN_TRUNCATABLE_WIDTH,
+            Math.floor((widths[i] / truncSum) * remaining)
+          );
+          widths[i] = share;
+          used += share;
+        }
+      });
     }
-    return `└${parts.join("┴")}┘`;
-  };
+  }
 
-  // Build table
   const lines: string[] = [];
 
-  // Top border
-  lines.push(`┌${widths.map((w) => "─".repeat(w + 2)).join("┬")}┐`);
-
-  // Header
-  lines.push(
-    createRow(
-      columns.map((c) => c.header),
-      true
-    )
-  );
-
-  // Separator
-  lines.push(separator("─"));
-
-  // Data rows
-  data.forEach((row) => {
-    lines.push(createRow(columns.map((c) => String(row[c.key] || ""))));
+  // Header: UPPERCASE, bold. Pad all but the last cell.
+  const headerCells = columns.map((c, i) => {
+    const text = c.header.toUpperCase();
+    const cell = i === columns.length - 1 ? text : padCell(text, widths[i]);
+    return chalk.bold(cell);
   });
+  lines.push(headerCells.join(GUTTER).trimEnd());
 
-  // Bottom border
-  lines.push(separator("─"));
+  for (const row of data) {
+    const cells = columns.map((c, i) => {
+      let v = String(row[c.key] ?? "");
+      if (visibleWidth(v) > widths[i]) {
+        v = truncateCell(v, widths[i]);
+      }
+      return i === columns.length - 1 ? v : padCell(v, widths[i]);
+    });
+    lines.push(cells.join(GUTTER).trimEnd());
+  }
 
   return lines.join("\n");
+}
+
+/**
+ * Whether stdout is piped/redirected. Callers use this to suppress decorative
+ * headers ("Available Tools (N):") in non-TTY mode so output stays parseable.
+ */
+export function isStdoutTty(): boolean {
+  return Boolean(process.stdout.isTTY);
+}
+
+/**
+ * One-word tool mode badge derived from MCP tool annotations.
+ * `readOnlyHint` wins; explicit `destructiveHint` is shown red; everything
+ * else is "write" (yellow), the safer-than-destructive default for the many
+ * tools that simply don't annotate.
+ */
+export function formatToolMode(annotations?: {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+}): string {
+  if (annotations?.readOnlyHint === true) return chalk.green("read-only");
+  if (annotations?.destructiveHint === true) return chalk.red("destructive");
+  return chalk.yellow("write");
 }
 
 /**
@@ -82,8 +187,21 @@ export function formatJson(data: any, pretty = true): string {
  */
 export function formatToolCall(result: CallToolResult): string {
   const lines: string[] = [];
+  const { isError, structuredContent } = result;
+  const hasStructured =
+    structuredContent !== undefined && structuredContent !== null;
+  // Per MCP spec, when a tool returns structuredContent it SHOULD also
+  // serialize the same JSON into a TextContent block for backwards
+  // compatibility. Treat structuredContent as canonical and drop the text
+  // duplicate. Non-text blocks (image/resource markers) are kept — they carry
+  // information the structured payload doesn't, even though the terminal can
+  // only render them as placeholders.
+  const visibleContent = (result.content ?? []).filter(
+    (item) => !hasStructured || item.type !== "text"
+  );
+  const hasVisibleContent = visibleContent.length > 0;
 
-  if (result.isError) {
+  if (isError) {
     lines.push(chalk.red("✗ Tool execution failed"));
     lines.push("");
   } else {
@@ -91,15 +209,17 @@ export function formatToolCall(result: CallToolResult): string {
     lines.push("");
   }
 
-  // Format content
-  if (result.content && result.content.length > 0) {
-    result.content.forEach((item, index) => {
-      if (result.content.length > 1) {
+  if (hasVisibleContent) {
+    if (isError) {
+      lines.push(chalk.red.bold("Error details:"));
+    }
+    visibleContent.forEach((item, index) => {
+      if (visibleContent.length > 1) {
         lines.push(chalk.bold(`Content ${index + 1}:`));
       }
 
       if (item.type === "text") {
-        lines.push(item.text);
+        lines.push(isError ? chalk.red(item.text) : item.text);
       } else if (item.type === "image") {
         lines.push(chalk.cyan(`[Image: ${item.mimeType || "unknown type"}]`));
         if (item.data) {
@@ -117,10 +237,21 @@ export function formatToolCall(result: CallToolResult): string {
         lines.push(chalk.gray(`[Unknown content type: ${item.type}]`));
       }
 
-      if (index < result.content.length - 1) {
+      if (index < visibleContent.length - 1) {
         lines.push("");
       }
     });
+  }
+
+  if (hasStructured) {
+    if (isError) {
+      lines.push(chalk.bold("Structured error data:"));
+    }
+    lines.push(formatJson(structuredContent));
+  }
+
+  if (isError && !hasVisibleContent && !hasStructured) {
+    lines.push(chalk.gray("(no error details provided by server)"));
   }
 
   return lines.join("\n");

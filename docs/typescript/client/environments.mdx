@@ -490,75 +490,90 @@ The CLI client provides a command-line interface for interacting with MCP server
 ### Quick Start
 
 ```bash
-# Connect to an HTTP server
-npx mcp-use client connect http://localhost:3000/mcp --name my-server
+# Connect to an HTTP server, saved under the name "my-server"
+npx mcp-use client connect my-server http://localhost:3000/mcp
 
 # Connect to a stdio server
-npx mcp-use client connect --stdio "npx -y @modelcontextprotocol/server-filesystem /tmp" --name fs
+npx mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
 
-# List available tools
-npx mcp-use client tools list
-
-# Call a tool
-npx mcp-use client tools call read_file '{"path": "/tmp/test.txt"}'
-
-# Start interactive mode
-npx mcp-use client interactive
+# Every subsequent command names the client it operates on
+npx mcp-use client my-server tools list
+npx mcp-use client my-server tools call read_file path=/tmp/test.txt
+npx mcp-use client my-server interactive
 ```
 
 ### Command Structure
 
-The CLI uses scoped commands organized by resource type:
+Top-level shapes:
+
+```bash
+# Save an MCP server under a short name
+npx mcp-use client connect <name> <url>
+
+# List saved servers
+npx mcp-use client list
+
+# Run any command against a saved server
+npx mcp-use client <name> <scope> <action> [args...]
+```
+
+The per-server scopes are `tools`, `resources`, `prompts`, `auth`, and `screenshot`, plus the top-level `interactive` and `disconnect`:
 
 ```bash
 # Tools
-npx mcp-use client tools list
-npx mcp-use client tools call <name> [args]
-npx mcp-use client tools describe <name>
+npx mcp-use client my-server tools list
+npx mcp-use client my-server tools call <tool> [args]
+npx mcp-use client my-server tools call <tool> [args] --screenshot   # widget PNG when the tool renders a UI resource
+npx mcp-use client my-server tools describe <tool>
 
 # Resources
-npx mcp-use client resources list
-npx mcp-use client resources read <uri>
+npx mcp-use client my-server resources list
+npx mcp-use client my-server resources read <uri>
 
 # Prompts
-npx mcp-use client prompts list
-npx mcp-use client prompts get <name> [args]
+npx mcp-use client my-server prompts list
+npx mcp-use client my-server prompts get <prompt> [args]
 
-# Sessions
-npx mcp-use client sessions list
-npx mcp-use client sessions switch <name>
+# Auth (OAuth servers only)
+npx mcp-use client my-server auth status
+npx mcp-use client my-server auth refresh
+npx mcp-use client my-server auth logout
 
-# Interactive mode
-npx mcp-use client interactive
+# Widget screenshot (saved-server form — reuses OAuth/bearer auth)
+npx mcp-use client my-server screenshot --tool <tool> [args]
+
+# Interactive mode for one server
+npx mcp-use client my-server interactive
 ```
 
-### Session Management
+For ad-hoc screenshots against a server you haven't saved, use the top-level form with `--mcp <url>` and optional `-H` headers — see the [CLI Client guide](/typescript/client/cli#screenshot).
 
-Sessions are automatically saved to `~/.mcp-use/cli-sessions.json` and persist across terminal sessions:
+### Managing Multiple Servers
+
+Saved servers are persisted to `~/.mcp-use/cli-sessions.json`:
 
 ```bash
 # Connect to multiple servers
-npx mcp-use client connect http://localhost:3000/mcp --name server1
-npx mcp-use client connect http://localhost:4000/mcp --name server2
+npx mcp-use client connect server1 http://localhost:3000/mcp
+npx mcp-use client connect server2 http://localhost:4000/mcp
 
-# List all sessions (shows active session)
-npx mcp-use client sessions list
+# List them
+npx mcp-use client list
 
-# Switch between sessions
-npx mcp-use client sessions switch server2
-
-# Use specific session without switching
-npx mcp-use client tools list --session server1
+# Run against either, by name
+npx mcp-use client server1 tools list
+npx mcp-use client server2 tools list
 ```
+
+There is no "active" server — every command names its target explicitly.
 
 ### Interactive Mode
 
-For exploration and testing, use interactive mode:
+For exploration and testing, drop into a REPL against a specific server:
 
 ```bash
-npx mcp-use client interactive
+npx mcp-use client my-server interactive
 
-# In interactive mode:
 mcp> tools list
 mcp> tools call read_file
 Arguments (JSON): {"path": "/tmp/test.txt"}
@@ -569,22 +584,22 @@ mcp> exit
 
 ### Scripting with the CLI
 
-Use the CLI in automation scripts with `--json` flag for machine-readable output:
+Use the CLI in automation scripts with the `--json` flag for machine-readable output:
 
 ```bash
 #!/bin/bash
 
-# Connect to server
-npx mcp-use client connect http://localhost:3000/mcp --name automation
+# Connect to server (saves it under the name "automation")
+npx mcp-use client connect automation http://localhost:3000/mcp
 
 # Get data as JSON and process with jq
-RESULT=$(npx mcp-use client tools call get_data '{}' --json 2>/dev/null)
+RESULT=$(npx mcp-use client automation tools call get_data --json 2>/dev/null)
 VALUE=$(echo "$RESULT" | jq -r '.content[0].text')
 
 echo "Retrieved value: $VALUE"
 
 # Cleanup
-npx mcp-use client disconnect automation
+npx mcp-use client automation disconnect
 ```
 
 ### CLI Features
@@ -697,8 +712,8 @@ const client = new MCPClient({
 
 Client examples live in the package under `examples/client/`. Run them from the **package root** (e.g. `libraries/typescript/packages/mcp-use`):
 
-- **Node**: `examples/client/node/` — full-features (tool calls, sampling, elicitation, notifications) and communication examples (sampling, notification).
-- **Browser**: `examples/client/browser/` — full-features and CommonJS (`browser/commonjs/`).
+- **Node**: `examples/client/node/`  -  full-features (tool calls, sampling, elicitation, notifications) and communication examples (sampling, notification).
+- **Browser**: `examples/client/browser/`  -  full-features and CommonJS (`browser/commonjs/`).
 
 ```bash
 # From package root (libraries/typescript/packages/mcp-use)

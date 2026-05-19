@@ -30,7 +30,7 @@ const client = new MCPClient({
 })
 await client.createAllSessions()
 
-const llm = new ChatOpenAI({ model: 'gpt-5.1' })
+const llm = new ChatOpenAI({ model: "gpt-5.5" })
 
 const agent = new MCPAgent({
   llm,
@@ -48,7 +48,7 @@ When creating an MCPAgent, you can configure several parameters to customize its
 ```typescript TypeScript
 // Advanced configuration
 const advancedAgent = new MCPAgent({
-    llm: new ChatOpenAI({ model: 'gpt-4o', temperature: 0.7 }),
+    llm: new ChatOpenAI({ model: "gpt-5.5", temperature: 0.7 }),
     client: new MCPClient(config),
     maxSteps: 30,
     autoInitialize: true,

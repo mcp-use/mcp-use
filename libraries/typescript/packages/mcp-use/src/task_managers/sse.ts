@@ -101,7 +101,9 @@ export class SseConnectionManager extends ConnectionManager<SSEClientTransport> 
             // Re-initialize: send new initialize request without session ID
             await this.reinitialize(transport);
 
-            logger.info(`[SSE] Re-initialization successful, retrying request`);
+            logger.debug(
+              `[SSE] Re-initialization successful, retrying request`
+            );
 
             // Retry the original message with new session
             await sendMessage(message);

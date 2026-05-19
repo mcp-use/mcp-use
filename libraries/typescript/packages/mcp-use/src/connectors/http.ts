@@ -212,10 +212,10 @@ export class HttpConnector extends BaseConnector {
     logger.debug(`Connecting to MCP implementation via HTTP: ${baseUrl}`);
 
     try {
-      // Try streamable HTTP transport first
-      logger.info("🔄 Attempting streamable HTTP transport...");
+      // Try streamable HTTP transport first (debug: routine connection detail, not info-level)
+      logger.debug("🔄 Attempting streamable HTTP transport...");
       await this.connectWithStreamableHttp(baseUrl);
-      logger.info("✅ Successfully connected via streamable HTTP");
+      logger.debug("✅ Successfully connected via streamable HTTP");
     } catch (err: unknown) {
       logger.debug("Streamable HTTP connect failed", err);
       const { fallbackReason, is401Error, httpStatusCode } =
@@ -237,7 +237,7 @@ export class HttpConnector extends BaseConnector {
       }
 
       // Always try SSE fallback for maximum compatibility
-      logger.info("🔄 Falling back to SSE transport...");
+      logger.debug("🔄 Falling back to SSE transport...");
 
       try {
         await this.connectWithSse(baseUrl);
@@ -383,14 +383,15 @@ export class HttpConnector extends BaseConnector {
 
       // Store the transport for later cleanup
       this.streamableTransport = streamableTransport;
-      // Create a minimal connection manager wrapper for cleanup purposes
+      // Create a minimal connection manager wrapper for cleanup purposes.
+      // Note: terminateSession() is invoked from cleanupResources() *before*
+      // the SDK's client.close() aborts the transport's abort controller.
+      // Calling terminateSession() here would race the abort and surface a
+      // spurious AbortError on every clean shutdown.
       this.connectionManager = {
         stop: async () => {
           if (this.streamableTransport) {
             try {
-              // First terminate the session per MCP spec (sends DELETE request)
-              await this.streamableTransport.terminateSession();
-              // Then close the transport
               await this.streamableTransport.close();
             } catch (e) {
               logger.warn(`Error closing Streamable HTTP transport: ${e}`);
@@ -493,5 +494,20 @@ export class HttpConnector extends BaseConnector {
    */
   getTransportType(): "streamable-http" | "sse" | null {
     return this.transportType;
+  }
+
+  // Send the streamable-HTTP DELETE *before* super.cleanupResources() invokes
+  // client.close(). The SDK's transport.close() aborts the shared abort
+  // controller, and terminateSession()'s DELETE fetch reuses that signal —
+  // running it after close() rejects immediately with AbortError.
+  protected async cleanupResources(): Promise<void> {
+    if (this.streamableTransport) {
+      try {
+        await this.streamableTransport.terminateSession();
+      } catch (e) {
+        logger.debug(`Error terminating Streamable HTTP session: ${e}`);
+      }
+    }
+    await super.cleanupResources();
   }
 }

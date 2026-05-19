@@ -160,7 +160,6 @@ describe("Elicitation Integration Tests", () => {
 
   describe("Form Mode", () => {
     it("handles simple form mode elicitation", async () => {
-      // Set up handler to accept with data
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         expect(request.params.mode).toBe("form");
         expect(request.params.message).toBe("Enter your name");
@@ -168,7 +167,7 @@ describe("Elicitation Integration Tests", () => {
 
         return {
           action: "accept",
-          data: { name: "Test User" },
+          content: { name: "Test User" },
         } as ElicitResult;
       });
 
@@ -184,7 +183,7 @@ describe("Elicitation Integration Tests", () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: {}, // Empty - should use default
+          content: {},
         } as ElicitResult;
       });
 
@@ -232,7 +231,7 @@ describe("Elicitation Integration Tests", () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: {
+          content: {
             name: "Valid User",
             age: 30,
             email: "valid@example.com",
@@ -253,9 +252,9 @@ describe("Elicitation Integration Tests", () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: {
+          content: {
             name: "Test User",
-            age: 200, // Exceeds max of 150
+            age: 200,
             email: "test@example.com",
           },
         } as ElicitResult;
@@ -267,15 +266,16 @@ describe("Elicitation Integration Tests", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("validation failed");
-      expect(result.content[0].text).toContain("too_big");
+      expect(result.content[0].text).toContain(
+        "does not match requested schema"
+      );
     });
 
     it("rejects invalid email format", async () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: {
+          content: {
             name: "Test User",
             age: 25,
             email: "not-an-email",
@@ -289,7 +289,6 @@ describe("Elicitation Integration Tests", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("validation failed");
       expect(result.content[0].text).toContain("email");
     });
 
@@ -297,7 +296,7 @@ describe("Elicitation Integration Tests", () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: {
+          content: {
             name: "Test User",
             age: "not a number",
             email: "test@example.com",
@@ -311,17 +310,17 @@ describe("Elicitation Integration Tests", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("validation failed");
-      expect(result.content[0].text).toContain("invalid_type");
+      expect(result.content[0].text).toContain(
+        "does not match requested schema"
+      );
     });
 
     it("rejects missing required fields", async () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: {
+          content: {
             age: 25,
-            // name is missing
           },
         } as ElicitResult;
       });
@@ -332,7 +331,9 @@ describe("Elicitation Integration Tests", () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("validation failed");
+      expect(result.content[0].text).toContain(
+        "does not match requested schema"
+      );
     });
   });
 
@@ -395,7 +396,7 @@ describe("Elicitation Integration Tests", () => {
       client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
         return {
           action: "accept",
-          data: { answer: "Quick response" },
+          content: { answer: "Quick response" },
         } as ElicitResult;
       });
 

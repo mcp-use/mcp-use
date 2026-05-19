@@ -4,25 +4,22 @@ description: "Understanding ChatGPT widget flows and how mcp-use simplifies widg
 icon: "openai"
 ---
 
-<Warning>
-**Apps SDK is deprecated**: ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Server](/typescript/server/creating-mcp-apps-server) to build widgets that work with both ChatGPT and MCP Apps clients.
-</Warning>
+<Info>
+ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Server](/typescript/server/creating-mcp-apps-server) to build widgets that work with both ChatGPT and MCP Apps clients.
+</Info>
 
 # Building ChatGPT Apps with Widgets
 
 <Info>
-**Widget Protocol Options**: This guide focuses on **ChatGPT Apps SDK** specifically. For the broader picture:
-- [MCP Apps](/typescript/server/mcp-apps) - Standard MCP protocol with dual-protocol support (recommended)
-- [ChatGPT Apps SDK](/typescript/server/ui-widgets) - This guide's focus
-- [MCP UI](/typescript/server/mcp-ui-resources) - Alternative framework for simpler UIs
+This guide focuses on shipping an MCP App to ChatGPT specifically. For the general reference on widgets, props, CSP, and auto-discovery across clients, see [MCP Apps](/typescript/server/mcp-apps).
 
-**Best Practice**: Use `type: "mcpApps"` to build widgets that work with **both** ChatGPT and MCP Apps clients from a single codebase.
+**Best Practice**: Build widgets once with the MCP Apps stack  -  they run in ChatGPT, Claude, and any MCP-compatible client from a single codebase.
 
 </Info>
 
 ## Introduction
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools—all within the ChatGPT interface.
+ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools - all within the ChatGPT interface.
 
 Widgets transform static responses into interactive experiences:
 
@@ -31,7 +28,7 @@ Widgets transform static responses into interactive experiences:
 - Persist state across conversations
 - Call MCP tools directly from the UI
 
-However, building widgets with the official OpenAI Apps SDK involves significant manual setup: configuring build tools, managing React mounting, implementing custom state hooks, and handling Content Security Policy (CSP) configurations.
+However, building widgets with the official OpenAI Apps SDK involves manual setup: configuring build tools, managing React mounting, implementing custom state hooks, and handling Content Security Policy (CSP) configurations.
 
 **mcp-use simplifies this entire process** by providing:
 
@@ -242,7 +239,7 @@ async def get_weather(city: str):
     }
 ```
 
-As you can see, the official approach requires significant boilerplate and manual configuration at every step.
+As you can see, the official approach requires boilerplate and manual configuration at every step.
 
 ## The mcp-use Simplified Approach
 
@@ -253,7 +250,7 @@ mcp-use eliminates all the manual setup and provides a zero-config development e
 With mcp-use, you get:
 
 1. **Single Command Setup**: `npx create-mcp-use-app my-app --template mcp-apps`
-2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder—they're automatically registered
+2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder - they're automatically registered
 3. **Built-in Bundling**: Hot reload and production builds work out of the box
 4. **Pre-built React Hooks**: Use `useWidget()` for props, state, tool calls, and display modes; [streaming tool input](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for live previews when the host supports it (MCP Apps / Inspector)
 5. **Automatic CSP Configuration**: Content Security Policy is configured automatically
@@ -388,7 +385,7 @@ server.tool(
 server.start();
 ```
 
-That's it! No build configuration, no custom hooks, no manual mounting—just write your widget and mcp-use handles the rest.
+That's it! No build configuration, no custom hooks, no manual mounting - just write your widget and mcp-use handles the rest.
 
 ## Widget Interaction Flow
 
@@ -653,7 +650,7 @@ const WeatherWidget: React.FC = () => {
 export default WeatherWidget;
 ```
 
-No build configuration needed—auto-bundled on `npm run dev`!
+No build configuration needed - auto-bundled on `npm run dev`!
 
   </Tab>
 </Tabs>
@@ -850,7 +847,7 @@ Now that you understand how ChatGPT Apps work and how mcp-use simplifies widget 
   <Card
     title="UI Widgets Guide"
     icon="paintbrush"
-    href="/typescript/server/ui-widgets"
+    href="/typescript/server/mcp-apps"
   >
     Complete guide to building widgets with mcp-use, including advanced patterns
     and best practices

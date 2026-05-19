@@ -150,7 +150,7 @@ export class RemoteAgent {
     };
     const chatUrl = `${this.baseUrl}${API_CHATS_ENDPOINT}`;
 
-    logger.info(`📝 Creating chat session for agent ${this.agentId}`);
+    logger.debug(`📝 Creating chat session for agent ${this.agentId}`);
 
     try {
       const response = await fetch(chatUrl, {
@@ -176,7 +176,7 @@ export class RemoteAgent {
 
       const chatData = await response.json();
       const chatId = chatData.id;
-      logger.info(`✅ Chat session created: ${chatId}`);
+      logger.debug(`✅ Chat session created: ${chatId}`);
       return chatId;
     } catch (e) {
       if (e instanceof Error) {
@@ -237,7 +237,7 @@ export class RemoteAgent {
     }
 
     try {
-      logger.info(`🌐 Executing query on remote agent ${this.agentId}`);
+      logger.debug(`🌐 Executing query on remote agent ${this.agentId}`);
 
       // Step 1: Create a chat session for this agent (only if we don't have one)
       if (this.chatId === null) {
@@ -255,7 +255,7 @@ export class RemoteAgent {
       // Add structured output schema if provided
       if (schema) {
         executionPayload.output_schema = this.pydanticToJsonSchema(schema);
-        logger.info(`🔧 Using structured output with schema`);
+        logger.debug(`🔧 Using structured output with schema`);
       }
 
       const headers = {
@@ -263,7 +263,7 @@ export class RemoteAgent {
         "x-api-key": this.apiKey,
       };
       const executionUrl = `${this.baseUrl}${API_CHAT_EXECUTE_ENDPOINT.replace("{chat_id}", chatId)}`;
-      logger.info(`🚀 Executing agent in chat ${chatId}`);
+      logger.debug(`🚀 Executing agent in chat ${chatId}`);
 
       const response = await fetch(executionUrl, {
         method: "POST",
@@ -318,8 +318,8 @@ export class RemoteAgent {
       }
 
       const result = await response.json();
-      logger.info(`🔧 Response: ${JSON.stringify(result)}`);
-      logger.info("✅ Remote execution completed successfully");
+      logger.debug(`🔧 Response: ${JSON.stringify(result)}`);
+      logger.debug("✅ Remote execution completed successfully");
 
       // Check for error responses (even with 200 status)
       if (typeof result === "object" && result !== null) {
@@ -424,7 +424,7 @@ export class RemoteAgent {
     /**
      * Close the remote agent connection.
      */
-    logger.info("🔌 Remote agent client closed");
+    logger.debug("🔌 Remote agent client closed");
     // In the future, we might want to delete the chat session here
     // if (this.chatId) {
     //   await this.deleteChatSession(this.chatId)

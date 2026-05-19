@@ -259,6 +259,83 @@ test.describe("Inspector Chat Tests", () => {
     await expect(successStatus).toBeVisible();
   });
 
+  test("should copy chat to clipboard when copy button is clicked", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+
+    await page.getByTestId("chat-input").fill("What is 2+2?");
+    await page.getByTestId("chat-send-button").click();
+
+    await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
+      timeout: 45000,
+    });
+
+    await page.getByTestId("chat-copy-button").click();
+
+    await expect(page.getByText("Chat copied to clipboard")).toBeVisible({
+      timeout: 3000,
+    });
+
+    const clipboardText = await page.evaluate(() =>
+      navigator.clipboard.readText()
+    );
+    expect(clipboardText).toContain("What is 2+2?");
+  });
+
+  test("should export chat as JSON when export JSON is clicked", async ({
+    page,
+    context,
+  }) => {
+    await page.getByTestId("chat-input").fill("What is 2+2?");
+    await page.getByTestId("chat-send-button").click();
+
+    await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
+      timeout: 45000,
+    });
+
+    const downloadPromise = page.waitForEvent("download");
+
+    await page.getByTestId("chat-export-button").click();
+    await page.getByTestId("chat-export-json").click();
+
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(
+      /^chat-export-\d{4}-\d{2}-\d{2}\.json$/
+    );
+
+    await expect(page.getByText("Chat exported as JSON")).toBeVisible({
+      timeout: 3000,
+    });
+  });
+
+  test("should export chat as Markdown when export Markdown is clicked", async ({
+    page,
+    context,
+  }) => {
+    await page.getByTestId("chat-input").fill("What is 2+2?");
+    await page.getByTestId("chat-send-button").click();
+
+    await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
+      timeout: 45000,
+    });
+
+    const downloadPromise = page.waitForEvent("download");
+
+    await page.getByTestId("chat-export-button").click();
+    await page.getByTestId("chat-export-markdown").click();
+
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toMatch(
+      /^chat-export-\d{4}-\d{2}-\d{2}\.md$/
+    );
+
+    await expect(page.getByText("Chat exported as MARKDOWN")).toBeVisible({
+      timeout: 3000,
+    });
+  });
+
   test("should display different tool call states - error", async ({
     page,
     context,

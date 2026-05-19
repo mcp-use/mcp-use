@@ -267,8 +267,9 @@ describe("displayPackageVersions", () => {
       const projectPath = "/fake/project";
       const expectedRequirePath = path.join(projectPath, "package.json");
 
-      // Verify path construction
-      expect(expectedRequirePath).toBe("/fake/project/package.json");
+      expect(expectedRequirePath).toBe(
+        path.join("/fake/project", "package.json")
+      );
     });
 
     it("should resolve package paths correctly", () => {

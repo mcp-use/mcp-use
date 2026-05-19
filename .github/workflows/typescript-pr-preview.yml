@@ -48,8 +48,10 @@ jobs:
 
       - name: Get PR Number
         id: pr-number
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "pr-number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
   deno-test:
     name: Test with Deno (PR Preview)
@@ -66,6 +68,8 @@ jobs:
 
       - name: Create temporary deno.json with PR preview imports
         working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        env:
+          PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
         # Note: Hybrid mapping to satisfy conflicting Zod requirements:
         # - SDK imports "zod/v3" and needs "z.custom" (available in Zod v3)
         # - Other deps import "zod/v4" and "zod/v4-mini"
@@ -75,8 +79,8 @@ jobs:
           cat > deno.json << EOF
           {
             "imports": {
-              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/server?no-dts&external=zod",
-              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@${{ needs.preview.outputs.pr-number }}/client?no-dts&external=zod",
+              "mcp-use/server": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER/server?no-dts&external=zod",
+              "mcp-use/client": "https://esm.sh/pr/mcp-use/mcp-use@$PR_NUMBER/client?no-dts&external=zod",
               "zod": "https://esm.sh/zod@3.24.4",
               "zod/v3": "https://esm.sh/zod@3.24.4",
               "zod/v4": "https://esm.sh/zod@4.2.0",
@@ -86,14 +90,15 @@ jobs:
             }
           }
           EOF
-          echo "Generated deno.json with PR #${{ needs.preview.outputs.pr-number }} preview packages:"
+          echo "Generated deno.json with PR #$PR_NUMBER preview packages:"
           cat deno.json
 
       - name: Wait for esm.sh to pick up the package
+        env:
+          PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "Waiting for esm.sh to pick up the preview package..."
-          PR_NUMBER="${{ needs.preview.outputs.pr-number }}"
-          COMMIT_SHA="${{ github.event.pull_request.head.sha }}"
           SHORT_SHA="${COMMIT_SHA:0:7}"
           
           MAX_RETRIES=10
@@ -175,6 +180,7 @@ jobs:
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
+          PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
         run: |
-          echo "Running Deno tests against PR #${{ needs.preview.outputs.pr-number }} preview packages..."
+          echo "Running Deno tests against PR #$PR_NUMBER preview packages..."
           deno test --no-check --allow-read --allow-env --allow-net

@@ -9,6 +9,7 @@ import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import type { ClientCapabilityChecker, McpContext } from "./context.js";
 import type { UnifiedWidgetMetadata } from "../widgets/adapters/types.js";
+import type { z } from "zod";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -125,20 +126,34 @@ export type ReadResourceCallback<HasOAuth extends boolean = false> =
   ReadResourceCallbackBivariant<HasOAuth>["bivarianceHack"];
 
 /**
+ * Extract template params type from a resource template definition's schema.
+ * Mirrors InferToolInput from tool.ts.
+ */
+export type InferTemplateParams<T> = T extends { schema: infer S }
+  ? S extends z.ZodTypeAny
+    ? z.infer<S>
+    : Record<string, any>
+  : Record<string, any>;
+
+/**
  * Callback type for reading a resource template with parameters.
  * Supports both CallToolResult (from helpers) and ReadResourceResult (old API).
  *
  * Supports multiple callback signatures:
  * - `async () => ...` - No parameters
  * - `async (uri: URL) => ...` - Just URI (required)
- * - `async (uri: URL, params: Record<string, any>) => ...` - URI and parameters (both required)
- * - `async (uri: URL, params: Record<string, any>, ctx: EnhancedResourceContext) => ...` - All parameters (all required)
+ * - `async (uri: URL, params: TParams) => ...` - URI and parameters (both required)
+ * - `async (uri: URL, params: TParams, ctx: EnhancedResourceContext) => ...` - All parameters (all required)
  *
  * The implementation checks callback.length to determine which signature to use.
  *
+ * @template TParams - Type for URI template parameters (defaults to Record<string, any>)
  * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
  */
-export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
+export type ReadResourceTemplateCallback<
+  TParams extends Record<string, any> = Record<string, any>,
+  HasOAuth extends boolean = false,
+> =
   | (() => Promise<
       CallToolResult | ReadResourceResult | TypedCallToolResult<any>
     >)
@@ -149,13 +164,13 @@ export type ReadResourceTemplateCallback<HasOAuth extends boolean = false> =
     >)
   | ((
       uri: URL,
-      params: Record<string, any>
+      params: TParams
     ) => Promise<
       CallToolResult | ReadResourceResult | TypedCallToolResult<any>
     >)
   | ((
       uri: URL,
-      params: Record<string, any>,
+      params: TParams,
       ctx: EnhancedResourceContext<HasOAuth>
     ) => Promise<
       CallToolResult | ReadResourceResult | TypedCallToolResult<any>
@@ -206,13 +221,23 @@ export interface ResourceTemplateConfig {
 /**
  * Resource template definition with readCallback (old API)
  */
-export interface ResourceTemplateDefinition<HasOAuth extends boolean = false> {
+export interface ResourceTemplateDefinition<
+  HasOAuth extends boolean = false,
+  TParams extends Record<string, any> = Record<string, any>,
+> {
   name: string;
   resourceTemplate: ResourceTemplateConfig;
   title?: string;
   description?: string;
   annotations?: ResourceAnnotations;
-  readCallback: ReadResourceTemplateCallback<HasOAuth>;
+  /**
+   * Optional Zod schema for URI template parameters. When provided, narrows
+   * the `params` argument in the callback to `z.infer<schema>`.
+   *
+   * @example z.object({ id: z.string() })
+   */
+  schema?: z.ZodTypeAny;
+  readCallback: ReadResourceTemplateCallback<TParams, HasOAuth>;
   _meta?: Record<string, unknown>;
 }
 
@@ -225,6 +250,13 @@ export interface ResourceTemplateDefinitionWithoutCallback {
   title?: string;
   description?: string;
   annotations?: ResourceAnnotations;
+  /**
+   * Optional Zod schema for URI template parameters. When provided, narrows
+   * the `params` argument in the callback to `z.infer<schema>`.
+   *
+   * @example z.object({ id: z.string() })
+   */
+  schema?: z.ZodTypeAny;
   _meta?: Record<string, unknown>;
 }
 
@@ -236,6 +268,7 @@ export interface ResourceTemplateDefinitionWithoutCallback {
  */
 export interface FlatResourceTemplateDefinition<
   HasOAuth extends boolean = false,
+  TParams extends Record<string, any> = Record<string, any>,
 > {
   /**
    * Unique identifier for the template.
@@ -269,8 +302,15 @@ export interface FlatResourceTemplateDefinition<
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
+  /**
+   * Optional Zod schema for URI template parameters. When provided, narrows
+   * the `params` argument in the readCallback to `z.infer<schema>`.
+   *
+   * @example z.object({ id: z.string() })
+   */
+  schema?: z.ZodTypeAny;
   /** Async callback function that returns the resource content */
-  readCallback: ReadResourceTemplateCallback<HasOAuth>;
+  readCallback: ReadResourceTemplateCallback<TParams, HasOAuth>;
   _meta?: Record<string, unknown>;
   /** Complete callback for the resource template */
   callbacks?: ResourceTemplateCallbacks;
@@ -315,6 +355,13 @@ export interface FlatResourceTemplateDefinitionWithoutCallback {
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
+  /**
+   * Optional Zod schema for URI template parameters. When provided, narrows
+   * the `params` argument in the callback to `z.infer<schema>`.
+   *
+   * @example z.object({ id: z.string() })
+   */
+  schema?: z.ZodTypeAny;
   _meta?: Record<string, unknown>;
   /** Complete callback for the resource template */
   callbacks?: ResourceTemplateCallbacks;

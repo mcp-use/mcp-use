@@ -21,7 +21,7 @@ const server = new MCPServer({
  *
  * We then create custom tools that use the weather-display widget manually.
  *
- * See docs: https://mcp-use.com/docs/typescript/server/ui-widgets
+ * See docs: https://mcp-use.com/docs/typescript/server/mcp-apps
  */
 
 // API endpoint for fruits data

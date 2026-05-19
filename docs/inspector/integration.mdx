@@ -21,7 +21,7 @@ const server = new MCPServer({
 })
 
 // Add your tools, resources, prompts...
-server.addTool(/* ... */)
+server.tool(/* ... */)
 
 // Start the server
 server.listen(3000)
@@ -187,6 +187,11 @@ import { ChatTab } from '@mcp-use/inspector/client'
 | `clearButtonHideIcon` | `boolean` | Hides the clear/new-chat button icon |
 | `clearButtonHideShortcut` | `boolean` | Hides the keyboard shortcut hint on the clear/new-chat button |
 | `clearButtonVariant` | `"default" \| "secondary" \| "ghost" \| "outline"` | Visual button variant for the clear/new-chat button |
+| `hideToolSelector` | `boolean` | Hides the tool selector in the chat input (when visible, disabled tools are sent to the stream API as `disabledTools`) |
+| `streamProtocol` | `"sse" \| "data-stream"` | Wire format for the streaming endpoint: Inspector SSE (default) or Vercel AI SDK data-stream |
+| `credentials` | `RequestCredentials` | `fetch` credentials, e.g. `"include"` for cross-origin cookie sessions |
+| `extraHeaders` | `Record<string, string>` | Additional headers on every streaming `POST` |
+| `body` | `(messages) => unknown` | Custom JSON body builder; use to send only `{ messages }` (or your own shape) to a backend you control |
 
 ### Advanced Composition (`MessageList` / `ChatHeader` / `ChatLandingForm`)
 
@@ -313,7 +318,7 @@ MCP_URL=https://abc123.ngrok.io npx @mcp-use/cli dev
 
 2. **`devMode` is enabled automatically** in development, so MCP Apps widgets use same-origin sandboxing (no `sandbox-{hostname}` subdomain required).
 
-3. **Vite HMR works through the proxy** — a WebSocket proxy forwards HMR connections from the main HTTP server to Vite's internal port automatically.
+3. **Vite HMR works through the proxy**  -  a WebSocket proxy forwards HMR connections from the main HTTP server to Vite's internal port automatically.
 
 See the [CLI Environment Variables](/inspector/cli#mcp_url) documentation for more details on `MCP_URL`.
 

@@ -667,16 +667,17 @@ export class JSONSchemaToZod {
     }
 
     // Handle pure record/map types: object with no named properties but with
-    // additionalProperties as a schema object. Use z.record() instead of
-    // z.object({}).catchall() because catchall doesn't roundtrip correctly
-    // through @langchain/core's toJsonSchema().
+    // additionalProperties as a schema object. Use z.object({}).catchall()
+    // rather than z.record() — catchall does not emit a `propertyNames` keyword
+    // when serialized via Zod's toJSONSchema(), whereas z.record() does.
+    // Google's Generative AI API rejects `propertyNames`, so this is the safe path.
     if (
       !schema.properties &&
       schema.additionalProperties &&
       typeof schema.additionalProperties === "object"
     ) {
       const valueSchema = this.parseSchema(schema.additionalProperties);
-      return z.record(z.string(), valueSchema);
+      return z.object({}).catchall(valueSchema);
     }
 
     // Create shape object for Zod

@@ -6,21 +6,186 @@ rss: true
 tag: "New"
 ---
 
-<Update label="v0.24.2" description="March 2026">
-  ## Embedded Inspector Proxy Fix
-  Patch release fixing auto-connect when inspector is served from MCP server (Python, custom servers).
+<Update label="v6.0.0" description="May 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=6.0.0&title=Widget%20preview%20route%20%26%20dark-mode%20scrollbars&date=2026-05&lang=inspector" alt="Release 6.0.0" />
+  </Frame>
+  ## Widget preview route & dark-mode scrollbars
+  Major release paired with `mcp-use` v1.28.0: new `ViewPreview` component and `/preview/:view` client-side route that back the `mcp-use client screenshot` CLI pipeline, dark-mode aware scrollbars across the UI, and a cleanup of duplicate Knip-flagged exports.
 
-- **Fix**: Skip proxy when inspector origin matches MCP server origin — no longer routes through missing `/inspector/api/proxy` on embedded servers
-- **Fix**: Detect proxy availability via runtime config injection (`__MCP_PROXY_URL__`); disable autoProxyFallback when no proxy is available
-- **Update**: Updated mcp-use to v1.21.2
+- **New**: `<ViewPreview>` internal component and `/preview/:view` client-side route — a chromeless surface the CLI screenshot pipeline drives via CDP. `MCPAppsRenderer` gains an optional `onReady` callback that the preview route uses to signal `body[data-view-ready="true"]`, which the CLI waits for before capturing. The preview route detects `globalThis.__mcpUsePreviewBundle` (injected by the CLI via CDP `Page.addScriptToEvaluateOnNewDocument`) and renders the widget inline, skipping the browser-side MCP connection entirely (`#1432`)
+- **Enhancement**: dark-mode aware scrollbars styled to match the inspector theme, with improved hover visibility (`#1484`)
+- **Fix**: removed the redundant default export of `JsonRpcLoggerView`; the named export is unchanged (`#1453`)
+- **Update**: Updated mcp-use to v1.28.0
 </Update>
 
-<Update label="v0.24.3" description="March 2026">
-  ## Sandbox Host Fix
-  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+<Update label="v5.0.1" description="May 2026">
+  ## MCP App width fix in chat
+  Patch release paired with `mcp-use` v1.27.1: MCP App width is pinned in chat so only height responds to widget-reported sizes.
 
-- **Fix**: Sandbox host derivation for cloud-embedded pages — apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
-- **Update**: Updated mcp-use to v1.21.3
+- **Fix**: Pin MCP App width in chat  -  `onSizeChange` only updates height, and the inline transition no longer animates `width`; prevents the chat panel from collapsing when widgets report narrower content (`#1462`)
+- **Update**: Updated mcp-use to v1.27.1
+</Update>
+
+<Update label="v5.0.0" description="May 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=5.0.0&title=OpenRouter%2C%20pre-registered%20OAuth%20%26%20telemetry%20env&date=2026-05&lang=inspector" alt="Release 5.0.0" />
+  </Frame>
+  ## OpenRouter, pre-registered OAuth & telemetry env
+  Major release paired with `mcp-use` v1.27.0: OpenRouter and OpenAI-compatible providers in chat configuration, pre-registered OAuth client credentials in the connection dialog, and `MCP_USE_ANONYMIZED_TELEMETRY` honored in browser telemetry.
+
+- **New**: OpenRouter as a first-class chat provider  -  a single OpenRouter API key fronts upstream OpenAI / Anthropic / Google models; internally reuses the OpenAI provider with an override base URL and the required `HTTP-Referer` / `X-Title` headers (`#1403`)
+- **New**: "OpenAI Compatible" entry in the chat provider dropdown  -  point inspector chat at any OpenAI-compatible API (LM Studio, Ollama, OpenRouter, etc.) with a required Base URL field and an optional API key; the standard OpenAI provider is unchanged (`#1437`)
+- **New**: `Client ID`, `Client Secret`, and `Scope` fields in the Authentication dialog wired through `addServer` / `updateServer` for pre-registered OAuth flows against providers that strip `registration_endpoint` from metadata (`#1400`)
+- **Fix**: Browser telemetry honors `MCP_USE_ANONYMIZED_TELEMETRY=false`  -  the inspector server mirrors the env var into `window.__MCP_USE_ANONYMIZED_TELEMETRY__` before the client bundle loads, so a single env var disables both `mcp-use`'s in-browser `posthog-js` and the inspector's own client telemetry (`#1443`)
+- **Update**: Updated mcp-use to v1.27.0
+</Update>
+
+<Update label="v3.0.2" description="April 2026">
+  ## E2E alignment for Settings dropdown
+  Patch release updating Playwright coverage for the command palette Settings entry after the navbar refactor; paired with `mcp-use` v1.25.2.
+
+- **Fix**: Command palette e2e test targets the Settings option via the dropdown trigger introduced in the inspector settings UX (`#1428`)
+- **Update**: Updated mcp-use to v1.25.2
+</Update>
+
+<Update label="v3.0.1" description="April 2026">
+  ## OAuth single-tab flow, embed fixes & Hono detection
+  Patch release fixing OAuth redirect flows, embedded `ChatTab` UI leaks, and Hono duck-type detection in `mountInspector`; paired with `mcp-use` v1.25.1.
+
+- **Fix**: OAuth authorization now opens in the current tab (`useRedirectFlow: true`, `preventAutoAuth: true`) and the callback navigates the same tab back  -  users no longer end up with two inspector tabs (`#1391`)
+- **Fix**: Store connection config in `sessionStorage` before OAuth redirect so auto-reconnect works after the callback without a `?autoConnect` param (`#1404`)
+- **Fix**: OAuth callback redirects back to the inspector with error parameters on failure (user denies, server error) instead of showing a raw error page; surfaced as a persistent app-level toast (`#1381`)
+- **Fix**: `mountInspector(app)` detects Hono via duck-typing (`.fetch(Request) => Response`) instead of `instanceof`, resolving crashes when the host and inspector resolve different Hono module records (`#1417`)
+- **Fix**: MCP App widget z-index  -  removed explicit `z-20`/`z-10` from sandboxed iframe wrappers so widgets scroll beneath the chat header instead of painting over it (`#1407`)
+- **Fix**: Free-tier upgrade UI (`Model & usage` dialog, model badge) is now opt-in via `enableFreeTierUpgrade` on `ChatTab` (default `false`) and is hidden for host-app embeds that manage their own session (`#1399`)
+- **Fix**: Suppress duplicate model chrome (landing pill, `ChatHeader` badge) when host passes `managedLlmConfig` + `hideModelBadge`; chat no longer auto-switches to client-side streaming when `localLlmConfig` exists in localStorage and the host owns the chat stream (`#1418`)
+- **Documentation**: `--no-open` CLI flag added to the inspector CLI reference (`#1397`)
+- **Update**: Updated mcp-use to v1.25.1
+</Update>
+
+<Update label="v3.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=3.0.0&title=Inline%20elicitation%20%26%20social%20meta%20tags&date=2026-04&lang=inspector" alt="Release 3.0.0" />
+  </Frame>
+  ## Inline elicitation & social meta tags
+  Major release paired with `mcp-use` v1.25.0: chat-initiated elicitation requests render inline in the chat thread, hosted inspector links get rich previews, and the peer dependency on `mcp-use` tracks the 1.25 OAuth refactor.
+
+- **New**: Elicitation requests triggered from the Chat tab render inline in the chat thread instead of routing users through a toast to the Elicitation tab; Tools-tab triggers keep the existing toast flow, and the Elicitation tab remains available as an audit view (`#1336`)
+- **New**: Links to the hosted inspector now render rich previews on Slack, X/Twitter, LinkedIn, Discord, and other platforms (`#1376`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.25.0-canary.9` to pick up the OAuth DCR-direct refactor
+- **Update**: Updated mcp-use to v1.25.0
+</Update>
+
+<Update label="v2.2.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.2.0&title=Hosted%20chat%2C%20LLM%20providers%20%26%20chat%20export&date=2026-04&lang=inspector" alt="Release 2.2.0" />
+  </Frame>
+  ## Hosted chat runtime, LLM providers & chat export
+  Minor release paired with `mcp-use` v1.24.2: first-party inspector LLM streaming (no LangChain on the chat path), copy/export chat, runtime hosted-chat URL, hosted free-tier chat, and cloud env tooling via the CLI (`#1372`).
+
+- **New**: First-party LLM providers for inspector chat (Anthropic, OpenAI, Google) with shared message formatting, SSE streaming, and tool loops  -  the inspector no longer depends on LangChain for chat (`#1372`)
+- **New**: "Copy Chat" and "Export Chat" in the chat header  -  markdown to clipboard; download as JSON or Markdown with tool calls in order (`#1324`)
+- **New**: Free tier chat on the hosted inspector (`#1368`)
+- **New**: Hosted chat URL from runtime config  -  inspector server reads `MANUFACT_CHAT_URL` and injects `window.__MANUFACT_CHAT_URL__`; `InspectorProvider` prefers that value and falls back to `VITE_MANUFACT_CHAT_URL` for local dev (`#1370`)
+- **Fix**: OAuth login popup  -  drop `noopener` and redirect `callbackURL` to `/inspector/oauth-popup-closed.html` so the popup self-closes instead of loading the full inspector (`#1370`)
+- **Update**: Updated mcp-use to v1.24.2
+</Update>
+
+<Update label="v2.1.0" description="April 2026">
+  ## Navbar, theme & debug controls
+  Minor release with MCP Apps debug theme toggle and navbar/settings UX improvements; dependency bump to `mcp-use` v1.24.1.
+
+- **New**: Theme toggle button in MCP Apps debug controls toolbar
+- **Enhancement**: Navbar  -  chat tab first with label and separator; `alwaysExpanded` on tab triggers so the active label stays visible when collapsed; Deploy links to manufact.com/signup with inspector referrer; tunnel control between Add to Client and Deploy with updated styling and mobile visibility; theme toggle, command palette, and GitHub under a settings dropdown; "Report a Bug" prefills a GitHub issue with the inspector label
+- **Update**: Updated mcp-use to v1.24.1
+</Update>
+
+<Update label="v2.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=2.0.0&title=Subpath%20OAuth%2C%20chat%20UX%20%26%20tab%20persistence&date=2026-04&lang=inspector" alt="Release 2.0.0" />
+  </Frame>
+  ## Subpath OAuth, chat UX & tab persistence
+  Major release paired with `mcp-use` v1.24.0: correct OAuth redirects when the inspector is served under `/inspector`, clearer chat streaming UI, and restored tab state after reload.
+
+- **Fix**: `McpClientProvider` receives `defaultCallbackUrl` so OAuth redirects target `/inspector/oauth/callback` (matches React Router `basename`); removes the authentication dialog "Redirect URL" field that was not wired to the live connection
+- **Fix**: Hide the thinking indicator when the assistant message already has rendered parts so the spinner does not linger after streaming completes
+- **Enhancement**: Persist the active inspector tab across page refresh
+- **Update**: Updated mcp-use to v1.24.0
+</Update>
+
+<Update label="v1.0.1" description="April 2026">
+  ## Embedded inspector without LangChain
+  Patch release fixing server routes that imported `telFetch` from the root `mcp-use` package.
+
+- **Fix**: Import `telFetch` from `mcp-use/telemetry/tel-fetch` so shared routes do not load the root entry (which eagerly pulls the agent graph); resolves embedded inspector failures when `langchain` is not installed
+- **Update**: Updated mcp-use to v1.23.1
+</Update>
+
+<Update label="v1.0.0" description="April 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.0.0&title=Stream%20Protocol%2C%20Aliases%20%26%20Chat%20Tooling&date=2026-04&lang=inspector" alt="Release 1.0.0" />
+  </Frame>
+  ## Stream protocol, aliases & chat tooling
+  Major release with MCP stream support in chat, connection UX improvements, and dependency hardening.
+
+- **New**: MCP data stream protocol support in `ChatTab` and `useChatMessages`
+- **Enhancement**: `disabledTools` prop on `ChatTab` and `useChatMessages` for finer tool control
+- **New**: Editable MCP server aliases in connection settings; `updateServerMetadata()` from `McpClientProvider` updates display names without a full reconnect; shared `getServerDisplayName` across dashboard tiles, server dropdown, header actions, command palette, server info modal, and server icon
+- **Fix**: Alias-only edits no longer trigger a full reconnect; IME composition no longer submits the connection form when pressing Enter mid-composition
+- **Enhancement**: Persist tabs on refresh; sync URL `tab` query param when switching tabs so state survives reload
+- **Enhancement**: Tool-invocation serialization, screenshots, and message list refs for integrations such as manufact.build
+- **Update**: Removed unused `transportType` / `setTransportType` props from `ConnectionSettingsForm`
+- **Fix**: Tighter `pnpm` overrides and lockfile refresh for `pnpm audit`; `lodash` override in the mcp-apps scaffold template for standalone installs
+- **Update**: Vite 8.0.5, Hono 4.12.12, `@hono/node-server` 1.19.13
+- **Update**: Updated mcp-use to v1.23.0
+</Update>
+
+<Update label="v0.26.1" description="March 2026">
+  ## Dependency & bundling alignment
+  Patch release aligning how `@mcp-use/inspector` packages `mcp-use` for bundling and shared types.
+
+- **Fix**: Restore `mcp-use` as both a `dependency` and `peerDependency`  -  tsup bundles non-React subpaths with transitive deps; `peerDependency` preserves shared `mcp-use`/`react` types with the host app
+- **Update**: Updated mcp-use to v1.22.3
+</Update>
+
+<Update label="v0.26.0" description="March 2026">
+  ## Peer Dependency Alignment & MCP UI v7
+  Minor release aligning inspector dependency strategy for shared type safety and upgrading MCP UI client rendering internals.
+
+- **Fix**: Moved `mcp-use` from `dependencies` to `peerDependencies` in `@mcp-use/inspector` so consumers reuse a single `mcp-use` type instance (prevents pnpm duplicate-type TS2322 conflicts)
+- **Enhancement**: Upgraded `@mcp-ui/client` from v6 to v7
+- **Enhancement**: Replaced removed legacy `UIResourceRenderer` path with sandboxed iframe rendering for legacy `ui://` resources
+- **Enhancement**: Removed remote-dom usage to align with upstream `@mcp-ui/client` v7 changes
+- **Update**: Updated mcp-use to v1.22.2
+</Update>
+
+<Update label="v0.25.1" description="March 2026">
+  ## Chat History Tool Results & ErrorBoundary Customization
+  Patch release improving chat history reconstruction so tool calls/results (including `structuredContent`) persist across turns, plus ErrorBoundary fallback/reporting hooks.
+
+- **Fix**: Preserve tool invocation context across chat turns  -  reconstruct assistant messages as `AIMessage` tool calls plus `ToolMessage` results; keep `structuredContent` and strip `_meta` before sending to the model
+- **Enhancement**: Chat message conversion supports tool results and multimodal content more reliably
+- **Enhancement**: `ErrorBoundary` now supports `fallback` (node or `(error) => node`) and `onError` for reporting (default UI unchanged)
+- **Update**: Updated mcp-use to v1.22.1
+</Update>
+
+<Update label="v0.25.0" description="March 2026">
+  ## Tunnel Controls & Vite 8
+  Minor release with tunnel management for `mcp-use dev`, Vite 8 build stack, and elicit payload alignment with the MCP spec.
+
+- **New**: Start/stop the `mcp-use dev` tunnel from the Inspector
+- **Enhancement**: Vite 8.0 with Rolldown bundler and `@vitejs/plugin-react` 6 in the inspector build
+- **Fix**: Elicit  -  send `content` instead of `data` per the MCP spec; aligns with `createElicitMethod` validation on the client
+- **Update**: Updated mcp-use to v1.22.0
+</Update>
+
+<Update label="v0.24.5" description="March 2026">
+  ## Dependency Updates
+  Patch release with dependency updates.
+
+- **Fix**: Dependabot security alerts  -  updated vulnerable dependencies (hono, dompurify, etc.)
+- **Update**: Updated mcp-use to v1.21.5
 </Update>
 
 <Update label="v0.24.4" description="March 2026">
@@ -28,6 +193,23 @@ tag: "New"
   Patch release with dependency update.
 
 - **Update**: Updated mcp-use to v1.21.4
+</Update>
+
+<Update label="v0.24.3" description="March 2026">
+  ## Sandbox Host Fix
+  Patch release fixing sandbox host derivation for cloud-embedded inspector pages.
+
+- **Fix**: Sandbox host derivation for cloud-embedded pages  -  apex hosts (e.g. manufact.com) now resolve to `sandbox-inspector.{domain}` instead of `sandbox-{domain}`
+- **Update**: Updated mcp-use to v1.21.3
+</Update>
+
+<Update label="v0.24.2" description="March 2026">
+  ## Embedded Inspector Proxy Fix
+  Patch release fixing auto-connect when inspector is served from MCP server (Python, custom servers).
+
+- **Fix**: Skip proxy when inspector origin matches MCP server origin  -  no longer routes through missing `/inspector/api/proxy` on embedded servers
+- **Fix**: Detect proxy availability via runtime config injection (`__MCP_PROXY_URL__`); disable autoProxyFallback when no proxy is available
+- **Update**: Updated mcp-use to v1.21.2
 </Update>
 
 <Update label="v0.24.1" description="March 2026">
@@ -40,6 +222,51 @@ tag: "New"
 - **Update**: Updated mcp-use to v1.21.1
 </Update>
 
+<Update label="v0.24.0" description="March 2026">
+  ## Inspector Embedding & MCP Apps
+  Minor release with embedding support and logger improvements.
+
+- **New**: Inspector embedding support  -  build fix and `InspectorProvider` for embedded usage
+- **New**: MCP Apps support in `clientInfo.capabilities`  -  inspector advertises `io.modelcontextprotocol/ui`
+- **Enhancement**: Logger middleware filters noisy API endpoints (telemetry, RPC stream/log)
+- **Fix**: `--no-open` flag respected in standalone dev mode (was always opening browser)
+- **Update**: Updated mcp-use to v1.21.0
+</Update>
+
+<Update label="v0.23.1" description="February 2026">
+  ## Dependency Update
+  Patch release with dependency update.
+
+- **Update**: Updated mcp-use to v1.20.5
+</Update>
+
+<Update label="v0.23.0" description="February 2026">
+  ## Embedded Chat Improvements
+  Minor release improving embedded chat experience.
+
+- **Enhancement**: Improved embedded chat
+- **Update**: Updated mcp-use to v1.20.4
+</Update>
+
+<Update label="v0.22.3" description="February 2026">
+  ## Standalone Deployment Fix
+  Patch release fixing version import in standalone deployment.
+
+- **Fix**: Standalone deployment was importing the version from the wrong path
+- **Update**: Updated mcp-use to v1.20.3
+</Update>
+
+<Update label="v0.22.2" description="February 2026">
+  ## Connection & Widget Display Improvements
+  Patch release with useAutoConnect, MCPAppsRenderer, and chat agent fixes.
+
+- **Fix**: useAutoConnect now retains tile visibility on connection failure
+- **Enhancement**: MCPAppsRenderer and OpenAIComponentRenderer  -  improved border handling and status display; `prefersBorder` default set to false; status labels above widget in inline mode
+- **Enhancement**: ToolResultDisplay z-index for proper sticky layering
+- **Enhancement**: `exposeResourcesAsTools` and `exposePromptsAsTools` options in MCPAgentOptions; inspector chat tab sets both to `false` so agent only exposes actual MCP tools
+- **Update**: Updated mcp-use to v1.20.2
+</Update>
+
 <Update label="v0.22.1" description="February 2026">
   ## Widget Status Texts & CSP Fixes
   Patch release with invoking/invoked status display and CSP handling improvements.
@@ -48,17 +275,6 @@ tag: "New"
 - **Enhancement**: MCPAppsDebugControls adjusts violation indicators based on CSP mode
 - **Fix**: sandbox-proxy strips existing CSP meta tags before injecting permissive CSP
 - **Update**: Updated mcp-use to v1.20.1
-</Update>
-
-<Update label="v0.24.0" description="March 2026">
-  ## Inspector Embedding & MCP Apps
-  Minor release with embedding support and logger improvements.
-
-- **New**: Inspector embedding support — build fix and `InspectorProvider` for embedded usage
-- **New**: MCP Apps support in `clientInfo.capabilities` — inspector advertises `io.modelcontextprotocol/ui`
-- **Enhancement**: Logger middleware filters noisy API endpoints (telemetry, RPC stream/log)
-- **Fix**: `--no-open` flag respected in standalone dev mode (was always opening browser)
-- **Update**: Updated mcp-use to v1.21.0
 </Update>
 
 <Update label="v0.22.0" description="February 2026">
@@ -75,6 +291,13 @@ tag: "New"
 - **Fix**: useSyncExternalStore first-render handling; reconnect logic; Tools tab sends only explicitly set fields; resource annotations include `_meta`
 - **New**: CSP violations panel with clear action; widget re-execution on CSP mode change; CSP mode for Apps SDK
 - **Update**: Updated mcp-use to v1.20.0
+</Update>
+
+<Update label="v0.21.1" description="February 2026">
+  ## Dependency Update
+  Patch release with dependency update.
+
+- **Update**: Updated mcp-use to v1.19.3
 </Update>
 
 <Update label="v0.21.0" description="February 2026">

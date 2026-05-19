@@ -138,6 +138,53 @@ test.describe("Inspector MCP Server Connections", () => {
     });
   });
 
+  test("should save and use a server alias from edit connection settings without interrupting the connection", async ({
+    page,
+  }) => {
+    await page.goto("http://localhost:3000/inspector");
+
+    await page.getByTestId("server-tile-settings").click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByTestId("connection-form-alias-input")
+    ).toBeVisible();
+    await dialog
+      .getByTestId("connection-form-alias-input")
+      .fill("QA Conformance");
+    await dialog.getByTestId("connection-form-connect-button").click();
+
+    await expect(
+      page.getByText("Connection settings updated").first()
+    ).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(
+      page.getByRole("heading", { name: "QA Conformance" })
+    ).toBeVisible();
+
+    await page.getByTestId("server-tile-http://localhost:3002/mcp").click();
+    await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
+    await page.getByTestId("tool-item-test_simple_text").click();
+    await expect(
+      page.getByTestId("tool-execution-execute-button")
+    ).toBeVisible();
+    await page.getByTestId("tool-param-message").fill("Alias check");
+    await page.getByTestId("tool-execution-execute-button").click();
+    await expect(
+      page.getByTestId("tool-execution-results-text-content")
+    ).toContainText("Echo: Alias check");
+
+    await page.goto("http://localhost:3000/inspector");
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "QA Conformance" })
+    ).toBeVisible();
+    await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
   test("should update connection settings from server dropdown", async ({
     page,
   }) => {

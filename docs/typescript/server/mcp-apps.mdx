@@ -72,7 +72,7 @@ While both protocols enable interactive widgets, they have key differences:
 
 ## Creating an MCP Apps Widget
 
-Widgets can receive partial tool arguments in real time (`partialToolInput` / `isStreaming`) when the host streams them, enabling live previews as the LLM generates the tool call. See [useWidget — Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for details.
+Widgets can receive partial tool arguments in real time (`partialToolInput` / `isStreaming`) when the host streams them, enabling live previews as the LLM generates the tool call. See [useWidget  -  Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for details.
 
 ### Using Dual-Protocol Type (Recommended)
 
@@ -112,7 +112,7 @@ server.uiResource({
     },
     prefersBorder: true,
 
-    // Invocation status text — shown in inspector and ChatGPT while tool runs / after completion
+    // Invocation status text  -  shown in inspector and ChatGPT while tool runs / after completion
     invoking: "Fetching weather...",   // auto-default: "Loading weather-display..."
     invoked: "Weather loaded",         // auto-default: "weather-display ready"
 
@@ -177,14 +177,25 @@ This separation enables a powerful pattern: the **server computes data for the w
 server.tool({
   name: "search-products",
   schema: z.object({ query: z.string() }),
+  annotations: {
+    readOnlyHint: true,
+    destructiveHint: false,
+    openWorldHint: true, // e.g. database or HTTP search  -  adjust per implementation
+  },
+  outputSchema: z.object({
+    query: z.string(),
+    results: z.array(
+      z.object({ id: z.string(), name: z.string(), price: z.number() })
+    ),
+  }),
   widget: { name: "product-search-result" },
 }, async ({ query }) => {
   const results = await db.search(query);
 
   return widget({
-    // Widget rendering data — LLM does NOT see this
+    // Widget rendering data  -  becomes structuredContent (hosts often validate against outputSchema)
     props: { query, results },
-    // Text summary — LLM sees this
+    // Text summary  -  LLM sees this
     output: text(`Found ${results.length} products matching "${query}"`),
   });
 });
@@ -220,7 +231,7 @@ await requestDisplayMode("pip");
 await requestDisplayMode("inline");
 ```
 
-The host may decline the request — always check `displayMode` for the actual state. Common pattern for a toolbar:
+The host may decline the request  -  always check `displayMode` for the actual state. Common pattern for a toolbar:
 
 ```tsx
 const isFullscreen = displayMode === "fullscreen";
@@ -253,7 +264,7 @@ const { sendFollowUpMessage } = useWidget();
   Ask the AI
 </button>
 
-// Full content array — supports text, image, and resource blocks per SEP-1865
+// Full content array  -  supports text, image, and resource blocks per SEP-1865
 <button onClick={() => sendFollowUpMessage([
   { type: "text", text: "Tell me more about mangoes" },
 ])}>
@@ -451,7 +462,7 @@ const toggleFavorite = (id: string) => {
 
 ### Cross-Session State (Backend-Owned)
 
-For state that must persist across conversations, store it on your backend. Use `callTool` from the widget to read/write preferences via your server's tools — don't rely on `localStorage`.
+For state that must persist across conversations, store it on your backend. Use `callTool` from the widget to read/write preferences via your server's tools  -  don't rely on `localStorage`.
 
 ## MCP Apps Bridge API
 
@@ -642,8 +653,8 @@ Complete mapping from Apps SDK to MCP Apps metadata:
 | `"openai/widgetDescription"`           | `widgetDescription`   | String (widget description)                             |
 | `"openai/widgetAccessible"`            | `widgetAccessible`    | Boolean (ChatGPT-specific, can stay in appsSdkMetadata) |
 | `"openai/locale"`                      | `locale`              | String (ChatGPT-specific, can stay in appsSdkMetadata)  |
-| `"openai/toolInvocation/invoking"`     | `invoking`            | String — status text while tool runs (auto-defaulted)   |
-| `"openai/toolInvocation/invoked"`      | `invoked`             | String — status text after tool completes (auto-defaulted) |
+| `"openai/toolInvocation/invoking"`     | `invoking`            | String  -  status text while tool runs (auto-defaulted)   |
+| `"openai/toolInvocation/invoked"`      | `invoked`             | String  -  status text after tool completes (auto-defaulted) |
 
 See [Content Security Policy](./content-security-policy) for full CSP configuration and field details.
 
@@ -721,8 +732,6 @@ MCP Apps is designed for **interactive widgets**, while MCP UI is better for sim
 - Read-only views
 - Lightweight embeds
 
-See [MCP UI Resources](/typescript/server/mcp-ui-resources) for more on the alternative approach.
-
 ## Testing Your Widgets
 
 ### Using the Inspector
@@ -775,11 +784,9 @@ You rarely need to interact with adapters directly, but they're available for ad
 
 ## Next Steps
 
-- [ChatGPT Apps SDK](/typescript/server/ui-widgets) - Learn about the ChatGPT-specific protocol
 - [Widget Components](/typescript/server/widget-components/usewidget) - Explore React components and hooks
 - [Creating MCP Apps Server](/typescript/server/creating-mcp-apps-server) - Complete server setup guide
 - [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test and debug with the Inspector
-- [MCP UI Resources](/typescript/server/mcp-ui-resources) - Alternative approach for simpler UIs
 
 ## Learn More
 

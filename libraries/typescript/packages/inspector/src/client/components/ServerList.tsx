@@ -13,6 +13,7 @@ import {
 import { useState } from "react";
 import { Link } from "react-router";
 import { useMcpClient, type McpServer } from "mcp-use/react";
+import { getServerDisplayName } from "@/client/utils/serverNames";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -105,7 +106,7 @@ export function ServerList() {
                     <ServerIcon server={connection} size="lg" />
                     <div className="space-y-1">
                       <h3 className="font-semibold text-lg">
-                        {connection.name}
+                        {getServerDisplayName(connection)}
                       </h3>
                       <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                         <span

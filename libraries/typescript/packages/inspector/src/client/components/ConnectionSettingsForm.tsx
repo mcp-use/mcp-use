@@ -19,15 +19,15 @@ import { Switch } from "@/client/components/ui/switch";
 import { cn } from "@/client/lib/utils";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { Cog, Copy, FileText, Shield } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { CustomHeadersEditor } from "./CustomHeadersEditor";
 
 interface ConnectionSettingsFormProps {
   // Form state
-  transportType: string;
-  setTransportType: (value: string) => void;
+  alias: string;
+  setAlias: (value: string) => void;
   url: string;
   setUrl: (value: string) => void;
   connectionType: string;
@@ -46,8 +46,8 @@ interface ConnectionSettingsFormProps {
   // OAuth fields
   clientId: string;
   setClientId: (value: string) => void;
-  redirectUrl: string;
-  setRedirectUrl: (value: string) => void;
+  clientSecret: string;
+  setClientSecret: (value: string) => void;
   scope: string;
   setScope: (value: string) => void;
 
@@ -85,8 +85,8 @@ interface ConnectionSettingsFormProps {
  * @returns The JSX element for the connection settings form
  */
 export function ConnectionSettingsForm({
-  transportType,
-  setTransportType,
+  alias,
+  setAlias,
   url,
   setUrl,
   connectionType,
@@ -103,8 +103,8 @@ export function ConnectionSettingsForm({
   setProxyAddress,
   clientId,
   setClientId,
-  redirectUrl,
-  setRedirectUrl,
+  clientSecret,
+  setClientSecret,
   scope,
   setScope,
   autoSwitch,
@@ -122,6 +122,7 @@ export function ConnectionSettingsForm({
   const [headersDialogOpen, setHeadersDialogOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const isComposingRef = useRef(false);
 
   // Note: we compute header enablement on-demand where needed to avoid unused vars
 
@@ -134,6 +135,7 @@ export function ConnectionSettingsForm({
     // Create a comprehensive config object with all current settings
     const config = {
       url,
+      ...(alias.trim() ? { name: alias.trim() } : {}),
       transportType: "http", // HTTP only - SSE is deprecated
       connectionType,
       proxyConfig:
@@ -167,7 +169,7 @@ export function ConnectionSettingsForm({
         clientId || scope
           ? {
               clientId,
-              redirectUrl,
+              ...(clientId && clientSecret ? { clientSecret } : {}),
               scope,
             }
           : undefined,
@@ -207,6 +209,11 @@ export function ConnectionSettingsForm({
 
         // Populate form fields with config data
         setUrl(config.url);
+        setAlias(
+          typeof config.name === "string" && config.name !== config.url
+            ? config.name
+            : ""
+        );
 
         // Transport type is always HTTP now (SSE is deprecated)
         // No need to set transportType from config
@@ -254,7 +261,7 @@ export function ConnectionSettingsForm({
 
         if (config.oauth) {
           setClientId(config.oauth.clientId || "");
-          setRedirectUrl(config.oauth.redirectUrl || redirectUrl);
+          setClientSecret(config.oauth.clientSecret || "");
           setScope(config.oauth.scope || "");
         }
 
@@ -267,6 +274,14 @@ export function ConnectionSettingsForm({
 
   // Handle Enter key to trigger connection
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (
+      isComposingRef.current ||
+      e.nativeEvent.isComposing ||
+      e.keyCode === 229
+    ) {
+      return;
+    }
+
     if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
       const target = e.target as HTMLElement;
       // Don't trigger if we're in a textarea (to allow multi-line input)
@@ -280,7 +295,16 @@ export function ConnectionSettingsForm({
   };
 
   return (
-    <div className="space-y-4 relative @container" onKeyDown={handleKeyDown}>
+    <div
+      className="space-y-4 relative @container"
+      onCompositionStart={() => {
+        isComposingRef.current = true;
+      }}
+      onCompositionEnd={() => {
+        isComposingRef.current = false;
+      }}
+      onKeyDown={handleKeyDown}
+    >
       <h3 className="text-xl font-semibold text-white mb-4">Connect</h3>
       {/* Copy Config Button - positioned absolutely on styled variant */}
       {showExportButton && (
@@ -301,6 +325,17 @@ export function ConnectionSettingsForm({
       )}
 
       {/* URL */}
+      <div className="space-y-2">
+        <Label className={labelClassName}>Alias</Label>
+        <Input
+          data-testid="connection-form-alias-input"
+          placeholder="Optional server alias"
+          value={alias}
+          onChange={(e) => setAlias(e.target.value)}
+          className={inputClassName}
+        />
+      </div>
+
       <div className="space-y-2">
         <Label className={labelClassName}>URL</Label>
         <Input
@@ -377,7 +412,7 @@ export function ConnectionSettingsForm({
                 data-testid="connection-form-auth-button"
                 variant="outline"
                 className={cn(
-                  (clientId || scope) && "border-2",
+                  (clientId || clientSecret || scope) && "border-2",
                   "w-full justify-center hover:text-white cursor-pointer",
                   buttonClassName
                 )}
@@ -405,14 +440,18 @@ export function ConnectionSettingsForm({
                 />
               </div>
 
-              {/* Redirect URL */}
               <div className="space-y-2">
-                <Label className="text-sm">Redirect URL</Label>
+                <Label className="text-sm">Client Secret</Label>
                 <Input
-                  data-testid="auth-dialog-redirect-url-input"
-                  value={redirectUrl}
-                  onChange={(e) => setRedirectUrl(e.target.value)}
+                  data-testid="auth-dialog-client-secret-input"
+                  type="password"
+                  placeholder="Client Secret (optional)"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Stored in your browser's localStorage.
+                </p>
               </div>
 
               {/* Scope */}

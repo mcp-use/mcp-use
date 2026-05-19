@@ -36,7 +36,7 @@ The `mcp` package is our core dependency — it provides the MCP protocol implem
 
 When a dependency update requires user action:
 
-1. The change is documented in the [changelog](https://docs.mcp-use.io/python/changelog/changelog)
+1. The change is documented in the [changelog](https://mcp-use.com/docs/python/changelog/changelog)
 2. A migration guide is provided if the change affects the public API
 3. The minimum version bump is noted in the release notes
 

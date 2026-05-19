@@ -526,3 +526,38 @@ jobs:
 
               core.info(`Created release for ${tag}`)
             }
+
+      - name: Send Discord notification (Main)
+        if: github.ref == 'refs/heads/main' && steps.check-prerelease.outputs.in_prerelease == 'false' && steps.check-release.outputs.should_publish == 'true'
+        run: |
+          # Read tags and find the main mcp-use package release
+          if [ ! -f .release-tags ]; then
+            echo "No release tags found, skipping Discord notification"
+            exit 0
+          fi
+
+          # Find the main mcp-use package tag (not scoped @mcp-use/* packages)
+          MAIN_TAG=$(grep -E '^mcp-use@' .release-tags | head -1)
+          if [ -z "$MAIN_TAG" ]; then
+            echo "No main mcp-use package tag found, skipping"
+            exit 0
+          fi
+
+          VERSION="${MAIN_TAG#mcp-use@}"
+          RELEASE_URL="https://github.com/mcp-use/mcp-use/releases/tag/${MAIN_TAG}"
+          RELEASE_BODY=$(gh release view "$MAIN_TAG" --json body -q '.body' | head -c 1800)
+
+          PAYLOAD=$(jq -n \
+            --arg title "TypeScript v${VERSION}" \
+            --arg url "$RELEASE_URL" \
+            --arg desc "$RELEASE_BODY" \
+            '{embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
+
+          curl -s -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK_URL"
+
+          echo "✅ Sent Discord notification for mcp-use@${VERSION}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}

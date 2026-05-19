@@ -1,20 +1,18 @@
 {
-  "name": "mcp-use server",
+  "name": "mcp-apps-gallery",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server with MCP-UI integration",
+  "description": "Programmatic MCP Apps widget gallery — three widgets built with server.uiResource({ type: 'mcpApps' })",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
+    "mcp-apps",
     "server",
-    "uiresource",
-    "ui",
-    "react",
     "widgets",
+    "ui",
     "ai",
-    "tools",
-    "mcp-ui"
+    "tools"
   ],
   "main": "dist/index.js",
   "scripts": {
@@ -36,10 +34,10 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^25.0.2",
-    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-react": "^6.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vite": "^7.3.0"
+    "vite": "^8.0.5"
   },
   "overrides": {
     "sugarss": "^5.0.1"

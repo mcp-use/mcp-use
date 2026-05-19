@@ -1,15 +1,14 @@
 /**
- * OAuth mode determines how the MCP server handles OAuth requests
- */
-export type OAuthMode =
-  | "direct" // Clients communicate directly with auth server (e.g., WorkOS)
-  | "proxy"; // MCP server proxies OAuth requests (legacy mode)
-
-/**
  * OAuth Provider Interface
  *
  * Defines the contract that all OAuth providers must implement
  * to provide authentication and authorization services.
+ *
+ * Built-in providers support the DCR-direct flow only: the MCP server
+ * proxies metadata discovery (`.well-known/*`) to the upstream authorization
+ * server and verifies bearer tokens. Clients communicate directly with the
+ * upstream for authorize/token/register. A separate `oauthProxy`
+ * will reintroduce proxy-mode behavior in a future change.
  */
 
 export interface OAuthProvider {
@@ -26,7 +25,7 @@ export interface OAuthProvider {
    * @param payload - The verified JWT payload
    * @returns User information object
    */
-  getUserInfo(payload: Record<string, unknown>): UserInfo;
+  getUserInfo(payload: Record<string, unknown>): UserInfo | Promise<UserInfo>;
 
   /**
    * Get the OAuth issuer URL
@@ -59,17 +58,51 @@ export interface OAuthProvider {
   getGrantTypesSupported(): string[];
 
   /**
-   * Get the OAuth mode for this provider
-   * @returns 'direct' if clients should communicate directly with auth server,
-   *          'proxy' if MCP server should proxy OAuth requests
+   * Get the user info endpoint URL
+   * @returns The user info endpoint URL, or undefined if not configured
    */
-  getMode?(): OAuthMode;
+  getUserInfoEndpoint?(): string | undefined;
 
   /**
-   * Get the registration endpoint URL (for direct mode with dynamic client registration)
-   * @returns The registration endpoint URL, or undefined if not supported
+   * Get the audience for JWT verification
+   * @returns The audience string, or undefined if not configured
    */
-  getRegistrationEndpoint?(): string | undefined;
+  getAudience?(): string | undefined;
+}
+
+/**
+ * OAuth Proxy Interface
+ *
+ * Extends OAuthProvider with proxy-specific fields for providers that don't
+ * support Dynamic Client Registration (e.g., Google OAuth, GitHub OAuth).
+ *
+ * OAuthProxy:
+ * - Implements the full OAuthProvider interface (getter methods)
+ * - Adds proxy-specific fields: type, clientId, clientSecret, extraAuthorizeParams
+ * - Exposes /register endpoint returning the configured clientId
+ * - Injects clientId/clientSecret at token exchange
+ * - Passes through upstream JWT tokens (no token minting)
+ */
+export interface OAuthProxy extends OAuthProvider {
+  /**
+   * Discriminator for union type detection
+   */
+  type: "proxy";
+
+  /**
+   * Pre-registered OAuth client ID
+   */
+  clientId: string;
+
+  /**
+   * Pre-registered OAuth client secret (optional for public clients)
+   */
+  clientSecret?: string;
+
+  /**
+   * Extra parameters to include in authorize requests
+   */
+  extraAuthorizeParams?: Record<string, string>;
 }
 
 /**
@@ -92,6 +125,7 @@ export interface UserInfo {
  */
 export interface BaseOAuthConfig {
   provider: string;
+  scopesSupported?: string[];
 }
 
 /**
@@ -101,7 +135,7 @@ export interface SupabaseOAuthConfig extends BaseOAuthConfig {
   provider: "supabase";
   projectId: string;
   jwtSecret?: string;
-  skipVerification?: boolean;
+  verifyJwt?: boolean;
 }
 
 /**
@@ -121,7 +155,8 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
   provider: "keycloak";
   serverUrl: string;
   realm: string;
-  clientId?: string;
+  /** MCP server URL used to validate the JWT `aud` claim (set via Keycloak audience mapper on client scopes) */
+  audience?: string;
   verifyJwt?: boolean;
 }
 
@@ -131,9 +166,31 @@ export interface KeycloakOAuthConfig extends BaseOAuthConfig {
 export interface WorkOSOAuthConfig extends BaseOAuthConfig {
   provider: "workos";
   subdomain: string;
-  clientId?: string;
-  apiKey?: string;
   verifyJwt?: boolean;
+}
+
+/**
+ * Clerk OAuth provider configuration
+ */
+export interface ClerkOAuthConfig extends BaseOAuthConfig {
+  provider: "clerk";
+  /** Clerk Frontend API URL (e.g. https://verb-noun-##.clerk.accounts.dev or https://clerk.yourdomain.com) */
+  frontendApiUrl: string;
+  /** Optional audience for JWT verification */
+  audience?: string;
+  verifyJwt?: boolean;
+}
+
+/**
+ * Better Auth OAuth provider configuration
+ */
+export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
+  provider: "better-auth";
+  authURL: string;
+  verifyJwt?: boolean;
+  getUserInfo?: (
+    payload: Record<string, unknown>
+  ) => UserInfo | Promise<UserInfo>;
 }
 
 /**
@@ -142,13 +199,16 @@ export interface WorkOSOAuthConfig extends BaseOAuthConfig {
 export interface CustomOAuthConfig extends BaseOAuthConfig {
   provider: "custom";
   issuer: string;
-  jwksUrl: string;
+  jwksUrl?: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  scopesSupported?: string[];
   grantTypesSupported?: string[];
   verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
   getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
+  /** User info endpoint URL */
+  userInfoEndpoint?: string;
+  /** Audience for JWT verification */
+  audience?: string;
 }
 
 /**
@@ -157,6 +217,8 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
 export type OAuthConfig =
   | SupabaseOAuthConfig
   | Auth0OAuthConfig
+  | ClerkOAuthConfig
   | KeycloakOAuthConfig
   | WorkOSOAuthConfig
+  | BetterAuthOAuthConfig
   | CustomOAuthConfig;

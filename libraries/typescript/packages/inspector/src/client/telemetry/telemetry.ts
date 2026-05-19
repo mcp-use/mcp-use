@@ -49,6 +49,28 @@ function getCacheKey(key: string): string {
   return `mcp_inspector_telemetry_${key}`;
 }
 
+export type InspectorMode = "standalone" | "embedded" | "cloud";
+
+/**
+ * Detect the inspector deployment mode from the runtime config injected by the
+ * server (see shared-static.ts's `injectRuntimeConfig`). Defaults to
+ * "standalone" when no mode has been injected (e.g. when the inspector dev
+ * server serves via the Vite proxy and no runtime scripts are present).
+ */
+function detectInspectorMode(): InspectorMode {
+  if (typeof window === "undefined") return "standalone";
+  const injected = (window as unknown as { __MCP_INSPECTOR_MODE__?: string })
+    .__MCP_INSPECTOR_MODE__;
+  if (
+    injected === "standalone" ||
+    injected === "embedded" ||
+    injected === "cloud"
+  ) {
+    return injected;
+  }
+  return "standalone";
+}
+
 /**
  * Check if localStorage is available and functional.
  * Node.js 25+ has an experimental localStorage that exists but doesn't implement methods properly.
@@ -72,6 +94,7 @@ export class Telemetry {
   private _posthogClient: TelemetryEventLogger | null = null;
   private _scarfClient: TelemetryEventLogger | null = null;
   private _source: string = "inspector";
+  private _mode: InspectorMode = "standalone";
 
   private constructor() {
     // Check if we're in a browser environment first
@@ -82,6 +105,10 @@ export class Telemetry {
 
     // Check for source from localStorage or default to 'inspector'
     this._source = this.getStoredSource() || "inspector";
+
+    // Deployment mode is injected by the server into window; fixed for the
+    // lifetime of the page, so we capture it once here.
+    this._mode = detectInspectorMode();
 
     if (telemetryDisabled) {
       this._posthogClient = null;
@@ -115,12 +142,21 @@ export class Telemetry {
   }
 
   private isTelemetryDisabled(): boolean {
+    // Server-injected runtime flag (auto-populated from MCP_USE_ANONYMIZED_TELEMETRY=false on
+    // the serving process). Checked first so a blocked localStorage doesn't defeat the env opt-out.
+    if (
+      typeof window !== "undefined" &&
+      (window as unknown as { __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean })
+        .__MCP_USE_ANONYMIZED_TELEMETRY__ === false
+    ) {
+      return true;
+    }
     // Check localStorage
     if (isLocalStorageFunctional()) {
       const stored = localStorage.getItem(getCacheKey("disabled"));
       if (stored === "true") return true;
     }
-    // Check environment variable (if available)
+    // Check environment variable (if available — only matches when bundler inlined it)
     if (
       typeof process !== "undefined" &&
       process.env?.MCP_USE_ANONYMIZED_TELEMETRY === "false"
@@ -161,6 +197,14 @@ export class Telemetry {
    */
   getSource(): string {
     return this._source;
+  }
+
+  /**
+   * Get the inspector's deployment mode (standalone CLI, embedded in mcp-use,
+   * or cloud-hosted). Emitted with every telemetry event.
+   */
+  getMode(): InspectorMode {
+    return this._mode;
   }
 
   get userId(): string {
@@ -248,7 +292,7 @@ export class Telemetry {
     // Send to PostHog proxy
     if (this._posthogClient) {
       try {
-        // Add package version, language flag, source, and user_id to all events
+        // Add package version, language flag, source, mode, and user_id to all events
         const properties: Record<string, any> = {
           event: event.name,
           user_id: this.userId, // Include user_id for distinct_id
@@ -258,6 +302,7 @@ export class Telemetry {
             language: "typescript",
             source: this._source,
             package: "inspector",
+            mode: this._mode,
           },
         };
 
@@ -270,7 +315,7 @@ export class Telemetry {
     // Send to Scarf proxy
     if (this._scarfClient) {
       try {
-        // Add package version, user_id, language flag, and source to all events
+        // Add package version, user_id, language flag, source, and mode to all events
         const properties: Record<string, any> = {};
         properties.mcp_use_version = getPackageVersion();
         properties.user_id = this.userId;
@@ -278,6 +323,7 @@ export class Telemetry {
         properties.language = "typescript";
         properties.source = this._source;
         properties.package = "inspector";
+        properties.mode = this._mode;
 
         await this._scarfClient.logEvent(properties);
       } catch {
@@ -333,6 +379,7 @@ export class Telemetry {
         eventProperties.language = "typescript";
         eventProperties.source = this._source;
         eventProperties.package = "inspector";
+        eventProperties.mode = this._mode;
 
         await this._scarfClient.logEvent(eventProperties);
       }

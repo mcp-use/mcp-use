@@ -4,6 +4,10 @@ description: "Get started with mcp-use in minutes"
 icon: "rocket"
 ---
 
+<Visibility for="agents">
+For the complete documentation index, see [llms.txt](https://mcp-use.com/docs/llms.txt).
+</Visibility>
+
 **mcp-use** is a unified MCP framework to build **MCP servers**, **MCP clients** and **MCP Agents**.
 
 ```mermaid
@@ -29,15 +33,19 @@ Building such agents is easy with **mcp-use**, all you need is an LLM and the MC
 
 <CodeGroup>
 ```bash pip
-pip install mcp-use
+pip install mcp-use langchain-openai
 ```
 ```bash uv
-uv add mcp-use
+uv add mcp-use langchain-openai
 ```
 ```bash poetry
-poetry add mcp-use
+poetry add mcp-use langchain-openai
 ```
 </CodeGroup>
+
+<Note>
+The agent requires a LangChain LLM provider package. The examples use `langchain-openai`  -  swap for `langchain-anthropic`, `langchain-google-genai`, or `langchain-groq` as needed.
+</Note>
 
 Here's a simple example to get you started for an agent with **browser tools** support.
 
@@ -62,7 +70,7 @@ async def main():
 
     # Create agent with the client
     agent = MCPAgent(
-        llm=ChatOpenAI(model="gpt-4o"),  # use your preferred LLM provider
+        llm=ChatOpenAI(model="gpt-5.5"),  # use your preferred LLM provider
         client=client,
         max_steps=30
     )

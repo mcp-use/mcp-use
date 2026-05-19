@@ -1,12 +1,5 @@
 import type { Resource } from "@modelcontextprotocol/sdk/types.js";
-import {
-  basicComponentLibrary,
-  remoteButtonDefinition,
-  remoteImageDefinition,
-  remoteStackDefinition,
-  remoteTextDefinition,
-  UIResourceRenderer,
-} from "@mcp-ui/client";
+import { useMemo } from "react";
 
 interface McpUIRendererProps {
   resource: Resource;
@@ -24,6 +17,7 @@ export function isMcpUIResource(resource: any): boolean {
   const mimeType = resource.mimeType.toLowerCase();
   return (
     mimeType === "text/html" ||
+    mimeType === "text/html;profile=mcp-app" ||
     mimeType === "text/html+skybridge" ||
     mimeType === "text/uri-list" ||
     mimeType.startsWith("application/vnd.mcp-ui.remote-dom")
@@ -31,71 +25,37 @@ export function isMcpUIResource(resource: any): boolean {
 }
 
 /**
- * Helper function to convert MCP SDK Resource to MCP UI Resource format
+ * Component to render MCP UI resources via a sandboxed iframe.
+ * Legacy remote-dom content types are no longer rendered interactively
+ * (upstream @mcp-ui/client v7 dropped remote-dom support).
  */
-function convertToMcpUIResource(resource: Resource): any {
+export function McpUIRenderer({ resource, className }: McpUIRendererProps) {
   const r = resource as Resource & { text?: string; blob?: string };
-  return {
-    uri: resource.uri,
-    mimeType: resource.mimeType,
-    text: r.text,
-    blob: r.blob,
-  };
-}
 
-/**
- * Component to render MCP UI resources
- */
-export function McpUIRenderer({
-  resource,
-  onUIAction,
-  className,
-  customProps,
-}: McpUIRendererProps) {
-  const handleUIAction = async (action: any) => {
-    return onUIAction?.(action);
-  };
-
-  const uiResource = convertToMcpUIResource(resource);
-
-  // Merge custom props into the resource if provided
-  const resourceWithProps = customProps
-    ? {
-        ...uiResource,
-        // Add custom props as data attributes or in a way the UIResourceRenderer can access
-        customProps,
+  const html = useMemo(() => {
+    if (r.text) return r.text;
+    if (r.blob) {
+      try {
+        return atob(r.blob);
+      } catch {
+        return null;
       }
-    : uiResource;
+    }
+    return null;
+  }, [r.text, r.blob]);
+
+  if (!html) return null;
 
   return (
     <div className={className}>
-      <UIResourceRenderer
-        resource={resourceWithProps}
-        onUIAction={handleUIAction}
-        htmlProps={{
-          autoResizeIframe: { width: true, height: true },
-          style: {
-            width: "100%",
-            minHeight: "200px",
-          },
-          sandboxPermissions: "allow-scripts allow-forms allow-popups",
-          // Pass custom props as data attributes
-          ...(customProps
-            ? {
-                "data-mcp-props": JSON.stringify(customProps),
-              }
-            : {}),
-        }}
-        remoteDomProps={{
-          remoteElements: [
-            remoteTextDefinition,
-            remoteButtonDefinition,
-            remoteStackDefinition,
-            remoteImageDefinition,
-          ],
-          library: basicComponentLibrary,
-          // Pass custom props to remote-dom components if supported
-          ...(customProps ? { customProps } : {}),
+      <iframe
+        srcDoc={html}
+        sandbox="allow-scripts allow-forms allow-popups"
+        title={resource.uri ?? "MCP UI Resource"}
+        style={{
+          width: "100%",
+          minHeight: "200px",
+          border: "none",
         }}
       />
     </div>

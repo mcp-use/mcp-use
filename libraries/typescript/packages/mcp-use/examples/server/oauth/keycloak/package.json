@@ -1,0 +1,31 @@
+{
+  "name": "keycloak-oauth-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server example with Keycloak OAuth + Dynamic Client Registration",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "example",
+    "keycloak",
+    "oauth",
+    "dcr",
+    "authentication"
+  ],
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

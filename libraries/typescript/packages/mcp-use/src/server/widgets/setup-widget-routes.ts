@@ -34,7 +34,7 @@ export function setupWidgetRoutes(
 ): void {
   // Serve static assets (JS, CSS) from the assets directory
   app.get("/mcp-use/widgets/:widget/assets/*", async (c: Context) => {
-    const widget = c.req.param("widget");
+    const widget = c.req.param("widget")!;
     const assetFile = c.req.path.split("/assets/")[1];
     const assetPath = pathHelpers.join(
       getCwd(),
@@ -99,7 +99,7 @@ export function setupWidgetRoutes(
   // Serve each widget's index.html at its route
   // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
   app.get("/mcp-use/widgets/:widget", async (c: Context) => {
-    const widget = c.req.param("widget");
+    const widget = c.req.param("widget")!;
     const filePath = pathHelpers.join(
       getCwd(),
       "dist",

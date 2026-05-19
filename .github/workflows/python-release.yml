@@ -11,6 +11,7 @@ on:
 permissions:
   contents: write
   id-token: write
+  discussions: write
 
 jobs:
   detect-release:
@@ -275,14 +276,70 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  create-github-discussion:
+    name: Create GitHub Discussion
+    runs-on: ubuntu-latest
+    needs: [create-github-release, publish-pypi]
+    if: needs.publish-pypi.outputs.publish_needed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare discussion body
+        id: body
+        run: |
+          VERSION="${{ needs.create-github-release.outputs.version }}"
+          TAG_NAME="python-v${VERSION}"
+          RELEASE_BODY=$(gh release view "$TAG_NAME" --json body -q '.body')
+
+          cat <<EOF > discussion_body.md
+          We've just published **Python v${VERSION}** to PyPI!
+
+          📦 \`pip install --upgrade mcp-use\`
+
+          ${RELEASE_BODY}
+
+          ---
+          📖 [Full changelog](https://mcp-use.com/python/changelog/${VERSION//./_})
+          🐙 [GitHub Release](https://github.com/mcp-use/mcp-use/releases/tag/${TAG_NAME})
+          EOF
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create discussion
+        uses: abirismyname/create-discussion@v2.1.0
+        with:
+          title: "🚀 Python v${{ needs.create-github-release.outputs.version }} Released"
+          body-filepath: discussion_body.md
+          repository-id: R_kgDOOQKbDA
+          category-id: DIC_kwDOOQKbDM4CrC8-
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   send-discord-notification:
     name: Notify Discord of published release
     runs-on: ubuntu-latest
-    needs: [publish-pypi]
+    needs: [create-github-release, publish-pypi]
     if: needs.publish-pypi.outputs.publish_needed == 'true'
     steps:
-      - name: GitHub Releases to Discord
-        uses: SethCohen/github-releases-to-discord@v1
-        with:
-          webhook_url: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}
-          reduce_headings: true
+      - uses: actions/checkout@v4
+
+      - name: Send Discord notification
+        run: |
+          VERSION="${{ needs.create-github-release.outputs.version }}"
+          TAG_NAME="python-v${VERSION}"
+          RELEASE_URL="https://github.com/mcp-use/mcp-use/releases/tag/${TAG_NAME}"
+          RELEASE_BODY=$(gh release view "$TAG_NAME" --json body -q '.body' | head -c 1800)
+
+          # Build Discord embed payload
+          PAYLOAD=$(jq -n \
+            --arg title "Python v${VERSION}" \
+            --arg url "$RELEASE_URL" \
+            --arg desc "$RELEASE_BODY" \
+            '{embeds: [{title: $title, url: $url, description: $desc, color: 5814783}]}')
+
+          curl -s -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK_URL"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}

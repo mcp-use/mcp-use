@@ -19,11 +19,7 @@ export default defineConfig({
   ],
   build: {
     outDir: "dist",
-    commonjsOptions: {
-      transformMixedEsModules: true,
-      ignore: ["posthog-node"],
-    },
-    rollupOptions: {
+    rolldownOptions: {
       external: ["posthog-node"],
     },
   },
@@ -50,11 +46,12 @@ export default defineConfig({
   optimizeDeps: {
     include: ["react", "react-dom"],
     exclude: ["posthog-node"],
-    esbuildOptions: {
-      define: {
-        global: "globalThis",
+    rolldownOptions: {
+      transform: {
+        define: {
+          global: "globalThis",
+        },
       },
-      plugins: [],
     },
   },
 });

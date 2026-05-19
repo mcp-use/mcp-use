@@ -7,12 +7,17 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { WIDGET_DEFAULTS } from "./constants.js";
 import { normalizeCallToolResponse } from "./widget-utils.js";
+import {
+  MODEL_CONTEXT_KEY,
+  registerModelContextFlush,
+} from "./model-context.js";
 import type {
   CallToolResponse,
   DisplayMode,
@@ -522,6 +527,57 @@ export function useWidget<
     }
   }, [widgetState]);
 
+  // Keep a ref to the current provider so the flush handler always uses the
+  // latest value without needing to re-register on every provider change.
+  const providerRef = useRef(provider);
+  providerRef.current = provider;
+
+  // Keep a ref to localWidgetState for the same reason
+  const localWidgetStateRef = useRef(localWidgetState);
+  localWidgetStateRef.current = localWidgetState;
+
+  // Register the model-context flush handler for the lifetime of this widget.
+  // When the node tree changes, this handler is called with the serialized
+  // description and pushes it to the host under MODEL_CONTEXT_KEY.
+  useEffect(() => {
+    const deregister = registerModelContextFlush((description) => {
+      const currentProvider = providerRef.current;
+
+      if (currentProvider === "mcp-apps") {
+        const bridge = getMcpAppsBridge();
+        if (bridge.isConnected()) {
+          bridge
+            .updateModelContext({
+              structuredContent: { [MODEL_CONTEXT_KEY]: description },
+              content: [{ type: "text", text: description }],
+            })
+            .catch((err: unknown) => {
+              console.warn(
+                "[ModelContext] Failed to update model context:",
+                err
+              );
+            });
+        }
+        return;
+      }
+
+      if (currentProvider === "openai" && window.openai?.setWidgetState) {
+        const prev = (window.openai.widgetState ??
+          localWidgetStateRef.current ??
+          {}) as Record<string, unknown>;
+        window.openai
+          .setWidgetState({
+            ...prev,
+            [MODEL_CONTEXT_KEY]: description,
+          } as TState)
+          .catch((err: unknown) => {
+            console.warn("[ModelContext] Failed to set widget state:", err);
+          });
+      }
+    });
+    return deregister;
+  }, []);
+
   // Stable API methods
   const callTool = useCallback(
     async (
@@ -623,10 +679,24 @@ export function useWidget<
         setLocalWidgetState(newState);
 
         const bridge = getMcpAppsBridge();
+        // Preserve __model_context from any prior update-model-context calls
+        // so setState doesn't wipe out the model context annotations.
+        const structuredContent = newState as Record<string, unknown>;
         bridge
           .updateModelContext({
-            structuredContent: newState as Record<string, unknown>,
-            content: [{ type: "text", text: JSON.stringify(newState) }],
+            structuredContent,
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  Object.fromEntries(
+                    Object.entries(structuredContent).filter(
+                      ([k]) => k !== MODEL_CONTEXT_KEY
+                    )
+                  )
+                ),
+              },
+            ],
           })
           .catch((err) => {
             console.warn("[useWidget] Failed to update model context:", err);
@@ -647,8 +717,17 @@ export function useWidget<
           ? (state as (prevState: TState | null) => TState)(currentState)
           : state;
 
+      // Preserve __model_context so setState doesn't wipe annotations
+      const prevModelContext = (
+        (window.openai.widgetState ?? {}) as Record<string, unknown>
+      )[MODEL_CONTEXT_KEY];
+
       setLocalWidgetState(newState);
-      return window.openai.setWidgetState(newState);
+      return window.openai.setWidgetState(
+        prevModelContext !== undefined
+          ? ({ ...newState, [MODEL_CONTEXT_KEY]: prevModelContext } as TState)
+          : newState
+      );
     },
     [provider, widgetState, localWidgetState]
   );
@@ -720,7 +799,13 @@ export function useWidget<
     metadata: (provider === "mcp-apps"
       ? (mcpAppsResponseMetadata ?? null)
       : (toolResponseMetadata ?? null)) as TMetadata | null,
-    state: localWidgetState,
+    state: localWidgetState
+      ? (Object.fromEntries(
+          Object.entries(localWidgetState as Record<string, unknown>).filter(
+            ([k]) => k !== MODEL_CONTEXT_KEY
+          )
+        ) as TState)
+      : null,
     setState,
 
     // Layout and theme (with safe defaults)

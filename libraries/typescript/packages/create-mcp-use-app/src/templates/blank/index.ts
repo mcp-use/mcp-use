@@ -32,6 +32,12 @@ const server = new MCPServer({
 /*
  * Define MCP tools
  * Docs: https://mcp-use.com/docs/typescript/server/tools
+ *
+ * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
+ * `widget`, ...) are exported from `mcp-use/server`.
+
+import { text } from "mcp-use/server";
+import { z } from "zod";
 
 server.tool(
   {
@@ -54,6 +60,8 @@ server.tool(
  * Define MCP resources
  * Docs: https://mcp-use.com/docs/typescript/server/resources
 
+import { object } from "mcp-use/server";
+
 server.resource({
   name: "config",
   uri: "config://settings",
@@ -67,6 +75,9 @@ server.resource({
 /*
  * Define MCP prompts
  * Docs: https://mcp-use.com/docs/typescript/server/prompts
+
+import { text } from "mcp-use/server";
+import { z } from "zod";
 
 server.prompt(
   {

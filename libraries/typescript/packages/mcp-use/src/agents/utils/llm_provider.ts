@@ -31,7 +31,7 @@ const PROVIDER_CONFIG = {
     package: "@langchain/anthropic",
     className: "ChatAnthropic",
     envVars: ["ANTHROPIC_API_KEY"],
-    defaultModel: "claude-3-5-sonnet-20241022",
+    defaultModel: "claude-sonnet-4-6",
   },
   google: {
     package: "@langchain/google-genai",
@@ -51,7 +51,7 @@ const PROVIDER_CONFIG = {
  * Parse LLM string format: "provider/model"
  * Examples:
  *   - "openai/gpt-4" -> { provider: "openai", model: "gpt-4" }
- *   - "anthropic/claude-3-5-sonnet-20241022" -> { provider: "anthropic", model: "claude-3-5-sonnet-20241022" }
+ *   - "anthropic/claude-sonnet-4-6" -> { provider: "anthropic", model: "claude-sonnet-4-6" }
  *   - "google/gemini-pro" -> { provider: "google", model: "gemini-pro" }
  */
 export function parseLLMString(llmString: string): {
@@ -63,7 +63,7 @@ export function parseLLMString(llmString: string): {
   if (parts.length !== 2) {
     throw new Error(
       `Invalid LLM string format. Expected 'provider/model', got '${llmString}'. ` +
-        `Examples: 'openai/gpt-4', 'anthropic/claude-3-5-sonnet-20241022', 'google/gemini-pro', 'groq/llama-3.1-70b-versatile'`
+        `Examples: 'openai/gpt-4', 'anthropic/claude-sonnet-4-6', 'google/gemini-pro', 'groq/llama-3.1-70b-versatile'`
     );
   }
 
@@ -140,14 +140,14 @@ function getAPIKey(provider: LLMProvider, config?: LLMConfig): string {
  *
  * @example
  * ```typescript
- * const llm = await createLLMFromString('anthropic/claude-3-5-sonnet-20241022');
+ * const llm = await createLLMFromString('anthropic/claude-sonnet-4-6');
  * ```
  */
 export async function createLLMFromString(
   llmString: string,
   config?: LLMConfig
 ): Promise<LanguageModel> {
-  logger.info(`Creating LLM from string: ${llmString}`);
+  logger.debug(`Creating LLM from string: ${llmString}`);
 
   const { provider, model } = parseLLMString(llmString);
   const providerConfig = PROVIDER_CONFIG[provider];
@@ -217,7 +217,7 @@ export async function createLLMFromString(
   // Instantiate the LLM
   try {
     const llmInstance = new LLMClass(llmConfig);
-    logger.info(`Successfully created ${provider} LLM with model ${model}`);
+    logger.debug(`Successfully created ${provider} LLM with model ${model}`);
     return llmInstance as LanguageModel;
   } catch (error: any) {
     throw new Error(

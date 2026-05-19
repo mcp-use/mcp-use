@@ -1,5 +1,8 @@
 import type { InputDefinition } from "./common.js";
-import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  ToolAnnotations,
+} from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./tool-context.js";
 import type { McpContext } from "./context.js";
 import type { z } from "zod";
@@ -73,11 +76,14 @@ interface ToolCallbackBivariant<
   TOutput extends Record<string, unknown>,
   HasOAuth extends boolean,
 > {
-  // Method signature enables bivariant checking for TInput parameter
+  // Method signature enables bivariant checking for TInput parameter.
+  // The union with CallToolResult allows response helpers like text(), mix(),
+  // and markdown() to be used even when outputSchema is defined — the SDK
+  // validates structuredContent at runtime only when it is present.
   bivarianceHack(
     params: TInput,
     ctx: EnhancedToolContext<HasOAuth>
-  ): Promise<TypedCallToolResult<TOutput>>;
+  ): Promise<TypedCallToolResult<TOutput> | CallToolResult>;
 }
 
 /**
@@ -136,7 +142,7 @@ export type ToolCallbackWithContext<
 > = (
   params: TInput,
   ctx: EnhancedToolContext<HasOAuth>
-) => Promise<TypedCallToolResult<TOutput>>;
+) => Promise<TypedCallToolResult<TOutput> | CallToolResult>;
 
 /**
  * Extract input type from a tool definition's schema.

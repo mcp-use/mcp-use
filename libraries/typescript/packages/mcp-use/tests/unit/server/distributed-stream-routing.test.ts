@@ -379,15 +379,16 @@ describe("wrapTransportForStreamManager", () => {
 // ---------------------------------------------------------------------------
 
 describe("Session persistence across server restart", () => {
-  const TEST_PORT = 3097;
-  const SERVER_URL = `http://localhost:${TEST_PORT}/mcp`;
-
   function closeServer(httpServer: any): Promise<void> {
     return new Promise<void>((resolve) => {
       httpServer.close(() => resolve());
-      // Force-close open connections so the port is freed immediately
       httpServer.closeAllConnections?.();
     });
+  }
+
+  function getServerPort(httpServer: any): number {
+    const addr = httpServer.address();
+    return typeof addr === "object" ? addr.port : 0;
   }
 
   it("should recover a session after server restart", async () => {
@@ -404,7 +405,7 @@ describe("Session persistence across server restart", () => {
     const sessionStore = new InMemorySessionStore();
 
     // --- Helper: create an MCPServer, mount it, and start HTTP ---
-    async function startMcpServer() {
+    async function startMcpServer(port = 0) {
       const server = new MCPServer({
         name: "persist-test",
         version: "1.0.0",
@@ -420,21 +421,22 @@ describe("Session persistence across server restart", () => {
           content: [{ type: "text" as const, text: params.msg }],
         })
       );
-      // getHandler() mounts MCP without starting a server
       const handler = await server.getHandler();
       const httpServer = serve({
         fetch: handler,
-        port: TEST_PORT,
+        port,
         hostname: "127.0.0.1",
       });
-      await new Promise((r) => setTimeout(r, 100));
-      return { server, httpServer };
+      await new Promise((r) => setTimeout(r, 200));
+      const assignedPort = getServerPort(httpServer);
+      return { server, httpServer, port: assignedPort };
     }
 
     // --- Server lifecycle 1 ---
-    const { httpServer: http1 } = await startMcpServer();
+    const { httpServer: http1, port: port1 } = await startMcpServer();
+    const serverUrl1 = `http://localhost:${port1}/mcp`;
 
-    const transport1 = new StreamableHTTPClientTransport(new URL(SERVER_URL));
+    const transport1 = new StreamableHTTPClientTransport(new URL(serverUrl1));
     const client1 = new Client(
       { name: "persist-client", version: "1.0.0" },
       {}
@@ -454,12 +456,13 @@ describe("Session persistence across server restart", () => {
 
     await client1.close();
     await closeServer(http1);
-    await new Promise((r) => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 200));
 
     // --- Server lifecycle 2 — same session store, new process ---
-    const { httpServer: http2 } = await startMcpServer();
+    const { httpServer: http2, port: port2 } = await startMcpServer();
+    const serverUrl2 = `http://localhost:${port2}/mcp`;
 
-    const transport2 = new StreamableHTTPClientTransport(new URL(SERVER_URL));
+    const transport2 = new StreamableHTTPClientTransport(new URL(serverUrl2));
     const client2 = new Client(
       { name: "persist-client", version: "1.0.0" },
       {}

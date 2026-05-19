@@ -24,9 +24,52 @@ function schemaToZod(schema: unknown): ZodTypeAny {
   }
 }
 
+function sanitizeToolName(name: string): string {
+  return name
+    .replace(/[^A-Za-z0-9_]+/g, "_")
+    .toLowerCase()
+    .replace(/^_+|_+$/g, "");
+}
+
 export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
+  private usedToolNames: Set<string> = new Set();
+
   constructor(disallowedTools: string[] = []) {
     super(disallowedTools);
+  }
+
+  private reserveName(name: string, kind?: "resource" | "prompt"): string {
+    if (!this.usedToolNames.has(name)) {
+      this.usedToolNames.add(name);
+      return name;
+    }
+    if (kind) {
+      const prefixed = `${kind}_${name}`;
+      if (!this.usedToolNames.has(prefixed)) {
+        this.usedToolNames.add(prefixed);
+        return prefixed;
+      }
+      // Both base name and prefixed name are taken; fall back to a numeric suffix.
+      let i = 2;
+      while (this.usedToolNames.has(`${prefixed}_${i}`)) i++;
+      const fallback = `${prefixed}_${i}`;
+      this.usedToolNames.add(fallback);
+      return fallback;
+    }
+    // No kind: use a numeric suffix to avoid collision.
+    let i = 2;
+    while (this.usedToolNames.has(`${name}_${i}`)) i++;
+    const fallback = `${name}_${i}`;
+    this.usedToolNames.add(fallback);
+    return fallback;
+  }
+
+  public override async createToolsFromConnectors(
+    connectors: BaseConnector[]
+  ): Promise<StructuredToolInterface[]> {
+    // Reset names at the start of each loading cycle.
+    this.usedToolNames.clear();
+    return super.createToolsFromConnectors(connectors);
   }
 
   /**
@@ -46,8 +89,9 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
       ? schemaToZod(mcpTool.inputSchema)
       : z.object({}).optional();
 
+    const toolName = this.reserveName(mcpTool.name ?? "NO NAME");
     const tool = new DynamicStructuredTool({
-      name: mcpTool.name ?? "NO NAME",
+      name: toolName,
       description: mcpTool.description ?? "", // Blank is acceptable but discouraged.
       schema: argsSchema,
       func: async (input: Record<string, any>): Promise<string> => {
@@ -78,16 +122,9 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     mcpResource: Resource,
     connector: BaseConnector
   ): StructuredToolInterface | null {
-    const sanitizeName = (name: string): string => {
-      return name
-        .replace(/[^A-Za-z0-9_]+/g, "_")
-        .toLowerCase()
-        .replace(/^_+|_+$/g, "");
-    };
-
-    const resourceName = sanitizeName(
-      mcpResource.name || `resource_${mcpResource.uri}`
-    );
+    const resourceBaseName =
+      sanitizeToolName(mcpResource.name || mcpResource.uri) || "resource";
+    const resourceName = this.reserveName(resourceBaseName, "resource");
     const resourceUri = mcpResource.uri;
 
     const tool = new DynamicStructuredTool({
@@ -158,8 +195,11 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
           : z.object({}).optional();
     }
 
+    const promptBaseName =
+      sanitizeToolName(mcpPrompt.name || "prompt") || "prompt";
+    const promptName = this.reserveName(promptBaseName, "prompt");
     const tool = new DynamicStructuredTool({
-      name: mcpPrompt.name,
+      name: promptName,
       description: mcpPrompt.description || "",
       schema: argsSchema,
       func: async (input: Record<string, any>): Promise<string> => {

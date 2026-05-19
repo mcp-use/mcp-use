@@ -42,7 +42,7 @@ This command will:
 - Optionally install skills for agent support
 
 <Tip>
-Check out [UI Widgets](/typescript/server/ui-widgets) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
+Check out [UI Widgets](/typescript/server/mcp-apps) with support to MCP-UI and OpenAI Apps SDK for ChatGPT.
 </Tip>
 
 ### Server Metadata
@@ -121,14 +121,14 @@ const server = new MCPServer({
 });
 
 // Define a tool
-server.tool("get_weather", {
+server.tool({
+  name: "get_weather",
   description: "Get weather for a city",
-  parameters: z.object({
+  schema: z.object({
     city: z.string().describe("City name"),
   }),
-  execute: async ({ city }) => {
-    return { temperature: 72, condition: "sunny", city };
-  },
+}, async ({ city }) => {
+  return { temperature: 72, condition: "sunny", city };
 });
 
 // Start server with auto-inspector

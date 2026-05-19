@@ -25,7 +25,7 @@
     "dev": "mcp-use dev",
     "start": "mcp-use start",
     "deploy": "mcp-use deploy",
-    "postinstall": "mcp-use generate-types || true"
+    "postinstall": "mcp-use generate-types || exit 0"
   },
   "dependencies": {
     "@openai/apps-sdk-ui": "^0.2.1",
@@ -37,17 +37,15 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.4",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "typescript": "^5.9.3"
   },
-  "overrides": {
-    "sugarss": "^5.0.1",
-    "lodash": "4.17.23"
+  "pnpm": {
+    "overrides": {
+      "lodash": ">=4.18.0"
+    }
   }
 }

@@ -82,20 +82,30 @@ export {
   getAuth,
   hasAnyScope,
   hasScope,
+  jwksVerifier,
   oauthAuth0Provider,
+  oauthBetterAuthProvider,
+  oauthClerkProvider,
   oauthCustomProvider,
   oauthKeycloakProvider,
+  oauthProxy,
   oauthSupabaseProvider,
   oauthWorkOSProvider,
   requireAnyScope,
   requireScope,
   type Auth0ProviderConfig,
   type AuthInfo,
+  type BetterAuthProviderConfig,
+  type ClerkProviderConfig,
   type CustomProviderConfig,
+  type JwksVerifierConfig,
   type KeycloakProviderConfig,
   type OAuthProvider,
+  type OAuthProxy,
+  type OAuthProxyConfig,
   type SupabaseProviderConfig,
   type UserInfo,
+  type VerifyToken,
   type WorkOSProviderConfig,
 } from "./oauth/index.js";
 
@@ -155,6 +165,20 @@ export {
 
 // MCP Proxy middleware for CORS proxying
 export { mountMcpProxy, type McpProxyOptions } from "./middleware/mcp-proxy.js";
+
+// MCP operation-level middleware
+export {
+  composeMiddleware,
+  matchesPattern,
+  type McpMiddlewareEntry,
+  type McpMiddlewareFn,
+  type McpMiddlewareFnFor,
+  type McpMiddlewarePatternMap,
+  type MiddlewareContext,
+  type ToolsCallMiddlewareContext,
+  type ResourcesReadMiddlewareContext,
+  type PromptsGetMiddlewareContext,
+} from "./middleware/mcp-middleware.js";
 
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";

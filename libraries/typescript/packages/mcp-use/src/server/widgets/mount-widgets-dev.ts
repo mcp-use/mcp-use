@@ -27,6 +27,26 @@ const TMP_MCP_USE_DIR = ".mcp-use";
 
 const DEFAULT_HMR_PORT = 24678;
 
+/**
+ * When a project has a `src/` tree (typical for Next.js apps), emit a
+ * Tailwind `@source` directive so shared components imported via
+ * `@/components/...` contribute their class names to the widget's CSS.
+ * Returns an empty string when the directory is absent.
+ *
+ * Shared by the initial widget CSS generation and the on-the-fly HMR
+ * path so both stay in sync.
+ */
+async function computeProjectSrcSourceLine(
+  widgetTempDir: string
+): Promise<string> {
+  const projectSrcPath = pathHelpers.join(getCwd(), "src");
+  if (!(await fsHelpers.existsSync(projectSrcPath))) return "";
+  const relative = pathHelpers
+    .relative(widgetTempDir, projectSrcPath)
+    .replace(/\\/g, "/");
+  return `@source "${relative}";\n`;
+}
+
 async function findAvailablePort(startPort: number): Promise<number> {
   const net = await import("node:net");
   return new Promise((resolve) => {
@@ -72,7 +92,13 @@ export async function mountWidgetsDev(
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
   const baseRoute = options?.baseRoute || "/mcp-use/widgets";
-  const resourcesDir = options?.resourcesDir || "resources";
+  // Resolution order for the widgets directory:
+  //   1. Caller-supplied `options.resourcesDir`
+  //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
+  //      or mcpUseConfig.mcpDir points at e.g. `src/mcp`)
+  //   3. Default `"resources"` at the project root
+  const resourcesDir =
+    options?.resourcesDir || process.env.MCP_USE_WIDGETS_DIR || "resources";
   const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
   // Ensure resources directory exists - create it if missing.
@@ -167,6 +193,11 @@ export async function mountWidgetsDev(
   let createServer: any;
   let react: any;
   let tailwindcss: any;
+  // When the project has a tsconfig.json, we enable Vite's native
+  // `resolve.tsconfigPaths` option so a widget can `import '@/components/...'`
+  // and the project's `@/*` paths resolve natively. Without a tsconfig, we
+  // fall back to a hardcoded `@` → resources alias below.
+  let hasProjectTsconfig = false;
 
   try {
     // Use createRequire to resolve modules from the user's project directory (getCwd())
@@ -184,13 +215,18 @@ export async function mountWidgetsDev(
     const reactPluginPath = userProjectRequire.resolve("@vitejs/plugin-react");
     const tailwindPath = userProjectRequire.resolve("@tailwindcss/vite");
 
-    // Now import using the resolved paths
-    const viteModule = await import(vitePath);
+    // Now import using the resolved paths (use pathToFileURL for Windows compatibility)
+    const viteModule = await import(pathToFileURL(vitePath).href);
     createServer = viteModule.createServer;
-    const reactModule = await import(reactPluginPath);
+    const reactModule = await import(pathToFileURL(reactPluginPath).href);
     react = reactModule.default;
-    const tailwindModule = await import(tailwindPath);
+    const tailwindModule = await import(pathToFileURL(tailwindPath).href);
     tailwindcss = tailwindModule.default;
+
+    const candidateTsconfig = pathHelpers.join(getCwd(), "tsconfig.json");
+    if (await fsHelpers.existsSync(candidateTsconfig)) {
+      hasProjectTsconfig = true;
+    }
   } catch (error) {
     throw new Error(
       "❌ Widget dependencies not installed!\n\n" +
@@ -233,12 +269,14 @@ export async function mountWidgetsDev(
       .relative(widgetTempDir, mcpUsePath)
       .replace(/\\/g, "/");
 
+    const projectSrcSource = await computeProjectSrcSourceLine(widgetTempDir);
+
     const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
 @source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
-`;
+${projectSrcSource}`;
     await fs.writeFile(
       pathHelpers.join(widgetTempDir, "styles.css"),
       cssContent,
@@ -248,7 +286,7 @@ export async function mountWidgetsDev(
     const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${widget.entry}'
+import Component from '${widget.entry.replace(/\\/g, "/")}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
@@ -343,6 +381,13 @@ if (container && Component) {
   };
 
   // Create a plugin to ensure Vite watches the resources directory for HMR
+  const warmWidgetEntry: {
+    current: (slugifiedName: string, reason: string) => Promise<void>;
+  } = {
+    current: async () => {
+      // No-op until Vite server is fully initialised.
+    },
+  };
   const watchResourcesPlugin = {
     name: "watch-resources",
     configureServer(server: any) {
@@ -474,12 +519,15 @@ if (container && Component) {
           .relative(widgetTempDir, mcpUsePath)
           .replace(/\\/g, "/");
 
+        const projectSrcSource =
+          await computeProjectSrcSourceLine(widgetTempDir);
+
         const cssContent = `@import "tailwindcss";
 
 /* Configure Tailwind to scan the resources directory and mcp-use package */
 @source "${relativeResourcesPath}";
 @source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
-`;
+${projectSrcSource}`;
         await fs.writeFile(
           pathHelpers.join(widgetTempDir, "styles.css"),
           cssContent,
@@ -489,7 +537,7 @@ if (container && Component) {
         const entryContent = `import React from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
-import Component from '${entryPath}'
+import Component from '${entryPath.replace(/\\/g, "/")}'
 
 const container = document.getElementById('widget-root')
 if (container && Component) {
@@ -821,6 +869,7 @@ if (container && Component) {
 
               // Create temp files and register widget
               await createWidgetTempFiles(widgetName, filePath);
+              await warmWidgetEntry.current(widgetName, "watch-add-file");
               await extractAndRegisterWidget(widgetName, filePath);
 
               console.log(`[WIDGETS] New widget added: ${widgetName}`);
@@ -862,6 +911,7 @@ if (container && Component) {
 
                 // Create temp files and register widget
                 await createWidgetTempFiles(widgetName, filePath);
+                await warmWidgetEntry.current(widgetName, "watch-add-folder");
                 await extractAndRegisterWidget(widgetName, filePath);
 
                 console.log(`[WIDGETS] New widget added: ${widgetName}`);
@@ -918,6 +968,38 @@ export default PostHog;
 `;
       }
       return null;
+    },
+  };
+
+  // Fail the dev build with a clear error if a widget transitively imports a
+  // Next.js server-runtime module. These are shimmed in the MCP server
+  // process (see @mcp-use/cli next-shims-*) but have no browser equivalent,
+  // so the right move in a widget is to fetch the data through a tool call.
+  // Keep in sync with `@mcp-use/cli`'s next-shims-registry.json.
+  const serverOnlyGuard = {
+    name: "mcp-use-widget-server-only-guard",
+    enforce: "pre" as const,
+    resolveId(id: string, importer: string | undefined) {
+      const rejected = new Set([
+        "server-only",
+        "client-only",
+        "next/cache",
+        "next/headers",
+        "next/navigation",
+        "next/server",
+      ]);
+      if (!rejected.has(id)) return null;
+      const from = importer ? ` (imported from ${importer})` : "";
+      throw new Error(
+        `Widget imports "${id}"${from}, which is a Next.js server-only ` +
+          `module. Widgets run in a browser iframe and cannot use server ` +
+          `APIs.\n\n` +
+          `To fix:\n` +
+          `  • Remove the import from the widget (or from any module the ` +
+          `widget transitively imports)\n` +
+          `  • If the widget needs data from ${id}, read it inside an MCP ` +
+          `tool and pass the result through the widget's props`
+      );
     },
   };
 
@@ -1067,6 +1149,7 @@ export default PostHog;
     root: tempDir,
     base: baseRoute + "/",
     plugins: [
+      serverOnlyGuard,
       zodJitlessPlugin,
       nodeStubsPlugin,
       ssrCssPlugin,
@@ -1077,17 +1160,30 @@ export default PostHog;
       react(),
     ],
     resolve: {
-      dedupe: ["react", "react-dom"],
-      alias: {
-        "@": pathHelpers.join(getCwd(), resourcesDir),
-      },
+      // Dedupe everything React-related so all importers share one runtime
+      // instance — without this, an HMR re-evaluation can introduce a
+      // second React module and the hooks dispatcher snaps to null on the
+      // next render ("Cannot read properties of null (reading 'useState')").
+      dedupe: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "react-dom/client",
+      ],
+      // With a tsconfig, Vite's native tsconfigPaths resolver owns `@/*`
+      // (it picks up whatever aliases the project already defines).
+      // Without one, fall back to the legacy hardcoded `@` → resourcesDir.
+      ...(hasProjectTsconfig
+        ? { tsconfigPaths: true }
+        : { alias: { "@": pathHelpers.join(getCwd(), resourcesDir) } }),
     },
     build: {
       // Disable source maps to avoid CSP eval violations
       // Source maps can use eval-based mappings which violate strict CSP
       sourcemap: false,
       // Minify for production builds
-      minify: "esbuild",
+      minify: true,
     },
     server: {
       middlewareMode: true,
@@ -1158,6 +1254,31 @@ export default PostHog;
       "import.meta.env.SSR": true,
     },
   });
+
+  // Pre-bundle a widget's dependencies via Vite's optimizer before the inspector
+  // requests its assets. Without this, the browser races against `depsOptimizer`
+  // and can fetch optimized deps with a stale hash, manifesting as 504s on
+  // `/.vite/deps/*` requests on first widget render.
+  const warmedWidgetEntries = new Set<string>();
+  warmWidgetEntry.current = async (widgetName: string, _reason: string) => {
+    const slugifiedName = slugifyWidgetName(widgetName);
+    const entryUrl = `/${slugifiedName}/entry.tsx`;
+    if (warmedWidgetEntries.has(entryUrl)) return;
+
+    try {
+      if (typeof viteServer.warmupRequest === "function") {
+        await viteServer.warmupRequest(entryUrl);
+      } else {
+        await viteServer.transformRequest(entryUrl);
+      }
+      if (typeof viteServer.waitForRequestsIdle === "function") {
+        await viteServer.waitForRequestsIdle(entryUrl);
+      }
+      warmedWidgetEntries.add(entryUrl);
+    } catch (error) {
+      console.warn(`[WIDGETS] Failed to warm widget entry ${entryUrl}:`, error);
+    }
+  };
 
   // Set up WebSocket proxy for Vite HMR through the main HTTP server.
   // In middleware mode, Vite creates its own WebSocket on a random port (e.g., 24678).
@@ -1370,6 +1491,7 @@ export default PostHog;
 
     // Use the extracted helper to register the widget
     const slugifiedName = slugifyWidgetName(widget.name);
+    await warmWidgetEntry.current(widget.name, "initial-registration");
     await registerWidgetFromTemplate(
       widget.name,
       pathHelpers.join(tempDir, slugifiedName, "index.html"),
