@@ -44,7 +44,6 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
     localStorage.setItem("mcp-inspector-api-keys", JSON.stringify(apiKeys));
   }, []);
 
-  // Load base URLs per provider from localStorage (used by ollama and openai-compatible)
   const getBaseUrls = useCallback((): Record<string, string> => {
     const saved = localStorage.getItem("mcp-inspector-base-urls");
     if (saved) {
@@ -188,8 +187,8 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
     const newLlmConfig: LLMConfig = {
       provider: tempProvider,
-      apiKey: tempApiKey.trim(),
-      model: tempModel.trim(),
+      apiKey: tempApiKey,
+      model: tempModel,
       ...(providerSupportsBaseUrl(tempProvider)
         ? { baseUrl: tempBaseUrl.trim() || getDefaultBaseUrl(tempProvider) }
         : {}),

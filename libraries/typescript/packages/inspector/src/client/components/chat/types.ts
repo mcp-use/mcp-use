@@ -1,3 +1,4 @@
+import { DEFAULT_OLLAMA_BASE_URL } from "@/llm/providers/ollama/utils";
 import type { ProviderName } from "@/llm/types";
 
 export interface MessageAttachment {
@@ -81,7 +82,7 @@ export const DEFAULT_MODELS: Record<ProviderName, string> = {
 };
 
 export const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
-  ollama: "http://localhost:11434",
+  ollama: DEFAULT_OLLAMA_BASE_URL,
 };
 
 export function providerRequiresApiKey(provider: ProviderName): boolean {

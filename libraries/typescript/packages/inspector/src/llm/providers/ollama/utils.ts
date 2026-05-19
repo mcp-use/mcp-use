@@ -14,3 +14,14 @@ export function buildOllamaApiUrl(
 ): string {
   return `${normalizeOllamaBaseUrl(baseUrl)}${path}`;
 }
+
+export class OllamaCorsError extends Error {
+  constructor(cause: unknown) {
+    super(
+      "Could not reach Ollama. If it's running, allow this origin by starting Ollama with " +
+        "`OLLAMA_ORIGINS=*` (or your inspector origin) and try again."
+    );
+    this.name = "OllamaCorsError";
+    this.cause = cause;
+  }
+}

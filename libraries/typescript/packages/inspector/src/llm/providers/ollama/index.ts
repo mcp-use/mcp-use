@@ -187,7 +187,10 @@ export async function* streamChat(
     );
   }
 
-  let emittedToolCalls = 0;
+  // Ollama emits tool_calls in the final chunk (done: true), but proxies and
+  // forks have been seen to repeat them across chunks — gate emission on
+  // first observation so downstream consumers can't fire the same tool twice.
+  let toolCallsEmitted = false;
 
   for await (const chunk of parseNDJSON(res.body, signal)) {
     const message =
@@ -199,40 +202,41 @@ export async function* streamChat(
       yield { type: "text-delta", delta: message.content };
     }
 
-    const toolCalls = normalizeToolCalls(message?.tool_calls);
-    if (toolCalls.length > 0) {
-      for (const [offset, toolCall] of toolCalls.entries()) {
-        const index = emittedToolCalls + offset;
-        const toolCallId = `call_${index}_${toolCall.name || "tool"}`;
+    if (!toolCallsEmitted) {
+      const toolCalls = normalizeToolCalls(message?.tool_calls);
+      if (toolCalls.length > 0) {
+        for (const [index, toolCall] of toolCalls.entries()) {
+          const toolCallId = `call_${index}_${toolCall.name || "tool"}`;
 
-        yield {
-          type: "tool-call-start",
-          index,
-          toolCallId,
-          toolName: toolCall.name,
-        };
-
-        const argsJson = JSON.stringify(toolCall.args);
-        if (argsJson && argsJson !== "{}") {
           yield {
-            type: "tool-call-args-delta",
+            type: "tool-call-start",
             index,
             toolCallId,
             toolName: toolCall.name,
-            argsDelta: argsJson,
+          };
+
+          const argsJson = JSON.stringify(toolCall.args);
+          if (argsJson && argsJson !== "{}") {
+            yield {
+              type: "tool-call-args-delta",
+              index,
+              toolCallId,
+              toolName: toolCall.name,
+              argsDelta: argsJson,
+            };
+          }
+
+          yield {
+            type: "tool-call-ready",
+            index,
+            toolCallId,
+            toolName: toolCall.name,
+            args: toolCall.args,
           };
         }
 
-        yield {
-          type: "tool-call-ready",
-          index,
-          toolCallId,
-          toolName: toolCall.name,
-          args: toolCall.args,
-        };
+        toolCallsEmitted = true;
       }
-
-      emittedToolCalls += toolCalls.length;
     }
 
     if (

@@ -5,16 +5,14 @@
 
 import { convertMessagesToProvider } from "../llm/messageFormat";
 import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
-import type { ProviderMessage, ProviderTool } from "../llm/types";
+import type {
+  ProviderMessage,
+  ProviderName,
+  ProviderTool,
+} from "../llm/types";
 
 interface LLMConfig {
-  provider:
-    | "openai"
-    | "openai-compatible"
-    | "anthropic"
-    | "google"
-    | "openrouter"
-    | "ollama";
+  provider: ProviderName;
   model: string;
   apiKey: string;
   temperature?: number;

@@ -41,18 +41,11 @@ import {
 } from "./types";
 import { getProviderLabel, ProviderIcon } from "./providerMeta";
 
-import { buildOllamaApiUrl } from "@/llm/providers/ollama/utils";
-
-class OllamaCorsError extends Error {
-  constructor(cause: unknown) {
-    super(
-      "Could not reach Ollama. If it's running, allow this origin by starting Ollama with " +
-        "`OLLAMA_ORIGINS=*` (or your inspector origin) and try again."
-    );
-    this.name = "OllamaCorsError";
-    this.cause = cause;
-  }
-}
+import {
+  buildOllamaApiUrl,
+  normalizeOllamaBaseUrl,
+  OllamaCorsError,
+} from "@/llm/providers/ollama/utils";
 
 interface ModelOption {
   id: string;
@@ -115,9 +108,16 @@ function getCachedModels(provider: string): ModelOption[] | null {
 }
 
 function getModelsCacheKey(provider: ProviderName, baseUrl?: string): string {
-  return provider === "ollama" && baseUrl
-    ? `${provider}:${baseUrl.trim().toLowerCase()}`
-    : provider;
+  if (!providerSupportsBaseUrl(provider) || !baseUrl?.trim()) {
+    return provider;
+  }
+  // Ollama normalizes trailing slashes and `/api` suffix to the same endpoint;
+  // collapsing them in the cache key keeps a single entry per real endpoint.
+  const keyPart =
+    provider === "ollama"
+      ? normalizeOllamaBaseUrl(baseUrl)
+      : baseUrl.trim().toLowerCase();
+  return `${provider}:${keyPart}`;
 }
 
 interface ConfigurationDialogProps {
@@ -480,7 +480,6 @@ export function ConfigurationDialog({
                     <span>{getProviderLabel("ollama")}</span>
                   </div>
                 </SelectItem>
-
                 <SelectItem value="openrouter">
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="openrouter" />

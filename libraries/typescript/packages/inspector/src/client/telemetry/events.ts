@@ -1,3 +1,5 @@
+import type { ProviderName } from "@/llm/types";
+
 export interface BaseTelemetryEvent {
   name: string;
   properties: Record<string, any>;
@@ -110,13 +112,7 @@ export class MCPServerConnectionEvent implements BaseTelemetryEvent {
 
 interface MCPChatMessageEventData {
   serverId?: string;
-  provider:
-    | "openai"
-    | "openai-compatible"
-    | "anthropic"
-    | "google"
-    | "openrouter"
-    | "ollama";
+  provider: ProviderName;
   model: string;
   messageCount: number;
   toolCallsCount?: number;

@@ -6,7 +6,6 @@ import type {
 } from "../types";
 import * as anthropic from "./anthropic";
 import * as google from "./google";
-
 import * as ollama from "./ollama";
 import * as openai from "./openai";
 
@@ -50,7 +49,6 @@ export function streamChat(
       return google.streamChat(params);
     case "openrouter":
       return openai.streamChat(withOpenRouter(params));
-
     case "ollama":
       return ollama.streamChat(params);
     default:
@@ -69,7 +67,6 @@ export function chat(params: ChatParams): Promise<ChatResult> {
       return google.chat(params);
     case "openrouter":
       return openai.chat(withOpenRouter(params));
-
     case "ollama":
       return ollama.chat(params);
     default:
