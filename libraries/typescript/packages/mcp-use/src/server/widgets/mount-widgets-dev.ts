@@ -313,7 +313,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${serverConfig.basePath ?? ""}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -556,7 +556,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${serverConfig.basePath ?? ""}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>

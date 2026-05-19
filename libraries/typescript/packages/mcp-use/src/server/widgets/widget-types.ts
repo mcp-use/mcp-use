@@ -27,6 +27,11 @@ export interface ServerConfig {
   /** Pre-created HTTP server for Vite HMR WebSocket support (optional, Node.js only) */
 
   httpServer?: any;
+  /**
+   * Normalized base path prefix for every route this server mounts.
+   * Empty string means "no prefix".
+   */
+  basePath?: string;
 }
 
 /**

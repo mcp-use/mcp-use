@@ -4,7 +4,7 @@
  * Handles mounting of the MCP Inspector UI at /inspector endpoint.
  */
 
-import type { Hono as HonoType } from "hono";
+import { Hono, type Hono as HonoType } from "hono";
 import { readBuildManifest } from "../widgets/index.js";
 
 /**
@@ -36,7 +36,8 @@ export async function mountInspectorUI(
   app: HonoType,
   serverHost: string,
   serverPort: number | undefined,
-  isProduction: boolean
+  isProduction: boolean,
+  basePath: string = ""
 ): Promise<boolean> {
   // In production, only mount if build manifest says so
   if (isProduction) {
@@ -55,25 +56,41 @@ export async function mountInspectorUI(
   try {
     // @ts-ignore - Optional peer dependency, may not be installed during build
     const { mountInspector } = await import("@mcp-use/inspector");
-    // Auto-connect to the local MCP server at /mcp (SSE endpoint)
+    // Auto-connect to the local MCP server at ${basePath}/mcp (SSE endpoint)
     // Use JSON config to specify SSE transport type
-    const mcpUrl = `http://${serverHost}:${serverPort}/mcp`; // Also available at /sse
+    const mcpUrl = `http://${serverHost}:${serverPort}${basePath}/mcp`; // Also available at ${basePath}/sse
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
       transportType: "sse",
       connectionType: "Direct",
     });
-    mountInspector(app, {
+    // When basePath is set, register the inspector's bare `/inspector/*`
+    // routes on a sub-Hono mounted at the prefix so request URLs compose to
+    // ${basePath}/inspector/*. We also pass `basePath` into mountInspector
+    // itself so the served HTML can inject a matching <base href> (used by
+    // Vite's relative asset URLs) and `window.__MCP_BASE_PATH__` (used by
+    // React Router and same-origin fetches in the client bundle). With no
+    // basePath we register directly on the main app to match historical
+    // behavior exactly.
+    const inspectorOptions = {
       autoConnectUrl: autoConnectConfig,
       // In dev mode, tell the inspector to use same-origin for MCP Apps sandbox.
       // This avoids requiring a sandbox-{hostname} subdomain that doesn't exist
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
-    });
+      basePath,
+    };
+    if (basePath) {
+      const inspectorApp = new Hono();
+      mountInspector(inspectorApp, inspectorOptions);
+      app.route(basePath, inspectorApp);
+    } else {
+      mountInspector(app, inspectorOptions);
+    }
     console.log(
-      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`
+      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}${basePath}/inspector`
     );
     return true;
   } catch (err) {

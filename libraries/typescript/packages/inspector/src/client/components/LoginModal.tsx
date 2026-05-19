@@ -28,6 +28,7 @@ import {
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Spinner } from "@/client/components/ui/spinner";
+import { inspectorPath } from "@/client/utils/basePath";
 import { cn } from "@/client/lib/utils";
 
 /* ------------------------------------------------------------------ */
@@ -155,7 +156,7 @@ export function LoginModal({
     // itself (via `window.close()` + postMessage) the moment better-auth
     // finishes setting the session cookie — instead of loading the whole
     // inspector inside the popup while we wait for the parent's session poll.
-    const callbackURL = `${window.location.origin}/inspector/oauth-popup-closed.html`;
+    const callbackURL = `${window.location.origin}${inspectorPath("/inspector/oauth-popup-closed.html")}`;
 
     fetch(`${authOrigin}/api/auth/sign-in/social`, {
       method: "POST",

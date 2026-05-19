@@ -1,3 +1,4 @@
+import { inspectorPath } from "../utils/basePath.js";
 import type { BaseTelemetryEvent } from "./events.js";
 import { MCPInspectorOpenEvent } from "./events.js";
 import { getPackageVersion } from "./utils.js";
@@ -86,8 +87,12 @@ function isLocalStorageFunctional(): boolean {
 export class Telemetry {
   private static instance: Telemetry | null = null;
 
-  private readonly POSTHOG_PROXY_URL = "/inspector/api/tel/posthog";
-  private readonly SCARF_PROXY_URL = "/inspector/api/tel/scarf";
+  private readonly POSTHOG_PROXY_URL = inspectorPath(
+    "/inspector/api/tel/posthog"
+  );
+  private readonly SCARF_PROXY_URL = inspectorPath(
+    "/inspector/api/tel/scarf"
+  );
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;

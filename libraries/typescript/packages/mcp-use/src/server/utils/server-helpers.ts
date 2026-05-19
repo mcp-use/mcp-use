@@ -10,6 +10,28 @@ import { hostHeaderValidation } from "../middleware/host-validation.js";
 import { getEnv } from "./runtime.js";
 
 /**
+ * Normalize a user-supplied `basePath` into the form the rest of the server
+ * expects: empty string for "no prefix", otherwise a leading `/` with no
+ * trailing `/`. Throws if the input is shaped wrong so misconfiguration shows
+ * up at startup rather than as confusing 404s.
+ */
+export function normalizeBasePath(input: string | undefined): string {
+  if (input === undefined || input === "" || input === "/") return "";
+  if (typeof input !== "string") {
+    throw new TypeError(
+      `[MCP] basePath must be a string, got ${typeof input}`
+    );
+  }
+  if (!input.startsWith("/")) {
+    throw new Error(
+      `[MCP] basePath must start with "/", got ${JSON.stringify(input)}`
+    );
+  }
+  const trimmed = input.replace(/\/+$/, "");
+  return trimmed;
+}
+
+/**
  * Get default CORS configuration for MCP server
  *
  * @returns CORS options object for Hono cors middleware

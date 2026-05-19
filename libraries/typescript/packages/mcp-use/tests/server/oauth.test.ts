@@ -69,6 +69,53 @@ describe("server OAuth integration", () => {
     expect(metadata.issuer).toBe(svc.baseUrl);
   });
 
+  it("publishes basePath-prefixed endpoints when configured", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client-id",
+      scopes: ["openid"],
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl, "/api");
+
+    const response = await fetch(
+      `${svc.baseUrl}/api/.well-known/oauth-authorization-server`
+    );
+    expect(response.status).toBe(200);
+    const metadata = await response.json();
+
+    expect(metadata.issuer).toBe(`${svc.baseUrl}/api`);
+    expect(metadata.authorization_endpoint).toBe(
+      `${svc.baseUrl}/api/authorize`
+    );
+    expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/api/token`);
+    expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/api/register`);
+
+    // The protected-resource metadata for the MCP transport should point at
+    // the prefixed transport URL.
+    const prResponse = await fetch(
+      `${svc.baseUrl}/api/.well-known/oauth-protected-resource/mcp`
+    );
+    expect(prResponse.status).toBe(200);
+    const pr = await prResponse.json();
+    expect(pr.resource).toBe(`${svc.baseUrl}/api/mcp`);
+
+    // The root well-known path must NOT serve metadata when basePath is set
+    // (everything is scoped under the prefix per the user's mount).
+    const rootResponse = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server`
+    );
+    expect(rootResponse.status).toBe(404);
+  });
+
   it("proxies token requests and injects client credentials", async () => {
     const tokenSpy = vi.fn();
 

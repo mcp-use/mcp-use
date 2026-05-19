@@ -39,7 +39,8 @@ export async function setupOAuthForServer(
   app: HonoType,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
-  state: OAuthSetupState
+  state: OAuthSetupState,
+  basePath: string = ""
 ): Promise<OAuthSetupState> {
   if (state.complete) {
     return state; // Already setup
@@ -48,15 +49,17 @@ export async function setupOAuthForServer(
   const proxyMode = isOAuthProxy(oauth);
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
-  // Create bearer auth middleware with baseUrl for WWW-Authenticate header
-  const middleware = createBearerAuthMiddleware(oauth, baseUrl);
+  // Create bearer auth middleware with the prefixed baseUrl for the
+  // WWW-Authenticate `resource_metadata` URL so clients discover the
+  // metadata at the same prefix the transport lives under.
+  const middleware = createBearerAuthMiddleware(oauth, `${baseUrl}${basePath}`);
 
   // Setup OAuth routes
-  setupOAuthRoutes(app, oauth, baseUrl);
+  setupOAuthRoutes(app, oauth, baseUrl, basePath);
 
   if (proxyMode) {
     console.log(
-      "[OAuth] Proxy mode: clients use local /authorize, /token, /register endpoints"
+      `[OAuth] Proxy mode: clients use local ${basePath}/authorize, ${basePath}/token, ${basePath}/register endpoints`
     );
     console.log("[OAuth] Credentials will be injected at token exchange");
   } else {
@@ -64,11 +67,12 @@ export async function setupOAuthForServer(
       "[OAuth] Clients will authenticate with provider directly via DCR"
     );
   }
-  console.log("[OAuth] Metadata endpoints: /.well-known/*");
+  console.log(`[OAuth] Metadata endpoints: ${basePath}/.well-known/*`);
 
-  // Apply bearer auth to all /mcp routes
-  app.use("/mcp/*", middleware);
-  console.log("[OAuth] Bearer authentication enabled on /mcp routes");
+  // Apply bearer auth to the MCP transport routes under the configured prefix
+  const mcpAuthPath = `${basePath}/mcp/*`;
+  app.use(mcpAuthPath, middleware);
+  console.log(`[OAuth] Bearer authentication enabled on ${mcpAuthPath} routes`);
 
   return {
     provider: oauth,
