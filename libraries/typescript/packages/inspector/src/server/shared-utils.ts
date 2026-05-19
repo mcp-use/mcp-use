@@ -5,11 +5,7 @@
 
 import { convertMessagesToProvider } from "../llm/messageFormat";
 import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
-import type {
-  ProviderMessage,
-  ProviderName,
-  ProviderTool,
-} from "../llm/types";
+import type { ProviderMessage, ProviderName, ProviderTool } from "../llm/types";
 
 interface LLMConfig {
   provider: ProviderName;
