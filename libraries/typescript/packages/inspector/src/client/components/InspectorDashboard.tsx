@@ -54,7 +54,6 @@ import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
-import { OpenApiConnectionForm } from "./OpenApiConnectionForm";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
@@ -488,6 +487,47 @@ export function InspectorDashboard() {
     scope,
     addServer,
   ]);
+
+  const handleOpenApiConnect = useCallback(
+    async (spec: string) => {
+      try {
+        const headersObject = customHeaders.reduce(
+          (acc, h) => {
+            if (h.name && h.value) acc[h.name] = h.value;
+            return acc;
+          },
+          {} as Record<string, string>
+        );
+        const res = await fetch("/inspector/api/openapi/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ spec, headers: headersObject }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || "Failed to start OpenAPI bridge");
+          return;
+        }
+        addServer(data.mcpUrl, {
+          url: data.mcpUrl,
+          name: data.serverName,
+          transportType: "http",
+          preventAutoAuth: true,
+          useRedirectFlow: true,
+          proxyConfig: {
+            proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+          },
+          autoProxyFallback: false,
+        });
+        setUrl("");
+        setCustomHeaders([]);
+        toast.success(`Connected "${data.serverName}" (${data.toolCount} tools)`);
+      } catch (err) {
+        toast.error("Failed to start OpenAPI bridge");
+      }
+    },
+    [addServer, customHeaders]
+  );
 
   const handleClearAllConnections = () => {
     // Remove all connections
@@ -1202,6 +1242,7 @@ export function InspectorDashboard() {
             scope={scope}
             setScope={setScope}
             onConnect={handleAddConnection}
+            onOpenApiConnect={handleOpenApiConnect}
             variant="styled"
             showConnectButton={true}
             showExportButton={true}

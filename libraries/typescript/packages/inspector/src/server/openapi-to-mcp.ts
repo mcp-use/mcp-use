@@ -351,7 +351,8 @@ export function buildInputs(tool: CompiledTool): Array<{
  */
 export async function startOpenApiMcpServer(
   spec: OpenAPISpec,
-  port: number
+  port: number,
+  defaultHeaders: Record<string, string> = {}
 ): Promise<{ mcpUrl: string; serverName: string }> {
   const { MCPServer, text } = await import("mcp-use/server");
 
@@ -368,6 +369,8 @@ export async function startOpenApiMcpServer(
 
     // Capture compiledTool in closure
     const toolRef = compiledTool;
+
+    const headersRef = defaultHeaders;
 
     server.tool(
       {
@@ -409,9 +412,10 @@ export async function startOpenApiMcpServer(
           jsonBody = bodyFields;
         }
 
-        // Build URL
+        // Build URL — strip leading slash so it's treated as relative to base (preserves basePath)
+        const relativePath = renderedPath.startsWith("/") ? renderedPath.slice(1) : renderedPath;
         const url = new URL(
-          renderedPath,
+          relativePath,
           toolRef.baseUrl.endsWith("/")
             ? toolRef.baseUrl
             : `${toolRef.baseUrl}/`
@@ -421,14 +425,14 @@ export async function startOpenApiMcpServer(
         }
 
         // Make the request
+        const reqHeaders: Record<string, string> = { ...headersRef };
         const fetchOptions: RequestInit = {
           method: toolRef.method.toUpperCase(),
-          headers: {} as Record<string, string>,
+          headers: reqHeaders,
         };
 
         if (jsonBody !== null && toolRef.jsonContentType) {
-          (fetchOptions.headers as Record<string, string>)["Content-Type"] =
-            toolRef.jsonContentType;
+          reqHeaders["Content-Type"] = toolRef.jsonContentType;
           fetchOptions.body = JSON.stringify(jsonBody);
         }
 

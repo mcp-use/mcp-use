@@ -2,11 +2,12 @@
  * OpenAPI-to-MCP bridge routes.
  *
  * Provides endpoints to start/stop ephemeral MCP servers that are
- * automatically generated from pasted OpenAPI JSON specs.
+ * automatically generated from pasted OpenAPI JSON/YAML specs.
  */
 
 import type { Hono } from "hono";
 import { createServer } from "node:net";
+import { parse as parseYaml } from "yaml";
 
 interface RunningBridge {
   mcpUrl: string;
@@ -46,6 +47,9 @@ export function registerOpenApiRoutes(app: Hono) {
     try {
       const body = await c.req.json();
       let spec = body.spec;
+      const apiHeaders: Record<string, string> = body.headers && typeof body.headers === "object"
+        ? body.headers
+        : {};
 
       if (!spec) {
         return c.json({ error: "Missing 'spec' field in request body" }, 400);
@@ -65,7 +69,7 @@ export function registerOpenApiRoutes(app: Hono) {
               `[OpenAPI Bridge] Fetching spec from URL: ${trimmed}`
             );
             const response = await fetch(trimmed, {
-              headers: { Accept: "application/json" },
+              headers: { Accept: "application/json, application/yaml, text/yaml, */*" },
             });
             if (!response.ok) {
               return c.json(
@@ -75,7 +79,21 @@ export function registerOpenApiRoutes(app: Hono) {
                 400
               );
             }
-            spec = await response.json();
+            const contentType = response.headers.get("content-type") || "";
+            const text = await response.text();
+            if (
+              contentType.includes("yaml") ||
+              trimmed.endsWith(".yaml") ||
+              trimmed.endsWith(".yml")
+            ) {
+              spec = parseYaml(text);
+            } else {
+              try {
+                spec = JSON.parse(text);
+              } catch {
+                spec = parseYaml(text);
+              }
+            }
           } catch (err: any) {
             return c.json(
               {
@@ -85,17 +103,21 @@ export function registerOpenApiRoutes(app: Hono) {
             );
           }
         } else {
-          // Try to parse as JSON
+          // Try JSON first, then YAML
           try {
             spec = JSON.parse(trimmed);
           } catch {
-            return c.json(
-              {
-                error:
-                  "Input is not a valid URL or JSON. Provide either a URL to an OpenAPI spec or the raw JSON.",
-              },
-              400
-            );
+            try {
+              spec = parseYaml(trimmed);
+            } catch {
+              return c.json(
+                {
+                  error:
+                    "Input is not a valid URL, JSON, or YAML. Provide a URL to an OpenAPI spec or paste the raw JSON/YAML.",
+                },
+                400
+              );
+            }
           }
         }
       }
@@ -131,7 +153,7 @@ export function registerOpenApiRoutes(app: Hono) {
 
       // Start the MCP server in-process
       const { startOpenApiMcpServer } = await import("../openapi-to-mcp.js");
-      const result = await startOpenApiMcpServer(spec, port);
+      const result = await startOpenApiMcpServer(spec, port, apiHeaders);
 
       runningBridges.set(id, {
         mcpUrl: result.mcpUrl,
