@@ -181,21 +181,14 @@ function normalizeBrowserHost(host: string): string {
 }
 
 /**
- * Read the running server's basePath from `.mcp-use/server-info.json` if the
- * server wrote one on startup. Returns "" when the file is missing or stale,
- * which preserves the historical bare `/mcp` / `/inspector` behavior for
- * servers configured without a basePath.
- *
- * The file is polled (not just read once) because `waitForServer` only
- * confirms the HTTP port is open — server-info.json is written immediately
- * before that point, so it should already exist by the time we read.
+ * Read the running server's basePath from `.mcp-use/server-info.json`. The
+ * server writes this file before reporting ready, so it should already exist
+ * by the time we read. Returns "" when missing or unparseable.
  */
 async function readServerBasePath(projectPath: string): Promise<string> {
   try {
-    const { readFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
     const raw = await readFile(
-      join(projectPath, ".mcp-use", "server-info.json"),
+      path.join(projectPath, ".mcp-use", "server-info.json"),
       "utf-8"
     );
     const parsed = JSON.parse(raw);
