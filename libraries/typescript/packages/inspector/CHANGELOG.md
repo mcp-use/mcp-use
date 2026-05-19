@@ -1,5 +1,15 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.10
+
+### Minor Changes
+
+- 0fbea77: Integrated Ollama as an LLM provider for the inspector, with local model discovery and streaming chat.
+
+### Patch Changes
+
+- mcp-use@1.29.0-canary.10
+
 ## 7.0.0-canary.9
 
 ### Patch Changes

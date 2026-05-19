@@ -18,6 +18,7 @@
     "oauth-emulate-e2e",
     "prune-unused-exports",
     "quiet-files-cleanup",
-    "supabase-oauth-url-override"
+    "supabase-oauth-url-override",
+    "thick-horses-punch"
   ]
 }
