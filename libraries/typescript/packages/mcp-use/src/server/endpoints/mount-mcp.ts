@@ -625,15 +625,19 @@ export async function mountMcp(
     }
   };
 
-  // Mount the handler for all HTTP methods on both /mcp and /sse
-  const mcpPath = `${basePath}/mcp`;
-  const ssePath = `${basePath}/sse`;
-  for (const endpoint of [mcpPath, ssePath]) {
+  // Register on the inner app at bare paths. When `basePath` is set the
+  // inner is sub-mounted under it externally, so these become
+  // `${basePath}/mcp` and `${basePath}/sse` from the outside.
+  for (const endpoint of ["/mcp", "/sse"]) {
     app.on(["GET", "POST", "DELETE", "HEAD"], endpoint, handleRequest);
   }
 
+  // Log the externally-visible paths (what users hit) rather than the
+  // bare paths we just registered on the inner.
+  const externalMcp = `${basePath}/mcp`;
+  const externalSse = `${basePath}/sse`;
   console.log(
-    `[MCP] Server mounted at ${mcpPath} and ${ssePath} (${config.stateless ? "stateless" : "stateful"} mode)`
+    `[MCP] Server mounted at ${externalMcp} and ${externalSse} (${config.stateless ? "stateless" : "stateful"} mode)`
   );
 
   return { mcpMounted: true, idleCleanupInterval };

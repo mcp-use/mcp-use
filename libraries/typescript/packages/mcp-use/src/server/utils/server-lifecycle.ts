@@ -8,42 +8,6 @@ import chalk from "chalk";
 import type { Hono as HonoType } from "hono";
 import { getEnv, isDeno } from "./runtime.js";
 
-/**
- * Best-effort handoff for external tools that spawn the user's server as a
- * child process (the CLI's `mcp-use dev` auto-open, the screenshot command,
- * etc.). Writing `.mcp-use/server-info.json` lets those tools discover the
- * configured `basePath` and rendered URLs without parsing source or
- * scraping stdout. Skipped on Deno and silently ignored on failure — a
- * read/write error must never block server startup.
- */
-export async function writeServerInfoFile(info: {
-  host: string;
-  port?: number;
-  basePath: string;
-}): Promise<void> {
-  if (isDeno) return;
-  try {
-    const { mkdir, writeFile } = await import("node:fs/promises");
-    const { join } = await import("node:path");
-    const dir = join(process.cwd(), ".mcp-use");
-    await mkdir(dir, { recursive: true });
-    const payload = {
-      host: info.host,
-      port: info.port,
-      basePath: info.basePath,
-      mcpUrl: `http://${info.host}:${info.port}${info.basePath}/mcp`,
-      inspectorUrl: `http://${info.host}:${info.port}${info.basePath}/inspector`,
-      writtenAt: new Date().toISOString(),
-    };
-    await writeFile(
-      join(dir, "server-info.json"),
-      JSON.stringify(payload, null, 2)
-    );
-  } catch {
-    // Best-effort — tooling falls back to /mcp and /inspector if the file is absent.
-  }
-}
-
 export function isProductionMode(): boolean {
   // Only check NODE_ENV - CLI commands set this explicitly
   // 'mcp-use dev' sets NODE_ENV=development

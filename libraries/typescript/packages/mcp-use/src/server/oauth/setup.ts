@@ -54,12 +54,21 @@ export async function setupOAuthForServer(
   // metadata at the same prefix the transport lives under.
   const middleware = createBearerAuthMiddleware(oauth, `${baseUrl}${basePath}`);
 
-  // Setup OAuth routes
+  // Setup OAuth routes. Route registrations use bare paths; the inner app's
+  // sub-mount at `basePath` adds the prefix externally. Response bodies
+  // (issuer, *_endpoint, resource) are built from `baseUrl + basePath` so
+  // clients land on the right URLs.
   setupOAuthRoutes(app, oauth, baseUrl, basePath);
+
+  // External (user-visible) paths for log messages.
+  const externalAuthorize = `${basePath}/authorize`;
+  const externalToken = `${basePath}/token`;
+  const externalRegister = `${basePath}/register`;
+  const externalWellKnown = `${basePath}/.well-known/*`;
 
   if (proxyMode) {
     console.log(
-      `[OAuth] Proxy mode: clients use local ${basePath}/authorize, ${basePath}/token, ${basePath}/register endpoints`
+      `[OAuth] Proxy mode: clients use local ${externalAuthorize}, ${externalToken}, ${externalRegister} endpoints`
     );
     console.log("[OAuth] Credentials will be injected at token exchange");
   } else {
@@ -67,12 +76,15 @@ export async function setupOAuthForServer(
       "[OAuth] Clients will authenticate with provider directly via DCR"
     );
   }
-  console.log(`[OAuth] Metadata endpoints: ${basePath}/.well-known/*`);
+  console.log(`[OAuth] Metadata endpoints: ${externalWellKnown}`);
 
-  // Apply bearer auth to the MCP transport routes under the configured prefix
-  const mcpAuthPath = `${basePath}/mcp/*`;
-  app.use(mcpAuthPath, middleware);
-  console.log(`[OAuth] Bearer authentication enabled on ${mcpAuthPath} routes`);
+  // Apply bearer auth to the MCP transport routes. Registered on the inner
+  // app at the bare path; the sub-mount makes it match `${basePath}/mcp/*`
+  // externally.
+  app.use("/mcp/*", middleware);
+  console.log(
+    `[OAuth] Bearer authentication enabled on ${basePath}/mcp/* routes`
+  );
 
   return {
     provider: oauth,

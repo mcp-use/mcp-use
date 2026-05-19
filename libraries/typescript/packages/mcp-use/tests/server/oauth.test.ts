@@ -70,7 +70,11 @@ describe("server OAuth integration", () => {
   });
 
   it("publishes basePath-prefixed endpoints when configured", async () => {
-    const app = new Hono();
+    // `setupOAuthRoutes` registers at bare paths; the caller is responsible
+    // for sub-mounting under the prefix. MCPServer does this by routing an
+    // inner Hono on the outer; here we reproduce the same wiring directly.
+    const outer = new Hono();
+    const inner = new Hono();
 
     const proxy = oauthProxy({
       issuer: "https://issuer.example.com",
@@ -81,10 +85,13 @@ describe("server OAuth integration", () => {
       verifyToken: stubVerifyToken,
     });
 
-    const svc = await listenOnRandomPort(app);
+    const svc = await listenOnRandomPort(outer);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl, "/api");
+    // Register OAuth routes on the inner at bare paths (the helper builds
+    // response bodies that include `${baseUrl}${basePath}` for discovery).
+    setupOAuthRoutes(inner, proxy, svc.baseUrl, "/api");
+    outer.route("/api", inner);
 
     const response = await fetch(
       `${svc.baseUrl}/api/.well-known/oauth-authorization-server`

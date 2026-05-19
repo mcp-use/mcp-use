@@ -765,12 +765,17 @@ export async function registerWidgetFromTemplate(
  */
 export function setupPublicRoutes(
   app: HonoType,
-  useDistDirectory: boolean = false,
-  basePath: string = ""
+  useDistDirectory: boolean = false
 ): void {
-  const routePrefix = `${basePath}/mcp-use/public/`;
+  // Register on the passed-in app at the bare path. When the caller passes
+  // the inner (sub-mounted) Hono, this becomes `${basePath}/mcp-use/public/*`
+  // externally; otherwise it lives at root.
+  const routePrefix = "/mcp-use/public/";
   app.get(`${routePrefix}*`, async (c: Context) => {
-    const filePath = c.req.path.replace(routePrefix, "");
+    // `c.req.path` is the full original URL path even inside a sub-mount,
+    // so split on `/mcp-use/public/` (the static literal) to recover the
+    // file portion regardless of any externally-applied prefix.
+    const filePath = c.req.path.split(routePrefix)[1] ?? "";
     const fsBase = useDistDirectory ? "dist/public" : "public";
     const fullPath = pathHelpers.join(getCwd(), fsBase, filePath);
 
@@ -812,8 +817,7 @@ export function setupPublicRoutes(
 export function setupFaviconRoute(
   app: HonoType,
   faviconPath: string | undefined,
-  useDistDirectory: boolean = false,
-  basePath: string = ""
+  useDistDirectory: boolean = false
 ): void {
   if (!faviconPath) {
     return; // No favicon configured
@@ -841,11 +845,7 @@ export function setupFaviconRoute(
     }
   };
 
-  // Always serve at /favicon.ico so browsers' implicit root request works,
-  // and additionally under the basePath so links generated under the prefix
-  // continue to resolve.
+  // Register at bare /favicon.ico. Callers should pass the outer (_rootApp)
+  // so browsers' implicit `GET /favicon.ico` resolves regardless of basePath.
   app.get("/favicon.ico", handler);
-  if (basePath) {
-    app.get(`${basePath}/favicon.ico`, handler);
-  }
 }
