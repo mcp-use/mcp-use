@@ -279,6 +279,7 @@ interface TabsTriggerProps {
   showDot?: boolean;
   /** When true, the label stays visible even when the tab bar is collapsed */
   alwaysExpanded?: boolean;
+  badge?: React.ReactNode;
 }
 
 // conditional tooltip wrapper if collapsed
@@ -328,6 +329,7 @@ const TabsTrigger = React.forwardRef<
       title: titleProp,
       showDot = false,
       alwaysExpanded = false,
+      badge,
       ...props
     },
     ref
@@ -372,7 +374,7 @@ const TabsTrigger = React.forwardRef<
           {Icon && (
             <Icon
               className={cn(
-                "h-4 w-4 transition-all duration-500 ease-in-out",
+                "h-4 w-4 shrink-0 transition-all duration-500 ease-in-out",
                 showLabel && "mr-2",
                 !showLabel && "mr-0!"
               )}
@@ -383,12 +385,13 @@ const TabsTrigger = React.forwardRef<
           )}
           <span
             className={cn(
-              "transition-all duration-500 ease-in-out overflow-hidden",
+              "min-w-0 transition-all duration-500 ease-in-out overflow-hidden",
               showLabel ? "w-auto opacity-100" : "w-0 opacity-0"
             )}
           >
             {children}
           </span>
+          {badge}
         </button>
       </ConditionalTooltip>
     );
