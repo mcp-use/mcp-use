@@ -74,14 +74,8 @@ export async function mountInspectorUI(
       transportType: "sse",
       connectionType: "Direct",
     });
-    // When basePath is set, register the inspector's bare `/inspector/*`
-    // routes on a sub-Hono mounted at the prefix so request URLs compose to
-    // ${basePath}/inspector/*. We also pass `basePath` into mountInspector
-    // itself so the served HTML can inject a matching <base href> (used by
-    // Vite's relative asset URLs) and `window.__MCP_BASE_PATH__` (used by
-    // React Router and same-origin fetches in the client bundle). With no
-    // basePath we register directly on the main app to match historical
-    // behavior exactly.
+    // mountInspector registers bare `/inspector/*` routes, so under a
+    // basePath we wrap it in a sub-Hono mounted at the prefix.
     const inspectorOptions = {
       autoConnectUrl: autoConnectConfig,
       // In dev mode, tell the inspector to use same-origin for MCP Apps sandbox.
