@@ -237,10 +237,12 @@ The Chat tab provides an interactive interface to test the MCP server with an LL
 **Setup:**
 
 1. Click **"Configure API Key"** to open the configuration modal
-2. Select your **Provider** (OpenAI, Anthropic, etc.)
+2. Select your **Provider** (OpenAI, Anthropic, Google, or Ollama)
 3. Choose the **Model** (gpt-4o, claude-3-5-sonnet, etc.)
 4. Enter your **API Key** (stored locally in browser)
 5. Click **"Save Configuration"**
+
+For **Ollama**, the API key is optional and you can point the inspector at a local or remote Ollama host by setting the **Base URL** (defaults to `http://localhost:11434`).
 
 **Using Chat:**
 
