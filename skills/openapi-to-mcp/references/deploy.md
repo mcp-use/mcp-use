@@ -20,6 +20,14 @@ npx mcp-use login    # one-time, or: npx @mcp-use/cli login on older scaffolds
 npm run deploy       # wraps `mcp-use deploy`
 ```
 
+> **Important:** `openapi.dereferenced.json` is generated locally and should be in `.gitignore`. The cloud build won't have it unless you generate it as part of the build. Before deploying, update the `build` script in `package.json` to run the spec deref step first:
+>
+> ```json
+> "build": "tsx scripts/load-spec.ts && mcp-use build"
+> ```
+>
+> This ensures the dereferenced file is always regenerated at build time on Manufact's side, even if it's not committed to the repo.
+
 `deploy` will:
 
 1. Push the latest commit to the configured branch (defaults to `main`).
