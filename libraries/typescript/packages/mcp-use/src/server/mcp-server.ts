@@ -11,7 +11,7 @@ import type {
   CreateMessageResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import { Hono, type Hono as HonoType } from "hono";
+import type { Hono as HonoType } from "hono";
 import { z } from "zod";
 import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
@@ -271,13 +271,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public app: HonoType;
 
   /**
-   * @internal Outer Hono that actually receives HTTP requests. When `basePath`
-   * is set, `app` is sub-mounted on this under the prefix and global
-   * middleware (CORS, host validation, request logging) lives here so it
-   * runs before route matching. When `basePath` is unset, `_rootApp === app`.
+   * @internal The underlying Hono instance. Receives HTTP requests and holds
+   * global middleware (CORS, host validation, request logging) plus routes
+   * that must stay at the host root (`/favicon.ico`, `/.well-known/*`,
+   * `/_mcp-use/*`).
    *
-   * Always use `_rootApp` for: serving HTTP, registering routes that must
-   * stay at root (e.g. `/favicon.ico`), and applying global middleware.
+   * `this.app` is either `_rootApp` directly (no basePath) or a Hono
+   * `basePath()` clone of it (with basePath). The clone shares this
+   * instance's router and routes array, so route registrations on
+   * `this.app` end up on the same router as `_rootApp` — just with the
+   * basePath prefix prepended at registration time.
    */
   private _rootApp!: HonoType;
 
@@ -2380,8 +2383,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       console.log(`[MCP] Auto-selected favicon from icons: ${this.favicon}`);
     }
 
-    // Helper to convert relative icon paths to absolute URLs
-    const basePathForIcons = this.basePath;
+    // Helper to convert relative icon paths to absolute URLs.
+    // Public assets are served at `/_mcp-use/public/` (basePath-agnostic).
     const processIconUrls = (
       icons: ServerConfig["icons"],
       baseUrl?: string
@@ -2391,7 +2394,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}${basePathForIcons}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}/_mcp-use/public/${icon.src}`,
       }));
     };
 
@@ -2423,35 +2426,27 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     );
 
-    // Create the outer Hono with global middleware (CORS, host validation,
-    // request logging). When `basePath` is set, the user-facing `this.app`
-    // is a separate inner Hono that gets sub-mounted under the prefix
-    // later — at listen() / getHandler() time, after all internal and
-    // user routes have been added. The deferred mount is required because
-    // Hono's `app.route(path, subApp)` snapshots the sub-app's routes at
-    // call time; routes added to the sub-app after that don't propagate.
-    // When `basePath` is unset, inner and outer are the same instance —
-    // zero overhead, identical to legacy behavior.
+    // Single Hono instance. Global middleware (CORS, host validation,
+    // request logging) lives here. When `basePath` is set, `this.app` is a
+    // `.basePath()` clone — same underlying router, but route registrations
+    // automatically get the prefix prepended. No sub-mounting, no deferred
+    // route-snapshot dance.
     this._rootApp = createHonoApp(createRequestLogger(this.basePath), {
       cors: this.config.cors,
       allowedOrigins: this.config.allowedOrigins,
     });
 
-    if (this.basePath) {
-      this.app = new Hono();
-    } else {
-      this.app = this._rootApp;
-    }
-
-    this.setupServerInfoRoute();
+    this.app = this.basePath
+      ? this._rootApp.basePath(this.basePath)
+      : this._rootApp;
 
     // Install the custom routes middleware FIRST (before any other routes).
     // This single middleware dispatches from the mutable _customRoutes map,
     // enabling HMR for custom HTTP routes (server.get(), server.post(), etc.)
     // without hitting Hono's "matcher already built" error. Registered on
-    // the inner app so user routes auto-prefix under `basePath`. The
-    // dispatcher strips the prefix from `c.req.path` so user keys stay
-    // bare (e.g. `server.get("/foo")` is reachable at `${basePath}/foo`).
+    // `this.app` so it auto-prefixes under `basePath`; the dispatcher strips
+    // the prefix from `c.req.path` so user keys stay bare (e.g.
+    // `server.get("/foo")` is reachable at `${basePath}/foo`).
     // See: https://github.com/honojs/hono/issues/3817
     installCustomRoutesMiddleware(
       this.app,
@@ -2460,9 +2455,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Setup public routes immediately if icons/favicon are configured.
-    // Public assets register on the inner app (auto-prefixed); favicon
-    // additionally registers at root on `_rootApp` so browsers' implicit
-    // `GET /favicon.ico` resolves regardless of basePath.
+    // Public assets register on `this.app` (auto-prefixed); favicon
+    // registers on `_rootApp` so browsers' implicit `GET /favicon.ico`
+    // resolves regardless of basePath.
     if (
       (this.favicon || this.config.icons) &&
       !isProductionModeHelper() &&
@@ -2677,8 +2672,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param sessionId - Optional session ID to store registered refs for hot reload support
    */
   public getServerForSession(sessionId?: string): OfficialMcpServer {
-    // Helper to convert relative icon paths to absolute URLs
-    const basePathForIcons = this.basePath;
+    // Helper to convert relative icon paths to absolute URLs.
+    // Public assets live at `/_mcp-use/public/` regardless of basePath.
     const processIconUrls = (
       icons: ServerConfig["icons"],
       baseUrl?: string
@@ -2688,7 +2683,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}${basePathForIcons}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}/_mcp-use/public/${icon.src}`,
       }));
     };
 
@@ -3758,52 +3753,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
-   * Track whether the inner app has been sub-mounted on `_rootApp`. Hono's
-   * `route(path, subApp)` snapshots routes at call time, so we defer this
-   * until all internal + user routes have been registered.
-   * @internal
-   */
-  private _innerAppMounted = false;
-
-  /**
-   * Root-level discovery endpoint for CLI/dev tooling. This intentionally
-   * lives on `_rootApp` instead of `this.app` so it remains available at a
-   * stable, unprefixed path even when the server is configured with
-   * `basePath`.
-   * @internal
-   */
-  private setupServerInfoRoute(): void {
-    this._rootApp.get("/__mcp-use/serverinfo", (c) => {
-      const origin = new URL(c.req.url).origin;
-      return c.json({
-        basePath: this.basePath,
-        mcpPath: `${this.basePath}/mcp`,
-        inspectorPath: `${this.basePath}/inspector`,
-        mcpUrl: `${origin}${this.basePath}/mcp`,
-        inspectorUrl: `${origin}${this.basePath}/inspector`,
-      });
-    });
-  }
-
-  /**
-   * Sub-mount the inner app under `basePath` on `_rootApp`. Must be called
-   * once, after every route the server cares about has been registered on
-   * `this.app` (MCP transport, OAuth, widgets, inspector, user routes).
-   * No-op when `basePath` is unset (inner and outer are already the same
-   * instance) or when already mounted.
-   * @internal
-   */
-  private _finalizeRouteMount(): void {
-    if (this._innerAppMounted) return;
-    if (!this.basePath) {
-      this._innerAppMounted = true;
-      return;
-    }
-    this._rootApp.route(this.basePath, this.app);
-    this._innerAppMounted = true;
-  }
-
-  /**
    * Starts the HTTP server and begins listening for connections.
    *
    * This method is the primary way to run an MCP server as a standalone HTTP service.
@@ -3979,7 +3928,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
-        this.app,
+        this._rootApp,
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
@@ -3988,7 +3937,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
+      baseRoute: "/_mcp-use/widgets",
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
@@ -4024,15 +3973,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Track server run event
     this._trackServerRun("http");
 
-    // Finalize the sub-mount now that all internal and user routes are
-    // registered on `this.app`. Hono snapshots sub-app routes at
-    // `route()` time, so this has to happen after `mountMcp`, `mountWidgets`,
-    // `mountInspector`, and any user code that called `server.app.use/get`.
-    this._finalizeRouteMount();
-
     // Start server using runtime-aware helper. Serve from `_rootApp` so the
-    // outer Hono (with global middleware) receives all requests and the
-    // sub-mount under `basePath` dispatches user/MCP routes correctly.
+    // outer Hono (with global middleware) receives all requests; routes
+    // registered via `this.app.basePath()` are already on the same router.
     const httpHandle = await startServer(
       this._rootApp,
       this.serverPort,
@@ -4118,7 +4061,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
-        this.app,
+        this._rootApp,
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
@@ -4128,7 +4071,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     console.log("[MCP] Mounting widgets");
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
+      baseRoute: "/_mcp-use/widgets",
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
@@ -4148,15 +4091,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     const provider = options?.provider || "fetch";
     this._trackServerRun(provider);
 
-    // Finalize the sub-mount now that all internal routes are registered.
-    // Same rationale as listen(): Hono snapshots sub-app routes at
-    // `route()` time, so the call has to happen after MCP/widgets/inspector
-    // mounting completes.
-    this._finalizeRouteMount();
-
-    // Wrap the fetch handler to ensure it always returns a Promise<Response>.
-    // Serve from `_rootApp` so global middleware runs and the sub-mount at
-    // `basePath` dispatches correctly when configured.
+    // Serve from `_rootApp` so global middleware runs; basePath-prefixed
+    // routes registered via `this.app` share the same underlying router.
     const fetchHandler = this._rootApp.fetch.bind(this._rootApp);
 
     // Handle platform-specific path rewriting and CORS

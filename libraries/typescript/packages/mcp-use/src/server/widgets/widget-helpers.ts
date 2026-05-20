@@ -187,8 +187,8 @@ export async function readBuildManifest(): Promise<{
   try {
     const manifestPath = pathHelpers.join(
       isDeno ? "." : getCwd(),
-      "dist",
-      "mcp-use.json"
+      ".mcp-use",
+      "manifest.json"
     );
     const content = await fsHelpers.readFileSync(manifestPath, "utf8");
     return JSON.parse(content);
@@ -310,8 +310,7 @@ export function getContentType(filename: string): string {
 export function processWidgetHtml(
   html: string,
   widgetName: string,
-  baseUrl: string,
-  basePath: string = ""
+  baseUrl: string
 ): string {
   let processedHtml = html;
 
@@ -347,22 +346,26 @@ export function processWidgetHtml(
       }
     }
 
-    // Replace relative paths that start with /mcp-use for scripts and CSS with absolute URLs
+    // Rewrite legacy `/mcp-use/widgets/...` references to the new
+    // basePath-agnostic `/_mcp-use/widgets/...` root. Emitted as bare
+    // absolute paths so the browser resolves them against the document
+    // origin — no baseUrl/basePath interpolation needed.
     processedHtml = processedHtml.replace(
-      /src="\/mcp-use\/widgets\/([^"]+)"/g,
-      `src="${baseUrl}${basePath}/mcp-use/widgets/$1"`
+      /src="\/(?:_)?mcp-use\/widgets\/([^"]+)"/g,
+      `src="/_mcp-use/widgets/$1"`
     );
     processedHtml = processedHtml.replace(
-      /href="\/mcp-use\/widgets\/([^"]+)"/g,
-      `href="${baseUrl}${basePath}/mcp-use/widgets/$1"`
+      /href="\/(?:_)?mcp-use\/widgets\/([^"]+)"/g,
+      `href="/_mcp-use/widgets/$1"`
     );
 
-    // Add window.__getFile and window.__mcpPublicUrl to head
-    // Use slugified name for URL routing
+    // Add window.__getFile and window.__mcpPublicUrl to head.
+    // The `_mcp-use/` namespace lives at the root regardless of basePath,
+    // so we emit bare absolute paths.
     const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}${basePath}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}${basePath}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "/_mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "/_mcp-use/public";</script>`
     );
   }
 
@@ -700,7 +703,7 @@ async function readWidgetHtml(
  * ```typescript
  * await registerWidgetFromTemplate(
  *   'kanban-board',
- *   './dist/resources/widgets/kanban-board/index.html',
+ *   './.mcp-use/widgets/kanban-board/index.html',
  *   { title: 'Kanban Board' },
  *   serverConfig,
  *   registerWidget,
@@ -712,7 +715,7 @@ export async function registerWidgetFromTemplate(
   widgetName: string,
   htmlPath: string,
   metadata: Record<string, unknown>,
-  serverConfig: { serverBaseUrl: string; cspUrls: string[]; basePath?: string },
+  serverConfig: { serverBaseUrl: string; cspUrls: string[] },
   registerWidget: import("./widget-types.js").RegisterWidgetCallback,
   isDev: boolean = false
 ): Promise<void> {
@@ -723,12 +726,7 @@ export async function registerWidgetFromTemplate(
   }
 
   // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(
-    html,
-    widgetName,
-    serverConfig.serverBaseUrl,
-    serverConfig.basePath ?? ""
-  );
+  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
@@ -748,11 +746,11 @@ export async function registerWidgetFromTemplate(
 /**
  * Setup static file serving routes for public files
  *
- * Creates an HTTP route to serve files from the public/ or dist/public/ directory.
+ * Creates an HTTP route to serve files from the public/ or .mcp-use/public/ directory.
  * This function encapsulates the common pattern of serving static files.
  *
  * @param app - Hono app instance to mount routes on
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from .mcp-use/public (production) or public (dev)
  *
  * @example
  * ```typescript
@@ -767,16 +765,14 @@ export function setupPublicRoutes(
   app: HonoType,
   useDistDirectory: boolean = false
 ): void {
-  // Register on the passed-in app at the bare path. When the caller passes
-  // the inner (sub-mounted) Hono, this becomes `${basePath}/mcp-use/public/*`
-  // externally; otherwise it lives at root.
-  const routePrefix = "/mcp-use/public/";
+  // Register on the outer (root) app at `/_mcp-use/public/*` so public
+  // assets are reachable at a stable, basePath-agnostic URL.
+  const routePrefix = "/_mcp-use/public/";
   app.get(`${routePrefix}*`, async (c: Context) => {
-    // `c.req.path` is the full original URL path even inside a sub-mount,
-    // so split on `/mcp-use/public/` (the static literal) to recover the
-    // file portion regardless of any externally-applied prefix.
     const filePath = c.req.path.split(routePrefix)[1] ?? "";
-    const fsBase = useDistDirectory ? "dist/public" : "public";
+    // Production reads from `.mcp-use/public` (built output). Dev reads
+    // from the user's source `public/` directory.
+    const fsBase = useDistDirectory ? ".mcp-use/public" : "public";
     const fullPath = pathHelpers.join(getCwd(), fsBase, filePath);
 
     try {
@@ -803,7 +799,7 @@ export function setupPublicRoutes(
  *
  * @param app - Hono app instance to mount routes on
  * @param faviconPath - Path to favicon file relative to public directory
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from .mcp-use/public (production) or public (dev)
  *
  * @example
  * ```typescript
@@ -824,7 +820,7 @@ export function setupFaviconRoute(
   }
 
   const handler = async (c: Context) => {
-    const fsBase = useDistDirectory ? "dist/public" : "public";
+    const fsBase = useDistDirectory ? ".mcp-use/public" : "public";
     const fullPath = pathHelpers.join(getCwd(), fsBase, faviconPath);
 
     try {
@@ -845,7 +841,8 @@ export function setupFaviconRoute(
     }
   };
 
-  // Register at bare /favicon.ico. Callers should pass the outer (_rootApp)
-  // so browsers' implicit `GET /favicon.ico` resolves regardless of basePath.
+  // Register at bare /favicon.ico. Callers should pass the underlying root
+  // Hono so browsers' implicit `GET /favicon.ico` resolves regardless of
+  // basePath.
   app.get("/favicon.ico", handler);
 }

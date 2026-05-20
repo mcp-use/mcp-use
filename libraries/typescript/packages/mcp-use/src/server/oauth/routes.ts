@@ -187,33 +187,49 @@ function createTokenHandler(
  * - POST /token - Forwards with injected credentials
  * - GET /.well-known/* - Synthesized metadata pointing to local endpoints
  *
- * @param app - The Hono application instance
+ * @param rootApp - The underlying Hono instance (un-prefixed root view)
  * @param oauth - The OAuth provider or proxy
  * @param baseUrl - The base URL of this server (for metadata)
+ * @param basePath - Optional prefix the server is mounted under (e.g. "/api")
  */
 export function setupOAuthRoutes(
-  app: Hono,
+  rootApp: Hono,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
   basePath: string = ""
 ): void {
   const proxyMode = isOAuthProxy(oauth);
   // `baseUrl` is the server origin (no path); `basePath` is the externally-
-  // visible prefix the inner app is sub-mounted under. The combination is
-  // what goes into discovery metadata so clients land on the right paths.
-  // Route registrations themselves use bare paths — the sub-mount adds the
-  // prefix externally.
+  // visible prefix the server is mounted under. The combination is what
+  // goes into discovery metadata so clients land on the right paths.
+  // - /authorize, /token, /register live under `basePath` — registered on
+  //   a `.basePath()` clone so the prefix is prepended automatically.
+  // - .well-known/* discovery lives at the host root on `rootApp`. Per
+  //   RFC 8414 §3.1, the discovery URL is `<host>/.well-known/<type>` with
+  //   the issuer's path appended *after* the well-known segment — not
+  //   `<host>/<basePath>/.well-known/...`. Registering on `rootApp` makes
+  //   discovery basePath-agnostic for the same reason `/_mcp-use/*` is.
+  const app = basePath ? rootApp.basePath(basePath) : rootApp;
   const prefixedBaseUrl = `${baseUrl}${basePath}`;
-  // Enable CORS for all OAuth-related endpoints
-  // This is required for browser-based MCP clients to discover OAuth metadata
-  app.use(
-    "/.well-known/*",
+  // Enable CORS for all OAuth-related discovery endpoints on rootApp.
+  rootApp.use(
+    "/.well-known/oauth-*",
     cors({
       origin: "*", // Allow all origins for metadata discovery
       allowMethods: ["GET", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
       exposeHeaders: ["Content-Type"],
       maxAge: 86400, // Cache preflight for 24 hours
+    })
+  );
+  rootApp.use(
+    "/.well-known/openid-configuration*",
+    cors({
+      origin: "*",
+      allowMethods: ["GET", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Authorization"],
+      exposeHeaders: ["Content-Type"],
+      maxAge: 86400,
     })
   );
 
@@ -350,15 +366,37 @@ export function setupOAuthRoutes(
     }
   };
 
-  // Register the handler for both OAuth and OpenID Connect discovery endpoints
-  app.get(
+  // Discovery URLs the SDK probes (see `buildDiscoveryUrls` in
+  // @modelcontextprotocol/sdk client/auth.js). The SDK tries the path-aware
+  // variant first (well-known segment with the issuer's path appended), then
+  // falls back to root. Register both so either probe wins.
+  //
+  // With `basePath: "/api"` and issuer `http://host/api`:
+  //   path-aware: GET /.well-known/oauth-authorization-server/api
+  //   root:       GET /.well-known/oauth-authorization-server
+  rootApp.get(
     "/.well-known/oauth-authorization-server",
     handleAuthorizationServerMetadata
   );
-  app.get(
+  rootApp.get(
     "/.well-known/openid-configuration",
     handleAuthorizationServerMetadata
   );
+  if (basePath) {
+    rootApp.get(
+      `/.well-known/oauth-authorization-server${basePath}`,
+      handleAuthorizationServerMetadata
+    );
+    rootApp.get(
+      `/.well-known/openid-configuration${basePath}`,
+      handleAuthorizationServerMetadata
+    );
+    // OIDC Discovery 1.0 style — well-known appended after the path.
+    rootApp.get(
+      `${basePath}/.well-known/openid-configuration`,
+      handleAuthorizationServerMetadata
+    );
+  }
 
   /**
    * OAuth Protected Resource Metadata
@@ -367,32 +405,45 @@ export function setupOAuthRoutes(
    * DCR-direct mode: Points to the actual OAuth provider.
    * Proxy mode: Points to the local server (which proxies to upstream).
    */
-  app.get("/.well-known/oauth-protected-resource", (c: Context) => {
-    // In proxy mode, the authorization server is the local proxy
+  const handleProtectedResourceMetadata = (c: Context) => {
     const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
-
     console.log(`[OAuth] Protected resource metadata request`);
     console.log(`[OAuth]   - Resource: ${prefixedBaseUrl}`);
     console.log(`[OAuth]   - Authorization server: ${authServer}`);
-
     return c.json({
       resource: prefixedBaseUrl,
       authorization_servers: [authServer],
       scopes_supported: oauth.getScopesSupported(),
       bearer_methods_supported: ["header"],
     });
-  });
+  };
 
-  // Path-scoped protected resource metadata per RFC 9728 — declares that the
-  // `/mcp` path specifically is the protected resource.
-  app.get("/.well-known/oauth-protected-resource/mcp", (c: Context) => {
+  const handleProtectedResourceMetadataMcp = (c: Context) => {
     const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
-
     return c.json({
       resource: `${prefixedBaseUrl}/mcp`,
       authorization_servers: [authServer],
       scopes_supported: oauth.getScopesSupported(),
       bearer_methods_supported: ["header"],
     });
-  });
+  };
+
+  rootApp.get(
+    "/.well-known/oauth-protected-resource",
+    handleProtectedResourceMetadata
+  );
+  // Path-scoped protected resource metadata per RFC 9728 — declares the MCP
+  // endpoint as the protected resource.
+  rootApp.get(
+    `/.well-known/oauth-protected-resource${basePath}/mcp`,
+    handleProtectedResourceMetadataMcp
+  );
+  if (basePath) {
+    // Also expose the basePath-scoped variant without the `/mcp` suffix, in
+    // case a client probes the issuer URL (`<host>/<basePath>`) directly.
+    rootApp.get(
+      `/.well-known/oauth-protected-resource${basePath}`,
+      handleProtectedResourceMetadata
+    );
+  }
 }
