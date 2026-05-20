@@ -86,10 +86,14 @@ export function ToolInputForm({
           enum?: string[];
           enumNames?: string[];
           description?: string;
-          required?: boolean;
           nullable?: boolean;
         };
-        typedProp.required = requiredFields.includes(key);
+        // Don't write `required` onto the property — `resolvedProp` aliases
+        // the live tool inputSchema, and `required` belongs on the parent
+        // schema as a string[], not on properties as a boolean. Mutating it
+        // here corrupts the schema for downstream consumers (e.g. the chat
+        // tab's request to Anthropic, which rejects it under draft 2020-12).
+        const isRequired = requiredFields.includes(key);
 
         // Get the current value and convert to string for display
         const currentValue = toolArgs[key];
@@ -127,7 +131,7 @@ export function ToolInputForm({
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor={key} className="text-sm font-medium">
                   {key}
-                  {typedProp?.required && (
+                  {isRequired && (
                     <span className="text-red-500 ml-1">*</span>
                   )}
                 </Label>
@@ -182,7 +186,7 @@ export function ToolInputForm({
             <div key={key} className="space-y-2">
               <Label htmlFor={key} className="text-sm font-medium">
                 {key}
-                {typedProp.required && (
+                {isRequired && (
                   <span className="text-red-500 ml-1">*</span>
                 )}
               </Label>
@@ -222,7 +226,7 @@ export function ToolInputForm({
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor={key} className="text-sm font-medium">
                 {key}
-                {typedProp?.required && (
+                {isRequired && (
                   <span className="text-red-500 ml-1">*</span>
                 )}
               </Label>
