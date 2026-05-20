@@ -88,7 +88,6 @@ export function ToolInputForm({
           description?: string;
           nullable?: boolean;
         };
-        // Don't write onto `resolvedProp` — it aliases the live tool inputSchema.
         const isRequired = requiredFields.includes(key);
 
         // Get the current value and convert to string for display
