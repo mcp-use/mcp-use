@@ -316,13 +316,9 @@ export function processWidgetHtml(
 
   // Inject or replace base tag with server base URL
   if (baseUrl && processedHtml) {
-    // Remove HTML comments temporarily to avoid matching base tags inside comments
-    let htmlWithoutComments = processedHtml;
-    let prevHtmlWithoutComments;
-    do {
-      prevHtmlWithoutComments = htmlWithoutComments;
-      htmlWithoutComments = htmlWithoutComments.replace(/<!--[\s\S]*?-->/g, "");
-    } while (prevHtmlWithoutComments !== htmlWithoutComments);
+    // Strip HTML comments before probing for a <base> tag so we don't match
+    // one inside a comment. HTML comments can't nest, so one pass suffices.
+    const htmlWithoutComments = processedHtml.replace(/<!--[\s\S]*?-->/g, "");
 
     // Try to replace existing base tag (only if not in comments)
     const baseTagRegex = /<base\s+[^>]*\/?>/i;
@@ -776,15 +772,11 @@ export function setupPublicRoutes(
     const fullPath = pathHelpers.join(getCwd(), fsBase, filePath);
 
     try {
-      if (await fsHelpers.existsSync(fullPath)) {
-        const content = await fsHelpers.readFile(fullPath);
-        const contentType = getContentType(filePath);
-        return new Response(content, {
-          status: 200,
-          headers: { "Content-Type": contentType },
-        });
-      }
-      return c.notFound();
+      const content = await fsHelpers.readFile(fullPath);
+      return new Response(content, {
+        status: 200,
+        headers: { "Content-Type": getContentType(filePath) },
+      });
     } catch {
       return c.notFound();
     }
@@ -824,18 +816,14 @@ export function setupFaviconRoute(
     const fullPath = pathHelpers.join(getCwd(), fsBase, faviconPath);
 
     try {
-      if (await fsHelpers.existsSync(fullPath)) {
-        const content = await fsHelpers.readFile(fullPath);
-        const contentType = getContentType(faviconPath);
-        return new Response(content, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType,
-            "Cache-Control": "public, max-age=31536000", // Cache for 1 year
-          },
-        });
-      }
-      return c.notFound();
+      const content = await fsHelpers.readFile(fullPath);
+      return new Response(content, {
+        status: 200,
+        headers: {
+          "Content-Type": getContentType(faviconPath),
+          "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+        },
+      });
     } catch {
       return c.notFound();
     }

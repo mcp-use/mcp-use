@@ -81,7 +81,7 @@ export async function mountWidgets(
   // `/_mcp-use/widgets/*`, `/_mcp-use/public/*`, and `/favicon.ico` all live
   // at the host root regardless of basePath. Pass the underlying root Hono
   // so registrations bypass any basePath prefix.
-  const rootApp = (server as any)._rootApp ?? (server as any).app;
+  const rootApp = (server as any)._rootApp as import("hono").Hono;
 
   if (isProductionMode() || isDeno) {
     console.log("[WIDGETS] Mounting widgets in production mode");

@@ -68,14 +68,11 @@ export function setupWidgetRoutes(
     );
 
     try {
-      if (await fsHelpers.existsSync(assetPath)) {
-        const content = await fsHelpers.readFile(assetPath);
-        return new Response(content, {
-          status: 200,
-          headers: { "Content-Type": getContentType(assetFile) },
-        });
-      }
-      return c.notFound();
+      const content = await fsHelpers.readFile(assetPath);
+      return new Response(content, {
+        status: 200,
+        headers: { "Content-Type": getContentType(assetFile) },
+      });
     } catch {
       return c.notFound();
     }
