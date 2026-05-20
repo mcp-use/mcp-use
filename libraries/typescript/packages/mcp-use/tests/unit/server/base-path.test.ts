@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MCPServer } from "../../../src/server/index.js";
+import { MCPServer, oauthSupabaseProvider } from "../../../src/server/index.js";
 import { normalizeBasePath } from "../../../src/server/utils/server-helpers.js";
 
 describe("MCPServer basePath", () => {
@@ -131,26 +131,93 @@ describe("MCPServer basePath", () => {
       expect(root.status).toBe(404);
     });
 
-    it("serves root serverinfo with basePath-aware URLs", async () => {
+    it("mounts framework-internal assets at /_mcp-use/ regardless of basePath", async () => {
       const server = new MCPServer({
-        name: "serverinfo-base-path",
+        name: "internal-assets-base-path",
         version: "1.0.0",
         basePath: "/api",
       });
 
       const handler = await server.getHandler();
-      const response = await handler(
+
+      // `_mcp-use/*` is basePath-agnostic — a missing widget still returns
+      // 404 rather than falling through to the inner sub-mount.
+      const internal = await handler(
+        new Request("http://localhost/_mcp-use/public/missing.png")
+      );
+      expect(internal.status).toBe(404);
+
+      // The legacy `/__mcp-use/serverinfo` HTTP endpoint is gone; the same
+      // information now lives in `.mcp-use/server-info.json` after listen().
+      const removed = await handler(
         new Request("http://localhost/__mcp-use/serverinfo")
       );
+      expect(removed.status).toBe(404);
+    });
 
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({
+    it("serves OAuth discovery at root and path-aware paths (basePath-agnostic)", async () => {
+      const server = new MCPServer({
+        name: "oauth-discovery-base-path",
+        version: "1.0.0",
         basePath: "/api",
-        mcpPath: "/api/mcp",
-        inspectorPath: "/api/inspector",
-        mcpUrl: "http://localhost/api/mcp",
-        inspectorUrl: "http://localhost/api/inspector",
+        baseUrl: "http://localhost:3000",
+        oauth: oauthSupabaseProvider({ projectId: "abc123" }),
       });
+
+      const handler = await server.getHandler();
+
+      // 1. Root-level RFC 9728 protected resource metadata (SDK fallback)
+      const root = await handler(
+        new Request(
+          "http://localhost:3000/.well-known/oauth-protected-resource"
+        )
+      );
+      expect(root.status).toBe(200);
+      const rootBody = (await root.json()) as {
+        resource: string;
+        authorization_servers: string[];
+      };
+      expect(rootBody.resource).toBe("http://localhost:3000/api");
+      expect(rootBody.authorization_servers).toEqual([
+        "https://abc123.supabase.co/auth/v1",
+      ]);
+
+      // 2. Path-scoped RFC 9728: <host>/.well-known/oauth-protected-resource/api/mcp
+      //    (what the SDK's `discoverMetadataWithFallback` probes first)
+      const scoped = await handler(
+        new Request(
+          "http://localhost:3000/.well-known/oauth-protected-resource/api/mcp"
+        )
+      );
+      expect(scoped.status).toBe(200);
+      const scopedBody = (await scoped.json()) as { resource: string };
+      expect(scopedBody.resource).toBe("http://localhost:3000/api/mcp");
+
+      // 3. Root RFC 8414 authorization server metadata route is mounted
+      //    (DCR-direct mode proxies upstream — we just assert the route
+      //    exists, not the body, since upstream is network-dependent).
+      const authMeta = await handler(
+        new Request(
+          "http://localhost:3000/.well-known/oauth-authorization-server"
+        )
+      );
+      expect(authMeta.status).not.toBe(404);
+
+      // 4. Path-aware RFC 8414: <host>/.well-known/oauth-authorization-server/api
+      const authMetaPath = await handler(
+        new Request(
+          "http://localhost:3000/.well-known/oauth-authorization-server/api"
+        )
+      );
+      expect(authMetaPath.status).not.toBe(404);
+
+      // 5. /token stays under basePath. Root /token must 404 — that's the
+      //    bug class this restructure prevents for embedded apps where
+      //    arbitrary host routes would otherwise collide.
+      const rootToken = await handler(
+        new Request("http://localhost:3000/token", { method: "POST" })
+      );
+      expect(rootToken.status).toBe(404);
     });
   });
 

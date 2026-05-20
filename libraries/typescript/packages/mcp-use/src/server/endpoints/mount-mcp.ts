@@ -264,7 +264,7 @@ export async function mountMcp(
         if (iconSrc) {
           iconUrl = iconSrc.startsWith("http")
             ? iconSrc
-            : `${origin}${basePath}/mcp-use/public/${iconSrc.replace(/^\//, "")}`;
+            : `${origin}/_mcp-use/public/${iconSrc.replace(/^\//, "")}`;
         }
         const regs = instance.registrations;
         const landingTools =

@@ -48,7 +48,7 @@ export function buildWidgetUrl(
   const slugifiedWidget = slugifyWidgetName(widget);
 
   const url = new URL(
-    `/mcp-use/widgets/${slugifiedWidget}`,
+    `/_mcp-use/widgets/${slugifiedWidget}`,
     `${config.baseUrl}:${config.port}`
   );
 

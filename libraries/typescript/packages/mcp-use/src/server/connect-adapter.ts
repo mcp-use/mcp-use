@@ -109,7 +109,7 @@ export async function adaptMiddleware(
  * Based on @hono/connect approach using node-mocks-http
  *
  * @param connectMiddleware - The Connect middleware handler
- * @param middlewarePath - The path pattern the middleware is mounted at (e.g., "/mcp-use/widgets/*")
+ * @param middlewarePath - The path pattern the middleware is mounted at (e.g., "/_mcp-use/widgets/*")
  * @returns A Hono middleware function
  */
 export async function adaptConnectMiddleware(
