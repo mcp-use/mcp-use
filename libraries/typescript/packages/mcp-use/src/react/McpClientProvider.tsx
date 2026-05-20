@@ -620,6 +620,7 @@ function McpServerWrapper({
 
     if (
       !prevServer ||
+      prevServer.name !== server.name ||
       prevServer.state !== server.state ||
       prevServer.error !== server.error ||
       prevServer.authUrl !== server.authUrl ||
