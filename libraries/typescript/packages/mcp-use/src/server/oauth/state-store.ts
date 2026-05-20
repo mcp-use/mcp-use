@@ -53,17 +53,42 @@ interface StoredEntry {
 }
 
 /**
+ * Minimum interval between full expiry sweeps in the in-memory store. Sweeps
+ * piggyback on `set` calls; abandoned authorize flows are still bounded by
+ * this interval even if no later read reaches them.
+ */
+const SWEEP_INTERVAL_MS = 60 * 1000;
+
+/**
  * Default in-memory {@link OAuthStateStore} backed by a `Map`. Suitable for
- * single-process MCP servers. Entries are lazily expired on read.
+ * single-process MCP servers.
+ *
+ * Records are consumed on read (one-shot). To keep abandoned authorize flows
+ * from accumulating, `set` amortises a full expiry sweep once per
+ * {@link SWEEP_INTERVAL_MS}.
  */
 export function createInMemoryStateStore(): OAuthStateStore {
   const entries = new Map<string, StoredEntry>();
+  let lastSweepAt = 0;
+
+  function sweepExpired(now: number): void {
+    for (const [key, entry] of entries) {
+      if (entry.expiresAt < now) {
+        entries.delete(key);
+      }
+    }
+    lastSweepAt = now;
+  }
 
   return {
     set(key, record, ttlMs) {
+      const now = Date.now();
+      if (now - lastSweepAt > SWEEP_INTERVAL_MS) {
+        sweepExpired(now);
+      }
       entries.set(key, {
         record,
-        expiresAt: Date.now() + ttlMs,
+        expiresAt: now + ttlMs,
       });
     },
     get(key) {
