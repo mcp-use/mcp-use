@@ -88,11 +88,7 @@ export function ToolInputForm({
           description?: string;
           nullable?: boolean;
         };
-        // Don't write `required` onto the property — `resolvedProp` aliases
-        // the live tool inputSchema, and `required` belongs on the parent
-        // schema as a string[], not on properties as a boolean. Mutating it
-        // here corrupts the schema for downstream consumers (e.g. the chat
-        // tab's request to Anthropic, which rejects it under draft 2020-12).
+        // Don't write onto `resolvedProp` — it aliases the live tool inputSchema.
         const isRequired = requiredFields.includes(key);
 
         // Get the current value and convert to string for display
