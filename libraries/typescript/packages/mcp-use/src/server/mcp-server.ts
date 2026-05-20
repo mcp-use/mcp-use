@@ -41,7 +41,7 @@ import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.
 
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
-import { requestLogger } from "./logging.js";
+import { createRequestLogger } from "./logging.js";
 import {
   getActiveSessions,
   sendNotification,
@@ -2432,7 +2432,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // call time; routes added to the sub-app after that don't propagate.
     // When `basePath` is unset, inner and outer are the same instance —
     // zero overhead, identical to legacy behavior.
-    this._rootApp = createHonoApp(requestLogger, {
+    this._rootApp = createHonoApp(createRequestLogger(this.basePath), {
       cors: this.config.cors,
       allowedOrigins: this.config.allowedOrigins,
     });

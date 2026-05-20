@@ -92,6 +92,12 @@ export async function mountWidgetsDev(
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
   const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const basePath = serverConfig.basePath ?? "";
+  // Hono leaves `c.req.path` / `c.req.raw.url` unprefixed across sub-mounts,
+  // so any code that inspects URLs (instead of using the route matcher) needs
+  // the full external prefix. Route patterns passed to `app.use(...)` stay as
+  // `baseRoute` — Hono's matcher composes them with the sub-mount automatically.
+  const externalRoute = `${basePath}${baseRoute}`;
   // Resolution order for the widgets directory:
   //   1. Caller-supplied `options.resourcesDir`
   //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
@@ -302,9 +308,10 @@ if (container && Component) {
 
     // Include Vite client and React refresh preamble explicitly
     // This is needed when loading in sandboxed iframes where auto-injection may not work
-    // Use the base route path (not full URL) so URLs resolve against the document origin.
-    // This works both locally and behind reverse proxies (ngrok, E2B, etc.)
-    const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
+    // Use the externally-visible route (basePath + baseRoute) so URLs the
+    // browser actually hits resolve to our Vite mount, not the unprefixed
+    // path which only matches when basePath is empty.
+    const fullBaseUrl = `${serverConfig.serverBaseUrl}${externalRoute}`;
     const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -313,7 +320,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${serverConfig.basePath ?? ""}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${basePath}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -546,8 +553,9 @@ if (container && Component) {
 }
 `;
 
-        // Use the base route path for URLs so they resolve against the document origin
-        const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
+        // Use the externally-visible route (basePath + baseRoute) for URLs so
+        // the browser hits our Vite mount even when basePath is configured.
+        const fullBaseUrl = `${serverConfig.serverBaseUrl}${externalRoute}`;
         const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -556,7 +564,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${serverConfig.basePath ?? ""}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${basePath}/mcp-use/public/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -1147,7 +1155,12 @@ export default PostHog;
 
   const viteServer = await createServer({
     root: tempDir,
-    base: baseRoute + "/",
+    // Vite's HMR client derives its WebSocket URL from `base`, and asset URLs
+    // emitted by Vite's transform pass also use it. We point both at the
+    // externally-visible route so the browser hits `${basePath}/mcp-use/widgets/...`
+    // and the WS upgrade matches the proxy set up in setupWsProxy below.
+    // Without basePath, this equals `baseRoute + "/"` — same as before.
+    base: externalRoute + "/",
     plugins: [
       serverOnlyGuard,
       zodJitlessPlugin,
@@ -1296,7 +1309,9 @@ export default PostHog;
 
     // Store the proxy setup function - it will be called when the HTTP server is available
     const hmrPort = viteHmrPort;
-    const widgetRoute = baseRoute;
+    // `req.url` here is the raw Node IncomingMessage URL, which includes any
+    // configured basePath — match against the externally-visible route.
+    const widgetRoute = externalRoute;
     // Pre-import net module at setup time (works in both CJS and ESM)
     const netModule = await import("node:net");
     const setupWsProxy = (httpServer: import("http").Server) => {
@@ -1326,15 +1341,23 @@ export default PostHog;
       });
     };
 
-    // Store for later use when HTTP server is available
+    // Store for later use when HTTP server is available. The lifecycle
+    // helper reads this off the app it actually hands to `startServer` —
+    // when `basePath` is set, that's the outer `_rootApp`, not this inner
+    // app. Stash on both so the lookup hits regardless.
     (app as any).__viteWsProxy = setupWsProxy;
+    if (serverConfig.rootApp && serverConfig.rootApp !== app) {
+      (serverConfig.rootApp as any).__viteWsProxy = setupWsProxy;
+    }
   }
 
   // Custom middleware to handle widget-specific paths
   app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
-    const widgetMatch = pathname.replace(baseRoute, "").match(/^\/([^/]+)/);
+    // `pathname` is the full URL including any configured basePath, so strip
+    // the externally-visible route (basePath + baseRoute), not just baseRoute.
+    const widgetMatch = pathname.replace(externalRoute, "").match(/^\/([^/]+)/);
 
     if (widgetMatch) {
       // URL contains slugified widget name, need to find original widget name
@@ -1347,14 +1370,17 @@ export default PostHog;
       if (widget) {
         // If requesting the root of a widget, serve its index.html
         // Use slugified name for URL paths
-        const relativePath = pathname.replace(baseRoute, "");
+        const relativePath = pathname.replace(externalRoute, "");
         if (
           relativePath === `/${slugifiedNameFromUrl}` ||
           relativePath === `/${slugifiedNameFromUrl}/`
         ) {
-          // Rewrite the URL for Vite by creating a new request with modified URL
+          // Rewrite the URL for Vite by creating a new request with modified URL.
+          // Keep the external prefix on the new pathname — downstream middleware
+          // (notably the connect adapter for Vite) strips it before handing
+          // the URL to Vite, so the prefix must be present here.
           const newUrl = new URL(c.req.url);
-          newUrl.pathname = `${baseRoute}/${slugifiedNameFromUrl}/index.html`;
+          newUrl.pathname = `${externalRoute}/${slugifiedNameFromUrl}/index.html`;
           // Create a new request with modified URL and update the context
           const newRequest = new Request(newUrl.toString(), c.req.raw);
           // Update the request in the context by creating a new context-like object
@@ -1374,10 +1400,15 @@ export default PostHog;
     await next();
   });
 
-  // Mount the single Vite server for all widgets using adapter
+  // Mount the single Vite server for all widgets using adapter.
+  // The adapter strips its `middlewarePath` prefix from `c.req.raw.url` before
+  // handing the request to Vite. That URL still has any configured basePath,
+  // so we pass the externally-visible route (basePath + baseRoute) — otherwise
+  // Vite receives e.g. `/api/mcp-use/widgets/foo` and 404s because its `base`
+  // is `/mcp-use/widgets/`.
   const viteMiddleware = await adaptConnectMiddleware(
     viteServer.middlewares,
-    `${baseRoute}/*`
+    `${externalRoute}/*`
   );
   app.use(`${baseRoute}/*`, viteMiddleware);
 
