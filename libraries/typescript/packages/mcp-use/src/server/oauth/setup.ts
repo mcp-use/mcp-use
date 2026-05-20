@@ -64,6 +64,7 @@ export async function setupOAuthForServer(
   const externalAuthorize = `${basePath}/authorize`;
   const externalToken = `${basePath}/token`;
   const externalRegister = `${basePath}/register`;
+  const externalMcp = `${basePath}/mcp`;
   const externalWellKnown = `/.well-known/*`;
 
   if (proxyMode) {
@@ -86,7 +87,7 @@ export async function setupOAuthForServer(
   const app = basePath ? rootApp.basePath(basePath) : rootApp;
   app.use("/mcp/*", middleware);
   console.log(
-    `[OAuth] Bearer authentication enabled on ${basePath}/mcp/* routes`
+    `[OAuth] Bearer authentication enabled on ${externalMcp}/* routes`
   );
 
   return {

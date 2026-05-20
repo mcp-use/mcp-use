@@ -93,6 +93,7 @@ import {
   logRegisteredItems as logRegisteredItemsHelper,
   normalizeBasePath,
   parseTemplateUri as parseTemplateUriHelper,
+  resolveIconUrls,
   rewriteSupabaseRequest,
   startServer,
 } from "./utils/index.js";
@@ -2383,21 +2384,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       console.log(`[MCP] Auto-selected favicon from icons: ${this.favicon}`);
     }
 
-    // Helper to convert relative icon paths to absolute URLs.
-    // Public assets are served at `/_mcp-use/public/` (basePath-agnostic).
-    const processIconUrls = (
-      icons: ServerConfig["icons"],
-      baseUrl?: string
-    ) => {
-      if (!icons || !baseUrl) return icons;
-      return icons.map((icon) => ({
-        ...icon,
-        src: icon.src.startsWith("http")
-          ? icon.src
-          : `${baseUrl}/_mcp-use/public/${icon.src}`,
-      }));
-    };
-
     // Create native SDK server instance with capabilities
     this.nativeServer = new OfficialMcpServer(
       {
@@ -2406,7 +2392,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: config.description,
         title: config.title,
         websiteUrl: config.websiteUrl,
-        icons: processIconUrls(config.icons, config.baseUrl),
+        icons: resolveIconUrls(config.icons, config.baseUrl),
       },
       {
         capabilities: {
@@ -2672,21 +2658,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param sessionId - Optional session ID to store registered refs for hot reload support
    */
   public getServerForSession(sessionId?: string): OfficialMcpServer {
-    // Helper to convert relative icon paths to absolute URLs.
-    // Public assets live at `/_mcp-use/public/` regardless of basePath.
-    const processIconUrls = (
-      icons: ServerConfig["icons"],
-      baseUrl?: string
-    ) => {
-      if (!icons || !baseUrl) return icons;
-      return icons.map((icon) => ({
-        ...icon,
-        src: icon.src.startsWith("http")
-          ? icon.src
-          : `${baseUrl}/_mcp-use/public/${icon.src}`,
-      }));
-    };
-
     const newServer = new OfficialMcpServer(
       {
         name: this.config.name,
@@ -2694,7 +2665,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: this.config.description,
         title: this.config.title,
         websiteUrl: this.config.websiteUrl,
-        icons: processIconUrls(this.config.icons, this.serverBaseUrl),
+        icons: resolveIconUrls(this.config.icons, this.serverBaseUrl),
       },
       {
         capabilities: {
@@ -3753,6 +3724,39 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Run the shared mount sequence used by both `listen()` and `getHandler()`:
+   * OAuth setup (if configured) → widgets → MCP transport → inspector. Each
+   * step internally guards against double-mounting, so it's safe to call this
+   * more than once across the same lifecycle.
+   */
+  private async _setupAndMount(): Promise<void> {
+    if (this.oauthProvider && !this.oauthSetupState.complete) {
+      await setupOAuthForServer(
+        this._rootApp,
+        this.oauthProvider,
+        this.getServerBaseUrl(),
+        this.oauthSetupState,
+        this.basePath
+      );
+    }
+
+    await mountWidgets(this as any, {
+      baseRoute: "/_mcp-use/widgets",
+      // Only forward `resourcesDir` when the env var is set. That lets
+      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
+      // (via `--mcp-dir src/mcp`) without forcing the user to configure
+      // anything in their server file. When the env var is unset,
+      // `mountWidgets` applies its own default (`"resources"`).
+      ...(process.env.MCP_USE_WIDGETS_DIR
+        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
+        : {}),
+    });
+    await this.mountMcp();
+    // Mount inspector BEFORE Vite middleware so it claims /inspector routes.
+    await this.mountInspector();
+  }
+
+  /**
    * Starts the HTTP server and begins listening for connections.
    *
    * This method is the primary way to run an MCP server as a standalone HTTP service.
@@ -3925,32 +3929,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverPort
     );
 
-    // Setup OAuth before mounting widgets/MCP (if configured)
-    if (this.oauthProvider && !this.oauthSetupState.complete) {
-      await setupOAuthForServer(
-        this._rootApp,
-        this.oauthProvider,
-        this.getServerBaseUrl(),
-        this.oauthSetupState,
-        this.basePath
-      );
-    }
-
-    await mountWidgets(this as any, {
-      baseRoute: "/_mcp-use/widgets",
-      // Only forward `resourcesDir` when the env var is set. That lets
-      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
-      // (via `--mcp-dir src/mcp`) without forcing the user to configure
-      // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
-      ...(process.env.MCP_USE_WIDGETS_DIR
-        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
-        : {}),
-    });
-    await this.mountMcp();
-
-    // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
-    await this.mountInspector();
+    await this._setupAndMount();
 
     // Log registered items before starting server
     this.logRegisteredItems();
@@ -4058,35 +4037,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
-    // Setup OAuth before mounting widgets/MCP (if configured)
-    if (this.oauthProvider && !this.oauthSetupState.complete) {
-      await setupOAuthForServer(
-        this._rootApp,
-        this.oauthProvider,
-        this.getServerBaseUrl(),
-        this.oauthSetupState,
-        this.basePath
-      );
-    }
-
-    console.log("[MCP] Mounting widgets");
-    await mountWidgets(this as any, {
-      baseRoute: "/_mcp-use/widgets",
-      // Only forward `resourcesDir` when the env var is set. That lets
-      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
-      // (via `--mcp-dir src/mcp`) without forcing the user to configure
-      // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
-      ...(process.env.MCP_USE_WIDGETS_DIR
-        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
-        : {}),
-    });
-    console.log("[MCP] Mounted widgets");
-    await this.mountMcp();
-    console.log("[MCP] Mounted MCP");
-    console.log("[MCP] Mounting inspector");
-    await this.mountInspector();
-    console.log("[MCP] Mounted inspector");
+    await this._setupAndMount();
 
     const provider = options?.provider || "fetch";
     this._trackServerRun(provider);
