@@ -26,12 +26,18 @@ import {
 
 declare const process: { env: Record<string, string | undefined> };
 
+// With `basePath: "/mcp-server"`, every route on `server.app` — including
+// the Better Auth handler at `/api/auth/**`, the sign-in/consent pages, and
+// the manually-registered `.well-known/*` metadata — moves under the prefix.
+// So tell Better Auth its authURL is `http://localhost:3000/mcp-server/api/auth`
+// and configure the GitHub OAuth callback to match the prefixed path.
 const server = new MCPServer({
   name: "better-auth-oauth-example",
   version: "1.0.0",
   description: "MCP server with Better Auth OAuth authentication",
+  basePath: "/mcp-server",
   oauth: oauthBetterAuthProvider({
-    authURL: "http://localhost:3000/api/auth",
+    authURL: "http://localhost:3000/mcp-server/api/auth",
   }),
 });
 
@@ -211,6 +217,7 @@ server.tool(
 
 server.listen({ port: 3000 }).then(() => {
   console.log("Better Auth OAuth MCP Server running on http://localhost:3000");
-  console.log("MCP Inspector: http://localhost:3000/inspector");
+  console.log("MCP Inspector: http://localhost:3000/mcp-server/inspector");
+  console.log("MCP transport: http://localhost:3000/mcp-server/mcp");
   console.log("Auth API: http://localhost:3000/api/auth");
 });
