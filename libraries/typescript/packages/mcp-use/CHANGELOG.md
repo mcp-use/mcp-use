@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.29.0-canary.14
+
+### Patch Changes
+
+- 803fa89: Treat `name` as a meaningful change in `McpServerWrapper` so alias-only edits propagate through `onUpdate` and the Inspector tile heading reflects the new alias immediately.
+  - @mcp-use/cli@3.2.1-canary.14
+  - @mcp-use/inspector@7.0.0-canary.14
+
 ## 1.29.0-canary.13
 
 ### Patch Changes
