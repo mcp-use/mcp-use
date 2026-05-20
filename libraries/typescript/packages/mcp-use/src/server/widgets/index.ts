@@ -28,7 +28,7 @@ export { uiResourceRegistration } from "./ui-resource-registration.js";
  * In production mode: serves pre-built static widgets
  *
  * @param options - Configuration options
- * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+ * @param options.baseRoute - Base route for widgets (defaults to '/_mcp-use/widgets')
  * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
  * @returns Promise that resolves when all widgets are mounted
  */
@@ -49,12 +49,6 @@ export async function mountWidgets(
     favicon: (server as any).favicon,
     publicRoutesMode: (server as any).publicRoutesMode,
     basePath: (server as any).basePath ?? "",
-    /**
-     * Outer Hono so widget setup can register favicon at root regardless of
-     * the basePath sub-mount. Falls back to `(server as any).app` when the
-     * server doesn't expose `_rootApp` (older instances, no basePath).
-     */
-    rootApp: (server as any)._rootApp ?? (server as any).app,
     /** Pre-created HTTP server for Vite HMR WebSocket support */
     httpServer: (server as any)._httpServer as
       | import("http").Server
@@ -84,18 +78,26 @@ export async function mountWidgets(
     (server as any).removeWidgetTool(toolName);
   };
 
-  const app = server.app;
+  // `/_mcp-use/widgets/*`, `/_mcp-use/public/*`, and `/favicon.ico` all live
+  // at the host root regardless of basePath. Pass the underlying root Hono
+  // so registrations bypass any basePath prefix.
+  const rootApp = (server as any)._rootApp ?? (server as any).app;
 
   if (isProductionMode() || isDeno) {
     console.log("[WIDGETS] Mounting widgets in production mode");
     // Setup routes first for production
-    setupWidgetRoutes(app, serverConfig);
+    setupWidgetRoutes(rootApp, serverConfig);
     (server as any).publicRoutesMode = "production";
-    await mountWidgetsProduction(app, serverConfig, registerWidget, options);
+    await mountWidgetsProduction(
+      rootApp,
+      serverConfig,
+      registerWidget,
+      options
+    );
   } else {
     console.log("[WIDGETS] Mounting widgets in development mode");
     await mountWidgetsDev(
-      app,
+      rootApp,
       serverConfig,
       registerWidget,
       updateWidgetTool,

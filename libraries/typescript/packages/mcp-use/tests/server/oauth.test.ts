@@ -70,11 +70,11 @@ describe("server OAuth integration", () => {
   });
 
   it("publishes basePath-prefixed endpoints when configured", async () => {
-    // `setupOAuthRoutes` registers at bare paths; the caller is responsible
-    // for sub-mounting under the prefix. MCPServer does this by routing an
-    // inner Hono on the outer; here we reproduce the same wiring directly.
-    const outer = new Hono();
-    const inner = new Hono();
+    // `setupOAuthRoutes` takes the underlying root Hono plus a basePath.
+    // Internally it registers /authorize, /token, /register on a
+    // `.basePath()` clone (so they live at `${basePath}/...`) and
+    // /.well-known/* on the root (per RFC 8414 §3.1).
+    const app = new Hono();
 
     const proxy = oauthProxy({
       issuer: "https://issuer.example.com",
@@ -85,16 +85,15 @@ describe("server OAuth integration", () => {
       verifyToken: stubVerifyToken,
     });
 
-    const svc = await listenOnRandomPort(outer);
+    const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    // Register OAuth routes on the inner at bare paths (the helper builds
-    // response bodies that include `${baseUrl}${basePath}` for discovery).
-    setupOAuthRoutes(inner, proxy, svc.baseUrl, "/api");
-    outer.route("/api", inner);
+    setupOAuthRoutes(app, proxy, svc.baseUrl, "/api");
 
+    // RFC 8414 §3.1 path-aware variant: well-known appended with the
+    // issuer's path. This is the SDK's preferred probe.
     const response = await fetch(
-      `${svc.baseUrl}/api/.well-known/oauth-authorization-server`
+      `${svc.baseUrl}/.well-known/oauth-authorization-server/api`
     );
     expect(response.status).toBe(200);
     const metadata = await response.json();
@@ -106,21 +105,20 @@ describe("server OAuth integration", () => {
     expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/api/token`);
     expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/api/register`);
 
-    // The protected-resource metadata for the MCP transport should point at
-    // the prefixed transport URL.
+    // The root well-known path should still serve metadata as the SDK's
+    // fallback probe (and for clients that don't append the path).
+    const rootMetadata = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server`
+    );
+    expect(rootMetadata.status).toBe(200);
+
+    // RFC 9728 path-scoped protected resource metadata for the MCP transport.
     const prResponse = await fetch(
-      `${svc.baseUrl}/api/.well-known/oauth-protected-resource/mcp`
+      `${svc.baseUrl}/.well-known/oauth-protected-resource/api/mcp`
     );
     expect(prResponse.status).toBe(200);
     const pr = await prResponse.json();
     expect(pr.resource).toBe(`${svc.baseUrl}/api/mcp`);
-
-    // The root well-known path must NOT serve metadata when basePath is set
-    // (everything is scoped under the prefix per the user's mount).
-    const rootResponse = await fetch(
-      `${svc.baseUrl}/.well-known/oauth-authorization-server`
-    );
-    expect(rootResponse.status).toBe(404);
   });
 
   it("proxies token requests and injects client credentials", async () => {

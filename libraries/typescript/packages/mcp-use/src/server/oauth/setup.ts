@@ -29,14 +29,15 @@ interface OAuthSetupState {
  * - DCR-direct (OAuthProvider): Clients authenticate directly with upstream
  * - Proxy (OAuthProxy): Server proxies OAuth flow with pre-registered credentials
  *
- * @param app - Hono app instance
+ * @param rootApp - Underlying Hono app (the un-prefixed root view)
  * @param oauth - OAuth provider or proxy instance
  * @param baseUrl - Server base URL for OAuth redirects
  * @param state - OAuth setup state to track completion
+ * @param basePath - Optional basePath prefix to scope authorize/token/register under
  * @returns Updated OAuth setup state with provider and middleware
  */
 export async function setupOAuthForServer(
-  app: HonoType,
+  rootApp: HonoType,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
   state: OAuthSetupState,
@@ -49,22 +50,21 @@ export async function setupOAuthForServer(
   const proxyMode = isOAuthProxy(oauth);
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
-  // Create bearer auth middleware with the prefixed baseUrl for the
-  // WWW-Authenticate `resource_metadata` URL so clients discover the
-  // metadata at the same prefix the transport lives under.
-  const middleware = createBearerAuthMiddleware(oauth, `${baseUrl}${basePath}`);
+  // Create bearer auth middleware. The WWW-Authenticate `resource_metadata`
+  // URL points at the host-root discovery path (RFC 9728 §5.1) so clients
+  // hit the route mounted on the root app, independent of basePath.
+  const middleware = createBearerAuthMiddleware(oauth, baseUrl);
 
-  // Setup OAuth routes. Route registrations use bare paths; the inner app's
-  // sub-mount at `basePath` adds the prefix externally. Response bodies
-  // (issuer, *_endpoint, resource) are built from `baseUrl + basePath` so
-  // clients land on the right URLs.
-  setupOAuthRoutes(app, oauth, baseUrl, basePath);
+  // Setup OAuth routes:
+  // - /authorize, /token, /register live under `basePath`
+  // - .well-known/* discovery lives at the host root
+  setupOAuthRoutes(rootApp, oauth, baseUrl, basePath);
 
   // External (user-visible) paths for log messages.
   const externalAuthorize = `${basePath}/authorize`;
   const externalToken = `${basePath}/token`;
   const externalRegister = `${basePath}/register`;
-  const externalWellKnown = `${basePath}/.well-known/*`;
+  const externalWellKnown = `/.well-known/*`;
 
   if (proxyMode) {
     console.log(
@@ -78,9 +78,12 @@ export async function setupOAuthForServer(
   }
   console.log(`[OAuth] Metadata endpoints: ${externalWellKnown}`);
 
-  // Apply bearer auth to the MCP transport routes. Registered on the inner
-  // app at the bare path; the sub-mount makes it match `${basePath}/mcp/*`
-  // externally.
+  // Apply bearer auth to the MCP transport routes. Registered on a basePath
+  // clone so the middleware path is prefixed automatically; both
+  // `rootApp.basePath('/api').use('/mcp/*', mw)` and
+  // `rootApp.use('/api/mcp/*', mw)` would work — using the clone keeps the
+  // prefix concern out of this function.
+  const app = basePath ? rootApp.basePath(basePath) : rootApp;
   app.use("/mcp/*", middleware);
   console.log(
     `[OAuth] Bearer authentication enabled on ${basePath}/mcp/* routes`

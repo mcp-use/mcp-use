@@ -32,14 +32,6 @@ export interface ServerConfig {
    * Empty string means "no prefix".
    */
   basePath?: string;
-  /**
-   * Outer Hono receiving raw HTTP requests. When `basePath` is set, this
-   * differs from the inner `app` passed to widget mount helpers; favicon
-   * and other always-at-root routes register here. When `basePath` is
-   * unset, this is the same instance as the inner app.
-   * @internal
-   */
-  rootApp?: any;
 }
 
 /**
@@ -48,7 +40,7 @@ export interface ServerConfig {
  * Common options used for both development and production widget mounting.
  */
 export interface MountWidgetsOptions {
-  /** Base route for widgets (defaults to '/mcp-use/widgets') */
+  /** Base route for widgets (defaults to '/_mcp-use/widgets') */
   baseRoute?: string;
   /** Resources directory path (defaults to 'resources') */
   resourcesDir?: string;
