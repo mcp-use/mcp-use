@@ -121,7 +121,9 @@ describe("MCPServer basePath", () => {
 
       const handler = await server.getHandler();
 
-      const prefixed = await handler(new Request("http://localhost/api/health"));
+      const prefixed = await handler(
+        new Request("http://localhost/api/health")
+      );
       expect(prefixed.status).toBe(200);
       expect(await prefixed.text()).toBe("ok");
 
