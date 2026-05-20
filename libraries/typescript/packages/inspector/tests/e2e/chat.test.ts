@@ -362,3 +362,51 @@ test.describe("Inspector Chat Tests", () => {
     );
   });
 });
+
+test.describe("Hosted chat stream errors", () => {
+  const mockStreamUrl = "http://localhost:3000/mock-chat/stream";
+
+  test.beforeEach(async ({ page, context }) => {
+    await context.clearCookies();
+    await page.addInitScript((url: string) => {
+      (
+        window as Window & { __MANUFACT_CHAT_URL__?: string }
+      ).__MANUFACT_CHAT_URL__ = url;
+    }, mockStreamUrl);
+
+    await page.route("**/mock-chat/stream", async (route) => {
+      if (route.request().method() === "POST") {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/plain; charset=utf-8",
+          body: '3:"Insufficient credits"\n',
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await page.goto("http://localhost:3000/inspector");
+    await page.evaluate(() => localStorage.clear());
+
+    await connectToConformanceServer(page);
+    await page.getByRole("tab", { name: /Chat/ }).first().click();
+    await expect(page.getByTestId("chat-landing-header")).toBeVisible();
+  });
+
+  test("should surface data-stream 3: error frames from provider", async ({
+    page,
+  }) => {
+    await page.getByTestId("chat-input").fill("Hello");
+    await page.getByTestId("chat-send-button").click();
+
+    await expect(page.getByTestId("chat-message-user")).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(
+      page.getByTestId("chat-message-content").filter({
+        hasText: /Insufficient credits/i,
+      })
+    ).toBeVisible({ timeout: 5000 });
+  });
+});

@@ -10,6 +10,14 @@ import type {
 } from "./types";
 import { fileToAttachment, hashString, isValidTotalSize } from "./utils";
 
+/** Thrown when the stream protocol delivers an explicit error frame (SSE or data-stream). */
+class StreamProtocolError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StreamProtocolError";
+  }
+}
+
 interface WidgetModelContext {
   content?: Array<{ type: string; text: string }>;
   structuredContent?: Record<string, unknown>;
@@ -76,6 +84,10 @@ export function useChatMessages({
   const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
     mcpServerUrl: string;
     message?: string;
+  } | null>(null);
+  const [streamError, setStreamError] = useState<{
+    message: string;
+    protocol: StreamProtocol;
   } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -436,7 +448,7 @@ export function useChatMessages({
                     break;
                   }
                   case "3": {
-                    throw new Error(
+                    throw new StreamProtocolError(
                       typeof val === "string" ? val : JSON.stringify(val)
                     );
                   }
@@ -462,22 +474,20 @@ export function useChatMessages({
                 } else if (event.type === "done") {
                   finalizeParts();
                 } else if (event.type === "error") {
-                  throw new Error(event.message || "Streaming error");
+                  throw new StreamProtocolError(
+                    event.message || "Streaming error"
+                  );
                 }
               }
             } catch (parseError) {
-              if (
-                parseError instanceof Error &&
-                parseError.message !== "Streaming error"
-              ) {
-                console.error(
-                  "Failed to parse streaming event:",
-                  parseError,
-                  line
-                );
-              } else {
+              if (parseError instanceof StreamProtocolError) {
                 throw parseError;
               }
+              console.error(
+                "Failed to parse streaming event:",
+                parseError,
+                line
+              );
             }
           }
         }
@@ -511,6 +521,13 @@ export function useChatMessages({
         // Don't show Abort Error
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
+        }
+
+        if (error instanceof StreamProtocolError) {
+          setStreamError({
+            message: error.message,
+            protocol: streamProtocol,
+          });
         }
 
         // Extract detailed error message with HTTP status
@@ -564,6 +581,11 @@ export function useChatMessages({
     setMessages([]);
     setRateLimitInfo(null);
     setMcpServerAuthRequired(null);
+    setStreamError(null);
+  }, []);
+
+  const clearStreamError = useCallback(() => {
+    setStreamError(null);
   }, []);
 
   const clearRateLimitInfo = useCallback(() => {
@@ -618,10 +640,12 @@ export function useChatMessages({
     attachments,
     rateLimitInfo,
     mcpServerAuthRequired,
+    streamError,
     sendMessage,
     clearMessages,
     clearRateLimitInfo,
     clearMcpServerAuthRequired,
+    clearStreamError,
     setMessages,
     stop,
     addAttachment,
