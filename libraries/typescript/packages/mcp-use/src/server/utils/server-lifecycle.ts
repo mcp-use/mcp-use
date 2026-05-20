@@ -7,6 +7,7 @@
 import chalk from "chalk";
 import type { Hono as HonoType } from "hono";
 import { getEnv, isDeno } from "./runtime.js";
+import { writeServerInfoFile } from "./server-info-file.js";
 
 export function isProductionMode(): boolean {
   // Only check NODE_ENV - CLI commands set this explicitly
@@ -184,6 +185,9 @@ export async function startServer(
         hostname: host,
       },
       (_info: any) => {
+        // Best-effort handshake file written before the first log line so
+        // tooling that waits for the server can read basePath from disk.
+        void writeServerInfoFile({ host, port, basePath });
         console.log(`[SERVER] Listening on http://${host}:${port}`);
         console.log(`[MCP] Endpoints: http://${host}:${port}${basePath}/mcp`);
         console.log(

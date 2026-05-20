@@ -151,9 +151,9 @@ async function extractResponseError(res: Response): Promise<string | null> {
  * The middleware logs incoming HTTP requests in a compact format controlled
  * by `MCP_DEBUG_LEVEL` (or legacy `DEBUG`). See {@link getDebugLevel}.
  *
- * Skips logging for inspector telemetry/RPC endpoints, dev widget assets, and
- * polling GETs against `/mcp` and `/inspector/api/*` — including their
- * basePath-prefixed equivalents.
+ * Skips logging for inspector telemetry/RPC endpoints, framework-internal
+ * `/_mcp-use/*` assets, and polling GETs against `/mcp` and `/inspector/api/*` —
+ * including their basePath-prefixed equivalents (where applicable).
  */
 export function createRequestLogger(
   basePath: string = ""
@@ -173,19 +173,28 @@ export function createRequestLogger(
       basePath && pathname.startsWith(basePath)
         ? pathname.slice(basePath.length) || "/"
         : pathname;
+    // Framework-internal asset paths live at the host root under `/_mcp-use/`
+    // (basePath-agnostic). Match them on the raw `pathname`, not on the
+    // basePath-stripped `routedPath`, since they never carry the prefix.
+    const isInternalAsset =
+      pathname.startsWith("/_mcp-use/widgets/") ||
+      pathname.startsWith("/_mcp-use/public/");
     const noisyPaths = [
       "/inspector/api/tel/",
       "/inspector/api/rpc/stream",
       "/inspector/api/rpc/log",
       "/inspector",
-      "/mcp-use/widgets/",
-      "/mcp-use/public/",
     ];
     const isNoisyGet =
       method === "GET" &&
       (routedPath === "/mcp" ||
         routedPath.startsWith("/inspector/api/") ||
-        routedPath.startsWith("/mcp-use/"));
+        pathname.startsWith("/_mcp-use/"));
+
+    if (isInternalAsset) {
+      await next();
+      return;
+    }
 
     if (
       noisyPaths.some((noisyPath) => routedPath.startsWith(noisyPath)) ||
