@@ -1,4 +1,9 @@
-def singleton(cls):
+from typing import Callable, TypeVar
+
+F = TypeVar("F", bound=Callable[..., object])
+
+
+def singleton(cls: type[F]) -> type[F]:
     """A decorator that implements the singleton pattern for a class.
 
     This decorator ensures that only one instance of a class is ever created.
