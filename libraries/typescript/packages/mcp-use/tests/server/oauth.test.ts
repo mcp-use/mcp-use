@@ -466,6 +466,37 @@ describe("server OAuth integration", () => {
     expect(target.searchParams.get("state")).toBe("client-state-xyz");
   });
 
+  it("forwards the RFC 9207 `iss` parameter when present on the callback", async () => {
+    const store = createInMemoryStateStore();
+    const app = new Hono();
+    app.get("/oauth/callback", createCallbackHandler(store));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    store.set(
+      "proxy-state-iss",
+      {
+        clientRedirectUri: "http://localhost:5173/inspector/oauth/callback",
+        clientState: "client-state-xyz",
+      },
+      DEFAULT_OAUTH_STATE_TTL_MS
+    );
+
+    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    callbackUrl.searchParams.set("code", "auth-code-abc");
+    callbackUrl.searchParams.set("state", "proxy-state-iss");
+    callbackUrl.searchParams.set("iss", "https://issuer.example.com/");
+
+    const response = await fetch(callbackUrl.toString(), {
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(302);
+    const target = new URL(response.headers.get("location")!);
+    expect(target.searchParams.get("iss")).toBe("https://issuer.example.com/");
+  });
+
   it("propagates upstream errors back to the client redirect URI", async () => {
     const store = createInMemoryStateStore();
     const app = new Hono();

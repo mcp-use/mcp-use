@@ -222,7 +222,10 @@ export function createCallbackHandler(
     }
 
     const redirect = new URL(record.clientRedirectUri);
-    const passthrough = ["code", "error", "error_description"] as const;
+    // `iss` is forwarded per RFC 9207 (Authorization Server Issuer Identification);
+    // some upstreams (e.g. Auth0 with Strict Authorization Requests) include it
+    // and clients may validate against it.
+    const passthrough = ["code", "error", "error_description", "iss"] as const;
     for (const name of passthrough) {
       const value = c.req.query(name);
       if (value !== undefined) {
