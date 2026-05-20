@@ -78,9 +78,12 @@ function parseSessionCookie(
   }
 }
 
-function serializeSessionCookie(session: StoredSession): string {
+function serializeSessionCookie(
+  session: StoredSession,
+  cookiePath: string
+): string {
   const value = encodeURIComponent(JSON.stringify(session));
-  return `${SESSION_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600`;
+  return `${SESSION_COOKIE}=${value}; Path=${cookiePath}; HttpOnly; SameSite=Lax; Max-Age=600`;
 }
 
 export function mountAuthRoutes(
@@ -88,6 +91,11 @@ export function mountAuthRoutes(
   { projectId, publishableKey }: MountAuthRoutesOptions
 ): void {
   const url = supabaseUrl(projectId);
+  // `server.app.get("/auth/...")` is auto-prefixed under `basePath`, but the
+  // HTML we render needs to know the external prefix to point fetches and
+  // the session cookie at the right place.
+  const basePath = server.basePath ?? "";
+  const authPrefix = `${basePath}/auth`;
 
   // -------------------------------------------------------------------------
   // GET /auth/consent?authorization_id=<id>
@@ -110,7 +118,7 @@ export function mountAuthRoutes(
     // Not signed in yet — show the sign-in prompt. After sign-in the page
     // reloads and falls through to the authenticated branch below.
     if (!session) {
-      return c.html(renderSignInPage(authorizationId));
+      return c.html(renderSignInPage(authorizationId, authPrefix));
     }
 
     const supabase = createServerClient(url, publishableKey);
@@ -132,7 +140,7 @@ export function mountAuthRoutes(
       return c.redirect(data.redirect_url, 302);
     }
 
-    return c.html(renderConsentPage(authorizationId, data));
+    return c.html(renderConsentPage(authorizationId, data, authPrefix));
   });
 
   // -------------------------------------------------------------------------
@@ -150,10 +158,13 @@ export function mountAuthRoutes(
     // Production: replace with signed/encrypted session storage.
     c.header(
       "Set-Cookie",
-      serializeSessionCookie({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      })
+      serializeSessionCookie(
+        {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        },
+        authPrefix
+      )
     );
     return c.json({ ok: true });
   });
@@ -223,7 +234,7 @@ function commonStyles(): string {
   `;
 }
 
-function renderSignInPage(authorizationId: string): string {
+function renderSignInPage(authorizationId: string, authPrefix: string): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -241,9 +252,9 @@ function renderSignInPage(authorizationId: string): string {
   </div>
   <script>
     async function signIn() {
-      const res = await fetch('/auth/signin', { method: 'POST' });
+      const res = await fetch('${authPrefix}/signin', { method: 'POST' });
       if (res.ok) {
-        window.location.href = '/auth/consent?authorization_id=${encodeURIComponent(authorizationId)}';
+        window.location.href = '${authPrefix}/consent?authorization_id=${encodeURIComponent(authorizationId)}';
       } else {
         document.getElementById('msg').textContent =
           'Sign-in failed. Enable anonymous sign-ins in the Supabase dashboard.';
@@ -256,7 +267,8 @@ function renderSignInPage(authorizationId: string): string {
 
 function renderConsentPage(
   authorizationId: string,
-  details: OAuthAuthorizationDetails
+  details: OAuthAuthorizationDetails,
+  authPrefix: string
 ): string {
   const clientName = escapeHtml(details.client.name || "Unknown client");
   const scopes = details.scope
@@ -285,7 +297,7 @@ function renderConsentPage(
   <script>
     async function decide(approve) {
       const res = await fetch(
-        '/auth/consent?authorization_id=${encodeURIComponent(authorizationId)}',
+        '${authPrefix}/consent?authorization_id=${encodeURIComponent(authorizationId)}',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
