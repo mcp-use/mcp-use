@@ -1,5 +1,7 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
-import { memo, useCallback, useEffect, useRef } from "react";
+import { Button } from "@/client/components/ui/button";
+import { ArrowDown } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MessageContentBlock } from "mcp-use/react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
@@ -53,6 +55,8 @@ interface MessageListProps {
   onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
   /** Handler called when the user cancels an elicitation. */
   onRejectElicitation?: (requestId: string, error?: string) => void;
+  /** Scroll container element (the overflow-y parent). Enables scroll-to-bottom UX. */
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export const MessageList = memo(
@@ -67,8 +71,32 @@ export const MessageList = memo(
     pendingElicitationRequests,
     onApproveElicitation,
     onRejectElicitation,
+    scrollContainerRef,
   }: MessageListProps) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [isNearBottom, setIsNearBottom] = useState(true);
+    const bottomThresholdPx = 64;
+
+    const hasMessages = messages.length > 0;
+    const showScrollToBottom = hasMessages && !isNearBottom;
+
+    const measureIsNearBottom = useCallback(() => {
+      const el = scrollContainerRef?.current;
+      if (!el) return;
+      const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+      setIsNearBottom(distanceFromBottom <= bottomThresholdPx);
+    }, [scrollContainerRef]);
+
+    const scrollToBottom = useCallback(
+      (behavior: ScrollBehavior) => {
+        const el = scrollContainerRef?.current;
+        if (!el) return;
+
+        el.scrollTo({ top: el.scrollHeight, behavior });
+        messagesEndRef.current?.scrollIntoView({ behavior, block: "start" });
+      },
+      [scrollContainerRef]
+    );
 
     // Helper function to get tool metadata by name.
     // Normalizes hyphens/underscores because the Anthropic API converts
@@ -115,15 +143,23 @@ export const MessageList = memo(
       [sendMessage]
     );
 
-    // Scroll to bottom when messages change or streaming status changes
+    // Track whether the user is reading older messages vs near the bottom.
     useEffect(() => {
-      if (messages.length > 0 && messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({
-          behavior: !isLoading ? "smooth" : "auto",
-          block: "start",
-        });
-      }
-    }, [messages.length, isLoading]);
+      const el = scrollContainerRef?.current;
+      if (!el) return;
+
+      measureIsNearBottom();
+      const onScroll = () => measureIsNearBottom();
+      el.addEventListener("scroll", onScroll, { passive: true });
+      return () => el.removeEventListener("scroll", onScroll);
+    }, [measureIsNearBottom, scrollContainerRef]);
+
+    // Auto-scroll only when the user is already near the bottom.
+    useEffect(() => {
+      if (!hasMessages || !messagesEndRef.current) return;
+      if (!isNearBottom) return;
+      scrollToBottom(!isLoading ? "smooth" : "auto");
+    }, [hasMessages, isLoading, isNearBottom, messages.length, scrollToBottom]);
 
     // Determine if we're in "thinking" state vs "streaming" state
     const isThinking =
@@ -171,6 +207,26 @@ export const MessageList = memo(
       const lastMessage = messages[messages.length - 1];
       return message.id === lastMessage.id && lastMessage.role === "assistant";
     };
+
+    const scrollButtonNode = useMemo(() => {
+      if (!showScrollToBottom) return null;
+
+      return (
+        <div className="sticky bottom-4 flex justify-end pointer-events-none">
+          <Button
+            type="button"
+            variant="secondary"
+            className="pointer-events-auto h-9 w-9 rounded-full p-0 shadow-md"
+            onClick={() => scrollToBottom("smooth")}
+            aria-label="Scroll to bottom"
+            title="Scroll to bottom"
+            data-testid="chat-scroll-to-bottom"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    }, [scrollToBottom, showScrollToBottom]);
 
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
@@ -368,6 +424,8 @@ export const MessageList = memo(
 
         {/* Reference for scrolling to bottom */}
         <div ref={messagesEndRef} />
+
+        {scrollButtonNode}
       </div>
     );
   }

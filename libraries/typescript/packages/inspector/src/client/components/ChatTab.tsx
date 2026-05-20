@@ -1119,6 +1119,7 @@ export function ChatTab({
       {/* Messages Area */}
       <div
         ref={messagesAreaRef}
+        data-testid="chat-messages-scroll-container"
         className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
       >
         {!llmConfig ? (
@@ -1137,6 +1138,7 @@ export function ChatTab({
             pendingElicitationRequests={connection.pendingElicitationRequests}
             onApproveElicitation={connection.approveElicitation}
             onRejectElicitation={connection.rejectElicitation}
+            scrollContainerRef={messagesAreaRef}
           />
         )}
       </div>
