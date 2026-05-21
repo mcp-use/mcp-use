@@ -288,6 +288,16 @@ export interface ServerConfig {
    */
   oauth?: OAuthProvider;
   /**
+   * Expose the HTML MCP landing page without bearer authentication.
+   *
+   * When OAuth is configured, `/mcp` routes require a token by default.
+   * Set to `true` to allow unauthenticated browser visits to the landing page
+   * while keeping MCP protocol traffic protected.
+   *
+   * @default false
+   */
+  publicLandingPage?: boolean;
+  /**
    * Path to favicon file relative to public directory
    *
    * The favicon will be automatically included in all widget pages.

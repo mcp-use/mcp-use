@@ -35,11 +35,16 @@ interface OAuthSetupState {
  * @param state - OAuth setup state to track completion
  * @returns Updated OAuth setup state with provider and middleware
  */
+export interface SetupOAuthForServerOptions {
+  publicLandingPage?: boolean;
+}
+
 export async function setupOAuthForServer(
   app: HonoType,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
-  state: OAuthSetupState
+  state: OAuthSetupState,
+  options?: SetupOAuthForServerOptions
 ): Promise<OAuthSetupState> {
   if (state.complete) {
     return state; // Already setup
@@ -49,7 +54,9 @@ export async function setupOAuthForServer(
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
   // Create bearer auth middleware with baseUrl for WWW-Authenticate header
-  const middleware = createBearerAuthMiddleware(oauth, baseUrl);
+  const middleware = createBearerAuthMiddleware(oauth, baseUrl, {
+    publicLandingPage: options?.publicLandingPage,
+  });
 
   // Setup OAuth routes
   setupOAuthRoutes(app, oauth, baseUrl);

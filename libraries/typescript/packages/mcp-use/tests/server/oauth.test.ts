@@ -135,6 +135,73 @@ describe("server OAuth integration", () => {
     });
   });
 
+  it("allows browser GET to /mcp when publicLandingPage is enabled", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => ({
+        payload: { sub: "user-1", scope: "openid profile" },
+      }),
+    });
+
+    app.use(
+      "/mcp/*",
+      createBearerAuthMiddleware(proxy, undefined, { publicLandingPage: true })
+    );
+    app.get("/mcp", (c) =>
+      c.html("<html><body>landing</body></html>", 200, {
+        "Content-Type": "text/html; charset=utf-8",
+      })
+    );
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    const response = await fetch(`${svc.baseUrl}/mcp`, {
+      headers: { Accept: "text/html" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("landing");
+  });
+
+  it("still requires bearer token for MCP JSON when publicLandingPage is enabled", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => ({
+        payload: { sub: "user-1", scope: "openid profile" },
+      }),
+    });
+
+    app.use(
+      "/mcp/*",
+      createBearerAuthMiddleware(proxy, undefined, { publicLandingPage: true })
+    );
+    app.post("/mcp", (c) => c.json({ ok: true }));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    const unauthorized = await fetch(`${svc.baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1 }),
+    });
+    expect(unauthorized.status).toBe(401);
+  });
+
   it("rejects /mcp requests without bearer token", async () => {
     const app = new Hono();
 

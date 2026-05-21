@@ -6,7 +6,13 @@
  */
 
 import type { Context, Next } from "hono";
+import { isBrowserLandingRequest } from "../landing.js";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
+
+export interface BearerAuthMiddlewareOptions {
+ 
+  publicLandingPage?: boolean;
+}
 
 /**
  * Create bearer authentication middleware for a given OAuth provider or proxy
@@ -17,12 +23,20 @@ import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
  */
 export function createBearerAuthMiddleware(
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl?: string
+  baseUrl?: string,
+  options?: BearerAuthMiddlewareOptions
 ) {
   return async (c: Context, next: Next) => {
     // Allow HEAD requests through without auth - used for health checks/keep-alive
     if (c.req.method === "HEAD") {
       return next();
+    }
+
+    if (options?.publicLandingPage) {
+      const acceptHeader = c.req.header("Accept") || "";
+      if (isBrowserLandingRequest(c.req.method, acceptHeader)) {
+        return next();
+      }
     }
 
     const authHeader = c.req.header("Authorization");
