@@ -1178,54 +1178,53 @@ export default {
         }
       }
 
-      // Post-process HTML for static deployments (e.g., Supabase)
-      // If MCP_SERVER_URL is set, inject window globals at build time
+      // Bake runtime globals into the built HTML so production serving is a
+      // pure static read — no per-request HTML rewriter needed. Mirrors the
+      // Next.js `/_next/` model: build owns transforms, server ships bytes.
+      //
+      // - `__getFile`: asset-URL builder used by Vite's `renderBuiltUrl` hook.
+      //   Defaults to the framework's `/_mcp-use/widgets/{name}/` path; uses
+      //   MCP_URL when that points at an external CDN (static deployments).
+      // - `__mcpPublicUrl`: public-asset prefix. MCP_SERVER_URL roots it
+      //   absolutely for static hosts that need a full origin; otherwise the
+      //   bare path is fine (served from the same origin as the widget).
+      // - `__mcpPublicAssetsUrl`: where public files are physically stored;
+      //   diverges from `__mcpPublicUrl` only when MCP_URL is a separate CDN.
       const mcpServerUrl = process.env.MCP_SERVER_URL;
-      if (mcpServerUrl) {
-        try {
-          const htmlPath = path.join(outDir, "index.html");
-          let html = await fs.readFile(htmlPath, "utf8");
+      const assetBase = mcpUrl
+        ? `${mcpUrl}/${widgetName}/`
+        : `/_mcp-use/widgets/${widgetName}/`;
+      const publicUrl = mcpServerUrl
+        ? `${mcpServerUrl}/_mcp-use/public`
+        : "/_mcp-use/public";
+      const publicAssetsUrl = mcpUrl ? `${mcpUrl}/public` : "/_mcp-use/public";
 
-          // Inject window.__mcpPublicUrl and window.__getFile into <head>
-          // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
-          // __mcpPublicAssetsUrl points to where public files are actually stored
-          const injectionScript = `<script>window.__getFile = (filename) => { return "${mcpUrl}/${widgetName}/"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/_mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpUrl}/public";</script>`;
+      try {
+        const htmlPath = path.join(outDir, "index.html");
+        let html = await fs.readFile(htmlPath, "utf8");
 
-          // Check if script tag already exists in head
-          if (!html.includes("window.__mcpPublicUrl")) {
-            html = html.replace(
-              /<head[^>]*>/i,
-              `<head>\n    ${injectionScript}`
-            );
-          }
+        const injectionScript = `<script>window.__getFile = (filename) => { return ${JSON.stringify(assetBase)}+filename }; window.__mcpPublicUrl = ${JSON.stringify(publicUrl)}; window.__mcpPublicAssetsUrl = ${JSON.stringify(publicAssetsUrl)};</script>`;
 
-          // Update base href if it exists, or inject it
-          if (/<base\s+[^>]*\/?>/i.test(html)) {
-            // Replace existing base tag
-            html = html.replace(
-              /<base\s+[^>]*\/?>/i,
-              `<base href="${mcpServerUrl}">`
-            );
-          } else {
-            // Inject base tag after the injection script
-            html = html.replace(
-              injectionScript,
-              `${injectionScript}\n    <base href="${mcpServerUrl}">`
-            );
-          }
-
-          await fs.writeFile(htmlPath, html, "utf8");
-          console.log(
-            chalk.gray(`    → Injected MCP_SERVER_URL into ${widgetName}`)
-          );
-        } catch (error) {
-          console.warn(
-            chalk.yellow(
-              `    ⚠ Failed to post-process HTML for ${widgetName}:`,
-              error
-            )
+        if (!html.includes("window.__mcpPublicUrl")) {
+          html = html.replace(
+            /<head[^>]*>/i,
+            (match) => `${match}\n    ${injectionScript}`
           );
         }
+
+        // Remove any stray <base> tag — Vite's absolute `base` URL means
+        // relative refs already resolve correctly, and a runtime origin in
+        // <base> would defeat static caching.
+        html = html.replace(/<base\s+[^>]*\/?>\s*/gi, "");
+
+        await fs.writeFile(htmlPath, html, "utf8");
+      } catch (error) {
+        console.warn(
+          chalk.yellow(
+            `    ⚠ Failed to post-process HTML for ${widgetName}:`,
+            error
+          )
+        );
       }
 
       console.log(chalk.green(`    ✓ Built ${widgetName}`));

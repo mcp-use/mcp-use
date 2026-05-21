@@ -1,86 +1,87 @@
 /**
  * Static widget route handlers
  *
- * This module sets up HTTP routes for serving widget assets, HTML files,
- * and public resources in production mode.
+ * In production, `/_mcp-use/*` is a pure static-file namespace mapped to
+ * `.mcp-use/` on disk — Next.js-style. Built HTML already contains the
+ * runtime globals it needs (baked in by the CLI's `buildWidgets`), so the
+ * framework just ships bytes.
  */
 
+import { serveStatic } from "@hono/node-server/serve-static";
 import type { Context, Hono as HonoType } from "hono";
-import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
-import {
-  getContentType,
-  processWidgetHtml,
-  setupFaviconRoute,
-  setupPublicRoutes,
-} from "./widget-helpers.js";
+import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import { getContentType, setupFaviconRoute } from "./widget-helpers.js";
 import type { ServerConfig } from "./widget-types.js";
 
 /**
- * Setup static file serving routes for widgets
+ * Mount static routes for `/_mcp-use/*` on the root Hono app.
  *
- * Routes (always at the host root — basePath-agnostic):
- * - `/_mcp-use/widgets/{widget}`              → .mcp-use/widgets/{widget}/index.html
- * - `/_mcp-use/widgets/{widget}/assets/*`     → .mcp-use/widgets/{widget}/assets/*
- * - `/_mcp-use/public/*`                      → .mcp-use/public/*
+ * Node + Bun: one `serveStatic` mount handles widgets, assets, and public
+ * files in a single middleware. Deno can't use `@hono/node-server`, so it
+ * falls back to hand-rolled handlers that go through the `fsHelpers`
+ * cross-runtime shim.
  *
- * Widget HTML is post-processed via `processWidgetHtml` so emitted asset
- * URLs are bare `/_mcp-use/widgets/...` references.
+ * Favicon is registered separately at `/favicon.ico` because it lives
+ * outside the `/_mcp-use/` namespace and needs an explicit Cache-Control
+ * header that `serveStatic` doesn't add by default.
  *
- * @param rootApp - The underlying Hono instance. All `_mcp-use/*` routes
- *   register here so they bypass any `basePath` prefix.
+ * @param rootApp - Underlying Hono instance. `/_mcp-use/*` always mounts at
+ *   the host root, so it bypasses any `basePath` prefix.
  * @param serverConfig - Server configuration.
  */
 export function setupWidgetRoutes(
   rootApp: HonoType,
   serverConfig: ServerConfig
 ): void {
-  // Widget HTML (single index.html per widget)
-  rootApp.get("/_mcp-use/widgets/:widget", async (c: Context) => {
-    const widget = c.req.param("widget")!;
-    const filePath = pathHelpers.join(
-      getCwd(),
-      ".mcp-use",
-      "widgets",
-      widget,
-      "index.html"
+  if (isDeno) {
+    setupWidgetRoutesDeno(rootApp);
+  } else {
+    rootApp.get(
+      "/_mcp-use/*",
+      serveStatic({
+        root: "./.mcp-use",
+        rewriteRequestPath: (p) => p.replace(/^\/_mcp-use/, ""),
+      })
     );
+  }
 
+  setupFaviconRoute(rootApp, serverConfig.favicon, true);
+}
+
+/**
+ * Deno fallback — three small handlers backed by `fsHelpers.readFile`.
+ * Kept separate so the Node/Bun path stays a one-liner.
+ */
+function setupWidgetRoutesDeno(rootApp: HonoType): void {
+  const serveDenoFile = async (
+    c: Context,
+    segments: string[]
+  ): Promise<Response> => {
+    const fullPath = pathHelpers.join(getCwd(), ".mcp-use", ...segments);
     try {
-      let html = await fsHelpers.readFileSync(filePath, "utf8");
-      html = processWidgetHtml(html, widget, serverConfig.serverBaseUrl);
-      return c.html(html);
-    } catch {
-      return c.notFound();
-    }
-  });
-
-  // Widget assets (JS/CSS/images) — single handler, prefix-strip → file path.
-  rootApp.get("/_mcp-use/widgets/:widget/assets/*", async (c: Context) => {
-    const widget = c.req.param("widget")!;
-    const assetFile = c.req.path.split("/assets/")[1];
-    const assetPath = pathHelpers.join(
-      getCwd(),
-      ".mcp-use",
-      "widgets",
-      widget,
-      "assets",
-      assetFile
-    );
-
-    try {
-      const content = await fsHelpers.readFile(assetPath);
+      const content = await fsHelpers.readFile(fullPath);
       return new Response(content, {
         status: 200,
-        headers: { "Content-Type": getContentType(assetFile) },
+        headers: { "Content-Type": getContentType(segments.at(-1) ?? "") },
       });
     } catch {
       return c.notFound();
     }
+  };
+
+  rootApp.get("/_mcp-use/widgets/:widget", async (c) => {
+    const widget = c.req.param("widget")!;
+    return serveDenoFile(c, ["widgets", widget, "index.html"]);
   });
 
-  // Public assets at `/_mcp-use/public/*`
-  setupPublicRoutes(rootApp, true);
+  rootApp.get("/_mcp-use/widgets/:widget/assets/*", async (c) => {
+    const widget = c.req.param("widget")!;
+    const assetFile = c.req.path.split("/assets/")[1] ?? "";
+    return serveDenoFile(c, ["widgets", widget, "assets", assetFile]);
+  });
 
-  // Favicon at server root (production mode).
-  setupFaviconRoute(rootApp, serverConfig.favicon, true);
+  rootApp.get("/_mcp-use/public/*", async (c) => {
+    const filePath = c.req.path.split("/_mcp-use/public/")[1] ?? "";
+    return serveDenoFile(c, ["public", filePath]);
+  });
 }

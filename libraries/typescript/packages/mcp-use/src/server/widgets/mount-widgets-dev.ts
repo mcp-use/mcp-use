@@ -696,11 +696,7 @@ if (container && Component) {
           let html = "";
           try {
             html = await fsHelpers.readFileSync(htmlPath);
-            html = processWidgetHtml(
-              html,
-              widgetName,
-              serverConfig.serverBaseUrl
-            );
+            html = processWidgetHtml(html, widgetName);
           } catch (e) {
             console.warn(
               `[WIDGET-HMR] Failed to read HTML for ${widgetName}:`,

@@ -294,78 +294,32 @@ export function getContentType(filename: string): string {
 }
 
 /**
- * Process widget HTML with base URL injection and path conversion
+ * Inject runtime globals into widget HTML.
+ *
+ * Production builds bake these globals at build time
+ * (`packages/cli/src/index.ts`), so this function is effectively dev-only —
+ * the CLI's `buildWidgets` already wrote the script into `.mcp-use/widgets/
+ * &lt;name&gt;/index.html` before it lands on disk. It stays here for the dev
+ * Vite middleware, which serves un-baked HTML on the fly.
+ *
+ * Idempotent: if the globals are already present (production reads), this
+ * is a no-op.
  *
  * @param html - Original HTML content
- * @param widgetName - Widget identifier
- * @param baseUrl - Server base URL
- * @returns Processed HTML with injected base tag and absolute URLs
- *
- * @example
- * ```typescript
- * const html = '<html><head></head><body>...</body></html>';
- * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000');
- * ```
+ * @param widgetName - Widget identifier (will be slugified for URL paths)
+ * @returns HTML with the globals script injected after the opening `<head>`
  */
-export function processWidgetHtml(
-  html: string,
-  widgetName: string,
-  baseUrl: string
-): string {
-  let processedHtml = html;
-
-  // Inject or replace base tag with server base URL
-  if (baseUrl && processedHtml) {
-    // Strip HTML comments before probing for a <base> tag so we don't match
-    // one inside a comment. HTML comments can't nest, so one pass suffices.
-    const htmlWithoutComments = processedHtml.replace(/<!--[\s\S]*?-->/g, "");
-
-    // Try to replace existing base tag (only if not in comments)
-    const baseTagRegex = /<base\s+[^>]*\/?>/i;
-    if (baseTagRegex.test(htmlWithoutComments)) {
-      // Find and replace the actual base tag in the original HTML
-      const actualBaseTagMatch = processedHtml.match(/<base\s+[^>]*\/?>/i);
-      if (actualBaseTagMatch) {
-        processedHtml = processedHtml.replace(
-          actualBaseTagMatch[0],
-          `<base href="${baseUrl}" />`
-        );
-      }
-    } else {
-      // Inject base tag in head if it doesn't exist
-      const headTagRegex = /<head[^>]*>/i;
-      if (headTagRegex.test(processedHtml)) {
-        processedHtml = processedHtml.replace(
-          headTagRegex,
-          (match) => `${match}\n    <base href="${baseUrl}" />`
-        );
-      }
-    }
-
-    // Rewrite legacy `/mcp-use/widgets/...` references to the new
-    // basePath-agnostic `/_mcp-use/widgets/...` root. Emitted as bare
-    // absolute paths so the browser resolves them against the document
-    // origin — no baseUrl/basePath interpolation needed.
-    processedHtml = processedHtml.replace(
-      /src="\/(?:_)?mcp-use\/widgets\/([^"]+)"/g,
-      `src="/_mcp-use/widgets/$1"`
-    );
-    processedHtml = processedHtml.replace(
-      /href="\/(?:_)?mcp-use\/widgets\/([^"]+)"/g,
-      `href="/_mcp-use/widgets/$1"`
-    );
-
-    // Add window.__getFile and window.__mcpPublicUrl to head.
-    // The `_mcp-use/` namespace lives at the root regardless of basePath,
-    // so we emit bare absolute paths.
-    const slugifiedName = slugifyWidgetName(widgetName);
-    processedHtml = processedHtml.replace(
-      /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "/_mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "/_mcp-use/public";</script>`
-    );
+export function processWidgetHtml(html: string, widgetName: string): string {
+  if (!html || html.includes("window.__mcpPublicUrl")) {
+    return html;
   }
 
-  return processedHtml;
+  const slugifiedName = slugifyWidgetName(widgetName);
+  return html.replace(
+    /<head[^>]*>/i,
+    (match) =>
+      `${match}\n    <script>window.__getFile = (filename) => { return "/_mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "/_mcp-use/public";</script>`
+  );
 }
 
 /**
@@ -721,8 +675,8 @@ export async function registerWidgetFromTemplate(
     return; // readWidgetHtml already logged the error
   }
 
-  // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  // Inject runtime globals (no-op if already baked at build time).
+  html = processWidgetHtml(html, widgetName);
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
