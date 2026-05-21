@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MCPServer, oauthSupabaseProvider } from "../../../src/server/index.js";
 import { normalizeBasePath } from "../../../src/server/utils/server-helpers.js";
 
@@ -153,6 +155,102 @@ describe("MCPServer basePath", () => {
         new Request("http://localhost/__mcp-use/serverinfo")
       );
       expect(removed.status).toBe(404);
+    });
+
+    describe("static serving from .mcp-use/", () => {
+      const fixturesDir = join(process.cwd(), ".mcp-use");
+      let originalNodeEnv: string | undefined;
+
+      beforeAll(async () => {
+        // serveStatic only mounts when NODE_ENV=production (see
+        // widgets/index.ts:86). Force prod for this block; restore after.
+        originalNodeEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = "production";
+
+        await mkdir(join(fixturesDir, "widgets", "sample"), { recursive: true });
+        await mkdir(join(fixturesDir, "widgets", "sample", "assets"), {
+          recursive: true,
+        });
+        await mkdir(join(fixturesDir, "public"), { recursive: true });
+        await writeFile(
+          join(fixturesDir, "widgets", "sample", "index.html"),
+          `<!doctype html><html><head><script>window.__mcpPublicUrl="/_mcp-use/public";</script></head><body>sample</body></html>`,
+          "utf8"
+        );
+        await writeFile(
+          join(fixturesDir, "widgets", "sample", "assets", "entry.js"),
+          `console.log("hi");`,
+          "utf8"
+        );
+        await writeFile(
+          join(fixturesDir, "public", "hello.txt"),
+          "hello world",
+          "utf8"
+        );
+      });
+
+      afterAll(async () => {
+        process.env.NODE_ENV = originalNodeEnv;
+        // Remove only the fixtures we created — leave anything else under
+        // .mcp-use/ alone (e.g. real generated files from other tests).
+        await rm(join(fixturesDir, "widgets", "sample"), {
+          recursive: true,
+          force: true,
+        });
+        await rm(join(fixturesDir, "public", "hello.txt"), { force: true });
+      });
+
+      it("serves widget HTML byte-for-byte from disk (no runtime transforms)", async () => {
+        const server = new MCPServer({
+          name: "static-widget-html",
+          version: "1.0.0",
+          basePath: "/api",
+        });
+
+        const handler = await server.getHandler();
+        const res = await handler(
+          new Request("http://localhost/_mcp-use/widgets/sample/index.html")
+        );
+
+        expect(res.status).toBe(200);
+        const body = await res.text();
+        expect(body).toContain('window.__mcpPublicUrl="/_mcp-use/public"');
+        expect(body).toContain("<body>sample</body>");
+      });
+
+      it("serves widget JS assets with correct content-type", async () => {
+        const server = new MCPServer({
+          name: "static-widget-assets",
+          version: "1.0.0",
+        });
+
+        const handler = await server.getHandler();
+        const res = await handler(
+          new Request(
+            "http://localhost/_mcp-use/widgets/sample/assets/entry.js"
+          )
+        );
+
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toMatch(/javascript/);
+        expect(await res.text()).toBe(`console.log("hi");`);
+      });
+
+      it("serves public files from .mcp-use/public/ at root namespace", async () => {
+        const server = new MCPServer({
+          name: "static-public",
+          version: "1.0.0",
+          basePath: "/api",
+        });
+
+        const handler = await server.getHandler();
+        const res = await handler(
+          new Request("http://localhost/_mcp-use/public/hello.txt")
+        );
+
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("hello world");
+      });
     });
 
     it("serves OAuth discovery at root and path-aware paths (basePath-agnostic)", async () => {

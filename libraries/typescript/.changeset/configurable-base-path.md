@@ -42,6 +42,17 @@ This means:
 - The HTTP discovery endpoint `/__mcp-use/serverinfo` is removed. `MCPServer.listen()` now writes `.mcp-use/server-info.json` (host, port, basePath, mcpUrl, inspectorUrl) for out-of-process tooling to read.
 - Dev-mode widget temp directories move under `.mcp-use/.tmp/` so every top-level entry in `.mcp-use/` is a framework namespace.
 
+### Production serving is now fully static
+
+`/_mcp-use/*` is served by a single Hono `serveStatic` middleware in production — built widget HTML is shipped byte-for-byte from disk. The CLI's `buildWidgets` bakes `window.__getFile` and `window.__mcpPublicUrl` directly into `index.html` at build time (previously only when `MCP_SERVER_URL` was set), so no per-request HTML rewriting happens.
+
+Two related behavior changes:
+
+- **`<base href>` is no longer injected** into widget HTML. If a widget relied on relative URLs resolving against the server origin root, switch to absolute paths (`/mcp`, `/_mcp-use/public/...`) or read `window.__mcpPublicUrl`.
+- **`setupPublicRoutes` is no longer used in production.** The export is still available for embedders that hand-roll their own server but want the dev-mode helper that serves from `./public/`.
+
+Runtime gate: Deno keeps hand-rolled handlers (Deno doesn't load `@hono/node-server`); Node and Bun use `serveStatic`.
+
 ### Embedder note
 
 If you mount `getHandler()` inside a larger app at some prefix, `/_mcp-use/` lives at the embedder's mount prefix, not the host root. "BasePath-agnostic" means "ignores mcp-use's own basePath config," not "magically escapes the embedder."
