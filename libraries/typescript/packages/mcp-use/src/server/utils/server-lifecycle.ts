@@ -7,6 +7,7 @@
 import chalk from "chalk";
 import type { Hono as HonoType } from "hono";
 import { getEnv, isDeno } from "./runtime.js";
+import { writeServerInfoFile } from "./server-info-file.js";
 
 export function isProductionMode(): boolean {
   // Only check NODE_ENV - CLI commands set this explicitly
@@ -127,8 +128,11 @@ export async function startServer(
   options?: {
     onDenoRequest?: (req: Request) => Request | Promise<Request>;
     onDenoResponse?: (res: Response) => Response | Promise<Response>;
+    /** Configured base path (e.g. "/api"). Empty for no prefix. */
+    basePath?: string;
   }
 ): Promise<HttpServerHandle> {
+  const basePath = options?.basePath ?? "";
   if (isDeno) {
     // Deno runtime
     const corsHeaders = getDenoCorsHeaders();
@@ -164,7 +168,7 @@ export async function startServer(
     console.log(`[SERVER] Listening`);
     console.log(
       chalk.gray(
-        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}${basePath}/mcp`
       )
     );
     return {
@@ -181,11 +185,14 @@ export async function startServer(
         hostname: host,
       },
       (_info: any) => {
+        // Best-effort handshake file written before the first log line so
+        // tooling that waits for the server can read basePath from disk.
+        void writeServerInfoFile({ host, port, basePath });
         console.log(`[SERVER] Listening on http://${host}:${port}`);
-        console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
+        console.log(`[MCP] Endpoints: http://${host}:${port}${basePath}/mcp`);
         console.log(
           chalk.gray(
-            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}${basePath}/mcp`
           )
         );
       }

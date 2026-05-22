@@ -68,17 +68,30 @@ const HMR_HTTP_METHODS = new Set([
  * custom route handlers from the mutable _customRoutes map.
  * This is called once at server startup so we never need to add
  * routes to Hono after the matcher is built (which would fail in Hono v4+).
+ *
+ * When the server is configured with a `basePath`, this middleware lives on
+ * the inner (sub-mounted) Hono. `c.req.path` is the full original URL path
+ * (Hono preserves it across sub-mounts), so we strip the prefix before
+ * looking up handlers — user code calls `server.get("/foo", ...)` and the
+ * request arrives at `${basePath}/foo`. The `getBasePath` accessor is read
+ * at dispatch time rather than captured, so the value is correct even if
+ * the field is set after this function runs.
  */
 export function installCustomRoutesMiddleware(
   app: HonoType,
-
-  customRoutes: Map<string, ((...args: any[]) => any)[]>
+  customRoutes: Map<string, ((...args: any[]) => any)[]>,
+  getBasePath: () => string = () => ""
 ): void {
   // Register a single catch-all middleware that checks the custom routes map
   // Must use `all` to match any HTTP method
   app.all("*", async (c: any, next: any) => {
     const method = c.req.method.toLowerCase();
-    const path = c.req.path;
+    const basePath = getBasePath();
+    const rawPath = c.req.path as string;
+    const path =
+      basePath && rawPath.startsWith(basePath)
+        ? rawPath.slice(basePath.length) || "/"
+        : rawPath;
 
     // Check for exact match: "get:/api/fruits"
     const key = `${method}:${path}`;

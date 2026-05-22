@@ -1,127 +1,101 @@
 /**
  * Static widget route handlers
  *
- * This module sets up HTTP routes for serving widget assets, HTML files,
- * and public resources in production mode.
+ * In production, `${basePath}/_mcp-use/*` is a pure static-file namespace
+ * mapped to `.mcp-use/` on disk — Next.js-style. Built HTML already contains
+ * the runtime globals it needs (baked in by the CLI's `buildWidgets`), so
+ * the framework just ships bytes.
  */
 
-import type { Hono as HonoType, Context } from "hono";
-import { pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
-import {
-  getContentType,
-  processWidgetHtml,
-  setupPublicRoutes,
-  setupFaviconRoute,
-} from "./widget-helpers.js";
+import { serveStatic } from "@hono/node-server/serve-static";
+import type { Context, Hono as HonoType } from "hono";
+import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import { getContentType, setupFaviconRoute } from "./widget-helpers.js";
 import type { ServerConfig } from "./widget-types.js";
 
 /**
- * Setup static file serving routes for widgets
+ * Mount static routes for `${basePath}/_mcp-use/*` on the basePath-aware app.
  *
- * Creates HTTP routes to serve:
- * - Widget assets (JS, CSS, images) from dist/resources/widgets/{widget}/assets/
- * - Widget HTML files from dist/resources/widgets/{widget}/index.html
- * - Public files from dist/public/ or public/ directories
+ * Node + Bun: one `serveStatic` mount handles widgets, assets, and public
+ * files in a single middleware. Deno can't use `@hono/node-server`, so it
+ * falls back to hand-rolled handlers that go through the `fsHelpers`
+ * cross-runtime shim.
  *
- * These routes are used in production mode to serve pre-built widget bundles.
+ * Favicon is registered separately at `/favicon.ico` (basePath-prefixed
+ * to `${basePath}/favicon.ico`) because it needs an explicit Cache-Control
+ * header that `serveStatic` doesn't add by default.
  *
- * @param app - Hono app instance to mount routes on
- * @param serverConfig - Server configuration (baseUrl)
+ * @param app - basePath-aware Hono view. The `/_mcp-use/*` route below is
+ *   auto-prefixed to `${basePath}/_mcp-use/*`.
+ * @param serverConfig - Server configuration.
+ * @param basePath - Server basePath prefix (e.g. `/api`). Used by the
+ *   serveStatic rewriter to strip the prefix before mapping to disk paths.
  */
 export function setupWidgetRoutes(
   app: HonoType,
-  serverConfig: ServerConfig
+  serverConfig: ServerConfig,
+  basePath: string = ""
 ): void {
-  // Serve static assets (JS, CSS) from the assets directory
-  app.get("/mcp-use/widgets/:widget/assets/*", async (c: Context) => {
-    const widget = c.req.param("widget")!;
-    const assetFile = c.req.path.split("/assets/")[1];
-    const assetPath = pathHelpers.join(
-      getCwd(),
-      "dist",
-      "resources",
-      "widgets",
-      widget,
-      "assets",
-      assetFile
+  if (isDeno) {
+    setupWidgetRoutesDeno(app);
+  } else {
+    app.get(
+      "/_mcp-use/*",
+      serveStatic({
+        root: "./.mcp-use",
+        // Strip both the basePath prefix and the `/_mcp-use` namespace to
+        // get a path relative to `./.mcp-use/` on disk. Works whether or not
+        // basePath is set.
+        rewriteRequestPath: (p) =>
+          p.replace(new RegExp(`^${escapeRegex(basePath)}/_mcp-use`), ""),
+      })
     );
+  }
 
-    try {
-      if (await fsHelpers.existsSync(assetPath)) {
-        const content = await fsHelpers.readFile(assetPath);
-        const contentType = getContentType(assetFile);
-        return new Response(content, {
-          status: 200,
-          headers: { "Content-Type": contentType },
-        });
-      }
-      return c.notFound();
-    } catch {
-      return c.notFound();
-    }
-  });
-
-  // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
-  app.get("/mcp-use/widgets/assets/*", async (c: Context) => {
-    const assetFile = c.req.path.split("/assets/")[1];
-    // Try to find which widget this asset belongs to by checking all widget directories
-    const widgetsDir = pathHelpers.join(
-      getCwd(),
-      "dist",
-      "resources",
-      "widgets"
-    );
-
-    try {
-      const widgets = await fsHelpers.readdirSync(widgetsDir);
-      for (const widget of widgets) {
-        const assetPath = pathHelpers.join(
-          widgetsDir,
-          widget,
-          "assets",
-          assetFile
-        );
-        if (await fsHelpers.existsSync(assetPath)) {
-          const content = await fsHelpers.readFile(assetPath);
-          const contentType = getContentType(assetFile);
-          return new Response(content, {
-            status: 200,
-            headers: { "Content-Type": contentType },
-          });
-        }
-      }
-      return c.notFound();
-    } catch {
-      return c.notFound();
-    }
-  });
-
-  // Serve each widget's index.html at its route
-  // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
-  app.get("/mcp-use/widgets/:widget", async (c: Context) => {
-    const widget = c.req.param("widget")!;
-    const filePath = pathHelpers.join(
-      getCwd(),
-      "dist",
-      "resources",
-      "widgets",
-      widget,
-      "index.html"
-    );
-
-    try {
-      let html = await fsHelpers.readFileSync(filePath, "utf8");
-      // Process HTML with base URL injection and path conversion
-      html = processWidgetHtml(html, widget, serverConfig.serverBaseUrl);
-      return c.html(html);
-    } catch {
-      return c.notFound();
-    }
-  });
-
-  // Serve static files from public directory (production mode)
-  setupPublicRoutes(app, true);
-
-  // Setup favicon route at server root (production mode)
   setupFaviconRoute(app, serverConfig.favicon, true);
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Deno fallback — three small handlers backed by `fsHelpers.readFile`.
+ * Kept separate so the Node/Bun path stays a one-liner.
+ *
+ * The handlers slice `c.req.path` on the `/_mcp-use/...` segment instead of
+ * matching from the start, so they work regardless of basePath.
+ */
+function setupWidgetRoutesDeno(app: HonoType): void {
+  const serveDenoFile = async (
+    c: Context,
+    segments: string[]
+  ): Promise<Response> => {
+    const fullPath = pathHelpers.join(getCwd(), ".mcp-use", ...segments);
+    try {
+      const content = await fsHelpers.readFile(fullPath);
+      return new Response(content, {
+        status: 200,
+        headers: { "Content-Type": getContentType(segments.at(-1) ?? "") },
+      });
+    } catch {
+      return c.notFound();
+    }
+  };
+
+  app.get("/_mcp-use/widgets/:widget", async (c) => {
+    const widget = c.req.param("widget")!;
+    return serveDenoFile(c, ["widgets", widget, "index.html"]);
+  });
+
+  app.get("/_mcp-use/widgets/:widget/assets/*", async (c) => {
+    const widget = c.req.param("widget")!;
+    const assetFile = c.req.path.split("/assets/")[1] ?? "";
+    return serveDenoFile(c, ["widgets", widget, "assets", assetFile]);
+  });
+
+  app.get("/_mcp-use/public/*", async (c) => {
+    const filePath = c.req.path.split("/_mcp-use/public/")[1] ?? "";
+    return serveDenoFile(c, ["public", filePath]);
+  });
 }

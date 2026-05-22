@@ -37,6 +37,8 @@ const server = new MCPServer({
   host: 'localhost',                    // Bind hostname (default: 'localhost')
   baseUrl: 'https://mcp.example.com',   // Public URL for widget/asset URLs
                                         // Overrides host:port; also read from MCP_URL env var
+  basePath: '/api',                     // Mount all routes under this prefix
+                                        // (MCP transport, inspector, widgets, OAuth)
 
   // ── CORS ───────────────────────────────────────────────────
   cors: {
@@ -65,6 +67,46 @@ await server.listen(3000)
 **Port resolution order:** `listen(port)` argument → `--port` CLI flag → `PORT` env var → `3000`
 
 **Base URL resolution order:** `baseUrl` config → `MCP_URL` env var → `http://{host}:{port}`
+
+### Mounting Under a Path Prefix
+
+Use `basePath` to mount every route the server registers under a single prefix. This is useful when:
+
+- The MCP server lives behind a reverse proxy that strips a path prefix (e.g. `/api/*` routed to one upstream)
+- You want to host the MCP server alongside other routes in the same Hono app under a non-root path
+- You're deploying multiple MCP servers on one origin and need to namespace them
+
+```typescript
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  basePath: '/api',
+})
+```
+
+With `basePath: '/api'`, every route the server handles moves under that prefix — including your own custom routes:
+
+| Route | Default | With `basePath: '/api'` |
+|---|---|---|
+| MCP transport (streamable HTTP) | `POST /mcp` | `POST /api/mcp` |
+| MCP transport (SSE) | `GET /sse` | `GET /api/sse` |
+| Inspector UI | `GET /inspector` | `GET /api/inspector` |
+| Widget assets | `/mcp-use/widgets/*` | `/api/mcp-use/widgets/*` |
+| Public assets | `/mcp-use/public/*` | `/api/mcp-use/public/*` |
+| OAuth metadata | `/.well-known/oauth-authorization-server` | `/api/.well-known/oauth-authorization-server` |
+| OAuth endpoints | `/authorize`, `/token`, `/register` | `/api/authorize`, `/api/token`, `/api/register` |
+| Custom route (e.g. `server.app.get('/sign-in', ...)`) | `/sign-in` | `/api/sign-in` |
+
+OAuth discovery metadata (`issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, protected-resource URLs) is rebuilt to include the prefix, so standard OAuth 2.1 / RFC 9728 discovery works without extra configuration.
+
+**Rules:**
+- Must start with `/` and must not end with `/`
+- Empty string or `"/"` means "no prefix" (the default)
+- `/favicon.ico` is always served at the root regardless of `basePath`, so browsers' implicit favicon request still resolves
+
+<Note>
+Routes you register on `server.app` (including `server.app.get(...)`, `server.app.use(...)`) automatically live under `basePath`. If you also configure OAuth on the same server (e.g. better-auth at `/api/auth/**`), update the `authURL` / callback URLs you pass to that auth provider to include `basePath` too — clients reaching the server through `basePath` need to discover those endpoints under the same prefix.
+</Note>
 
 ### Environment Variables
 

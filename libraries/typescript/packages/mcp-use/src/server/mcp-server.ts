@@ -41,7 +41,7 @@ import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.
 
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
-import { requestLogger } from "./logging.js";
+import { createRequestLogger } from "./logging.js";
 import {
   getActiveSessions,
   sendNotification,
@@ -91,7 +91,9 @@ import {
   isDeno,
   isProductionMode as isProductionModeHelper,
   logRegisteredItems as logRegisteredItemsHelper,
+  normalizeBasePath,
   parseTemplateUri as parseTemplateUriHelper,
+  resolveIconUrls,
   rewriteSupabaseRequest,
   startServer,
 } from "./utils/index.js";
@@ -258,7 +260,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   /**
    * Hono application instance.
    *
-   * The underlying Hono app that handles HTTP routing and middleware.
+   * When `basePath` is set, this is a Hono `.basePath()` clone — route
+   * registrations made here automatically pick up the basePath prefix.
+   * The clone shares its parent's router/routes array (see Hono's
+   * `clone()`), so `app.fetch` still dispatches root-level routes such
+   * as OAuth `.well-known/*` discovery that were registered on the
+   * un-prefixed view inside the constructor before the clone was taken.
+   *
    * Can be used to add custom routes and middleware alongside MCP endpoints.
    *
    * @example
@@ -317,6 +325,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public serverBaseUrl?: string;
 
   /**
+   * Normalized base path prefix for every route this server mounts.
+   *
+   * Empty string means no prefix. Otherwise starts with `/` and has no
+   * trailing `/`. Computed once in the constructor from `config.basePath`.
+   */
+  public basePath: string;
+
+  /**
    * Optional favicon URL to display in inspector and documentation.
    */
   public favicon?: string;
@@ -348,15 +364,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
-  private oauthSetupState = {
-    complete: false,
-    provider: undefined as OAuthProvider | undefined,
-    middleware: undefined as
-      | ((c: any, next: any) => Promise<Response | void>)
-      | undefined,
-  };
   public oauthProvider?: OAuthProvider;
-  private oauthMiddleware?: (c: any, next: any) => Promise<Response | void>;
 
   /**
    * Storage for registrations that can be replayed on new server instances
@@ -2350,6 +2358,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     this.serverHost = config.host || "localhost";
     this.serverBaseUrl = config.baseUrl;
+    this.basePath = normalizeBasePath(config.basePath);
 
     // Auto-select favicon from icons array if not explicitly provided
     if (config.favicon) {
@@ -2359,20 +2368,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       console.log(`[MCP] Auto-selected favicon from icons: ${this.favicon}`);
     }
 
-    // Helper to convert relative icon paths to absolute URLs
-    const processIconUrls = (
-      icons: ServerConfig["icons"],
-      baseUrl?: string
-    ) => {
-      if (!icons || !baseUrl) return icons;
-      return icons.map((icon) => ({
-        ...icon,
-        src: icon.src.startsWith("http")
-          ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
-      }));
-    };
-
     // Create native SDK server instance with capabilities
     this.nativeServer = new OfficialMcpServer(
       {
@@ -2381,7 +2376,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: config.description,
         title: config.title,
         websiteUrl: config.websiteUrl,
-        icons: processIconUrls(config.icons, config.baseUrl),
+        icons: resolveIconUrls(config.icons, config.baseUrl, this.basePath),
       },
       {
         capabilities: {
@@ -2401,22 +2396,59 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
     );
 
-    // Create and configure Hono app with default middleware
-    this.app = createHonoApp(requestLogger, {
+    // Single Hono instance. Global middleware (CORS, host validation,
+    // request logging) lives on the un-prefixed root view created here.
+    // When `basePath` is set, `this.app` is later switched to a
+    // `.basePath()` clone — same underlying router and routes array (see
+    // Hono's `clone()`), but registrations through the clone automatically
+    // get the prefix prepended. No sub-mounting, no deferred route-snapshot
+    // dance.
+    const rootApp = createHonoApp(createRequestLogger(this.basePath), {
       cors: this.config.cors,
       allowedOrigins: this.config.allowedOrigins,
     });
 
+    this.oauthProvider = config.oauth;
+
+    // Mount OAuth on the un-prefixed root view BEFORE switching `this.app`
+    // to the basePath clone. OAuth has to register `.well-known/*` at the
+    // literal host root (RFC 8414 §3.1) regardless of basePath; everything
+    // else it registers (/authorize, /token, /register, /mcp middleware) is
+    // scoped under basePath via an internal `.basePath()` clone. Doing this
+    // here is the only thing that needs the un-prefixed handle — afterwards
+    // we collapse to a single `this.app` reference. `getServerBaseUrl()` is
+    // passed as a lazy getter because the port isn't bound yet when the
+    // constructor runs; metadata handlers resolve it at request time.
+    if (this.oauthProvider) {
+      setupOAuthForServer(
+        rootApp,
+        this.oauthProvider,
+        () => this.getServerBaseUrl(),
+        this.basePath
+      );
+    }
+
+    this.app = this.basePath ? rootApp.basePath(this.basePath) : rootApp;
+
     // Install the custom routes middleware FIRST (before any other routes).
     // This single middleware dispatches from the mutable _customRoutes map,
     // enabling HMR for custom HTTP routes (server.get(), server.post(), etc.)
-    // without hitting Hono's "matcher already built" error.
+    // without hitting Hono's "matcher already built" error. Registered on
+    // `this.app` so it auto-prefixes under `basePath`; the dispatcher strips
+    // the prefix from `c.req.path` so user keys stay bare (e.g.
+    // `server.get("/foo")` is reachable at `${basePath}/foo`).
     // See: https://github.com/honojs/hono/issues/3817
-    installCustomRoutesMiddleware(this.app, this._customRoutes);
+    installCustomRoutesMiddleware(
+      this.app,
+      this._customRoutes,
+      () => this.basePath
+    );
 
-    // Setup public routes immediately if icons/favicon are configured
-    // This ensures icons are served even before listen() or getHandler() is called
-    // Only set up dev routes if not in production mode - production routes will be set up later
+    // Setup public routes immediately if icons/favicon are configured.
+    // Both register on `this.app` so they auto-prefix under `basePath` —
+    // `${basePath}/_mcp-use/public/*` and `${basePath}/favicon.ico`. The
+    // MCP icon declaration in `getServerInfo` is what clients consume to
+    // discover the icon when the server is mounted under a basePath.
     if (
       (this.favicon || this.config.icons) &&
       !isProductionModeHelper() &&
@@ -2426,8 +2458,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       setupFaviconRoute(this.app, this.favicon, false);
       this.publicRoutesMode = "dev";
     }
-
-    this.oauthProvider = config.oauth;
 
     // Wrap registration methods to capture registrations for multi-session support
     this.wrapRegistrationMethods();
@@ -2631,20 +2661,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param sessionId - Optional session ID to store registered refs for hot reload support
    */
   public getServerForSession(sessionId?: string): OfficialMcpServer {
-    // Helper to convert relative icon paths to absolute URLs
-    const processIconUrls = (
-      icons: ServerConfig["icons"],
-      baseUrl?: string
-    ) => {
-      if (!icons || !baseUrl) return icons;
-      return icons.map((icon) => ({
-        ...icon,
-        src: icon.src.startsWith("http")
-          ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
-      }));
-    };
-
     const newServer = new OfficialMcpServer(
       {
         name: this.config.name,
@@ -2652,7 +2668,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: this.config.description,
         title: this.config.title,
         websiteUrl: this.config.websiteUrl,
-        icons: processIconUrls(this.config.icons, this.serverBaseUrl),
+        icons: resolveIconUrls(
+          this.config.icons,
+          this.serverBaseUrl,
+          this.basePath
+        ),
       },
       {
         capabilities: {
@@ -3703,10 +3723,36 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this, // Pass the MCPServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.basePath
     );
 
     this.mcpMounted = result.mcpMounted;
+  }
+
+  /**
+   * Run the shared mount sequence used by both `listen()` and `getHandler()`:
+   * widgets → MCP transport → inspector. Each step internally guards
+   * against double-mounting, so it's safe to call this more than once
+   * across the same lifecycle. (OAuth is mounted up front in the
+   * constructor — its `.well-known/*` routes need the un-prefixed root
+   * handle, which only exists during construction.)
+   */
+  private async _setupAndMount(): Promise<void> {
+    await mountWidgets(this as any, {
+      baseRoute: "/_mcp-use/widgets",
+      // Only forward `resourcesDir` when the env var is set. That lets
+      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
+      // (via `--mcp-dir src/mcp`) without forcing the user to configure
+      // anything in their server file. When the env var is unset,
+      // `mountWidgets` applies its own default (`"resources"`).
+      ...(process.env.MCP_USE_WIDGETS_DIR
+        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
+        : {}),
+    });
+    await this.mountMcp();
+    // Mount inspector BEFORE Vite middleware so it claims /inspector routes.
+    await this.mountInspector();
   }
 
   /**
@@ -3882,31 +3928,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverPort
     );
 
-    // Setup OAuth before mounting widgets/MCP (if configured)
-    if (this.oauthProvider && !this.oauthSetupState.complete) {
-      await setupOAuthForServer(
-        this.app,
-        this.oauthProvider,
-        this.getServerBaseUrl(),
-        this.oauthSetupState
-      );
-    }
-
-    await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
-      // Only forward `resourcesDir` when the env var is set. That lets
-      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
-      // (via `--mcp-dir src/mcp`) without forcing the user to configure
-      // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
-      ...(process.env.MCP_USE_WIDGETS_DIR
-        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
-        : {}),
-    });
-    await this.mountMcp();
-
-    // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
-    await this.mountInspector();
+    await this._setupAndMount();
 
     // Log registered items before starting server
     this.logRegisteredItems();
@@ -3929,13 +3951,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Track server run event
     this._trackServerRun("http");
 
-    // Start server using runtime-aware helper
+    // Start server using runtime-aware helper. `this.app` is the basePath
+    // clone but its router/routes array is shared with the un-prefixed root
+    // view used inside the constructor for OAuth `.well-known/*`, so its
+    // fetch dispatches both prefixed and root-level routes.
     const httpHandle = await startServer(
       this.app,
       this.serverPort,
       this.serverHost,
       {
         onDenoRequest: rewriteSupabaseRequest,
+        basePath: this.basePath,
       }
     );
     this._httpServerClose = httpHandle.close;
@@ -4011,39 +4037,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
-    // Setup OAuth before mounting widgets/MCP (if configured)
-    if (this.oauthProvider && !this.oauthSetupState.complete) {
-      await setupOAuthForServer(
-        this.app,
-        this.oauthProvider,
-        this.getServerBaseUrl(),
-        this.oauthSetupState
-      );
-    }
-
-    console.log("[MCP] Mounting widgets");
-    await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
-      // Only forward `resourcesDir` when the env var is set. That lets
-      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
-      // (via `--mcp-dir src/mcp`) without forcing the user to configure
-      // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
-      ...(process.env.MCP_USE_WIDGETS_DIR
-        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
-        : {}),
-    });
-    console.log("[MCP] Mounted widgets");
-    await this.mountMcp();
-    console.log("[MCP] Mounted MCP");
-    console.log("[MCP] Mounting inspector");
-    await this.mountInspector();
-    console.log("[MCP] Mounted inspector");
+    await this._setupAndMount();
 
     const provider = options?.provider || "fetch";
     this._trackServerRun(provider);
 
-    // Wrap the fetch handler to ensure it always returns a Promise<Response>
+    // `this.app` is the basePath clone but shares its router/routes array
+    // with the un-prefixed root view used during construction (for OAuth
+    // `.well-known/*`), so its fetch handles both prefixed and root-level
+    // routes.
     const fetchHandler = this.app.fetch.bind(this.app);
 
     // Handle platform-specific path rewriting and CORS
@@ -4131,7 +4133,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.app,
       this.serverHost,
       this.serverPort,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.basePath
     );
 
     if (mounted) {

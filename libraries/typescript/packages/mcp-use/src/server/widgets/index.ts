@@ -28,7 +28,7 @@ export { uiResourceRegistration } from "./ui-resource-registration.js";
  * In production mode: serves pre-built static widgets
  *
  * @param options - Configuration options
- * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+ * @param options.baseRoute - Base route for widgets (defaults to '/_mcp-use/widgets')
  * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
  * @returns Promise that resolves when all widgets are mounted
  */
@@ -48,6 +48,7 @@ export async function mountWidgets(
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,
     publicRoutesMode: (server as any).publicRoutesMode,
+    basePath: (server as any).basePath ?? "",
     /** Pre-created HTTP server for Vite HMR WebSocket support */
     httpServer: (server as any)._httpServer as
       | import("http").Server
@@ -77,12 +78,18 @@ export async function mountWidgets(
     (server as any).removeWidgetTool(toolName);
   };
 
-  const app = server.app;
+  // `/_mcp-use/widgets/*`, `/_mcp-use/public/*`, and `/favicon.ico` all live
+  // under the configured `basePath` (empty string == host root). Pass the
+  // basePath-aware Hono view so registrations get auto-prefixed. This is
+  // also the same Hono instance handed to `startServer()`, so attaching
+  // `__viteWsProxy` to it lets the lifecycle helper pick the WS proxy up.
+  const app = (server as any).app as import("hono").Hono;
+  const basePath = serverConfig.basePath;
 
   if (isProductionMode() || isDeno) {
     console.log("[WIDGETS] Mounting widgets in production mode");
     // Setup routes first for production
-    setupWidgetRoutes(app, serverConfig);
+    setupWidgetRoutes(app, serverConfig, basePath);
     (server as any).publicRoutesMode = "production";
     await mountWidgetsProduction(app, serverConfig, registerWidget, options);
   } else {

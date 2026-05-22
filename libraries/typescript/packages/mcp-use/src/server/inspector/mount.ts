@@ -36,7 +36,8 @@ export async function mountInspectorUI(
   app: HonoType,
   serverHost: string,
   serverPort: number | undefined,
-  isProduction: boolean
+  isProduction: boolean,
+  basePath: string = ""
 ): Promise<boolean> {
   // In production, only mount if build manifest says so
   if (isProduction) {
@@ -55,15 +56,23 @@ export async function mountInspectorUI(
   try {
     // @ts-ignore - Optional peer dependency, may not be installed during build
     const { mountInspector } = await import("@mcp-use/inspector");
-    // Auto-connect to the local MCP server at /mcp (SSE endpoint)
-    // Use JSON config to specify SSE transport type
-    const mcpUrl = `http://${serverHost}:${serverPort}/mcp`; // Also available at /sse
+    // Auto-connect to the local MCP server. The transport lives at
+    // `${basePath}/mcp` externally; the inspector's auto-connect URL uses
+    // the externally-visible path because it's loaded by the user's
+    // browser, not internally.
+    const mcpUrl = `http://${serverHost}:${serverPort}${basePath}/mcp`;
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
       transportType: "sse",
       connectionType: "Direct",
     });
+    // The inspector registers bare `/inspector/*` routes on whatever app
+    // we hand it. We're handing it the inner app, which is already
+    // sub-mounted under `basePath` by the MCPServer constructor — so the
+    // inspector composes to `${basePath}/inspector/*` externally without
+    // any wrapping here. `basePath` still flows in for URL emission
+    // (`<base href>`, `window.__MCP_BASE_PATH__`).
     mountInspector(app, {
       autoConnectUrl: autoConnectConfig,
       // In dev mode, tell the inspector to use same-origin for MCP Apps sandbox.
@@ -71,9 +80,10 @@ export async function mountInspectorUI(
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
+      basePath,
     });
     console.log(
-      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`
+      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}${basePath}/inspector`
     );
     return true;
   } catch (err) {

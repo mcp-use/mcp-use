@@ -187,8 +187,8 @@ export async function readBuildManifest(): Promise<{
   try {
     const manifestPath = pathHelpers.join(
       isDeno ? "." : getCwd(),
-      "dist",
-      "mcp-use.json"
+      ".mcp-use",
+      "manifest.json"
     );
     const content = await fsHelpers.readFileSync(manifestPath, "utf8");
     return JSON.parse(content);
@@ -209,6 +209,8 @@ export interface WidgetServerConfig {
   serverBaseUrl?: string;
   /** Build ID for cache busting */
   buildId?: string;
+  /** Server basePath prefix (e.g. "/api"). Empty string when unset. */
+  basePath?: string;
 }
 
 /**
@@ -294,78 +296,38 @@ export function getContentType(filename: string): string {
 }
 
 /**
- * Process widget HTML with base URL injection and path conversion
+ * Inject runtime globals into widget HTML.
+ *
+ * The injected script resolves the server's `basePath` at runtime from
+ * `window.location.pathname` (splitting on the literal `/_mcp-use/` segment).
+ * This keeps the baked HTML basePath-agnostic — the same `.mcp-use/widgets/
+ * <name>/index.html` file produced by `packages/cli/src/index.ts` works
+ * whether the server is mounted at the host root or under a `basePath` like
+ * `/api`, with no rebuild needed.
+ *
+ * Production builds bake these globals at build time (CLI). Dev mode calls
+ * this on the fly from the Vite middleware. Idempotent: if the globals are
+ * already present, this is a no-op.
  *
  * @param html - Original HTML content
- * @param widgetName - Widget identifier
- * @param baseUrl - Server base URL
- * @returns Processed HTML with injected base tag and absolute URLs
- *
- * @example
- * ```typescript
- * const html = '<html><head></head><body>...</body></html>';
- * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000');
- * ```
+ * @param widgetName - Widget identifier (will be slugified for URL paths)
+ * @returns HTML with the globals script injected after the opening `<head>`
  */
-export function processWidgetHtml(
-  html: string,
-  widgetName: string,
-  baseUrl: string
-): string {
-  let processedHtml = html;
-
-  // Inject or replace base tag with server base URL
-  if (baseUrl && processedHtml) {
-    // Remove HTML comments temporarily to avoid matching base tags inside comments
-    let htmlWithoutComments = processedHtml;
-    let prevHtmlWithoutComments;
-    do {
-      prevHtmlWithoutComments = htmlWithoutComments;
-      htmlWithoutComments = htmlWithoutComments.replace(/<!--[\s\S]*?-->/g, "");
-    } while (prevHtmlWithoutComments !== htmlWithoutComments);
-
-    // Try to replace existing base tag (only if not in comments)
-    const baseTagRegex = /<base\s+[^>]*\/?>/i;
-    if (baseTagRegex.test(htmlWithoutComments)) {
-      // Find and replace the actual base tag in the original HTML
-      const actualBaseTagMatch = processedHtml.match(/<base\s+[^>]*\/?>/i);
-      if (actualBaseTagMatch) {
-        processedHtml = processedHtml.replace(
-          actualBaseTagMatch[0],
-          `<base href="${baseUrl}" />`
-        );
-      }
-    } else {
-      // Inject base tag in head if it doesn't exist
-      const headTagRegex = /<head[^>]*>/i;
-      if (headTagRegex.test(processedHtml)) {
-        processedHtml = processedHtml.replace(
-          headTagRegex,
-          (match) => `${match}\n    <base href="${baseUrl}" />`
-        );
-      }
-    }
-
-    // Replace relative paths that start with /mcp-use for scripts and CSS with absolute URLs
-    processedHtml = processedHtml.replace(
-      /src="\/mcp-use\/widgets\/([^"]+)"/g,
-      `src="${baseUrl}/mcp-use/widgets/$1"`
-    );
-    processedHtml = processedHtml.replace(
-      /href="\/mcp-use\/widgets\/([^"]+)"/g,
-      `href="${baseUrl}/mcp-use/widgets/$1"`
-    );
-
-    // Add window.__getFile and window.__mcpPublicUrl to head
-    // Use slugified name for URL routing
-    const slugifiedName = slugifyWidgetName(widgetName);
-    processedHtml = processedHtml.replace(
-      /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
-    );
+export function processWidgetHtml(html: string, widgetName: string): string {
+  if (!html || html.includes("window.__mcpPublicUrl")) {
+    return html;
   }
 
-  return processedHtml;
+  const slugifiedName = slugifyWidgetName(widgetName);
+  // The widget HTML is always served at `<basePath>/_mcp-use/widgets/<slug>/...`,
+  // so the prefix preceding `/_mcp-use/` in `window.location.pathname` IS the
+  // server's basePath (possibly empty). Compute it once and use it to build
+  // sibling URLs (own assets, public files).
+  return html.replace(
+    /<head[^>]*>/i,
+    (match) =>
+      `${match}\n    <script>(function(){var p=window.location.pathname.split("/_mcp-use/")[0]||"";window.__getFile=function(filename){return p+"/_mcp-use/widgets/${slugifiedName}/"+filename};window.__mcpPublicUrl=p+"/_mcp-use/public";})();</script>`
+  );
 }
 
 /**
@@ -567,6 +529,7 @@ export async function createWidgetUIResource(
     baseUrl: configBaseUrl,
     port: configPort,
     buildId: serverConfig.buildId,
+    basePath: serverConfig.basePath ?? "",
   };
 
   const uiResource = await createUIResourceFromDefinition(
@@ -699,7 +662,7 @@ async function readWidgetHtml(
  * ```typescript
  * await registerWidgetFromTemplate(
  *   'kanban-board',
- *   './dist/resources/widgets/kanban-board/index.html',
+ *   './.mcp-use/widgets/kanban-board/index.html',
  *   { title: 'Kanban Board' },
  *   serverConfig,
  *   registerWidget,
@@ -721,8 +684,8 @@ export async function registerWidgetFromTemplate(
     return; // readWidgetHtml already logged the error
   }
 
-  // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  // Inject runtime globals (no-op if already baked at build time).
+  html = processWidgetHtml(html, widgetName);
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
@@ -742,11 +705,11 @@ export async function registerWidgetFromTemplate(
 /**
  * Setup static file serving routes for public files
  *
- * Creates an HTTP route to serve files from the public/ or dist/public/ directory.
+ * Creates an HTTP route to serve files from the public/ or .mcp-use/public/ directory.
  * This function encapsulates the common pattern of serving static files.
  *
  * @param app - Hono app instance to mount routes on
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from .mcp-use/public (production) or public (dev)
  *
  * @example
  * ```typescript
@@ -761,21 +724,23 @@ export function setupPublicRoutes(
   app: HonoType,
   useDistDirectory: boolean = false
 ): void {
-  app.get("/mcp-use/public/*", async (c: Context) => {
-    const filePath = c.req.path.replace("/mcp-use/public/", "");
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, filePath);
+  // Callers pass the basePath-aware app so the final route lands at
+  // `${basePath}/_mcp-use/public/*`. The `split("/_mcp-use/public/")` below
+  // is unambiguous regardless of basePath since `_mcp-use` is reserved.
+  const routePrefix = "/_mcp-use/public/";
+  app.get(`${routePrefix}*`, async (c: Context) => {
+    const filePath = c.req.path.split(routePrefix)[1] ?? "";
+    // Production reads from `.mcp-use/public` (built output). Dev reads
+    // from the user's source `public/` directory.
+    const fsBase = useDistDirectory ? ".mcp-use/public" : "public";
+    const fullPath = pathHelpers.join(getCwd(), fsBase, filePath);
 
     try {
-      if (await fsHelpers.existsSync(fullPath)) {
-        const content = await fsHelpers.readFile(fullPath);
-        const contentType = getContentType(filePath);
-        return new Response(content, {
-          status: 200,
-          headers: { "Content-Type": contentType },
-        });
-      }
-      return c.notFound();
+      const content = await fsHelpers.readFile(fullPath);
+      return new Response(content, {
+        status: 200,
+        headers: { "Content-Type": getContentType(filePath) },
+      });
     } catch {
       return c.notFound();
     }
@@ -790,7 +755,7 @@ export function setupPublicRoutes(
  *
  * @param app - Hono app instance to mount routes on
  * @param faviconPath - Path to favicon file relative to public directory
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from .mcp-use/public (production) or public (dev)
  *
  * @example
  * ```typescript
@@ -810,25 +775,29 @@ export function setupFaviconRoute(
     return; // No favicon configured
   }
 
-  app.get("/favicon.ico", async (c: Context) => {
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, faviconPath);
+  const handler = async (c: Context) => {
+    const fsBase = useDistDirectory ? ".mcp-use/public" : "public";
+    const fullPath = pathHelpers.join(getCwd(), fsBase, faviconPath);
 
     try {
-      if (await fsHelpers.existsSync(fullPath)) {
-        const content = await fsHelpers.readFile(fullPath);
-        const contentType = getContentType(faviconPath);
-        return new Response(content, {
-          status: 200,
-          headers: {
-            "Content-Type": contentType,
-            "Cache-Control": "public, max-age=31536000", // Cache for 1 year
-          },
-        });
-      }
-      return c.notFound();
+      const content = await fsHelpers.readFile(fullPath);
+      return new Response(content, {
+        status: 200,
+        headers: {
+          "Content-Type": getContentType(faviconPath),
+          "Cache-Control": "public, max-age=31536000", // Cache for 1 year
+        },
+      });
     } catch {
       return c.notFound();
     }
-  });
+  };
+
+  // Register at `/favicon.ico` on the basePath-aware app — final route lands
+  // at `${basePath}/favicon.ico`. Browsers' implicit `GET /favicon.ico` at
+  // the host root won't resolve when basePath is set; the MCP icon
+  // declaration in `getServerInfo` is the authoritative reference for
+  // clients that consume the icon, and the rendered landing page links to
+  // the basePath-prefixed URL.
+  app.get("/favicon.ico", handler);
 }

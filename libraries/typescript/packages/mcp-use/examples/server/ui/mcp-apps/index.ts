@@ -5,6 +5,7 @@ import { setTimeout as sleep } from "timers/promises";
 const server = new MCPServer({
   name: "mcp-apps-example",
   version: "1.0.0",
+  basePath: "/api",
   description:
     "Example MCP server demonstrating dual-protocol widget support (works with both ChatGPT and MCP Apps clients)",
 });
@@ -185,7 +186,7 @@ server.uiResource({
         // Parse props from URL (for both protocols)
         const params = new URLSearchParams(window.location.search);
         const propsJson = params.get('props');
-        
+
         if (propsJson) {
           try {
             const props = JSON.parse(propsJson);

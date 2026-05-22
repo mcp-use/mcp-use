@@ -695,7 +695,7 @@ export interface WidgetManifest {
 export interface DiscoverWidgetsOptions {
   /**
    * Path to widgets directory.
-   * Defaults to dist/resources/mcp-use/widgets.
+   * Defaults to .mcp-use/widgets.
    *
    * @example "./resources/widgets"
    */

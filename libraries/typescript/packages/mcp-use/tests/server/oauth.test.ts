@@ -54,7 +54,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl);
 
     const response = await fetch(
       `${svc.baseUrl}/.well-known/oauth-authorization-server`
@@ -67,6 +67,58 @@ describe("server OAuth integration", () => {
     expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/register`);
     // In proxy mode, the issuer is the local server URL
     expect(metadata.issuer).toBe(svc.baseUrl);
+  });
+
+  it("publishes basePath-prefixed endpoints when configured", async () => {
+    // `setupOAuthRoutes` takes the underlying root Hono plus a basePath.
+    // Internally it registers /authorize, /token, /register on a
+    // `.basePath()` clone (so they live at `${basePath}/...`) and
+    // /.well-known/* on the root (per RFC 8414 §3.1).
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client-id",
+      scopes: ["openid"],
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl, "/api");
+
+    // RFC 8414 §3.1 path-aware variant: well-known appended with the
+    // issuer's path. This is the SDK's preferred probe.
+    const response = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server/api`
+    );
+    expect(response.status).toBe(200);
+    const metadata = await response.json();
+
+    expect(metadata.issuer).toBe(`${svc.baseUrl}/api`);
+    expect(metadata.authorization_endpoint).toBe(
+      `${svc.baseUrl}/api/authorize`
+    );
+    expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/api/token`);
+    expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/api/register`);
+
+    // The root well-known path should still serve metadata as the SDK's
+    // fallback probe (and for clients that don't append the path).
+    const rootMetadata = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server`
+    );
+    expect(rootMetadata.status).toBe(200);
+
+    // RFC 9728 path-scoped protected resource metadata for the MCP transport.
+    const prResponse = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-protected-resource/api/mcp`
+    );
+    expect(prResponse.status).toBe(200);
+    const pr = await prResponse.json();
+    expect(pr.resource).toBe(`${svc.baseUrl}/api/mcp`);
   });
 
   it("proxies token requests and injects client credentials", async () => {
@@ -104,7 +156,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl);
 
     const form = new URLSearchParams({
       grant_type: "authorization_code",
@@ -164,6 +216,39 @@ describe("server OAuth integration", () => {
     expect(authorized.status).toBe(200);
   });
 
+  it("advertises path-aware resource_metadata URL with basePath", async () => {
+    // Per RFC 9728 §3.1, the resource metadata URL is built by inserting
+    // `/.well-known/oauth-protected-resource` between host and the resource
+    // path. For an MCP endpoint at `<host>/api/mcp` that's
+    // `<host>/.well-known/oauth-protected-resource/api/mcp`.
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    app.use(
+      "/api/mcp/*",
+      createBearerAuthMiddleware(proxy, () => svc.baseUrl, "/api")
+    );
+    app.get("/api/mcp/test", (c) => c.json({ ok: true }));
+
+    const response = await fetch(`${svc.baseUrl}/api/mcp/test`);
+    expect(response.status).toBe(401);
+
+    const wwwAuth = response.headers.get("www-authenticate");
+    expect(wwwAuth).toContain(
+      `resource_metadata="${svc.baseUrl}/.well-known/oauth-protected-resource/api/mcp"`
+    );
+  });
+
   it("returns configured clientId from /register endpoint", async () => {
     const app = new Hono();
 
@@ -179,7 +264,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl);
 
     const response = await fetch(`${svc.baseUrl}/register`, {
       method: "POST",

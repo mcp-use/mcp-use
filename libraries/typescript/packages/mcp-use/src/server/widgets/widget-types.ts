@@ -27,6 +27,11 @@ export interface ServerConfig {
   /** Pre-created HTTP server for Vite HMR WebSocket support (optional, Node.js only) */
 
   httpServer?: any;
+  /**
+   * Normalized base path prefix for every route this server mounts.
+   * Empty string means "no prefix".
+   */
+  basePath?: string;
 }
 
 /**
@@ -35,7 +40,7 @@ export interface ServerConfig {
  * Common options used for both development and production widget mounting.
  */
 export interface MountWidgetsOptions {
-  /** Base route for widgets (defaults to '/mcp-use/widgets') */
+  /** Base route for widgets (defaults to '/_mcp-use/widgets') */
   baseRoute?: string;
   /** Resources directory path (defaults to 'resources') */
   resourcesDir?: string;

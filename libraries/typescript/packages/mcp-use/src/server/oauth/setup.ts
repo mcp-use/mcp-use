@@ -5,58 +5,64 @@
  * Supports both DCR-direct mode (OAuthProvider) and proxy mode (OAuthProxy).
  */
 
-import type { Hono as HonoType, Context, Next } from "hono";
+import type { Hono as HonoType } from "hono";
 import { setupOAuthRoutes, isOAuthProxy } from "./routes.js";
 import { createBearerAuthMiddleware } from "./middleware.js";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 
 /**
- * OAuth setup state
- */
-interface OAuthSetupState {
-  provider?: OAuthProvider | OAuthProxy;
-  middleware?: (c: Context, next: Next) => Promise<Response | void>;
-  complete: boolean;
-}
-
-/**
- * Setup OAuth authentication for MCP server
+ * Setup OAuth authentication for MCP server.
  *
- * Initializes OAuth provider/proxy, creates bearer auth middleware,
- * sets up OAuth routes, and applies auth to /mcp endpoints.
+ * Initializes OAuth provider/proxy, creates bearer auth middleware, sets up
+ * OAuth routes, and applies auth to /mcp endpoints. Synchronous — registers
+ * routes against the supplied Hono and returns immediately. baseUrl is a
+ * lazy getter consumed inside request handlers, so this can run before the
+ * HTTP listener has bound a port.
  *
  * Supports two modes:
  * - DCR-direct (OAuthProvider): Clients authenticate directly with upstream
  * - Proxy (OAuthProxy): Server proxies OAuth flow with pre-registered credentials
  *
- * @param app - Hono app instance
+ * @param rootApp - Underlying Hono app (the un-prefixed root view). Must NOT
+ *                  be a `.basePath()` clone, because `.well-known/*` discovery
+ *                  has to land at the literal host root (RFC 8414 §3.1) and
+ *                  this function does its own basePath clone internally for
+ *                  `/authorize`, `/token`, `/register`.
  * @param oauth - OAuth provider or proxy instance
- * @param baseUrl - Server base URL for OAuth redirects
- * @param state - OAuth setup state to track completion
- * @returns Updated OAuth setup state with provider and middleware
+ * @param getBaseUrl - Lazy getter for the server base URL. Called per-request.
+ * @param basePath - Optional basePath prefix to scope authorize/token/register under
  */
-export async function setupOAuthForServer(
-  app: HonoType,
+export function setupOAuthForServer(
+  rootApp: HonoType,
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string,
-  state: OAuthSetupState
-): Promise<OAuthSetupState> {
-  if (state.complete) {
-    return state; // Already setup
-  }
-
+  getBaseUrl: () => string,
+  basePath: string = ""
+): void {
   const proxyMode = isOAuthProxy(oauth);
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
-  // Create bearer auth middleware with baseUrl for WWW-Authenticate header
-  const middleware = createBearerAuthMiddleware(oauth, baseUrl);
+  // Create bearer auth middleware. The WWW-Authenticate `resource_metadata`
+  // URL points at the path-aware discovery URL per RFC 9728 §3.1:
+  // `<host>/.well-known/oauth-protected-resource<basePath>/mcp` — identifying
+  // the MCP endpoint specifically as the protected resource. The matching
+  // route is registered by `setupOAuthRoutes` on the root app.
+  const middleware = createBearerAuthMiddleware(oauth, getBaseUrl, basePath);
 
-  // Setup OAuth routes
-  setupOAuthRoutes(app, oauth, baseUrl);
+  // Setup OAuth routes:
+  // - /authorize, /token, /register live under `basePath`
+  // - .well-known/* discovery lives at the host root
+  setupOAuthRoutes(rootApp, oauth, getBaseUrl, basePath);
+
+  // External (user-visible) paths for log messages.
+  const externalAuthorize = `${basePath}/authorize`;
+  const externalToken = `${basePath}/token`;
+  const externalRegister = `${basePath}/register`;
+  const externalMcp = `${basePath}/mcp`;
+  const externalWellKnown = `/.well-known/*`;
 
   if (proxyMode) {
     console.log(
-      "[OAuth] Proxy mode: clients use local /authorize, /token, /register endpoints"
+      `[OAuth] Proxy mode: clients use local ${externalAuthorize}, ${externalToken}, ${externalRegister} endpoints`
     );
     console.log("[OAuth] Credentials will be injected at token exchange");
   } else {
@@ -64,15 +70,16 @@ export async function setupOAuthForServer(
       "[OAuth] Clients will authenticate with provider directly via DCR"
     );
   }
-  console.log("[OAuth] Metadata endpoints: /.well-known/*");
+  console.log(`[OAuth] Metadata endpoints: ${externalWellKnown}`);
 
-  // Apply bearer auth to all /mcp routes
+  // Apply bearer auth to the MCP transport routes. Registered on a basePath
+  // clone so the middleware path is prefixed automatically; both
+  // `rootApp.basePath('/api').use('/mcp/*', mw)` and
+  // `rootApp.use('/api/mcp/*', mw)` would work — using the clone keeps the
+  // prefix concern out of this function.
+  const app = basePath ? rootApp.basePath(basePath) : rootApp;
   app.use("/mcp/*", middleware);
-  console.log("[OAuth] Bearer authentication enabled on /mcp routes");
-
-  return {
-    provider: oauth,
-    middleware: middleware,
-    complete: true,
-  };
+  console.log(
+    `[OAuth] Bearer authentication enabled on ${externalMcp}/* routes`
+  );
 }
