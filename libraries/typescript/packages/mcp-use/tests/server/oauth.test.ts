@@ -54,7 +54,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl);
 
     const response = await fetch(
       `${svc.baseUrl}/.well-known/oauth-authorization-server`
@@ -88,7 +88,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl, "/api");
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl, "/api");
 
     // RFC 8414 §3.1 path-aware variant: well-known appended with the
     // issuer's path. This is the SDK's preferred probe.
@@ -156,7 +156,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl);
 
     const form = new URLSearchParams({
       grant_type: "authorization_code",
@@ -231,7 +231,7 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    setupOAuthRoutes(app, proxy, svc.baseUrl);
+    setupOAuthRoutes(app, proxy, () => svc.baseUrl);
 
     const response = await fetch(`${svc.baseUrl}/register`, {
       method: "POST",

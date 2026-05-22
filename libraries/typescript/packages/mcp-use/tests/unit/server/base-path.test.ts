@@ -133,7 +133,7 @@ describe("MCPServer basePath", () => {
       expect(root.status).toBe(404);
     });
 
-    it("mounts framework-internal assets at /_mcp-use/ regardless of basePath", async () => {
+    it("mounts framework-internal assets under basePath at `${basePath}/_mcp-use/*`", async () => {
       const server = new MCPServer({
         name: "internal-assets-base-path",
         version: "1.0.0",
@@ -142,12 +142,19 @@ describe("MCPServer basePath", () => {
 
       const handler = await server.getHandler();
 
-      // `_mcp-use/*` is basePath-agnostic — a missing widget still returns
-      // 404 rather than falling through to the inner sub-mount.
-      const internal = await handler(
+      // Unprefixed `/_mcp-use/*` no longer resolves — the framework
+      // namespace is mounted under the configured basePath.
+      const root = await handler(
         new Request("http://localhost/_mcp-use/public/missing.png")
       );
-      expect(internal.status).toBe(404);
+      expect(root.status).toBe(404);
+
+      // Prefixed path: 404 for a missing file is the expected production
+      // result (the route exists, the file doesn't).
+      const prefixed = await handler(
+        new Request("http://localhost/api/_mcp-use/public/missing.png")
+      );
+      expect(prefixed.status).toBe(404);
 
       // The legacy `/__mcp-use/serverinfo` HTTP endpoint is gone; the same
       // information now lives in `.mcp-use/server-info.json` after listen().
@@ -200,7 +207,7 @@ describe("MCPServer basePath", () => {
         await rm(join(fixturesDir, "public", "hello.txt"), { force: true });
       });
 
-      it("serves widget HTML byte-for-byte from disk (no runtime transforms)", async () => {
+      it("serves widget HTML byte-for-byte from disk under basePath", async () => {
         const server = new MCPServer({
           name: "static-widget-html",
           version: "1.0.0",
@@ -209,7 +216,9 @@ describe("MCPServer basePath", () => {
 
         const handler = await server.getHandler();
         const res = await handler(
-          new Request("http://localhost/_mcp-use/widgets/sample/index.html")
+          new Request(
+            "http://localhost/api/_mcp-use/widgets/sample/index.html"
+          )
         );
 
         expect(res.status).toBe(200);
@@ -236,7 +245,7 @@ describe("MCPServer basePath", () => {
         expect(await res.text()).toBe(`console.log("hi");`);
       });
 
-      it("serves public files from .mcp-use/public/ at root namespace", async () => {
+      it("serves public files from .mcp-use/public/ under basePath", async () => {
         const server = new MCPServer({
           name: "static-public",
           version: "1.0.0",
@@ -245,7 +254,7 @@ describe("MCPServer basePath", () => {
 
         const handler = await server.getHandler();
         const res = await handler(
-          new Request("http://localhost/_mcp-use/public/hello.txt")
+          new Request("http://localhost/api/_mcp-use/public/hello.txt")
         );
 
         expect(res.status).toBe(200);

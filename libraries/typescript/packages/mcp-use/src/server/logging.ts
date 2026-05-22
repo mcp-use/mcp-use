@@ -152,8 +152,8 @@ async function extractResponseError(res: Response): Promise<string | null> {
  * by `MCP_DEBUG_LEVEL` (or legacy `DEBUG`). See {@link getDebugLevel}.
  *
  * Skips logging for inspector telemetry/RPC endpoints, framework-internal
- * `/_mcp-use/*` assets, and polling GETs against `/mcp` and `/inspector/api/*` —
- * including their basePath-prefixed equivalents (where applicable).
+ * `${basePath}/_mcp-use/*` assets, and polling GETs against `/mcp` and
+ * `/inspector/api/*` (all matched against the basePath-stripped path).
  */
 export function createRequestLogger(
   basePath: string = ""
@@ -173,12 +173,11 @@ export function createRequestLogger(
       basePath && pathname.startsWith(basePath)
         ? pathname.slice(basePath.length) || "/"
         : pathname;
-    // Framework-internal asset paths live at the host root under `/_mcp-use/`
-    // (basePath-agnostic). Match them on the raw `pathname`, not on the
-    // basePath-stripped `routedPath`, since they never carry the prefix.
+    // Framework-internal asset paths live under `${basePath}/_mcp-use/`, so
+    // match them against the basePath-stripped `routedPath`.
     const isInternalAsset =
-      pathname.startsWith("/_mcp-use/widgets/") ||
-      pathname.startsWith("/_mcp-use/public/");
+      routedPath.startsWith("/_mcp-use/widgets/") ||
+      routedPath.startsWith("/_mcp-use/public/");
     const noisyPaths = [
       "/inspector/api/tel/",
       "/inspector/api/rpc/stream",
@@ -189,7 +188,7 @@ export function createRequestLogger(
       method === "GET" &&
       (routedPath === "/mcp" ||
         routedPath.startsWith("/inspector/api/") ||
-        pathname.startsWith("/_mcp-use/"));
+        routedPath.startsWith("/_mcp-use/"));
 
     if (isInternalAsset) {
       await next();

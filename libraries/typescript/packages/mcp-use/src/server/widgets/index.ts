@@ -79,25 +79,23 @@ export async function mountWidgets(
   };
 
   // `/_mcp-use/widgets/*`, `/_mcp-use/public/*`, and `/favicon.ico` all live
-  // at the host root regardless of basePath. Pass the underlying root Hono
-  // so registrations bypass any basePath prefix.
-  const rootApp = (server as any)._rootApp as import("hono").Hono;
+  // under the configured `basePath` (empty string == host root). Pass the
+  // basePath-aware Hono view so registrations get auto-prefixed. This is
+  // also the same Hono instance handed to `startServer()`, so attaching
+  // `__viteWsProxy` to it lets the lifecycle helper pick the WS proxy up.
+  const app = (server as any).app as import("hono").Hono;
+  const basePath = serverConfig.basePath;
 
   if (isProductionMode() || isDeno) {
     console.log("[WIDGETS] Mounting widgets in production mode");
     // Setup routes first for production
-    setupWidgetRoutes(rootApp, serverConfig);
+    setupWidgetRoutes(app, serverConfig, basePath);
     (server as any).publicRoutesMode = "production";
-    await mountWidgetsProduction(
-      rootApp,
-      serverConfig,
-      registerWidget,
-      options
-    );
+    await mountWidgetsProduction(app, serverConfig, registerWidget, options);
   } else {
     console.log("[WIDGETS] Mounting widgets in development mode");
     await mountWidgetsDev(
-      rootApp,
+      app,
       serverConfig,
       registerWidget,
       updateWidgetTool,

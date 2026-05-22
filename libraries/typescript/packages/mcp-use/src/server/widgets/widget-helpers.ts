@@ -209,6 +209,8 @@ export interface WidgetServerConfig {
   serverBaseUrl?: string;
   /** Build ID for cache busting */
   buildId?: string;
+  /** Server basePath prefix (e.g. "/api"). Empty string when unset. */
+  basePath?: string;
 }
 
 /**
@@ -296,14 +298,16 @@ export function getContentType(filename: string): string {
 /**
  * Inject runtime globals into widget HTML.
  *
- * Production builds bake these globals at build time
- * (`packages/cli/src/index.ts`), so this function is effectively dev-only —
- * the CLI's `buildWidgets` already wrote the script into `.mcp-use/widgets/
- * &lt;name&gt;/index.html` before it lands on disk. It stays here for the dev
- * Vite middleware, which serves un-baked HTML on the fly.
+ * The injected script resolves the server's `basePath` at runtime from
+ * `window.location.pathname` (splitting on the literal `/_mcp-use/` segment).
+ * This keeps the baked HTML basePath-agnostic — the same `.mcp-use/widgets/
+ * <name>/index.html` file produced by `packages/cli/src/index.ts` works
+ * whether the server is mounted at the host root or under a `basePath` like
+ * `/api`, with no rebuild needed.
  *
- * Idempotent: if the globals are already present (production reads), this
- * is a no-op.
+ * Production builds bake these globals at build time (CLI). Dev mode calls
+ * this on the fly from the Vite middleware. Idempotent: if the globals are
+ * already present, this is a no-op.
  *
  * @param html - Original HTML content
  * @param widgetName - Widget identifier (will be slugified for URL paths)
@@ -315,10 +319,14 @@ export function processWidgetHtml(html: string, widgetName: string): string {
   }
 
   const slugifiedName = slugifyWidgetName(widgetName);
+  // The widget HTML is always served at `<basePath>/_mcp-use/widgets/<slug>/...`,
+  // so the prefix preceding `/_mcp-use/` in `window.location.pathname` IS the
+  // server's basePath (possibly empty). Compute it once and use it to build
+  // sibling URLs (own assets, public files).
   return html.replace(
     /<head[^>]*>/i,
     (match) =>
-      `${match}\n    <script>window.__getFile = (filename) => { return "/_mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "/_mcp-use/public";</script>`
+      `${match}\n    <script>(function(){var p=window.location.pathname.split("/_mcp-use/")[0]||"";window.__getFile=function(filename){return p+"/_mcp-use/widgets/${slugifiedName}/"+filename};window.__mcpPublicUrl=p+"/_mcp-use/public";})();</script>`
   );
 }
 
@@ -521,6 +529,7 @@ export async function createWidgetUIResource(
     baseUrl: configBaseUrl,
     port: configPort,
     buildId: serverConfig.buildId,
+    basePath: serverConfig.basePath ?? "",
   };
 
   const uiResource = await createUIResourceFromDefinition(
@@ -715,8 +724,9 @@ export function setupPublicRoutes(
   app: HonoType,
   useDistDirectory: boolean = false
 ): void {
-  // Register on the outer (root) app at `/_mcp-use/public/*` so public
-  // assets are reachable at a stable, basePath-agnostic URL.
+  // Callers pass the basePath-aware app so the final route lands at
+  // `${basePath}/_mcp-use/public/*`. The `split("/_mcp-use/public/")` below
+  // is unambiguous regardless of basePath since `_mcp-use` is reserved.
   const routePrefix = "/_mcp-use/public/";
   app.get(`${routePrefix}*`, async (c: Context) => {
     const filePath = c.req.path.split(routePrefix)[1] ?? "";
@@ -783,8 +793,11 @@ export function setupFaviconRoute(
     }
   };
 
-  // Register at bare /favicon.ico. Callers should pass the underlying root
-  // Hono so browsers' implicit `GET /favicon.ico` resolves regardless of
-  // basePath.
+  // Register at `/favicon.ico` on the basePath-aware app — final route lands
+  // at `${basePath}/favicon.ico`. Browsers' implicit `GET /favicon.ico` at
+  // the host root won't resolve when basePath is set; the MCP icon
+  // declaration in `getServerInfo` is the authoritative reference for
+  // clients that consume the icon, and the rendered landing page links to
+  // the basePath-prefixed URL.
   app.get("/favicon.ico", handler);
 }

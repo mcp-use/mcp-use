@@ -189,28 +189,32 @@ function createTokenHandler(
  *
  * @param rootApp - The underlying Hono instance (un-prefixed root view)
  * @param oauth - The OAuth provider or proxy
- * @param baseUrl - The base URL of this server (for metadata)
+ * @param getBaseUrl - Lazy getter for the server base URL. Called per-request so
+ *                     callers can register routes before the HTTP listener has
+ *                     bound a port (baseUrl is only consumed inside handlers).
  * @param basePath - Optional prefix the server is mounted under (e.g. "/api")
  */
 export function setupOAuthRoutes(
   rootApp: Hono,
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string,
+  getBaseUrl: () => string,
   basePath: string = ""
 ): void {
   const proxyMode = isOAuthProxy(oauth);
-  // `baseUrl` is the server origin (no path); `basePath` is the externally-
-  // visible prefix the server is mounted under. The combination is what
-  // goes into discovery metadata so clients land on the right paths.
+  // `getBaseUrl()` returns the server origin (no path); `basePath` is the
+  // externally-visible prefix the server is mounted under. The combination
+  // (resolved lazily inside each handler) is what goes into discovery metadata
+  // so clients land on the right paths.
   // - /authorize, /token, /register live under `basePath` — registered on
   //   a `.basePath()` clone so the prefix is prepended automatically.
   // - .well-known/* discovery lives at the host root on `rootApp`. Per
   //   RFC 8414 §3.1, the discovery URL is `<host>/.well-known/<type>` with
   //   the issuer's path appended *after* the well-known segment — not
-  //   `<host>/<basePath>/.well-known/...`. Registering on `rootApp` makes
-  //   discovery basePath-agnostic for the same reason `/_mcp-use/*` is.
+  //   `<host>/<basePath>/.well-known/...`. Registering on `rootApp` keeps
+  //   the well-known endpoints at the literal host root regardless of
+  //   `basePath` (unlike `/_mcp-use/*`, which now lives under basePath).
   const app = basePath ? rootApp.basePath(basePath) : rootApp;
-  const prefixedBaseUrl = `${baseUrl}${basePath}`;
+  const getPrefixedBaseUrl = () => `${getBaseUrl()}${basePath}`;
   // Enable CORS for all OAuth-related discovery endpoints on rootApp.
   rootApp.use(
     "/.well-known/oauth-*",
@@ -313,6 +317,7 @@ export function setupOAuthRoutes(
       const proxy = oauth as OAuthProxy;
       console.log(`[OAuth] Returning proxy mode metadata`);
 
+      const prefixedBaseUrl = getPrefixedBaseUrl();
       return c.json({
         issuer: prefixedBaseUrl,
         authorization_endpoint: `${prefixedBaseUrl}/authorize`,
@@ -406,6 +411,7 @@ export function setupOAuthRoutes(
    * Proxy mode: Points to the local server (which proxies to upstream).
    */
   const handleProtectedResourceMetadata = (c: Context) => {
+    const prefixedBaseUrl = getPrefixedBaseUrl();
     const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
     console.log(`[OAuth] Protected resource metadata request`);
     console.log(`[OAuth]   - Resource: ${prefixedBaseUrl}`);
@@ -419,6 +425,7 @@ export function setupOAuthRoutes(
   };
 
   const handleProtectedResourceMetadataMcp = (c: Context) => {
+    const prefixedBaseUrl = getPrefixedBaseUrl();
     const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
     return c.json({
       resource: `${prefixedBaseUrl}/mcp`,
