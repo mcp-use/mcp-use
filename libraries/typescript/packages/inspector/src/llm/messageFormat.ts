@@ -1,3 +1,4 @@
+import { isToolResultError, toolResultToContent } from "./toolResultParts";
 import type { ContentPart, ProviderMessage } from "./types";
 
 interface InspectorAttachment {
@@ -41,14 +42,6 @@ function extractText(m: InspectorMessageLike): string {
       .trim();
   }
   return "";
-}
-
-function serializeToolResult(result: unknown): string {
-  if (result && typeof result === "object") {
-    const { _meta: _ignored, ...rest } = result as Record<string, unknown>;
-    return JSON.stringify(rest);
-  }
-  return typeof result === "string" ? result : JSON.stringify(result);
 }
 
 /**
@@ -112,12 +105,14 @@ export function convertMessagesToProvider(
       toolCalls,
     });
     toolParts.forEach((p, i) => {
+      const result = p.toolInvocation!.result;
       out.push({
         role: "tool",
-        content: serializeToolResult(p.toolInvocation!.result),
+        content: toolResultToContent(result),
         toolCallId: `call_${mi}_${i}_${p.toolInvocation!.toolName}`,
         toolName: p.toolInvocation!.toolName,
-        toolResult: p.toolInvocation!.result,
+        toolResult: result,
+        toolIsError: isToolResultError(result),
       });
     });
   });
