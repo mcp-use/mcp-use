@@ -32,7 +32,7 @@ function readSubdomainFromManifest(): string | undefined {
   const projectPath = process.env.MCP_USE_PROJECT_PATH || process.cwd();
   try {
     const raw = readFileSync(
-      join(projectPath, "dist", "mcp-use.json"),
+      join(projectPath, ".mcp-use", "manifest.json"),
       "utf-8"
     );
     const manifest = JSON.parse(raw);

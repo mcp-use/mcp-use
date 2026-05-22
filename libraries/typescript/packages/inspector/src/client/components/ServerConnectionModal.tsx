@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/client/components/ui/dialog";
 import { getConfiguredServerAlias } from "@/client/utils/serverNames";
+import { inspectorPath } from "@/client/utils/basePath";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import { toast } from "sonner";
 
@@ -68,7 +69,7 @@ export function ServerConnectionModal({
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
   const [maxTotalTimeout, setMaxTotalTimeout] = useState("60000");
   const [proxyAddress, setProxyAddress] = useState(
-    `${window.location.origin}/inspector/api/proxy`
+    `${window.location.origin}${inspectorPath("/inspector/api/proxy")}`
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
@@ -112,7 +113,9 @@ export function ServerConnectionModal({
         setProxyAddress(proxyAddress);
       } else {
         setConnectionType("Direct");
-        setProxyAddress(`${window.location.origin}/inspector/api/proxy`);
+        setProxyAddress(
+          `${window.location.origin}${inspectorPath("/inspector/api/proxy")}`
+        );
       }
 
       // Convert headers from Record<string, string> to CustomHeader[]

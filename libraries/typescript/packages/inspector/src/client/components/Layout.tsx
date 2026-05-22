@@ -7,6 +7,7 @@ import {
 } from "@/client/context/InspectorContext";
 import { useAutoConnect } from "@/client/hooks/useAutoConnect";
 import { useKeyboardShortcuts } from "@/client/hooks/useKeyboardShortcuts";
+import { inspectorPath } from "@/client/utils/basePath";
 import { useSavedRequests } from "@/client/hooks/useSavedRequests";
 import {
   MCPCommandPaletteOpenEvent,
@@ -635,7 +636,7 @@ export function Layout({ children }: LayoutProps) {
           proxyAddress: string;
           headers?: Record<string, string>;
         } = {
-          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
+          proxyAddress: `${window.location.origin}${inspectorPath("/inspector/api/proxy")}`,
           ...(Object.keys(customHeaders).length > 0 && {
             headers: customHeaders,
           }),

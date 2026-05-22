@@ -2,6 +2,7 @@ import type { McpServer } from "mcp-use/react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import { inspectorPath } from "../utils/basePath";
 
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
@@ -302,10 +303,10 @@ export function useAutoConnect({
         const targetOrigin = new URL(url).origin;
         const inspectorOrigin = window.location.origin;
         if (inspectorOrigin !== targetOrigin) {
-          proxyAddress = `${inspectorOrigin}/inspector/api/proxy`;
+          proxyAddress = `${inspectorOrigin}${inspectorPath("/inspector/api/proxy")}`;
         }
       } catch {
-        proxyAddress = `${window.location.origin}/inspector/api/proxy`;
+        proxyAddress = `${window.location.origin}${inspectorPath("/inspector/api/proxy")}`;
       }
 
       const proxyConfig: {
@@ -473,7 +474,7 @@ export function useAutoConnect({
     }
 
     // Fallback to config.json
-    fetch("/inspector/config.json")
+    fetch(inspectorPath("/inspector/config.json"))
       .then((res) => res.json())
       .then((configData: { autoConnectUrl: string | null }) => {
         setConfigLoaded(true);

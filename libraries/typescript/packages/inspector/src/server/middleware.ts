@@ -31,6 +31,16 @@ export function mountInspector(
     sandboxOrigin?: string | null;
     /** Port the host app listens on (embedded inspector); required for tunnel start */
     serverPort?: number;
+    /**
+     * Path prefix the embedding host mounts the inspector under.
+     *
+     * When set (e.g. `"/api"`), the served HTML gets a `<base href>` of
+     * `${basePath}/inspector/` and `window.__MCP_BASE_PATH__` is exposed so
+     * the client can prefix React Router and same-origin fetch URLs.
+     *
+     * Empty/undefined keeps the historical behavior (mounted at `/inspector`).
+     */
+    basePath?: string;
   }
 ): void {
   // Find the built client files
@@ -50,6 +60,7 @@ export function mountInspector(
     devMode: config?.devMode,
     sandboxOrigin: config?.sandboxOrigin,
     inspectorMode: "embedded" as const,
+    basePath: config?.basePath,
   };
 
   // If it's already a Hono app, register routes directly.

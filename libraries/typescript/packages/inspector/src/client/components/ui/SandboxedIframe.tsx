@@ -22,6 +22,7 @@ import {
   useState,
 } from "react";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../../constants/iframe";
+import { inspectorPath } from "../../utils/basePath";
 
 export interface SandboxedIframeHandle {
   postMessage: (data: unknown) => void;
@@ -103,7 +104,7 @@ export const SandboxedIframe = forwardRef<
     const configuredSandboxOrigin = (window as any).__MCP_SANDBOX_ORIGIN__;
     if (configuredSandboxOrigin) {
       // Use fully configured origin (e.g., "https://sandbox-inspector.mcp-use.com")
-      return `${configuredSandboxOrigin}/inspector/api/mcp-apps/sandbox-proxy?v=${Date.now()}`;
+      return `${configuredSandboxOrigin}${inspectorPath("/inspector/api/mcp-apps/sandbox-proxy")}?v=${Date.now()}`;
     }
 
     let sandboxHost: string;
@@ -136,7 +137,7 @@ export const SandboxedIframe = forwardRef<
     }
 
     const portSuffix = currentPort ? `:${currentPort}` : "";
-    return `${protocol}//${sandboxHost}${portSuffix}/inspector/api/mcp-apps/sandbox-proxy?v=${Date.now()}`;
+    return `${protocol}//${sandboxHost}${portSuffix}${inspectorPath("/inspector/api/mcp-apps/sandbox-proxy")}?v=${Date.now()}`;
   });
 
   const sandboxProxyOrigin = useMemo(() => {

@@ -63,6 +63,14 @@ interface RuntimeConfig {
    * network calls are made.
    */
   disableTelemetry?: boolean;
+  /**
+   * Path prefix the embedding host mounts the inspector under (no trailing
+   * slash). When non-empty, the served HTML gets a `<base href>` of
+   * `${basePath}/inspector/` so Vite's relative asset URLs resolve under the
+   * prefix, and `window.__MCP_BASE_PATH__` is exposed so the client can
+   * prefix React Router and same-origin fetch URLs.
+   */
+  basePath?: string;
 }
 
 /**
@@ -108,10 +116,38 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
     );
   }
 
-  if (scripts.length === 0) return html;
+  // Expose the runtime basePath so the React client can prefix Router
+  // basename and same-origin fetches. Default empty string = legacy
+  // "mounted at /inspector" behavior.
+  const basePath = config.basePath ?? "";
+  scripts.push(
+    `<script>window.__MCP_BASE_PATH__ = ${JSON.stringify(basePath)};</script>`
+  );
+
+  // With Vite built using `base: "./"`, asset URLs in the served HTML are
+  // relative ("./assets/foo.js"). The browser resolves them against the
+  // document's <base href> if present. Inject one matching the embedding
+  // host's mount so chunks load from `${basePath}/inspector/assets/...`.
+  // The trailing slash is required for <base href> path resolution.
+  const baseHref = `${basePath}/inspector/`;
+  const baseTag = `<base href="${baseHref}">`;
+
+  let injected = html;
+  // <base> must come before any asset reference. Vite emits <meta charset>
+  // first; place <base> immediately after it (or after <head> as a fallback).
+  if (/<meta\s+charset=[^>]*>/i.test(injected)) {
+    injected = injected.replace(
+      /(<meta\s+charset=[^>]*>)/i,
+      `$1\n    ${baseTag}`
+    );
+  } else {
+    injected = injected.replace(/<head[^>]*>/i, (m) => `${m}\n    ${baseTag}`);
+  }
+
+  if (scripts.length === 0) return injected;
 
   const injection = scripts.join("\n    ");
-  return html.replace("</head>", `    ${injection}\n  </head>`);
+  return injected.replace("</head>", `    ${injection}\n  </head>`);
 }
 
 /**
@@ -152,13 +188,22 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
         `<script>window.__MCP_USE_ANONYMIZED_TELEMETRY__ = false;try{localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY","false");}catch(e){}</script>`
       );
     }
+    scripts.push(
+      `<script>window.__MCP_BASE_PATH__ = ${JSON.stringify(config.basePath ?? "")};</script>`
+    );
     return scripts.join("\n    ");
   })();
+
+  // CDN shell loads JS from absolute https:// CDN URLs, so <base href> is
+  // only needed for any future same-origin relative refs — emit it anyway
+  // so behavior stays consistent with the local-file path.
+  const baseTag = `<base href="${config?.basePath ?? ""}/inspector/">`;
 
   return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    ${baseTag}
     <link
       rel="icon"
       type="image/svg+xml"
@@ -257,12 +302,13 @@ export function registerStaticRoutes(
   // disableTelemetry is auto-populated from MCP_USE_ANONYMIZED_TELEMETRY=false so
   // setting that single env var disables both the inspector's own telemetry and
   // the in-browser posthog-js init triggered by `useMcp` hooks rendered inside.
+  const basePath = runtimeConfig?.basePath ?? "";
   const effectiveConfig: RuntimeConfig = {
     ...runtimeConfig,
     proxyUrl:
       runtimeConfig?.proxyUrl !== undefined
         ? runtimeConfig.proxyUrl
-        : "/inspector/api/proxy",
+        : `${basePath}/inspector/api/proxy`,
     disableTelemetry:
       runtimeConfig?.disableTelemetry ??
       process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false",
@@ -314,8 +360,12 @@ export function registerStaticRoutes(
 
   // Serve static assets from /inspector/assets/*
   app.get("/inspector/assets/*", (c) => {
-    const path = c.req.path.replace("/inspector/assets/", "assets/");
-    const fullPath = join(distPath, path);
+    // Use the suffix after `/assets/` so this still works when the inspector
+    // is mounted under a host-supplied basePath (e.g. `/api/inspector/...`),
+    // where `c.req.path` is the full original URL even inside a sub-Hono.
+    const afterAssets = c.req.path.split("/assets/")[1];
+    if (afterAssets === undefined) return c.notFound();
+    const fullPath = join(distPath, "assets", afterAssets);
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath);
       const contentType = getContentType(fullPath);

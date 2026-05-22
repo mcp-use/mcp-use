@@ -8,6 +8,7 @@ import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
+import { inspectorPath } from "../utils/basePath";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
 import { Spinner } from "./ui/spinner";
@@ -252,7 +253,7 @@ function OpenAIComponentRendererBase({
 
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
         const storeResponse = await fetch(
-          `${inspectorApiBase}/inspector/api/resources/widget/store`,
+          `${inspectorApiBase}${inspectorPath("/inspector/api/resources/widget/store")}`,
           {
             method: "POST",
             headers: {
@@ -291,7 +292,7 @@ function OpenAIComponentRendererBase({
         // the store so that iframe fetch gets latest data. Changing URL would reload the iframe.
         if (!hasSetWidgetUrlRef.current) {
           hasSetWidgetUrlRef.current = true;
-          const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
+          const widgetUrl = `${inspectorApiBase}${inspectorPath("/inspector/api/resources/widget-content")}/${toolId}?t=${Date.now()}`;
           setWidgetUrl(widgetUrl);
           // Register widget in debug context so CSP violations can be stored
           addWidget(toolId, { toolName, protocol: "chatgpt-app" });
