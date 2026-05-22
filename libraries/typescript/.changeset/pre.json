@@ -14,6 +14,7 @@
     "fix-inspector-tool-schema-mutation",
     "fix-knip-tabcountbadge-barrel",
     "fix-oauth-metadata-double-slash",
+    "fix-provider-render-phase-setstate",
     "fix-server-alias-tile-heading",
     "improve-tab-animation-duration",
     "inspector-mcp-reconnect-banner",

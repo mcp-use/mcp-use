@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.2.1-canary.15
+
+### Patch Changes
+
+- Updated dependencies [ecdb0fd]
+  - mcp-use@1.29.0-canary.15
+  - @mcp-use/inspector@7.0.0-canary.15
+
 ## 3.2.1-canary.14
 
 ### Patch Changes
