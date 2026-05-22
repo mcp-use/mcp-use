@@ -11,6 +11,8 @@
  * will reintroduce proxy-mode behavior in a future change.
  */
 
+import type { Hono as HonoType } from "hono";
+
 export interface OAuthProvider {
   /**
    * Verify and decode a JWT token
@@ -68,6 +70,42 @@ export interface OAuthProvider {
    * @returns The audience string, or undefined if not configured
    */
   getAudience?(): string | undefined;
+
+  /**
+   * Override the default `.well-known/oauth-authorization-server` handler.
+   *
+   * The default behavior fetches metadata from the upstream issuer. Providers
+   * running in-process (e.g. Better Auth mounted on the same Hono app) supply
+   * this hook to synthesize metadata from a local source instead — necessary
+   * when the issuer is on the same host but doesn't serve `.well-known/*`
+   * itself.
+   */
+  authorizationServerMetadataHandler?(
+    req: Request
+  ): Response | Promise<Response>;
+
+  /**
+   * Override the default `.well-known/openid-configuration` handler.
+   * Same semantics as {@link authorizationServerMetadataHandler}.
+   */
+  openIdConfigurationMetadataHandler?(
+    req: Request
+  ): Response | Promise<Response>;
+
+  /**
+   * Register provider-specific routes on the root Hono app after the SDK's
+   * default OAuth routes are installed.
+   *
+   * Used by in-process providers to mount their request handler (e.g.
+   * `auth.handler`) at the issuer path on the host root. The SDK's
+   * `.well-known/*` registrations live at the literal host root regardless of
+   * basePath, so providers can also use this hook to register additional
+   * discovery paths.
+   *
+   * @param rootApp - Un-prefixed root Hono app
+   * @param basePath - MCPServer basePath (empty string when not set)
+   */
+  installRoutes?(rootApp: HonoType, basePath: string): void;
 }
 
 /**
@@ -192,11 +230,48 @@ export interface ClerkOAuthConfig extends BaseOAuthConfig {
 }
 
 /**
- * Better Auth OAuth provider configuration
+ * Minimal shape required of a Better Auth instance for in-process mode.
+ *
+ * Better Auth's exported type is huge and generic over plugin configuration;
+ * we only need the runtime surface the SDK actually calls, so this stays
+ * structural and avoids a direct dependency on `better-auth` types.
+ */
+export interface BetterAuthInstance {
+  handler: (req: Request) => Response | Promise<Response>;
+  options: {
+    baseURL?: string;
+    basePath?: string;
+    [key: string]: unknown;
+  };
+  api: {
+    getOAuthServerConfig: (input: {
+      request: Request;
+      asResponse: false;
+    }) => Promise<Record<string, unknown>>;
+    getOpenIdConfig: (input: {
+      request: Request;
+      asResponse: false;
+    }) => Promise<Record<string, unknown>>;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+/**
+ * Better Auth OAuth provider configuration.
+ *
+ * Two mutually exclusive modes:
+ * - **In-process** (`auth`): SDK mounts Better Auth's handler at the
+ *   server's basePath and serves discovery metadata locally.
+ * - **External** (`authURL`): Better Auth runs on a separate origin; the SDK
+ *   only verifies tokens issued by it.
  */
 export interface BetterAuthOAuthConfig extends BaseOAuthConfig {
   provider: "better-auth";
-  authURL: string;
+  /** In-process mode: the Better Auth instance to mount. */
+  auth?: BetterAuthInstance;
+  /** External mode: full base URL of the remote Better Auth deployment. */
+  authURL?: string;
   verifyJwt?: boolean;
   getUserInfo?: (
     payload: Record<string, unknown>

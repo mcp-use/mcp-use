@@ -2,13 +2,16 @@
  * Better Auth OAuth MCP Server Example
  *
  * Demonstrates running Better Auth and an MCP server on a single Hono app.
- * The auth server and MCP resource server share one port — no separate processes.
+ * The auth server and MCP resource server share one port — no separate
+ * processes. Passing the `auth` instance directly to `oauthBetterAuthProvider`
+ * is enough; the SDK mounts Better Auth's handler under MCPServer's basePath
+ * and registers OAuth discovery (`.well-known/*`) at the host root.
  *
  * Setup:
  * 1. Copy .env.example to .env and fill in GitHub OAuth credentials
  * 2. Run: pnpx auth@latest migrate (creates the database tables)
  * 3. Run: pnpm dev
- * 4. Open MCP Inspector at http://localhost:3000/inspector
+ * 4. Open MCP Inspector at http://localhost:3000/mcp-server/inspector
  *
  * Environment variables:
  * - BETTER_AUTH_SECRET (required)
@@ -19,69 +22,18 @@
 // @ts-nocheck
 import { MCPServer, oauthBetterAuthProvider, object } from "mcp-use/server";
 import { auth } from "./auth.js";
-import {
-  oauthProviderAuthServerMetadata,
-  oauthProviderOpenIdConfigMetadata,
-} from "@better-auth/oauth-provider";
 
 declare const process: { env: Record<string, string | undefined> };
 
-// With `basePath: "/mcp-server"`, every route on `server.app` — including
-// the Better Auth handler at `/api/auth/**`, the sign-in/consent pages, and
-// the manually-registered `.well-known/*` metadata — moves under the prefix.
-// So tell Better Auth its authURL is `http://localhost:3000/mcp-server/api/auth`
-// and configure the GitHub OAuth callback to match the prefixed path.
 const server = new MCPServer({
   name: "better-auth-oauth-example",
   version: "1.0.0",
   description: "MCP server with Better Auth OAuth authentication",
   basePath: "/mcp-server",
-  oauth: oauthBetterAuthProvider({
-    authURL: "http://localhost:3000/mcp-server/api/auth",
-  }),
+  oauth: oauthBetterAuthProvider(auth),
 });
 
 // ---------------------------------------------------------------------------
-// Mount Better Auth on the MCP server's Hono app
-// ---------------------------------------------------------------------------
-
-// Handle all Better Auth API routes
-server.app.on(["GET", "POST"], "/api/auth/**", (c) => auth.handler(c.req.raw));
-
-// Mount .well-known/oauth-authorization-server metadata
-// RFC 8414 uses path insertion: /.well-known/oauth-authorization-server{issuer-path}
-// We mount at both the root (fallback) and the spec-compliant path.
-// CORS headers needed for browser-based MCP clients (e.g. MCP Inspector).
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET",
-};
-const authServerMetadataHandler = oauthProviderAuthServerMetadata(auth, {
-  headers: corsHeaders,
-});
-server.app.get("/.well-known/oauth-authorization-server", async (c) => {
-  return authServerMetadataHandler(c.req.raw);
-});
-server.app.get(
-  "/.well-known/oauth-authorization-server/api/auth",
-  async (c) => {
-    return authServerMetadataHandler(c.req.raw);
-  }
-);
-
-// Mount .well-known/openid-configuration metadata
-// Required because the openid scope is supported.
-// RFC 8414 path insertion: /.well-known/openid-configuration{issuer-path}
-const openIdConfigHandler = oauthProviderOpenIdConfigMetadata(auth, {
-  headers: corsHeaders,
-});
-server.app.get("/.well-known/openid-configuration", async (c) => {
-  return openIdConfigHandler(c.req.raw);
-});
-server.app.get("/.well-known/openid-configuration/api/auth", async (c) => {
-  return openIdConfigHandler(c.req.raw);
-});
-
 // Login page — redirects to GitHub OAuth
 // ---------------------------------------------------------------------------
 server.app.get("/sign-in", (c) => {
@@ -108,13 +60,13 @@ server.app.get("/sign-in", (c) => {
   </div>
   <script>
     async function signIn() {
-      const res = await fetch('/api/auth/sign-in/social', {
+      const res = await fetch('/mcp-server/api/auth/sign-in/social', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           provider: 'github',
-          callbackURL: '/api/auth/oauth2/authorize${queryString}',
+          callbackURL: '/mcp-server/api/auth/oauth2/authorize${queryString}',
         }),
       });
       const data = await res.json();
@@ -170,7 +122,7 @@ server.app.get("/consent", (c) => {
   <script>
     async function handleConsent(accept) {
       const oauthQuery = window.location.search.slice(1); // strip leading '?'
-      const res = await fetch('/api/auth/oauth2/consent', {
+      const res = await fetch('/mcp-server/api/auth/oauth2/consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -219,5 +171,5 @@ server.listen({ port: 3000 }).then(() => {
   console.log("Better Auth OAuth MCP Server running on http://localhost:3000");
   console.log("MCP Inspector: http://localhost:3000/mcp-server/inspector");
   console.log("MCP transport: http://localhost:3000/mcp-server/mcp");
-  console.log("Auth API: http://localhost:3000/api/auth");
+  console.log("Auth API: http://localhost:3000/mcp-server/api/auth");
 });

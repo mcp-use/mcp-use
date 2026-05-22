@@ -15,14 +15,15 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 declare const process: { env: Record<string, string | undefined> };
 
 export const auth = betterAuth({
-  // The mcp-use server is mounted at `/mcp-server`, so everything on
-  // `server.app` (including Better Auth's `/api/auth/**`, the sign-in
-  // page, the consent page, and `validAudiences` below) lives under
-  // that prefix. Reflect it in Better Auth's own `baseURL` so its
-  // self-published authorization endpoints, callbacks, and JWT issuer
-  // all match the externally-visible paths.
-  baseURL: "http://localhost:3000/mcp-server",
-  basePath: "/api/auth",
+  // The MCP server lives at `/mcp-server` (see server.ts) and we want Better
+  // Auth nested under it at `/mcp-server/api/auth` — both so it doesn't
+  // shadow MCP's own routes under the basePath, and so every endpoint
+  // (issuer, /oauth2/*, /sign-in/*, /jwks, …) anchors on a sub-path that
+  // never collides with the MCP transport. `baseURL` stays as the origin
+  // and `basePath` carries the full path; that's the same split Better Auth
+  // uses elsewhere, just with the MCP basePath segment prepended.
+  baseURL: "http://localhost:3000",
+  basePath: "/mcp-server/api/auth",
   secret: process.env.BETTER_AUTH_SECRET || "dev-secret-change-in-production",
   socialProviders: {
     github: {
@@ -33,8 +34,8 @@ export const auth = betterAuth({
   plugins: [
     jwt(),
     oauthProvider({
-      loginPage: "/sign-in",
-      consentPage: "/consent",
+      loginPage: "/mcp-server/sign-in",
+      consentPage: "/mcp-server/consent",
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       // MCP clients send the resource URL from /.well-known/oauth-protected-resource

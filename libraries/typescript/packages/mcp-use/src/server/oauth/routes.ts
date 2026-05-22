@@ -305,10 +305,13 @@ export function setupOAuthRoutes(
    * OAuth Authorization Server Metadata
    * As per RFC 8414: https://tools.ietf.org/html/rfc8414
    *
-   * DCR-direct mode: Fetches and returns metadata from upstream provider.
-   * Proxy mode: Synthesizes metadata pointing to local endpoints.
+   * Resolution order:
+   *   1. Provider-supplied override handler (in-process providers like
+   *      Better Auth that synthesize metadata from a local source).
+   *   2. Proxy mode: synthesize pointing to local endpoints.
+   *   3. DCR-direct mode: fetch from the upstream issuer.
    */
-  const handleAuthorizationServerMetadata = async (c: Context) => {
+  const defaultAuthorizationServerMetadataHandler = async (c: Context) => {
     const requestPath = new URL(c.req.url).pathname;
     console.log(`[OAuth] Metadata request: ${requestPath}`);
 
@@ -371,35 +374,66 @@ export function setupOAuthRoutes(
     }
   };
 
-  // Discovery URLs the SDK probes (see `buildDiscoveryUrls` in
-  // @modelcontextprotocol/sdk client/auth.js). The SDK tries the path-aware
-  // variant first (well-known segment with the issuer's path appended), then
-  // falls back to root. Register both so either probe wins.
+  // Resolve metadata handlers — provider overrides take precedence over the
+  // SDK default (which proxies upstream / synthesizes for proxy mode). In-
+  // process providers like Better Auth supply overrides so the SDK can
+  // answer discovery requests locally without round-tripping to the issuer.
+  const wrapOverride =
+    (override: (req: Request) => Response | Promise<Response>) =>
+    (c: Context) =>
+      override(c.req.raw);
+
+  const handleAuthorizationServerMetadata =
+    oauth.authorizationServerMetadataHandler
+      ? wrapOverride(oauth.authorizationServerMetadataHandler.bind(oauth))
+      : defaultAuthorizationServerMetadataHandler;
+
+  const handleOpenIdConfigMetadata = oauth.openIdConfigurationMetadataHandler
+    ? wrapOverride(oauth.openIdConfigurationMetadataHandler.bind(oauth))
+    : defaultAuthorizationServerMetadataHandler;
+
+  // Path-insertion variants per RFC 8414 §3.1: clients probe
+  // `/.well-known/<type>{issuer-path}` on the issuer's host. Two reasonable
+  // suffixes exist on the local server:
   //
-  // With `basePath: "/api"` and issuer `http://host/api`:
-  //   path-aware: GET /.well-known/oauth-authorization-server/api
-  //   root:       GET /.well-known/oauth-authorization-server
+  // - `basePath`: what proxy-mode metadata advertises as the issuer path, and
+  //   what SDK clients use as a basePath-aware fallback against the resource
+  //   server even when the upstream issuer lives on a different host.
+  // - the pathname of `oauth.getIssuer()`: spec-correct for in-process
+  //   providers like Better Auth where the issuer is on the local host with a
+  //   path deeper than basePath (e.g. `/mcp-server/api/auth`). Anchoring on
+  //   basePath alone produces a silent 404 for these.
+  //
+  // Register both when they differ — neither collides with the other.
+  const issuerPath = (() => {
+    try {
+      return new URL(oauth.getIssuer()).pathname.replace(/\/+$/, "");
+    } catch {
+      return "";
+    }
+  })();
+  const wellKnownSuffixes = new Set<string>();
+  if (basePath) wellKnownSuffixes.add(basePath);
+  if (issuerPath) wellKnownSuffixes.add(issuerPath);
+
   rootApp.get(
     "/.well-known/oauth-authorization-server",
     handleAuthorizationServerMetadata
   );
-  rootApp.get(
-    "/.well-known/openid-configuration",
-    handleAuthorizationServerMetadata
-  );
-  if (basePath) {
+  rootApp.get("/.well-known/openid-configuration", handleOpenIdConfigMetadata);
+  for (const suffix of wellKnownSuffixes) {
     rootApp.get(
-      `/.well-known/oauth-authorization-server${basePath}`,
+      `/.well-known/oauth-authorization-server${suffix}`,
       handleAuthorizationServerMetadata
     );
     rootApp.get(
-      `/.well-known/openid-configuration${basePath}`,
-      handleAuthorizationServerMetadata
+      `/.well-known/openid-configuration${suffix}`,
+      handleOpenIdConfigMetadata
     );
     // OIDC Discovery 1.0 style — well-known appended after the path.
     rootApp.get(
-      `${basePath}/.well-known/openid-configuration`,
-      handleAuthorizationServerMetadata
+      `${suffix}/.well-known/openid-configuration`,
+      handleOpenIdConfigMetadata
     );
   }
 

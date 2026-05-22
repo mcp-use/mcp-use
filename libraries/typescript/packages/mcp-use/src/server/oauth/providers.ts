@@ -12,6 +12,7 @@ import { ClerkOAuthProvider } from "./providers/clerk.js";
 import { KeycloakOAuthProvider } from "./providers/keycloak.js";
 import { WorkOSOAuthProvider } from "./providers/workos.js";
 import { BetterAuthOAuthProvider } from "./providers/better-auth.js";
+import type { BetterAuthInstance } from "./providers/types.js";
 import { CustomOAuthProvider } from "./providers/custom.js";
 import type { UserInfo } from "./providers/types.js";
 import { getEnv } from "../utils/runtime.js";
@@ -398,7 +399,7 @@ export function oauthClerkProvider(
 }
 
 /**
- * Configuration for Better Auth OAuth provider
+ * Configuration for Better Auth OAuth provider (external mode).
  */
 export interface BetterAuthProviderConfig {
   authURL: string;
@@ -410,46 +411,80 @@ export interface BetterAuthProviderConfig {
 }
 
 /**
- * Create a Better Auth OAuth provider
+ * Type guard for distinguishing a Better Auth instance from a config object.
  *
- * MCP clients discover Better Auth's OAuth endpoints via `.well-known`
- * passthrough and communicate directly with Better Auth for registration,
- * authorization, and token exchange. The MCP server only verifies tokens
- * and provides metadata.
+ * A Better Auth instance exposes `handler` (the request handler) and `options`
+ * (the configuration object). Plain config objects don't have these shapes.
+ */
+function isBetterAuthInstance(arg: unknown): arg is BetterAuthInstance {
+  return (
+    typeof arg === "object" &&
+    arg !== null &&
+    typeof (arg as { handler?: unknown }).handler === "function" &&
+    typeof (arg as { options?: unknown }).options === "object"
+  );
+}
+
+/**
+ * Create a Better Auth OAuth provider.
  *
- * Better Auth's OAuth Provider plugin exposes standard OAuth 2.0 endpoints:
- * - /oauth2/authorize - Authorization endpoint
- * - /oauth2/token - Token endpoint
- * - /oauth2/register - Dynamic Client Registration
- * - /jwks - JSON Web Key Set for token verification
+ * Two modes, distinguished by the argument shape:
  *
- * Environment variables:
- * - MCP_USE_OAUTH_BETTER_AUTH_URL (required)
+ * **In-process** — pass the Better Auth instance directly. The SDK mounts
+ * Better Auth's API handler under the MCPServer's basePath, serves OAuth
+ * discovery metadata locally (synthesized from `auth.api.getOAuthServerConfig`),
+ * and verifies tokens against Better Auth's JWKS. Set `auth.options.baseURL`
+ * to the externally-visible URL (including any MCPServer basePath).
  *
- * @param config - Optional Better Auth configuration (overrides environment variables)
- * @returns OAuthProvider instance
- *
- * @example
  * ```typescript
+ * import { betterAuth } from "better-auth";
+ * import { oauthProvider } from "@better-auth/oauth-provider";
+ *
+ * const auth = betterAuth({
+ *   baseURL: "http://localhost:3000/mcp-server",
+ *   plugins: [oauthProvider({ ... })],
+ *   // ...
+ * });
+ *
  * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   oauth: oauthBetterAuthProvider({
- *     authURL: 'http://localhost:3000/api/auth'
- *   })
+ *   basePath: "/mcp-server",
+ *   oauth: oauthBetterAuthProvider(auth),
  * });
  * ```
  *
+ * **External** — pass a config object with `authURL` for a Better Auth
+ * deployment running on a separate origin. The SDK only verifies tokens; you
+ * mount Better Auth's routes yourself on the other origin.
+ *
+ * ```typescript
+ * oauthBetterAuthProvider({ authURL: "https://auth.example.com/api/auth" })
+ * ```
+ *
+ * Environment variable: `MCP_USE_OAUTH_BETTER_AUTH_URL` is consulted only in
+ * external mode when neither argument is provided.
+ *
+ * @param arg - Either a Better Auth instance (in-process) or `{ authURL }` (external).
+ * @returns OAuthProvider instance
  */
 export function oauthBetterAuthProvider(
-  config: Partial<BetterAuthProviderConfig> = {}
+  arg: BetterAuthInstance | Partial<BetterAuthProviderConfig> = {}
 ): OAuthProvider {
+  if (isBetterAuthInstance(arg)) {
+    return new BetterAuthOAuthProvider({
+      provider: "better-auth",
+      auth: arg,
+    });
+  }
+
+  const config = arg;
   const authURL = config.authURL ?? getEnv("MCP_USE_OAUTH_BETTER_AUTH_URL");
 
   if (!authURL) {
     throw new Error(
-      "Better Auth authURL is required. " +
-        "Set MCP_USE_OAUTH_BETTER_AUTH_URL environment variable or pass authURL in config."
+      "Better Auth OAuth provider requires either a Better Auth instance " +
+        "(in-process mode) or `authURL` (external mode). For external mode, " +
+        "set the `MCP_USE_OAUTH_BETTER_AUTH_URL` environment variable or pass " +
+        "`{ authURL }` in the config."
     );
   }
 

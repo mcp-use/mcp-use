@@ -53,6 +53,13 @@ export function setupOAuthForServer(
   // - .well-known/* discovery lives at the host root
   setupOAuthRoutes(rootApp, oauth, getBaseUrl, basePath);
 
+  // Let providers install provider-specific routes after the defaults are
+  // registered. In-process providers (e.g. Better Auth) use this to mount
+  // their request handler at the issuer's pathname on the root app, so
+  // requests to `${basePath}${auth.options.basePath}/**` reach Better Auth's
+  // OAuth endpoints (/oauth2/authorize, /oauth2/token, /jwks, etc).
+  oauth.installRoutes?.(rootApp, basePath);
+
   // External (user-visible) paths for log messages.
   const externalAuthorize = `${basePath}/authorize`;
   const externalToken = `${basePath}/token`;
