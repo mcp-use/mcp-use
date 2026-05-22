@@ -17,6 +17,7 @@
     "fix-provider-render-phase-setstate",
     "fix-server-alias-tile-heading",
     "improve-tab-animation-duration",
+    "inspector-image-tool-results",
     "inspector-mcp-reconnect-banner",
     "inspector-skipped-log-wording",
     "inspector-tab-count-badge",
