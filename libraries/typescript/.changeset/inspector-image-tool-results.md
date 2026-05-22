@@ -13,3 +13,5 @@ The conversion now extracts MCP `content` blocks into provider-neutral `ContentP
 - **Google (Gemini)**: `functionResponse.response` keeps only a text/metadata summary; image bytes are forwarded as a follow-up `user` turn with `inlineData` parts.
 
 Text-only tool results still take the legacy `content: string` path on every provider, so non-image tools are unaffected. Audio, resource, and resource-link blocks are summarized as text markers (audio bytes are not yet forwarded).
+
+Note: text-only tool results now reach the model unwrapped (e.g. `"hi"`) instead of as JSON-wrapped `{"content":[{"type":"text","text":"hi"}]}`; on Gemini specifically, `functionResponse.response` is now `{ result: "hi" }` rather than the previous MCP-shaped object.

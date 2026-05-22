@@ -72,6 +72,20 @@ function isMcpResultShape(value: unknown): value is McpToolResult {
   return "structuredContent" in v;
 }
 
+/**
+ * Returns true when a tool result carries the MCP `isError: true` flag.
+ * Used by both the live tool loop and the replay path so a tool that
+ * successfully returns `{ isError: true, content: [...] }` is treated the
+ * same as one that threw.
+ */
+export function isToolResultError(result: unknown): boolean {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    (result as { isError?: unknown }).isError === true
+  );
+}
+
 function blockToPart(block: McpContentBlock): ContentPart | null {
   if (!block || typeof block !== "object") return null;
   switch (block.type) {

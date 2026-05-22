@@ -1,5 +1,5 @@
 import { chat, streamChat } from "./providers";
-import { toolResultToContent } from "./toolResultParts";
+import { isToolResultError, toolResultToContent } from "./toolResultParts";
 import type {
   LlmStreamEvent,
   ProviderConfig,
@@ -97,9 +97,11 @@ export async function* runToolLoop(
       let isError = false;
       try {
         result = await callTool(tc.name, tc.args);
+        isError = isToolResultError(result);
       } catch (err) {
         isError = true;
         result = {
+          isError: true,
           error: err instanceof Error ? err.message : String(err),
         };
       }
@@ -162,9 +164,11 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
       let isError = false;
       try {
         result = await callTool(tc.name, tc.args);
+        isError = isToolResultError(result);
       } catch (err) {
         isError = true;
         result = {
+          isError: true,
           error: err instanceof Error ? err.message : String(err),
         };
       }

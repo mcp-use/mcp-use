@@ -50,10 +50,14 @@ export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
       // OpenAI's tool role only accepts string content; forward image bytes as
       // a follow-up user turn so vision-capable models can see them.
       const { text, imageParts } = partitionToolContent(m.content);
+      const fallback =
+        imageParts.length > 0
+          ? "[image content; see next message]"
+          : "[no content]";
       out.push({
         role: "tool",
         tool_call_id: m.toolCallId,
-        content: text || "[image content; see next message]",
+        content: text || fallback,
       });
       if (imageParts.length > 0) {
         const userParts: unknown[] = [

@@ -1,4 +1,4 @@
-import { toolResultToContent } from "./toolResultParts";
+import { isToolResultError, toolResultToContent } from "./toolResultParts";
 import type { ContentPart, ProviderMessage } from "./types";
 
 interface InspectorAttachment {
@@ -105,12 +105,14 @@ export function convertMessagesToProvider(
       toolCalls,
     });
     toolParts.forEach((p, i) => {
+      const result = p.toolInvocation!.result;
       out.push({
         role: "tool",
-        content: toolResultToContent(p.toolInvocation!.result),
+        content: toolResultToContent(result),
         toolCallId: `call_${mi}_${i}_${p.toolInvocation!.toolName}`,
         toolName: p.toolInvocation!.toolName,
-        toolResult: p.toolInvocation!.result,
+        toolResult: result,
+        toolIsError: isToolResultError(result),
       });
     });
   });
