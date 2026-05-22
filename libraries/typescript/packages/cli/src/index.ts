@@ -778,7 +778,12 @@ if (container && Component) {
 }
 `;
 
-    // Create HTML template
+    // Create HTML template. The favicon href is a *relative* path so it
+    // resolves correctly whether the widget HTML is served at
+    // `/_mcp-use/widgets/<slug>/index.html` (no basePath) or
+    // `${basePath}/_mcp-use/widgets/<slug>/index.html` (basePath set).
+    // `../../public/foo.ico` lands on the same-origin `/_mcp-use/public/`
+    // namespace in both cases.
     const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -787,7 +792,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       favicon
         ? `
-    <link rel="icon" href="/_mcp-use/public/${favicon}" />`
+    <link rel="icon" href="../../public/${favicon}" />`
         : ""
     }
   </head>
@@ -1183,27 +1188,36 @@ export default {
       // Next.js `/_next/` model: build owns transforms, server ships bytes.
       //
       // - `__getFile`: asset-URL builder used by Vite's `renderBuiltUrl` hook.
-      //   Defaults to the framework's `/_mcp-use/widgets/{name}/` path; uses
-      //   MCP_URL when that points at an external CDN (static deployments).
+      //   Defaults to a same-origin path that *resolves the server's
+      //   `basePath` at runtime* from `window.location.pathname` (so the same
+      //   built HTML works whether the server is mounted at `/` or `/api`);
+      //   uses MCP_URL when that points at an external CDN.
       // - `__mcpPublicUrl`: public-asset prefix. MCP_SERVER_URL roots it
-      //   absolutely for static hosts that need a full origin; otherwise the
-      //   bare path is fine (served from the same origin as the widget).
+      //   absolutely for static hosts that need a full origin; otherwise it
+      //   self-resolves basePath the same way as `__getFile`.
       // - `__mcpPublicAssetsUrl`: where public files are physically stored;
       //   diverges from `__mcpPublicUrl` only when MCP_URL is a separate CDN.
       const mcpServerUrl = process.env.MCP_SERVER_URL;
-      const assetBase = mcpUrl
-        ? `${mcpUrl}/${widgetName}/`
-        : `/_mcp-use/widgets/${widgetName}/`;
-      const publicUrl = mcpServerUrl
-        ? `${mcpServerUrl}/_mcp-use/public`
-        : "/_mcp-use/public";
-      const publicAssetsUrl = mcpUrl ? `${mcpUrl}/public` : "/_mcp-use/public";
 
       try {
         const htmlPath = path.join(outDir, "index.html");
         let html = await fs.readFile(htmlPath, "utf8");
 
-        const injectionScript = `<script>window.__getFile = (filename) => { return ${JSON.stringify(assetBase)}+filename }; window.__mcpPublicUrl = ${JSON.stringify(publicUrl)}; window.__mcpPublicAssetsUrl = ${JSON.stringify(publicAssetsUrl)};</script>`;
+        const injectionScript = mcpUrl
+          ? // External CDN — fully-qualified URLs; basePath doesn't apply.
+            `<script>window.__getFile = (filename) => { return ${JSON.stringify(`${mcpUrl}/${widgetName}/`)}+filename }; window.__mcpPublicUrl = ${JSON.stringify(
+              mcpServerUrl
+                ? `${mcpServerUrl}/_mcp-use/public`
+                : "/_mcp-use/public"
+            )}; window.__mcpPublicAssetsUrl = ${JSON.stringify(`${mcpUrl}/public`)};</script>`
+          : // Same-origin: resolve basePath at runtime from the widget's URL.
+            // `${basePath}/_mcp-use/widgets/<slug>/index.html` is the page
+            // location, so everything before `/_mcp-use/` is the basePath.
+            `<script>(function(){var p=${
+              mcpServerUrl
+                ? JSON.stringify(mcpServerUrl)
+                : 'window.location.pathname.split("/_mcp-use/")[0]||""'
+            };window.__getFile=function(filename){return p+${JSON.stringify(`/_mcp-use/widgets/${widgetName}/`)}+filename};window.__mcpPublicUrl=p+"/_mcp-use/public";window.__mcpPublicAssetsUrl=p+"/_mcp-use/public";})();</script>`;
 
         if (!html.includes("window.__mcpPublicUrl")) {
           html = html.replace(

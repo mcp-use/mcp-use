@@ -27,7 +27,7 @@ type MountWidgetsProductionOptions = MountWidgetsOptions;
  * Reads the manifest file to discover available widgets and their metadata,
  * then registers each widget as both a tool and resource.
  *
- * @param _rootApp - Underlying Hono instance (currently unused; kept for
+ * @param _app - basePath-aware Hono view (currently unused; kept for
  *   signature parity with the dev variant and future static-route needs)
  * @param serverConfig - Server configuration (baseUrl, CSP URLs, buildId)
  * @param registerWidget - Callback to register each discovered widget
@@ -35,7 +35,7 @@ type MountWidgetsProductionOptions = MountWidgetsOptions;
  * @returns Promise that resolves when all widgets are mounted
  */
 export async function mountWidgetsProduction(
-  _rootApp: HonoType,
+  _app: HonoType,
   serverConfig: ServerConfig,
   registerWidget: RegisterWidgetCallback,
   options?: MountWidgetsProductionOptions

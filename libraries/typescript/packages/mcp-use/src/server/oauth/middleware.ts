@@ -12,12 +12,14 @@ import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
  * Create bearer authentication middleware for a given OAuth provider or proxy
  *
  * @param oauth - The OAuth provider or proxy to use for token verification
- * @param baseUrl - The base URL of the server (for WWW-Authenticate header)
+ * @param getBaseUrl - Lazy getter for the server base URL (for WWW-Authenticate header).
+ *                    Called per-request so callers can defer resolution until after
+ *                    the HTTP listener has bound a port.
  * @returns Hono middleware function
  */
 export function createBearerAuthMiddleware(
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl?: string
+  getBaseUrl?: () => string | undefined
 ) {
   return async (c: Context, next: Next) => {
     // Allow HEAD requests through without auth - used for health checks/keep-alive
@@ -30,7 +32,7 @@ export function createBearerAuthMiddleware(
     // Build WWW-Authenticate header for 401 responses
     // This enables MCP clients to discover the OAuth configuration
     const getWWWAuthenticateHeader = () => {
-      const base = baseUrl || new URL(c.req.url).origin;
+      const base = getBaseUrl?.() || new URL(c.req.url).origin;
       const parts = [
         'Bearer error="unauthorized"',
         'error_description="Authorization needed"',

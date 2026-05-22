@@ -11,19 +11,23 @@ import { getEnv } from "./runtime.js";
 
 /**
  * Resolve relative icon `src` values to absolute URLs under the framework's
- * basePath-agnostic public asset prefix. Paths already starting with `http`
- * are passed through unchanged. Returns `undefined`/the original array when
- * `icons` or `baseUrl` is missing.
+ * public asset prefix (`${basePath}/_mcp-use/public/`). Paths already
+ * starting with `http` are passed through unchanged. Returns
+ * `undefined`/the original array when `icons` or `baseUrl` is missing.
  */
 export function resolveIconUrls<
   T extends { src: string } = { src: string; [k: string]: unknown },
->(icons: T[] | undefined, baseUrl?: string): T[] | undefined {
+>(
+  icons: T[] | undefined,
+  baseUrl?: string,
+  basePath: string = ""
+): T[] | undefined {
   if (!icons || !baseUrl) return icons;
   return icons.map((icon) => ({
     ...icon,
     src: icon.src.startsWith("http")
       ? icon.src
-      : `${baseUrl}/_mcp-use/public/${icon.src}`,
+      : `${baseUrl}${basePath}/_mcp-use/public/${icon.src}`,
   }));
 }
 

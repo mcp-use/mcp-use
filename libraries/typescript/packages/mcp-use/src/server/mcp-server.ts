@@ -260,7 +260,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   /**
    * Hono application instance.
    *
-   * The underlying Hono app that handles HTTP routing and middleware.
+   * When `basePath` is set, this is a Hono `.basePath()` clone — route
+   * registrations made here automatically pick up the basePath prefix.
+   * The clone shares its parent's router/routes array (see Hono's
+   * `clone()`), so `app.fetch` still dispatches root-level routes such
+   * as OAuth `.well-known/*` discovery that were registered on the
+   * un-prefixed view inside the constructor before the clone was taken.
+   *
    * Can be used to add custom routes and middleware alongside MCP endpoints.
    *
    * @example
@@ -270,20 +276,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * ```
    */
   public app: HonoType;
-
-  /**
-   * @internal The underlying Hono instance. Receives HTTP requests and holds
-   * global middleware (CORS, host validation, request logging) plus routes
-   * that must stay at the host root (`/favicon.ico`, `/.well-known/*`,
-   * `/_mcp-use/*`).
-   *
-   * `this.app` is either `_rootApp` directly (no basePath) or a Hono
-   * `basePath()` clone of it (with basePath). The clone shares this
-   * instance's router and routes array, so route registrations on
-   * `this.app` end up on the same router as `_rootApp` — just with the
-   * basePath prefix prepended at registration time.
-   */
-  private _rootApp!: HonoType;
 
   /** @internal Whether MCP endpoints have been mounted */
   private mcpMounted = false;
@@ -372,15 +364,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public sessions = new Map<string, SessionData>();
   private idleCleanupInterval?: NodeJS.Timeout;
-  private oauthSetupState = {
-    complete: false,
-    provider: undefined as OAuthProvider | undefined,
-    middleware: undefined as
-      | ((c: any, next: any) => Promise<Response | void>)
-      | undefined,
-  };
   public oauthProvider?: OAuthProvider;
-  private oauthMiddleware?: (c: any, next: any) => Promise<Response | void>;
 
   /**
    * Storage for registrations that can be replayed on new server instances
@@ -2392,7 +2376,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: config.description,
         title: config.title,
         websiteUrl: config.websiteUrl,
-        icons: resolveIconUrls(config.icons, config.baseUrl),
+        icons: resolveIconUrls(config.icons, config.baseUrl, this.basePath),
       },
       {
         capabilities: {
@@ -2413,18 +2397,38 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Single Hono instance. Global middleware (CORS, host validation,
-    // request logging) lives here. When `basePath` is set, `this.app` is a
-    // `.basePath()` clone — same underlying router, but route registrations
-    // automatically get the prefix prepended. No sub-mounting, no deferred
-    // route-snapshot dance.
-    this._rootApp = createHonoApp(createRequestLogger(this.basePath), {
+    // request logging) lives on the un-prefixed root view created here.
+    // When `basePath` is set, `this.app` is later switched to a
+    // `.basePath()` clone — same underlying router and routes array (see
+    // Hono's `clone()`), but registrations through the clone automatically
+    // get the prefix prepended. No sub-mounting, no deferred route-snapshot
+    // dance.
+    const rootApp = createHonoApp(createRequestLogger(this.basePath), {
       cors: this.config.cors,
       allowedOrigins: this.config.allowedOrigins,
     });
 
-    this.app = this.basePath
-      ? this._rootApp.basePath(this.basePath)
-      : this._rootApp;
+    this.oauthProvider = config.oauth;
+
+    // Mount OAuth on the un-prefixed root view BEFORE switching `this.app`
+    // to the basePath clone. OAuth has to register `.well-known/*` at the
+    // literal host root (RFC 8414 §3.1) regardless of basePath; everything
+    // else it registers (/authorize, /token, /register, /mcp middleware) is
+    // scoped under basePath via an internal `.basePath()` clone. Doing this
+    // here is the only thing that needs the un-prefixed handle — afterwards
+    // we collapse to a single `this.app` reference. `getServerBaseUrl()` is
+    // passed as a lazy getter because the port isn't bound yet when the
+    // constructor runs; metadata handlers resolve it at request time.
+    if (this.oauthProvider) {
+      setupOAuthForServer(
+        rootApp,
+        this.oauthProvider,
+        () => this.getServerBaseUrl(),
+        this.basePath
+      );
+    }
+
+    this.app = this.basePath ? rootApp.basePath(this.basePath) : rootApp;
 
     // Install the custom routes middleware FIRST (before any other routes).
     // This single middleware dispatches from the mutable _customRoutes map,
@@ -2441,20 +2445,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // Setup public routes immediately if icons/favicon are configured.
-    // Public assets register on `this.app` (auto-prefixed); favicon
-    // registers on `_rootApp` so browsers' implicit `GET /favicon.ico`
-    // resolves regardless of basePath.
+    // Both register on `this.app` so they auto-prefix under `basePath` —
+    // `${basePath}/_mcp-use/public/*` and `${basePath}/favicon.ico`. The
+    // MCP icon declaration in `getServerInfo` is what clients consume to
+    // discover the icon when the server is mounted under a basePath.
     if (
       (this.favicon || this.config.icons) &&
       !isProductionModeHelper() &&
       !isDeno
     ) {
       setupPublicRoutes(this.app, false); // Dev mode (public/)
-      setupFaviconRoute(this._rootApp, this.favicon, false);
+      setupFaviconRoute(this.app, this.favicon, false);
       this.publicRoutesMode = "dev";
     }
-
-    this.oauthProvider = config.oauth;
 
     // Wrap registration methods to capture registrations for multi-session support
     this.wrapRegistrationMethods();
@@ -2665,7 +2668,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: this.config.description,
         title: this.config.title,
         websiteUrl: this.config.websiteUrl,
-        icons: resolveIconUrls(this.config.icons, this.serverBaseUrl),
+        icons: resolveIconUrls(
+          this.config.icons,
+          this.serverBaseUrl,
+          this.basePath
+        ),
       },
       {
         capabilities: {
@@ -3725,21 +3732,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
   /**
    * Run the shared mount sequence used by both `listen()` and `getHandler()`:
-   * OAuth setup (if configured) → widgets → MCP transport → inspector. Each
-   * step internally guards against double-mounting, so it's safe to call this
-   * more than once across the same lifecycle.
+   * widgets → MCP transport → inspector. Each step internally guards
+   * against double-mounting, so it's safe to call this more than once
+   * across the same lifecycle. (OAuth is mounted up front in the
+   * constructor — its `.well-known/*` routes need the un-prefixed root
+   * handle, which only exists during construction.)
    */
   private async _setupAndMount(): Promise<void> {
-    if (this.oauthProvider && !this.oauthSetupState.complete) {
-      await setupOAuthForServer(
-        this._rootApp,
-        this.oauthProvider,
-        this.getServerBaseUrl(),
-        this.oauthSetupState,
-        this.basePath
-      );
-    }
-
     await mountWidgets(this as any, {
       baseRoute: "/_mcp-use/widgets",
       // Only forward `resourcesDir` when the env var is set. That lets
@@ -3952,11 +3951,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Track server run event
     this._trackServerRun("http");
 
-    // Start server using runtime-aware helper. Serve from `_rootApp` so the
-    // outer Hono (with global middleware) receives all requests; routes
-    // registered via `this.app.basePath()` are already on the same router.
+    // Start server using runtime-aware helper. `this.app` is the basePath
+    // clone but its router/routes array is shared with the un-prefixed root
+    // view used inside the constructor for OAuth `.well-known/*`, so its
+    // fetch dispatches both prefixed and root-level routes.
     const httpHandle = await startServer(
-      this._rootApp,
+      this.app,
       this.serverPort,
       this.serverHost,
       {
@@ -4042,9 +4042,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     const provider = options?.provider || "fetch";
     this._trackServerRun(provider);
 
-    // Serve from `_rootApp` so global middleware runs; basePath-prefixed
-    // routes registered via `this.app` share the same underlying router.
-    const fetchHandler = this._rootApp.fetch.bind(this._rootApp);
+    // `this.app` is the basePath clone but shares its router/routes array
+    // with the un-prefixed root view used during construction (for OAuth
+    // `.well-known/*`), so its fetch handles both prefixed and root-level
+    // routes.
+    const fetchHandler = this.app.fetch.bind(this.app);
 
     // Handle platform-specific path rewriting and CORS
     if (options?.provider === "supabase") {
