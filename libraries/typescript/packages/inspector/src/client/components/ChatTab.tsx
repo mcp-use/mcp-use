@@ -12,6 +12,7 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
+import { ChevronDown } from "lucide-react";
 import { copyToClipboard } from "../utils/clipboard";
 import { downloadJSON } from "../utils/jsonUtils";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
@@ -146,6 +147,22 @@ export function ChatTab({
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const handleScroll = useCallback(() => {
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    const threshold = 80; // px from bottom considered "at bottom"
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    setIsAtBottom(atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    messagesAreaRef.current?.scrollTo({
+      top: messagesAreaRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, []);
 
   const toolInfos: ToolInfo[] = useMemo(
     () =>
@@ -1119,7 +1136,8 @@ export function ChatTab({
       {/* Messages Area */}
       <div
         ref={messagesAreaRef}
-        className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
+        className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px] relative"
+        onScroll={handleScroll}
       >
         {!llmConfig ? (
           <ConfigureEmptyState
@@ -1138,6 +1156,18 @@ export function ChatTab({
             onApproveElicitation={connection.approveElicitation}
             onRejectElicitation={connection.rejectElicitation}
           />
+        )}
+
+        {/* Scroll to bottom button — shown when user has scrolled up */}
+        {!isAtBottom && (
+          <button
+            onClick={scrollToBottom}
+            className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 w-10 h-10 rounded-full bg-background border shadow-md flex items-center justify-center text-foreground hover:bg-muted transition-colors"
+            title="Scroll to bottom"
+            data-testid="scroll-to-bottom"
+          >
+            <ChevronDown className="h-5 w-5" />
+          </button>
         )}
       </div>
 
