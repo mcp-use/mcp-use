@@ -216,6 +216,39 @@ describe("server OAuth integration", () => {
     expect(authorized.status).toBe(200);
   });
 
+  it("advertises path-aware resource_metadata URL with basePath", async () => {
+    // Per RFC 9728 §3.1, the resource metadata URL is built by inserting
+    // `/.well-known/oauth-protected-resource` between host and the resource
+    // path. For an MCP endpoint at `<host>/api/mcp` that's
+    // `<host>/.well-known/oauth-protected-resource/api/mcp`.
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    app.use(
+      "/api/mcp/*",
+      createBearerAuthMiddleware(proxy, () => svc.baseUrl, "/api")
+    );
+    app.get("/api/mcp/test", (c) => c.json({ ok: true }));
+
+    const response = await fetch(`${svc.baseUrl}/api/mcp/test`);
+    expect(response.status).toBe(401);
+
+    const wwwAuth = response.headers.get("www-authenticate");
+    expect(wwwAuth).toContain(
+      `resource_metadata="${svc.baseUrl}/.well-known/oauth-protected-resource/api/mcp"`
+    );
+  });
+
   it("returns configured clientId from /register endpoint", async () => {
     const app = new Hono();
 

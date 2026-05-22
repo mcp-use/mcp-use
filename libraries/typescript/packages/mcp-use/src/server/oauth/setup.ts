@@ -42,9 +42,11 @@ export function setupOAuthForServer(
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
   // Create bearer auth middleware. The WWW-Authenticate `resource_metadata`
-  // URL points at the host-root discovery path (RFC 9728 §5.1) so clients
-  // hit the route mounted on the root app, independent of basePath.
-  const middleware = createBearerAuthMiddleware(oauth, getBaseUrl);
+  // URL points at the path-aware discovery URL per RFC 9728 §3.1:
+  // `<host>/.well-known/oauth-protected-resource<basePath>/mcp` — identifying
+  // the MCP endpoint specifically as the protected resource. The matching
+  // route is registered by `setupOAuthRoutes` on the root app.
+  const middleware = createBearerAuthMiddleware(oauth, getBaseUrl, basePath);
 
   // Setup OAuth routes:
   // - /authorize, /token, /register live under `basePath`
