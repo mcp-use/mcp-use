@@ -111,7 +111,7 @@ describe("MCPServer basePath", () => {
       expect(root.status).toBe(404);
     });
 
-    it("mounts framework-internal assets under basePath at `${basePath}/_mcp-use/*`", async () => {
+    it("mounts framework-internal assets under basePath at <basePath>/_mcp-use/*", async () => {
       const server = new MCPServer({
         name: "internal-assets-base-path",
         version: "1.0.0",
@@ -152,7 +152,9 @@ describe("MCPServer basePath", () => {
         originalNodeEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = "production";
 
-        await mkdir(join(fixturesDir, "widgets", "sample"), { recursive: true });
+        await mkdir(join(fixturesDir, "widgets", "sample"), {
+          recursive: true,
+        });
         await mkdir(join(fixturesDir, "widgets", "sample", "assets"), {
           recursive: true,
         });
@@ -194,9 +196,7 @@ describe("MCPServer basePath", () => {
 
         const handler = await server.getHandler();
         const res = await handler(
-          new Request(
-            "http://localhost/api/_mcp-use/widgets/sample/index.html"
-          )
+          new Request("http://localhost/api/_mcp-use/widgets/sample/index.html")
         );
 
         expect(res.status).toBe(200);
