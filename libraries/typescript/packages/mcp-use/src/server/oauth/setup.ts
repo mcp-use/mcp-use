@@ -20,6 +20,14 @@ export interface OAuthSetupState {
 }
 
 /**
+ * Options for OAuth setup
+ */
+export interface OAuthSetupOptions {
+  /** When true, the landing page at /mcp is accessible without authentication */
+  publicLandingPage?: boolean;
+}
+
+/**
  * Setup OAuth authentication for MCP server
  *
  * Initializes OAuth provider/proxy, creates bearer auth middleware,
@@ -39,7 +47,8 @@ export async function setupOAuthForServer(
   app: HonoType,
   oauth: OAuthProvider | OAuthProxy,
   baseUrl: string,
-  state: OAuthSetupState
+  state: OAuthSetupState,
+  options?: OAuthSetupOptions
 ): Promise<OAuthSetupState> {
   if (state.complete) {
     return state; // Already setup
@@ -49,7 +58,34 @@ export async function setupOAuthForServer(
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
   // Create bearer auth middleware with baseUrl for WWW-Authenticate header
-  const middleware = createBearerAuthMiddleware(oauth, baseUrl);
+  let middleware = createBearerAuthMiddleware(oauth, baseUrl);
+
+  // If publicLandingPage is enabled, wrap the middleware to skip auth for
+  // browser GET requests to /mcp (the landing page)
+  if (options?.publicLandingPage) {
+    const originalMiddleware = middleware;
+    middleware = async (c: Context, next: Next) => {
+      // Check if this is a browser GET request to /mcp (landing page)
+      if (
+        c.req.method === "GET" &&
+        c.req.path === "/mcp"
+      ) {
+        const accept = c.req.header("Accept") || "";
+        // Detect browser: accepts HTML and not JSON/SSE
+        const isBrowser =
+          accept.includes("text/html") ||
+          (!accept.includes("application/json") &&
+            !accept.includes("text/event-stream"));
+        if (isBrowser) {
+          // Skip auth for public landing page
+          return next();
+        }
+      }
+      // All other requests require auth
+      return originalMiddleware(c, next);
+    };
+    console.log("[OAuth] Landing page will be served without authentication");
+  }
 
   // Setup OAuth routes
   setupOAuthRoutes(app, oauth, baseUrl);

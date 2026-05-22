@@ -3905,7 +3905,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
-        this.oauthSetupState
+        this.oauthSetupState,
+        { publicLandingPage: this.publicLandingPage }
       );
     }
 
@@ -4034,7 +4035,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
-        this.oauthSetupState
+        this.oauthSetupState,
+        { publicLandingPage: this.publicLandingPage }
       );
     }
 

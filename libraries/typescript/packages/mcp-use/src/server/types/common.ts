@@ -288,6 +288,29 @@ export interface ServerConfig {
    */
   oauth?: OAuthProvider;
   /**
+   * Expose the MCP landing page publicly when OAuth is enabled.
+   *
+   * When set to `true`, the landing page at `/mcp` will be accessible without
+   * authentication. This is useful when you want users to discover the MCP
+   * server's capabilities before signing in (e.g., to see available tools,
+   * prompts, and resources).
+   *
+   * When `false` (default), all `/mcp/*` routes require Bearer authentication.
+   *
+   * @default false
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   oauth: oauthAuth0Provider({ ... }),
+   *   publicLandingPage: true // Landing page accessible without login
+   * });
+   * ```
+   */
+  publicLandingPage?: boolean;
+  /**
    * Path to favicon file relative to public directory
    *
    * The favicon will be automatically included in all widget pages.
