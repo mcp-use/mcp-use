@@ -1,3 +1,4 @@
+import { CopyButton } from "./CopyButton";
 import type { MessageAttachment } from "./types";
 
 interface UserMessageProps {
@@ -56,9 +57,12 @@ export function UserMessage({
         </div>
 
         {timestamp && (
-          <span className="text-xs text-muted-foreground mt-1">
-            {new Date(timestamp).toLocaleTimeString()}
-          </span>
+          <div className="flex items-center gap-2 mt-2">
+            <CopyButton text={content} />
+            <span className="text-xs text-muted-foreground">
+              {new Date(timestamp).toLocaleTimeString()}
+            </span>
+          </div>
         )}
       </div>
     </div>
