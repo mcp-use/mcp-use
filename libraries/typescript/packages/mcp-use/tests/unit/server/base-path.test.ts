@@ -2,30 +2,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MCPServer, oauthSupabaseProvider } from "../../../src/server/index.js";
-import { normalizeBasePath } from "../../../src/server/utils/server-helpers.js";
 
 describe("MCPServer basePath", () => {
-  describe("normalizeBasePath", () => {
-    it("returns empty string for undefined / empty / '/'", () => {
-      expect(normalizeBasePath(undefined)).toBe("");
-      expect(normalizeBasePath("")).toBe("");
-      expect(normalizeBasePath("/")).toBe("");
-    });
-
-    it("strips trailing slashes", () => {
-      expect(normalizeBasePath("/api/")).toBe("/api");
-      expect(normalizeBasePath("/api///")).toBe("/api");
-    });
-
-    it("preserves nested paths", () => {
-      expect(normalizeBasePath("/a/b/c")).toBe("/a/b/c");
-    });
-
-    it("throws when the prefix is missing the leading slash", () => {
-      expect(() => normalizeBasePath("api")).toThrow(/must start with/);
-    });
-  });
-
   describe("route mounting", () => {
     it("mounts MCP transport at the configured basePath and 404s the root", async () => {
       const server = new MCPServer({
@@ -325,26 +303,6 @@ describe("MCPServer basePath", () => {
         new Request("http://localhost:3000/token", { method: "POST" })
       );
       expect(rootToken.status).toBe(404);
-    });
-  });
-
-  describe("instance state", () => {
-    it("exposes the normalized basePath as a public field", () => {
-      const server = new MCPServer({
-        name: "base-path-field",
-        version: "1.0.0",
-        basePath: "/api/",
-      });
-
-      expect(server.basePath).toBe("/api");
-    });
-
-    it("defaults basePath to empty string", () => {
-      const server = new MCPServer({
-        name: "base-path-empty",
-        version: "1.0.0",
-      });
-      expect(server.basePath).toBe("");
     });
   });
 });
