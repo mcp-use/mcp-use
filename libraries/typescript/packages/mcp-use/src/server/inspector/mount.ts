@@ -55,9 +55,18 @@ export async function mountInspectorUI(
   try {
     // @ts-ignore - Optional peer dependency, may not be installed during build
     const { mountInspector } = await import("@mcp-use/inspector");
+    // 0.0.0.0 is valid for binding but browsers can't resolve it as a
+    // destination, and the SDK's OAuth resource validator does strict
+    // origin equality — so an autoConnect URL of http://0.0.0.0:PORT/mcp
+    // mismatches the resource metadata published as http://localhost:PORT
+    // (which goes through `normalizeUrlHost` in server-helpers.ts).
+    const hostForBrowser =
+      serverHost === "0.0.0.0" || serverHost === "::"
+        ? "localhost"
+        : serverHost;
     // Auto-connect to the local MCP server at /mcp (SSE endpoint)
     // Use JSON config to specify SSE transport type
-    const mcpUrl = `http://${serverHost}:${serverPort}/mcp`; // Also available at /sse
+    const mcpUrl = `http://${hostForBrowser}:${serverPort}/mcp`; // Also available at /sse
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
@@ -73,7 +82,7 @@ export async function mountInspectorUI(
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
     });
     console.log(
-      `[INSPECTOR] UI available at http://${serverHost}:${serverPort}/inspector`
+      `[INSPECTOR] UI available at http://${hostForBrowser}:${serverPort}/inspector`
     );
     return true;
   } catch (err) {
