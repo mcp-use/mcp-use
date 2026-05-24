@@ -11,6 +11,7 @@
     "clean-inspector-files",
     "cross-platform-clean-scripts",
     "fix-codeql-ollama-redos",
+    "fix-inspector-autoconnect-loopback",
     "fix-inspector-tool-schema-mutation",
     "fix-knip-tabcountbadge-barrel",
     "fix-oauth-metadata-double-slash",

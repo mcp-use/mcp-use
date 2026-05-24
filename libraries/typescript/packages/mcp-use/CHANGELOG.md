@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.29.0-canary.17
+
+### Patch Changes
+
+- 4b80127: Fix OAuth-protected `mcp-use dev` flows by normalizing `0.0.0.0` and `::` to `localhost` in the inspector's autoConnect URL, so it matches the resource metadata published by `getServerBaseUrl()` and passes the SDK's strict origin check.
+  - @mcp-use/cli@3.2.1-canary.17
+  - @mcp-use/inspector@7.0.0-canary.17
+
 ## 1.29.0-canary.16
 
 ### Patch Changes
