@@ -106,7 +106,7 @@
   },
   "scripts": {
     "generate:version": "node scripts/generate-version.mjs",
-    "build": "npm run generate:version && rm -rf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "build": "npm run generate:version && rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
     "test:unit": "vitest run --exclude 'tests/integration/**'",
