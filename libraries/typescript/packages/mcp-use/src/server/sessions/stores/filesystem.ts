@@ -17,7 +17,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, join, resolve, normalize, isAbsolute } from "node:path";
+import { dirname, join, resolve, normalize, isAbsolute, relative as pathRelative } from "node:path";
 import type { SessionMetadata } from "../session-manager.js";
 import type { SessionStore } from "./index.js";
 
@@ -85,7 +85,10 @@ export class FileSystemSessionStore implements SessionStore {
    * Validate and resolve a configured path.
    * - Resolves relative paths against process.cwd()
    * - Normalizes the resolved path
-   * - Ensures the resolved path is within the process.cwd() tree to prevent path traversal
+   * - Ensures the resolved path is contained inside the project root to prevent path traversal
+   *
+   * Note: absolute paths that resolve outside the project are rejected. Use this
+   * to fail fast on misconfiguration and avoid accidental writes outside the repo.
    */
   private validatePath(pathStr: string): string {
     const resolved = isAbsolute(pathStr) ? resolve(pathStr) : resolve(process.cwd(), pathStr);
@@ -93,14 +96,22 @@ export class FileSystemSessionStore implements SessionStore {
 
     const cwdRoot = resolve(process.cwd());
 
-    // Prevent escaping the cwd when a relative path was provided
-    if (!normalized.startsWith(cwdRoot)) {
-      throw new Error(
-        `FileSystemSessionStore: path must be absolute or within the project directory (resolved: ${normalized})`
-      );
+    // Perform a boundary-aware containment check using path.relative.
+    // On Windows, compare case-insensitively to avoid false negatives.
+    const isWindows = process.platform === "win32";
+    const baseForCompare = isWindows ? cwdRoot.toLowerCase() : cwdRoot;
+    const targetForCompare = isWindows ? normalized.toLowerCase() : normalized;
+
+    const rel = pathRelative(baseForCompare, targetForCompare);
+
+    // Accept when the relative path is empty (same path) or does not begin with '..'
+    if (rel === "" || (!rel.startsWith("..") && !isAbsolute(rel))) {
+      return normalized;
     }
 
-    return normalized;
+    throw new Error(
+      `FileSystemSessionStore: configured path must resolve inside the project directory (resolved: ${normalized})`
+    );
   }
 
   /**
