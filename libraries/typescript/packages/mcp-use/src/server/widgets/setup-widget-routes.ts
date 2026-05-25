@@ -8,9 +8,9 @@
  */
 
 import { serveStatic } from "@hono/node-server/serve-static";
-import type { Context, Hono as HonoType } from "hono";
-import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
-import { getContentType, setupFaviconRoute } from "./widget-helpers.js";
+import type { Hono as HonoType, MiddlewareHandler } from "hono";
+import { isDeno } from "../utils/runtime.js";
+import { setupFaviconRoute } from "./widget-helpers.js";
 import type { ServerConfig } from "./widget-types.js";
 
 /**
@@ -18,8 +18,7 @@ import type { ServerConfig } from "./widget-types.js";
  *
  * Node + Bun: one `serveStatic` mount handles widgets, assets, and public
  * files in a single middleware. Deno can't use `@hono/node-server`, so it
- * falls back to hand-rolled handlers that go through the `fsHelpers`
- * cross-runtime shim.
+ * uses `hono/deno`'s `serveStatic` with the same mount config.
  *
  * Favicon is registered separately at `/favicon.ico` (basePath-prefixed
  * to `${basePath}/favicon.ico`) because it needs an explicit Cache-Control
@@ -37,7 +36,7 @@ export function setupWidgetRoutes(
   basePath: string = ""
 ): void {
   if (isDeno) {
-    setupWidgetRoutesDeno(app);
+    setupWidgetRoutesDeno(app, basePath);
   } else {
     app.get(
       "/_mcp-use/*",
@@ -60,42 +59,21 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Deno fallback — three small handlers backed by `fsHelpers.readFile`.
- * Kept separate so the Node/Bun path stays a one-liner.
- *
- * The handlers slice `c.req.path` on the `/_mcp-use/...` segment instead of
- * matching from the start, so they work regardless of basePath.
+ * Deno fallback — mirrors the Node/Bun mount above using `hono/deno`'s
+ * `serveStatic`. The import is lazy because `hono/deno` reads `Deno.open` and
+ * `Deno.lstatSync` at module load, which would crash in Node.
  */
-function setupWidgetRoutesDeno(app: HonoType): void {
-  const serveDenoFile = async (
-    c: Context,
-    segments: string[]
-  ): Promise<Response> => {
-    const fullPath = pathHelpers.join(getCwd(), ".mcp-use", ...segments);
-    try {
-      const content = await fsHelpers.readFile(fullPath);
-      return new Response(content, {
-        status: 200,
-        headers: { "Content-Type": getContentType(segments.at(-1) ?? "") },
+function setupWidgetRoutesDeno(app: HonoType, basePath: string): void {
+  let middleware: MiddlewareHandler | null = null;
+  app.get("/_mcp-use/*", async (c, next) => {
+    if (!middleware) {
+      const { serveStatic: denoServeStatic } = await import("hono/deno");
+      middleware = denoServeStatic({
+        root: "./.mcp-use",
+        rewriteRequestPath: (p) =>
+          p.replace(new RegExp(`^${escapeRegex(basePath)}/_mcp-use`), ""),
       });
-    } catch {
-      return c.notFound();
     }
-  };
-
-  app.get("/_mcp-use/widgets/:widget", async (c) => {
-    const widget = c.req.param("widget")!;
-    return serveDenoFile(c, ["widgets", widget, "index.html"]);
-  });
-
-  app.get("/_mcp-use/widgets/:widget/assets/*", async (c) => {
-    const widget = c.req.param("widget")!;
-    const assetFile = c.req.path.split("/assets/")[1] ?? "";
-    return serveDenoFile(c, ["widgets", widget, "assets", assetFile]);
-  });
-
-  app.get("/_mcp-use/public/*", async (c) => {
-    const filePath = c.req.path.split("/_mcp-use/public/")[1] ?? "";
-    return serveDenoFile(c, ["public", filePath]);
+    return middleware(c, next);
   });
 }
