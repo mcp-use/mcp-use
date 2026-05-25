@@ -1,7 +1,7 @@
 /**
  * Production mode widget mounting
  *
- * This module handles serving pre-built widgets from the dist/resources/widgets/ directory.
+ * This module handles serving pre-built widgets from the .mcp-use/widgets/ directory.
  * Widgets are built using the 'mcp-use build' command and served as static files in production.
  */
 
@@ -21,36 +21,36 @@ import type {
 type MountWidgetsProductionOptions = MountWidgetsOptions;
 
 /**
- * Mount pre-built widgets from dist/resources/widgets/ directory in production mode
+ * Mount pre-built widgets from .mcp-use/widgets/ directory in production mode
  *
  * Serves static widget bundles that were built using the build command.
  * Reads the manifest file to discover available widgets and their metadata,
  * then registers each widget as both a tool and resource.
  *
- * @param app - Hono app instance (not used directly, kept for consistency)
+ * @param _app - basePath-aware Hono view (currently unused; kept for
+ *   signature parity with the dev variant and future static-route needs)
  * @param serverConfig - Server configuration (baseUrl, CSP URLs, buildId)
  * @param registerWidget - Callback to register each discovered widget
  * @param options - Optional configuration (baseRoute)
  * @returns Promise that resolves when all widgets are mounted
  */
 export async function mountWidgetsProduction(
-  app: HonoType,
+  _app: HonoType,
   serverConfig: ServerConfig,
   registerWidget: RegisterWidgetCallback,
   options?: MountWidgetsProductionOptions
 ): Promise<void> {
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const baseRoute = options?.baseRoute || "/_mcp-use/widgets";
   const widgetsDir = pathHelpers.join(
     isDeno ? "." : getCwd(),
-    "dist",
-    "resources",
+    ".mcp-use",
     "widgets"
   );
 
   console.log("widgetsDir", widgetsDir);
 
   // Discover built widgets from manifest
-  const manifestPath = "./dist/mcp-use.json";
+  const manifestPath = "./.mcp-use/manifest.json";
   let widgets: string[] = [];
   let widgetsMetadata: Record<string, any> = {};
 
@@ -109,7 +109,7 @@ export async function mountWidgetsProduction(
   }
 
   console.log(
-    `[WIDGETS] Serving ${widgets.length} pre-built widget(s) from dist/resources/widgets/`
+    `[WIDGETS] Serving ${widgets.length} pre-built widget(s) from .mcp-use/widgets/`
   );
 
   // Register tools and resources for each widget

@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Context, Next } from "hono";
 
-import { getDebugLevel, requestLogger } from "../../../src/server/logging.js";
+import {
+  createRequestLogger,
+  getDebugLevel,
+} from "../../../src/server/logging.js";
+
+const requestLogger = createRequestLogger();
 
 // ---------------------------------------------------------------------------
 // Helpers

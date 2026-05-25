@@ -38,6 +38,7 @@ import {
 } from "mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
+import { inspectorPath } from "@/client/utils/basePath";
 import {
   buildOAuthStaticConfig,
   getStoredConnectionConfig,
@@ -300,7 +301,7 @@ export function InspectorDashboard() {
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
   const [maxTotalTimeout, setMaxTotalTimeout] = useState("60000");
   const [proxyAddress, setProxyAddress] = useState(
-    `${window.location.origin}/inspector/api/proxy`
+    `${window.location.origin}${inspectorPath("/inspector/api/proxy")}`
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");

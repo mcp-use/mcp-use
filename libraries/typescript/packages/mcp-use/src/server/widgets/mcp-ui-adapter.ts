@@ -26,6 +26,8 @@ export interface UrlConfig {
   baseUrl: string;
   port: number | string;
   buildId?: string;
+  /** Server basePath prefix (e.g. "/api"). Empty string when unset. */
+  basePath?: string;
 }
 
 /**
@@ -47,8 +49,9 @@ export function buildWidgetUrl(
   // This must be imported dynamically to avoid circular dependencies
   const slugifiedWidget = slugifyWidgetName(widget);
 
+  const basePath = config.basePath ?? "";
   const url = new URL(
-    `/mcp-use/widgets/${slugifiedWidget}`,
+    `${basePath}/_mcp-use/widgets/${slugifiedWidget}`,
     `${config.baseUrl}:${config.port}`
   );
 

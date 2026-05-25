@@ -146,23 +146,48 @@ async function findAvailablePort(
   throw new Error("No available ports found");
 }
 
-// Helper to check if server is ready
+type ServerInfo = {
+  basePath: string;
+};
+
+/**
+ * Best-effort read of `.mcp-use/server-info.json`. The server writes this
+ * file inside the `listen()` callback, so by the time `waitForServer`
+ * resolves it's already on disk.
+ *
+ * Returns `""` on any failure — caller composes URLs as
+ * `http://${host}:${port}${basePath}/mcp`, which degrades to bare `/mcp`
+ * exactly like before basePath existed.
+ */
+async function readServerBasePath(projectPath: string): Promise<string> {
+  try {
+    const filePath = path.join(projectPath, ".mcp-use", "server-info.json");
+    const raw = await readFile(filePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.basePath === "string" ? parsed.basePath : "";
+  } catch {
+    return "";
+  }
+}
+
+// Helper to check if server is ready. Polls a known endpoint at the basePath
+// derived from the server-info handshake file (or root, if missing/stale).
 async function waitForServer(
   port: number,
   host: string = "localhost",
+  projectPath: string = process.cwd(),
   maxAttempts = 30
-): Promise<boolean> {
+): Promise<ServerInfo | null> {
   for (let i = 0; i < maxAttempts; i++) {
     const controller = new AbortController();
+    const basePath = await readServerBasePath(projectPath);
     try {
-      // Use /inspector/health endpoint for cleaner health checks
-      // This avoids 400 errors from the MCP endpoint which requires session headers
-      const response = await fetch(`http://${host}:${port}/inspector/health`, {
-        signal: controller.signal,
-      });
-
+      const response = await fetch(
+        `http://${host}:${port}${basePath}/inspector/health`,
+        { signal: controller.signal }
+      );
       if (response.ok) {
-        return true;
+        return { basePath };
       }
     } catch {
       // Server not ready yet
@@ -171,7 +196,7 @@ async function waitForServer(
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  return false;
+  return null;
 }
 
 // Helper to normalize host for browser connections
@@ -705,8 +730,9 @@ async function buildWidgets(
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
-    // Create temp directory for build artifacts
-    const tempDir = path.join(projectPath, ".mcp-use", widgetName);
+    // Create temp directory for build artifacts under `.mcp-use/.tmp/` so it
+    // doesn't collide with framework-owned namespaces (widgets/, public/).
+    const tempDir = path.join(projectPath, ".mcp-use", ".tmp", widgetName);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Create CSS file with Tailwind directives
@@ -752,7 +778,12 @@ if (container && Component) {
 }
 `;
 
-    // Create HTML template
+    // Create HTML template. The favicon href is a *relative* path so it
+    // resolves correctly whether the widget HTML is served at
+    // `/_mcp-use/widgets/<slug>/index.html` (no basePath) or
+    // `${basePath}/_mcp-use/widgets/<slug>/index.html` (basePath set).
+    // `../../public/foo.ico` lands on the same-origin `/_mcp-use/public/`
+    // namespace in both cases.
     const htmlContent = `<!doctype html>
 <html lang="en">
   <head>
@@ -761,7 +792,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+    <link rel="icon" href="../../public/${favicon}" />`
         : ""
     }
   </head>
@@ -774,19 +805,14 @@ if (container && Component) {
     await fs.writeFile(path.join(tempDir, "entry.tsx"), entryContent, "utf8");
     await fs.writeFile(path.join(tempDir, "index.html"), htmlContent, "utf8");
 
-    // Build with Vite
-    const outDir = path.join(
-      projectPath,
-      "dist",
-      "resources",
-      "widgets",
-      widgetName
-    );
+    // Build widget output into the framework-owned `.mcp-use/widgets/` tree.
+    const outDir = path.join(projectPath, ".mcp-use", "widgets", widgetName);
 
-    // Set base URL: use MCP_URL if set, otherwise relative path
+    // Set base URL: use MCP_URL if set, otherwise the basePath-agnostic
+    // root namespace `/_mcp-use/widgets/<name>/`.
     const baseUrl = mcpUrl
       ? `${mcpUrl}/${widgetName}/`
-      : `/mcp-use/widgets/${widgetName}/`;
+      : `/_mcp-use/widgets/${widgetName}/`;
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
@@ -795,6 +821,7 @@ if (container && Component) {
       const metadataTempDir = path.join(
         projectPath,
         ".mcp-use",
+        ".tmp",
         `${widgetName}-metadata`
       );
       await fs.mkdir(metadataTempDir, { recursive: true });
@@ -1156,54 +1183,62 @@ export default {
         }
       }
 
-      // Post-process HTML for static deployments (e.g., Supabase)
-      // If MCP_SERVER_URL is set, inject window globals at build time
+      // Bake runtime globals into the built HTML so production serving is a
+      // pure static read — no per-request HTML rewriter needed. Mirrors the
+      // Next.js `/_next/` model: build owns transforms, server ships bytes.
+      //
+      // - `__getFile`: asset-URL builder used by Vite's `renderBuiltUrl` hook.
+      //   Defaults to a same-origin path that *resolves the server's
+      //   `basePath` at runtime* from `window.location.pathname` (so the same
+      //   built HTML works whether the server is mounted at `/` or `/api`);
+      //   uses MCP_URL when that points at an external CDN.
+      // - `__mcpPublicUrl`: public-asset prefix. MCP_SERVER_URL roots it
+      //   absolutely for static hosts that need a full origin; otherwise it
+      //   self-resolves basePath the same way as `__getFile`.
+      // - `__mcpPublicAssetsUrl`: where public files are physically stored;
+      //   diverges from `__mcpPublicUrl` only when MCP_URL is a separate CDN.
       const mcpServerUrl = process.env.MCP_SERVER_URL;
-      if (mcpServerUrl) {
-        try {
-          const htmlPath = path.join(outDir, "index.html");
-          let html = await fs.readFile(htmlPath, "utf8");
 
-          // Inject window.__mcpPublicUrl and window.__getFile into <head>
-          // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
-          // __mcpPublicAssetsUrl points to where public files are actually stored
-          const injectionScript = `<script>window.__getFile = (filename) => { return "${mcpUrl}/${widgetName}/"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpUrl}/public";</script>`;
+      try {
+        const htmlPath = path.join(outDir, "index.html");
+        let html = await fs.readFile(htmlPath, "utf8");
 
-          // Check if script tag already exists in head
-          if (!html.includes("window.__mcpPublicUrl")) {
-            html = html.replace(
-              /<head[^>]*>/i,
-              `<head>\n    ${injectionScript}`
-            );
-          }
+        const injectionScript = mcpUrl
+          ? // External CDN — fully-qualified URLs; basePath doesn't apply.
+            `<script>window.__getFile = (filename) => { return ${JSON.stringify(`${mcpUrl}/${widgetName}/`)}+filename }; window.__mcpPublicUrl = ${JSON.stringify(
+              mcpServerUrl
+                ? `${mcpServerUrl}/_mcp-use/public`
+                : "/_mcp-use/public"
+            )}; window.__mcpPublicAssetsUrl = ${JSON.stringify(`${mcpUrl}/public`)};</script>`
+          : // Same-origin: resolve basePath at runtime from the widget's URL.
+            // `${basePath}/_mcp-use/widgets/<slug>/index.html` is the page
+            // location, so everything before `/_mcp-use/` is the basePath.
+            `<script>(function(){var p=${
+              mcpServerUrl
+                ? JSON.stringify(mcpServerUrl)
+                : 'window.location.pathname.split("/_mcp-use/")[0]||""'
+            };window.__getFile=function(filename){return p+${JSON.stringify(`/_mcp-use/widgets/${widgetName}/`)}+filename};window.__mcpPublicUrl=p+"/_mcp-use/public";window.__mcpPublicAssetsUrl=p+"/_mcp-use/public";})();</script>`;
 
-          // Update base href if it exists, or inject it
-          if (/<base\s+[^>]*\/?>/i.test(html)) {
-            // Replace existing base tag
-            html = html.replace(
-              /<base\s+[^>]*\/?>/i,
-              `<base href="${mcpServerUrl}">`
-            );
-          } else {
-            // Inject base tag after the injection script
-            html = html.replace(
-              injectionScript,
-              `${injectionScript}\n    <base href="${mcpServerUrl}">`
-            );
-          }
-
-          await fs.writeFile(htmlPath, html, "utf8");
-          console.log(
-            chalk.gray(`    → Injected MCP_SERVER_URL into ${widgetName}`)
-          );
-        } catch (error) {
-          console.warn(
-            chalk.yellow(
-              `    ⚠ Failed to post-process HTML for ${widgetName}:`,
-              error
-            )
+        if (!html.includes("window.__mcpPublicUrl")) {
+          html = html.replace(
+            /<head[^>]*>/i,
+            (match) => `${match}\n    ${injectionScript}`
           );
         }
+
+        // Remove any stray <base> tag — Vite's absolute `base` URL means
+        // relative refs already resolve correctly, and a runtime origin in
+        // <base> would defeat static caching.
+        html = html.replace(/<base\s+[^>]*\/?>\s*/gi, "");
+
+        await fs.writeFile(htmlPath, html, "utf8");
+      } catch (error) {
+        console.warn(
+          chalk.yellow(
+            `    ⚠ Failed to post-process HTML for ${widgetName}:`,
+            error
+          )
+        );
       }
 
       console.log(chalk.green(`    ✓ Built ${widgetName}`));
@@ -1558,7 +1593,7 @@ program
       try {
         await fs.access(publicDir);
         console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+        await fs.cp(publicDir, path.join(projectPath, ".mcp-use", "public"), {
           recursive: true,
         });
         console.log(chalk.green("✓ Public assets copied"));
@@ -1566,8 +1601,8 @@ program
         // Public folder doesn't exist, skip
       }
 
-      // Create build manifest
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      // Create build manifest under the framework-owned `.mcp-use/` tree.
+      const manifestPath = path.join(projectPath, ".mcp-use", "manifest.json");
 
       // Read existing manifest to preserve tunnel subdomain and other fields
       let existingManifest: any = {};
@@ -1697,7 +1732,11 @@ program
 
       if (options.tunnel) {
         try {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const manifestPath = path.join(
+            projectPath,
+            ".mcp-use",
+            "manifest.json"
+          );
           let existingSubdomain: string | undefined;
 
           try {
@@ -1860,13 +1899,18 @@ program
         if (options.open !== false) {
           const startTime = Date.now();
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
-          if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+          const serverInfo = await waitForServer(
+            port,
+            browserHost,
+            projectPath
+          );
+          if (serverInfo) {
+            const basePath = serverInfo.basePath;
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}/mcp`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}/mcp`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1876,7 +1920,9 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(
+                chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}/mcp`)
+              );
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
@@ -2134,13 +2180,18 @@ program
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
-          if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+          const serverInfo = await waitForServer(
+            port,
+            browserHost,
+            projectPath
+          );
+          if (serverInfo) {
+            const basePath = serverInfo.basePath;
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}/mcp`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}/mcp`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -2150,7 +2201,9 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(
+                chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}/mcp`)
+              );
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
             console.log(chalk.gray(`Watching for changes...\n`));
@@ -2434,7 +2487,11 @@ program
         // 2. Start tunnel if requested
         tunnelUrl = undefined;
         if (withTunnel) {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const manifestPath = path.join(
+            projectPath,
+            ".mcp-use",
+            "manifest.json"
+          );
           let existingSubdomain: string | undefined;
           try {
             const manifestContent = await readFile(manifestPath, "utf-8");
@@ -2476,7 +2533,7 @@ program
 
           // Persist subdomain
           try {
-            const mPath = path.join(projectPath, "dist", "mcp-use.json");
+            const mPath = path.join(projectPath, ".mcp-use", "manifest.json");
             let manifest: any = {};
             try {
               manifest = JSON.parse(await readFile(mPath, "utf-8"));
@@ -2655,7 +2712,11 @@ program
       if (options.tunnel) {
         try {
           // Read existing subdomain from mcp-use.json if available
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const manifestPath = path.join(
+            projectPath,
+            ".mcp-use",
+            "manifest.json"
+          );
           let existingSubdomain: string | undefined;
 
           try {
@@ -2747,7 +2808,7 @@ program
       // Find the built server file
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      const manifestPath = path.join(projectPath, ".mcp-use", "manifest.json");
 
       try {
         const manifestContent = await readFile(manifestPath, "utf-8");
@@ -2798,7 +2859,7 @@ program
       if (!serverFile) {
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - .mcp-use/manifest.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
           )
         );
         process.exit(1);

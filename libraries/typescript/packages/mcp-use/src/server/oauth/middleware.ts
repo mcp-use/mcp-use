@@ -12,12 +12,21 @@ import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
  * Create bearer authentication middleware for a given OAuth provider or proxy
  *
  * @param oauth - The OAuth provider or proxy to use for token verification
- * @param baseUrl - The base URL of the server (for WWW-Authenticate header)
+ * @param getBaseUrl - Lazy getter for the server base URL (for WWW-Authenticate header).
+ *                    Called per-request so callers can defer resolution until after
+ *                    the HTTP listener has bound a port.
+ * @param basePath - Optional externally-visible prefix the server is mounted under
+ *                   (e.g. "/api"). Used to construct the path-aware
+ *                   `resource_metadata` URL per RFC 9728 §3.1, which inserts
+ *                   `/.well-known/oauth-protected-resource` between host and
+ *                   resource path — so the MCP endpoint at `<host><basePath>/mcp`
+ *                   has metadata at `<host>/.well-known/oauth-protected-resource<basePath>/mcp`.
  * @returns Hono middleware function
  */
 export function createBearerAuthMiddleware(
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl?: string
+  getBaseUrl?: () => string | undefined,
+  basePath: string = ""
 ) {
   return async (c: Context, next: Next) => {
     // Allow HEAD requests through without auth - used for health checks/keep-alive
@@ -30,15 +39,19 @@ export function createBearerAuthMiddleware(
     // Build WWW-Authenticate header for 401 responses
     // This enables MCP clients to discover the OAuth configuration
     const getWWWAuthenticateHeader = () => {
-      const base = baseUrl || new URL(c.req.url).origin;
+      const base = getBaseUrl?.() || new URL(c.req.url).origin;
       const parts = [
         'Bearer error="unauthorized"',
         'error_description="Authorization needed"',
       ];
 
-      // Add resource_metadata for OAuth discovery (MCP spec)
+      // Path-aware resource_metadata URL per RFC 9728 §3.1: the metadata URL
+      // is built by inserting `/.well-known/oauth-protected-resource` between
+      // host and the resource path. The protected resource here is the MCP
+      // transport endpoint at `<basePath>/mcp`. The matching route is
+      // registered in routes.ts (`/.well-known/oauth-protected-resource<basePath>/mcp`).
       parts.push(
-        `resource_metadata="${base}/.well-known/oauth-protected-resource"`
+        `resource_metadata="${base}/.well-known/oauth-protected-resource${basePath}/mcp"`
       );
 
       return parts.join(", ");

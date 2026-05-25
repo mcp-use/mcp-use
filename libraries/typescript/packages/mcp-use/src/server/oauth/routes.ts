@@ -187,26 +187,53 @@ function createTokenHandler(
  * - POST /token - Forwards with injected credentials
  * - GET /.well-known/* - Synthesized metadata pointing to local endpoints
  *
- * @param app - The Hono application instance
+ * @param rootApp - The underlying Hono instance (un-prefixed root view)
  * @param oauth - The OAuth provider or proxy
- * @param baseUrl - The base URL of this server (for metadata)
+ * @param getBaseUrl - Lazy getter for the server base URL. Called per-request so
+ *                     callers can register routes before the HTTP listener has
+ *                     bound a port (baseUrl is only consumed inside handlers).
+ * @param basePath - Optional prefix the server is mounted under (e.g. "/api")
  */
 export function setupOAuthRoutes(
-  app: Hono,
+  rootApp: Hono,
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string
+  getBaseUrl: () => string,
+  basePath: string = ""
 ): void {
   const proxyMode = isOAuthProxy(oauth);
-  // Enable CORS for all OAuth-related endpoints
-  // This is required for browser-based MCP clients to discover OAuth metadata
-  app.use(
-    "/.well-known/*",
+  // `getBaseUrl()` returns the server origin (no path); `basePath` is the
+  // externally-visible prefix the server is mounted under. The combination
+  // (resolved lazily inside each handler) is what goes into discovery metadata
+  // so clients land on the right paths.
+  // - /authorize, /token, /register live under `basePath` — registered on
+  //   a `.basePath()` clone so the prefix is prepended automatically.
+  // - .well-known/* discovery lives at the host root on `rootApp`. Per
+  //   RFC 8414 §3.1, the discovery URL is `<host>/.well-known/<type>` with
+  //   the issuer's path appended *after* the well-known segment — not
+  //   `<host>/<basePath>/.well-known/...`. Registering on `rootApp` keeps
+  //   the well-known endpoints at the literal host root regardless of
+  //   `basePath` (unlike `/_mcp-use/*`, which now lives under basePath).
+  const app = basePath ? rootApp.basePath(basePath) : rootApp;
+  const getPrefixedBaseUrl = () => `${getBaseUrl()}${basePath}`;
+  // Enable CORS for all OAuth-related discovery endpoints on rootApp.
+  rootApp.use(
+    "/.well-known/oauth-*",
     cors({
       origin: "*", // Allow all origins for metadata discovery
       allowMethods: ["GET", "OPTIONS"],
       allowHeaders: ["Content-Type", "Authorization"],
       exposeHeaders: ["Content-Type"],
       maxAge: 86400, // Cache preflight for 24 hours
+    })
+  );
+  rootApp.use(
+    "/.well-known/openid-configuration*",
+    cors({
+      origin: "*",
+      allowMethods: ["GET", "OPTIONS"],
+      allowHeaders: ["Content-Type", "Authorization"],
+      exposeHeaders: ["Content-Type"],
+      maxAge: 86400,
     })
   );
 
@@ -290,11 +317,12 @@ export function setupOAuthRoutes(
       const proxy = oauth as OAuthProxy;
       console.log(`[OAuth] Returning proxy mode metadata`);
 
+      const prefixedBaseUrl = getPrefixedBaseUrl();
       return c.json({
-        issuer: baseUrl,
-        authorization_endpoint: `${baseUrl}/authorize`,
-        token_endpoint: `${baseUrl}/token`,
-        registration_endpoint: `${baseUrl}/register`,
+        issuer: prefixedBaseUrl,
+        authorization_endpoint: `${prefixedBaseUrl}/authorize`,
+        token_endpoint: `${prefixedBaseUrl}/token`,
+        registration_endpoint: `${prefixedBaseUrl}/register`,
         scopes_supported: oauth.getScopesSupported(),
         response_types_supported: ["code"],
         grant_types_supported: oauth.getGrantTypesSupported(),
@@ -343,15 +371,37 @@ export function setupOAuthRoutes(
     }
   };
 
-  // Register the handler for both OAuth and OpenID Connect discovery endpoints
-  app.get(
+  // Discovery URLs the SDK probes (see `buildDiscoveryUrls` in
+  // @modelcontextprotocol/sdk client/auth.js). The SDK tries the path-aware
+  // variant first (well-known segment with the issuer's path appended), then
+  // falls back to root. Register both so either probe wins.
+  //
+  // With `basePath: "/api"` and issuer `http://host/api`:
+  //   path-aware: GET /.well-known/oauth-authorization-server/api
+  //   root:       GET /.well-known/oauth-authorization-server
+  rootApp.get(
     "/.well-known/oauth-authorization-server",
     handleAuthorizationServerMetadata
   );
-  app.get(
+  rootApp.get(
     "/.well-known/openid-configuration",
     handleAuthorizationServerMetadata
   );
+  if (basePath) {
+    rootApp.get(
+      `/.well-known/oauth-authorization-server${basePath}`,
+      handleAuthorizationServerMetadata
+    );
+    rootApp.get(
+      `/.well-known/openid-configuration${basePath}`,
+      handleAuthorizationServerMetadata
+    );
+    // OIDC Discovery 1.0 style — well-known appended after the path.
+    rootApp.get(
+      `${basePath}/.well-known/openid-configuration`,
+      handleAuthorizationServerMetadata
+    );
+  }
 
   /**
    * OAuth Protected Resource Metadata
@@ -360,32 +410,47 @@ export function setupOAuthRoutes(
    * DCR-direct mode: Points to the actual OAuth provider.
    * Proxy mode: Points to the local server (which proxies to upstream).
    */
-  app.get("/.well-known/oauth-protected-resource", (c: Context) => {
-    // In proxy mode, the authorization server is the local proxy
-    const authServer = proxyMode ? baseUrl : oauth.getIssuer();
-
+  const handleProtectedResourceMetadata = (c: Context) => {
+    const prefixedBaseUrl = getPrefixedBaseUrl();
+    const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
     console.log(`[OAuth] Protected resource metadata request`);
-    console.log(`[OAuth]   - Resource: ${baseUrl}`);
+    console.log(`[OAuth]   - Resource: ${prefixedBaseUrl}`);
     console.log(`[OAuth]   - Authorization server: ${authServer}`);
-
     return c.json({
-      resource: baseUrl,
+      resource: prefixedBaseUrl,
       authorization_servers: [authServer],
       scopes_supported: oauth.getScopesSupported(),
       bearer_methods_supported: ["header"],
     });
-  });
+  };
 
-  // Path-scoped protected resource metadata per RFC 9728 — declares that the
-  // `/mcp` path specifically is the protected resource.
-  app.get("/.well-known/oauth-protected-resource/mcp", (c: Context) => {
-    const authServer = proxyMode ? baseUrl : oauth.getIssuer();
-
+  const handleProtectedResourceMetadataMcp = (c: Context) => {
+    const prefixedBaseUrl = getPrefixedBaseUrl();
+    const authServer = proxyMode ? prefixedBaseUrl : oauth.getIssuer();
     return c.json({
-      resource: `${baseUrl}/mcp`,
+      resource: `${prefixedBaseUrl}/mcp`,
       authorization_servers: [authServer],
       scopes_supported: oauth.getScopesSupported(),
       bearer_methods_supported: ["header"],
     });
-  });
+  };
+
+  rootApp.get(
+    "/.well-known/oauth-protected-resource",
+    handleProtectedResourceMetadata
+  );
+  // Path-scoped protected resource metadata per RFC 9728 — declares the MCP
+  // endpoint as the protected resource.
+  rootApp.get(
+    `/.well-known/oauth-protected-resource${basePath}/mcp`,
+    handleProtectedResourceMetadataMcp
+  );
+  if (basePath) {
+    // Also expose the basePath-scoped variant without the `/mcp` suffix, in
+    // case a client probes the issuer URL (`<host>/<basePath>`) directly.
+    rootApp.get(
+      `/.well-known/oauth-protected-resource${basePath}`,
+      handleProtectedResourceMetadata
+    );
+  }
 }

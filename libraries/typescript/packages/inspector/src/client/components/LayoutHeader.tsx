@@ -53,6 +53,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
+import { inspectorPath } from "@/client/utils/basePath";
 import type { McpServer } from "mcp-use/react";
 import { useEffect, useState } from "react";
 
@@ -252,7 +253,7 @@ function TunnelBadge({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/inspector/api/dev/info");
+        const res = await fetch(inspectorPath("/inspector/api/dev/info"));
         if (!res.ok || cancelled) return;
         const info = (await res.json()) as {
           fromCli?: boolean;
@@ -282,7 +283,7 @@ function TunnelBadge({
    */
   const pollAndReconnect = async (expectTunnel: boolean) => {
     const port = window.location.port || "3000";
-    const infoUrl = `http://localhost:${port}/inspector/api/dev/info`;
+    const infoUrl = `http://localhost:${port}${inspectorPath("/inspector/api/dev/info")}`;
     const deadline = Date.now() + 90_000;
 
     setTunnelPhaseMessage(
@@ -358,9 +359,12 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch("/inspector/api/dev/start-tunnel", {
-        method: "POST",
-      });
+      const res = await fetch(
+        inspectorPath("/inspector/api/dev/start-tunnel"),
+        {
+          method: "POST",
+        }
+      );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast.error((data as any).error || "Failed to start tunnel");
@@ -388,7 +392,7 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch("/inspector/api/dev/stop-tunnel", {
+      const res = await fetch(inspectorPath("/inspector/api/dev/stop-tunnel"), {
         method: "POST",
       });
       if (!res.ok) {

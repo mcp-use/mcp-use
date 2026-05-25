@@ -10,6 +10,44 @@ import { hostHeaderValidation } from "../middleware/host-validation.js";
 import { getEnv } from "./runtime.js";
 
 /**
+ * Resolve relative icon `src` values to absolute URLs under the framework's
+ * public asset prefix (`${basePath}/_mcp-use/public/`). Paths already
+ * starting with `http` are passed through unchanged. Returns
+ * `undefined`/the original array when `icons` or `baseUrl` is missing.
+ */
+export function resolveIconUrls<
+  T extends { src: string } = { src: string; [k: string]: unknown },
+>(
+  icons: T[] | undefined,
+  baseUrl?: string,
+  basePath: string = ""
+): T[] | undefined {
+  if (!icons || !baseUrl) return icons;
+  return icons.map((icon) => ({
+    ...icon,
+    src: icon.src.startsWith("http")
+      ? icon.src
+      : `${baseUrl}${basePath}/_mcp-use/public/${icon.src}`,
+  }));
+}
+
+/**
+ * Normalize a user-supplied `basePath` into the form the rest of the server
+ * expects: empty string for "no prefix", otherwise a leading `/` with no
+ * trailing `/`. Throws if the input is shaped wrong so misconfiguration shows
+ * up at startup rather than as confusing 404s.
+ */
+export function normalizeBasePath(input: string | undefined): string {
+  if (input === undefined || input === "" || input === "/") return "";
+  if (!input.startsWith("/")) {
+    throw new Error(
+      `[MCP] basePath must start with "/", got ${JSON.stringify(input)}`
+    );
+  }
+  return input.replace(/\/+$/, "");
+}
+
+/**
  * Get default CORS configuration for MCP server
  *
  * @returns CORS options object for Hono cors middleware

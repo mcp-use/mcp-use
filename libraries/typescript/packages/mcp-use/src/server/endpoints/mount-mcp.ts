@@ -152,7 +152,8 @@ export async function mountMcp(
   }, // The McpServer instance with getServerForSession() method
   sessions: Map<string, SessionData>,
   config: ServerConfig,
-  isProductionMode: boolean
+  isProductionMode: boolean,
+  basePath: string = ""
 ): Promise<{ mcpMounted: boolean; idleCleanupInterval?: NodeJS.Timeout }> {
   const { WebStandardStreamableHTTPServerTransport } =
     await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
@@ -263,7 +264,7 @@ export async function mountMcp(
         if (iconSrc) {
           iconUrl = iconSrc.startsWith("http")
             ? iconSrc
-            : `${origin}/mcp-use/public/${iconSrc.replace(/^\//, "")}`;
+            : `${origin}${basePath}/_mcp-use/public/${iconSrc.replace(/^\//, "")}`;
         }
         const regs = instance.registrations;
         const landingTools =
@@ -624,13 +625,19 @@ export async function mountMcp(
     }
   };
 
-  // Mount the handler for all HTTP methods on both /mcp and /sse
+  // Register on the inner app at bare paths. When `basePath` is set the
+  // inner is sub-mounted under it externally, so these become
+  // `${basePath}/mcp` and `${basePath}/sse` from the outside.
   for (const endpoint of ["/mcp", "/sse"]) {
     app.on(["GET", "POST", "DELETE", "HEAD"], endpoint, handleRequest);
   }
 
+  // Log the externally-visible paths (what users hit) rather than the
+  // bare paths we just registered on the inner.
+  const externalMcp = `${basePath}/mcp`;
+  const externalSse = `${basePath}/sse`;
   console.log(
-    `[MCP] Server mounted at /mcp and /sse (${config.stateless ? "stateless" : "stateful"} mode)`
+    `[MCP] Server mounted at ${externalMcp} and ${externalSse} (${config.stateless ? "stateless" : "stateful"} mode)`
   );
 
   return { mcpMounted: true, idleCleanupInterval };
