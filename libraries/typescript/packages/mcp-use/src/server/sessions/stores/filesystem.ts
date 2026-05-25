@@ -17,7 +17,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, normalize, isAbsolute } from "node:path";
 import type { SessionMetadata } from "../session-manager.js";
 import type { SessionStore } from "./index.js";
 
@@ -72,13 +72,35 @@ export class FileSystemSessionStore implements SessionStore {
   private pendingSave = false;
 
   constructor(config: FileSystemSessionStoreConfig = {}) {
-    this.filePath =
-      config.path ?? join(process.cwd(), ".mcp-use", "sessions.json");
+    const rawPath = config.path ?? join(process.cwd(), ".mcp-use", "sessions.json");
+    this.filePath = this.validatePath(rawPath);
     this.debounceMs = config.debounceMs ?? 100;
     this.maxAgeMs = config.maxAgeMs ?? 24 * 60 * 60 * 1000; // 24 hours
 
     // Load existing sessions synchronously on construction
     this.loadSessionsSync();
+  }
+
+  /**
+   * Validate and resolve a configured path.
+   * - Resolves relative paths against process.cwd()
+   * - Normalizes the resolved path
+   * - Ensures the resolved path is within the process.cwd() tree to prevent path traversal
+   */
+  private validatePath(pathStr: string): string {
+    const resolved = isAbsolute(pathStr) ? resolve(pathStr) : resolve(process.cwd(), pathStr);
+    const normalized = normalize(resolved);
+
+    const cwdRoot = resolve(process.cwd());
+
+    // Prevent escaping the cwd when a relative path was provided
+    if (!normalized.startsWith(cwdRoot)) {
+      throw new Error(
+        `FileSystemSessionStore: path must be absolute or within the project directory (resolved: ${normalized})`
+      );
+    }
+
+    return normalized;
   }
 
   /**
