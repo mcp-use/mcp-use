@@ -522,6 +522,62 @@ export function getWidgetData(toolId: string): WidgetData | undefined {
   return widgetDataStore.get(toolId);
 }
 
+function getWidgetBaseHref(widgetData: WidgetData): string | undefined {
+  if (!widgetData.serverId || !/^https?:\/\//.test(widgetData.serverId)) {
+    return undefined;
+  }
+
+  let widgetName: string | undefined;
+  const uriMatch = widgetData.uri.match(/^ui:\/\/widget\/([^/?#]+)/);
+  if (uriMatch?.[1]) {
+    widgetName = uriMatch[1];
+  } else {
+    const contentsArray = Array.isArray(widgetData.resourceData?.contents)
+      ? widgetData.resourceData.contents
+      : [];
+    const contentUri = contentsArray.find(
+      (content: { uri?: unknown }) => typeof content?.uri === "string"
+    )?.uri;
+    const contentUriMatch =
+      typeof contentUri === "string"
+        ? contentUri.match(/^ui:\/\/widget\/([^/?#]+)/)
+        : null;
+    widgetName = contentUriMatch?.[1];
+  }
+
+  if (!widgetName) return undefined;
+  // Resource URIs are often `ui://widget/<name>.html`, but static widget assets
+  // are served from `/_mcp-use/widgets/<name>/...` (without `.html`).
+  widgetName = widgetName.replace(/\.html$/i, "");
+
+  try {
+    const url = new URL(widgetData.serverId);
+    url.hostname = url.hostname.replace("0.0.0.0", "localhost");
+    url.search = "";
+    url.hash = "";
+    url.pathname = url.pathname.replace(/\/(?:mcp|sse)\/?$/, "");
+    const basePath = url.pathname.replace(/\/+$/, "");
+    return `${url.origin}${basePath}/_mcp-use/widgets/${encodeURIComponent(widgetName)}/`;
+  } catch {
+    return undefined;
+  }
+}
+
+export function injectWidgetBaseHref(
+  html: string,
+  widgetData: WidgetData
+): string {
+  const baseHref = getWidgetBaseHref(widgetData);
+  if (!baseHref || /<base\s/i.test(html)) return html;
+
+  const baseTag = `<base href="${baseHref}">`;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (match) => `${match}${baseTag}`);
+  }
+
+  return html;
+}
+
 /**
  * Generate widget container HTML
  */
@@ -994,12 +1050,17 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
   if (htmlContent.includes("<html") && htmlContent.includes("<head")) {
     // If it's a full HTML document, inject at the beginning of head
     // Preserve any existing base tag instead of commenting it out
-    modifiedHtml = htmlContent.replace("<head>", `<head>${apiScript}`);
+    modifiedHtml = injectWidgetBaseHref(htmlContent, widgetData).replace(
+      "<head>",
+      `<head>${apiScript}`
+    );
   } else {
     // Widget HTML is just fragments, wrap it properly
+    const baseHref = getWidgetBaseHref(widgetData);
     modifiedHtml = `<!DOCTYPE html>
 <html>
 <head>
+  ${baseHref ? `<base href="${baseHref}">` : ""}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   ${apiScript}

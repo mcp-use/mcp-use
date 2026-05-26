@@ -6,7 +6,11 @@
  */
 
 import type { Hono } from "hono";
-import { getWidgetData, storeWidgetData } from "../shared-utils.js";
+import {
+  getWidgetData,
+  injectWidgetBaseHref,
+  storeWidgetData,
+} from "../shared-utils.js";
 
 const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
@@ -344,13 +348,14 @@ export function registerMcpAppsRoutes(app: Hono) {
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
 
+      // Ensure relative asset/module URLs resolve against the MCP widget
+      // endpoint (not inspector routes) by injecting a <base href> when absent.
+      const htmlWithBaseHref = injectWidgetBaseHref(htmlContent, widgetData);
+
       // Return JSON with HTML and metadata for CSP enforcement.
-      // The HTML is served as-is -- the MCP server is responsible for
-      // producing fully-resolved HTML with absolute asset URLs and any
-      // runtime globals the widget framework needs.
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
-        html: htmlContent,
+        html: htmlWithBaseHref,
         csp: isPermissive ? undefined : mcpAppsCsp,
         permissions: mcpAppsPermissions,
         permissive: isPermissive,
