@@ -11,7 +11,7 @@ import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 /**
  * Options for {@link createBearerAuthMiddleware}.
  */
-export interface BearerAuthMiddlewareOptions {
+interface BearerAuthMiddlewareOptions {
   /**
    * When `true`, the middleware does **not** reject requests that arrive without
    * an `Authorization` header — it just lets them through with no auth context
