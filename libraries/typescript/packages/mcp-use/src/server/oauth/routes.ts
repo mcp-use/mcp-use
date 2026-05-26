@@ -308,7 +308,10 @@ export function setupOAuthRoutes(
     // DCR-direct mode: proxy to upstream
     try {
       const issuer = oauth.getIssuer();
-      const metadataUrl = `${issuer}/.well-known/oauth-authorization-server`;
+      // RFC 8414 §3: The well-known segment goes between the host and path
+      const u = new URL(issuer);
+      const path = u.pathname.replace(/\/$/, "");
+      const metadataUrl = `${u.origin}/.well-known/oauth-authorization-server${path}`;
       console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
       const response = await fetch(metadataUrl);
 
