@@ -1,4 +1,3 @@
-
 export function getWidgetAssetBase(
   mcpUrl: string | undefined,
   widgetName: string
