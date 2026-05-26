@@ -94,8 +94,9 @@ export function createBearerAuthMiddleware(
 
       await next();
     } catch (error) {
+      console.warn("[OAuth] Token verification failed:", error);
       c.header("WWW-Authenticate", getWWWAuthenticateHeader());
-      return c.json({ error: `Invalid token: ${error}` }, 401);
+      return c.json({ error: "Invalid token" }, 401);
     }
   };
 }

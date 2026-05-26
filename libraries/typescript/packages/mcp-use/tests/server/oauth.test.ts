@@ -164,6 +164,47 @@ describe("server OAuth integration", () => {
     expect(authorized.status).toBe(200);
   });
 
+  it("does not leak verifier error details for invalid bearer tokens", async () => {
+    const app = new Hono();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => {
+        throw new Error(
+          "jwt expired for tenant=acme internal_key_id=secret-kid-123"
+        );
+      },
+    });
+
+    app.use("/mcp/*", createBearerAuthMiddleware(proxy));
+    app.get("/mcp/test", (c) => c.json({ ok: true }));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    const response = await fetch(`${svc.baseUrl}/mcp/test`, {
+      headers: { Authorization: "Bearer bad-token" },
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toEqual({ error: "Invalid token" });
+    expect(JSON.stringify(body)).not.toContain("secret-kid-123");
+    expect(response.headers.get("WWW-Authenticate")).toContain(
+      'Bearer error="unauthorized"'
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[OAuth] Token verification failed:",
+      expect.any(Error)
+    );
+
+    warnSpy.mockRestore();
+  });
+
   it("returns configured clientId from /register endpoint", async () => {
     const app = new Hono();
 
