@@ -808,11 +808,13 @@ if (container && Component) {
     // Build widget output into the framework-owned `.mcp-use/widgets/` tree.
     const outDir = path.join(projectPath, ".mcp-use", "widgets", widgetName);
 
-    // Set base URL: use MCP_URL if set, otherwise the basePath-agnostic
-    // root namespace `/_mcp-use/widgets/<name>/`.
+    // Set base URL: use MCP_URL if set, otherwise keep Vite's emitted HTML
+    // asset URLs relative to the widget page. A widget served from
+    // `${basePath}/_mcp-use/widgets/<name>/` then loads its entry chunks from
+    // that same basePath-prefixed directory instead of root `/_mcp-use/...`.
     const baseUrl = mcpUrl
       ? `${mcpUrl}/${widgetName}/`
-      : `/_mcp-use/widgets/${widgetName}/`;
+      : "./";
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
