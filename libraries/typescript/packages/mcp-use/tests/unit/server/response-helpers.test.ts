@@ -179,7 +179,9 @@ describe("authenticationRequired() helper", () => {
     const challenges = getChallenges(result);
     expect(Array.isArray(challenges)).toBe(true);
     expect(challenges[0]).toContain('error="invalid_token"');
-    expect(challenges[0]).toContain('error_description="Authentication required"');
+    expect(challenges[0]).toContain(
+      'error_description="Authentication required"'
+    );
     expect(challenges[0].startsWith("Bearer ")).toBe(true);
   });
 
@@ -212,7 +214,8 @@ describe("authenticationRequired() helper", () => {
 
   it("includes resource_metadata and scope when provided", () => {
     const result = authenticationRequired({
-      resourceMetadataUrl: "https://example.com/.well-known/oauth-protected-resource",
+      resourceMetadataUrl:
+        "https://example.com/.well-known/oauth-protected-resource",
       scopes: ["docs.write", "user.read"],
       error: "invalid_token",
       errorDescription: "Token expired",

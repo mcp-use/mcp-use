@@ -655,7 +655,9 @@ describe("server OAuth integration", () => {
         createBearerAuthMiddleware(proxy, undefined, { optional: true })
       );
       app.get("/mcp/test", (c) => {
-        const auth = c.get("auth") as { user?: { userId?: string } } | undefined;
+        const auth = c.get("auth") as
+          | { user?: { userId?: string } }
+          | undefined;
         return c.json({ userId: auth?.user?.userId ?? null });
       });
 

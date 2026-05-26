@@ -102,7 +102,8 @@ async function openSession(handler: RpcHandler): Promise<string> {
       clientInfo: { name: "raw-test", version: "0.0.0" },
     },
   });
-  if (!sessionId) throw new Error("Expected mcp-session-id header on initialize");
+  if (!sessionId)
+    throw new Error("Expected mcp-session-id header on initialize");
 
   // Send the initialized notification (no id, no response).
   await handler(
@@ -257,9 +258,8 @@ describe("defaultSecuritySchemes — integration", () => {
       defaultSecuritySchemes: [{ type: "oauth2", scopes: ["read"] }],
     });
 
-    server.tool(
-      { name: "inherits", schema: z.object({}) },
-      async () => text("ok")
+    server.tool({ name: "inherits", schema: z.object({}) }, async () =>
+      text("ok")
     );
 
     server.tool(
@@ -458,9 +458,8 @@ describe("defaultSecuritySchemes: [] — integration", () => {
       defaultSecuritySchemes: [],
     });
 
-    server.tool(
-      { name: "plain", schema: z.object({}) },
-      async () => text("ok")
+    server.tool({ name: "plain", schema: z.object({}) }, async () =>
+      text("ok")
     );
 
     handler = await server.getHandler();

@@ -107,7 +107,9 @@ export async function setupOAuthForServer(
       "[OAuth] Bearer authentication in OPTIONAL mode on /mcp and /sse routes (SEP-1488 mixed auth: noauth tools detected)"
     );
   } else {
-    console.log("[OAuth] Bearer authentication enabled on /mcp and /sse routes");
+    console.log(
+      "[OAuth] Bearer authentication enabled on /mcp and /sse routes"
+    );
   }
 
   return {
