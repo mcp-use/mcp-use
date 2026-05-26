@@ -164,6 +164,45 @@ describe("server OAuth integration", () => {
     expect(authorized.status).toBe(200);
   });
 
+  it("does not expose token verification internals to clients", async () => {
+    const app = new Hono();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => {
+        throw new Error(
+          "JWKS fetch failed at https://issuer.example.com/.well-known/jwks.json"
+        );
+      },
+    });
+
+    app.use("/mcp/*", createBearerAuthMiddleware(proxy));
+    app.get("/mcp/test", (c) => c.json({ ok: true }));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    const response = await fetch(`${svc.baseUrl}/mcp/test`, {
+      headers: { Authorization: "Bearer token-123" },
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(body).toEqual({ error: "Invalid token" });
+    expect(JSON.stringify(body)).not.toContain("JWKS");
+    expect(JSON.stringify(body)).not.toContain("issuer.example.com");
+    expect(errorSpy).toHaveBeenCalledWith(
+      "[OAuth Middleware] Token verification failed:",
+      expect.any(Error)
+    );
+
+    errorSpy.mockRestore();
+  });
+
   it("returns configured clientId from /register endpoint", async () => {
     const app = new Hono();
 
