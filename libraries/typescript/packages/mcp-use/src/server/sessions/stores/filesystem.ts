@@ -37,6 +37,18 @@ export interface FileSystemSessionStoreConfig {
   debounceMs?: number;
 
   /**
+   * Minimum delay in milliseconds between disk writes (default: 500)
+   * Protects the filesystem from sustained rapid session churn.
+   */
+  minSaveIntervalMs?: number;
+
+  /**
+   * Maximum number of disk writes allowed per rolling second (default: 2)
+   * Additional writes are coalesced into the next allowed save.
+   */
+  maxSavesPerSecond?: number;
+
+  /**
    * Maximum session age in milliseconds (default: 24 hours)
    * Sessions older than this are cleaned up on load
    */
@@ -66,16 +78,35 @@ export class FileSystemSessionStore implements SessionStore {
   private sessions = new Map<string, SessionMetadata>();
   private readonly filePath: string;
   private readonly debounceMs: number;
+  private readonly minSaveIntervalMs: number;
+  private readonly maxSavesPerSecond: number;
   private readonly maxAgeMs: number;
   private saveTimer: NodeJS.Timeout | null = null;
   private saving = false;
   private pendingSave = false;
+  private lastSaveAt = 0;
+  private saveTimestamps: number[] = [];
 
   constructor(config: FileSystemSessionStoreConfig = {}) {
     this.filePath =
       config.path ?? join(process.cwd(), ".mcp-use", "sessions.json");
     this.debounceMs = config.debounceMs ?? 100;
+    this.minSaveIntervalMs = config.minSaveIntervalMs ?? 500;
+    this.maxSavesPerSecond = config.maxSavesPerSecond ?? 2;
     this.maxAgeMs = config.maxAgeMs ?? 24 * 60 * 60 * 1000; // 24 hours
+
+    if (this.debounceMs < 0) {
+      throw new Error("debounceMs must be non-negative");
+    }
+    if (this.minSaveIntervalMs < 0) {
+      throw new Error("minSaveIntervalMs must be non-negative");
+    }
+    if (
+      !Number.isInteger(this.maxSavesPerSecond) ||
+      this.maxSavesPerSecond < 1
+    ) {
+      throw new Error("maxSavesPerSecond must be a positive integer");
+    }
 
     // Load existing sessions synchronously on construction
     this.loadSessionsSync();
@@ -188,7 +219,7 @@ export class FileSystemSessionStore implements SessionStore {
     // Schedule cleanup using setTimeout as fallback
     setTimeout(() => {
       this.sessions.delete(sessionId);
-      this.scheduleSave();
+      void this.scheduleSave();
     }, ttlMs);
   }
 
@@ -223,10 +254,40 @@ export class FileSystemSessionStore implements SessionStore {
       clearTimeout(this.saveTimer);
     }
 
-    // Schedule new save after debounce delay
-    this.saveTimer = setTimeout(() => {
-      this.performSave();
-    }, this.debounceMs);
+    const delay = this.getSaveDelay();
+
+    // Schedule new save after debounce and throttle delay
+    this.saveTimer = setTimeout(async () => {
+      await this.performSave();
+    }, delay);
+  }
+
+  /**
+   * Compute the next allowed save time. Debouncing handles short bursts,
+   * minSaveInterval handles sustained churn, and maxSavesPerSecond protects
+   * against repeated immediate flushes/saves in a rolling one-second window.
+   */
+  private getSaveDelay(): number {
+    const now = Date.now();
+    let delay = this.debounceMs;
+
+    if (this.lastSaveAt > 0) {
+      delay = Math.max(
+        delay,
+        Math.max(0, this.minSaveIntervalMs - (now - this.lastSaveAt))
+      );
+    }
+
+    this.saveTimestamps = this.saveTimestamps.filter(
+      (timestamp) => now - timestamp < 1000
+    );
+
+    if (this.saveTimestamps.length >= this.maxSavesPerSecond) {
+      const oldestSave = this.saveTimestamps[0];
+      delay = Math.max(delay, Math.max(0, 1000 - (now - oldestSave)));
+    }
+
+    return delay;
   }
 
   /**
@@ -253,6 +314,12 @@ export class FileSystemSessionStore implements SessionStore {
       const tempPath = `${this.filePath}.tmp`;
       await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
       await rename(tempPath, this.filePath);
+      const now = Date.now();
+      this.lastSaveAt = now;
+      this.saveTimestamps = [
+        ...this.saveTimestamps.filter((timestamp) => now - timestamp < 1000),
+        now,
+      ];
     } catch (error: any) {
       console.error(
         `[FileSystemSessionStore] Error saving sessions:`,

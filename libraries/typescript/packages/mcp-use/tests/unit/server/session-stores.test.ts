@@ -6,8 +6,12 @@
  * Run with Redis: infisical run --env=dev --projectId=13272018-648f-41fd-911c-908a27c9901e -- pnpm test tests/unit/server/session-stores.test.ts
  */
 
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  FileSystemSessionStore,
   InMemorySessionStore,
   RedisSessionStore,
 } from "../../../src/server/index.js";
@@ -178,6 +182,135 @@ describe("InMemorySessionStore", () => {
       expect(retrieved?.lastAccessedAt).toBe(2000);
       expect(retrieved?.logLevel).toBe("debug");
     });
+  });
+});
+
+describe("FileSystemSessionStore", () => {
+  let tempDir: string;
+  let sessionFile: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), "mcp-use-session-store-"));
+    sessionFile = join(tempDir, "sessions.json");
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  function wait(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function readSessions(): Record<string, SessionMetadata> {
+    return JSON.parse(readFileSync(sessionFile, "utf-8"));
+  }
+
+  it("coalesces bursty updates into one debounced write", async () => {
+    const store = new FileSystemSessionStore({
+      path: sessionFile,
+      debounceMs: 20,
+      minSaveIntervalMs: 100,
+    });
+
+    const sessionData: SessionMetadata = {
+      lastAccessedAt: Date.now(),
+    };
+
+    await store.set("session-1", sessionData);
+    await store.set("session-2", sessionData);
+    await store.set("session-3", sessionData);
+
+    await wait(10);
+    expect(existsSync(sessionFile)).toBe(false);
+
+    await wait(30);
+    expect(Object.keys(readSessions()).sort()).toEqual([
+      "session-1",
+      "session-2",
+      "session-3",
+    ]);
+  });
+
+  it("enforces the minimum interval between sustained writes", async () => {
+    const store = new FileSystemSessionStore({
+      path: sessionFile,
+      debounceMs: 10,
+      minSaveIntervalMs: 100,
+    });
+
+    const sessionData: SessionMetadata = {
+      lastAccessedAt: Date.now(),
+    };
+
+    await store.set("session-1", sessionData);
+    await wait(30);
+    expect(Object.keys(readSessions())).toEqual(["session-1"]);
+
+    await store.set("session-2", sessionData);
+    await wait(50);
+    expect(Object.keys(readSessions())).toEqual(["session-1"]);
+
+    await wait(80);
+    expect(Object.keys(readSessions()).sort()).toEqual([
+      "session-1",
+      "session-2",
+    ]);
+  });
+
+  it("caps filesystem saves per rolling second", async () => {
+    const store = new FileSystemSessionStore({
+      path: sessionFile,
+      debounceMs: 0,
+      minSaveIntervalMs: 0,
+      maxSavesPerSecond: 2,
+    });
+
+    const sessionData: SessionMetadata = {
+      lastAccessedAt: Date.now(),
+    };
+
+    await store.set("session-1", sessionData);
+    await wait(20);
+    expect(Object.keys(readSessions())).toEqual(["session-1"]);
+
+    await store.set("session-2", sessionData);
+    await wait(20);
+    expect(Object.keys(readSessions()).sort()).toEqual([
+      "session-1",
+      "session-2",
+    ]);
+
+    await store.set("session-3", sessionData);
+    await wait(100);
+    expect(Object.keys(readSessions()).sort()).toEqual([
+      "session-1",
+      "session-2",
+    ]);
+
+    await wait(950);
+    expect(Object.keys(readSessions()).sort()).toEqual([
+      "session-1",
+      "session-2",
+      "session-3",
+    ]);
+  });
+
+  it("flushes immediately for process-exit persistence", async () => {
+    const store = new FileSystemSessionStore({
+      path: sessionFile,
+      debounceMs: 10_000,
+      minSaveIntervalMs: 10_000,
+    });
+
+    const sessionData: SessionMetadata = {
+      lastAccessedAt: Date.now(),
+    };
+
+    await store.set("session-1", sessionData);
+    await store.flush();
+
+    expect(Object.keys(readSessions())).toEqual(["session-1"]);
   });
 });
 
