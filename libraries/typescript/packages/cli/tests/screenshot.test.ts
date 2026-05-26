@@ -40,8 +40,16 @@ describe("extractViewName", () => {
     );
   });
 
-  it("returns the original string when prefix doesn't match", () => {
-    expect(extractViewName("not-a-widget-uri")).toBe("not-a-widget-uri");
+  it("prefixes host name for non-widget namespaces", () => {
+    expect(extractViewName("ui://excalidraw/mcp-app.html")).toBe(
+      "excalidraw-mcp-app"
+    );
+  });
+
+  it("returns percent-encoded string when prefix doesn't match", () => {
+    expect(extractViewName("not-a-widget-uri")).toBe(
+      encodeURIComponent("not-a-widget-uri")
+    );
   });
 });
 

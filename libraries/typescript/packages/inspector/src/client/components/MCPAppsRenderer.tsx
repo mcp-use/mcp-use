@@ -120,6 +120,8 @@ interface MCPAppsRendererProps {
   onReady?: () => void;
   /** When true in fullscreen mode, suppresses the fullscreen navbar + top padding so the iframe fills the viewport edge-to-edge. Used by the preview/screenshot route. */
   chromeless?: boolean;
+  /** Override the inline-mode max-width cap (default: 768 on desktop, device width on mobile). Used by the preview/screenshot route to render widgets wider than the chat-column width. */
+  inlineWidthOverride?: number;
 }
 
 function MCPAppsRendererBase({
@@ -144,6 +146,7 @@ function MCPAppsRendererBase({
   onRerun,
   onReady,
   chromeless,
+  inlineWidthOverride,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -218,8 +221,11 @@ function MCPAppsRendererBase({
   // Calculate dimensions based on device type
   const { maxWidth, maxHeight } = useDeviceViewport(deviceType, customViewport);
 
-  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width
-  const inlineMaxWidth = deviceType === "mobile" ? maxWidth : 768;
+  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width.
+  // inlineWidthOverride (set by the preview/screenshot route) bypasses the cap so widgets can render
+  // at arbitrary widths for capture.
+  const inlineMaxWidth =
+    inlineWidthOverride ?? (deviceType === "mobile" ? maxWidth : 768);
 
   // Get the tool definition from the server's tool list (memoized to prevent infinite re-renders)
   // Stringify toolName to ensure stable reference if it's passed as an object
@@ -1208,6 +1214,7 @@ function mcpAppsRendererAreEqual(
   if (prev.onRerun !== next.onRerun) return false;
   if (prev.onReady !== next.onReady) return false;
   if (prev.chromeless !== next.chromeless) return false;
+  if (prev.inlineWidthOverride !== next.inlineWidthOverride) return false;
   if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
   if (prev.className !== next.className) return false;
   if (prev.serverBaseUrl !== next.serverBaseUrl) return false;
