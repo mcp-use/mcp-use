@@ -1,25 +1,27 @@
 /**
- * Supabase OAuth MCP Server Example
+ * basePath + Supabase OAuth example.
  *
- * Uses Supabase's OAuth 2.1 server — Supabase hosts /authorize, /token,
- * /register and .well-known discovery, while this example hosts the consent
- * screen (which also triggers sign-in for unauthenticated users). Configure
- * the consent URL in the Supabase Dashboard (Authentication → OAuth Server)
- * to point at /auth/consent here.
+ * Identical to `examples/server/oauth/supabase`, but with `basePath: "/api"`.
+ * The point of this example is to show that every OAuth surface — the bearer-
+ * protected `/mcp` endpoint, the `/authorize`, `/token`, `/register` endpoints,
+ * and the `/.well-known/oauth-protected-resource` / `oauth-authorization-server`
+ * discovery documents — moves under the basePath automatically, with no extra
+ * configuration on the server side.
  *
- * Anonymous sign-ins are used for zero-config sign-up — enable them in the
- * Supabase dashboard under Auth → Providers. See ./auth-routes.ts.
+ * Routes exposed by this server:
+ *   /api/mcp                                 - MCP transport (bearer-protected)
+ *   /api/authorize, /api/token, /api/register - OAuth proxy endpoints
+ *   /api/auth/consent                         - Consent UI (configure in Supabase)
+ *   /api/auth/signin                          - Anonymous sign-in (demo)
+ *   /.well-known/oauth-authorization-server/api   - RFC 8414 §3.1 path-aware
+ *   /.well-known/oauth-protected-resource/api/mcp - RFC 9728 §3.1 path-aware
  *
- * Token verification is automatic: new Supabase projects sign tokens with
- * ES256 and publish a JWKS endpoint, which the provider fetches and caches.
- * No JWT secret configuration is required.
- *
- * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
+ * Configure Supabase Dashboard → Authentication → OAuth Server → consent URL:
+ *   http://localhost:3000/api/auth/consent
  *
  * Environment variables:
  * - MCP_USE_OAUTH_SUPABASE_PROJECT_ID       (required)
- * - MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY  (required — used by the consent UI
- *                                            and by tools calling Supabase)
+ * - MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY  (required)
  */
 
 import {
@@ -51,13 +53,13 @@ if (!SUPABASE_PUBLISHABLE_KEY) {
 const supabaseUrl = `https://${SUPABASE_PROJECT_ID}.supabase.co`;
 
 const server = new MCPServer({
-  name: "supabase-oauth-example",
+  name: "base-path-supabase-oauth-example",
   version: "1.0.0",
-  description: "MCP server with Supabase OAuth authentication",
+  description: "Supabase OAuth MCP server mounted under /api",
+  basePath: "/api",
   oauth: oauthSupabaseProvider(),
 });
 
-// Mount the consent page that Supabase redirects to after /authorize.
 mountAuthRoutes(server, {
   projectId: SUPABASE_PROJECT_ID,
   publishableKey: SUPABASE_PUBLISHABLE_KEY,
@@ -103,6 +105,4 @@ server.tool(
   }
 );
 
-server.listen().then(() => {
-  console.log("Supabase OAuth MCP Server Running");
-});
+await server.listen();

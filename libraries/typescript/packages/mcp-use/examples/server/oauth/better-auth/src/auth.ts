@@ -15,13 +15,10 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 declare const process: { env: Record<string, string | undefined> };
 
 export const auth = betterAuth({
-  // The mcp-use server is mounted at `/mcp-server`, so everything on
-  // `server.app` (including Better Auth's `/api/auth/**`, the sign-in
-  // page, the consent page, and `validAudiences` below) lives under
-  // that prefix. Reflect it in Better Auth's own `baseURL` so its
-  // self-published authorization endpoints, callbacks, and JWT issuer
-  // all match the externally-visible paths.
-  baseURL: "http://localhost:3000/mcp-server",
+  // Better Auth's own `baseURL` + `basePath` are used to construct its
+  // self-published authorization endpoints, OAuth callbacks, and the JWT
+  // issuer — they must match the externally-visible paths.
+  baseURL: "http://localhost:3000",
   basePath: "/api/auth",
   secret: process.env.BETTER_AUTH_SECRET || "dev-secret-change-in-production",
   socialProviders: {
@@ -38,9 +35,9 @@ export const auth = betterAuth({
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       // MCP clients send the resource URL from /.well-known/oauth-protected-resource
-      // as the token request's `resource` parameter. Better Auth validates it against
-      // this list. The MCP transport lives at `/mcp-server/mcp` externally.
-      validAudiences: ["http://localhost:3000/mcp-server/mcp"],
+      // as the token request's `resource` parameter. Better Auth validates it
+      // against this list.
+      validAudiences: ["http://localhost:3000/mcp"],
       // Include user profile claims in the access token JWT so
       // ctx.auth.user.email / .name / .picture are available in MCP tools.
       // Without this, Better Auth only includes standard claims (sub, iss, scope, etc.).

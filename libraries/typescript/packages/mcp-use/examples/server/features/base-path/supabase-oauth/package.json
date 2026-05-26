@@ -1,0 +1,21 @@
+{
+  "name": "base-path-supabase-oauth-example",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server demonstrating basePath with Supabase OAuth authentication",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.104.0",
+    "mcp-use": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
