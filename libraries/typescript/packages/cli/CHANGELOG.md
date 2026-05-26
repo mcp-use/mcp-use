@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.2.1-canary.18
+
+### Patch Changes
+
+- 8f17837: Fix widget asset 404s when `MCP_URL` is set at build time. Vite's `base` and the injected `window.__getFile` now resolve to `${MCP_URL}/mcp-use/widgets/{widget}/`, matching the production static route mounted by the `mcp-use` server.
+  - mcp-use@1.29.0-canary.18
+  - @mcp-use/inspector@7.0.0-canary.18
+
 ## 3.2.1-canary.17
 
 ### Patch Changes
