@@ -1,0 +1,33 @@
+{
+  "name": "security-schemes-example",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "MCP server example demonstrating tool-level securitySchemes (SEP-1488) with Supabase OAuth + anonymous sign-in",
+  "author": "",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "server",
+    "example",
+    "security-schemes",
+    "sep-1488",
+    "supabase",
+    "oauth"
+  ],
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "mcp-use build",
+    "dev": "mcp-use dev",
+    "start": "mcp-use start"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "@supabase/supabase-js": "^2.104.0",
+    "zod": "4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

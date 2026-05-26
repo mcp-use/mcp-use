@@ -371,6 +371,83 @@ export function error(message: string): TypedCallToolResult<never> {
 }
 
 /**
+ * Standard OAuth 2.0 error codes used in WWW-Authenticate challenges.
+ * @see https://datatracker.ietf.org/doc/html/rfc6750#section-3.1
+ */
+export type AuthenticationErrorCode =
+  | "invalid_request"
+  | "invalid_token"
+  | "insufficient_scope";
+
+export interface AuthenticationRequiredOptions {
+  /** Human-readable text shown in the tool result content (defaults to errorDescription). */
+  message?: string;
+  /** OAuth 2.0 error code. Defaults to "invalid_token". Custom codes accepted. */
+  error?: AuthenticationErrorCode | (string & {});
+  /** Human-readable description carried in the WWW-Authenticate challenge. */
+  errorDescription?: string;
+  /** Scopes the client should request when initiating sign-in. */
+  scopes?: string[];
+  /** URL of the protected-resource metadata document (RFC 9728). */
+  resourceMetadataUrl?: string;
+}
+
+// RFC 7235/9110 quoted-string: backslash-escape embedded quotes and backslashes.
+const quotedString = (value: string): string =>
+  `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+
+/**
+ * Return an authentication-required tool result.
+ *
+ * Emits `_meta["mcp/www_authenticate"]` containing a Bearer challenge so that
+ * ChatGPT-style clients trigger their OAuth linking UI (SEP-1488 / OpenAI
+ * Apps SDK). Pair with `securitySchemes` on the tool definition — both halves
+ * are required for the client to surface the sign-in flow.
+ *
+ * @example
+ * ```typescript
+ * server.tool({
+ *   name: "create_doc",
+ *   securitySchemes: [{ type: "oauth2", scopes: ["docs.write"] }],
+ * }, async ({ title }, ctx) => {
+ *   if (!ctx.auth) {
+ *     return authenticationRequired({
+ *       scopes: ["docs.write"],
+ *       resourceMetadataUrl: "https://your-mcp.example.com/.well-known/oauth-protected-resource",
+ *     });
+ *   }
+ *   return text(`Created: ${title}`);
+ * });
+ * ```
+ */
+export function authenticationRequired(
+  options: AuthenticationRequiredOptions = {}
+): TypedCallToolResult<never> {
+  const errorCode = options.error ?? "invalid_token";
+  const errorDescription =
+    options.errorDescription ?? "Authentication required";
+
+  const params: string[] = [];
+  if (options.resourceMetadataUrl) {
+    params.push(
+      `resource_metadata=${quotedString(options.resourceMetadataUrl)}`
+    );
+  }
+  if (options.scopes && options.scopes.length > 0) {
+    params.push(`scope=${quotedString(options.scopes.join(" "))}`);
+  }
+  params.push(`error=${quotedString(errorCode)}`);
+  params.push(`error_description=${quotedString(errorDescription)}`);
+
+  return {
+    ...error(options.message ?? errorDescription),
+    _meta: {
+      "mcp/www_authenticate": [`Bearer ${params.join(", ")}`],
+    },
+  };
+}
+
+/**
  * Create a JSON object response for MCP tools and resources
  *
  * @param data - The object to return as JSON

@@ -11,6 +11,13 @@ export {
   InferZodInput,
 } from "./common.js";
 
+// Security / authentication metadata
+export {
+  SecurityScheme,
+  NoAuthScheme,
+  OAuth2Scheme,
+} from "./security.js";
+
 // Context types
 export { ClientCapabilityChecker, McpContext } from "./context.js";
 

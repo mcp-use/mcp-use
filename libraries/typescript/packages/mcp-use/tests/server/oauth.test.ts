@@ -604,6 +604,101 @@ describe("server OAuth integration", () => {
     });
   });
 
+  describe("bearer middleware in optional mode (SEP-1488 mixed auth)", () => {
+    it("lets requests through without an Authorization header", async () => {
+      const app = new Hono();
+
+      const proxy = oauthProxy({
+        issuer: "https://issuer.example.com",
+        authEndpoint: "https://issuer.example.com/oauth/authorize",
+        tokenEndpoint: "https://issuer.example.com/oauth/token",
+        clientId: "test-client",
+        verifyToken: async () => ({
+          payload: { sub: "user-1", scope: "openid" },
+        }),
+      });
+
+      app.use(
+        "/mcp/*",
+        createBearerAuthMiddleware(proxy, undefined, { optional: true })
+      );
+      app.get("/mcp/test", (c) => {
+        // No auth should be attached when there's no header.
+        return c.json({ ok: true, hasAuth: !!c.get("auth") });
+      });
+
+      const svc = await listenOnRandomPort(app);
+      closers.push(svc.close);
+
+      const response = await fetch(`${svc.baseUrl}/mcp/test`);
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { ok: boolean; hasAuth: boolean };
+      expect(body.ok).toBe(true);
+      expect(body.hasAuth).toBe(false);
+    });
+
+    it("still attaches auth context when a valid token is sent", async () => {
+      const app = new Hono();
+
+      const proxy = oauthProxy({
+        issuer: "https://issuer.example.com",
+        authEndpoint: "https://issuer.example.com/oauth/authorize",
+        tokenEndpoint: "https://issuer.example.com/oauth/token",
+        clientId: "test-client",
+        verifyToken: async () => ({
+          payload: { sub: "user-42", scope: "openid" },
+        }),
+      });
+
+      app.use(
+        "/mcp/*",
+        createBearerAuthMiddleware(proxy, undefined, { optional: true })
+      );
+      app.get("/mcp/test", (c) => {
+        const auth = c.get("auth") as { user?: { userId?: string } } | undefined;
+        return c.json({ userId: auth?.user?.userId ?? null });
+      });
+
+      const svc = await listenOnRandomPort(app);
+      closers.push(svc.close);
+
+      const response = await fetch(`${svc.baseUrl}/mcp/test`, {
+        headers: { Authorization: "Bearer good-token" },
+      });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { userId: string | null };
+      expect(body.userId).toBe("user-42");
+    });
+
+    it("still rejects an invalid token with 401", async () => {
+      const app = new Hono();
+
+      const proxy = oauthProxy({
+        issuer: "https://issuer.example.com",
+        authEndpoint: "https://issuer.example.com/oauth/authorize",
+        tokenEndpoint: "https://issuer.example.com/oauth/token",
+        clientId: "test-client",
+        verifyToken: async () => {
+          throw new Error("bad signature");
+        },
+      });
+
+      app.use(
+        "/mcp/*",
+        createBearerAuthMiddleware(proxy, undefined, { optional: true })
+      );
+      app.get("/mcp/test", (c) => c.json({ ok: true }));
+
+      const svc = await listenOnRandomPort(app);
+      closers.push(svc.close);
+
+      const response = await fetch(`${svc.baseUrl}/mcp/test`, {
+        headers: { Authorization: "Bearer bogus" },
+      });
+      expect(response.status).toBe(401);
+    });
+  });
+
   it("returns configured clientId from /register endpoint", async () => {
     const app = new Hono();
 

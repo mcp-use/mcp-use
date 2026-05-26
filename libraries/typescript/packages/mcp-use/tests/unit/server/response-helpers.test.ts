@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { widget, text } from "../../../src/server/utils/response-helpers.js";
+import {
+  widget,
+  text,
+  authenticationRequired,
+} from "../../../src/server/utils/response-helpers.js";
 
 describe("widget() helper", () => {
   it("should return basic widget response structure with data", () => {
@@ -152,5 +156,81 @@ describe("widget() helper", () => {
 
     expect(result._meta).toBeUndefined();
     expect(result.structuredContent).toBeUndefined();
+  });
+});
+
+describe("authenticationRequired() helper", () => {
+  const getChallenges = (
+    result: ReturnType<typeof authenticationRequired>
+  ): string[] => {
+    const meta = result._meta as
+      | { "mcp/www_authenticate"?: string[] }
+      | undefined;
+    const challenges = meta?.["mcp/www_authenticate"];
+    if (!challenges) throw new Error("Expected mcp/www_authenticate challenge");
+    return challenges;
+  };
+
+  it("defaults to invalid_token when no error is supplied", () => {
+    const result = authenticationRequired();
+
+    expect(result.isError).toBe(true);
+    expect(result._meta).toBeDefined();
+    const challenges = getChallenges(result);
+    expect(Array.isArray(challenges)).toBe(true);
+    expect(challenges[0]).toContain('error="invalid_token"');
+    expect(challenges[0]).toContain('error_description="Authentication required"');
+    expect(challenges[0].startsWith("Bearer ")).toBe(true);
+  });
+
+  it("uses the message override for the visible content", () => {
+    const result = authenticationRequired({
+      message: "Please sign in",
+      errorDescription: "Login needed",
+    });
+
+    expect(result.content[0]).toMatchObject({
+      type: "text",
+      text: "Please sign in",
+    });
+    // Description still flows into the WWW-Authenticate challenge
+    expect(getChallenges(result)[0]).toContain(
+      'error_description="Login needed"'
+    );
+  });
+
+  it("falls back to errorDescription when no message is supplied", () => {
+    const result = authenticationRequired({
+      errorDescription: "Login needed",
+    });
+
+    expect(result.content[0]).toMatchObject({
+      type: "text",
+      text: "Login needed",
+    });
+  });
+
+  it("includes resource_metadata and scope when provided", () => {
+    const result = authenticationRequired({
+      resourceMetadataUrl: "https://example.com/.well-known/oauth-protected-resource",
+      scopes: ["docs.write", "user.read"],
+      error: "invalid_token",
+      errorDescription: "Token expired",
+    });
+
+    const challenge = getChallenges(result)[0];
+    expect(challenge).toContain(
+      'resource_metadata="https://example.com/.well-known/oauth-protected-resource"'
+    );
+    expect(challenge).toContain('scope="docs.write user.read"');
+    expect(challenge).toContain('error="invalid_token"');
+    expect(challenge).toContain('error_description="Token expired"');
+  });
+
+  it("omits the scope parameter when scopes is empty", () => {
+    const result = authenticationRequired({ scopes: [] });
+
+    const challenge = getChallenges(result)[0];
+    expect(challenge).not.toContain("scope=");
   });
 });

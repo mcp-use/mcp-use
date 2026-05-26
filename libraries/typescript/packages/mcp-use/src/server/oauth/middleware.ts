@@ -9,16 +9,40 @@ import type { Context, Next } from "hono";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 
 /**
+ * Options for {@link createBearerAuthMiddleware}.
+ */
+export interface BearerAuthMiddlewareOptions {
+  /**
+   * When `true`, the middleware does **not** reject requests that arrive without
+   * an `Authorization` header — it just lets them through with no auth context
+   * attached. Tokens that *are* sent are still verified, and invalid tokens are
+   * still rejected with 401.
+   *
+   * This is the SEP-1488 / OpenAI Apps SDK mixed-auth model: any tool advertising
+   * `{ type: "noauth" }` in its `securitySchemes` must be reachable anonymously,
+   * so the transport must accept anonymous requests and let the tool handler
+   * decide (via `authenticationRequired()`) whether to issue a challenge.
+   *
+   * @default false
+   */
+  optional?: boolean;
+}
+
+/**
  * Create bearer authentication middleware for a given OAuth provider or proxy
  *
  * @param oauth - The OAuth provider or proxy to use for token verification
  * @param baseUrl - The base URL of the server (for WWW-Authenticate header)
+ * @param options - Middleware options (see {@link BearerAuthMiddlewareOptions})
  * @returns Hono middleware function
  */
 export function createBearerAuthMiddleware(
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl?: string
+  baseUrl?: string,
+  options?: BearerAuthMiddlewareOptions
 ) {
+  const optional = options?.optional === true;
+
   return async (c: Context, next: Next) => {
     // Allow HEAD requests through without auth - used for health checks/keep-alive
     if (c.req.method === "HEAD") {
@@ -45,6 +69,12 @@ export function createBearerAuthMiddleware(
     };
 
     if (!authHeader) {
+      // In optional mode (SEP-1488 mixed auth), missing tokens are allowed
+      // through with no auth context. Tools that need auth gate themselves
+      // by returning authenticationRequired().
+      if (optional) {
+        return next();
+      }
       c.header("WWW-Authenticate", getWWWAuthenticateHeader());
       return c.json({ error: "Missing Authorization header" }, 401);
     }

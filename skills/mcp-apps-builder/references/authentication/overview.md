@@ -184,6 +184,78 @@ Provider-specific examples (Supabase, Keycloak, Auth0, etc.) live in each provid
 
 ---
 
+## Advertising Auth to ChatGPT (`securitySchemes` + `authenticationRequired()`)
+
+ChatGPT and other SEP-1488–aware clients decide which sign-in UI to show *before* invoking a tool by reading the `securitySchemes` field on each tool in `tools/list`. The framework only emits this field if you set it.
+
+There are two halves to wire up:
+
+**1. Advertise the policy on each tool** (or set `defaultSecuritySchemes` on the server config):
+
+```typescript
+import { z } from "zod";
+import { text, authenticationRequired } from "mcp-use/server";
+
+// Anonymous tool — no sign-in UI
+server.tool(
+  {
+    name: "public_search",
+    schema: z.object({ q: z.string() }),
+    securitySchemes: [{ type: "noauth" }],
+  },
+  async ({ q }) => text(`results for ${q}`)
+);
+
+// Optional auth — anonymous works, signed-in unlocks more
+server.tool(
+  {
+    name: "browse_catalog",
+    schema: z.object({ q: z.string() }),
+    securitySchemes: [
+      { type: "noauth" },
+      { type: "oauth2", scopes: ["catalog.read"] },
+    ],
+  },
+  async ({ q }, ctx) =>
+    ctx.auth ? text(`personalised: ${q}`) : text(`anonymous: ${q}`)
+);
+
+// Auth-required tool — must be signed in
+server.tool(
+  {
+    name: "create_doc",
+    schema: z.object({ title: z.string() }),
+    securitySchemes: [{ type: "oauth2", scopes: ["docs.write"] }],
+  },
+  async ({ title }, ctx) => {
+    if (!ctx.auth) {
+      return authenticationRequired({
+        scopes: ["docs.write"],
+        resourceMetadataUrl:
+          "https://your-mcp.example.com/.well-known/oauth-protected-resource",
+      });
+    }
+    return text(`created: ${title}`);
+  }
+);
+```
+
+**2. Return `authenticationRequired()` on the failure path.** The helper emits `_meta["mcp/www_authenticate"]` with a `Bearer` challenge, which is what triggers ChatGPT's sign-in flow. Pair with `securitySchemes` — both halves are required.
+
+Server-wide default (use when most tools share the same policy):
+
+```typescript
+new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  defaultSecuritySchemes: [{ type: "oauth2", scopes: ["read"] }],
+});
+```
+
+`securitySchemes` is **advertisement only** — token verification still happens at the OAuth provider layer (`oauth: ...`) and inside the tool handler via `ctx.auth`. The advertisement just tells the client which sign-in UI to surface ahead of time.
+
+---
+
 ## Common Mistakes
 
 - **Wrong `ctx.auth` shape** — User info is nested: `ctx.auth.user.email`, not `ctx.auth.email`
@@ -192,6 +264,8 @@ Provider-specific examples (Supabase, Keycloak, Auth0, etc.) live in each provid
 - **Hardcoding provider credentials** — Use env vars; never commit secrets
 - **Skipping JWT verification in production** — `verifyJwt: false` is development only
 - **Throwing errors instead of returning `error()`** — Use the `error()` response helper for auth-related failures
+- **Declaring `securitySchemes` without returning `authenticationRequired()`** — ChatGPT won't trigger sign-in unless the failure path emits the `Bearer` challenge. Both halves are required.
+- **Treating `securitySchemes` as enforcement** — It's advertisement only. Always verify `ctx.auth` (and scopes) inside the handler regardless.
 
 ---
 

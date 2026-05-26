@@ -251,6 +251,62 @@ server.tool({
 })
 ```
 
+## Advertising Authentication (`securitySchemes`)
+
+Tools can declare their authentication policy with `securitySchemes`. The value is emitted as a top-level field on each `Tool` in the `tools/list` response so ChatGPT and other [SEP-1488](https://modelcontextprotocol.io/specification/draft/server/tools#security-schemes)–aware clients can show the right sign-in UI before the tool is invoked.
+
+Two scheme types are supported. List both when a tool works anonymously **and** unlocks more behaviour when signed in:
+
+```typescript
+import { z } from 'zod';
+import { text, authenticationRequired } from 'mcp-use/server';
+
+// 1. Anonymous tool — no sign-in needed
+server.tool({
+  name: 'public_search',
+  description: 'Search public content',
+  schema: z.object({ q: z.string() }),
+  securitySchemes: [{ type: 'noauth' }],
+}, async ({ q }) => text(`results for ${q}`))
+
+// 2. Optional auth — works signed-out, richer when signed-in
+server.tool({
+  name: 'browse_catalog',
+  description: 'Browse the catalog; personalised when signed in',
+  schema: z.object({ q: z.string() }),
+  securitySchemes: [
+    { type: 'noauth' },
+    { type: 'oauth2', scopes: ['catalog.read'] },
+  ],
+}, async ({ q }, ctx) =>
+  ctx.auth
+    ? text(`personalised: ${q}`)
+    : text(`anonymous: ${q}`)
+)
+
+// 3. Auth-required tool — pair with authenticationRequired() on the failure path
+server.tool({
+  name: 'create_doc',
+  description: 'Create a document',
+  schema: z.object({ title: z.string() }),
+  securitySchemes: [{ type: 'oauth2', scopes: ['docs.write'] }],
+}, async ({ title }, ctx) => {
+  if (!ctx.auth) {
+    return authenticationRequired({
+      scopes: ['docs.write'],
+      resourceMetadataUrl: 'https://your-mcp.example.com/.well-known/oauth-protected-resource',
+    });
+  }
+  return text(`created: ${title}`);
+})
+```
+
+<Note>
+**Advertisement only.** `securitySchemes` tells the client which sign-in UI to show — it does not enforce anything. Token verification still happens at the transport layer and inside the tool handler. Use [OAuth providers](./authentication/index) for verification, and the [`authenticationRequired()` helper](./response-helpers#authenticationrequired) to return a sign-in challenge from the handler.
+</Note>
+
+If most of your tools share the same auth policy, set [`defaultSecuritySchemes`](./configuration#defaultsecurityschemes) on the server config and override per-tool only where needed.
+
 ## Error Handling with error()
 
 The `error()` helper provides a standardized way to return error responses from tools. It sets the `isError` flag to `true`, allowing clients to distinguish between successful results and error conditions. This ensures consistent error handling across your MCP server.

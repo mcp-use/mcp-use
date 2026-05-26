@@ -408,6 +408,31 @@ const server = new MCPServer({
 })
 ```
 
+### defaultSecuritySchemes
+
+Set a server-wide default for the per-tool [`securitySchemes`](./tools#advertising-authentication-securityschemes) advertised on `tools/list`. Use this when most tools share an auth policy — individual tools can still opt out by declaring their own `securitySchemes`.
+
+```typescript
+// Every tool that doesn't declare its own securitySchemes
+// inherits this OAuth-with-read-scope policy.
+const server = new MCPServer({
+  name: 'my-server',
+  version: '1.0.0',
+  defaultSecuritySchemes: [{ type: 'oauth2', scopes: ['read'] }],
+})
+
+// Per-tool override: this tool is callable anonymously
+server.tool({
+  name: 'public_status',
+  schema: z.object({}),
+  securitySchemes: [{ type: 'noauth' }],
+}, async () => text('ok'))
+```
+
+<Tip>
+The [SEP-1488 spec](https://modelcontextprotocol.io/specification/draft/server/tools#security-schemes) recommends per-tool declarations when policies vary; defaults are harder to evolve later. Reach for `defaultSecuritySchemes` when nearly every tool would otherwise repeat the same value.
+</Tip>
+
 ### Input Validation
 
 Always validate tool inputs using Zod schemas. The schema is enforced automatically before your handler runs:

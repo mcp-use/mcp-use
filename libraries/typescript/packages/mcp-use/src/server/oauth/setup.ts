@@ -34,9 +34,15 @@ interface OAuthSetupState {
  * @param oauth - OAuth provider or proxy instance
  * @param baseUrl - Server base URL for OAuth redirects
  * @param state - OAuth setup state to track completion
+ * @param options - Setup options
+ * @param options.optionalAuth - When true, bearer middleware lets requests
+ *   without an Authorization header through (needed for SEP-1488 / OpenAI Apps
+ *   SDK mixed-auth servers where some tools declare `{ type: "noauth" }`).
+ *   Invalid tokens are still rejected.
  * @returns Updated OAuth setup state with provider and middleware
  */
 interface SetupOAuthForServerOptions {
+  optionalAuth?: boolean;
   publicLandingPage?: boolean;
 }
 
@@ -52,10 +58,13 @@ export async function setupOAuthForServer(
   }
 
   const proxyMode = isOAuthProxy(oauth);
+  const optionalAuth = options?.optionalAuth === true;
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
   // Create bearer auth middleware with baseUrl for WWW-Authenticate header
-  let middleware = createBearerAuthMiddleware(oauth, baseUrl);
+  let middleware = createBearerAuthMiddleware(oauth, baseUrl, {
+    optional: optionalAuth,
+  });
 
   // Setup OAuth routes
   setupOAuthRoutes(app, oauth, baseUrl);
@@ -93,7 +102,13 @@ export async function setupOAuthForServer(
   app.use("/mcp/*", middleware);
   app.use("/sse", middleware);
   app.use("/sse/*", middleware);
-  console.log("[OAuth] Bearer authentication enabled on /mcp and /sse routes");
+  if (optionalAuth) {
+    console.log(
+      "[OAuth] Bearer authentication in OPTIONAL mode on /mcp and /sse routes (SEP-1488 mixed auth: noauth tools detected)"
+    );
+  } else {
+    console.log("[OAuth] Bearer authentication enabled on /mcp and /sse routes");
+  }
 
   return {
     provider: oauth,

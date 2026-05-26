@@ -3,6 +3,7 @@
  */
 
 import type { OAuthProvider } from "../oauth/providers/types.js";
+import type { SecurityScheme } from "./security.js";
 import type { cors } from "hono/cors";
 import type { z } from "zod";
 
@@ -307,6 +308,18 @@ export interface ServerConfig {
    * @default false
    */
   publicLandingPage?: boolean;
+  /**
+   * Default `securitySchemes` advertised for tools that don't declare their own
+   * (SEP-1488 / OpenAI Apps SDK).
+   *
+   * Use this when most tools share an auth policy and you want to opt
+   * specific tools out by declaring their own `securitySchemes`. Per the SEP,
+   * tool-level declarations are still preferred when policies vary — server
+   * defaults are harder to evolve later.
+   *
+   * @example [{ type: "oauth2", scopes: ["read"] }]
+   */
+  defaultSecuritySchemes?: SecurityScheme[];
   /**
    * Path to favicon file relative to public directory
    *
