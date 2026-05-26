@@ -186,7 +186,7 @@ function waitForDevToolsUrl(
  *   - Page.navigate, then poll Runtime.evaluate for `waitForSelector`.
  *   - Page.captureScreenshot, write PNG, clean up.
  */
-export interface CaptureScreenshotResult {
+interface CaptureScreenshotResult {
   /** Final clip width in CSS pixels (what the PNG visually represents). */
   width: number;
   /** Final clip height in CSS pixels. */
