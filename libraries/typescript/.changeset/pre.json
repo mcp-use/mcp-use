@@ -26,6 +26,7 @@
     "oauth-emulate-e2e",
     "prune-unused-exports",
     "quiet-files-cleanup",
+    "screenshot-external-mcp-autosizing",
     "supabase-oauth-url-override",
     "thick-horses-punch"
   ]
