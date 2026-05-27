@@ -12,6 +12,26 @@ Configure capabilities once at the top level of `MCPClient` or
 `BrowserMCPClient`. They are shared by every server connection because they
 describe the client implementation, not an individual server.
 
+The MCP lifecycle spec defines client capabilities as part of the
+[`initialize` request](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle#initialization):
+
+```json
+{
+  "method": "initialize",
+  "params": {
+    "capabilities": {
+      "extensions": {}
+    },
+    "clientInfo": {
+      "name": "my-app",
+      "version": "1.0.0"
+    }
+  }
+}
+```
+
+The mcp-use `capabilities` option maps to that `params.capabilities` object.
+
 ## Advertise MCP Apps support
 
 Use `mcpApps()` to advertise the canonical MCP Apps extension (SEP-1865). This
@@ -61,8 +81,8 @@ const client = new BrowserMCPClient({
 
 ## Combine extensions
 
-`capabilities.extensions` mirrors the MCP wire format, so you can spread
-`mcpApps()` together with other extension declarations.
+Extensions are declared under the top-level `capabilities.extensions` object.
+You can spread `mcpApps()` together with other extension declarations.
 
 ```typescript
 import { MCPClient, mcpApps } from "mcp-use";
@@ -123,41 +143,3 @@ const client = new MCPClient(
 Avoid manually setting `roots`, `sampling`, or `elicitation` unless you are
 intentionally overriding low-level behavior. mcp-use may replace those keys with
 the values required by its registered handlers.
-
-## Merge precedence
-
-Capabilities can also be passed through the underlying MCP SDK with
-`clientOptions.capabilities` on a server config. Prefer the top-level
-`capabilities` field for new code.
-
-When the same key appears in multiple places, mcp-use merges them in this order:
-
-1. `clientOptions.capabilities`
-2. Top-level `capabilities`
-3. mcp-use managed capabilities (`roots`, `sampling`, `elicitation`)
-
-Later entries win. This keeps existing SDK passthroughs working while making
-the new top-level option the easiest place to declare extensions.
-
-```typescript
-import { MCPClient, mcpApps } from "mcp-use";
-
-const client = new MCPClient({
-  capabilities: {
-    extensions: mcpApps(),
-  },
-  mcpServers: {
-    widgets: {
-      url: "http://localhost:3000/mcp",
-      clientOptions: {
-        capabilities: {
-          experimental: {},
-        },
-      },
-    },
-  },
-});
-```
-
-In the example above, the initialize request advertises both `experimental` and
-the MCP Apps extension.
