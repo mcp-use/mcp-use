@@ -4,10 +4,155 @@ import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust pa
 import type { StoredState } from "./types.js"; // Adjust path, ensure definition includes providerOptions
 
 /**
+ * Module-level cache of an in-flight (or completed) `onMcpAuthorization()`
+ * promise. The OAuth callback consumes a single-use authorization code and
+ * removes its localStorage state record on first run. If the callback page's
+ * effect runs again in the same page load (HMR, React strict-mode double
+ * invocation, Suspense re-mount, etc.), the second invocation would otherwise
+ * fail with "Invalid or expired state" and post a `success: false` message
+ * to the opener — overwriting an already-successful auth on the parent.
+ *
+ * Reusing the same promise (without clearing it on settle) makes every
+ * subsequent call resolve/reject with the original result without touching
+ * the network or localStorage again. The popup is short-lived; on a real
+ * hard refresh the module re-initializes naturally.
+ */
+let inFlightCallback: Promise<void> | null = null;
+
+/**
+ * Returns true when the current window was opened by our popup
+ * (`window.open(authUrl, "mcp_auth_<serverUrlHash>", ...)`). `window.name`
+ * survives same-origin and most cross-origin redirects, so it's a reliable
+ * signal even when `window.opener` has been severed by COOP, cross-origin
+ * intermediate redirects, or browser tab grouping. Used to suppress the
+ * "navigate this window back to the dashboard" fallback that would otherwise
+ * load the full dashboard inside the popup-sized window.
+ */
+function isMcpAuthPopupWindow(): boolean {
+  if (typeof window === "undefined") return false;
+  const name = window.name;
+  return typeof name === "string" && name.startsWith("mcp_auth_");
+}
+
+/**
+ * Same-origin channel used as a fallback signal when the popup can't reach
+ * its opener (e.g. COOP severed `window.opener`, cross-origin intermediate
+ * redirects, browser tab grouping). The parent `useMcp` subscribes to a
+ * channel of the same name and reacts identically to a `postMessage` of
+ * `mcp_auth_callback`.
+ *
+ * Keep in sync with the `BroadcastChannel("mcp_auth_callback")` subscription
+ * in `useMcp.ts`.
+ */
+const MCP_AUTH_BROADCAST_CHANNEL = "mcp_auth_callback";
+
+/**
+ * Broadcasts an auth callback result to all same-origin browsing contexts.
+ * Only used in the lost-opener fallback paths — the happy path continues to
+ * use `window.opener.postMessage(...)` to avoid duplicate reconnect cycles
+ * on the parent (BroadcastChannel does not deliver to the sender, but it
+ * does deliver to every other same-origin tab/window).
+ */
+function broadcastAuthCallback(success: boolean, error?: string): void {
+  if (typeof BroadcastChannel === "undefined") return;
+  let channel: BroadcastChannel | null = null;
+  try {
+    channel = new BroadcastChannel(MCP_AUTH_BROADCAST_CHANNEL);
+    channel.postMessage(
+      success
+        ? { type: "mcp_auth_callback", success: true }
+        : {
+            type: "mcp_auth_callback",
+            success: false,
+            error: error ?? "Unknown error",
+          }
+    );
+  } catch (e) {
+    console.warn(
+      "[mcp-callback] Failed to broadcast auth callback over BroadcastChannel:",
+      e
+    );
+  } finally {
+    // Defer close so the message has a chance to dispatch.
+    if (channel) {
+      setTimeout(() => {
+        try {
+          channel?.close();
+        } catch {
+          /* ignore */
+        }
+      }, 0);
+    }
+  }
+}
+
+/**
+ * Render an in-place "you can close this window" UI in the current document.
+ * Used in the popup-with-lost-opener fallback so we can communicate success
+ * (or an OAuth error) to the user without navigating the popup window to the
+ * dashboard URL.
+ */
+function renderCloseWindowMessage(
+  title: string,
+  body: string,
+  tone: "success" | "error" = "success"
+): void {
+  if (typeof document === "undefined") return;
+  try {
+    document.body.innerHTML = "";
+    const container = document.createElement("div");
+    container.style.fontFamily = "sans-serif";
+    container.style.padding = "20px";
+
+    const heading = document.createElement("h1");
+    heading.textContent = title;
+    container.appendChild(heading);
+
+    const para = document.createElement("p");
+    if (tone === "error") {
+      para.style.color = "red";
+      para.style.backgroundColor = "#ffebeb";
+      para.style.border = "1px solid red";
+      para.style.padding = "10px";
+      para.style.borderRadius = "4px";
+    }
+    para.textContent = body;
+    container.appendChild(para);
+
+    const closePara = document.createElement("p");
+    closePara.textContent = "You can close this window or ";
+    const closeLink = document.createElement("a");
+    closeLink.href = "#";
+    closeLink.textContent = "click here to close";
+    closeLink.onclick = (e) => {
+      e.preventDefault();
+      window.close();
+      return false;
+    };
+    closePara.appendChild(closeLink);
+    closePara.appendChild(document.createTextNode("."));
+    container.appendChild(closePara);
+
+    document.body.appendChild(container);
+  } catch {
+    /* best-effort UI; ignore */
+  }
+}
+
+/**
  * Handles the OAuth callback using the SDK's auth() function.
  * Assumes it's running on the page specified as the callbackUrl.
+ *
+ * Idempotent within a single page load: re-invocations return the same
+ * promise as the first call (see `inFlightCallback` above).
  */
-export async function onMcpAuthorization() {
+export function onMcpAuthorization(): Promise<void> {
+  if (inFlightCallback) return inFlightCallback;
+  inFlightCallback = doOnMcpAuthorization();
+  return inFlightCallback;
+}
+
+async function doOnMcpAuthorization() {
   const queryParams = new URLSearchParams(window.location.search);
   const code = queryParams.get("code");
   const state = queryParams.get("state");
@@ -104,6 +249,7 @@ export async function onMcpAuthorization() {
       );
       const isRedirectFlow = storedStateData.flowType === "redirect";
       const hasOpener = window.opener && !window.opener.closed;
+      const isPopupWindow = isMcpAuthPopupWindow();
 
       const redirectWithError = (target: string) => {
         console.log(`${logPrefix} Returning to: ${target}`);
@@ -116,12 +262,6 @@ export async function onMcpAuthorization() {
         window.location.href = url.toString();
       };
 
-      // Prefer redirect when the originating flow was a full-page redirect, or
-      // when there is no opener to post back to.
-      if (storedStateData.returnUrl && (isRedirectFlow || !hasOpener)) {
-        redirectWithError(storedStateData.returnUrl);
-        return;
-      }
       if (hasOpener) {
         window.opener.postMessage(
           {
@@ -133,6 +273,34 @@ export async function onMcpAuthorization() {
         );
         localStorage.removeItem(stateKey);
         window.close();
+        return;
+      }
+      // Prefer full-page redirect back to the originating page when the
+      // originating flow was a redirect flow, OR when we are clearly NOT in
+      // a popup window we opened (popup-blocker / manual-link fallback).
+      // For a popup whose opener was severed (COOP, cross-origin redirects,
+      // tab grouping), navigating to `returnUrl?auth_error=...` would load
+      // the full dashboard inside the popup window — render in place instead.
+      if (storedStateData.returnUrl && (isRedirectFlow || !isPopupWindow)) {
+        redirectWithError(storedStateData.returnUrl);
+        return;
+      }
+      if (isPopupWindow) {
+        broadcastAuthCallback(
+          false,
+          `${error}${errorDescription ? `: ${errorDescription}` : ""}`
+        );
+        localStorage.removeItem(stateKey);
+        renderCloseWindowMessage(
+          "Authentication Error",
+          `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
+          "error"
+        );
+        try {
+          window.close();
+        } catch {
+          /* close may be blocked; the user can dismiss manually */
+        }
         return;
       }
       throw new Error(
@@ -284,6 +452,7 @@ export async function onMcpAuthorization() {
 
       // Check if this was a redirect flow (has returnUrl) or popup flow
       const isRedirectFlow = storedStateData.flowType === "redirect";
+      const isPopupWindow = isMcpAuthPopupWindow();
 
       if (isRedirectFlow && storedStateData.returnUrl) {
         // Redirect flow: navigate back to the original page
@@ -301,11 +470,36 @@ export async function onMcpAuthorization() {
         );
         localStorage.removeItem(stateKey);
         window.close();
-      } else if (storedStateData.returnUrl) {
-        // Fallback for popup flow when popup was blocked and user clicked link manually
-        // Use the stored returnUrl to navigate back to the original page
+      } else if (isPopupWindow) {
+        // We are inside a popup we opened, but `window.opener` has been
+        // severed (COOP, cross-origin redirects, tab grouping, etc.).
+        // Navigating to `returnUrl` here would load the full dashboard
+        // inside the popup-sized window — instead, show a friendly
+        // close-window message and best-effort `window.close()`.
+        //
+        // Notify the parent over BroadcastChannel since `postMessage` to
+        // `window.opener` is unavailable; without this, the parent
+        // `useMcp` would be stuck in `authenticating` forever.
         console.log(
-          `${logPrefix} Popup flow without opener. Returning to: ${storedStateData.returnUrl}`
+          `${logPrefix} Popup flow complete but opener was lost; broadcasting success and rendering close-window message.`
+        );
+        broadcastAuthCallback(true);
+        localStorage.removeItem(stateKey);
+        renderCloseWindowMessage(
+          "Authentication Successful!",
+          "You're authenticated. You can close this window and return to the app."
+        );
+        try {
+          window.close();
+        } catch {
+          /* close may be blocked when window has multiple history entries; the user can dismiss manually */
+        }
+      } else if (storedStateData.returnUrl) {
+        // Genuine popup-blocker / manual-link case: the auth URL was opened
+        // as a top-level navigation in the original tab, so navigating to
+        // `returnUrl` correctly returns the user to the originating page.
+        console.log(
+          `${logPrefix} Popup flow without opener (top-level nav). Returning to: ${storedStateData.returnUrl}`
         );
         localStorage.removeItem(stateKey);
         window.location.href = storedStateData.returnUrl;
@@ -345,6 +539,11 @@ export async function onMcpAuthorization() {
       );
       // Optionally close even on error, depending on UX preference
       // window.close();
+    } else if (isMcpAuthPopupWindow()) {
+      // Popup whose opener was severed: signal failure to the parent via
+      // BroadcastChannel so it leaves the `authenticating` state instead of
+      // hanging forever waiting for a postMessage that can't arrive.
+      broadcastAuthCallback(false, errorMessage);
     }
 
     // Display error in the callback window

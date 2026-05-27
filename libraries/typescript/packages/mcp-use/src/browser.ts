@@ -1,18 +1,11 @@
 /**
- * Browser entry point - exports OAuth utilities and MCP client/agent for browser-based MCP usage
+ * Browser entry point - exports OAuth utilities and MCP client for browser-based MCP usage.
  *
- * MCPAgent is now exported and works in the browser when:
- * - A BrowserMCPClient instance is passed to it (not using simplified mode)
- * - Or using RemoteAgent for remote agent capabilities
+ * LangChain agents (MCPAgent, RemoteAgent, adapters, observability) live in
+ * `mcp-use/browser/agent` so this entry stays free of langchain dependencies.
  */
 
-// Export core client and agent classes for browsers
 export { BrowserMCPClient as MCPClient } from "./client/browser.js";
-export { MCPAgent } from "./agents/mcp_agent.js";
-export { RemoteAgent } from "./agents/remote.js";
-
-// Export adapters
-export { BaseAdapter } from "./adapters/index.js";
 
 // Export connectors that work in the browser
 export { BaseConnector } from "./connectors/base.js";
@@ -42,21 +35,6 @@ export {
 // Backwards compatibility aliases
 export { Tel as BrowserTelemetry } from "./telemetry/telemetry-browser.js";
 export { setTelemetrySource as setBrowserTelemetrySource } from "./telemetry/telemetry-browser.js";
-
-// Export observability
-export {
-  type ObservabilityConfig,
-  ObservabilityManager,
-} from "./observability/index.js";
-
-// Export AI SDK utilities
-export * from "./agents/utils/index.js";
-
-// !!! NEVER EXPORT @langchain/core types it causes OOM errors when building the package
-// Note: Message classes are not re-exported to avoid forcing TypeScript to deeply analyze
-// @langchain/core types.
-// Import them directly from "@langchain/core/messages" if needed.
-// Same for StreamEvent - import from "@langchain/core/tracers/log_stream"
 
 // Re-export useful SDK types
 export type {

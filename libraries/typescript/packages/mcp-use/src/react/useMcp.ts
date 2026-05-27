@@ -1925,55 +1925,102 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
   /**
    * Effect: Listen for OAuth callback messages from popup window
-   * Handles successful authentication and reconnection
+   *
+   * Subscribes to two transports for the same `mcp_auth_callback` payload:
+   * - `window.message` (postMessage from `window.opener`): the happy path
+   *   when the popup retained its opener reference.
+   * - `BroadcastChannel("mcp_auth_callback")`: same-origin fallback used by
+   *   the popup callback when `window.opener` has been severed by COOP,
+   *   cross-origin intermediate redirects, or browser tab grouping.
+   *   Without this, a popup that completes auth but lost its opener leaves
+   *   the parent stuck in `authenticating` forever.
+   *
+   * The popup only emits over one transport per callback, so the two
+   * listeners don't double-fire on a single auth completion.
    */
   useEffect(() => {
-    const messageHandler = (event: globalThis.MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "mcp_auth_callback") {
-        addLog("info", "Received auth callback message.", event.data);
-        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
-        authTimeoutRef.current = null;
+    const handleCallbackPayload = (
+      payload: { success?: boolean; error?: string } | undefined,
+      source: "postMessage" | "BroadcastChannel"
+    ) => {
+      addLog("info", `Received auth callback via ${source}.`, payload);
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+      authTimeoutRef.current = null;
 
-        if (event.data.success) {
+      if (payload?.success) {
+        addLog(
+          "info",
+          "Authentication successful via popup. Reconnecting client..."
+        );
+
+        // Check if already connecting
+        if (connectingRef.current) {
           addLog(
-            "info",
-            "Authentication successful via popup. Reconnecting client..."
-          );
-
-          // Check if already connecting
-          if (connectingRef.current) {
-            addLog(
-              "debug",
-              "Connection attempt already in progress, resetting flag to allow reconnection."
-            );
-          }
-
-          // Reset the connecting flag and reconnect since auth just succeeded
-          connectingRef.current = false;
-
-          // Small delay to ensure state is clean before reconnecting
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              addLog(
-                "debug",
-                "Initiating reconnection after successful auth callback."
-              );
-              connectRef.current?.();
-            }
-          }, 100);
-        } else {
-          failConnectionRef.current?.(
-            `Authentication failed in callback: ${event.data.error || "Unknown reason."}`
+            "debug",
+            "Connection attempt already in progress, resetting flag to allow reconnection."
           );
         }
+
+        // Reset the connecting flag and reconnect since auth just succeeded
+        connectingRef.current = false;
+
+        // Small delay to ensure state is clean before reconnecting
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            addLog(
+              "debug",
+              "Initiating reconnection after successful auth callback."
+            );
+            connectRef.current?.();
+          }
+        }, 100);
+      } else {
+        failConnectionRef.current?.(
+          `Authentication failed in callback: ${payload?.error || "Unknown reason."}`
+        );
       }
+    };
+
+    const messageHandler = (event: globalThis.MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "mcp_auth_callback") return;
+      handleCallbackPayload(event.data, "postMessage");
     };
     window.addEventListener("message", messageHandler);
     addLog("debug", "Auth callback message listener added.");
+
+    let broadcastChannel: BroadcastChannel | null = null;
+    const broadcastHandler = (event: MessageEvent) => {
+      if (event.data?.type !== "mcp_auth_callback") return;
+      handleCallbackPayload(event.data, "BroadcastChannel");
+    };
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        broadcastChannel = new BroadcastChannel("mcp_auth_callback");
+        broadcastChannel.addEventListener("message", broadcastHandler);
+        addLog("debug", "Auth callback BroadcastChannel listener added.");
+      } catch (e) {
+        addLog(
+          "warn",
+          "Failed to open auth callback BroadcastChannel; lost-opener popups will not reach this client.",
+          e as Error
+        );
+        broadcastChannel = null;
+      }
+    }
+
     return () => {
       window.removeEventListener("message", messageHandler);
       addLog("debug", "Auth callback message listener removed.");
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.removeEventListener("message", broadcastHandler);
+          broadcastChannel.close();
+        } catch {
+          /* ignore */
+        }
+        addLog("debug", "Auth callback BroadcastChannel listener removed.");
+      }
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
     };
   }, [addLog]);

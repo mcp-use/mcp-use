@@ -68,6 +68,15 @@ const NODE_NPM_PACKAGES = [
   "posthog-node",
 ];
 
+const LANGCHAIN_PACKAGES = [
+  "@langchain/core",
+  "@langchain/openai",
+  "@langchain/anthropic",
+  "@langchain/google-genai",
+  "@langchain/langgraph",
+  "langchain",
+];
+
 /**
  * Recursively read all JavaScript files in a directory
  */
@@ -244,6 +253,45 @@ function checkForNodePackages(content: string, filePath: string): string[] {
           `Line ${index + 1}: import("${packageName}") - ${filePath}`
         );
       }
+    }
+  });
+
+  return violations;
+}
+
+function checkForLangchainPackages(
+  content: string,
+  filePath: string
+): string[] {
+  const violations: string[] = [];
+  const lines = content.split("\n");
+
+  lines.forEach((line, index) => {
+    const requirePattern = /(?:__)?require\(["']([^"']+)["']\)/g;
+    const importPattern = /import\s+.*from\s+["']([^"']+)["']/g;
+    const dynamicImportPattern = /import\(["']([^"']+)["']\)/g;
+
+    let match;
+
+    const checkPackage = (packageName: string) => {
+      if (
+        LANGCHAIN_PACKAGES.includes(packageName) ||
+        LANGCHAIN_PACKAGES.some((pkg) => packageName.startsWith(pkg + "/"))
+      ) {
+        violations.push(
+          `Line ${index + 1}: langchain import "${packageName}" - ${filePath}`
+        );
+      }
+    };
+
+    while ((match = requirePattern.exec(line)) !== null) {
+      checkPackage(match[1]);
+    }
+    while ((match = importPattern.exec(line)) !== null) {
+      checkPackage(match[1]);
+    }
+    while ((match = dynamicImportPattern.exec(line)) !== null) {
+      checkPackage(match[1]);
     }
   });
 
@@ -518,6 +566,36 @@ import('${modulePath}')
         console.error(
           "\n❌ Found Node.js-specific npm packages in mcp-use/browser:\n"
         );
+        allViolations.forEach((violation) => {
+          console.error(`  - ${violation}`);
+        });
+      }
+
+      expect(allViolations).toEqual([]);
+    });
+
+    it("should not import langchain packages in built output", () => {
+      if (!statSync(browserEntryFile, { throwIfNoEntry: false })) {
+        throw new Error(
+          `Built file not found: ${browserEntryFile}. Please run 'npm run build' first.`
+        );
+      }
+
+      const dependencyFiles = getDependencyFiles(browserEntryFile);
+      const allViolations: string[] = [];
+
+      dependencyFiles.forEach((file) => {
+        try {
+          const content = readFileSync(file, "utf-8");
+          const violations = checkForLangchainPackages(content, file);
+          allViolations.push(...violations);
+        } catch (error) {
+          console.debug(`Skipped file ${file}: ${error}`);
+        }
+      });
+
+      if (allViolations.length > 0) {
+        console.error("\n❌ Found langchain imports in mcp-use/browser:\n");
         allViolations.forEach((violation) => {
           console.error(`  - ${violation}`);
         });
