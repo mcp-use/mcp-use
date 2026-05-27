@@ -259,7 +259,10 @@ function checkForNodePackages(content: string, filePath: string): string[] {
   return violations;
 }
 
-function checkForLangchainPackages(content: string, filePath: string): string[] {
+function checkForLangchainPackages(
+  content: string,
+  filePath: string
+): string[] {
   const violations: string[] = [];
   const lines = content.split("\n");
 
