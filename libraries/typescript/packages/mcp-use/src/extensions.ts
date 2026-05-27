@@ -21,21 +21,25 @@ export const MCP_APPS_MIME_TYPE = "text/html;profile=mcp-app";
 
 /**
  * Returns the `extensions` fragment that advertises support for the MCP Apps
- * extension (SEP-1865). Assign directly to the `extensions` field, or spread
- * when combining with other extensions.
+ * extension (SEP-1865). Assign to `capabilities.extensions`, or spread when
+ * combining with other extensions.
  *
  * @example
  * ```ts
  * import { MCPClient, mcpApps } from "mcp-use";
  *
  * const client = new MCPClient({
- *   extensions: mcpApps(), // advertise MCP Apps to every server
+ *   capabilities: {
+ *     extensions: mcpApps(), // advertise MCP Apps to every server
+ *   },
  *   mcpServers: { widget: { url: "..." } },
  * });
  *
  * // Combining with other extensions:
  * new MCPClient({
- *   extensions: { ...mcpApps(), "com.example/custom": { setting: 1 } },
+ *   capabilities: {
+ *     extensions: { ...mcpApps(), "com.example/custom": { setting: 1 } },
+ *   },
  *   mcpServers: { ... },
  * });
  * ```

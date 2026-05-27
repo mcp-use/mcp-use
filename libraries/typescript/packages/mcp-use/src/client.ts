@@ -185,6 +185,13 @@ export type {
   ElicitValidationResult,
 } from "./client/elicitation-helpers.js";
 
+// SEP-1724 extension capability helpers
+export {
+  MCP_APPS_EXTENSION_ID,
+  MCP_APPS_MIME_TYPE,
+  mcpApps,
+} from "./extensions.js";
+
 // Export MCPSession and related types for CLI and other consumers
 export { MCPSession } from "./session.js";
 export type { CallToolResult, Notification, Root, Tool } from "./session.js";
