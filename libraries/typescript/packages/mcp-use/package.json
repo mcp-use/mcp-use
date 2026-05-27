@@ -62,6 +62,11 @@
       "import": "./dist/src/browser.js",
       "require": "./dist/src/browser.cjs"
     },
+    "./browser/agent": {
+      "types": "./dist/src/browser-agent.d.ts",
+      "import": "./dist/src/browser-agent.js",
+      "require": "./dist/src/browser-agent.cjs"
+    },
     "./client": {
       "types": "./dist/src/client.d.ts",
       "import": "./dist/src/client.js",
