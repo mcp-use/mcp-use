@@ -633,6 +633,7 @@
                       "typescript/client/server-manager",
                       "typescript/client/sampling",
                       "typescript/client/elicitation",
+                      "typescript/client/client-capabilities",
                       "typescript/client/completion",
                       "typescript/client/notifications",
                       "typescript/client/logging"
