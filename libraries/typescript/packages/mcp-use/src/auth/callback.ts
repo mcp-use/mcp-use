@@ -37,12 +37,14 @@ function isMcpAuthPopupWindow(): boolean {
 /**
  * Same-origin channel used as a fallback signal when the popup can't reach
  * its opener (e.g. COOP severed `window.opener`, cross-origin intermediate
- * redirects, browser tab grouping). The parent `useMcp` subscribes to this
- * channel and reacts identically to a `postMessage` of `mcp_auth_callback`.
+ * redirects, browser tab grouping). The parent `useMcp` subscribes to a
+ * channel of the same name and reacts identically to a `postMessage` of
+ * `mcp_auth_callback`.
  *
- * Keep in sync with the `BroadcastChannel` subscription in `useMcp.ts`.
+ * Keep in sync with the `BroadcastChannel("mcp_auth_callback")` subscription
+ * in `useMcp.ts`.
  */
-export const MCP_AUTH_BROADCAST_CHANNEL = "mcp_auth_callback";
+const MCP_AUTH_BROADCAST_CHANNEL = "mcp_auth_callback";
 
 /**
  * Broadcasts an auth callback result to all same-origin browsing contexts.
