@@ -5,9 +5,8 @@ import type { Plugin } from "esbuild";
 /**
  * Browser build: substitute any import of telemetry-node.{ts,js} with telemetry-browser.
  *
- * mcp_agent.ts and connectors/base.ts are exported from src/browser.ts, so they end
- * up in the browser bundle. Those files correctly import telemetry-node for Node.js
- * semantics, but the browser build must not contain require("node:fs/os/path/crypto").
+ * Some browser entries include modules that import telemetry-node for Node.js
+ * semantics, but browser builds must not contain require("node:fs/os/path/crypto").
  * This plugin transparently swaps the implementation at build time.
  */
 const telemetryBrowserPlugin: Plugin = {
