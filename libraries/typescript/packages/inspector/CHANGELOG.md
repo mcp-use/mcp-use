@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.20
+
+### Patch Changes
+
+- Updated dependencies [b43ec44]
+  - mcp-use@1.29.0-canary.20
+
 ## 7.0.0-canary.19
 
 ### Minor Changes

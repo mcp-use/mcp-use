@@ -16,6 +16,7 @@
     "fix-inspector-tool-schema-mutation",
     "fix-knip-tabcountbadge-barrel",
     "fix-oauth-metadata-double-slash",
+    "fix-oauth-popup-callback",
     "fix-provider-render-phase-setstate",
     "fix-server-alias-tile-heading",
     "improve-tab-animation-duration",
