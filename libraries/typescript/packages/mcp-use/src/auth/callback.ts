@@ -35,6 +35,56 @@ function isMcpAuthPopupWindow(): boolean {
 }
 
 /**
+ * Same-origin channel used as a fallback signal when the popup can't reach
+ * its opener (e.g. COOP severed `window.opener`, cross-origin intermediate
+ * redirects, browser tab grouping). The parent `useMcp` subscribes to this
+ * channel and reacts identically to a `postMessage` of `mcp_auth_callback`.
+ *
+ * Keep in sync with the `BroadcastChannel` subscription in `useMcp.ts`.
+ */
+export const MCP_AUTH_BROADCAST_CHANNEL = "mcp_auth_callback";
+
+/**
+ * Broadcasts an auth callback result to all same-origin browsing contexts.
+ * Only used in the lost-opener fallback paths — the happy path continues to
+ * use `window.opener.postMessage(...)` to avoid duplicate reconnect cycles
+ * on the parent (BroadcastChannel does not deliver to the sender, but it
+ * does deliver to every other same-origin tab/window).
+ */
+function broadcastAuthCallback(success: boolean, error?: string): void {
+  if (typeof BroadcastChannel === "undefined") return;
+  let channel: BroadcastChannel | null = null;
+  try {
+    channel = new BroadcastChannel(MCP_AUTH_BROADCAST_CHANNEL);
+    channel.postMessage(
+      success
+        ? { type: "mcp_auth_callback", success: true }
+        : {
+            type: "mcp_auth_callback",
+            success: false,
+            error: error ?? "Unknown error",
+          }
+    );
+  } catch (e) {
+    console.warn(
+      "[mcp-callback] Failed to broadcast auth callback over BroadcastChannel:",
+      e
+    );
+  } finally {
+    // Defer close so the message has a chance to dispatch.
+    if (channel) {
+      setTimeout(() => {
+        try {
+          channel?.close();
+        } catch {
+          /* ignore */
+        }
+      }, 0);
+    }
+  }
+}
+
+/**
  * Render an in-place "you can close this window" UI in the current document.
  * Used in the popup-with-lost-opener fallback so we can communicate success
  * (or an OAuth error) to the user without navigating the popup window to the
@@ -234,6 +284,10 @@ async function doOnMcpAuthorization() {
         return;
       }
       if (isPopupWindow) {
+        broadcastAuthCallback(
+          false,
+          `${error}${errorDescription ? `: ${errorDescription}` : ""}`
+        );
         localStorage.removeItem(stateKey);
         renderCloseWindowMessage(
           "Authentication Error",
@@ -420,9 +474,14 @@ async function doOnMcpAuthorization() {
         // Navigating to `returnUrl` here would load the full dashboard
         // inside the popup-sized window — instead, show a friendly
         // close-window message and best-effort `window.close()`.
+        //
+        // Notify the parent over BroadcastChannel since `postMessage` to
+        // `window.opener` is unavailable; without this, the parent
+        // `useMcp` would be stuck in `authenticating` forever.
         console.log(
-          `${logPrefix} Popup flow complete but opener was lost; rendering close-window message.`
+          `${logPrefix} Popup flow complete but opener was lost; broadcasting success and rendering close-window message.`
         );
+        broadcastAuthCallback(true);
         localStorage.removeItem(stateKey);
         renderCloseWindowMessage(
           "Authentication Successful!",
@@ -478,6 +537,11 @@ async function doOnMcpAuthorization() {
       );
       // Optionally close even on error, depending on UX preference
       // window.close();
+    } else if (isMcpAuthPopupWindow()) {
+      // Popup whose opener was severed: signal failure to the parent via
+      // BroadcastChannel so it leaves the `authenticating` state instead of
+      // hanging forever waiting for a postMessage that can't arrive.
+      broadcastAuthCallback(false, errorMessage);
     }
 
     // Display error in the callback window
