@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.21
+
+### Patch Changes
+
+- 04334d8: Add a copy button to user messages in the inspector chat.
+  - mcp-use@1.29.0-canary.21
+
 ## 7.0.0-canary.20
 
 ### Patch Changes

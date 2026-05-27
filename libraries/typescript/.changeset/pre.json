@@ -28,6 +28,7 @@
     "prune-unused-exports",
     "quiet-files-cleanup",
     "screenshot-external-mcp-autosizing",
+    "silver-ravens-type",
     "supabase-oauth-url-override",
     "thick-horses-punch"
   ]
