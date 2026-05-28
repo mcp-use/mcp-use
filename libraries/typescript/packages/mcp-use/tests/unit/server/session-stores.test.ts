@@ -7,7 +7,11 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
+  FileSystemSessionStore,
   InMemorySessionStore,
   RedisSessionStore,
 } from "../../../src/server/index.js";
@@ -177,6 +181,87 @@ describe("InMemorySessionStore", () => {
 
       expect(retrieved?.lastAccessedAt).toBe(2000);
       expect(retrieved?.logLevel).toBe("debug");
+    });
+  });
+});
+
+describe("FileSystemSessionStore", () => {
+  let testDir: string;
+  let sessionFile: string;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    testDir = await mkdtemp(join(tmpdir(), "mcp-use-session-store-"));
+    sessionFile = join(testDir, "sessions.json");
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    await rm(testDir, { recursive: true, force: true });
+  });
+
+  async function readSessionsFile() {
+    return JSON.parse(await readFile(sessionFile, "utf-8"));
+  }
+
+  async function expectPersistedSessions(
+    expected: Record<string, SessionMetadata>
+  ) {
+    await vi.waitFor(async () => {
+      expect(await readSessionsFile()).toEqual(expected);
+    });
+  }
+
+  it("coalesces rapid updates into one debounced save", async () => {
+    const store = new FileSystemSessionStore({
+      path: sessionFile,
+      debounceMs: 25,
+      minSaveIntervalMs: 100,
+    });
+
+    await store.set("session-1", { lastAccessedAt: 1 });
+    await store.set("session-2", { lastAccessedAt: 2 });
+    await store.delete("session-1");
+
+    await vi.advanceTimersByTimeAsync(24);
+    await expect(readFile(sessionFile, "utf-8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expectPersistedSessions({
+      "session-2": { lastAccessedAt: 2 },
+    });
+  });
+
+  it("throttles sustained updates after the first save", async () => {
+    const store = new FileSystemSessionStore({
+      path: sessionFile,
+      debounceMs: 25,
+      minSaveIntervalMs: 100,
+    });
+
+    await store.set("session-1", { lastAccessedAt: 1 });
+    await vi.advanceTimersByTimeAsync(25);
+
+    await expectPersistedSessions({
+      "session-1": { lastAccessedAt: 1 },
+    });
+
+    await store.set("session-2", { lastAccessedAt: 2 });
+    await vi.advanceTimersByTimeAsync(99);
+
+    expect(await readSessionsFile()).toEqual({
+      "session-1": { lastAccessedAt: 1 },
+    });
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expectPersistedSessions({
+      "session-1": { lastAccessedAt: 1 },
+      "session-2": { lastAccessedAt: 2 },
     });
   });
 });

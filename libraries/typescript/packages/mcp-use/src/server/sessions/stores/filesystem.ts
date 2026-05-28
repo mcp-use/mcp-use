@@ -37,6 +37,12 @@ export interface FileSystemSessionStoreConfig {
   debounceMs?: number;
 
   /**
+   * Minimum time in milliseconds between disk writes (default: 500)
+   * Throttles sustained write bursts after the initial debounced save
+   */
+  minSaveIntervalMs?: number;
+
+  /**
    * Maximum session age in milliseconds (default: 24 hours)
    * Sessions older than this are cleaned up on load
    */
@@ -66,15 +72,18 @@ export class FileSystemSessionStore implements SessionStore {
   private sessions = new Map<string, SessionMetadata>();
   private readonly filePath: string;
   private readonly debounceMs: number;
+  private readonly minSaveIntervalMs: number;
   private readonly maxAgeMs: number;
   private saveTimer: NodeJS.Timeout | null = null;
   private saving = false;
   private pendingSave = false;
+  private lastSaveTime = 0;
 
   constructor(config: FileSystemSessionStoreConfig = {}) {
     this.filePath =
       config.path ?? join(process.cwd(), ".mcp-use", "sessions.json");
     this.debounceMs = config.debounceMs ?? 100;
+    this.minSaveIntervalMs = config.minSaveIntervalMs ?? 500;
     this.maxAgeMs = config.maxAgeMs ?? 24 * 60 * 60 * 1000; // 24 hours
 
     // Load existing sessions synchronously on construction
@@ -208,8 +217,8 @@ export class FileSystemSessionStore implements SessionStore {
   }
 
   /**
-   * Schedule a save operation with debouncing
-   * Prevents excessive disk I/O from rapid consecutive writes
+   * Schedule a save operation with debouncing and throttling
+   * Prevents excessive disk I/O from rapid or sustained consecutive writes
    */
   private async scheduleSave(): Promise<void> {
     // If already saving, mark that another save is pending
@@ -223,10 +232,15 @@ export class FileSystemSessionStore implements SessionStore {
       clearTimeout(this.saveTimer);
     }
 
-    // Schedule new save after debounce delay
+    const throttleMs =
+      this.lastSaveTime === 0
+        ? 0
+        : Math.max(0, this.minSaveIntervalMs - (Date.now() - this.lastSaveTime));
+
+    // Schedule new save after both the debounce and throttle windows have elapsed
     this.saveTimer = setTimeout(() => {
       this.performSave();
-    }, this.debounceMs);
+    }, Math.max(this.debounceMs, throttleMs));
   }
 
   /**
@@ -253,6 +267,7 @@ export class FileSystemSessionStore implements SessionStore {
       const tempPath = `${this.filePath}.tmp`;
       await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
       await rename(tempPath, this.filePath);
+      this.lastSaveTime = Date.now();
     } catch (error: any) {
       console.error(
         `[FileSystemSessionStore] Error saving sessions:`,
