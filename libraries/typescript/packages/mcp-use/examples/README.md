@@ -71,6 +71,7 @@
 | [completion/src/server.ts](server/features/completion/src/server.ts) | Completion for prompt and resource arguments |
 | [conformance/src/server.ts](server/features/conformance/src/server.ts) | MCP conformance test server |
 | [dns-rebinding/src/server.ts](server/features/dns-rebinding/src/server.ts) | DNS rebinding protection |
+| [openapi/src/server.ts](server/features/openapi/src/server.ts) | Generate MCP tools from an OpenAPI spec |
 | [express-middleware/index.ts](server/features/express-middleware/index.ts) | Express and Hono middleware integration |
 | [middleware/src/server.ts](server/features/middleware/src/server.ts) | Built-in middleware pipeline |
 | [proxy/src/server.ts](server/features/proxy/src/server.ts) | Proxy server setup |
