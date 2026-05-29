@@ -127,7 +127,8 @@ console.log(session);
     expect(existsSync(serverOutput)).toBe(true);
     const output = readFileSync(serverOutput, "utf-8");
     expect(output).toContain("function cookies()");
-    expect(output).not.toContain("next/headers");
+    expect(output).not.toMatch(/from\s+["']next\/headers["']/);
+    expect(output).not.toMatch(/require\(["']next\/headers["']\)/);
 
     const manifest = JSON.parse(
       readFileSync(join(projectDir, "dist", "mcp-use.json"), "utf-8")

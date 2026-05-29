@@ -588,7 +588,6 @@ function makeNextServerRuntimeShimPlugin(
         return {
           path: args.path,
           namespace,
-          sideEffects: false,
         };
       });
 
