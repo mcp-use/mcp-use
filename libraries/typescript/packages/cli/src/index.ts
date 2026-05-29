@@ -8,6 +8,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import type { Plugin as EsbuildPlugin } from "esbuild";
 import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
@@ -44,6 +45,16 @@ const packageContent = readFileSync(
 );
 const packageJson = JSON.parse(packageContent);
 const packageVersion = packageJson.version || "unknown";
+
+const MCP_DIR_SERVER_OUTPUT = path.join("dist", "mcp", "index.mjs");
+const NEXT_SERVER_RUNTIME_MODULES = [
+  "server-only",
+  "client-only",
+  "next/cache",
+  "next/headers",
+  "next/navigation",
+  "next/server",
+] as const;
 
 program
   .name("mcp-use")
@@ -397,6 +408,228 @@ function resolveWidgetsDir(cliWidgetsDir?: string, mcpDir?: string): string {
   return "resources";
 }
 
+type NextServerRuntimeShimWarning = {
+  specifier: string;
+  importer?: string;
+};
+
+type TsconfigPathPattern = {
+  prefix: string;
+  suffix: string;
+};
+
+function getTsconfigPathPatterns(tsconfig: any): TsconfigPathPattern[] {
+  const paths = tsconfig.compilerOptions?.paths;
+  if (!paths || typeof paths !== "object") return [];
+
+  return Object.keys(paths).map((pattern) => {
+    const starIndex = pattern.indexOf("*");
+    if (starIndex === -1) return { prefix: pattern, suffix: "" };
+    return {
+      prefix: pattern.slice(0, starIndex),
+      suffix: pattern.slice(starIndex + 1),
+    };
+  });
+}
+
+function matchesTsconfigPathPattern(
+  specifier: string,
+  pattern: TsconfigPathPattern
+): boolean {
+  if (!pattern.suffix && specifier === pattern.prefix) return true;
+  return (
+    specifier.startsWith(pattern.prefix) && specifier.endsWith(pattern.suffix)
+  );
+}
+
+function isBareSpecifier(specifier: string): boolean {
+  return (
+    !specifier.startsWith(".") &&
+    !specifier.startsWith("/") &&
+    !specifier.startsWith("file:")
+  );
+}
+
+function makeExternalizePackagesPlugin(
+  tsconfigPathPatterns: TsconfigPathPattern[]
+): EsbuildPlugin {
+  return {
+    name: "mcp-use-externalize-packages",
+    setup(build) {
+      build.onResolve({ filter: /^[^./]|^\.[^./]/ }, (args) => {
+        if (!isBareSpecifier(args.path)) return null;
+        if (args.path.startsWith("node:"))
+          return { path: args.path, external: true };
+        if (
+          tsconfigPathPatterns.some((pattern) =>
+            matchesTsconfigPathPattern(args.path, pattern)
+          )
+        ) {
+          return null;
+        }
+        return { path: args.path, external: true };
+      });
+    },
+  };
+}
+
+function getNextServerRuntimeShimModule(specifier: string): string {
+  switch (specifier) {
+    case "server-only":
+    case "client-only":
+      return "export {};";
+    case "next/cache":
+      return `
+export function revalidatePath() {}
+export function revalidateTag() {}
+export function unstable_cache(fn) { return fn; }
+export function unstable_noStore() {}
+export const unstable_cacheLife = () => {};
+export const unstable_cacheTag = () => {};
+`;
+    case "next/headers":
+      return `
+export function headers() { return new Headers(); }
+export function cookies() {
+  return {
+    get() { return undefined; },
+    getAll() { return []; },
+    has() { return false; },
+    set() {},
+    delete() {},
+  };
+}
+export function draftMode() {
+  return {
+    isEnabled: false,
+    enable() {},
+    disable() {},
+  };
+}
+`;
+    case "next/navigation":
+      return `
+export function redirect(url) {
+  const err = new Error(\`redirect(\${url}) called outside Next.js\`);
+  err.digest = "NEXT_REDIRECT;" + url;
+  throw err;
+}
+export function permanentRedirect(url) { return redirect(url); }
+export function notFound() {
+  const err = new Error("notFound() called outside Next.js");
+  err.digest = "NEXT_NOT_FOUND";
+  throw err;
+}
+export const RedirectType = { push: "push", replace: "replace" };
+`;
+    case "next/server":
+      return `
+export class NextResponse extends Response {
+  static json(data, init) {
+    return new Response(JSON.stringify(data), {
+      ...init,
+      headers: { ...((init && init.headers) || {}), "content-type": "application/json" },
+    });
+  }
+  static redirect(url, status) {
+    return new Response(null, { status: status || 302, headers: { location: String(url) } });
+  }
+  static next() { return new Response(null); }
+  static rewrite() { return new Response(null); }
+}
+export class NextRequest extends Request {
+  constructor(input, init) {
+    super(input, init);
+    this.nextUrl = new URL(typeof input === "string" ? input : input.url);
+    this.cookies = {
+      get() { return undefined; },
+      getAll() { return []; },
+      has() { return false; },
+      set() {},
+      delete() {},
+    };
+  }
+}
+export const userAgent = () => ({
+  ua: "",
+  browser: {},
+  device: {},
+  engine: {},
+  os: {},
+  cpu: {},
+  isBot: false,
+});
+`;
+    default:
+      throw new Error(`No Next.js server-runtime shim for ${specifier}`);
+  }
+}
+
+function makeNextServerRuntimeShimPlugin(
+  projectPath: string,
+  warnings: NextServerRuntimeShimWarning[]
+): EsbuildPlugin {
+  const namespace = "mcp-use-next-server-runtime-shim";
+  const shimmed = new Set<string>(NEXT_SERVER_RUNTIME_MODULES);
+  const filter =
+    /^(server-only|client-only|next\/cache|next\/headers|next\/navigation|next\/server)$/;
+
+  return {
+    name: "mcp-use-next-server-runtime-shims",
+    setup(build) {
+      build.onResolve({ filter }, (args) => {
+        if (!shimmed.has(args.path)) return null;
+        warnings.push({
+          specifier: args.path,
+          importer: args.importer
+            ? path.relative(projectPath, args.importer)
+            : undefined,
+        });
+        return {
+          path: args.path,
+          namespace,
+          sideEffects: false,
+        };
+      });
+
+      build.onLoad({ filter: /.*/, namespace }, (args) => ({
+        contents: getNextServerRuntimeShimModule(args.path),
+        loader: "js",
+      }));
+    },
+  };
+}
+
+function printNextServerRuntimeShimWarnings(
+  warnings: NextServerRuntimeShimWarning[]
+): void {
+  if (warnings.length === 0) return;
+
+  const grouped = new Map<string, Set<string>>();
+  for (const warning of warnings) {
+    const importers = grouped.get(warning.specifier) ?? new Set<string>();
+    importers.add(warning.importer || "<entry>");
+    grouped.set(warning.specifier, importers);
+  }
+
+  console.log(
+    chalk.yellow(
+      `⚠ Replaced ${warnings.length} Next.js server-runtime import${warnings.length === 1 ? "" : "s"} with MCP shims:`
+    )
+  );
+  for (const [specifier, importers] of grouped) {
+    console.log(chalk.yellow(`  ${specifier}`));
+    for (const importer of importers) {
+      console.log(chalk.gray(`    - ${importer}`));
+    }
+  }
+  console.log(
+    chalk.gray(
+      "  These shims run outside the Next.js request runtime. headers()/cookies() return empty stand-ins, cache revalidation is a no-op, and redirect()/notFound() still throw."
+    )
+  );
+}
+
 /**
  * Vite plugin that fails the widget build with a clear, actionable error when
  * a widget transitively imports a Next.js server-runtime module.
@@ -411,14 +644,7 @@ function resolveWidgetsDir(cliWidgetsDir?: string, mcpDir?: string): string {
  * stays import-free for the source-mode tests that load it via tsx.
  */
 function makeWidgetServerOnlyGuard(widgetName: string) {
-  const rejected = new Set([
-    "server-only",
-    "client-only",
-    "next/cache",
-    "next/headers",
-    "next/navigation",
-    "next/server",
-  ]);
+  const rejected = new Set<string>(NEXT_SERVER_RUNTIME_MODULES);
   return {
     name: "mcp-use-widget-server-only-guard",
     enforce: "pre" as const,
@@ -1374,6 +1600,48 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
   });
 }
 
+async function buildMcpDirServer(
+  projectPath: string,
+  sourceServerFile: string
+): Promise<string> {
+  const esbuild = await import("esbuild");
+  const { promises: fs } = await import("node:fs");
+
+  const tsconfigPath = path.join(projectPath, "tsconfig.json");
+  let tsconfig: any = {};
+  let esbuildTsconfig: string | undefined;
+  try {
+    const raw = await fs.readFile(tsconfigPath, "utf-8");
+    tsconfig = JSON.parse(raw);
+    esbuildTsconfig = tsconfigPath;
+  } catch {
+    // No tsconfig: esbuild can still compile the entry, just without paths.
+  }
+
+  const warnings: NextServerRuntimeShimWarning[] = [];
+  const outputFile = path.join(projectPath, MCP_DIR_SERVER_OUTPUT);
+
+  await fs.mkdir(path.dirname(outputFile), { recursive: true });
+  await esbuild.build({
+    entryPoints: [path.join(projectPath, sourceServerFile)],
+    outfile: outputFile,
+    bundle: true,
+    format: "esm",
+    platform: "node",
+    target: "node20",
+    tsconfig: esbuildTsconfig,
+    sourcemap: false,
+    logLevel: "warning",
+    plugins: [
+      makeNextServerRuntimeShimPlugin(projectPath, warnings),
+      makeExternalizePackagesPlugin(getTsconfigPathPatterns(tsconfig)),
+    ],
+  });
+
+  printNextServerRuntimeShimWarnings(warnings);
+  return MCP_DIR_SERVER_OUTPUT;
+}
+
 program
   .command("build")
   .description("Build TypeScript and MCP UI widgets")
@@ -1424,10 +1692,11 @@ program
           options.mcpDir
         );
       } catch (err) {
+        if (mcpDir) {
+          throw err;
+        }
         // No server file found. Widget-only projects hit this on purpose,
-        // but a misconfigured --mcp-dir is a user error worth surfacing so
-        // it doesn't cascade into a manifest without an entryPoint and an
-        // unclear start-time failure.
+        // but legacy widget-only builds can continue without an entry point.
         console.log(
           chalk.yellow(
             `⚠ Could not locate a server entry file: ${err instanceof Error ? err.message : String(err)}`
@@ -1469,25 +1738,15 @@ program
 
       // Transpile TypeScript with esbuild (fast, no OOM on complex types).
       // Type checking is a separate step via tsc --noEmit (skippable with --no-typecheck).
-      //
-      // SKIPPED when --mcp-dir is set (drop-in Next.js layout). The host app
-      // (Next.js) owns its own build; trying to transpile every .ts/.tsx in
-      // a Next.js project chokes on files like `tailwind.config.ts` that are
-      // never meant to be runtime-compiled and on RSC-only files that
-      // esbuild doesn't understand. In --mcp-dir mode, `mcp-use start` runs
-      // the TypeScript source directly via tsx (same setup as `mcp-use dev`,
-      // minus HMR), so there's nothing to transpile ahead of time. The
-      // manifest written below still records the .ts source as the entry.
+      let entryPoint: string | undefined;
       if (!mcpDir) {
         console.log(chalk.gray("Building TypeScript..."));
         await transpileWithEsbuild(projectPath);
         console.log(chalk.green("✓ TypeScript build complete!"));
-      } else {
-        console.log(
-          chalk.gray(
-            "Skipping TypeScript transpile (--mcp-dir mode runs source via tsx at start time)"
-          )
-        );
+      } else if (sourceServerFile) {
+        console.log(chalk.gray("Building MCP server entry..."));
+        entryPoint = await buildMcpDirServer(projectPath, sourceServerFile);
+        console.log(chalk.green(`✓ MCP server built to ${entryPoint}`));
       }
 
       // Type-check with tsc --noEmit (separate from transpilation).
@@ -1522,33 +1781,25 @@ program
         }
       }
 
-      // Determine the entry point `mcp-use start` should run.
-      //   - Legacy layout: the file was transpiled to dist/ above; record
-      //     the compiled .js path.
-      //   - --mcp-dir layout: no transpile step ran, so point the manifest
-      //     at the .ts source. `mcp-use start` loads it via tsx (same setup
-      //     as `mcp-use dev`, minus HMR).
-      let entryPoint: string | undefined;
-      if (sourceServerFile) {
-        if (mcpDir) {
-          entryPoint = sourceServerFile;
-        } else {
-          // Check possible output locations based on common tsconfig patterns
-          // tsc may or may not preserve the src/ prefix depending on rootDir setting
-          const baseName = path.basename(sourceServerFile, ".ts") + ".js";
-          const possibleOutputs = [
-            `dist/${baseName}`, // rootDir set to project root or src
-            `dist/src/${baseName}`, // no rootDir, source in src/
-            `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
-          ];
-          for (const candidate of possibleOutputs) {
-            try {
-              await access(path.join(projectPath, candidate));
-              entryPoint = candidate;
-              break;
-            } catch {
-              continue;
-            }
+      // Determine the entry point `mcp-use start` should run for the legacy
+      // layout. In --mcp-dir mode the scoped server build above writes the
+      // deterministic dist/mcp/index.mjs artifact directly.
+      if (sourceServerFile && !mcpDir) {
+        // Check possible output locations based on common tsconfig patterns
+        // tsc may or may not preserve the src/ prefix depending on rootDir setting
+        const baseName = path.basename(sourceServerFile, ".ts") + ".js";
+        const possibleOutputs = [
+          `dist/${baseName}`, // rootDir set to project root or src
+          `dist/src/${baseName}`, // no rootDir, source in src/
+          `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+        ];
+        for (const candidate of possibleOutputs) {
+          try {
+            await access(path.join(projectPath, candidate));
+            entryPoint = candidate;
+            break;
+          } catch {
+            continue;
           }
         }
       }
@@ -2748,14 +2999,19 @@ program
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      const startMcpDir = options.mcpDir as string | undefined;
 
       try {
         const manifestContent = await readFile(manifestPath, "utf-8");
         const manifest = JSON.parse(manifestContent);
-        if (manifest.entryPoint) {
+        const manifestEntry = manifest.entryPoint as string | undefined;
+        const isSourceEntry = manifestEntry
+          ? /\.(ts|tsx|mts|cts)$/.test(manifestEntry)
+          : false;
+        if (manifestEntry && (!startMcpDir || !isSourceEntry)) {
           // Verify the entry point exists
-          await access(path.join(projectPath, manifest.entryPoint));
-          serverFile = manifest.entryPoint;
+          await access(path.join(projectPath, manifestEntry));
+          serverFile = manifestEntry;
         }
       } catch {
         // Manifest doesn't exist or entryPoint not set, fall back to searching
@@ -2763,20 +3019,9 @@ program
 
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
-        // Resolve mcpDir from CLI flag so `--mcp-dir src/mcp` finds the
-        // entry at dist/src/mcp/index.js (legacy transpile mode) or the TS
-        // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
-        // and `start` runs the source via tsx).
-        const startMcpDir = options.mcpDir as string | undefined;
-
         const serverCandidates = [
           ...(startMcpDir
-            ? [
-                `${startMcpDir}/index.ts`,
-                `${startMcpDir}/index.tsx`,
-                `dist/${startMcpDir}/index.js`,
-                `dist/${startMcpDir}/server.js`,
-              ]
+            ? [MCP_DIR_SERVER_OUTPUT, path.join("dist", "mcp", "index.js")]
             : []),
           "dist/index.js",
           "dist/server.js",
@@ -2798,7 +3043,7 @@ program
       if (!serverFile) {
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with built entryPoint)\n  - ${MCP_DIR_SERVER_OUTPUT}\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
           )
         );
         process.exit(1);
@@ -2835,39 +3080,16 @@ program
       }
       const env = isNextJsProject ? withNextShimsEnv(baseEnv) : baseEnv;
 
-      // If the recorded entry is a TypeScript source (the --mcp-dir mode,
-      // where `build` deliberately skips full-project transpilation), run
-      // it through tsx. Otherwise the legacy path of `node dist/index.js`.
-      const isTsEntry = /\.(ts|tsx|mts|cts)$/.test(serverFile);
-      let spawnCmd = "node";
-      let spawnArgs: string[] = [serverFile];
-      if (isTsEntry) {
-        try {
-          const projectRequire = createRequire(
-            path.join(projectPath, "package.json")
-          );
-          const tsxPkgPath = projectRequire.resolve("tsx/package.json");
-          const tsxPkg = JSON.parse(await readFile(tsxPkgPath, "utf-8"));
-          const binField =
-            typeof tsxPkg.bin === "string"
-              ? tsxPkg.bin
-              : (tsxPkg.bin?.tsx ?? Object.values(tsxPkg.bin ?? {})[0]);
-          if (!binField) throw new Error("tsx bin entry not found");
-          const tsxBin = path.resolve(path.dirname(tsxPkgPath), binField);
-          spawnCmd = "node";
-          spawnArgs = [tsxBin, serverFile];
-        } catch (error) {
-          console.log(
-            chalk.yellow(
-              `Could not resolve local tsx (${error instanceof Error ? error.message : String(error)}); falling back to npx`
-            )
-          );
-          spawnCmd = "npx";
-          spawnArgs = ["tsx", serverFile];
-        }
+      if (/\.(ts|tsx|mts|cts)$/.test(serverFile)) {
+        console.error(
+          chalk.red(
+            `Built server entry points to TypeScript source (${serverFile}). Run 'mcp-use build' again to create a JavaScript server artifact.`
+          )
+        );
+        process.exit(1);
       }
 
-      const serverProc = spawn(spawnCmd, spawnArgs, {
+      const serverProc = spawn("node", [serverFile], {
         cwd: projectPath,
         stdio: "inherit",
         env,
