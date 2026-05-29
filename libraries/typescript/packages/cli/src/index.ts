@@ -37,9 +37,9 @@ import {
 } from "./utils/next-shims.js";
 import {
   MCP_DIR_SERVER_OUTPUT,
-  NEXT_SERVER_RUNTIME_MODULES,
   buildMcpDirServer,
 } from "./utils/mcp-dir-build.js";
+import { NEXT_SERVER_RUNTIME_MODULES } from "./utils/next-server-runtime-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 const program = new Command();
 
