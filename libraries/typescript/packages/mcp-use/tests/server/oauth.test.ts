@@ -32,6 +32,7 @@ async function listenOnRandomPort(
 const closers: Array<() => void> = [];
 
 afterEach(() => {
+  vi.restoreAllMocks();
   while (closers.length > 0) {
     closers.pop()?.();
   }
@@ -162,6 +163,48 @@ describe("server OAuth integration", () => {
       headers: { Authorization: "Bearer token-123" },
     });
     expect(authorized.status).toBe(200);
+  });
+
+  it("does not expose token verification errors to clients", async () => {
+    const app = new Hono();
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => {
+        throw new Error(
+          "JWKS fetch failed for https://issuer.example.com/.well-known/jwks.json"
+        );
+      },
+    });
+
+    app.use("/mcp/*", createBearerAuthMiddleware(proxy));
+    app.get("/mcp/test", (c) => c.json({ ok: true }));
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    const response = await fetch(`${svc.baseUrl}/mcp/test`, {
+      headers: { Authorization: "Bearer token-123" },
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data).toEqual({ error: "Invalid token" });
+    expect(JSON.stringify(data)).not.toContain("JWKS");
+    expect(JSON.stringify(data)).not.toContain("issuer.example.com");
+    expect(response.headers.get("WWW-Authenticate")).toContain(
+      "oauth-protected-resource"
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "[OAuth Middleware] Token verification failed:",
+      expect.any(Error)
+    );
   });
 
   it("returns configured clientId from /register endpoint", async () => {
