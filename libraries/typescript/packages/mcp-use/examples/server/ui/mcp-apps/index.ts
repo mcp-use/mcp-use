@@ -195,6 +195,9 @@ server.uiResource({
             console.error('Failed to parse props:', e);
           }
         }
+        
+        // Signal to the MCP screenshot pipeline that the widget is done rendering
+        document.body.setAttribute('data-view-ready', 'true');
       </script>
     </body>
     </html>

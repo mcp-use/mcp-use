@@ -934,6 +934,19 @@ function MCPAppsRendererBase({
   // Handle CSP violations
   const handleSandboxMessage = useCallback(
     (event: MessageEvent) => {
+      // Programmatic widgets (without AppBridge) send this message once loaded.
+      // This allows the screenshot pipeline to detect readiness even for simple
+      // raw HTML widgets that don't use the full AppBridge SDK.
+      if (event.data?.type === "mcp-use:widget-ready") {
+        if (!readyFiredRef.current && initCount === 0) {
+          readyFiredRef.current = true;
+          setShowSpinner(false);
+          hasLoadedOnceRef.current = true;
+          onReady?.();
+        }
+        return;
+      }
+
       if (event.data?.type !== "mcp-apps:csp-violation") return;
 
       const {
@@ -963,8 +976,9 @@ function MCPAppsRendererBase({
         sourceFile ? `at ${sourceFile}:${lineNumber}:${columnNumber}` : ""
       );
     },
-    [toolCallId, addCspViolation]
+    [toolCallId, addCspViolation, initCount, onReady]
   );
+
 
   // Handle fullscreen changes
   useEffect(() => {
@@ -1026,11 +1040,12 @@ function MCPAppsRendererBase({
   const readyFiredRef = useRef(false);
   useEffect(() => {
     if (readyFiredRef.current) return;
-    if (initCount > 0) {
+    // Wait for BOTH the AppBridge handshake AND the spinner to be completely hidden
+    if (initCount > 0 && !showSpinner) {
       readyFiredRef.current = true;
       onReady?.();
     }
-  }, [initCount, onReady]);
+  }, [initCount, showSpinner, onReady]);
 
   useEffect(() => {
     if (!iframeEffectivelyReady || !showSpinner) return;

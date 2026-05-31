@@ -250,6 +250,39 @@ export function createAppsSdkResource(
  * )
  * ```
  */
+/**
+ * Small script injected into every programmatic mcpApps widget.
+ * Fires a postMessage to the parent (SandboxedIframe proxy) once the page
+ * has loaded so that MCPAppsRenderer can call onReady() even for widgets
+ * that don't use the full AppBridge SDK.
+ */
+const MCP_APPS_READY_SCRIPT = `
+<script>
+(function () {
+  function signalReady() {
+    window.parent.postMessage({ type: 'mcp-use:widget-ready' }, '*');
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    signalReady();
+  } else {
+    window.addEventListener('load', signalReady);
+  }
+})();
+</script>`;
+
+/**
+ * Inject the readiness script into an HTML string just before </body>.
+ * Falls back to appending at the end if no </body> tag is present.
+ */
+function injectReadinessScript(html: string): string {
+  const tag = "</body>";
+  const idx = html.lastIndexOf(tag);
+  if (idx !== -1) {
+    return html.slice(0, idx) + MCP_APPS_READY_SCRIPT + html.slice(idx);
+  }
+  return html + MCP_APPS_READY_SCRIPT;
+}
+
 export function createMcpAppsResource(
   uri: string,
   htmlTemplate: string,
@@ -270,7 +303,9 @@ export function createMcpAppsResource(
   const resource: any = {
     uri,
     mimeType: "text/html;profile=mcp-app",
-    text: htmlTemplate,
+    // Inject readiness postMessage script so the screenshot CLI can detect
+    // when even simple programmatic widgets (without AppBridge) are ready.
+    text: injectReadinessScript(htmlTemplate),
   };
 
   // Build _meta.ui metadata per MCP Apps spec (SEP-1865):
@@ -300,6 +335,8 @@ export function createMcpAppsResource(
     resource,
   };
 }
+
+
 
 /**
  * Create a UIResource from a high-level definition
