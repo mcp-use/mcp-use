@@ -1,4 +1,5 @@
 import type { Plugin as EsbuildPlugin } from "esbuild";
+import { parse as parseJsonc, type ParseError } from "jsonc-parser";
 import path from "node:path";
 import {
   type NextServerRuntimeShimWarning,
@@ -6,7 +7,7 @@ import {
   printNextServerRuntimeShimWarnings,
 } from "./next-server-runtime-shims.js";
 
-export const MCP_DIR_SERVER_OUTPUT = path.join("dist", "mcp", "index.mjs");
+export const MCP_DIR_SERVER_OUTPUT = "dist/mcp/index.mjs";
 
 type TsconfigShape = {
   compilerOptions?: {
@@ -90,7 +91,17 @@ export async function buildMcpDirServer(
   let esbuildTsconfig: string | undefined;
   try {
     const raw = await fs.readFile(tsconfigPath, "utf-8");
-    tsconfig = JSON.parse(raw) as TsconfigShape;
+    const parseErrors: ParseError[] = [];
+    tsconfig = parseJsonc(raw, parseErrors, {
+      allowTrailingComma: true,
+      disallowComments: false,
+    }) as TsconfigShape;
+    if (parseErrors.length > 0) {
+      console.warn(
+        `⚠ Could not parse ${path.relative(projectPath, tsconfigPath)} for path aliases; continuing without tsconfig path externalization.`
+      );
+      tsconfig = {};
+    }
     esbuildTsconfig = tsconfigPath;
   } catch {
     // No tsconfig: esbuild can still compile the entry, just without paths.

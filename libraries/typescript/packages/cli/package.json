@@ -55,6 +55,7 @@
     "commander": "^14.0.2",
     "dotenv": "^17.3.1",
     "esbuild": "0.27.1",
+    "jsonc-parser": "^3.3.1",
     "mcp-use": "workspace:*",
     "open": "^11.0.0",
     "tar": "^7.5.11",

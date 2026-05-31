@@ -69,22 +69,20 @@ describe("mcp-use build --mcp-dir", () => {
 
     writeFileSync(
       join(projectDir, "tsconfig.json"),
-      JSON.stringify(
-        {
-          compilerOptions: {
-            target: "ES2022",
-            module: "ESNext",
-            moduleResolution: "bundler",
-            baseUrl: ".",
-            paths: {
-              "@/*": ["src/*"],
-            },
-            skipLibCheck: true,
-          },
-        },
-        null,
-        2
-      )
+      `{
+  // Next.js projects commonly use JSONC tsconfig files.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"],
+    },
+    "skipLibCheck": true,
+  },
+}
+`
     );
 
     writeFileSync(
