@@ -36,7 +36,7 @@ import {
   withNextShimsEnv,
 } from "./utils/next-shims.js";
 import {
-  MCP_DIR_SERVER_OUTPUT,
+  MCP_DIR_SERVER_OUTPUTS,
   buildMcpDirServer,
 } from "./utils/mcp-dir-build.js";
 import { NEXT_SERVER_RUNTIME_MODULES } from "./utils/next-server-runtime-shims.js";
@@ -1513,7 +1513,8 @@ program
 
       // Determine the entry point `mcp-use start` should run for the legacy
       // layout. In --mcp-dir mode the scoped server build above writes the
-      // deterministic dist/mcp/index.mjs artifact directly.
+      // deterministic dist/mcp/index.{cjs,mjs} artifact directly (extension
+      // depends on the host package.json "type").
       if (sourceServerFile && !mcpDir) {
         // Check possible output locations based on common tsconfig patterns
         // tsc may or may not preserve the src/ prefix depending on rootDir setting
@@ -2751,7 +2752,7 @@ program
       if (!serverFile) {
         const serverCandidates = [
           ...(startMcpDir
-            ? [MCP_DIR_SERVER_OUTPUT, path.join("dist", "mcp", "index.js")]
+            ? [...MCP_DIR_SERVER_OUTPUTS, path.join("dist", "mcp", "index.js")]
             : []),
           "dist/index.js",
           "dist/server.js",
@@ -2773,7 +2774,7 @@ program
       if (!serverFile) {
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with built entryPoint)\n  - ${MCP_DIR_SERVER_OUTPUT}\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with built entryPoint)\n  - ${MCP_DIR_SERVER_OUTPUTS.join("\n  - ")}\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
           )
         );
         process.exit(1);

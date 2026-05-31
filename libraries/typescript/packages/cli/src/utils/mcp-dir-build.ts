@@ -7,7 +7,16 @@ import {
   printNextServerRuntimeShimWarnings,
 } from "./next-server-runtime-shims.js";
 
-export const MCP_DIR_SERVER_OUTPUT = "dist/mcp/index.mjs";
+const MCP_DIR_SERVER_DIR = "dist/mcp";
+
+// Possible built server artifacts. The extension depends on the host package's
+// module system (see resolveServerOutput); listed CommonJS-first since most
+// consumers (Next.js apps) are CommonJS-default. Used by `mcp-use start` as a
+// fallback when the build manifest's entryPoint isn't available.
+export const MCP_DIR_SERVER_OUTPUTS = [
+  `${MCP_DIR_SERVER_DIR}/index.cjs`,
+  `${MCP_DIR_SERVER_DIR}/index.mjs`,
+];
 
 type TsconfigShape = {
   compilerOptions?: {
@@ -79,6 +88,38 @@ function makeExternalizePackagesPlugin(
   };
 }
 
+// Decide the artifact's module system from the host package.json "type".
+//
+// This must match how Node will actually load the built file at runtime, which
+// Node governs via package.json "type" (+ file extension) — NOT tsconfig
+// "module". tsconfig "module" describes the TypeScript compiler's emit, and
+// Next.js apps set "module":"esnext" with "moduleResolution":"bundler" while
+// staying CommonJS at the package level (no "type" field). Keying off "type"
+// keeps the output consistent with how the host resolves its dependencies'
+// export conditions (require vs import). Default to CommonJS (Node's own
+// default when "type" is absent).
+async function resolveServerOutput(
+  projectPath: string,
+  fs: typeof import("node:fs").promises
+): Promise<{ format: "cjs" | "esm"; relativePath: string }> {
+  let packageType: string | undefined;
+  try {
+    const raw = await fs.readFile(
+      path.join(projectPath, "package.json"),
+      "utf-8"
+    );
+    packageType = (JSON.parse(raw) as { type?: string }).type;
+  } catch {
+    // No package.json — treat as CommonJS (Node's default).
+  }
+
+  const isEsm = packageType === "module";
+  return {
+    format: isEsm ? "esm" : "cjs",
+    relativePath: `${MCP_DIR_SERVER_DIR}/index.${isEsm ? "mjs" : "cjs"}`,
+  };
+}
+
 export async function buildMcpDirServer(
   projectPath: string,
   sourceServerFile: string
@@ -108,14 +149,15 @@ export async function buildMcpDirServer(
   }
 
   const warnings: NextServerRuntimeShimWarning[] = [];
-  const outputFile = path.join(projectPath, MCP_DIR_SERVER_OUTPUT);
+  const { format, relativePath } = await resolveServerOutput(projectPath, fs);
+  const outputFile = path.join(projectPath, relativePath);
 
   await fs.mkdir(path.dirname(outputFile), { recursive: true });
   await esbuild.build({
     entryPoints: [path.join(projectPath, sourceServerFile)],
     outfile: outputFile,
     bundle: true,
-    format: "esm",
+    format,
     platform: "node",
     target: "node20",
     tsconfig: esbuildTsconfig,
@@ -128,5 +170,5 @@ export async function buildMcpDirServer(
   });
 
   printNextServerRuntimeShimWarnings(warnings);
-  return MCP_DIR_SERVER_OUTPUT;
+  return relativePath;
 }

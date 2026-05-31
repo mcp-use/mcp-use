@@ -102,6 +102,11 @@ export const userAgent = () => ({
   cpu: {},
   isBot: false,
 });
+export function after(callback) {
+  if (typeof callback === "function") {
+    Promise.resolve().then(callback).catch(() => {});
+  }
+}
 `;
     default:
       throw new Error(`No Next.js server-runtime shim for ${specifier}`);

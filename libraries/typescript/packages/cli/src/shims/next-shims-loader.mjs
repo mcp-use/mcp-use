@@ -78,7 +78,8 @@ const SHIMS = new Map([
       encodeURIComponent(
         "export class NextResponse extends Response{static json(data,init){return new Response(JSON.stringify(data),{...init,headers:{...(init&&init.headers),'content-type':'application/json'}});}static redirect(url,status){return new Response(null,{status:status||302,headers:{location:String(url)}});}static next(){return new Response(null);}static rewrite(){return new Response(null);}}" +
           "export class NextRequest extends Request{constructor(input,init){super(input,init);this.nextUrl=new URL(typeof input==='string'?input:input.url);this.cookies={get(){return undefined},getAll(){return []},has(){return false},set(){},delete(){}};}}" +
-          "export const userAgent=()=>({ua:'',browser:{},device:{},engine:{},os:{},cpu:{},isBot:false});"
+          "export const userAgent=()=>({ua:'',browser:{},device:{},engine:{},os:{},cpu:{},isBot:false});" +
+          "export function after(cb){if(typeof cb==='function'){Promise.resolve().then(cb).catch(()=>{});}}"
       ),
   ],
 ]);

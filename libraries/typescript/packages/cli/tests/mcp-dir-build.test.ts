@@ -111,22 +111,56 @@ console.log(session);
     }
   });
 
-  it("builds a deterministic JS server artifact and shims Next server imports", async () => {
+  it("builds a CommonJS artifact for a CommonJS-default host and shims Next server imports", async () => {
+    // The fixture's package.json has no "type" field, so Node treats it as
+    // CommonJS — the build should emit a .cjs artifact accordingly.
     const result = await runCLI(["build", "--mcp-dir", "src/mcp"], projectDir);
     const combined = result.stdout + result.stderr;
 
     expect(result.exitCode).toBe(0);
-    expect(combined).toMatch(/MCP server built to dist[/\\]mcp[/\\]index\.mjs/);
+    expect(combined).toMatch(/MCP server built to dist[/\\]mcp[/\\]index\.cjs/);
     expect(combined).toMatch(/Replaced 1 Next\.js server-runtime import/);
     expect(combined).toMatch(/next\/headers/);
     expect(combined).toMatch(/src[/\\]lib[/\\]server-data\.ts/);
 
-    const serverOutput = join(projectDir, "dist", "mcp", "index.mjs");
+    const serverOutput = join(projectDir, "dist", "mcp", "index.cjs");
     expect(existsSync(serverOutput)).toBe(true);
     const output = readFileSync(serverOutput, "utf-8");
     expect(output).toContain("function cookies()");
     expect(output).not.toMatch(/from\s+["']next\/headers["']/);
     expect(output).not.toMatch(/require\(["']next\/headers["']\)/);
+
+    const manifest = JSON.parse(
+      readFileSync(join(projectDir, "dist", "mcp-use.json"), "utf-8")
+    );
+    expect(manifest.entryPoint).toBe("dist/mcp/index.cjs");
+  }, 90000);
+
+  it("builds an ESM artifact when the host package.json is type: module", async () => {
+    // Output format must follow the host's runtime module system (package.json
+    // "type"), not tsconfig "module" — so a type:module host yields .mjs.
+    writeFileSync(
+      join(projectDir, "package.json"),
+      JSON.stringify(
+        {
+          name: "mcp-dir-build-fixture",
+          version: "0.0.0",
+          type: "module",
+          dependencies: { next: "^16.0.0" },
+        },
+        null,
+        2
+      )
+    );
+
+    const result = await runCLI(["build", "--mcp-dir", "src/mcp"], projectDir);
+    const combined = result.stdout + result.stderr;
+
+    expect(result.exitCode).toBe(0);
+    expect(combined).toMatch(/MCP server built to dist[/\\]mcp[/\\]index\.mjs/);
+
+    const serverOutput = join(projectDir, "dist", "mcp", "index.mjs");
+    expect(existsSync(serverOutput)).toBe(true);
 
     const manifest = JSON.parse(
       readFileSync(join(projectDir, "dist", "mcp-use.json"), "utf-8")
