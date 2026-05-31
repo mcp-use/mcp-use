@@ -49,7 +49,9 @@ function isBareSpecifier(specifier: string): boolean {
   return (
     !specifier.startsWith(".") &&
     !specifier.startsWith("/") &&
-    !specifier.startsWith("file:")
+    !specifier.startsWith("file:") &&
+    !path.isAbsolute(specifier) &&
+    !/^[A-Za-z]:[\\/]/.test(specifier)
   );
 }
 
