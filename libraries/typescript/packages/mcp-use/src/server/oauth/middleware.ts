@@ -94,8 +94,13 @@ export function createBearerAuthMiddleware(
 
       await next();
     } catch (error) {
+      // Log detailed error server-side for debugging
+      console.error("[OAuth Middleware] Token verification failed:", error);
+
+      // Return generic error to client to avoid leaking internal details
+      // (JWKS endpoint URLs, provider config, stack traces, etc.)
       c.header("WWW-Authenticate", getWWWAuthenticateHeader());
-      return c.json({ error: `Invalid token: ${error}` }, 401);
+      return c.json({ error: "Invalid token" }, 401);
     }
   };
 }

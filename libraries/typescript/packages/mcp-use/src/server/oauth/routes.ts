@@ -306,9 +306,22 @@ export function setupOAuthRoutes(
     }
 
     // DCR-direct mode: proxy to upstream
+    // Per RFC 8414 §3, the well-known segment is inserted between the host
+    // component and the path component of the issuer — not appended at the end.
+    // For issuer https://auth.example.com/oauth/2.1 the correct metadata URL is:
+    //   https://auth.example.com/.well-known/oauth-authorization-server/oauth/2.1
     try {
       const issuer = oauth.getIssuer();
-      const metadataUrl = `${issuer}/.well-known/oauth-authorization-server`;
+      const u = new URL(issuer);
+      const issuerPath = u.pathname.replace(/\/$/, "");
+      // Determine the well-known segment from the request path
+      const wellKnownMatch = requestPath.match(
+        /\/\.well-known\/(oauth-authorization-server|openid-configuration)/
+      );
+      const wellKnownSegment = wellKnownMatch
+        ? wellKnownMatch[0]
+        : "/.well-known/oauth-authorization-server";
+      const metadataUrl = `${u.origin}${wellKnownSegment}${issuerPath}`;
       console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
       const response = await fetch(metadataUrl);
 

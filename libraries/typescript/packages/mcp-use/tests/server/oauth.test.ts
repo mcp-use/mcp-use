@@ -164,6 +164,144 @@ describe("server OAuth integration", () => {
     expect(authorized.status).toBe(200);
   });
 
+  it("constructs correct RFC 8414 metadata URL for path-suffix issuer", async () => {
+    // Simulate an authorization server with a path-suffix issuer (e.g. PropelAuth)
+    // Per RFC 8414 §3, the well-known segment goes between host and path.
+    // For issuer http://127.0.0.1:{port}/oauth/2.1 the metadata URL should be:
+    //   http://127.0.0.1:{port}/.well-known/oauth-authorization-server/oauth/2.1
+    const upstream = new Hono();
+    upstream.get(
+      "/.well-known/oauth-authorization-server/oauth/2.1",
+      (c) => {
+        return c.json({
+          issuer: "http://127.0.0.1/placeholder",
+          authorization_endpoint: "http://127.0.0.1/authorize",
+          token_endpoint: "http://127.0.0.1/token",
+        });
+      }
+    );
+
+    const upstreamSvc = await listenOnRandomPort(upstream);
+    closers.push(upstreamSvc.close);
+
+    // Create an OAuthProvider whose issuer has a path suffix
+    const providerIssuer = `${upstreamSvc.baseUrl}/oauth/2.1`;
+    const oauthProvider = {
+      issuer: providerIssuer,
+      authEndpoint: `${upstreamSvc.baseUrl}/authorize`,
+      tokenEndpoint: `${upstreamSvc.baseUrl}/token`,
+    };
+    // Build a minimal OAuthProvider that returns the path-suffix issuer
+    const provider = {
+      getIssuer: () => providerIssuer,
+      getAuthEndpoint: () => oauthProvider.authEndpoint,
+      getTokenEndpoint: () => oauthProvider.tokenEndpoint,
+      getScopesSupported: () => ["openid"],
+      getGrantTypesSupported: () => ["authorization_code"],
+      verifyToken: stubVerifyToken,
+    };
+
+    const app = new Hono();
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, provider, svc.baseUrl);
+
+    // The handler should fetch from the RFC 8414 correct URL
+    const response = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server`
+    );
+    expect(response.status).toBe(200);
+
+    const metadata = await response.json();
+    expect(metadata).toHaveProperty("issuer");
+  });
+
+  it("constructs correct RFC 8414 metadata URL for OIDC discovery with path-suffix issuer", async () => {
+    const upstream = new Hono();
+    upstream.get(
+      "/.well-known/openid-configuration/oauth/2.1",
+      (c) => {
+        return c.json({
+          issuer: "http://127.0.0.1/placeholder",
+          authorization_endpoint: "http://127.0.0.1/authorize",
+          token_endpoint: "http://127.0.0.1/token",
+        });
+      }
+    );
+
+    const upstreamSvc = await listenOnRandomPort(upstream);
+    closers.push(upstreamSvc.close);
+
+    const providerIssuer = `${upstreamSvc.baseUrl}/oauth/2.1`;
+    const provider = {
+      getIssuer: () => providerIssuer,
+      getAuthEndpoint: () => `${upstreamSvc.baseUrl}/authorize`,
+      getTokenEndpoint: () => `${upstreamSvc.baseUrl}/token`,
+      getScopesSupported: () => ["openid"],
+      getGrantTypesSupported: () => ["authorization_code"],
+      verifyToken: stubVerifyToken,
+    };
+
+    const app = new Hono();
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, provider, svc.baseUrl);
+
+    // The handler should fetch from the RFC 8414 correct URL for OIDC too
+    const response = await fetch(
+      `${svc.baseUrl}/.well-known/openid-configuration`
+    );
+    expect(response.status).toBe(200);
+
+    const metadata = await response.json();
+    expect(metadata).toHaveProperty("issuer");
+  });
+
+  it("constructs correct metadata URL for issuer without path", async () => {
+    // Verify that issuers without a path component still work correctly
+    // For issuer http://127.0.0.1:{port} the metadata URL should be:
+    //   http://127.0.0.1:{port}/.well-known/oauth-authorization-server
+    const upstream = new Hono();
+    upstream.get(
+      "/.well-known/oauth-authorization-server",
+      (c) => {
+        return c.json({
+          issuer: "http://127.0.0.1/placeholder",
+          authorization_endpoint: "http://127.0.0.1/authorize",
+          token_endpoint: "http://127.0.0.1/token",
+        });
+      }
+    );
+
+    const upstreamSvc = await listenOnRandomPort(upstream);
+    closers.push(upstreamSvc.close);
+
+    const provider = {
+      getIssuer: () => upstreamSvc.baseUrl,
+      getAuthEndpoint: () => `${upstreamSvc.baseUrl}/authorize`,
+      getTokenEndpoint: () => `${upstreamSvc.baseUrl}/token`,
+      getScopesSupported: () => ["openid"],
+      getGrantTypesSupported: () => ["authorization_code"],
+      verifyToken: stubVerifyToken,
+    };
+
+    const app = new Hono();
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, provider, svc.baseUrl);
+
+    const response = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server`
+    );
+    expect(response.status).toBe(200);
+
+    const metadata = await response.json();
+    expect(metadata).toHaveProperty("issuer");
+  });
+
   it("returns configured clientId from /register endpoint", async () => {
     const app = new Hono();
 
