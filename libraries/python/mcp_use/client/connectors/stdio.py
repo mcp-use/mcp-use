@@ -179,4 +179,4 @@ class StdioConnector(BaseConnector):
     @property
     def public_identifier(self) -> str:
         """Get the identifier for the connector."""
-        return f"stdio:{self.command} {' '.join(self.args)}"
+        return f"stdio:{self.command}" + (f" {' '.join(self.args)}" if self.args else "")
