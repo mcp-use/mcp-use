@@ -691,6 +691,7 @@ class MCPAgent:
         success = False
         final_output = None
         steps_taken = 0
+        self.tools_used_names = []
 
         try:
             # 1. Initialize if needed
@@ -974,7 +975,7 @@ class MCPAgent:
             raise RuntimeError("MCP agent failed to initialise – call initialise() first?")
 
         # 2. Configure max steps -------------------------------------------------
-        self.max_steps = max_steps or self.max_steps
+        effective_max_steps = max_steps or self.max_steps
 
         # 3. Build inputs --------------------------------------------------------
         human_query = self._ensure_human_message(query)
@@ -983,7 +984,7 @@ class MCPAgent:
         inputs = {"messages": [*langchain_history, human_query]}
 
         # 4. Stream & collect response chunks ------------------------------------
-        recursion_limit = self.max_steps * 2
+        recursion_limit = effective_max_steps * 2
         # Collect AI message content from streaming chunks
         turn_messages = []
 
