@@ -132,9 +132,9 @@ export function computeClaudeResourceDomain(domain: string): string {
     .slice(0, 32)}.claudemcpcontent.com`;
 }
 
-export function getMcpUiResourceDomain(
-  resource: { _meta?: Record<string, unknown> }
-): string | undefined {
+export function getMcpUiResourceDomain(resource: {
+  _meta?: Record<string, unknown>;
+}): string | undefined {
   const uiMeta = resource._meta?.ui as Record<string, unknown> | undefined;
   const domain = uiMeta?.domain;
   return typeof domain === "string" && domain.length > 0 ? domain : undefined;
