@@ -8,7 +8,7 @@
 import type { Context, Hono as HonoType } from "hono";
 import { join } from "node:path";
 import { Telemetry } from "../../telemetry/telemetry-node.js";
-import { generateLandingPage, isBrowserLandingRequest } from "../landing.js";
+import { generateLandingPage } from "../landing.js";
 import type { SessionData, StreamManager } from "../sessions/index.js";
 import {
   FileSystemSessionStore,
@@ -233,71 +233,79 @@ export async function mountMcp(
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
     // Detect browser GET requests and return landing page
-    const acceptHeader = c.req.header("Accept") || "";
-    if (isBrowserLandingRequest(c.req.method, acceptHeader)) {
-      const fullUrl = getFullUrl(c);
-      const origin = new URL(fullUrl).origin;
-      const instance = mcpServerInstance as {
-        favicon?: string;
-        config?: { icons?: Array<{ src: string }>; favicon?: string };
-        registrations?: {
-          tools: Map<string, { config: { description?: string } }>;
-          prompts: Map<string, { config: { description?: string } }>;
-          resources: Map<
-            string,
-            { config: { uri: string; name?: string; description?: string } }
-          >;
+    if (c.req.method === "GET") {
+      const acceptHeader = c.req.header("Accept") || "";
+      const isBrowser =
+        acceptHeader.includes("text/html") ||
+        (!acceptHeader.includes("application/json") &&
+          !acceptHeader.includes("text/event-stream"));
+
+      if (isBrowser) {
+        const fullUrl = getFullUrl(c);
+        const origin = new URL(fullUrl).origin;
+        const instance = mcpServerInstance as {
+          favicon?: string;
+          config?: { icons?: Array<{ src: string }>; favicon?: string };
+          registrations?: {
+            tools: Map<string, { config: { description?: string } }>;
+            prompts: Map<string, { config: { description?: string } }>;
+            resources: Map<
+              string,
+              { config: { uri: string; name?: string; description?: string } }
+            >;
+          };
         };
-      };
-      let iconUrl: string | undefined;
-      const iconSrc =
-        instance.favicon ??
-        instance.config?.favicon ??
-        instance.config?.icons?.[0]?.src;
-      if (iconSrc) {
-        iconUrl = iconSrc.startsWith("http")
-          ? iconSrc
-          : `${origin}/mcp-use/public/${iconSrc.replace(/^\//, "")}`;
+        let iconUrl: string | undefined;
+        const iconSrc =
+          instance.favicon ??
+          instance.config?.favicon ??
+          instance.config?.icons?.[0]?.src;
+        if (iconSrc) {
+          iconUrl = iconSrc.startsWith("http")
+            ? iconSrc
+            : `${origin}/mcp-use/public/${iconSrc.replace(/^\//, "")}`;
+        }
+        const regs = instance.registrations;
+        const landingTools =
+          regs?.tools &&
+          Array.from(regs.tools.entries()).map(([name, r]) => ({
+            name,
+            description: r.config.description,
+          }));
+        const landingPrompts =
+          regs?.prompts &&
+          Array.from(regs.prompts.entries()).map(([name, r]) => ({
+            name,
+            description: r.config.description || undefined,
+          }));
+        const landingResources =
+          regs?.resources &&
+          Array.from(regs.resources.values()).map((r) => ({
+            uri: r.config.uri,
+            name: r.config.name,
+            description: r.config.description,
+          }));
+        const landingPage = generateLandingPage(
+          config.name,
+          config.version,
+          fullUrl,
+          config.description,
+          landingTools?.length ? landingTools : undefined,
+          landingPrompts?.length ? landingPrompts : undefined,
+          landingResources?.length ? landingResources : undefined,
+          iconUrl
+        );
+        return new Response(landingPage, {
+          status: 200,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        });
       }
-      const regs = instance.registrations;
-      const landingTools =
-        regs?.tools &&
-        Array.from(regs.tools.entries()).map(([name, r]) => ({
-          name,
-          description: r.config.description,
-        }));
-      const landingPrompts =
-        regs?.prompts &&
-        Array.from(regs.prompts.entries()).map(([name, r]) => ({
-          name,
-          description: r.config.description || undefined,
-        }));
-      const landingResources =
-        regs?.resources &&
-        Array.from(regs.resources.values()).map((r) => ({
-          uri: r.config.uri,
-          name: r.config.name,
-          description: r.config.description,
-        }));
-      const landingPage = generateLandingPage(
-        config.name,
-        config.version,
-        fullUrl,
-        config.description,
-        landingTools?.length ? landingTools : undefined,
-        landingPrompts?.length ? landingPrompts : undefined,
-        landingResources?.length ? landingResources : undefined,
-        iconUrl
-      );
-      return new Response(landingPage, {
-        status: 200,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
     }
 
     // Auto-detect mode based on Accept header
     // Per MCP spec: clients that support SSE will send Accept: text/event-stream
     // Clients that don't (k6, curl, etc.) should work in stateless mode
+    const acceptHeader = c.req.header("Accept") || c.req.header("accept") || "";
     const clientSupportsSSE = acceptHeader.includes("text/event-stream");
 
     // Use stateless mode if:
