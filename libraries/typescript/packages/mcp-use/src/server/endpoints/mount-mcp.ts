@@ -233,8 +233,7 @@ export async function mountMcp(
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
     // Detect browser GET requests and return landing page
-    const acceptHeader =
-      c.req.header("Accept") || c.req.header("accept") || "";
+    const acceptHeader = c.req.header("Accept") || c.req.header("accept") || "";
     if (isBrowserLandingRequest(c.req.method, acceptHeader)) {
       const fullUrl = getFullUrl(c);
       const origin = new URL(fullUrl).origin;
