@@ -36,9 +36,6 @@ export {
   type VerifyToken,
 } from "./oauth-proxy.js";
 
-// Export utilities
-export { createBearerAuthMiddleware } from "./middleware.js";
-export { setupOAuthRoutes, isOAuthProxy } from "./routes.js";
 export {
   getAuth,
   hasAnyScope,
@@ -47,9 +44,3 @@ export {
   requireScope,
 } from "./utils.js";
 export type { AuthInfo } from "./utils.js";
-
-// Export setup
-export {
-  setupOAuthForServer,
-  type SetupOAuthForServerOptions,
-} from "./setup.js";

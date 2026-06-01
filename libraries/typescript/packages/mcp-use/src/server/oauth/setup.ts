@@ -36,7 +36,7 @@ interface OAuthSetupState {
  * @param state - OAuth setup state to track completion
  * @returns Updated OAuth setup state with provider and middleware
  */
-export interface SetupOAuthForServerOptions {
+interface SetupOAuthForServerOptions {
   publicLandingPage?: boolean;
 }
 
