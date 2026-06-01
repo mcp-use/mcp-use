@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBearerAuthMiddleware } from "../../src/server/oauth/middleware.js";
 import { setupOAuthRoutes } from "../../src/server/oauth/routes.js";
 import { oauthProxy } from "../../src/server/oauth/oauth-proxy.js";
+import { setupOAuthForServer } from "../../src/server/oauth/setup.js";
 
 // A stub verifier that accepts any token. Used in tests that don't exercise
 // the verification path (routes, metadata, registration).
@@ -135,7 +136,7 @@ describe("server OAuth integration", () => {
     });
   });
 
-  it("allows browser GET to /mcp when publicLandingPage is enabled", async () => {
+  it("allows browser GET to /mcp through OAuth when publicLandingPage is enabled", async () => {
     const app = new Hono();
 
     const proxy = oauthProxy({
@@ -148,9 +149,12 @@ describe("server OAuth integration", () => {
       }),
     });
 
-    app.use(
-      "/mcp/*",
-      createBearerAuthMiddleware(proxy, undefined, { publicLandingPage: true })
+    await setupOAuthForServer(
+      app,
+      proxy,
+      "http://localhost:3000",
+      { complete: false },
+      { publicLandingPage: true }
     );
     app.get("/mcp", (c) =>
       c.html("<html><body>landing</body></html>", 200, {
@@ -158,10 +162,7 @@ describe("server OAuth integration", () => {
       })
     );
 
-    const svc = await listenOnRandomPort(app);
-    closers.push(svc.close);
-
-    const response = await fetch(`${svc.baseUrl}/mcp`, {
+    const response = await app.request("/mcp", {
       headers: { Accept: "text/html" },
     });
 
@@ -169,7 +170,7 @@ describe("server OAuth integration", () => {
     expect(await response.text()).toContain("landing");
   });
 
-  it("still requires bearer token for MCP JSON when publicLandingPage is enabled", async () => {
+  it("still requires bearer token for MCP JSON at /mcp when publicLandingPage is enabled", async () => {
     const app = new Hono();
 
     const proxy = oauthProxy({
@@ -182,22 +183,46 @@ describe("server OAuth integration", () => {
       }),
     });
 
-    app.use(
-      "/mcp/*",
-      createBearerAuthMiddleware(proxy, undefined, { publicLandingPage: true })
+    await setupOAuthForServer(
+      app,
+      proxy,
+      "http://localhost:3000",
+      { complete: false },
+      { publicLandingPage: true }
     );
     app.post("/mcp", (c) => c.json({ ok: true }));
 
-    const svc = await listenOnRandomPort(app);
-    closers.push(svc.close);
-
-    const unauthorized = await fetch(`${svc.baseUrl}/mcp`, {
+    const unauthorized = await app.request("/mcp", {
       method: "POST",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ jsonrpc: "2.0", method: "initialize", id: 1 }),
+    });
+    expect(unauthorized.status).toBe(401);
+  });
+
+  it("requires bearer token for /mcp when publicLandingPage is disabled", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => ({
+        payload: { sub: "user-1", scope: "openid profile" },
+      }),
+    });
+
+    await setupOAuthForServer(app, proxy, "http://localhost:3000", {
+      complete: false,
+    });
+    app.get("/mcp", (c) => c.html("<html><body>landing</body></html>"));
+
+    const unauthorized = await app.request("/mcp", {
+      headers: { Accept: "text/html" },
     });
     expect(unauthorized.status).toBe(401);
   });
