@@ -38,10 +38,7 @@ export {
 
 // Export utilities
 export { createBearerAuthMiddleware } from "./middleware.js";
-export {
-  setupOAuthRoutes,
-  isOAuthProxy,
-} from "./routes.js";
+export { setupOAuthRoutes, isOAuthProxy } from "./routes.js";
 export {
   getAuth,
   hasAnyScope,
