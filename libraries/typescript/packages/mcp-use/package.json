@@ -166,6 +166,7 @@
     "example:client:sampling": "tsx examples/client/node/communication/sampling-client.ts",
     "example:server:elicitation": "tsx examples/server/features/elicitation/src/server.ts",
     "example:server:completion": "tsx examples/server/features/completion/src/server.ts",
+    "example:server:public-landing-page": "tsx examples/server/features/public-landing-page/src/server.ts",
     "example:client:completion": "tsx examples/client/node/communication/completion-client.ts",
     "example:sampling": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/features/sampling/src/server.ts & sleep 3 && tsx examples/client/node/communication/sampling-client.ts",
     "example:completion": "lsof -ti:3000 | xargs kill -9 2>/dev/null; tsx examples/server/features/completion/src/server.ts & sleep 6 && tsx examples/client/node/communication/completion-client.ts",
