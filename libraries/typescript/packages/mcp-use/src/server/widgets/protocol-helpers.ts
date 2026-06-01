@@ -5,6 +5,9 @@
  * Reduces duplication in ui-resource-registration.ts
  */
 
+import { createHash } from "node:crypto";
+import type { Implementation } from "@modelcontextprotocol/sdk/types.js";
+
 import { McpAppsAdapter } from "./adapters/mcp-apps.js";
 import { AppsSdkAdapter } from "./adapters/apps-sdk.js";
 import type { UIResourceDefinition } from "../types/resource.js";
@@ -112,6 +115,50 @@ export function buildResourceUiMeta(
   }
 
   return uiMeta && Object.keys(uiMeta).length > 0 ? uiMeta : undefined;
+}
+
+export function isClaudeClient(clientInfo: Implementation): boolean {
+  return clientInfo.name.toLowerCase().includes("claude");
+}
+
+export function computeClaudeResourceDomain(domain: string): string {
+  if (domain.endsWith(".claudemcpcontent.com")) {
+    return domain;
+  }
+
+  return `${createHash("sha256")
+    .update(domain)
+    .digest("hex")
+    .slice(0, 32)}.claudemcpcontent.com`;
+}
+
+export function getMcpUiResourceDomain(
+  resource: { _meta?: Record<string, unknown> }
+): string | undefined {
+  const uiMeta = resource._meta?.ui as Record<string, unknown> | undefined;
+  const domain = uiMeta?.domain;
+  return typeof domain === "string" && domain.length > 0 ? domain : undefined;
+}
+
+export function applyClaudeResourceDomain(
+  resource: { _meta?: Record<string, unknown> },
+  clientInfo: Implementation
+): void {
+  if (!isClaudeClient(clientInfo)) {
+    return;
+  }
+
+  const domain = getMcpUiResourceDomain(resource);
+  if (!domain) {
+    return;
+  }
+
+  resource._meta = resource._meta ?? {};
+  const uiMeta = resource._meta.ui as Record<string, unknown> | undefined;
+  resource._meta.ui = {
+    ...uiMeta,
+    domain: computeClaudeResourceDomain(domain),
+  };
 }
 
 /**

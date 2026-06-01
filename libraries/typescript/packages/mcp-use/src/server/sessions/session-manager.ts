@@ -8,6 +8,7 @@
 import type { Context } from "hono";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Serializable session metadata
@@ -23,7 +24,7 @@ export interface SessionMetadata {
   /** Client capabilities advertised during initialization */
   clientCapabilities?: Record<string, unknown>;
   /** Client info (name, version) */
-  clientInfo?: Record<string, unknown>;
+  clientInfo?: Implementation;
   /** Protocol version negotiated during initialization */
   protocolVersion?: string;
   /** Progress token for current tool call (if any) */
