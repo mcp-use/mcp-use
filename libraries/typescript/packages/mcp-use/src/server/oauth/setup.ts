@@ -75,8 +75,7 @@ export async function setupOAuthForServer(
   if (options?.publicLandingPage) {
     const bearerMiddleware = middleware;
     middleware = (c: Context, next: Next) => {
-      const acceptHeader =
-        c.req.header("Accept") || c.req.header("accept") || "";
+      const acceptHeader = c.req.header("Accept") || "";
       if (
         c.req.path === "/mcp" &&
         isBrowserLandingRequest(c.req.method, acceptHeader)
