@@ -51,7 +51,10 @@ export function collectOperations(
         resolvedOperation.parameters
       );
       const requestBody = resolvedOperation.requestBody
-        ? resolveRef<OpenAPIRequestBodyObject>(spec, resolvedOperation.requestBody)
+        ? resolveRef<OpenAPIRequestBodyObject>(
+            spec,
+            resolvedOperation.requestBody
+          )
         : undefined;
 
       const item: CollectedOpenAPIOperation = {
@@ -104,7 +107,9 @@ function isIncluded(
     }
   }
 
-  return !(options.exclude ?? []).some((rule) => matchesExcludeRule(operation, rule));
+  return !(options.exclude ?? []).some((rule) =>
+    matchesExcludeRule(operation, rule)
+  );
 }
 
 function matchesExcludeRule(
@@ -115,7 +120,10 @@ function matchesExcludeRule(
     return false;
   }
 
-  if (rule.operationId && !matchesPattern(rule.operationId, operation.operation.operationId ?? "")) {
+  if (
+    rule.operationId &&
+    !matchesPattern(rule.operationId, operation.operation.operationId ?? "")
+  ) {
     return false;
   }
 

@@ -1,6 +1,8 @@
 import type { OpenAPIDocument, OpenAPIReferenceObject } from "./types.js";
 
-export function isReferenceObject(value: unknown): value is OpenAPIReferenceObject {
+export function isReferenceObject(
+  value: unknown
+): value is OpenAPIReferenceObject {
   return (
     !!value &&
     typeof value === "object" &&
@@ -8,7 +10,10 @@ export function isReferenceObject(value: unknown): value is OpenAPIReferenceObje
   );
 }
 
-export function resolveRef<T>(spec: OpenAPIDocument, value: T | OpenAPIReferenceObject): T {
+export function resolveRef<T>(
+  spec: OpenAPIDocument,
+  value: T | OpenAPIReferenceObject
+): T {
   if (!isReferenceObject(value)) {
     return value;
   }

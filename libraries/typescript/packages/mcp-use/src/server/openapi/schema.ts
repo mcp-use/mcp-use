@@ -42,7 +42,7 @@ export function createToolInputSchema(
   return z.object(shape);
 }
 
-export function schemaToZod(
+function schemaToZod(
   spec: OpenAPIDocument,
   schemaOrRef: OpenAPISchemaObject | OpenAPIReferenceObject
 ): z.ZodTypeAny {
@@ -63,7 +63,10 @@ export function schemaToZod(
       return withNullable(schema, zodVariants[0]);
     }
     if (zodVariants.length >= 2) {
-      return withNullable(schema, z.union(zodVariants as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]]));
+      return withNullable(
+        schema,
+        z.union(zodVariants as [z.ZodTypeAny, z.ZodTypeAny, ...z.ZodTypeAny[]])
+      );
     }
   }
 
@@ -75,7 +78,9 @@ export function schemaToZod(
     if (objectSchemas.length > 0) {
       return withNullable(
         schema,
-        objectSchemas.slice(1).reduce((merged, current) => merged.merge(current), objectSchemas[0])
+        objectSchemas
+          .slice(1)
+          .reduce((merged, current) => merged.merge(current), objectSchemas[0])
       );
     }
   }
@@ -121,7 +126,9 @@ function objectSchemaToZod(
         ? resolvedProperty.description
         : undefined;
     const propertySchema = schemaToZod(spec, property);
-    const described = description ? propertySchema.describe(description) : propertySchema;
+    const described = description
+      ? propertySchema.describe(description)
+      : propertySchema;
 
     shape[name] = required.has(name) ? described : described.optional();
   }
@@ -129,7 +136,9 @@ function objectSchemaToZod(
   return z.object(shape);
 }
 
-function enumToZod(values: Array<string | number | boolean | null>): z.ZodTypeAny {
+function enumToZod(
+  values: Array<string | number | boolean | null>
+): z.ZodTypeAny {
   if (values.every((value): value is string => typeof value === "string")) {
     return z.enum(values as [string, ...string[]]);
   }
@@ -147,7 +156,10 @@ function enumToZod(values: Array<string | number | boolean | null>): z.ZodTypeAn
   );
 }
 
-function withNullable(schema: OpenAPISchemaObject, zodSchema: z.ZodTypeAny): z.ZodTypeAny {
+function withNullable(
+  schema: OpenAPISchemaObject,
+  zodSchema: z.ZodTypeAny
+): z.ZodTypeAny {
   if (
     schema.nullable ||
     (Array.isArray(schema.type) && schema.type.includes("null")) ||

@@ -1,5 +1,9 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { error, object as objectResponse, text } from "../utils/response-helpers.js";
+import {
+  error,
+  object as objectResponse,
+  text,
+} from "../utils/response-helpers.js";
 import type {
   CollectedOpenAPIOperation,
   FromOpenAPIOptions,
@@ -14,7 +18,8 @@ export async function callOpenAPIOperation(
   const fetchImpl = options.fetch ?? fetch;
   const url = buildUrl(operation, params, options);
   const headers = buildHeaders(operation.parameters, params, options);
-  const body = params.body === undefined ? undefined : JSON.stringify(params.body);
+  const body =
+    params.body === undefined ? undefined : JSON.stringify(params.body);
 
   if (body !== undefined && !hasHeader(headers, "content-type")) {
     headers["content-type"] = "application/json";
@@ -32,7 +37,10 @@ export async function callOpenAPIOperation(
     return error(await response.text());
   }
 
-  if (contentType.includes("application/json") || contentType.includes("+json")) {
+  if (
+    contentType.includes("application/json") ||
+    contentType.includes("+json")
+  ) {
     return objectResponse(await response.json());
   }
 
@@ -115,5 +123,7 @@ function ensureTrailingSlash(url: string): string {
 }
 
 function hasHeader(headers: Record<string, string>, name: string): boolean {
-  return Object.keys(headers).some((headerName) => headerName.toLowerCase() === name);
+  return Object.keys(headers).some(
+    (headerName) => headerName.toLowerCase() === name
+  );
 }

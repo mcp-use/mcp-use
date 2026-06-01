@@ -134,7 +134,10 @@ type Todo = {
 };
 
 const todos = new Map<string, Todo>([
-  ["todo-1", { id: "todo-1", title: "Write the OpenAPI spec", completed: true }],
+  [
+    "todo-1",
+    { id: "todo-1", title: "Write the OpenAPI spec", completed: true },
+  ],
   [
     "todo-2",
     { id: "todo-2", title: "Generate MCP tools from it", completed: false },
@@ -173,7 +176,9 @@ server.app.patch("/api/todos/:id", async (c) => {
     return c.json({ error: "Todo not found" }, 404);
   }
 
-  const patch = (await c.req.json()) as Partial<Pick<Todo, "title" | "completed">>;
+  const patch = (await c.req.json()) as Partial<
+    Pick<Todo, "title" | "completed">
+  >;
   const updated = { ...todo, ...patch };
   todos.set(id, updated);
 

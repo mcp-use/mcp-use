@@ -236,7 +236,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * Each included OpenAPI operation is registered as an MCP tool.
    */
-  public static fromOpenAPI(options: FromOpenAPIOptions): MCPServerClass<false> {
+  public static fromOpenAPI(
+    options: FromOpenAPIOptions
+  ): MCPServerClass<false> {
     const server = new MCPServerClass({
       name: options.name ?? options.spec.info.title,
       version: options.version ?? options.spec.info.version ?? "1.0.0",
