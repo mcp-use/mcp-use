@@ -5,6 +5,20 @@
  * from Claude Code, Cursor, VS Code, ChatGPT, and Manufact Inspector (hosted).
  */
 
+export function isBrowserLandingRequest(
+  method: string,
+  acceptHeader: string
+): boolean {
+  if (method !== "GET") {
+    return false;
+  }
+  return (
+    acceptHeader.includes("text/html") ||
+    (!acceptHeader.includes("application/json") &&
+      !acceptHeader.includes("text/event-stream"))
+  );
+}
+
 /**
  * Escapes HTML special characters to prevent XSS in user-provided content.
  */

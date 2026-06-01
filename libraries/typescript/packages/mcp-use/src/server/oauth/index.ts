@@ -36,7 +36,6 @@ export {
   type VerifyToken,
 } from "./oauth-proxy.js";
 
-// Export utilities
 export {
   getAuth,
   hasAnyScope,

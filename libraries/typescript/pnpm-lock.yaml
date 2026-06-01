@@ -945,6 +945,25 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/mcp-use/examples/server/features/public-landing-page:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.6.0
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   packages/mcp-use/examples/server/features/sampling:
     dependencies:
       mcp-use:
