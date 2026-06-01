@@ -41,8 +41,6 @@ export { createBearerAuthMiddleware } from "./middleware.js";
 export {
   setupOAuthRoutes,
   isOAuthProxy,
-  createAuthorizeHandler,
-  createTokenHandler,
 } from "./routes.js";
 export {
   getAuth,
@@ -56,6 +54,5 @@ export type { AuthInfo } from "./utils.js";
 // Export setup
 export {
   setupOAuthForServer,
-  type OAuthSetupState,
   type SetupOAuthForServerOptions,
 } from "./setup.js";
