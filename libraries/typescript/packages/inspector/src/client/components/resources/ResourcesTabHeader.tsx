@@ -8,12 +8,19 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import { cn } from "@/client/lib/utils";
+
+/** Which sub-view is shown inside the Resources left panel */
+export type ResourcesViewTab = "resources" | "templates";
 
 interface ResourcesTabHeaderProps {
   activeTab: "resources";
+  viewTab: ResourcesViewTab;
   isSearchExpanded: boolean;
   searchQuery: string;
   filteredResourcesCount: number;
+  templatesCount: number;
+  onViewTabChange: (tab: ResourcesViewTab) => void;
   onSearchExpand: () => void;
   onSearchChange: (query: string) => void;
   onSearchBlur: () => void;
@@ -24,9 +31,12 @@ interface ResourcesTabHeaderProps {
 }
 
 export function ResourcesTabHeader({
+  viewTab,
   isSearchExpanded,
   searchQuery,
   filteredResourcesCount,
+  templatesCount,
+  onViewTabChange,
   onSearchExpand,
   onSearchChange,
   onSearchBlur,
@@ -35,6 +45,8 @@ export function ResourcesTabHeader({
   isRefreshing = false,
 }: ResourcesTabHeaderProps) {
   return (
+    <div className="flex flex-col border-b border-gray-200 dark:border-zinc-700">
+      {/* ── Title row ──────────────────────────────────────────────────── */}
     <div className="flex flex-row items-center justify-between p-4 sm:p-4 py-3 gap-2">
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
@@ -42,12 +54,23 @@ export function ResourcesTabHeader({
             <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
               Resources
             </h2>
+            {viewTab === "resources" && (
             <Badge
               className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
               variant="outline"
             >
               {filteredResourcesCount}
             </Badge>
+            )}
+            {viewTab === "templates" && templatesCount > 0 && (
+                <Badge
+                  className="bg-zinc-500/20 text-zinc-600 dark:text-zinc-400 border-transparent"
+                  variant="outline"
+                >
+                  {templatesCount}
+                </Badge>
+            )}
+            {viewTab === "resources" && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -64,6 +87,7 @@ export function ResourcesTabHeader({
                 <Kbd>F</Kbd>
               </TooltipContent>
             </Tooltip>
+            )}
             {onRefresh && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -97,6 +121,39 @@ export function ResourcesTabHeader({
           />
         )}
       </div>
+    </div>
+
+      {/* ── Sub-tab toggle: Resources | Templates ──────────────────────── */}
+      {templatesCount > 0 && (
+        <div className="flex px-4 pb-2 gap-1">
+          <button
+            type="button"
+            onClick={() => onViewTabChange("resources")}
+            className={cn(
+              "flex-1 text-xs font-medium py-1 rounded-md transition-colors",
+              viewTab === "resources"
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+            )}
+            data-testid="resources-view-tab-resources"
+          >
+            Resources
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewTabChange("templates")}
+            className={cn(
+              "flex-1 text-xs font-medium py-1 rounded-md transition-colors",
+              viewTab === "templates"
+                ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+                : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+            )}
+            data-testid="resources-view-tab-templates"
+          >
+            Templates
+          </button>
+        </div>
+      )}
     </div>
   );
 }

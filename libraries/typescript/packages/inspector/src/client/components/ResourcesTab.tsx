@@ -6,7 +6,12 @@ import {
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CompleteRequestParams,
+  CompleteResult,
+  Resource,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import {
@@ -23,8 +28,11 @@ import {
   ResourcesList,
   ResourcesTabHeader,
 } from "./resources";
+import type { ResourcesViewTab } from "./resources/ResourcesTabHeader";
+import { ResourceTemplatePanel } from "./resources/ResourceTemplatePanel";
 import { RpcPanel } from "./shared";
 import { useConfig } from "./chat/useConfig";
+import { useCompletion } from "../hooks/useCompletion";
 import { copyToClipboard } from "@/client/utils/clipboard";
 
 export interface ResourcesTabRef {
@@ -39,17 +47,33 @@ interface ResourcesTabProps {
   isConnected: boolean;
   mcpServerUrl: string;
   refreshResources?: () => Promise<void>;
+  /**
+   * Resource templates from the MCP server (e.g. `file:///{path}`).
+   * When provided and non-empty, a "Templates" tab toggle appears in the
+   * resources list header so users can select and fill in template URIs.
+   */
+  resourceTemplates?: ResourceTemplate[];
+  /**
+   * The MCP complete() function. When provided, template variable fields
+   * and resource-related fields show autocomplete suggestions as the user
+   * types. Omit to fall back to plain inputs.
+   */
+  complete?: (params: CompleteRequestParams) => Promise<CompleteResult>;
 }
 
 /**
- * Render the Resources tab UI and manage its interactions (resource list, selection, result display, search, keyboard navigation, mobile/desktop layouts, copy/download/fullscreen actions, and RPC logger).
+ * Render the Resources tab UI and manage its interactions (resource list,
+ * selection, result display, search, keyboard navigation, mobile/desktop
+ * layouts, copy/download/fullscreen actions, RPC logger, and – when the server
+ * supports it – resource template completion).
  *
- * @param ref - Optional ref exposing `focusSearch()` and `blurSearch()` methods for programmatic search focus control.
- * @param resources - Array of resources to show and filter.
- * @param readResource - Function to read a resource by its URI; used when a resource is selected.
- * @param serverId - Identifier for the server; used for telemetry and RPC logger scope.
- * @param isConnected - When `true`, selecting a resource triggers `readResource`; when `false`, reads are skipped.
- * @returns The ResourcesTab React element.
+ * @param ref - Optional ref exposing `focusSearch()` and `blurSearch()`.
+ * @param resources - Array of concrete resources to show.
+ * @param readResource - Reads a resource by URI.
+ * @param serverId - Server identifier for telemetry and RPC logger scope.
+ * @param isConnected - Gates resource reads and completion requests.
+ * @param resourceTemplates - Optional list of URI template resources.
+ * @param complete - Optional MCP complete() for template variable suggestions.
  */
 export function ResourcesTab({
   ref,
@@ -59,6 +83,8 @@ export function ResourcesTab({
   isConnected,
   mcpServerUrl,
   refreshResources,
+  resourceTemplates = [],
+  complete,
 }: ResourcesTabProps & { ref?: React.RefObject<ResourcesTabRef | null> }) {
   // State
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -82,7 +108,21 @@ export function ResourcesTab({
   const [isMobile, setIsMobile] = useState(false);
   const [mobileView, setMobileView] = useState<"list" | "detail">("list");
 
-  // Detect mobile screen size
+  // ── Template state ────────────────────────────────────────────────────────
+  /** Which sub-view is shown in the left panel (resources vs templates) */
+  const [viewTab, setViewTab] = useState<ResourcesViewTab>("resources");
+  /** The currently-selected resource template */
+  const [selectedTemplate, setSelectedTemplate] =
+    useState<ResourceTemplate | null>(null);
+
+  // Completion hook for resource template variable suggestions
+  const { fetchResourceTemplateCompletion } = useCompletion({
+    complete,
+    isConnected,
+  });
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -94,12 +134,12 @@ export function ResourcesTab({
 
   // Handle mobile view transitions
   useEffect(() => {
-    if (selectedResource) {
+    if (selectedResource || selectedTemplate) {
       setMobileView("detail");
     } else {
       setMobileView("list");
     }
-  }, [selectedResource]);
+  }, [selectedResource, selectedTemplate]);
 
   // Expose focusSearch and blurSearch methods via ref
   useImperativeHandle(ref, () => ({
@@ -157,6 +197,7 @@ export function ResourcesTab({
   const handleResourceSelect = useCallback(
     async (resource: Resource) => {
       setSelectedResource(resource);
+      setSelectedTemplate(null);
 
       // Automatically read the resource when selected
       if (isConnected) {
@@ -226,10 +267,43 @@ export function ResourcesTab({
     [readResource, serverId, isConnected]
   );
 
-  // Reset focused index when filtered resources change
+  // ── Template selection / reading ──────────────────────────────────────────
+
+  const handleTemplateSelect = useCallback((template: ResourceTemplate) => {
+    setSelectedTemplate(template);
+    setSelectedResource(null);
+    setCurrentResult(null);
+  }, []);
+
+  /** Called by ResourceTemplatePanel when the user clicks "Read Resource" */
+  const handleTemplateRead = useCallback(
+    async (uri: string) => {
+      if (!isConnected) return;
+      setIsLoading(true);
+      const timestamp = Date.now();
+      try {
+        const result = await readResource(uri);
+        setCurrentResult({ uri, result, timestamp });
+      } catch (error) {
+        setCurrentResult({
+          uri,
+          result: { contents: [], _meta: {} },
+          error: error instanceof Error ? error.message : "Unknown error",
+          timestamp,
+        });
+      } finally {
+        setIsLoading(false);
+        if (isMobile) setMobileView("detail");
+      }
+    },
+    [readResource, isConnected, isMobile]
+  );
+
+  // ── Keyboard navigation ───────────────────────────────────────────────────
+
   useEffect(() => {
     setFocusedIndex(-1);
-  }, [searchQuery, activeTab]);
+  }, [searchQuery, activeTab, viewTab]);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -244,7 +318,8 @@ export function ResourcesTab({
         return;
       }
 
-      const items = filteredResources;
+      const items =
+        viewTab === "resources" ? filteredResources : resourceTemplates;
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -260,27 +335,38 @@ export function ResourcesTab({
         });
       } else if (e.key === "Enter" && focusedIndex >= 0) {
         e.preventDefault();
-        const resource = filteredResources[focusedIndex];
-        if (resource) {
-          handleResourceSelect(resource);
+        if (viewTab === "resources") {
+          const resource = filteredResources[focusedIndex];
+          if (resource) handleResourceSelect(resource);
+        } else {
+          const template = resourceTemplates[focusedIndex];
+          if (template) handleTemplateSelect(template);
         }
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [focusedIndex, filteredResources, handleResourceSelect]);
+  }, [
+    focusedIndex, 
+    filteredResources,
+    resourceTemplates,
+    viewTab,
+    handleResourceSelect,
+    handleTemplateSelect,
+  ]);
 
-  // Scroll focused item into view
   useEffect(() => {
-    if (focusedIndex >= 0) {
+    if (focusedIndex >= 0 && viewTab === "resources") {
       const itemId = `resource-${filteredResources[focusedIndex]?.uri}`;
       const element = document.getElementById(itemId);
       if (element) {
         element.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
     }
-  }, [focusedIndex, filteredResources]);
+  }, [focusedIndex, filteredResources, viewTab]);
+
+  // ── Auto-selection from context ───────────────────────────────────────────
 
   // Handle auto-selection from context
   useEffect(() => {
@@ -313,18 +399,13 @@ export function ResourcesTab({
   // When resources change via HMR, update selectedResource to the new object reference
   useEffect(() => {
     if (selectedResource) {
-      const updatedResource = resources.find(
-        (r) => r.uri === selectedResource.uri
-      );
-      if (updatedResource && updatedResource !== selectedResource) {
-        // Resource definition changed - update the reference
+      const updated = resources.find((r) => r.uri === selectedResource.uri);
+      if (updated && updated !== selectedResource) {
         const hasChanges =
-          updatedResource.description !== selectedResource.description ||
-          updatedResource.mimeType !== selectedResource.mimeType ||
-          updatedResource.name !== selectedResource.name;
-        if (hasChanges) {
-          setSelectedResource(updatedResource);
-        }
+          updated.description !== selectedResource.description ||
+          updated.mimeType !== selectedResource.mimeType ||
+          updated.name !== selectedResource.name;
+        if (hasChanges) setSelectedResource(updated);
       }
     }
   }, [resources, selectedResource]);
@@ -376,6 +457,121 @@ export function ResourcesTab({
     }
   }, []);
 
+  // ── Shared sub-components ─────────────────────────────────────────────────
+
+  /** Left list panel contents — resources or templates depending on viewTab */
+  const renderLeftList = () => {
+    if (viewTab === "templates") {
+      if (resourceTemplates.length === 0) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              No resource templates available
+            </p>
+          </div>
+        );
+      }
+      return (
+        <div className="overflow-y-auto flex-1 overscroll-contain">
+          {resourceTemplates.map((tpl, index) => (
+            <button
+              key={tpl.uriTemplate}
+              type="button"
+              id={`template-${tpl.uriTemplate}`}
+              data-testid={`template-item-${tpl.name}`}
+              onClick={() => handleTemplateSelect(tpl)}
+              className={`w-full text-left cursor-pointer p-2 sm:p-4 border-b dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors group ${
+                selectedTemplate?.uriTemplate === tpl.uriTemplate
+                  ? "bg-zinc-50 dark:bg-zinc-800 border-l-4 border-l-zinc-500"
+                  : ""
+              } ${focusedIndex === index && viewTab === "templates" ? "ring-2 ring-zinc-500 dark:ring-zinc-400 ring-inset" : ""}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm font-mono truncate">
+                  {tpl.name}
+                </p>
+                <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">
+                  {tpl.uriTemplate}
+                </p>
+                {tpl.description && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                    {tpl.description}
+                  </p>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <ResourcesList
+        resources={filteredResources}
+        selectedResource={selectedResource}
+        onResourceSelect={handleResourceSelect}
+        focusedIndex={viewTab === "resources" ? focusedIndex : -1}
+      />
+    );
+  };
+
+  /** Right detail panel — ResourceTemplatePanel or ResourceResultDisplay */
+  const renderDetail = () => {
+    if (selectedTemplate && viewTab === "templates") {
+      return (
+        <ResourceTemplatePanel
+          template={selectedTemplate}
+          isConnected={isConnected}
+          onRead={handleTemplateRead}
+          onFetchSuggestions={(templateUri, varName, value) =>
+            fetchResourceTemplateCompletion(templateUri, varName, value)
+          }
+        />
+      );
+    }
+
+    return (
+      <ResourceResultDisplay
+        result={currentResult}
+        isLoading={isLoading}
+        previewMode={previewMode}
+        serverId={serverId}
+        readResource={readResource}
+        onTogglePreview={() => setPreviewMode(!previewMode)}
+        onCopy={handleCopy}
+        onDownload={handleDownload}
+        onFullscreen={handleFullscreen}
+        isCopied={isCopied}
+        selectedResource={selectedResource}
+        llmConfig={llmConfig}
+      />
+    );
+  };
+
+  const sharedHeaderProps = {
+    activeTab,
+    viewTab,
+    isSearchExpanded,
+    searchQuery,
+    filteredResourcesCount: filteredResources.length,
+    templatesCount: resourceTemplates.length,
+    onViewTabChange: (tab: ResourcesViewTab) => {
+      setViewTab(tab);
+      setSelectedResource(null);
+      setSelectedTemplate(null);
+      setCurrentResult(null);
+    },
+    onSearchExpand: () => setIsSearchExpanded(true),
+    onSearchChange: setSearchQuery,
+    onSearchBlur: handleSearchBlur,
+    onTabSwitch: () => {},
+    searchInputRef: searchInputRef as React.RefObject<HTMLInputElement>,
+    onRefresh: refreshResources ? handleRefresh : undefined,
+    isRefreshing,
+  };
+
+  // ── Mobile layout ─────────────────────────────────────────────────────────
+
   if (isMobile) {
     return (
       <div className="h-full flex flex-col overflow-hidden relative bg-background">
@@ -387,6 +583,7 @@ export function ResourcesTab({
               size="sm"
               onClick={() => {
                 setSelectedResource(null);
+                setSelectedTemplate(null);
                 setMobileView("list");
               }}
               className="p-0 h-8 w-8"
@@ -397,6 +594,7 @@ export function ResourcesTab({
               <button
                 onClick={() => {
                   setSelectedResource(null);
+                  setSelectedTemplate(null);
                   setMobileView("list");
                 }}
                 className="text-muted-foreground hover:text-foreground hover:underline cursor-pointer"
@@ -406,7 +604,9 @@ export function ResourcesTab({
               {mobileView === "detail" && (
                 <>
                   <span className="mx-2 text-muted-foreground">/</span>
-                  <span className="text-foreground">Content</span>
+                  <span className="text-foreground">
+                    {selectedTemplate ? selectedTemplate.name : "Content"}
+                  </span>
                 </>
               )}
             </div>
@@ -424,29 +624,8 @@ export function ResourcesTab({
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="absolute inset-0 flex flex-col bg-background z-0"
               >
-                <ResourcesTabHeader
-                  activeTab={activeTab}
-                  isSearchExpanded={isSearchExpanded}
-                  searchQuery={searchQuery}
-                  filteredResourcesCount={filteredResources.length}
-                  onSearchExpand={() => setIsSearchExpanded(true)}
-                  onSearchChange={setSearchQuery}
-                  onSearchBlur={handleSearchBlur}
-                  onTabSwitch={() => {}}
-                  searchInputRef={
-                    searchInputRef as React.RefObject<HTMLInputElement>
-                  }
-                  onRefresh={refreshResources ? handleRefresh : undefined}
-                  isRefreshing={isRefreshing}
-                />
-                <div className="flex flex-col h-full">
-                  <ResourcesList
-                    resources={filteredResources}
-                    selectedResource={selectedResource}
-                    onResourceSelect={handleResourceSelect}
-                    focusedIndex={focusedIndex}
-                  />
-                </div>
+                <ResourcesTabHeader {...sharedHeaderProps} />
+                <div className="flex flex-col h-full">{renderLeftList()}</div>
               </motion.div>
             )}
 
@@ -460,20 +639,7 @@ export function ResourcesTab({
                 className="absolute inset-0 bg-white dark:bg-zinc-900 z-10"
               >
                 <div ref={resourceDisplayRef} className="h-full">
-                  <ResourceResultDisplay
-                    result={currentResult}
-                    isLoading={isLoading}
-                    previewMode={previewMode}
-                    serverId={serverId}
-                    readResource={readResource}
-                    onTogglePreview={() => setPreviewMode(!previewMode)}
-                    onCopy={handleCopy}
-                    onDownload={handleDownload}
-                    onFullscreen={handleFullscreen}
-                    isCopied={isCopied}
-                    selectedResource={selectedResource}
-                    llmConfig={llmConfig}
-                  />
+                  {renderDetail()}
                 </div>
               </motion.div>
             )}
@@ -482,6 +648,8 @@ export function ResourcesTab({
       </div>
     );
   }
+
+  // ── Desktop layout ────────────────────────────────────────────────────────
 
   return (
     <ResizablePanelGroup orientation="horizontal" className="h-full">
@@ -492,28 +660,8 @@ export function ResourcesTab({
         >
           <ResizablePanel minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
-              <ResourcesTabHeader
-                activeTab={activeTab}
-                isSearchExpanded={isSearchExpanded}
-                searchQuery={searchQuery}
-                filteredResourcesCount={filteredResources.length}
-                onSearchExpand={() => setIsSearchExpanded(true)}
-                onSearchChange={setSearchQuery}
-                onSearchBlur={handleSearchBlur}
-                onTabSwitch={() => {}}
-                searchInputRef={
-                  searchInputRef as React.RefObject<HTMLInputElement>
-                }
-                onRefresh={refreshResources ? handleRefresh : undefined}
-                isRefreshing={isRefreshing}
-              />
-
-              <ResourcesList
-                resources={filteredResources}
-                selectedResource={selectedResource}
-                onResourceSelect={handleResourceSelect}
-                focusedIndex={focusedIndex}
-              />
+              <ResourcesTabHeader {...sharedHeaderProps} />
+              {renderLeftList()}
             </div>
           </ResizablePanel>
 
@@ -530,20 +678,7 @@ export function ResourcesTab({
           ref={resourceDisplayRef}
           className="h-full bg-white dark:bg-zinc-900"
         >
-          <ResourceResultDisplay
-            result={currentResult}
-            isLoading={isLoading}
-            previewMode={previewMode}
-            serverId={serverId}
-            readResource={readResource}
-            onTogglePreview={() => setPreviewMode(!previewMode)}
-            onCopy={handleCopy}
-            onDownload={handleDownload}
-            onFullscreen={handleFullscreen}
-            isCopied={isCopied}
-            selectedResource={selectedResource}
-            llmConfig={llmConfig}
-          />
+          {renderDetail()}
         </div>
       </ResizablePanel>
     </ResizablePanelGroup>

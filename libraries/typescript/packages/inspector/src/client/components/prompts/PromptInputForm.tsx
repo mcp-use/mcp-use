@@ -2,17 +2,32 @@ import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { Textarea } from "@/client/components/ui/textarea";
+import { CompletionInput } from "@/client/components/shared/CompletionInput";
 
 interface PromptInputFormProps {
   selectedPrompt: Prompt;
   promptArgs: Record<string, unknown>;
   onArgChange: (key: string, value: any) => void;
+  /**
+   * Optional async function that returns completion suggestions for a prompt
+   * argument. When provided, string-type argument fields are rendered as
+   * `CompletionInput` instead of a plain `Input`, enabling server-side
+   * autocomplete. If undefined the form falls back to plain inputs.
+   *
+   * @param argName - The name of the argument being completed
+   * @param value   - The partial value typed so far
+   */
+  onFetchArgSuggestions?: (
+    argName: string,
+    value: string
+  ) => Promise<string[]>;
 }
 
 export function PromptInputForm({
   selectedPrompt,
   promptArgs,
   onArgChange,
+  onFetchArgSuggestions,
 }: PromptInputFormProps) {
   const arguments_ = selectedPrompt?.arguments || [];
   const hasInputs = arguments_.length > 0;
@@ -108,12 +123,27 @@ export function PromptInputForm({
       );
     }
 
+    // ── Default: string (or untyped) argument ─────────────────────────────
+    // Use CompletionInput when the parent provides a suggestion fetcher,
+    // otherwise fall back to a plain Input for unchanged behaviour.
+    const isStringArg = !arg.type || arg.type === "string";
+
     return (
       <div key={key} className="space-y-2">
         <Label htmlFor={key} className="text-sm font-medium">
           {key}
           {arg.required && <span className="text-red-500 ml-1">*</span>}
         </Label>
+        {isStringArg && onFetchArgSuggestions ? (
+          <CompletionInput
+            id={key}
+            data-testid={`prompt-param-${key}`}
+            value={stringValue}
+            onChange={(newValue) => onArgChange(key, newValue)}
+            onFetchSuggestions={(v) => onFetchArgSuggestions(key, v)}
+            placeholder={arg.description || `Enter ${key}`}
+          />
+        ) : (
         <Input
           id={key}
           data-testid={`prompt-param-${key}`}
@@ -121,6 +151,7 @@ export function PromptInputForm({
           onChange={(e) => onArgChange(key, e.target.value)}
           placeholder={arg.description || `Enter ${key}`}
         />
+        )}
         {arg.description && (
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {arg.description}

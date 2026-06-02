@@ -6,7 +6,11 @@ import {
   usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CompleteRequestParams,
+  CompleteResult,
+  Prompt,
+} from "@modelcontextprotocol/sdk/types.js";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
 import {
@@ -25,6 +29,7 @@ import {
   SavedPromptsList,
 } from "./prompts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
+import { useCompletion } from "../hooks/useCompletion";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { RpcPanel } from "./shared";
 
@@ -39,6 +44,12 @@ interface PromptsTabProps {
   serverId: string;
   isConnected: boolean;
   refreshPrompts?: () => Promise<void>;
+  /**
+   * The MCP complete() function from the server connection.
+   * When provided, prompt argument fields show autocomplete suggestions
+   * as the user types. If omitted the form falls back to plain inputs.
+   */
+  complete?: (params: CompleteRequestParams) => Promise<CompleteResult>;
 }
 
 const SAVED_PROMPTS_KEY = "mcp-inspector-saved-prompts";
@@ -64,6 +75,7 @@ export function PromptsTab({
   serverId,
   isConnected,
   refreshPrompts,
+  complete,
 }: PromptsTabProps & { ref?: React.RefObject<PromptsTabRef | null> }) {
   // State
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -99,6 +111,21 @@ export function PromptsTab({
     searchQuery,
     setSearchQuery,
   } = useMCPPrompts({ prompts, callPrompt, serverId });
+
+  // Build per-argument completion fetcher from the server's complete() function
+  const { fetchPromptArgCompletion } = useCompletion({ complete, isConnected });
+
+  /**
+   * Bound to the currently-selected prompt so PromptExecutionPanel only needs
+   * (argName, value) rather than knowing the prompt name.
+   */
+  const handleFetchArgSuggestions = useCallback(
+    (argName: string, value: string): Promise<string[]> => {
+      if (!selectedPrompt) return Promise.resolve([]);
+      return fetchPromptArgCompletion(selectedPrompt.name, argName, value);
+    },
+    [selectedPrompt, fetchPromptArgCompletion]
+  );
 
   const leftPanelRef = usePanelRef();
   const toolParamsPanelRef = usePanelRef();
@@ -537,6 +564,9 @@ export function PromptsTab({
                   onArgChange={handleArgChange}
                   onExecute={executeSelectedPrompt}
                   onSave={openSaveDialog}
+                  onFetchArgSuggestions={
+                    complete ? handleFetchArgSuggestions : undefined
+                  }
                 />
               </motion.div>
             )}
@@ -641,6 +671,9 @@ export function PromptsTab({
               onArgChange={handleArgChange}
               onExecute={executeSelectedPrompt}
               onSave={openSaveDialog}
+              onFetchArgSuggestions={
+                complete ? handleFetchArgSuggestions : undefined
+              }
             />
           </ResizablePanel>
 

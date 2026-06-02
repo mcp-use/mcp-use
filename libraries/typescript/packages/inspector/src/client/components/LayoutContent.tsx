@@ -157,6 +157,7 @@ export function LayoutContent({
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
             refreshPrompts={selectedServer.refreshPrompts}
+            complete={selectedServer.complete}
           />
         </div>
       )}
@@ -169,11 +170,13 @@ export function LayoutContent({
             key={`resources-${selectedServer.id}`}
             ref={resourcesSearchRef}
             resources={selectedServer.resources}
+            resourceTemplates={selectedServer.resourceTemplates}
             readResource={selectedServer.readResource}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
             mcpServerUrl={selectedServer.url || ""}
             refreshResources={selectedServer.refreshResources}
+            complete={selectedServer.complete}
           />
         </div>
       )}
