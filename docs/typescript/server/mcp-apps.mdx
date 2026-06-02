@@ -84,6 +84,8 @@ import { MCPServer } from "mcp-use/server";
 const server = new MCPServer({
   name: "my-server",
   version: "1.0.0",
+  instructions:
+    "Use weather-display when the user wants a visual forecast or comparison.",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 

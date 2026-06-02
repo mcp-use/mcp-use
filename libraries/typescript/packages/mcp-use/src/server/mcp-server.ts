@@ -2298,6 +2298,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 86400000 = 1 day)
    * @param config.cors - Optional CORS configuration overrides
    * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation
+   * @param config.instructions - Server-wide model instructions returned during MCP initialization
    *
    * @returns Proxied server instance supporting both MCP and Hono methods
    *
@@ -2401,6 +2402,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         icons: processIconUrls(config.icons, config.baseUrl),
       },
       {
+        instructions: config.instructions,
         capabilities: {
           logging: {},
           completions: {},
@@ -2672,6 +2674,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         icons: processIconUrls(this.config.icons, this.serverBaseUrl),
       },
       {
+        instructions: this.config.instructions,
         capabilities: {
           logging: {},
           completions: {},
