@@ -19,6 +19,7 @@
     "fix-oauth-popup-callback",
     "fix-provider-render-phase-setstate",
     "fix-server-alias-tile-heading",
+    "fix-widget-fullscreen-cloud-chrome",
     "improve-tab-animation-duration",
     "inspector-image-tool-results",
     "inspector-mcp-reconnect-banner",

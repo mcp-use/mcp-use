@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.22
+
+### Patch Changes
+
+- 583310b: Fix cloud chat widget display modes (MCP-2181): native fullscreen on the widget shell with exit navbar; PiP portaled to `document.body` at `z-[100]`. Reconnect AppBridge after sandbox iframe remounts so display-mode toggles do not leave the widget stuck loading. Sets `data-mcp-widget-display-mode` on the document root.
+  - mcp-use@1.29.0-canary.22
+
 ## 7.0.0-canary.21
 
 ### Patch Changes
