@@ -11,6 +11,7 @@
     "clean-inspector-files",
     "cross-platform-clean-scripts",
     "drop-live-langfuse-integration-tests",
+    "fix-builtin-inspector-autoconnect-http",
     "fix-cli-widget-base-mcp-url",
     "fix-codeql-ollama-redos",
     "fix-inspector-autoconnect-loopback",
