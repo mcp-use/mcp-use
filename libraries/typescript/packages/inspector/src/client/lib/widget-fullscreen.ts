@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useState, type RefObject } from "react";
 
-export type WidgetDisplayMode = "inline" | "pip" | "fullscreen";
+type WidgetDisplayMode = "inline" | "pip" | "fullscreen";
 
 const SHELL_BASE =
   "w-full h-full min-h-0 bg-background flex flex-col [&:fullscreen]:h-full [&:fullscreen]:w-full [&:fullscreen]:bg-background";
 
 /** Shell when the browser owns the viewport via Fullscreen API. */
-export const WIDGET_FULLSCREEN_NATIVE_CLASSES = SHELL_BASE;
+const WIDGET_FULLSCREEN_NATIVE_CLASSES = SHELL_BASE;
 
 /** Shell when Fullscreen API is unavailable (CSS fallback). */
-export const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[100] ${SHELL_BASE}`;
+const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[100] ${SHELL_BASE}`;
 
 /** PiP floating card; portaled to document.body to escape host stacking contexts. */
-export const WIDGET_PIP_SHELL_CLASSES = [
+const WIDGET_PIP_SHELL_CLASSES = [
   "fixed top-4 left-1/2 -translate-x-1/2 z-[100]",
   "rounded-3xl w-full min-w-[300px] h-[400px]",
   "shadow-2xl border overflow-hidden",
@@ -20,10 +20,10 @@ export const WIDGET_PIP_SHELL_CLASSES = [
   "flex flex-col",
 ].join(" ");
 
-/** @deprecated Use WIDGET_DISPLAY_MODE_ATTR */
-export const WIDGET_FULLSCREEN_DOCUMENT_ATTR = "data-mcp-widget-fullscreen";
+/** Legacy host hook; kept alongside the display-mode attr for embedded hosts. */
+const WIDGET_FULLSCREEN_DOCUMENT_ATTR = "data-mcp-widget-fullscreen";
 
-export const WIDGET_DISPLAY_MODE_ATTR = "data-mcp-widget-display-mode";
+const WIDGET_DISPLAY_MODE_ATTR = "data-mcp-widget-display-mode";
 
 function fullscreenShellClass(cssFallback: boolean): string {
   return cssFallback
@@ -31,7 +31,7 @@ function fullscreenShellClass(cssFallback: boolean): string {
     : WIDGET_FULLSCREEN_NATIVE_CLASSES;
 }
 
-export function useWidgetDisplayModeDocumentChrome(
+function useWidgetDisplayModeDocumentChrome(
   displayMode: WidgetDisplayMode
 ): void {
   useEffect(() => {
@@ -132,10 +132,3 @@ export function useWidgetDisplayModeControls({
     isPip,
   };
 }
-
-/** @deprecated Use useWidgetDisplayModeControls */
-export const useWidgetFullscreenControls = useWidgetDisplayModeControls;
-
-/** @deprecated Use useWidgetDisplayModeDocumentChrome */
-export const useWidgetFullscreenDocumentChrome = (active: boolean) =>
-  useWidgetDisplayModeDocumentChrome(active ? "fullscreen" : "inline");
