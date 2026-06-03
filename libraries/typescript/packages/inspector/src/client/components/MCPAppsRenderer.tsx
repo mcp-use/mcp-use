@@ -510,6 +510,9 @@ function MCPAppsRendererBase({
     if (!iframe?.contentWindow) return;
 
     lastInitTimeRef.current = 0;
+    toolInputSentRef.current = null;
+    lastSentPropsRef.current = null;
+    lastSentToolOutputKeyRef.current = null;
     setInitCount(0);
 
     // Create a custom transport that posts messages through the SandboxedIframe
@@ -847,7 +850,6 @@ function MCPAppsRendererBase({
     sandboxRef,
     toolCallId,
     sandboxGeneration,
-    isReady,
     // readResource, server: use refs to avoid bridge tear-down/recreate on parent re-renders
     // (which would reset initCount and cause iframe/widget to re-init, appearing as "re-render")
   ]);
