@@ -1,5 +1,54 @@
 # mcp-use
 
+## 1.29.0
+
+### Minor Changes
+
+- 83271e8: Add `supabaseUrl` override to `oauthSupabaseProvider` so it can point at a local or self-hosted Supabase instance (e.g. `http://localhost:54321`) instead of the hosted `https://${projectId}.supabase.co` URL. Configurable via the new `supabaseUrl` config option or `MCP_USE_OAUTH_SUPABASE_URL` environment variable; `projectId` is now optional when `supabaseUrl` is provided.
+
+### Patch Changes
+
+- 83271e8: Fix built-in inspector auto-connect to use streamable HTTP for the local `/mcp` endpoint instead of SSE.
+- 83271e8: Fix OAuth-protected `mcp-use dev` flows by normalizing `0.0.0.0` and `::` to `localhost` in the inspector's autoConnect URL, so it matches the resource metadata published by `getServerBaseUrl()` and passes the SDK's strict origin check.
+- 83271e8: Fix double slash in OAuth metadata proxy URL for DCR-direct providers (e.g. `oauthAuth0Provider`) by normalizing the issuer's trailing slash before appending `/.well-known/oauth-authorization-server`.
+- 83271e8: Fix browser OAuth popup callback edge cases in `onMcpAuthorization()`:
+  - The popup window navigating itself to the dashboard URL when `window.opener` was severed (COOP / cross-origin redirects / browser tab grouping). Detect "is this a popup we opened?" via `window.name.startsWith("mcp_auth_")` and render an in-place close-window message instead of redirecting to `returnUrl`. The genuine popup-blocker / manual-link case (top-level navigation, not a popup window) still redirects to `returnUrl` as before.
+  - "Invalid or expired state" surfaced to the parent after a successful flow when `onMcpAuthorization()` was invoked more than once in the same page load (HMR, React strict-mode double invocation, Suspense re-mount). Re-invocations now reuse the original promise via a module-level cache, so they never re-exchange the code or post a stale `success: false` to the opener.
+  - The lost-opener popup branch saved tokens but had no way to notify the parent, leaving `useMcp` stuck in `authenticating` until a hard refresh. Both the popup callback and the parent `useMcp` now use a same-origin `BroadcastChannel("mcp_auth_callback")` as a fallback transport when `window.opener.postMessage` is unavailable — matching the pattern used by `oidc-client-ts` and MSAL.js for the same COOP-driven scenario.
+  - **`mcp-use/browser` no longer exports LangChain agents** (`MCPAgent`, `RemoteAgent`, adapters, observability, AI SDK utils). Those moved to **`mcp-use/browser/agent`** so client bundles (e.g. Next.js dashboards) that only need `MCPClient` do not pull in `@langchain/*` / `langchain`.
+
+- 83271e8: Fix `McpClientProvider.removeServer` and `McpClientProvider.updateServer` triggering React's "Cannot update a component (`McpServerWrapper`) while rendering a different component (`McpClientProvider`)" warning whenever a wrapper is torn down.
+
+  Both methods invoked `server.disconnect()` and `server.clearStorage()` _inside_ a `setServers((prev) => …)` updater. React 18+ runs updater functions during the render phase of the component that owns the state, and both wrapper callbacks make synchronous setState calls on the wrapper itself — `setLog` via `addLog("info", "Disconnecting…")` (the very first sync line of `disconnect`) and `setAuthUrl(void 0)` inside `clearStorage`. Those setStates landed during `McpClientProvider`'s render phase, producing the warning every time a consumer changed the URL of an existing wrapper or removed one.
+
+  The provider now keeps a `serversRef` mirror of `servers`, captures the wrapper to tear down BEFORE scheduling the state updates, and runs `disconnect()` / `clearStorage()` after the `setServers` / `setServerConfigs` calls return. The updaters are now pure (`(prev) => prev.filter(…)`); the wrapper's synchronous setStates fire from event-handler context and batch normally with the pending provider updates, never crossing into the render phase.
+
+- 83271e8: Treat `name` as a meaningful change in `McpServerWrapper` so alias-only edits propagate through `onUpdate` and the Inspector tile heading reflects the new alias immediately.
+- 83271e8: Clarify the "Inspector: Skipped in production" log so users don't try to pass `--with-inspector` to `mcp-use start`. The flag belongs to `mcp-use build`; the new log spells out the rebuild command.
+
+  Docs: added a short note under `start` in `cli-reference.mdx` pointing readers at `build --with-inspector` for production inspector access.
+
+- 83271e8: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- 83271e8: Remove unused internal source files flagged by the TypeScript workspace Knip check.
+- 83271e8: Redact OAuth token verification errors from client responses while logging details server-side.
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+  - @mcp-use/inspector@7.0.0
+  - @mcp-use/cli@3.3.0
+
 ## 1.29.0-canary.24
 
 ### Patch Changes
