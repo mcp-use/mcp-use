@@ -3,12 +3,13 @@ import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MCP_APPS_CONFIG } from "../constants/mcp-apps";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
-import { useWidgetFullscreenControls } from "../lib/widget-fullscreen";
+import { useWidgetDisplayModeControls } from "../lib/widget-fullscreen";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
 import { Spinner } from "./ui/spinner";
@@ -500,12 +501,32 @@ function OpenAIComponentRendererBase({
     [updateIframeGlobals]
   );
 
-  const { handleDisplayModeChange, fullscreenShellClassName } =
-    useWidgetFullscreenControls({
-      containerRef,
-      displayMode,
-      setDisplayMode: setDisplayModeWithGlobals,
-    });
+  const {
+    handleDisplayModeChange,
+    fullscreenShellClassName,
+    pipShellClassName,
+    isPip,
+  } = useWidgetDisplayModeControls({
+    containerRef,
+    displayMode,
+    setDisplayMode: setDisplayModeWithGlobals,
+  });
+
+  const iframeMountCountRef = useRef(0);
+  const [iframeMountGeneration, setIframeMountGeneration] = useState(0);
+
+  const setIframeRef = useCallback((node: HTMLIFrameElement | null) => {
+    iframeRef.current = node;
+    if (!node) return;
+    iframeMountCountRef.current += 1;
+    if (iframeMountCountRef.current > 1) {
+      setIframeMountGeneration((g) => g + 1);
+      if (hasLoadedOnceRef.current) {
+        setShowSkeleton(true);
+        setIsReady(false);
+      }
+    }
+  }, []);
 
   const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
   handleDisplayModeChangeRef.current = handleDisplayModeChange;
@@ -532,11 +553,8 @@ function OpenAIComponentRendererBase({
     let hasHandledLoad = false;
 
     const handleMessage = async (event: any) => {
-      // Only accept messages from our iframe
-      if (
-        !iframeRef.current ||
-        event.source !== iframeRef.current.contentWindow
-      ) {
+      const activeIframe = iframeRef.current;
+      if (!activeIframe || event.source !== activeIframe.contentWindow) {
         return;
       }
 
@@ -877,7 +895,14 @@ function OpenAIComponentRendererBase({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError);
     };
-  }, [widgetUrl, isSameOrigin, serverId, updateIframeGlobals, useDevMode]);
+  }, [
+    widgetUrl,
+    isSameOrigin,
+    serverId,
+    updateIframeGlobals,
+    useDevMode,
+    iframeMountGeneration,
+  ]);
 
   // Sync theme changes to iframe's color-scheme for light-dark() CSS function
   // OpenAI Apps SDK UI uses [data-theme] attribute to set color-scheme via CSS
@@ -907,13 +932,8 @@ function OpenAIComponentRendererBase({
   }, [resolvedTheme, isReady, isSameOrigin, updateIframeGlobals]);
 
   // Hide skeleton once the iframe has loaded real content.
-  // The readyState guard in the load handler already ensures we only set
-  // isReady when the iframe has actual scripts (not a stale blank document),
-  // so no additional delay is needed.
   useEffect(() => {
-    if (!isReady || !showSkeleton) {
-      return;
-    }
+    if (!isReady || !showSkeleton) return;
     setShowSkeleton(false);
     hasLoadedOnceRef.current = true;
   }, [isReady, showSkeleton]);
@@ -1014,9 +1034,111 @@ function OpenAIComponentRendererBase({
     );
   }
 
+  const widgetShell = (
+    <div
+      ref={containerRef}
+      className={cn(
+        "w-full h-full flex flex-col min-h-0",
+        displayMode === "fullscreen"
+          ? "items-stretch justify-stretch"
+          : cn(
+              "justify-center items-center",
+              centerVertically && "items-center"
+            ),
+        fullscreenShellClassName,
+        pipShellClassName
+      )}
+      style={
+        isPip
+          ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
+          : undefined
+      }
+      onMouseEnter={() => isPip && setIsPipHovered(true)}
+      onMouseLeave={() => isPip && setIsPipHovered(false)}
+    >
+      {displayMode === "fullscreen" && (
+        <FullscreenNavbar
+          title={toolName}
+          onClose={() => handleDisplayModeChange("inline")}
+        />
+      )}
+
+      {isPip && (
+        <button
+          onClick={() => handleDisplayModeChange("inline")}
+          className={cn(
+            "absolute top-2 right-2 z-50",
+            "flex items-center justify-center",
+            "w-8 h-8 rounded-full",
+            "bg-background/90 hover:bg-background",
+            "border border-border",
+            "shadow-lg",
+            "transition-opacity duration-200",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            isPipHovered ? "opacity-100" : "opacity-0"
+          )}
+          aria-label="Exit Picture in Picture"
+        >
+          <X className="w-4 h-4 text-foreground" />
+        </button>
+      )}
+
+      <div
+        className={cn(
+          "relative w-full min-h-0",
+          displayMode === "fullscreen" || displayMode === "pip"
+            ? "flex flex-1 flex-col"
+            : cn(
+                "flex flex-1 justify-center items-center",
+                centerVertically && "items-center"
+              ),
+          displayMode === "inline" && (invoking || invoked) && "pt-8"
+        )}
+      >
+        <div
+          className={cn(
+            "relative w-full",
+            displayMode === "fullscreen" || displayMode === "pip"
+              ? "h-full min-h-0 flex-1"
+              : "max-w-[768px]"
+          )}
+        >
+          {displayMode === "inline" && (invoking || invoked) && (
+            <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
+              {invoking && !toolResult && (
+                <TextShimmer className="text-xs">{invoking}</TextShimmer>
+              )}
+              {invoked && toolResult && (
+                <span className="text-xs text-muted-foreground">{invoked}</span>
+              )}
+            </div>
+          )}
+          <iframe
+            ref={setIframeRef}
+            src={widgetUrl}
+            className={cn(
+              displayMode === "inline" && "w-full",
+              displayMode === "fullscreen" && "w-full h-full rounded-none",
+              displayMode === "pip" && "w-full h-full rounded-lg"
+            )}
+            style={{
+              height:
+                displayMode === "fullscreen" || displayMode === "pip"
+                  ? "100%"
+                  : `${iframeHeight}px`,
+            }}
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
+            title={`OpenAI Component: ${toolName}`}
+            allow="web-share"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
-      {showSkeleton && (
+      {!isPip && showSkeleton && (
         <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-0">
           <Spinner className="size-5" />
         </div>
@@ -1024,8 +1146,8 @@ function OpenAIComponentRendererBase({
 
       {showConsole &&
         isSameOrigin &&
-        displayMode !== "fullscreen" &&
-        displayMode !== "pip" && (
+        !isPip &&
+        displayMode !== "fullscreen" && (
           <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
             <MCPAppsDebugControls
               displayMode={displayMode}
@@ -1043,108 +1165,19 @@ function OpenAIComponentRendererBase({
             />
           </div>
         )}
-      <div
-        ref={containerRef}
-        className={cn(
-          "w-full h-full flex flex-col min-h-0",
-          displayMode === "fullscreen"
-            ? "items-stretch justify-stretch"
-            : cn(
-                "justify-center items-center",
-                centerVertically && "items-center"
-              ),
-          fullscreenShellClassName,
-          displayMode === "pip" &&
-            `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px] shadow-2xl border overflow-hidden`
-        )}
-        style={
-          displayMode === "pip"
-            ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
-            : undefined
-        }
-        onMouseEnter={() => displayMode === "pip" && setIsPipHovered(true)}
-        onMouseLeave={() => displayMode === "pip" && setIsPipHovered(false)}
-      >
-        {displayMode === "fullscreen" && (
-          <FullscreenNavbar
-            title={toolName}
-            onClose={() => handleDisplayModeChange("inline")}
-          />
-        )}
 
-        {displayMode === "pip" && (
-          <button
-            onClick={() => handleDisplayModeChange("inline")}
-            className={cn(
-              "absolute top-2 right-2 z-50",
-              "flex items-center justify-center",
-              "w-8 h-8 rounded-full",
-              "bg-background/90 hover:bg-background",
-              "border border-border",
-              "shadow-lg",
-              "transition-opacity duration-200",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-              isPipHovered ? "opacity-100" : "opacity-0"
-            )}
-            aria-label="Exit Picture in Picture"
-          >
-            <X className="w-4 h-4 text-foreground" />
-          </button>
-        )}
-
-        <div
-          className={cn(
-            "relative w-full min-h-0",
-            displayMode === "fullscreen" || displayMode === "pip"
-              ? "flex flex-1 flex-col"
-              : cn(
-                  "flex flex-1 justify-center items-center",
-                  centerVertically && "items-center"
-                ),
-            displayMode === "inline" && (invoking || invoked) && "pt-8"
+      {isPip && typeof document !== "undefined" ? (
+        <>
+          {showSkeleton && (
+            <div className="fixed inset-0 z-[99] flex items-center justify-center bg-background/40">
+              <Spinner className="size-5" />
+            </div>
           )}
-        >
-          <div
-            className={cn(
-              "relative w-full",
-              displayMode === "fullscreen" || displayMode === "pip"
-                ? "h-full min-h-0 flex-1"
-                : "max-w-[768px]"
-            )}
-          >
-            {displayMode === "inline" && (invoking || invoked) && (
-              <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
-                {invoking && !toolResult && (
-                  <TextShimmer className="text-xs">{invoking}</TextShimmer>
-                )}
-                {invoked && toolResult && (
-                  <span className="text-xs text-muted-foreground">
-                    {invoked}
-                  </span>
-                )}
-              </div>
-            )}
-            <iframe
-              ref={iframeRef}
-              src={widgetUrl}
-              className={cn(
-                displayMode === "inline" && "w-full",
-                displayMode === "fullscreen" && "w-full h-full rounded-none",
-                displayMode === "pip" && "w-full h-full rounded-lg"
-              )}
-              style={{
-                height:
-                  displayMode === "fullscreen" || displayMode === "pip"
-                    ? "100%"
-                    : `${iframeHeight}px`,
-              }}
-              sandbox={IFRAME_SANDBOX_PERMISSIONS}
-              title={`OpenAI Component: ${toolName}`}
-              allow="web-share"
-            />
-          </div>
-        </div>
-      </div>
+          {createPortal(widgetShell, document.body)}
+        </>
+      ) : (
+        widgetShell
+      )}
     </Wrapper>
   );
 }

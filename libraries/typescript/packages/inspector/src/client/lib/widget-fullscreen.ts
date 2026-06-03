@@ -11,7 +11,19 @@ export const WIDGET_FULLSCREEN_NATIVE_CLASSES = SHELL_BASE;
 /** Shell when Fullscreen API is unavailable (CSS fallback). */
 export const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[100] ${SHELL_BASE}`;
 
+/** PiP floating card; portaled to document.body to escape host stacking contexts. */
+export const WIDGET_PIP_SHELL_CLASSES = [
+  "fixed top-4 left-1/2 -translate-x-1/2 z-[100]",
+  "rounded-3xl w-full min-w-[300px] h-[400px]",
+  "shadow-2xl border overflow-hidden",
+  "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
+  "flex flex-col",
+].join(" ");
+
+/** @deprecated Use WIDGET_DISPLAY_MODE_ATTR */
 export const WIDGET_FULLSCREEN_DOCUMENT_ATTR = "data-mcp-widget-fullscreen";
+
+export const WIDGET_DISPLAY_MODE_ATTR = "data-mcp-widget-display-mode";
 
 function fullscreenShellClass(cssFallback: boolean): string {
   return cssFallback
@@ -19,18 +31,40 @@ function fullscreenShellClass(cssFallback: boolean): string {
     : WIDGET_FULLSCREEN_NATIVE_CLASSES;
 }
 
-export function useWidgetFullscreenDocumentChrome(active: boolean): void {
+export function useWidgetDisplayModeDocumentChrome(
+  displayMode: WidgetDisplayMode
+): void {
   useEffect(() => {
-    if (typeof document === "undefined" || !active) return;
-    document.documentElement.setAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR, "");
-    return () => {
-      document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
-    };
-  }, [active]);
+    if (typeof document === "undefined") return;
+    if (displayMode === "pip" || displayMode === "fullscreen") {
+      document.documentElement.setAttribute(
+        WIDGET_DISPLAY_MODE_ATTR,
+        displayMode
+      );
+      if (displayMode === "fullscreen") {
+        document.documentElement.setAttribute(
+          WIDGET_FULLSCREEN_DOCUMENT_ATTR,
+          ""
+        );
+      } else {
+        document.documentElement.removeAttribute(
+          WIDGET_FULLSCREEN_DOCUMENT_ATTR
+        );
+      }
+      return () => {
+        document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
+        document.documentElement.removeAttribute(
+          WIDGET_FULLSCREEN_DOCUMENT_ATTR
+        );
+      };
+    }
+    document.documentElement.removeAttribute(WIDGET_DISPLAY_MODE_ATTR);
+    document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
+  }, [displayMode]);
 }
 
 /** Native Fullscreen API first; CSS overlay only when `requestFullscreen` fails. */
-export function useWidgetFullscreenControls({
+export function useWidgetDisplayModeControls({
   containerRef,
   displayMode,
   setDisplayMode,
@@ -42,8 +76,9 @@ export function useWidgetFullscreenControls({
 }) {
   const [cssFallback, setCssFallback] = useState(false);
   const isFullscreen = displayMode === "fullscreen";
+  const isPip = displayMode === "pip";
 
-  useWidgetFullscreenDocumentChrome(isFullscreen);
+  useWidgetDisplayModeDocumentChrome(displayMode);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -87,5 +122,20 @@ export function useWidgetFullscreenControls({
     ? fullscreenShellClass(cssFallback)
     : undefined;
 
-  return { handleDisplayModeChange, fullscreenShellClassName, isFullscreen };
+  const pipShellClassName = isPip ? WIDGET_PIP_SHELL_CLASSES : undefined;
+
+  return {
+    handleDisplayModeChange,
+    fullscreenShellClassName,
+    pipShellClassName,
+    isFullscreen,
+    isPip,
+  };
 }
+
+/** @deprecated Use useWidgetDisplayModeControls */
+export const useWidgetFullscreenControls = useWidgetDisplayModeControls;
+
+/** @deprecated Use useWidgetDisplayModeDocumentChrome */
+export const useWidgetFullscreenDocumentChrome = (active: boolean) =>
+  useWidgetDisplayModeDocumentChrome(active ? "fullscreen" : "inline");

@@ -32,6 +32,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 import { rpcLogBus } from "../../server/rpc-log-bus.js";
 import { consoleLogBus } from "../console-log-bus";
 import { IFRAME_SANDBOX_PERMISSIONS, MCP_APPS_CONFIG } from "../constants";
@@ -40,7 +41,8 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
 import { cn } from "../lib/utils";
-import { useWidgetFullscreenControls } from "../lib/widget-fullscreen";
+import { useSandboxRemountGeneration } from "../lib/use-sandbox-remount-generation";
+import { useWidgetDisplayModeControls } from "../lib/widget-fullscreen";
 import type { WidgetDeclaredCsp } from "../context/WidgetDebugContext";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
@@ -208,12 +210,28 @@ function MCPAppsRendererBase({
     [onDisplayModeChange, displayModeProp]
   );
 
-  const { handleDisplayModeChange, fullscreenShellClassName, isFullscreen } =
-    useWidgetFullscreenControls({
-      containerRef,
-      displayMode,
-      setDisplayMode,
-    });
+  const { sandboxGeneration, onSandboxMount } = useSandboxRemountGeneration();
+
+  const handleSandboxMount = useCallback(() => {
+    if (onSandboxMount()) {
+      if (hasLoadedOnceRef.current) {
+        setShowSpinner(true);
+        setIsReady(false);
+      }
+    }
+  }, [onSandboxMount]);
+
+  const {
+    handleDisplayModeChange,
+    fullscreenShellClassName,
+    pipShellClassName,
+    isFullscreen,
+    isPip,
+  } = useWidgetDisplayModeControls({
+    containerRef,
+    displayMode,
+    setDisplayMode,
+  });
 
   const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
   handleDisplayModeChangeRef.current = handleDisplayModeChange;
@@ -484,13 +502,14 @@ function MCPAppsRendererBase({
     };
   }, [initCount, resourceUri, readResource]);
 
-  // Initialize AppBridge when HTML is ready
+  // Initialize AppBridge when HTML is ready (re-run when sandbox iframe remounts)
   useEffect(() => {
     if (!widgetHtml || !sandboxRef.current) return;
 
     const iframe = sandboxRef.current.getIframeElement();
     if (!iframe?.contentWindow) return;
 
+    lastInitTimeRef.current = 0;
     setInitCount(0);
 
     // Create a custom transport that posts messages through the SandboxedIframe
@@ -727,10 +746,12 @@ function MCPAppsRendererBase({
 
     // Set up message handler for incoming messages from widget (via SandboxedIframe)
     const handleMessage = (event: MessageEvent) => {
+      const activeIframe = sandboxRef.current?.getIframeElement();
+      if (!activeIframe?.contentWindow) return;
       // Only process messages from our sandbox proxy
-      const proxyOrigin = new URL(iframe.src).origin;
+      const proxyOrigin = new URL(activeIframe.src).origin;
       if (event.origin !== proxyOrigin) return;
-      if (event.source !== iframe.contentWindow) return;
+      if (event.source !== activeIframe.contentWindow) return;
 
       if (event.data?.type === "iframe-console-log") {
         if (
@@ -825,6 +846,8 @@ function MCPAppsRendererBase({
     widgetHtml,
     sandboxRef,
     toolCallId,
+    sandboxGeneration,
+    isReady,
     // readResource, server: use refs to avoid bridge tear-down/recreate on parent re-renders
     // (which would reset initCount and cause iframe/widget to re-init, appearing as "re-render")
   ]);
@@ -1000,7 +1023,8 @@ function MCPAppsRendererBase({
   // Hide spinner after iframe loads + brief delay for widget to render (first load only)
   // Also hide when bridge initializes (initCount > 0), which proves the iframe is loaded
   // even if the onLoad event was missed during a rapid remount/re-render cycle.
-  const iframeEffectivelyReady = isReady || initCount > 0;
+  const iframeEffectivelyReady =
+    initCount > 0 || (isReady && !hasLoadedOnceRef.current);
 
   // Fire onReady once after the AppBridge handshake completes (initCount goes 0 → 1).
   const readyFiredRef = useRef(false);
@@ -1046,21 +1070,13 @@ function MCPAppsRendererBase({
     );
   }
 
-  const isPip = displayMode === "pip";
-
   const containerClassName = (() => {
     if (fullscreenShellClassName) {
       return fullscreenShellClassName;
     }
-
-    if (isPip) {
-      return [
-        `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px]`,
-        "shadow-2xl border overflow-hidden",
-        "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
-      ].join(" ");
+    if (pipShellClassName) {
+      return pipShellClassName;
     }
-
     return "flex group flex-1 items-center justify-center";
   })();
 
@@ -1071,101 +1087,108 @@ function MCPAppsRendererBase({
     transition: isFullscreen || isPip ? undefined : "height 300ms ease-out",
   };
 
-  return (
-    <WidgetWrapper className={className} noWrapper={noWrapper}>
+  const widgetShell = (
+    <div
+      ref={containerRef}
+      className={containerClassName}
+      style={
+        isPip
+          ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
+          : undefined
+      }
+    >
+      {isFullscreen && !chromeless && (
+        <FullscreenNavbar
+          title={toolName}
+          onClose={() => handleDisplayModeChange("inline")}
+          testId="debugger-exit-fullscreen-button"
+        />
+      )}
+
+      {isPip && (
+        <button
+          data-testid="debugger-exit-pip-button"
+          onClick={() => handleDisplayModeChange("inline")}
+          className="absolute left-2 top-2 z-30 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
+          aria-label="Close PiP mode"
+          title="Close PiP mode"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Main content with centering like Apps SDK */}
       <div
-        ref={containerRef}
-        className={containerClassName}
-        style={
-          isPip
-            ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
-            : undefined
-        }
+        className={cn(
+          "relative w-full min-h-0",
+          isFullscreen || isPip
+            ? "flex flex-1 flex-col"
+            : "flex flex-1 justify-center items-center",
+          !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
+        )}
       >
-        {isFullscreen && !chromeless && (
-          <FullscreenNavbar
-            title={toolName}
-            onClose={() => handleDisplayModeChange("inline")}
-            testId="debugger-exit-fullscreen-button"
-          />
+        {showSpinner && (
+          <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-10">
+            <Spinner className="size-5" />
+          </div>
         )}
-
-        {isPip && (
-          <button
-            data-testid="debugger-exit-pip-button"
-            onClick={() => handleDisplayModeChange("inline")}
-            className="absolute left-2 top-2 z-30 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
-            aria-label="Close PiP mode"
-            title="Close PiP mode"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* Main content with centering like Apps SDK */}
         <div
           className={cn(
-            "relative w-full min-h-0",
+            "relative w-full",
+            isFullscreen || isPip ? "h-full min-h-0 flex-1" : "h-full"
+          )}
+          style={
             isFullscreen || isPip
-              ? "flex flex-1 flex-col"
-              : "flex flex-1 justify-center items-center",
-            !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
-          )}
+              ? undefined
+              : { maxWidth: iframeStyle.maxWidth }
+          }
         >
-          {showSpinner && (
-            <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-10">
-              <Spinner className="size-5" />
-            </div>
-          )}
-          <div
-            className={cn(
-              "relative w-full",
-              isFullscreen || isPip ? "h-full min-h-0 flex-1" : "h-full"
+          <div className="absolute -top-8 left-2 z-10 h-full">
+            {/* Status label above the widget — only in inline mode */}
+            {!isPip && !isFullscreen && (invoking || invoked) && (
+              <div className="whitespace-nowrap">
+                {invoking && !toolOutput && (
+                  <TextShimmer className="text-xs ">{invoking}</TextShimmer>
+                )}
+                {invoked && !!toolOutput && (
+                  <span className="text-xs text-muted-foreground">
+                    {invoked}
+                  </span>
+                )}
+              </div>
             )}
-            style={
-              isFullscreen || isPip
-                ? undefined
-                : { maxWidth: iframeStyle.maxWidth }
-            }
-          >
-            <div className="absolute -top-8 left-2 z-10 h-full">
-              {/* Status label above the widget — only in inline mode */}
-              {!isPip && !isFullscreen && (invoking || invoked) && (
-                <div className="whitespace-nowrap">
-                  {invoking && !toolOutput && (
-                    <TextShimmer className="text-xs ">{invoking}</TextShimmer>
-                  )}
-                  {invoked && !!toolOutput && (
-                    <span className="text-xs text-muted-foreground">
-                      {invoked}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <SandboxedIframe
-              ref={sandboxRef}
-              html={widgetHtml}
-              sandbox={IFRAME_SANDBOX_PERMISSIONS}
-              csp={widgetCsp}
-              permissions={widgetPermissions}
-              permissive={cspMode === "permissive"}
-              onLoad={() => setIsReady(true)}
-              onMessage={handleSandboxMessage}
-              title={`MCP App: ${toolName}`}
-              className={cn(
-                displayMode === "inline" && "w-full",
-                displayMode === "fullscreen" && "w-full h-full rounded-none",
-                displayMode === "pip" && "w-full h-full",
-                displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
-                "overflow-hidden",
-                prefersBorder && "border border-zinc-200 dark:border-zinc-700"
-              )}
-              style={iframeStyle}
-            />{" "}
           </div>
+          <SandboxedIframe
+            ref={sandboxRef}
+            html={widgetHtml}
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
+            csp={widgetCsp}
+            permissions={widgetPermissions}
+            permissive={cspMode === "permissive"}
+            onSandboxMount={handleSandboxMount}
+            onLoad={() => setIsReady(true)}
+            onMessage={handleSandboxMessage}
+            title={`MCP App: ${toolName}`}
+            className={cn(
+              displayMode === "inline" && "w-full",
+              displayMode === "fullscreen" && "w-full h-full rounded-none",
+              displayMode === "pip" && "w-full h-full",
+              displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
+              "overflow-hidden",
+              prefersBorder && "border border-zinc-200 dark:border-zinc-700"
+            )}
+            style={iframeStyle}
+          />{" "}
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <WidgetWrapper className={className} noWrapper={noWrapper}>
+      {isPip && typeof document !== "undefined"
+        ? createPortal(widgetShell, document.body)
+        : widgetShell}
     </WidgetWrapper>
   );
 }
