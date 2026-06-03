@@ -63,7 +63,7 @@ jobs:
 
           if [ "${{ steps.pm.outputs.pm }}" = "pnpm" ]; then
             corepack enable
-            pnpm install --config.dangerously-allow-all-builds=true
+            pnpm install --no-frozen-lockfile --config.dangerously-allow-all-builds=true
             pnpm run build
           else
             npm install
