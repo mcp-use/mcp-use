@@ -1,0 +1,90 @@
+name: Bump mcp-use (reusable)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve npm stable mcp-use version
+        id: target
+        run: |
+          TARGET="$(npm view mcp-use version)"
+          echo "version=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "caret=^${TARGET}" >> "$GITHUB_OUTPUT"
+          echo "Target mcp-use: $TARGET (^${TARGET})"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Detect package manager
+        id: pm
+        run: |
+          if [ -f pnpm-lock.yaml ] || grep -q '"packageManager".*pnpm' package.json 2>/dev/null; then
+            echo "pm=pnpm" >> "$GITHUB_OUTPUT"
+          else
+            echo "pm=npm" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump, install, and build
+        id: bump
+        env:
+          TARGET: ${{ steps.target.outputs.version }}
+          CARET: ${{ steps.target.outputs.caret }}
+        run: |
+          set -e
+          CURRENT="$(node -p "require('./package.json').dependencies?.['mcp-use'] ?? require('./package.json').devDependencies?.['mcp-use'] ?? ''")"
+          echo "Current specifier: ${CURRENT:-<none>}"
+
+          rm -rf node_modules
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.dependencies = p.dependencies || {};
+            p.dependencies['mcp-use'] = process.env.CARET;
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+          if [ "${{ steps.pm.outputs.pm }}" = "pnpm" ]; then
+            corepack enable
+            pnpm install --config.dangerously-allow-all-builds=true
+            pnpm run build
+          else
+            npm install
+            npm run build
+          fi
+
+          INSTALLED="$(node -p "require('./node_modules/mcp-use/package.json').version")"
+          echo "Installed mcp-use@${INSTALLED}"
+
+      - name: Commit and push
+        env:
+          TARGET: ${{ steps.target.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          [ -f pnpm-lock.yaml ] && git add pnpm-lock.yaml
+          [ -f package-lock.json ] && git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit (already on mcp-use ${TARGET})."
+            exit 0
+          fi
+          git commit -m "chore(deps): bump mcp-use to ${TARGET}"
+          git push
