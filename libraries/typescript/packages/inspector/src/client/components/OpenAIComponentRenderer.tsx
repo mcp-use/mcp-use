@@ -113,7 +113,6 @@ function OpenAIComponentRendererBase({
     typeof window.HTMLIFrameElement
   > | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const fullscreenTargetRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const hasLoadedOnceRef = useRef(false);
@@ -504,7 +503,6 @@ function OpenAIComponentRendererBase({
   const { handleDisplayModeChange, fullscreenShellClassName } =
     useWidgetFullscreenControls({
       containerRef,
-      fullscreenTargetRef,
       displayMode,
       setDisplayMode: setDisplayModeWithGlobals,
     });
@@ -1048,8 +1046,13 @@ function OpenAIComponentRendererBase({
       <div
         ref={containerRef}
         className={cn(
-          "w-full h-full flex flex-col justify-center items-center",
-          centerVertically && "items-center",
+          "w-full h-full flex flex-col min-h-0",
+          displayMode === "fullscreen"
+            ? "items-stretch justify-stretch"
+            : cn(
+                "justify-center items-center",
+                centerVertically && "items-center"
+              ),
           fullscreenShellClassName,
           displayMode === "pip" &&
             `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px] shadow-2xl border overflow-hidden`
@@ -1090,15 +1093,25 @@ function OpenAIComponentRendererBase({
         )}
 
         <div
-          ref={fullscreenTargetRef}
           className={cn(
-            "flex-1 w-full flex justify-center items-center relative",
-            displayMode === "fullscreen" && "pt-14",
-            centerVertically && "items-center",
+            "relative w-full min-h-0",
+            displayMode === "fullscreen" || displayMode === "pip"
+              ? "flex flex-1 flex-col"
+              : cn(
+                  "flex flex-1 justify-center items-center",
+                  centerVertically && "items-center"
+                ),
             displayMode === "inline" && (invoking || invoked) && "pt-8"
           )}
         >
-          <div className="relative w-full max-w-[768px]">
+          <div
+            className={cn(
+              "relative w-full",
+              displayMode === "fullscreen" || displayMode === "pip"
+                ? "h-full min-h-0 flex-1"
+                : "max-w-[768px]"
+            )}
+          >
             {displayMode === "inline" && (invoking || invoked) && (
               <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
                 {invoking && !toolResult && (

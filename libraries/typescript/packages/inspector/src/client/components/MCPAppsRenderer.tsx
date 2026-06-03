@@ -195,7 +195,6 @@ function MCPAppsRendererBase({
   const displayMode = displayModeProp ?? internalDisplayMode;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const fullscreenTargetRef = useRef<HTMLDivElement | null>(null);
   const prevControlledDisplayModeRef = useRef(displayModeProp);
 
   const setDisplayMode = useCallback(
@@ -212,7 +211,6 @@ function MCPAppsRendererBase({
   const { handleDisplayModeChange, fullscreenShellClassName, isFullscreen } =
     useWidgetFullscreenControls({
       containerRef,
-      fullscreenTargetRef,
       displayMode,
       setDisplayMode,
     });
@@ -1106,10 +1104,11 @@ function MCPAppsRendererBase({
 
         {/* Main content with centering like Apps SDK */}
         <div
-          ref={fullscreenTargetRef}
           className={cn(
-            "flex-1 w-full h-full flex justify-center items-center relative",
-            isFullscreen && !chromeless && "pt-14",
+            "relative w-full min-h-0",
+            isFullscreen || isPip
+              ? "flex flex-1 flex-col"
+              : "flex flex-1 justify-center items-center",
             !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
           )}
         >
@@ -1119,8 +1118,15 @@ function MCPAppsRendererBase({
             </div>
           )}
           <div
-            className="relative w-full h-full"
-            style={{ maxWidth: iframeStyle.maxWidth }}
+            className={cn(
+              "relative w-full",
+              isFullscreen || isPip ? "h-full min-h-0 flex-1" : "h-full"
+            )}
+            style={
+              isFullscreen || isPip
+                ? undefined
+                : { maxWidth: iframeStyle.maxWidth }
+            }
           >
             <div className="absolute -top-8 left-2 z-10 h-full">
               {/* Status label above the widget — only in inline mode */}

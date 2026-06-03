@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState, type RefObject } from "react";
 
 export type WidgetDisplayMode = "inline" | "pip" | "fullscreen";
 
-const SHELL_BASE = "w-full h-full bg-background flex flex-col";
+const SHELL_BASE =
+  "w-full h-full min-h-0 bg-background flex flex-col [&:fullscreen]:h-full [&:fullscreen]:w-full [&:fullscreen]:bg-background";
 
 /** Shell when the browser owns the viewport via Fullscreen API. */
 export const WIDGET_FULLSCREEN_NATIVE_CLASSES = SHELL_BASE;
@@ -31,18 +32,14 @@ export function useWidgetFullscreenDocumentChrome(active: boolean): void {
 /** Native Fullscreen API first; CSS overlay only when `requestFullscreen` fails. */
 export function useWidgetFullscreenControls({
   containerRef,
-  fullscreenTargetRef,
   displayMode,
   setDisplayMode,
 }: {
-  /** Layout shell (navbar, padding). Not used for `requestFullscreen` when `fullscreenTargetRef` is set. */
+  /** Shell that includes exit chrome + widget; promoted via `requestFullscreen`. */
   containerRef: RefObject<HTMLElement | null>;
-  /** Element promoted to browser fullscreen (typically the iframe wrapper). */
-  fullscreenTargetRef?: RefObject<HTMLElement | null>;
   displayMode: WidgetDisplayMode;
   setDisplayMode: (mode: WidgetDisplayMode) => void;
 }) {
-  const fullscreenElementRef = fullscreenTargetRef ?? containerRef;
   const [cssFallback, setCssFallback] = useState(false);
   const isFullscreen = displayMode === "fullscreen";
 
@@ -64,7 +61,7 @@ export function useWidgetFullscreenControls({
     async (mode: WidgetDisplayMode) => {
       if (mode === "fullscreen") {
         try {
-          await fullscreenElementRef.current?.requestFullscreen();
+          await containerRef.current?.requestFullscreen();
           setCssFallback(false);
         } catch {
           setCssFallback(true);
@@ -83,7 +80,7 @@ export function useWidgetFullscreenControls({
       setCssFallback(false);
       setDisplayMode(mode);
     },
-    [fullscreenElementRef, setDisplayMode]
+    [containerRef, setDisplayMode]
   );
 
   const fullscreenShellClassName = isFullscreen

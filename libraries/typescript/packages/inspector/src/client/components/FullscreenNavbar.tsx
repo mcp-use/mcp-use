@@ -17,7 +17,7 @@ export function FullscreenNavbar({
   return (
     <div
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-3",
+        "shrink-0 z-50 flex w-full items-center justify-between px-4 py-3",
         "bg-background/80 backdrop-blur-md border-b border-border",
         "supports-[backdrop-filter]:bg-background/60",
         className
