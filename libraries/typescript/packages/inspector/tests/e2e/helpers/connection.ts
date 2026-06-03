@@ -143,10 +143,18 @@ export async function goToInspectorWithAutoConnectAndOpenTools(
   page: Page,
   options?: { waitForWidgets?: boolean }
 ) {
-  const { inspectorUrl, serverUrl } = getTestMatrix();
+  const { inspectorUrl, serverUrl, usesBuiltinInspector } = getTestMatrix();
   const waitForWidgets = options?.waitForWidgets ?? false;
-  const url = `${inspectorUrl}?autoConnect=${encodeURIComponent(serverUrl)}`;
-  await page.goto(url);
+  const autoConnectConfig = {
+    url: serverUrl,
+    name: process.env.TEST_SERVER_NAME || "ConformanceTestServer",
+    transportType: "http",
+    connectionType: "Direct",
+  };
+  const url = `${inspectorUrl}?autoConnect=${encodeURIComponent(
+    JSON.stringify(autoConnectConfig)
+  )}`;
+  await page.goto(usesBuiltinInspector ? inspectorUrl : url);
   await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
   await expect(page.getByTestId("tool-item-test_simple_text")).toBeVisible();
 
