@@ -36,6 +36,7 @@ import {
   withNextShimsEnv,
 } from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
+import { getWidgetBuildBaseUrl } from "./utils/widget-base-url.js";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -783,10 +784,8 @@ if (container && Component) {
       widgetName
     );
 
-    // Set base URL: use MCP_URL if set, otherwise relative path
-    const baseUrl = mcpUrl
-      ? `${mcpUrl}/${widgetName}/`
-      : `/mcp-use/widgets/${widgetName}/`;
+    // Set base URL to the same route used by the production widget server.
+    const baseUrl = getWidgetBuildBaseUrl(widgetName, mcpUrl);
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
@@ -1167,7 +1166,8 @@ export default {
           // Inject window.__mcpPublicUrl and window.__getFile into <head>
           // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
           // __mcpPublicAssetsUrl points to where public files are actually stored
-          const injectionScript = `<script>window.__getFile = (filename) => { return "${mcpUrl}/${widgetName}/"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpUrl}/public";</script>`;
+          const widgetPublicBaseUrl = getWidgetBuildBaseUrl(widgetName, mcpUrl);
+          const injectionScript = `<script>window.__getFile = (filename) => { return "${widgetPublicBaseUrl}"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpUrl}/public";</script>`;
 
           // Check if script tag already exists in head
           if (!html.includes("window.__mcpPublicUrl")) {
