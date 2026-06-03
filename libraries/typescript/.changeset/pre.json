@@ -10,6 +10,7 @@
   "changesets": [
     "clean-inspector-files",
     "cross-platform-clean-scripts",
+    "drop-live-langfuse-integration-tests",
     "fix-cli-widget-base-mcp-url",
     "fix-codeql-ollama-redos",
     "fix-inspector-autoconnect-loopback",
