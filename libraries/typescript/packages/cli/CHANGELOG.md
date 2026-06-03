@@ -1,5 +1,42 @@
 # @mcp-use/cli
 
+## 3.3.0
+
+### Minor Changes
+
+- 83271e8: `mcp-use client screenshot` now auto-sizes screenshots to the widget's natural rendered dimensions when `--width`/`--height` are omitted, eliminating excess whitespace. Fixes screenshotting against external MCP servers (e.g. Excalidraw) — URIs like `ui://excalidraw/mcp-app.html` were breaking the preview route; they are now correctly handled as `<server>-<name>`.
+
+### Patch Changes
+
+- 83271e8: Fix widget asset 404s when `MCP_URL` is set at build time. Vite's `base` and the injected `window.__getFile` now resolve to `${MCP_URL}/mcp-use/widgets/{widget}/`, matching the production static route mounted by the `mcp-use` server.
+- 83271e8: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+- Updated dependencies [83271e8]
+  - @mcp-use/inspector@7.0.0
+  - mcp-use@1.29.0
+
 ## 3.3.0-canary.24
 
 ### Patch Changes
