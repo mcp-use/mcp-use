@@ -31,13 +31,18 @@ export function useWidgetFullscreenDocumentChrome(active: boolean): void {
 /** Native Fullscreen API first; CSS overlay only when `requestFullscreen` fails. */
 export function useWidgetFullscreenControls({
   containerRef,
+  fullscreenTargetRef,
   displayMode,
   setDisplayMode,
 }: {
+  /** Layout shell (navbar, padding). Not used for `requestFullscreen` when `fullscreenTargetRef` is set. */
   containerRef: RefObject<HTMLElement | null>;
+  /** Element promoted to browser fullscreen (typically the iframe wrapper). */
+  fullscreenTargetRef?: RefObject<HTMLElement | null>;
   displayMode: WidgetDisplayMode;
   setDisplayMode: (mode: WidgetDisplayMode) => void;
 }) {
+  const fullscreenElementRef = fullscreenTargetRef ?? containerRef;
   const [cssFallback, setCssFallback] = useState(false);
   const isFullscreen = displayMode === "fullscreen";
 
@@ -59,13 +64,12 @@ export function useWidgetFullscreenControls({
     async (mode: WidgetDisplayMode) => {
       if (mode === "fullscreen") {
         try {
-          await containerRef.current?.requestFullscreen();
+          await fullscreenElementRef.current?.requestFullscreen();
           setCssFallback(false);
-          setDisplayMode("fullscreen");
         } catch {
           setCssFallback(true);
-          setDisplayMode("fullscreen");
         }
+        setDisplayMode("fullscreen");
         return;
       }
 
@@ -79,7 +83,7 @@ export function useWidgetFullscreenControls({
       setCssFallback(false);
       setDisplayMode(mode);
     },
-    [containerRef, setDisplayMode]
+    [fullscreenElementRef, setDisplayMode]
   );
 
   const fullscreenShellClassName = isFullscreen

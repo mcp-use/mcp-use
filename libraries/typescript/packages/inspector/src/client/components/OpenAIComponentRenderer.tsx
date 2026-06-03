@@ -113,6 +113,7 @@ function OpenAIComponentRendererBase({
     typeof window.HTMLIFrameElement
   > | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fullscreenTargetRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
   const hasLoadedOnceRef = useRef(false);
@@ -150,6 +151,8 @@ function OpenAIComponentRendererBase({
   // outside the inspector's own McpClientProvider).
   const { servers } = useMcpClient();
   const server = servers.find((connection) => connection.id === serverId);
+  const serverRef = useRef(server);
+  serverRef.current = server;
   const serverBaseUrl = serverBaseUrlProp ?? server?.url;
   const { resolvedTheme } = useTheme();
   const { playground, addWidget, addCspViolation } = useWidgetDebug();
@@ -501,19 +504,30 @@ function OpenAIComponentRendererBase({
   const { handleDisplayModeChange, fullscreenShellClassName } =
     useWidgetFullscreenControls({
       containerRef,
+      fullscreenTargetRef,
       displayMode,
       setDisplayMode: setDisplayModeWithGlobals,
     });
+
+  const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
+  handleDisplayModeChangeRef.current = handleDisplayModeChange;
+
+  const widgetUrlRef = useRef<string | null>(null);
 
   // Handle postMessage communication with iframe
   useEffect(() => {
     if (!widgetUrl) return;
 
-    // Reset readiness whenever we load a new widget URL.
-    // Only show skeleton on first load, not on prop updates
-    setIsReady(false);
-    if (!hasLoadedOnceRef.current) {
-      setShowSkeleton(true);
+    const widgetUrlChanged = widgetUrlRef.current !== widgetUrl;
+    widgetUrlRef.current = widgetUrl;
+
+    // Reset readiness only when the iframe URL changes, not on unrelated re-runs
+    // (e.g. unstable `server` reference during chat streaming).
+    if (widgetUrlChanged) {
+      setIsReady(false);
+      if (!hasLoadedOnceRef.current) {
+        setShowSkeleton(true);
+      }
     }
     setError(null);
 
@@ -616,7 +630,8 @@ function OpenAIComponentRendererBase({
 
         case "openai:callTool":
           try {
-            if (!server) {
+            const currentServer = serverRef.current;
+            if (!currentServer) {
               throw new Error("Server connection not available");
             }
 
@@ -624,7 +639,7 @@ function OpenAIComponentRendererBase({
 
             // Call the tool via the MCP connection
             // Use a 10 minute timeout for tool calls, as tools may trigger sampling
-            const result = await server.callTool(toolName, params || {}, {
+            const result = await currentServer.callTool(toolName, params || {}, {
               timeout: 600000, // 10 minutes
               resetTimeoutOnProgress: true,
             });
@@ -753,7 +768,7 @@ function OpenAIComponentRendererBase({
           try {
             const { mode } = event.data;
             if (mode && ["inline", "pip", "fullscreen"].includes(mode)) {
-              await handleDisplayModeChange(mode);
+              await handleDisplayModeChangeRef.current(mode);
             }
           } catch (err) {
             console.error(
@@ -860,16 +875,7 @@ function OpenAIComponentRendererBase({
       iframe?.removeEventListener("load", handleLoad);
       iframe?.removeEventListener("error", handleError);
     };
-  }, [
-    widgetUrl,
-    isSameOrigin,
-    handleDisplayModeChange,
-    server,
-    serverId,
-    resolvedTheme,
-    updateIframeGlobals,
-    useDevMode,
-  ]);
+  }, [widgetUrl, isSameOrigin, serverId, updateIframeGlobals, useDevMode]);
 
   // Sync theme changes to iframe's color-scheme for light-dark() CSS function
   // OpenAI Apps SDK UI uses [data-theme] attribute to set color-scheme via CSS
@@ -1080,6 +1086,7 @@ function OpenAIComponentRendererBase({
         )}
 
         <div
+          ref={fullscreenTargetRef}
           className={cn(
             "flex-1 w-full flex justify-center items-center relative",
             displayMode === "fullscreen" && "pt-14",

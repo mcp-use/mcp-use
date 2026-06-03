@@ -195,26 +195,43 @@ function MCPAppsRendererBase({
   const displayMode = displayModeProp ?? internalDisplayMode;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const fullscreenTargetRef = useRef<HTMLDivElement | null>(null);
+  const prevControlledDisplayModeRef = useRef(displayModeProp);
 
   const setDisplayMode = useCallback(
     (mode: DisplayMode) => {
+      if (displayModeProp !== undefined) {
+        prevControlledDisplayModeRef.current = mode;
+      }
       if (onDisplayModeChange) onDisplayModeChange(mode);
       else setInternalDisplayMode(mode);
     },
-    [onDisplayModeChange]
+    [onDisplayModeChange, displayModeProp]
   );
 
   const { handleDisplayModeChange, fullscreenShellClassName, isFullscreen } =
     useWidgetFullscreenControls({
       containerRef,
+      fullscreenTargetRef,
       displayMode,
       setDisplayMode,
     });
+
+  const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
+  handleDisplayModeChangeRef.current = handleDisplayModeChange;
 
   // Keep a ref so the onsizechange closure (captured at bridge creation) always
   // reads the current displayMode without needing to recreate the bridge.
   const displayModeRef = useRef(displayMode);
   displayModeRef.current = displayMode;
+
+  // Controlled displayMode (e.g. MCPAppsDebugControls): sync native fullscreen without remounting.
+  useEffect(() => {
+    if (displayModeProp === undefined) return;
+    if (prevControlledDisplayModeRef.current === displayModeProp) return;
+    prevControlledDisplayModeRef.current = displayModeProp;
+    void handleDisplayModeChangeRef.current(displayModeProp);
+  }, [displayModeProp]);
 
   // Track the last height requested by the widget in inline mode.
   // This persists across fullscreen/PiP transitions so the iframe is
@@ -257,6 +274,12 @@ function MCPAppsRendererBase({
     toolMetadata,
     tool,
   });
+
+  // Reset load flags when the widget identity changes (not on display-mode toggles).
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+    readyFiredRef.current = false;
+  }, [toolCallId, resourceUri]);
 
   // Fetch widget HTML when component mounts
   useEffect(() => {
@@ -607,12 +630,8 @@ function MCPAppsRendererBase({
     };
 
     bridge.onrequestdisplaymode = async ({ mode }) => {
-      const requestedMode = mode ?? "inline";
-      if (onDisplayModeChange) {
-        onDisplayModeChange(requestedMode);
-      } else {
-        setInternalDisplayMode(requestedMode);
-      }
+      const requestedMode = (mode ?? "inline") as DisplayMode;
+      await handleDisplayModeChangeRef.current(requestedMode);
       return { mode: requestedMode };
     };
 
@@ -1087,6 +1106,7 @@ function MCPAppsRendererBase({
 
         {/* Main content with centering like Apps SDK */}
         <div
+          ref={fullscreenTargetRef}
           className={cn(
             "flex-1 w-full h-full flex justify-center items-center relative",
             isFullscreen && !chromeless && "pt-14",
