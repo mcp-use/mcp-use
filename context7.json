@@ -64,7 +64,15 @@
     "Use Python server, client, and agent docs for Python SDK examples. Avoid mixing TypeScript and Python APIs.",
     "MCPAgent plus an LLM is the Agent capability only. Do not present connecting an LLM to an MCP server as the headline use case.",
     "Prefer concept-anchored API examples from the docs tree over install/run shell snippets or example README files.",
-    "For widgets, prefer the MCP Apps flow using mcp-use server widgets and React hooks such as useWidget, useCallTool, useFiles, and useMcp.",
-    "For server examples, prefer MCPServer tools, resources, prompts, response helpers, OAuth providers, middleware, session management, Inspector, and deployment docs."
+    "For widgets, prefer the MCP Apps flow using mcp-use server widgets and React hooks such as useWidget, useCallTool, useFiles, and ModelContext.",
+    "For server examples, prefer MCPServer tools, resources, prompts, response helpers, OAuth providers, middleware, session management, Inspector, and deployment docs.",
+    "Every tool should set explicit annotations readOnlyHint, openWorldHint, and destructiveHint; add outputSchema when returning structured content or widget props.",
+    "Import server APIs from mcp-use/server and React hooks/components from mcp-use/react; avoid internal package paths unless docs explicitly require them.",
+    "For new TypeScript MCP servers or apps, scaffold with npx create-mcp-use-app instead of hand-rolling MCPServer boilerplate, package.json, or widget build setup.",
+    "Tool handlers should use Zod schemas with describe fields and return response helpers such as text(), object(), widget(), and error() instead of raw objects or thrown errors.",
+    "Widgets should use McpUseProvider autoSize, useWidget<Props>(), and an isPending guard before reading props; keep UI state inside the widget.",
+    "Use useCallTool() for widget-initiated tool calls and ModelContext only to describe what the user is seeing, not as persistent state.",
+    "Verify tools and widgets with mcp-use client and mcp-use client screenshot during development, especially before shipping widget changes.",
+    "Never hardcode secrets. Read API keys and configuration from environment variables and document required variables in .env.example."
   ]
 }
