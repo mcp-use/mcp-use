@@ -40,11 +40,7 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
 import { cn } from "../lib/utils";
-import {
-  useWidgetFullscreenDocumentChrome,
-  WIDGET_FULLSCREEN_NATIVE_CLASSES,
-  WIDGET_FULLSCREEN_OVERLAY_CLASSES,
-} from "../lib/widget-fullscreen";
+import { useWidgetFullscreenControls } from "../lib/widget-fullscreen";
 import type { WidgetDeclaredCsp } from "../context/WidgetDebugContext";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
@@ -195,20 +191,30 @@ function MCPAppsRendererBase({
   const [prefersBorder, setPrefersBorder] = useState<boolean>(false);
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<DisplayMode>("inline");
-  /** True when fullscreen mode uses CSS overlay because requestFullscreen failed. */
-  const [cssFullscreenFallback, setCssFullscreenFallback] = useState(false);
-
   // Use controlled displayMode if provided, otherwise use internal state
   const displayMode = displayModeProp ?? internalDisplayMode;
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const setDisplayMode = useCallback(
+    (mode: DisplayMode) => {
+      if (onDisplayModeChange) onDisplayModeChange(mode);
+      else setInternalDisplayMode(mode);
+    },
+    [onDisplayModeChange]
+  );
+
+  const { handleDisplayModeChange, fullscreenShellClassName, isFullscreen } =
+    useWidgetFullscreenControls({
+      containerRef,
+      displayMode,
+      setDisplayMode,
+    });
 
   // Keep a ref so the onsizechange closure (captured at bridge creation) always
   // reads the current displayMode without needing to recreate the bridge.
   const displayModeRef = useRef(displayMode);
   displayModeRef.current = displayMode;
-
-  const isPipMode = displayMode === "pip";
-  const isFullscreenMode = displayMode === "fullscreen";
-  useWidgetFullscreenDocumentChrome(isFullscreenMode);
 
   // Track the last height requested by the widget in inline mode.
   // This persists across fullscreen/PiP transitions so the iframe is
@@ -217,9 +223,6 @@ function MCPAppsRendererBase({
   const [inlineHeight, setInlineHeight] = useState<number>(
     MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT
   );
-
-  // Use useRef instead of useState to avoid state updates during ref callback
-  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // Use playground settings when available
   const cspMode = playground.cspMode;
@@ -977,63 +980,6 @@ function MCPAppsRendererBase({
     [toolCallId, addCspViolation]
   );
 
-  const applyDisplayMode = useCallback(
-    (mode: DisplayMode) => {
-      if (onDisplayModeChange) {
-        onDisplayModeChange(mode);
-      } else {
-        setInternalDisplayMode(mode);
-      }
-    },
-    [onDisplayModeChange]
-  );
-
-  // Handle fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && displayMode === "fullscreen") {
-        setCssFullscreenFallback(false);
-        applyDisplayMode("inline");
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, [displayMode, applyDisplayMode]);
-
-  // Handle display mode changes — native Fullscreen API first, CSS overlay on failure
-  const handleDisplayModeChange = useCallback(
-    async (mode: DisplayMode) => {
-      if (mode === "fullscreen") {
-        try {
-          if (containerRef.current) {
-            await containerRef.current.requestFullscreen();
-          }
-          setCssFullscreenFallback(false);
-          applyDisplayMode("fullscreen");
-        } catch (err) {
-          console.error("[MCPAppsRenderer] Fullscreen error:", err);
-          setCssFullscreenFallback(true);
-          applyDisplayMode("fullscreen");
-        }
-        return;
-      }
-
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-      } catch (err) {
-        console.error("[MCPAppsRenderer] Exit fullscreen error:", err);
-      }
-      setCssFullscreenFallback(false);
-      applyDisplayMode(mode);
-    },
-    [applyDisplayMode]
-  );
-
   // Hide spinner after iframe loads + brief delay for widget to render (first load only)
   // Also hide when bridge initializes (initCount > 0), which proves the iframe is loaded
   // even if the onLoad event was missed during a rapid remount/re-render cycle.
@@ -1083,18 +1029,11 @@ function MCPAppsRendererBase({
     );
   }
 
-  const isPip = isPipMode;
-  const isFullscreen = isFullscreenMode;
-
-  const fullscreenShellClass = isFullscreen
-    ? cssFullscreenFallback
-      ? WIDGET_FULLSCREEN_OVERLAY_CLASSES
-      : WIDGET_FULLSCREEN_NATIVE_CLASSES
-    : undefined;
+  const isPip = displayMode === "pip";
 
   const containerClassName = (() => {
-    if (isFullscreen && fullscreenShellClass) {
-      return fullscreenShellClass;
+    if (fullscreenShellClassName) {
+      return fullscreenShellClassName;
     }
 
     if (isPip) {

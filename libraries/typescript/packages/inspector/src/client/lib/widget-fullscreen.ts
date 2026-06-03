@@ -1,35 +1,19 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 
-/** Viewport-covering shell when Fullscreen API is unavailable (CSS fallback). */
-export const WIDGET_FULLSCREEN_OVERLAY_CLASSES =
-  "fixed inset-0 z-[100] w-full h-full bg-background flex flex-col";
+export type WidgetDisplayMode = "inline" | "pip" | "fullscreen";
 
-/** Minimal shell when the browser owns the viewport via Fullscreen API. */
-export const WIDGET_FULLSCREEN_NATIVE_CLASSES =
-  "w-full h-full bg-background flex flex-col";
+const SHELL_BASE = "w-full h-full bg-background flex flex-col";
 
-/**
- * Set on `document.documentElement` while a widget is in fullscreen so host
- * apps (e.g. cloud dashboard) can hide sidebars / chat chrome.
- */
+/** Shell when the browser owns the viewport via Fullscreen API. */
+export const WIDGET_FULLSCREEN_NATIVE_CLASSES = SHELL_BASE;
+
+/** Shell when Fullscreen API is unavailable (CSS fallback). */
+export const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[100] ${SHELL_BASE}`;
+
 export const WIDGET_FULLSCREEN_DOCUMENT_ATTR = "data-mcp-widget-fullscreen";
 
-/** True when display mode is fullscreen but the container is not the native fullscreen element. */
-export function isCssFullscreenFallback(
-  isFullscreenMode: boolean,
-  container: HTMLElement | null
-): boolean {
-  if (!isFullscreenMode) return false;
-  if (typeof document === "undefined") return true;
-  return document.fullscreenElement !== container;
-}
-
-export function widgetFullscreenShellClassName(
-  isFullscreenMode: boolean,
-  container: HTMLElement | null
-): string | undefined {
-  if (!isFullscreenMode) return undefined;
-  return isCssFullscreenFallback(isFullscreenMode, container)
+function fullscreenShellClass(cssFallback: boolean): string {
+  return cssFallback
     ? WIDGET_FULLSCREEN_OVERLAY_CLASSES
     : WIDGET_FULLSCREEN_NATIVE_CLASSES;
 }
@@ -42,4 +26,65 @@ export function useWidgetFullscreenDocumentChrome(active: boolean): void {
       document.documentElement.removeAttribute(WIDGET_FULLSCREEN_DOCUMENT_ATTR);
     };
   }, [active]);
+}
+
+/** Native Fullscreen API first; CSS overlay only when `requestFullscreen` fails. */
+export function useWidgetFullscreenControls({
+  containerRef,
+  displayMode,
+  setDisplayMode,
+}: {
+  containerRef: RefObject<HTMLElement | null>;
+  displayMode: WidgetDisplayMode;
+  setDisplayMode: (mode: WidgetDisplayMode) => void;
+}) {
+  const [cssFallback, setCssFallback] = useState(false);
+  const isFullscreen = displayMode === "fullscreen";
+
+  useWidgetFullscreenDocumentChrome(isFullscreen);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && displayMode === "fullscreen") {
+        setCssFallback(false);
+        setDisplayMode("inline");
+      }
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, [displayMode, setDisplayMode]);
+
+  const handleDisplayModeChange = useCallback(
+    async (mode: WidgetDisplayMode) => {
+      if (mode === "fullscreen") {
+        try {
+          await containerRef.current?.requestFullscreen();
+          setCssFallback(false);
+          setDisplayMode("fullscreen");
+        } catch {
+          setCssFallback(true);
+          setDisplayMode("fullscreen");
+        }
+        return;
+      }
+
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+        }
+      } catch {
+        // exitFullscreen can fail if already exited
+      }
+      setCssFallback(false);
+      setDisplayMode(mode);
+    },
+    [containerRef, setDisplayMode]
+  );
+
+  const fullscreenShellClassName = isFullscreen
+    ? fullscreenShellClass(cssFallback)
+    : undefined;
+
+  return { handleDisplayModeChange, fullscreenShellClassName, isFullscreen };
 }

@@ -8,11 +8,7 @@ import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
-import {
-  useWidgetFullscreenDocumentChrome,
-  WIDGET_FULLSCREEN_NATIVE_CLASSES,
-  WIDGET_FULLSCREEN_OVERLAY_CLASSES,
-} from "../lib/widget-fullscreen";
+import { useWidgetFullscreenControls } from "../lib/widget-fullscreen";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
 import { Spinner } from "./ui/spinner";
@@ -131,9 +127,6 @@ function OpenAIComponentRendererBase({
   const [displayMode, setDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
-  const [cssFullscreenFallback, setCssFullscreenFallback] = useState(false);
-
-  useWidgetFullscreenDocumentChrome(displayMode === "fullscreen");
   const [isSameOrigin, setIsSameOrigin] = useState<boolean>(false);
   const [isPipHovered, setIsPipHovered] = useState<boolean>(false);
   const [useDevMode, setUseDevMode] = useState<boolean>(false);
@@ -497,7 +490,7 @@ function OpenAIComponentRendererBase({
     });
   }, [toolResult, isReady, updateIframeGlobals]);
 
-  const applyDisplayMode = useCallback(
+  const setDisplayModeWithGlobals = useCallback(
     (mode: "inline" | "pip" | "fullscreen") => {
       setDisplayMode(mode);
       updateIframeGlobals({ displayMode: mode });
@@ -505,42 +498,12 @@ function OpenAIComponentRendererBase({
     [updateIframeGlobals]
   );
 
-  // Native Fullscreen API first; CSS overlay only when requestFullscreen fails
-  const handleDisplayModeChange = useCallback(
-    async (mode: "inline" | "pip" | "fullscreen") => {
-      if (mode === "fullscreen") {
-        if (document.fullscreenElement) {
-          setCssFullscreenFallback(false);
-          applyDisplayMode("fullscreen");
-          return;
-        }
-
-        try {
-          if (containerRef.current) {
-            await containerRef.current.requestFullscreen();
-          }
-          setCssFullscreenFallback(false);
-          applyDisplayMode("fullscreen");
-        } catch (err) {
-          console.error("[OpenAIComponentRenderer] Fullscreen error:", err);
-          setCssFullscreenFallback(true);
-          applyDisplayMode("fullscreen");
-        }
-        return;
-      }
-
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-      } catch (err) {
-        console.error("[OpenAIComponentRenderer] Exit fullscreen error:", err);
-      }
-      setCssFullscreenFallback(false);
-      applyDisplayMode(mode);
-    },
-    [applyDisplayMode]
-  );
+  const { handleDisplayModeChange, fullscreenShellClassName } =
+    useWidgetFullscreenControls({
+      containerRef,
+      displayMode,
+      setDisplayMode: setDisplayModeWithGlobals,
+    });
 
   // Handle postMessage communication with iframe
   useEffect(() => {
@@ -1009,28 +972,6 @@ function OpenAIComponentRendererBase({
     };
   }, [iframeHeight]);
 
-  // Listen for fullscreen changes to sync state
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && displayMode === "fullscreen") {
-        setCssFullscreenFallback(false);
-        applyDisplayMode("inline");
-      } else if (document.fullscreenElement && displayMode !== "fullscreen") {
-        setCssFullscreenFallback(false);
-        applyDisplayMode("fullscreen");
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("fullscreenerror", (e) => {
-      console.error("[OpenAIComponentRenderer] Fullscreen error:", e);
-    });
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, [displayMode, applyDisplayMode]);
-
   // Watch for theme changes and update iframe
   // Also update when iframe becomes ready to ensure initial theme is set correctly
   useEffect(() => {
@@ -1099,10 +1040,7 @@ function OpenAIComponentRendererBase({
         className={cn(
           "w-full h-full flex flex-col justify-center items-center",
           centerVertically && "items-center",
-          displayMode === "fullscreen" &&
-            (cssFullscreenFallback
-              ? WIDGET_FULLSCREEN_OVERLAY_CLASSES
-              : WIDGET_FULLSCREEN_NATIVE_CLASSES),
+          fullscreenShellClassName,
           displayMode === "pip" &&
             `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px] shadow-2xl border overflow-hidden`
         )}
