@@ -335,10 +335,10 @@ async function main() {
     if (mode === "builtin") {
       playwrightArgs.push(
         "--grep-invert",
-        "auth-flows.test.ts|connection.test.ts|setup.test.ts|python.test.ts"
+        "auth-flows.test.ts|connection.test.ts|oauth-emulate.test.ts|setup.test.ts|python.test.ts"
       );
       console.log(
-        "⏭️  Skipping auth-flows, connection, and setup tests (not applicable for builtin mode)\n"
+        "⏭️  Skipping auth-flows, connection, oauth-emulate, and setup tests (not applicable for builtin mode)\n"
       );
     } else {
       playwrightArgs.push(
