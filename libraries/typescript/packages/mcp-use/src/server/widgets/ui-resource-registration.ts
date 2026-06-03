@@ -24,11 +24,16 @@ import {
   type WidgetServerConfig,
 } from "./widget-helpers.js";
 import {
+  applyClaudeResourceDomain,
   buildDualProtocolMetadata,
   buildResourceUiMeta,
   generateToolOutput,
+  getMcpUiResourceDomain,
   getBuildIdPart,
 } from "./protocol-helpers.js";
+import { getRequestContext } from "../context-storage.js";
+import { findSessionContext } from "../tools/tool-execution-helpers.js";
+import type { SessionData } from "../sessions/session-manager.js";
 
 /**
  * Minimal server interface for UI resource registration
@@ -51,7 +56,7 @@ interface UIResourceServer {
     resourceTemplates: Map<string, any>;
   };
   /** Active sessions for sending notifications (for HMR updates) */
-  sessions?: Map<string, { server?: { sendToolListChanged?: () => void } }>;
+  sessions?: Map<string, SessionData>;
   resource: (
     definition: ResourceDefinition | ResourceDefinitionWithoutCallback,
     callback?: any
@@ -315,6 +320,26 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     return (full as UIResourceDefinition) ?? enrichedDefinition;
   };
 
+  const applyHostResourceMetadata = (uiResource: {
+    resource: { _meta?: Record<string, unknown> };
+  }) => {
+    if (!getMcpUiResourceDomain(uiResource.resource)) {
+      return;
+    }
+
+    const sessions = server.sessions || new Map();
+    const { session } = findSessionContext(
+      sessions,
+      getRequestContext(),
+      undefined,
+      undefined
+    );
+
+    if (session?.clientInfo) {
+      applyClaudeResourceDomain(uiResource.resource, session.clientInfo);
+    }
+  };
+
   const resourceReadCallback = async () => {
     const latestDef = getLatestDefinition();
     const params =
@@ -329,6 +354,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     );
 
     uiResource.resource.uri = resourceUri;
+    applyHostResourceMetadata(uiResource);
 
     return {
       contents: [uiResource.resource],
@@ -347,6 +373,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     );
 
     uiResource.resource.uri = uri.toString();
+    applyHostResourceMetadata(uiResource);
 
     return {
       contents: [uiResource.resource],
