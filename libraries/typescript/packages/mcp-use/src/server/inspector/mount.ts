@@ -64,13 +64,12 @@ export async function mountInspectorUI(
       serverHost === "0.0.0.0" || serverHost === "::"
         ? "localhost"
         : serverHost;
-    // Auto-connect to the local MCP server at /mcp (SSE endpoint)
-    // Use JSON config to specify SSE transport type
-    const mcpUrl = `http://${hostForBrowser}:${serverPort}/mcp`; // Also available at /sse
+    // Auto-connect to the local MCP server at /mcp using streamable HTTP.
+    const mcpUrl = `http://${hostForBrowser}:${serverPort}/mcp`;
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
-      transportType: "sse",
+      transportType: "http",
       connectionType: "Direct",
     });
     mountInspector(app, {
