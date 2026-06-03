@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.29.1-canary.0
+
+### Patch Changes
+
+- 5585db7: Updated dependency `hono` to `4.12.18`.
+  - @mcp-use/cli@3.3.1-canary.0
+  - @mcp-use/inspector@7.0.1-canary.0
+
 ## 1.29.0
 
 ### Minor Changes
