@@ -30,6 +30,7 @@
     "prune-unused-exports",
     "quiet-files-cleanup",
     "screenshot-external-mcp-autosizing",
+    "silent-oauth-errors",
     "silver-ravens-type",
     "supabase-oauth-url-override",
     "thick-horses-punch"

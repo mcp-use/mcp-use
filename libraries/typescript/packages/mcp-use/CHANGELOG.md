@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.29.0-canary.23
+
+### Patch Changes
+
+- 419941d: Redact OAuth token verification errors from client responses while logging details server-side.
+  - @mcp-use/cli@3.3.0-canary.23
+  - @mcp-use/inspector@7.0.0-canary.23
+
 ## 1.29.0-canary.22
 
 ### Patch Changes
