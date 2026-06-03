@@ -6,6 +6,35 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.29.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.29.0&title=Public%20landing%20pages%2C%20OAuth%20callback%20hardening%20%26%20Supabase%20URL%20override&date=2026-06&lang=typescript" alt="Release 1.29.0" />
+  </Frame>
+  ## Public landing pages and Ollama chat support
+  Minor release adding a public browser landing page for OAuth-protected servers, a Supabase URL override for local/self-hosted instances, Claude UI-resource domain hashing, and a round of OAuth callback and React-provider hardening. Inspector ships a major v7.0.0 with local LLM (Ollama) chat and image tool results (see inspector changelog).
+
+- **New**: `publicLandingPage` option on `MCPServer`  -  keep the browser landing page (`GET` + `Accept: text/html`) reachable without authentication while the MCP endpoint stays OAuth-protected; ships with a `public-landing-page` server example (`#1550`)
+- **New**: `supabaseUrl` override on `oauthSupabaseProvider`  -  point the provider at a local or self-hosted Supabase (e.g. `http://localhost:54321`) instead of the hosted `https://${projectId}.supabase.co`; set via the `supabaseUrl` config option or `MCP_USE_OAUTH_SUPABASE_URL`, and `projectId` becomes optional when it is set (`#1517`)
+- **New**: Claude UI-resource domain hashing  -  when a Claude client requests a widget/UI resource that declares a `ui.domain`, the server rewrites it to a stable `<sha256-prefix>.claudemcpcontent.com` content domain (`#1599`)
+- **Breaking**: `mcp-use/browser` no longer exports the LangChain agents (`MCPAgent`, `RemoteAgent`, adapters, observability, AI SDK utils)  -  they moved to `mcp-use/browser/agent`, so client bundles that only need `MCPClient` no longer pull in `@langchain/*` (`#1580`)
+- **Fix**: browser OAuth popup callback edge cases in `onMcpAuthorization()`  -  popups whose `window.opener` was severed by COOP / cross-origin redirects now render an in-place close-window message and broadcast over a same-origin `BroadcastChannel("mcp_auth_callback")` so `useMcp` no longer hangs in `authenticating`; repeat invocations in one page load (HMR, strict-mode double render) reuse a cached promise instead of re-exchanging the code (`#1580`)
+- **Fix**: redact OAuth token-verification errors from client responses while logging the details server-side (`#1573`)
+- **Fix**: normalize the issuer trailing slash before appending `/.well-known/oauth-authorization-server` in the DCR-direct metadata proxy, fixing the double-slash 404 against providers like Auth0 (`#1483`)
+- **Fix**: normalize `0.0.0.0` and `::` to `localhost` in the inspector autoConnect URL so OAuth-protected `mcp-use dev` flows match the published resource metadata and pass the SDK's strict origin check (`#1552`)
+- **Fix** (react): `McpClientProvider.removeServer` / `updateServer` no longer trigger React's "cannot update a component while rendering a different component" warning  -  teardown side effects (`disconnect()`, `clearStorage()`) now run after the state updaters instead of inside them (`#1561`)
+- **Fix** (react): treat `name` as a meaningful change in `McpServerWrapper` so alias-only edits propagate through `onUpdate` and the inspector tile heading updates immediately (`#1539`)
+- **Fix**: pin published dependency versions in `mcp-use`'s `package.json` (`#1610`)
+- **New** (@mcp-use/cli): `mcp-use client screenshot` auto-sizes captures to the widget's natural rendered dimensions when `--width`/`--height` are omitted, and now handles external MCP server URIs like `ui://excalidraw/mcp-app.html` (flattened to `<server>-<name>`) that previously broke the preview route (`#1579`)
+- **Fix** (@mcp-use/cli): widget assets resolve correctly when `MCP_URL` is set at build time  -  Vite `base` and `window.__getFile` now point at `${MCP_URL}/mcp-use/widgets/{widget}/`, matching the production static route (`#1560`)
+- **Fix** (create-mcp-use-app): move the `mcp-apps` template's pnpm settings into `pnpm-workspace.yaml` so scaffolded apps install cleanly under pnpm 10 (`#1602`)
+- **Enhancement** (@mcp-use/inspector): local LLM provider (Ollama) chat, MCP image tool results forwarded as real image content, an MCP-server reconnect banner, and widget fullscreen / display-mode fixes (see inspector changelog)
+- **Documentation**: clarify the "Inspector: Skipped in production" log and the `start` CLI reference so users rebuild with `mcp-use build --with-inspector` instead of passing the flag to `mcp-use start` (`#1505`)
+- **Chore**: prune 187 unused exports and delete unused source files flagged by Knip across the workspace, and enforce Knip in CI (`#1511`, `#1476`, `#1510`, `#1512`)
+- **Update**: Updated @mcp-use/inspector to v7.0.0
+- **Update**: Updated @mcp-use/cli to v3.3.0
+- **Update**: Updated create-mcp-use-app to v0.14.13
+</Update>
+
 <Update label="v1.28.0" description="May 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.28.0&title=Node%20OAuth%2C%20CLI%20client%20redesign%20%26%20widget%20screenshot&date=2026-05&lang=typescript" alt="Release 1.28.0" />

@@ -32,6 +32,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
+import { createPortal } from "react-dom";
 import { rpcLogBus } from "../../server/rpc-log-bus.js";
 import { consoleLogBus } from "../console-log-bus";
 import { IFRAME_SANDBOX_PERMISSIONS, MCP_APPS_CONFIG } from "../constants";
@@ -40,6 +41,8 @@ import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
 import { cn } from "../lib/utils";
+import { useSandboxRemountGeneration } from "../lib/use-sandbox-remount-generation";
+import { useWidgetDisplayModeControls } from "../lib/widget-fullscreen";
 import type { WidgetDeclaredCsp } from "../context/WidgetDebugContext";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
@@ -120,6 +123,8 @@ interface MCPAppsRendererProps {
   onReady?: () => void;
   /** When true in fullscreen mode, suppresses the fullscreen navbar + top padding so the iframe fills the viewport edge-to-edge. Used by the preview/screenshot route. */
   chromeless?: boolean;
+  /** Override the inline-mode max-width cap (default: 768 on desktop, device width on mobile). Used by the preview/screenshot route to render widgets wider than the chat-column width. */
+  inlineWidthOverride?: number;
 }
 
 function MCPAppsRendererBase({
@@ -144,6 +149,7 @@ function MCPAppsRendererBase({
   onRerun,
   onReady,
   chromeless,
+  inlineWidthOverride,
 }: MCPAppsRendererProps) {
   const sandboxRef = useRef<SandboxedIframeHandle>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
@@ -190,14 +196,61 @@ function MCPAppsRendererBase({
   const [prefersBorder, setPrefersBorder] = useState<boolean>(false);
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<DisplayMode>("inline");
-
   // Use controlled displayMode if provided, otherwise use internal state
   const displayMode = displayModeProp ?? internalDisplayMode;
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const prevControlledDisplayModeRef = useRef(displayModeProp);
+
+  const setDisplayMode = useCallback(
+    (mode: DisplayMode) => {
+      if (displayModeProp !== undefined) {
+        prevControlledDisplayModeRef.current = mode;
+      }
+      if (onDisplayModeChange) onDisplayModeChange(mode);
+      else setInternalDisplayMode(mode);
+    },
+    [onDisplayModeChange, displayModeProp]
+  );
+
+  const { sandboxGeneration, onSandboxMount } = useSandboxRemountGeneration();
+
+  const handleSandboxMount = useCallback(() => {
+    if (onSandboxMount()) {
+      if (hasLoadedOnceRef.current) {
+        setShowSpinner(true);
+        setIsReady(false);
+      }
+    }
+  }, [onSandboxMount]);
+
+  const {
+    handleDisplayModeChange,
+    fullscreenShellClassName,
+    pipShellClassName,
+    isFullscreen,
+    isPip,
+  } = useWidgetDisplayModeControls({
+    containerRef,
+    displayMode,
+    setDisplayMode,
+  });
+
+  const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
+  handleDisplayModeChangeRef.current = handleDisplayModeChange;
 
   // Keep a ref so the onsizechange closure (captured at bridge creation) always
   // reads the current displayMode without needing to recreate the bridge.
   const displayModeRef = useRef(displayMode);
   displayModeRef.current = displayMode;
+
+  // Controlled displayMode (e.g. MCPAppsDebugControls): sync native fullscreen without remounting.
+  useEffect(() => {
+    if (displayModeProp === undefined) return;
+    if (prevControlledDisplayModeRef.current === displayModeProp) return;
+    prevControlledDisplayModeRef.current = displayModeProp;
+    void handleDisplayModeChangeRef.current(displayModeProp);
+  }, [displayModeProp]);
 
   // Track the last height requested by the widget in inline mode.
   // This persists across fullscreen/PiP transitions so the iframe is
@@ -207,9 +260,6 @@ function MCPAppsRendererBase({
     MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT
   );
 
-  // Use useRef instead of useState to avoid state updates during ref callback
-  const containerRef = useRef<HTMLDivElement | null>(null);
-
   // Use playground settings when available
   const cspMode = playground.cspMode;
   const deviceType = playground.deviceType;
@@ -218,8 +268,11 @@ function MCPAppsRendererBase({
   // Calculate dimensions based on device type
   const { maxWidth, maxHeight } = useDeviceViewport(deviceType, customViewport);
 
-  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width
-  const inlineMaxWidth = deviceType === "mobile" ? maxWidth : 768;
+  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width.
+  // inlineWidthOverride (set by the preview/screenshot route) bypasses the cap so widgets can render
+  // at arbitrary widths for capture.
+  const inlineMaxWidth =
+    inlineWidthOverride ?? (deviceType === "mobile" ? maxWidth : 768);
 
   // Get the tool definition from the server's tool list (memoized to prevent infinite re-renders)
   // Stringify toolName to ensure stable reference if it's passed as an object
@@ -243,6 +296,12 @@ function MCPAppsRendererBase({
     toolMetadata,
     tool,
   });
+
+  // Reset load flags when the widget identity changes (not on display-mode toggles).
+  useEffect(() => {
+    hasLoadedOnceRef.current = false;
+    readyFiredRef.current = false;
+  }, [toolCallId, resourceUri]);
 
   // Fetch widget HTML when component mounts
   useEffect(() => {
@@ -449,13 +508,17 @@ function MCPAppsRendererBase({
     };
   }, [initCount, resourceUri, readResource]);
 
-  // Initialize AppBridge when HTML is ready
+  // Initialize AppBridge when HTML is ready (re-run when sandbox iframe remounts)
   useEffect(() => {
     if (!widgetHtml || !sandboxRef.current) return;
 
     const iframe = sandboxRef.current.getIframeElement();
     if (!iframe?.contentWindow) return;
 
+    lastInitTimeRef.current = 0;
+    toolInputSentRef.current = null;
+    lastSentPropsRef.current = null;
+    lastSentToolOutputKeyRef.current = null;
     setInitCount(0);
 
     // Create a custom transport that posts messages through the SandboxedIframe
@@ -593,12 +656,8 @@ function MCPAppsRendererBase({
     };
 
     bridge.onrequestdisplaymode = async ({ mode }) => {
-      const requestedMode = mode ?? "inline";
-      if (onDisplayModeChange) {
-        onDisplayModeChange(requestedMode);
-      } else {
-        setInternalDisplayMode(requestedMode);
-      }
+      const requestedMode = (mode ?? "inline") as DisplayMode;
+      await handleDisplayModeChangeRef.current(requestedMode);
       return { mode: requestedMode };
     };
 
@@ -696,10 +755,12 @@ function MCPAppsRendererBase({
 
     // Set up message handler for incoming messages from widget (via SandboxedIframe)
     const handleMessage = (event: MessageEvent) => {
+      const activeIframe = sandboxRef.current?.getIframeElement();
+      if (!activeIframe?.contentWindow) return;
       // Only process messages from our sandbox proxy
-      const proxyOrigin = new URL(iframe.src).origin;
+      const proxyOrigin = new URL(activeIframe.src).origin;
       if (event.origin !== proxyOrigin) return;
-      if (event.source !== iframe.contentWindow) return;
+      if (event.source !== activeIframe.contentWindow) return;
 
       if (event.data?.type === "iframe-console-log") {
         if (
@@ -794,6 +855,7 @@ function MCPAppsRendererBase({
     widgetHtml,
     sandboxRef,
     toolCallId,
+    sandboxGeneration,
     // readResource, server: use refs to avoid bridge tear-down/recreate on parent re-renders
     // (which would reset initCount and cause iframe/widget to re-init, appearing as "re-render")
   ]);
@@ -966,61 +1028,11 @@ function MCPAppsRendererBase({
     [toolCallId, addCspViolation]
   );
 
-  // Handle fullscreen changes
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && displayMode === "fullscreen") {
-        if (onDisplayModeChange) {
-          onDisplayModeChange("inline");
-        } else {
-          setInternalDisplayMode("inline");
-        }
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, [displayMode, onDisplayModeChange]);
-
-  // Handle display mode changes
-  const handleDisplayModeChange = useCallback(
-    async (mode: DisplayMode) => {
-      try {
-        if (mode === "fullscreen") {
-          if (containerRef.current) {
-            await containerRef.current.requestFullscreen();
-          }
-        } else {
-          if (document.fullscreenElement) {
-            await document.exitFullscreen();
-          }
-        }
-
-        // Call the callback if provided (controlled), otherwise update internal state
-        if (onDisplayModeChange) {
-          onDisplayModeChange(mode);
-        } else {
-          setInternalDisplayMode(mode);
-        }
-      } catch (err) {
-        console.error("[MCPAppsRenderer] Display mode error:", err);
-        // Still update state even on error
-        if (onDisplayModeChange) {
-          onDisplayModeChange(mode);
-        } else {
-          setInternalDisplayMode(mode);
-        }
-      }
-    },
-    [onDisplayModeChange]
-  );
-
   // Hide spinner after iframe loads + brief delay for widget to render (first load only)
   // Also hide when bridge initializes (initCount > 0), which proves the iframe is loaded
   // even if the onLoad event was missed during a rapid remount/re-render cycle.
-  const iframeEffectivelyReady = isReady || initCount > 0;
+  const iframeEffectivelyReady =
+    initCount > 0 || (isReady && !hasLoadedOnceRef.current);
 
   // Fire onReady once after the AppBridge handshake completes (initCount goes 0 → 1).
   const readyFiredRef = useRef(false);
@@ -1066,22 +1078,13 @@ function MCPAppsRendererBase({
     );
   }
 
-  const isPip = displayMode === "pip";
-  const isFullscreen = displayMode === "fullscreen";
-
   const containerClassName = (() => {
-    if (isFullscreen) {
-      return "fixed inset-0 z-40 w-full h-full bg-background flex flex-col";
+    if (fullscreenShellClassName) {
+      return fullscreenShellClassName;
     }
-
-    if (isPip) {
-      return [
-        `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px]`,
-        "shadow-2xl border overflow-hidden",
-        "bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80",
-      ].join(" ");
+    if (pipShellClassName) {
+      return pipShellClassName;
     }
-
     return "flex group flex-1 items-center justify-center";
   })();
 
@@ -1092,92 +1095,108 @@ function MCPAppsRendererBase({
     transition: isFullscreen || isPip ? undefined : "height 300ms ease-out",
   };
 
-  return (
-    <WidgetWrapper className={className} noWrapper={noWrapper}>
+  const widgetShell = (
+    <div
+      ref={containerRef}
+      className={containerClassName}
+      style={
+        isPip
+          ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
+          : undefined
+      }
+    >
+      {isFullscreen && !chromeless && (
+        <FullscreenNavbar
+          title={toolName}
+          onClose={() => handleDisplayModeChange("inline")}
+          testId="debugger-exit-fullscreen-button"
+        />
+      )}
+
+      {isPip && (
+        <button
+          data-testid="debugger-exit-pip-button"
+          onClick={() => handleDisplayModeChange("inline")}
+          className="absolute left-2 top-2 z-30 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
+          aria-label="Close PiP mode"
+          title="Close PiP mode"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      )}
+
+      {/* Main content with centering like Apps SDK */}
       <div
-        ref={containerRef}
-        className={containerClassName}
-        style={
-          isPip
-            ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
-            : undefined
-        }
+        className={cn(
+          "relative w-full min-h-0",
+          isFullscreen || isPip
+            ? "flex flex-1 flex-col"
+            : "flex flex-1 justify-center items-center",
+          !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
+        )}
       >
-        {isFullscreen && !chromeless && (
-          <FullscreenNavbar
-            title={toolName}
-            onClose={() => handleDisplayModeChange("inline")}
-            testId="debugger-exit-fullscreen-button"
-          />
+        {showSpinner && (
+          <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-10">
+            <Spinner className="size-5" />
+          </div>
         )}
-
-        {isPip && (
-          <button
-            data-testid="debugger-exit-pip-button"
-            onClick={() => handleDisplayModeChange("inline")}
-            className="absolute left-2 top-2 z-30 flex h-6 w-6 items-center justify-center rounded-md bg-background/80 hover:bg-background border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer"
-            aria-label="Close PiP mode"
-            title="Close PiP mode"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* Main content with centering like Apps SDK */}
         <div
           className={cn(
-            "flex-1 w-full h-full flex justify-center items-center relative",
-            isFullscreen && !chromeless && "pt-14",
-            !isPip && !isFullscreen && (invoking || invoked) && "pt-8"
+            "relative w-full",
+            isFullscreen || isPip ? "h-full min-h-0 flex-1" : "h-full"
           )}
+          style={
+            isFullscreen || isPip
+              ? undefined
+              : { maxWidth: iframeStyle.maxWidth }
+          }
         >
-          {showSpinner && (
-            <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-10">
-              <Spinner className="size-5" />
-            </div>
-          )}
-          <div
-            className="relative w-full h-full"
-            style={{ maxWidth: iframeStyle.maxWidth }}
-          >
-            <div className="absolute -top-8 left-2 z-10 h-full">
-              {/* Status label above the widget — only in inline mode */}
-              {!isPip && !isFullscreen && (invoking || invoked) && (
-                <div className="whitespace-nowrap">
-                  {invoking && !toolOutput && (
-                    <TextShimmer className="text-xs ">{invoking}</TextShimmer>
-                  )}
-                  {invoked && !!toolOutput && (
-                    <span className="text-xs text-muted-foreground">
-                      {invoked}
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <SandboxedIframe
-              ref={sandboxRef}
-              html={widgetHtml}
-              sandbox={IFRAME_SANDBOX_PERMISSIONS}
-              csp={widgetCsp}
-              permissions={widgetPermissions}
-              permissive={cspMode === "permissive"}
-              onLoad={() => setIsReady(true)}
-              onMessage={handleSandboxMessage}
-              title={`MCP App: ${toolName}`}
-              className={cn(
-                displayMode === "inline" && "w-full",
-                displayMode === "fullscreen" && "w-full h-full rounded-none",
-                displayMode === "pip" && "w-full h-full",
-                displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
-                "overflow-hidden",
-                prefersBorder && "border border-zinc-200 dark:border-zinc-700"
-              )}
-              style={iframeStyle}
-            />{" "}
+          <div className="absolute -top-8 left-2 z-10 h-full">
+            {/* Status label above the widget — only in inline mode */}
+            {!isPip && !isFullscreen && (invoking || invoked) && (
+              <div className="whitespace-nowrap">
+                {invoking && !toolOutput && (
+                  <TextShimmer className="text-xs ">{invoking}</TextShimmer>
+                )}
+                {invoked && !!toolOutput && (
+                  <span className="text-xs text-muted-foreground">
+                    {invoked}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
+          <SandboxedIframe
+            ref={sandboxRef}
+            html={widgetHtml}
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
+            csp={widgetCsp}
+            permissions={widgetPermissions}
+            permissive={cspMode === "permissive"}
+            onSandboxMount={handleSandboxMount}
+            onLoad={() => setIsReady(true)}
+            onMessage={handleSandboxMessage}
+            title={`MCP App: ${toolName}`}
+            className={cn(
+              displayMode === "inline" && "w-full",
+              displayMode === "fullscreen" && "w-full h-full rounded-none",
+              displayMode === "pip" && "w-full h-full",
+              displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
+              "overflow-hidden",
+              prefersBorder && "border border-zinc-200 dark:border-zinc-700"
+            )}
+            style={iframeStyle}
+          />{" "}
         </div>
       </div>
+    </div>
+  );
+
+  return (
+    <WidgetWrapper className={className} noWrapper={noWrapper}>
+      {isPip && typeof document !== "undefined"
+        ? createPortal(widgetShell, document.body)
+        : widgetShell}
     </WidgetWrapper>
   );
 }
@@ -1208,6 +1227,7 @@ function mcpAppsRendererAreEqual(
   if (prev.onRerun !== next.onRerun) return false;
   if (prev.onReady !== next.onReady) return false;
   if (prev.chromeless !== next.chromeless) return false;
+  if (prev.inlineWidthOverride !== next.inlineWidthOverride) return false;
   if (prev.onDisplayModeChange !== next.onDisplayModeChange) return false;
   if (prev.className !== next.className) return false;
   if (prev.serverBaseUrl !== next.serverBaseUrl) return false;

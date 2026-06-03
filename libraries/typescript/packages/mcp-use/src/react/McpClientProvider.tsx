@@ -620,6 +620,7 @@ function McpServerWrapper({
 
     if (
       !prevServer ||
+      prevServer.name !== server.name ||
       prevServer.state !== server.state ||
       prevServer.error !== server.error ||
       prevServer.authUrl !== server.authUrl ||
@@ -883,6 +884,25 @@ export function McpClientProvider({
   const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
   const [servers, setServers] = useState<McpServer[]>([]);
   const [storageLoaded, setStorageLoaded] = useState(false);
+
+  // Mirror of `servers` for synchronous access from event handlers
+  // (specifically `removeServer` / `updateServer`). Reading the latest
+  // servers from a ref lets us run the wrapper teardown side effects
+  // (`disconnect()` / `clearStorage()`) OUTSIDE the `setServers` updater
+  // function. Those wrapper callbacks fire synchronous setStates on the
+  // wrapper itself (`setLog` via `addLog`, `setAuthUrl`); when invoked
+  // inside an updater they land during the provider's render phase, which
+  // React reports as
+  //   "Cannot update a component (`McpServerWrapper`) while rendering a
+  //    different component (`McpClientProvider`)".
+  // Reading from the ref keeps the callback identities stable too — we
+  // don't have to add `servers` to their dependency arrays, which would
+  // re-create the callbacks on every connection-state tick and trigger
+  // downstream effects in consumers.
+  const serversRef = useRef<McpServer[]>([]);
+  useEffect(() => {
+    serversRef.current = servers;
+  }, [servers]);
 
   // Store cached server metadata
   const cachedMetadataRef = useRef<
@@ -1196,21 +1216,22 @@ export function McpClientProvider({
 
   const removeServer = useCallback(
     (id: string) => {
-      // Find and disconnect the server
-      setServers((prev) => {
-        const server = prev.find((s) => s.id === id);
-        if (server?.disconnect) {
-          server.disconnect();
-        }
-        if (server?.clearStorage) {
-          server.clearStorage();
-        }
-        return prev.filter((s) => s.id !== id);
-      });
+      // Capture the wrapper from the latest state BEFORE scheduling state
+      // updates. The wrapper teardown (`disconnect()` / `clearStorage()`)
+      // synchronously fires setState on the wrapper itself; running it here
+      // — in the event-handler context — keeps those updates out of the
+      // `setServers` updater, which would otherwise execute during the
+      // provider's render phase and trigger
+      //   "Cannot update a component (`McpServerWrapper`) while rendering
+      //    a different component (`McpClientProvider`)".
+      const captured = serversRef.current.find((s) => s.id === id);
 
+      setServers((prev) => prev.filter((s) => s.id !== id));
       setServerConfigs((prev) => prev.filter((s) => s.id !== id));
 
-      // Call callback
+      if (captured?.disconnect) captured.disconnect();
+      if (captured?.clearStorage) captured.clearStorage();
+
       onServerRemoved?.(id);
     },
     [onServerRemoved]
@@ -1238,19 +1259,13 @@ export function McpClientProvider({
             ((currentConfig.options as any)._updateVersion || 0) + 1,
         };
 
-        // Disconnect the old server
-        setServers((prev) => {
-          const server = prev.find((s) => s.id === id);
-          if (server?.disconnect) {
-            server.disconnect();
-          }
-          if (server?.clearStorage) {
-            server.clearStorage();
-          }
-          return prev.filter((s) => s.id !== id);
-        });
+        // Capture the existing wrapper before mutating state so its
+        // synchronous setState side effects (`setLog`, `setAuthUrl`) run
+        // outside the `setServers` updater. See `removeServer` for the
+        // full rationale.
+        const captured = serversRef.current.find((s) => s.id === id);
 
-        // Update the config (this will trigger a new McpServerWrapper to mount)
+        setServers((prev) => prev.filter((s) => s.id !== id));
         setServerConfigs((prev) => {
           const updated = prev.map((s) =>
             s.id === id ? { id, options: updatedOptions } : s
@@ -1259,6 +1274,9 @@ export function McpClientProvider({
           setTimeout(() => resolve(), 0);
           return updated;
         });
+
+        if (captured?.disconnect) captured.disconnect();
+        if (captured?.clearStorage) captured.clearStorage();
       });
     },
     [serverConfigs]

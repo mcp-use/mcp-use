@@ -7,7 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   deriveProjectInfo,
   findUnsafeEntries,
@@ -145,7 +145,7 @@ describe("deriveProjectInfo", () => {
   it("treats a normal name as a subdirectory", () => {
     const info = deriveProjectInfo("my-app", "/tmp");
     expect(info.useCurrentDir).toBe(false);
-    expect(info.projectPath).toBe("/tmp/my-app");
+    expect(info.projectPath).toBe(resolve("/tmp", "my-app"));
     expect(info.displayName).toBe("my-app");
     expect(info.packageName).toBe("my-app");
   });

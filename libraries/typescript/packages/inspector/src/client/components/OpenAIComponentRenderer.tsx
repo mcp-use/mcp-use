@@ -3,11 +3,13 @@ import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MCP_APPS_CONFIG } from "../constants/mcp-apps";
 import { IFRAME_SANDBOX_PERMISSIONS } from "../constants/iframe";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { injectConsoleInterceptor } from "../utils/iframeConsoleInterceptor";
+import { useWidgetDisplayModeControls } from "../lib/widget-fullscreen";
 import { FullscreenNavbar } from "./FullscreenNavbar";
 import { MCPAppsDebugControls } from "./MCPAppsDebugControls";
 import { Spinner } from "./ui/spinner";
@@ -149,6 +151,8 @@ function OpenAIComponentRendererBase({
   // outside the inspector's own McpClientProvider).
   const { servers } = useMcpClient();
   const server = servers.find((connection) => connection.id === serverId);
+  const serverRef = useRef(server);
+  serverRef.current = server;
   const serverBaseUrl = serverBaseUrlProp ?? server?.url;
   const { resolvedTheme } = useTheme();
   const { playground, addWidget, addCspViolation } = useWidgetDebug();
@@ -489,64 +493,68 @@ function OpenAIComponentRendererBase({
     });
   }, [toolResult, isReady, updateIframeGlobals]);
 
-  // Handle display mode changes with native Fullscreen API
-  const handleDisplayModeChange = useCallback(
-    async (mode: "inline" | "pip" | "fullscreen") => {
-      try {
-        if (mode === "fullscreen") {
-          // Enter fullscreen
-          if (document.fullscreenElement) {
-            // Already in fullscreen, just update state
-            setDisplayMode(mode);
-            updateIframeGlobals({ displayMode: mode });
-            return;
-          }
-
-          if (containerRef.current) {
-            await containerRef.current.requestFullscreen();
-            setDisplayMode(mode);
-            updateIframeGlobals({ displayMode: mode });
-            console.log("[OpenAIComponentRenderer] Entered fullscreen");
-          }
-        } else {
-          // Exit fullscreen
-          if (document.fullscreenElement) {
-            await document.exitFullscreen();
-          }
-          setDisplayMode(mode);
-          updateIframeGlobals({ displayMode: mode });
-          console.log("[OpenAIComponentRenderer] Exited fullscreen");
-        }
-      } catch (err) {
-        console.error("[OpenAIComponentRenderer] Fullscreen error:", err);
-        // Fallback to CSS-based fullscreen if native API fails
-        setDisplayMode(mode);
-        updateIframeGlobals({ displayMode: mode });
-      }
+  const setDisplayModeWithGlobals = useCallback(
+    (mode: "inline" | "pip" | "fullscreen") => {
+      setDisplayMode(mode);
+      updateIframeGlobals({ displayMode: mode });
     },
     [updateIframeGlobals]
   );
+
+  const {
+    handleDisplayModeChange,
+    fullscreenShellClassName,
+    pipShellClassName,
+    isPip,
+  } = useWidgetDisplayModeControls({
+    containerRef,
+    displayMode,
+    setDisplayMode: setDisplayModeWithGlobals,
+  });
+
+  const iframeMountCountRef = useRef(0);
+  const [iframeMountGeneration, setIframeMountGeneration] = useState(0);
+
+  const setIframeRef = useCallback((node: HTMLIFrameElement | null) => {
+    iframeRef.current = node;
+    if (!node) return;
+    iframeMountCountRef.current += 1;
+    if (iframeMountCountRef.current > 1) {
+      setIframeMountGeneration((g) => g + 1);
+      if (hasLoadedOnceRef.current) {
+        setShowSkeleton(true);
+        setIsReady(false);
+      }
+    }
+  }, []);
+
+  const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
+  handleDisplayModeChangeRef.current = handleDisplayModeChange;
+
+  const widgetUrlRef = useRef<string | null>(null);
 
   // Handle postMessage communication with iframe
   useEffect(() => {
     if (!widgetUrl) return;
 
-    // Reset readiness whenever we load a new widget URL.
-    // Only show skeleton on first load, not on prop updates
-    setIsReady(false);
-    if (!hasLoadedOnceRef.current) {
-      setShowSkeleton(true);
+    const widgetUrlChanged = widgetUrlRef.current !== widgetUrl;
+    widgetUrlRef.current = widgetUrl;
+
+    // Reset readiness only when the iframe URL changes, not on unrelated re-runs
+    // (e.g. unstable `server` reference during chat streaming).
+    if (widgetUrlChanged) {
+      setIsReady(false);
+      if (!hasLoadedOnceRef.current) {
+        setShowSkeleton(true);
+      }
     }
     setError(null);
 
     let hasHandledLoad = false;
 
     const handleMessage = async (event: any) => {
-      // Only accept messages from our iframe
-      if (
-        !iframeRef.current ||
-        event.source !== iframeRef.current.contentWindow
-      ) {
+      const activeIframe = iframeRef.current;
+      if (!activeIframe || event.source !== activeIframe.contentWindow) {
         return;
       }
 
@@ -638,7 +646,8 @@ function OpenAIComponentRendererBase({
 
         case "openai:callTool":
           try {
-            if (!server) {
+            const currentServer = serverRef.current;
+            if (!currentServer) {
               throw new Error("Server connection not available");
             }
 
@@ -646,10 +655,14 @@ function OpenAIComponentRendererBase({
 
             // Call the tool via the MCP connection
             // Use a 10 minute timeout for tool calls, as tools may trigger sampling
-            const result = await server.callTool(toolName, params || {}, {
-              timeout: 600000, // 10 minutes
-              resetTimeoutOnProgress: true,
-            });
+            const result = await currentServer.callTool(
+              toolName,
+              params || {},
+              {
+                timeout: 600000, // 10 minutes
+                resetTimeoutOnProgress: true,
+              }
+            );
 
             // Format the result to match OpenAI's expected format
             // MCP tools return { contents: [...] }, we need to convert to OpenAI format
@@ -775,7 +788,7 @@ function OpenAIComponentRendererBase({
           try {
             const { mode } = event.data;
             if (mode && ["inline", "pip", "fullscreen"].includes(mode)) {
-              await handleDisplayModeChange(mode);
+              await handleDisplayModeChangeRef.current(mode);
             }
           } catch (err) {
             console.error(
@@ -885,12 +898,10 @@ function OpenAIComponentRendererBase({
   }, [
     widgetUrl,
     isSameOrigin,
-    handleDisplayModeChange,
-    server,
     serverId,
-    resolvedTheme,
     updateIframeGlobals,
     useDevMode,
+    iframeMountGeneration,
   ]);
 
   // Sync theme changes to iframe's color-scheme for light-dark() CSS function
@@ -921,13 +932,8 @@ function OpenAIComponentRendererBase({
   }, [resolvedTheme, isReady, isSameOrigin, updateIframeGlobals]);
 
   // Hide skeleton once the iframe has loaded real content.
-  // The readyState guard in the load handler already ensures we only set
-  // isReady when the iframe has actual scripts (not a stale blank document),
-  // so no additional delay is needed.
   useEffect(() => {
-    if (!isReady || !showSkeleton) {
-      return;
-    }
+    if (!isReady || !showSkeleton) return;
     setShowSkeleton(false);
     hasLoadedOnceRef.current = true;
   }, [isReady, showSkeleton]);
@@ -994,31 +1000,6 @@ function OpenAIComponentRendererBase({
     };
   }, [iframeHeight]);
 
-  // Listen for fullscreen changes to sync state
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && displayMode === "fullscreen") {
-        // User exited fullscreen via ESC or other means
-        setDisplayMode("inline");
-        updateIframeGlobals({ displayMode: "inline" });
-        console.log("[OpenAIComponentRenderer] Fullscreen exited by user");
-      } else if (document.fullscreenElement && displayMode !== "fullscreen") {
-        // Fullscreen was entered externally
-        setDisplayMode("fullscreen");
-        updateIframeGlobals({ displayMode: "fullscreen" });
-      }
-    };
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener("fullscreenerror", (e) => {
-      console.error("[OpenAIComponentRenderer] Fullscreen error:", e);
-    });
-
-    return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
-  }, [displayMode, updateIframeGlobals]);
-
   // Watch for theme changes and update iframe
   // Also update when iframe becomes ready to ensure initial theme is set correctly
   useEffect(() => {
@@ -1053,9 +1034,111 @@ function OpenAIComponentRendererBase({
     );
   }
 
+  const widgetShell = (
+    <div
+      ref={containerRef}
+      className={cn(
+        "w-full h-full flex flex-col min-h-0",
+        displayMode === "fullscreen"
+          ? "items-stretch justify-stretch"
+          : cn(
+              "justify-center items-center",
+              centerVertically && "items-center"
+            ),
+        fullscreenShellClassName,
+        pipShellClassName
+      )}
+      style={
+        isPip
+          ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
+          : undefined
+      }
+      onMouseEnter={() => isPip && setIsPipHovered(true)}
+      onMouseLeave={() => isPip && setIsPipHovered(false)}
+    >
+      {displayMode === "fullscreen" && (
+        <FullscreenNavbar
+          title={toolName}
+          onClose={() => handleDisplayModeChange("inline")}
+        />
+      )}
+
+      {isPip && (
+        <button
+          onClick={() => handleDisplayModeChange("inline")}
+          className={cn(
+            "absolute top-2 right-2 z-50",
+            "flex items-center justify-center",
+            "w-8 h-8 rounded-full",
+            "bg-background/90 hover:bg-background",
+            "border border-border",
+            "shadow-lg",
+            "transition-opacity duration-200",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+            isPipHovered ? "opacity-100" : "opacity-0"
+          )}
+          aria-label="Exit Picture in Picture"
+        >
+          <X className="w-4 h-4 text-foreground" />
+        </button>
+      )}
+
+      <div
+        className={cn(
+          "relative w-full min-h-0",
+          displayMode === "fullscreen" || displayMode === "pip"
+            ? "flex flex-1 flex-col"
+            : cn(
+                "flex flex-1 justify-center items-center",
+                centerVertically && "items-center"
+              ),
+          displayMode === "inline" && (invoking || invoked) && "pt-8"
+        )}
+      >
+        <div
+          className={cn(
+            "relative w-full",
+            displayMode === "fullscreen" || displayMode === "pip"
+              ? "h-full min-h-0 flex-1"
+              : "max-w-[768px]"
+          )}
+        >
+          {displayMode === "inline" && (invoking || invoked) && (
+            <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
+              {invoking && !toolResult && (
+                <TextShimmer className="text-xs">{invoking}</TextShimmer>
+              )}
+              {invoked && toolResult && (
+                <span className="text-xs text-muted-foreground">{invoked}</span>
+              )}
+            </div>
+          )}
+          <iframe
+            ref={setIframeRef}
+            src={widgetUrl}
+            className={cn(
+              displayMode === "inline" && "w-full",
+              displayMode === "fullscreen" && "w-full h-full rounded-none",
+              displayMode === "pip" && "w-full h-full rounded-lg"
+            )}
+            style={{
+              height:
+                displayMode === "fullscreen" || displayMode === "pip"
+                  ? "100%"
+                  : `${iframeHeight}px`,
+            }}
+            sandbox={IFRAME_SANDBOX_PERMISSIONS}
+            title={`OpenAI Component: ${toolName}`}
+            allow="web-share"
+          />
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Wrapper className={className} noWrapper={noWrapper}>
-      {showSkeleton && (
+      {!isPip && showSkeleton && (
         <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full z-0">
           <Spinner className="size-5" />
         </div>
@@ -1063,8 +1146,8 @@ function OpenAIComponentRendererBase({
 
       {showConsole &&
         isSameOrigin &&
-        displayMode !== "fullscreen" &&
-        displayMode !== "pip" && (
+        !isPip &&
+        displayMode !== "fullscreen" && (
           <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
             <MCPAppsDebugControls
               displayMode={displayMode}
@@ -1082,93 +1165,19 @@ function OpenAIComponentRendererBase({
             />
           </div>
         )}
-      <div
-        ref={containerRef}
-        className={cn(
-          "w-full h-full flex flex-col justify-center items-center",
-          centerVertically && "items-center",
-          displayMode === "fullscreen" && "bg-background",
-          displayMode === "pip" &&
-            `fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-3xl w-full min-w-[300px] h-[400px] shadow-2xl border overflow-hidden`
-        )}
-        style={
-          displayMode === "pip"
-            ? { maxWidth: MCP_APPS_CONFIG.DIMENSIONS.PIP_MAX_WIDTH }
-            : undefined
-        }
-        onMouseEnter={() => displayMode === "pip" && setIsPipHovered(true)}
-        onMouseLeave={() => displayMode === "pip" && setIsPipHovered(false)}
-      >
-        {displayMode === "fullscreen" && document.fullscreenElement && (
-          <FullscreenNavbar
-            title={toolName}
-            onClose={() => handleDisplayModeChange("inline")}
-          />
-        )}
 
-        {displayMode === "pip" && (
-          <button
-            onClick={() => handleDisplayModeChange("inline")}
-            className={cn(
-              "absolute top-2 right-2 z-50",
-              "flex items-center justify-center",
-              "w-8 h-8 rounded-full",
-              "bg-background/90 hover:bg-background",
-              "border border-border",
-              "shadow-lg",
-              "transition-opacity duration-200",
-              "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-              isPipHovered ? "opacity-100" : "opacity-0"
-            )}
-            aria-label="Exit Picture in Picture"
-          >
-            <X className="w-4 h-4 text-foreground" />
-          </button>
-        )}
-
-        <div
-          className={cn(
-            "flex-1 w-full flex justify-center items-center relative",
-            displayMode === "fullscreen" && "pt-14",
-            centerVertically && "items-center",
-            displayMode === "inline" && (invoking || invoked) && "pt-8"
+      {isPip && typeof document !== "undefined" ? (
+        <>
+          {showSkeleton && (
+            <div className="fixed inset-0 z-[99] flex items-center justify-center bg-background/40">
+              <Spinner className="size-5" />
+            </div>
           )}
-        >
-          <div className="relative w-full max-w-[768px]">
-            {/* Status label above the widget — only in inline mode, matching MCPAppsRenderer */}
-            {displayMode === "inline" && (invoking || invoked) && (
-              <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
-                {invoking && !toolResult && (
-                  <TextShimmer className="text-xs">{invoking}</TextShimmer>
-                )}
-                {invoked && toolResult && (
-                  <span className="text-xs text-muted-foreground">
-                    {invoked}
-                  </span>
-                )}
-              </div>
-            )}
-            <iframe
-              ref={iframeRef}
-              src={widgetUrl}
-              className={cn(
-                displayMode === "inline" && "w-full",
-                displayMode === "fullscreen" && "w-full h-full rounded-none",
-                displayMode === "pip" && "w-full h-full rounded-lg"
-              )}
-              style={{
-                height:
-                  displayMode === "fullscreen" || displayMode === "pip"
-                    ? "100%"
-                    : `${iframeHeight}px`,
-              }}
-              sandbox={IFRAME_SANDBOX_PERMISSIONS}
-              title={`OpenAI Component: ${toolName}`}
-              allow="web-share"
-            />
-          </div>
-        </div>
-      </div>
+          {createPortal(widgetShell, document.body)}
+        </>
+      ) : (
+        widgetShell
+      )}
     </Wrapper>
   );
 }

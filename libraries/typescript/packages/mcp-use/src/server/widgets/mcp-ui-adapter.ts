@@ -185,7 +185,7 @@ export async function createRemoteDomResource(
  * )
  * ```
  */
-export function createAppsSdkResource(
+function createAppsSdkResource(
   uri: string,
   htmlTemplate: string,
   metadata?: AppsSdkMetadata

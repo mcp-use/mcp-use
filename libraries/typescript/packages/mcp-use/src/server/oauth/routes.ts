@@ -38,7 +38,7 @@ export function isOAuthProxy(
  * @param oauth - The OAuth provider or proxy
  * @returns Hono handler that redirects to the upstream authorize endpoint
  */
-export function createAuthorizeHandler(
+function createAuthorizeHandler(
   oauth: OAuthProvider | OAuthProxy
 ): (c: Context) => Promise<Response> {
   return async (c: Context) => {
@@ -112,7 +112,7 @@ export function createAuthorizeHandler(
  * @param oauth - The OAuth provider or proxy
  * @returns Hono handler that forwards form-encoded token exchanges upstream
  */
-export function createTokenHandler(
+function createTokenHandler(
   oauth: OAuthProvider | OAuthProxy
 ): (c: Context) => Promise<Response> {
   return async (c: Context) => {
@@ -308,7 +308,7 @@ export function setupOAuthRoutes(
     // DCR-direct mode: proxy to upstream
     try {
       const issuer = oauth.getIssuer();
-      const metadataUrl = `${issuer}/.well-known/oauth-authorization-server`;
+      const metadataUrl = `${issuer.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
       console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
       const response = await fetch(metadataUrl);
 

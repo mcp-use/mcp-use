@@ -4,10 +4,20 @@ import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
 
-export interface CaptureScreenshotOptions {
+interface CaptureScreenshotOptions {
   url: string;
-  width: number;
-  height: number;
+  /**
+   * Desired output width in CSS pixels. Optional — when omitted, the capture
+   * clips to the rendered widget's natural width (read from `body[data-view-width]`
+   * set by the inspector preview route). Falls back to the internal default
+   * viewport width if the page didn't expose a width.
+   */
+  width?: number;
+  /**
+   * Desired output height in CSS pixels. Same semantics as `width` — omit to
+   * fit the widget's natural height.
+   */
+  height?: number;
   theme: "light" | "dark";
   waitForSelector: string;
   timeoutMs: number;
@@ -176,9 +186,16 @@ function waitForDevToolsUrl(
  *   - Page.navigate, then poll Runtime.evaluate for `waitForSelector`.
  *   - Page.captureScreenshot, write PNG, clean up.
  */
+interface CaptureScreenshotResult {
+  /** Final clip width in CSS pixels (what the PNG visually represents). */
+  width: number;
+  /** Final clip height in CSS pixels. */
+  height: number;
+}
+
 export async function captureScreenshot(
   opts: CaptureScreenshotOptions
-): Promise<void> {
+): Promise<CaptureScreenshotResult> {
   let userDataDir: string | undefined;
   let child: ChildProcess | undefined;
   let cdp: CdpClient | undefined;
@@ -214,6 +231,16 @@ export async function captureScreenshot(
     }
   };
 
+  // The browser viewport (Chrome window + setDeviceMetricsOverride) must be
+  // big enough to contain the widget's render box. When the caller didn't
+  // specify dimensions, use a generous default so widgets have room to lay
+  // out at their natural size; the final clip is narrowed afterward based on
+  // either the user's explicit dimensions or the widget's reported rect.
+  const DEFAULT_VIEWPORT_WIDTH = 1280;
+  const DEFAULT_VIEWPORT_HEIGHT = 2000;
+  const viewportWidth = Math.max(opts.width ?? 0, DEFAULT_VIEWPORT_WIDTH);
+  const viewportHeight = Math.max(opts.height ?? 0, DEFAULT_VIEWPORT_HEIGHT);
+
   try {
     let wsUrl: string;
     if (opts.cdpUrl) {
@@ -235,7 +262,7 @@ export async function captureScreenshot(
         "--disable-gpu",
         "--hide-scrollbars",
         "--mute-audio",
-        `--window-size=${opts.width},${opts.height}`,
+        `--window-size=${viewportWidth},${viewportHeight}`,
         "about:blank",
       ];
       child = spawn(opts.chromePath, chromeArgs, {
@@ -331,8 +358,8 @@ export async function captureScreenshot(
     await cdp.send(
       "Emulation.setDeviceMetricsOverride",
       {
-        width: opts.width,
-        height: opts.height,
+        width: viewportWidth,
+        height: viewportHeight,
         deviceScaleFactor: opts.deviceScaleFactor ?? 1,
         mobile: false,
       },
@@ -394,22 +421,61 @@ export async function captureScreenshot(
       await new Promise((res) => setTimeout(res, opts.delayMs));
     }
 
+    // Prefer the widget rect that ViewPreview's bundle-mode readiness signal
+    // serializes onto body[data-view-*]. When present, this lets us clip to
+    // the actual rendered widget instead of the (often larger) viewport,
+    // avoiding the whitespace problem when widgets are shorter than the
+    // browser canvas. Falls back to the viewport when the attrs are missing
+    // (e.g. live mode, or widgets that never finish loading).
+    const rectResult = await cdp.send<{
+      result?: {
+        value?: {
+          x?: number;
+          y?: number;
+          width?: number;
+          height?: number;
+        };
+      };
+    }>(
+      "Runtime.evaluate",
+      {
+        expression: `(() => {
+          const d = document.body.dataset;
+          const n = (s) => { const v = parseFloat(s ?? ""); return Number.isFinite(v) ? v : undefined; };
+          return { x: n(d.viewX), y: n(d.viewY), width: n(d.viewWidth), height: n(d.viewHeight) };
+        })()`,
+        returnByValue: true,
+      },
+      sessionId
+    );
+    // Clip preference: explicit caller dimensions > widget's reported rect >
+    // viewport dimensions. The widget rect's origin is used to anchor the
+    // clip so even centered widgets are captured tightly.
+    const rect = rectResult.result?.value ?? {};
+    const clip = {
+      x: rect.x ?? 0,
+      y: rect.y ?? 0,
+      width:
+        opts.width ??
+        (rect.width && rect.width > 0 ? rect.width : viewportWidth),
+      height:
+        opts.height ??
+        (rect.height && rect.height > 0 ? rect.height : viewportHeight),
+      scale: 1,
+    };
+
     const shot = await cdp.send<{ data: string }>(
       "Page.captureScreenshot",
       {
         format: "png",
-        clip: {
-          x: 0,
-          y: 0,
-          width: opts.width,
-          height: opts.height,
-          scale: 1,
-        },
+        clip,
       },
       sessionId
     );
 
     writeFileSync(opts.outputPath, Buffer.from(shot.data, "base64"));
+
+    return { width: clip.width, height: clip.height };
   } finally {
     cleanup();
   }

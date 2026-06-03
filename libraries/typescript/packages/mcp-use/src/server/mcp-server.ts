@@ -39,23 +39,6 @@ import { generateWidgetUri } from "./widgets/widget-helpers.js";
 import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
-// Import and re-export tool context types for public API
-import type {
-  ElicitFormParams,
-  ElicitOptions,
-  ElicitUrlParams,
-  SampleOptions,
-  ToolContext,
-} from "./types/tool-context.js";
-
-export type {
-  ElicitFormParams,
-  ElicitOptions,
-  ElicitUrlParams,
-  SampleOptions,
-  ToolContext,
-};
-
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
 import { requestLogger } from "./logging.js";
@@ -3905,7 +3888,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
-        this.oauthSetupState
+        this.oauthSetupState,
+        { publicLandingPage: this.config.publicLandingPage }
       );
     }
 
@@ -4034,7 +4018,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
-        this.oauthSetupState
+        this.oauthSetupState,
+        { publicLandingPage: this.config.publicLandingPage }
       );
     }
 
@@ -4166,7 +4151,7 @@ export type MCPServer<HasOAuth extends boolean = false> =
   MCPServerClass<HasOAuth>;
 
 // Interface to properly type the MCPServer constructor with OAuth overloads
-export interface MCPServerConstructor {
+interface MCPServerConstructor {
   // Overload: when OAuth is configured, return McpServerInstance<true>
   new (
     config: ServerConfig & { oauth: NonNullable<ServerConfig["oauth"]> }

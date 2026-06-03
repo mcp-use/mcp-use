@@ -9,11 +9,6 @@ export {
 } from "./session-manager.js";
 
 export {
-  sendNotificationToAll,
-  sendNotificationToSession,
-} from "./notifications.js";
-
-export {
   type SessionStore,
   InMemorySessionStore,
   RedisSessionStore,

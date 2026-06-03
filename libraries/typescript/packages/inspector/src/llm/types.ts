@@ -13,7 +13,8 @@ export type ProviderName =
   | "openai-compatible"
   | "anthropic"
   | "google"
-  | "openrouter";
+  | "openrouter"
+  | "ollama";
 
 export interface ProviderConfig {
   provider: ProviderName;

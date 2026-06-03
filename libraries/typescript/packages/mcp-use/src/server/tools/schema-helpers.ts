@@ -53,7 +53,7 @@ export function convertZodSchemaToParams(
 /**
  * Input definition for tool parameters
  */
-export interface InputDefinition {
+interface InputDefinition {
   name: string;
   type: string;
   required?: boolean;

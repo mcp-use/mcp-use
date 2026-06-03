@@ -14,7 +14,7 @@ import { getEnv } from "./runtime.js";
  *
  * @returns CORS options object for Hono cors middleware
  */
-export function getDefaultCorsOptions(): Parameters<typeof cors>[0] {
+function getDefaultCorsOptions(): Parameters<typeof cors>[0] {
   return {
     origin: "*",
     allowMethods: ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -178,35 +178,6 @@ export function getCSPUrls(): string[] {
 
   console.log("[CSP] Parsed CSP URLs:", urls);
   return urls;
-}
-
-/**
- * Wait for transport.handleRequest to complete and response to be written
- *
- * Wraps the transport.handleRequest call in a Promise that only resolves when
- * expressRes.end() is called, ensuring all async operations complete before
- * we attempt to read the response.
- *
- * @param transport - The transport instance
- * @param expressReq - Express-like request object
- * @param expressRes - Express-like response object
- * @param body - Optional request body
- * @returns Promise that resolves when the request is complete
- */
-export function waitForRequestComplete(
-  transport: any,
-  expressReq: any,
-  expressRes: any,
-  body?: any
-): Promise<void> {
-  return new Promise<void>((resolve) => {
-    const originalEnd = expressRes.end;
-    expressRes.end = (...args: any[]) => {
-      originalEnd.apply(expressRes, args);
-      resolve();
-    };
-    transport.handleRequest(expressReq, expressRes, body);
-  });
 }
 
 /**

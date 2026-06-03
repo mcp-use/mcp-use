@@ -14,7 +14,7 @@ A production-ready example of an MCP server with WorkOS AuthKit OAuth 2.0 authen
 ## Prerequisites
 
 1. **WorkOS Account**: Sign up at [workos.com](https://workos.com)
-2. **Node.js**: Version 18 or higher
+2. **Node.js**: Version 20.19 or higher, or 22.12 or higher
 3. **AuthKit Setup**: Follow [WorkOS AuthKit Quickstart](https://workos.com/docs/authkit) to set up your project
 
 ## What is WorkOS AuthKit?

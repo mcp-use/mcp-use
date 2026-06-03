@@ -34,7 +34,7 @@ export interface OAuthSessionStoreOptions {
  *
  * @internal
  */
-export interface StoreAuthorizationStateOptions {
+interface StoreAuthorizationStateOptions {
   /**
    * Platform-specific provider options that should round-trip through the
    * stored state so the callback handler can rebuild the provider.

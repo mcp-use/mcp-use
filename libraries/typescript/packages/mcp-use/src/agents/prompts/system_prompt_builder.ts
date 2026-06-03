@@ -2,7 +2,7 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 
 import { SystemMessage } from "langchain";
 
-export function generateToolDescriptions(
+function generateToolDescriptions(
   tools: StructuredToolInterface[],
   disallowedTools?: string[]
 ): string[] {
@@ -18,7 +18,7 @@ export function generateToolDescriptions(
   return descriptions;
 }
 
-export function buildSystemPromptContent(
+function buildSystemPromptContent(
   template: string,
   toolDescriptionLines: string[],
   additionalInstructions?: string

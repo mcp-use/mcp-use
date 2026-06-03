@@ -56,7 +56,7 @@ export function applyDenoCorsHeaders(response: Response): Response {
  *
  * @returns Function that rewrites Supabase paths to actual route paths
  */
-export function createSupabasePathRewriter(): (pathname: string) => string {
+function createSupabasePathRewriter(): (pathname: string) => string {
   return (pathname: string): string => {
     let newPathname = pathname;
 
@@ -103,7 +103,7 @@ export function rewriteSupabaseRequest(req: Request): Request {
 }
 
 /** Handle to cleanly shut down the HTTP listener (Node) or no-op (Deno). */
-export type HttpServerHandle = {
+type HttpServerHandle = {
   close: () => Promise<void>;
   /** Force-close all connections and stop listening immediately (Node 18.2+). */
   forceClose: () => Promise<void>;

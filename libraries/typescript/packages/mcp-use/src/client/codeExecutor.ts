@@ -5,13 +5,9 @@ export type {
   SearchToolsFunction,
   ToolNamespaceInfo,
   ToolSearchResult,
-  ToolSearchMeta,
   ToolSearchResponse,
 } from "./executors/base.js";
 
 // Re-export implementations
 export { E2BCodeExecutor } from "./executors/e2b.js";
 export { VMCodeExecutor, isVMAvailable } from "./executors/vm.js";
-
-// Re-export BaseCodeExecutor as CodeExecutor for backward compatibility
-export { BaseCodeExecutor as CodeExecutor } from "./executors/base.js";

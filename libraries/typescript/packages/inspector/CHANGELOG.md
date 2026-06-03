@@ -1,5 +1,212 @@
 # @mcp-use/inspector
 
+## 7.0.0-canary.24
+
+### Patch Changes
+
+- Updated dependencies [1c1aadf]
+  - mcp-use@1.29.0-canary.24
+
+## 7.0.0-canary.23
+
+### Patch Changes
+
+- Updated dependencies [419941d]
+  - mcp-use@1.29.0-canary.23
+
+## 7.0.0-canary.22
+
+### Patch Changes
+
+- 583310b: Fix cloud chat widget display modes (MCP-2181): native fullscreen on the widget shell with exit navbar; PiP portaled to `document.body` at `z-[100]`. Reconnect AppBridge after sandbox iframe remounts so display-mode toggles do not leave the widget stuck loading. Sets `data-mcp-widget-display-mode` on the document root.
+  - mcp-use@1.29.0-canary.22
+
+## 7.0.0-canary.21
+
+### Patch Changes
+
+- 04334d8: Add a copy button to user messages in the inspector chat.
+  - mcp-use@1.29.0-canary.21
+
+## 7.0.0-canary.20
+
+### Patch Changes
+
+- Updated dependencies [b43ec44]
+  - mcp-use@1.29.0-canary.20
+
+## 7.0.0-canary.19
+
+### Minor Changes
+
+- 014ca4f: `mcp-use client screenshot` now auto-sizes screenshots to the widget's natural rendered dimensions when `--width`/`--height` are omitted, eliminating excess whitespace. Fixes screenshotting against external MCP servers (e.g. Excalidraw) — URIs like `ui://excalidraw/mcp-app.html` were breaking the preview route; they are now correctly handled as `<server>-<name>`.
+
+### Patch Changes
+
+- mcp-use@1.29.0-canary.19
+
+## 7.0.0-canary.18
+
+### Patch Changes
+
+- mcp-use@1.29.0-canary.18
+
+## 7.0.0-canary.17
+
+### Patch Changes
+
+- Updated dependencies [4b80127]
+  - mcp-use@1.29.0-canary.17
+
+## 7.0.0-canary.16
+
+### Patch Changes
+
+- c9b5a8a: Forward MCP image tool results as real image content to the model instead of base64-encoded JSON.
+
+  Previously, when an MCP tool returned an `image` content block, the inspector's chat would `JSON.stringify` the entire result — including the base64 `data` field — and hand that string to the LLM as the tool message body. Vision-capable models couldn't decode the embedded bytes, so they saw a blob of base64 text instead of the picture.
+
+  The conversion now extracts MCP `content` blocks into provider-neutral `ContentPart[]` and forwards image bytes through each provider's vision channel:
+  - **Anthropic**: image blocks are embedded inside `tool_result.content` as `{ type: "image", source: { type: "base64", media_type, data } }`.
+  - **OpenAI**: the `tool` role keeps a text summary; image bytes are forwarded as a follow-up `user` turn with `image_url` parts (the tool role can't carry images).
+  - **Google (Gemini)**: `functionResponse.response` keeps only a text/metadata summary; image bytes are forwarded as a follow-up `user` turn with `inlineData` parts.
+
+  Text-only tool results still take the legacy `content: string` path on every provider, so non-image tools are unaffected. Audio, resource, and resource-link blocks are summarized as text markers (audio bytes are not yet forwarded).
+
+  Note: text-only tool results now reach the model unwrapped (e.g. `"hi"`) instead of as JSON-wrapped `{"content":[{"type":"text","text":"hi"}]}`; on Gemini specifically, `functionResponse.response` is now `{ result: "hi" }` rather than the previous MCP-shaped object.
+  - mcp-use@1.29.0-canary.16
+
+## 7.0.0-canary.15
+
+### Patch Changes
+
+- Updated dependencies [ecdb0fd]
+  - mcp-use@1.29.0-canary.15
+
+## 7.0.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [803fa89]
+  - mcp-use@1.29.0-canary.14
+
+## 7.0.0-canary.13
+
+### Patch Changes
+
+- 6a95b2c: Improve tab switch animation timing for snappier UI
+  - mcp-use@1.29.0-canary.13
+
+## 7.0.0-canary.12
+
+### Patch Changes
+
+- 9c3fce4: Fix Inspector chat sending an invalid tool `input_schema` to LLM providers after a tool was opened in the Tools tab. `ToolInputForm` was writing `required: boolean` onto each property of the live tool inputSchema during render; that's not valid JSON Schema (`required` belongs on the parent as a `string[]`), and Anthropic's draft 2020-12 validator rejected it with `tools.0.custom.input_schema invalid`. The render now uses a local `isRequired` and no longer mutates the schema.
+  - mcp-use@1.29.0-canary.12
+
+## 7.0.0-canary.11
+
+### Patch Changes
+
+- 3fc04e5: Replace the trailing-slash regex in `normalizeOllamaBaseUrl` with an explicit linear scan. The regex was flagged by CodeQL as a polynomial regular expression on uncontrolled input; the new implementation is unambiguously linear and behaves identically.
+  - mcp-use@1.29.0-canary.11
+
+## 7.0.0-canary.10
+
+### Minor Changes
+
+- 0fbea77: Integrated Ollama as an LLM provider for the inspector, with local model discovery and streaming chat.
+
+### Patch Changes
+
+- mcp-use@1.29.0-canary.10
+
+## 7.0.0-canary.9
+
+### Patch Changes
+
+- d08b524: Drop unused `TabCountBadge` re-export from the shared barrel; the only consumer imports it directly. Fixes Knip CI on canary.
+  - mcp-use@1.29.0-canary.9
+
+## 7.0.0-canary.8
+
+### Patch Changes
+
+- 64e2ae3: Keep per-tab count badges visible in collapsed header tabs and align them to the right of the tab label. Extract shared `TabCountBadge` styling for mobile and desktop tab rows.
+  - mcp-use@1.29.0-canary.8
+
+## 7.0.0-canary.7
+
+### Patch Changes
+
+- 3ed0b4e: fix(inspector): surface MCP server auth failures with a reconnect banner
+
+  When the hosted inspector's chat backend returned 401 because the
+  upstream MCP server rejected the user's OAuth token (e.g. Linear token
+  expired), the inspector previously threw a generic `HTTP error! status:
+401` and the cloud response misleadingly pointed users at the Manufact
+  account login.
+
+  The chat now recognises the cloud's `{ error: "mcp_auth_required",
+mcpServerUrl }` response and renders an inline banner above the input
+  ("Reconnect to <server>") with a button that calls
+  `connection.authenticate()`. Reconnect refreshes the OAuth token in
+  localStorage; the banner clears on success and chat resumes.
+
+  Pairs with a cloud-side change that drops the misleading `loginUrl`
+  field from the 401 response.
+  - mcp-use@1.29.0-canary.7
+
+## 7.0.0-canary.6
+
+### Patch Changes
+
+- 31f2104: Add Playwright e2e test covering the inspector's OAuth redirect flow against an emulated Google issuer (via `emulate`), exercising both "Direct" and "Via Proxy" connection types. Test-only — no runtime change.
+  - mcp-use@1.29.0-canary.6
+
+## 7.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [273b5d7]
+  - mcp-use@1.29.0-canary.5
+
+## 7.0.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f8a6a58]
+  - mcp-use@1.29.0-canary.4
+
+## 6.0.1-canary.3
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [680ef2f]
+  - mcp-use@1.28.1-canary.3
+
+## 6.0.1-canary.2
+
+### Patch Changes
+
+- 81cebc7: Remove 18 unused inspector source files flagged by the TypeScript workspace Knip check, and stop generating the unused client-side `version.ts` (the client reads the version from the `window.__INSPECTOR_VERSION__` global injected by the server).
+  - mcp-use@1.28.1-canary.2
+
+## 6.0.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3a39cf]
+  - mcp-use@1.28.1-canary.1
+
+## 6.0.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [ef32a50]
+  - mcp-use@1.28.1-canary.0
+
 ## 6.0.0
 
 ### Minor Changes

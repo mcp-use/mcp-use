@@ -20,7 +20,7 @@
  */
 
 import { useMcpClient } from "mcp-use/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { MCPAppsRenderer } from "./MCPAppsRenderer";
 
@@ -125,21 +125,104 @@ function usePreviewReadinessSignal(rendererReady: boolean): void {
 }
 
 /**
+ * Bundle-mode readiness: after the renderer signals ready, watch the iframe's
+ * bounding rect via ResizeObserver. Once the rect stops changing for a short
+ * idle window (~250ms — enough to absorb the inline-height 300ms transition
+ * and any post-layout settling), serialize the rect onto body data attributes
+ * and flip `data-view-ready="true"` so the screenshot CLI can read it and
+ * use it as the capture clip. Falls back gracefully if the iframe never
+ * appears or never reports a size (the CLI's overall timeout still bounds us).
+ */
+function useBundleReadinessSignal(
+  rendererReady: boolean,
+  containerRef: React.RefObject<HTMLDivElement | null>
+): void {
+  useEffect(() => {
+    if (!rendererReady) return;
+    let cancelled = false;
+    let stableTimer: ReturnType<typeof setTimeout> | undefined;
+    let observer: ResizeObserver | undefined;
+
+    const writeReady = (rect: DOMRect | null) => {
+      if (cancelled) return;
+      if (rect) {
+        document.body.dataset.viewX = String(Math.round(rect.left));
+        document.body.dataset.viewY = String(Math.round(rect.top));
+        document.body.dataset.viewWidth = String(Math.round(rect.width));
+        document.body.dataset.viewHeight = String(Math.round(rect.height));
+      }
+      document.body.setAttribute("data-view-ready", "true");
+    };
+
+    (async () => {
+      try {
+        await document.fonts.ready;
+      } catch {
+        // fonts API may be unavailable; proceed anyway
+      }
+      if (cancelled) return;
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+      await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+      if (cancelled) return;
+
+      const iframe = containerRef.current?.querySelector("iframe");
+      if (!iframe) {
+        writeReady(null);
+        return;
+      }
+
+      const scheduleStable = () => {
+        if (stableTimer) clearTimeout(stableTimer);
+        stableTimer = setTimeout(() => {
+          if (cancelled) return;
+          observer?.disconnect();
+          writeReady(iframe.getBoundingClientRect());
+        }, 250);
+      };
+
+      observer = new ResizeObserver(scheduleStable);
+      observer.observe(iframe);
+      scheduleStable();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (stableTimer) clearTimeout(stableTimer);
+      observer?.disconnect();
+      document.body.removeAttribute("data-view-ready");
+      delete document.body.dataset.viewX;
+      delete document.body.dataset.viewY;
+      delete document.body.dataset.viewWidth;
+      delete document.body.dataset.viewHeight;
+    };
+  }, [rendererReady, containerRef]);
+}
+
+/**
  * Bundle mode: render from inline data injected by the screenshot CLI.
  * No live MCP connection. Runtime widget calls (`oncalltool`,
  * `onlistresources`) intentionally fall through to MCPAppsRenderer's
  * "no server" path and throw — bundle mode targets initial render only.
+ *
+ * Uses `displayMode="inline"` so the iframe auto-sizes to the widget's
+ * reported height (avoiding the whitespace that fullscreen mode produces
+ * for widgets shorter than the viewport). An optional `?width=N` query
+ * param overrides the inline 768px max-width cap so callers can request
+ * wider screenshots.
  */
 function ViewPreviewBundle({
   view,
   bundle,
+  widthOverride,
 }: {
   view: string;
   bundle: PreviewBundle;
+  widthOverride?: number;
 }) {
   const [rendererReady, setRendererReady] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   usePreviewViewport();
-  usePreviewReadinessSignal(rendererReady);
+  useBundleReadinessSignal(rendererReady, containerRef);
 
   const readResource = useMemo(() => {
     return async (uri: string) => {
@@ -154,7 +237,7 @@ function ViewPreviewBundle({
   );
 
   return (
-    <div style={{ width: "100vw", height: "100vh" }}>
+    <div ref={containerRef} style={{ width: "100vw", height: "100vh" }}>
       <MCPAppsRenderer
         serverId={PREVIEW_BUNDLE_SERVER_ID}
         toolCallId={toolCallId}
@@ -163,7 +246,8 @@ function ViewPreviewBundle({
         toolOutput={bundle.toolOutput}
         resourceUri={bundle.resourceUri}
         readResource={readResource}
-        displayMode="fullscreen"
+        displayMode="inline"
+        inlineWidthOverride={widthOverride}
         noWrapper
         chromeless
         onReady={() => setRendererReady(true)}
@@ -298,14 +382,28 @@ function ViewPreviewLive({ view }: { view: string }) {
 
 export function ViewPreview() {
   const params = useParams<{ view: string }>();
+  const [search] = useSearchParams();
   const view = params.view ?? "";
 
   // Bundle is read once at mount. The screenshot CLI sets it via CDP
   // before any document scripts run, so it's stable across renders.
   const bundle = useMemo(() => readPreviewBundle(), []);
 
+  const widthOverride = useMemo(() => {
+    const raw = search.get("width");
+    if (!raw) return undefined;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, [search]);
+
   if (bundle) {
-    return <ViewPreviewBundle view={view} bundle={bundle} />;
+    return (
+      <ViewPreviewBundle
+        view={view}
+        bundle={bundle}
+        widthOverride={widthOverride}
+      />
+    );
   }
   return <ViewPreviewLive view={view} />;
 }

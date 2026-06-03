@@ -13,7 +13,7 @@ export interface CustomHeader {
   id: string;
 }
 
-export interface CustomHeadersEditorProps {
+interface CustomHeadersEditorProps {
   headers: CustomHeader[];
   onChange: (headers: CustomHeader[]) => void;
   onSave?: () => void;

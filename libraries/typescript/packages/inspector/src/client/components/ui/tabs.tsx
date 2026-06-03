@@ -256,7 +256,7 @@ function TabsList({
           <span
             ref={indicatorRef}
             className={cn(
-              "absolute transition-all duration-500 ease-in-out z-0",
+              "absolute transition-all duration-[250ms] ease-in-out z-0",
               variant === "default" &&
                 "bg-white dark:bg-zinc-700 rounded-full h-[calc(100%)] top-0 border border-zinc-300 dark:border-zinc-600",
               variant === "underline" && "bottom-0 h-0.5 bg-black dark:bg-white"
@@ -279,6 +279,7 @@ interface TabsTriggerProps {
   showDot?: boolean;
   /** When true, the label stays visible even when the tab bar is collapsed */
   alwaysExpanded?: boolean;
+  badge?: React.ReactNode;
 }
 
 // conditional tooltip wrapper if collapsed
@@ -328,6 +329,7 @@ const TabsTrigger = React.forwardRef<
       title: titleProp,
       showDot = false,
       alwaysExpanded = false,
+      badge,
       ...props
     },
     ref
@@ -358,7 +360,7 @@ const TabsTrigger = React.forwardRef<
           aria-selected={isActive ? "true" : "false"}
           title={title}
           className={cn(
-            "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-500 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
+            "relative z-10 flex-1 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-all duration-[250ms] ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 cursor-pointer",
             variant === "default" && "py-2.5",
             variant === "default" && "rounded-md px-4",
             variant === "underline" &&
@@ -372,7 +374,7 @@ const TabsTrigger = React.forwardRef<
           {Icon && (
             <Icon
               className={cn(
-                "h-4 w-4 transition-all duration-500 ease-in-out",
+                "h-4 w-4 shrink-0 transition-all duration-[250ms] ease-in-out",
                 showLabel && "mr-2",
                 !showLabel && "mr-0!"
               )}
@@ -383,12 +385,13 @@ const TabsTrigger = React.forwardRef<
           )}
           <span
             className={cn(
-              "transition-all duration-500 ease-in-out overflow-hidden",
+              "min-w-0 transition-all duration-[250ms] ease-in-out overflow-hidden",
               showLabel ? "w-auto opacity-100" : "w-0 opacity-0"
             )}
           >
             {children}
           </span>
+          {badge}
         </button>
       </ConditionalTooltip>
     );
@@ -396,38 +399,4 @@ const TabsTrigger = React.forwardRef<
 );
 TabsTrigger.displayName = "TabsTrigger";
 
-interface TabsContentProps {
-  children: React.ReactNode;
-  value: string;
-  className?: string;
-}
-
-function TabsContent({
-  ref,
-  children,
-  value,
-  className,
-  ...props
-}: TabsContentProps & { ref?: React.RefObject<HTMLDivElement | null> }) {
-  const { activeValue } = useTabs();
-  const isActive = activeValue === value;
-
-  if (!isActive) return null;
-
-  return (
-    <div
-      ref={ref}
-      role="tabpanel"
-      className={cn(
-        "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-}
-TabsContent.displayName = "TabsContent";
-
-export { Tabs, TabsContent, TabsList, TabsTrigger, useTabs, useTabsList };
+export { Tabs, TabsList, TabsTrigger };

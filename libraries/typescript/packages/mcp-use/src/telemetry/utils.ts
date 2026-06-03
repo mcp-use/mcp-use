@@ -1,13 +1,12 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-// Re-export from global version module for backward compatibility
-export { VERSION, getPackageVersion } from "../version.js";
+export { getPackageVersion } from "../version.js";
 
-export function getModelProvider(llm: BaseLanguageModel): string {
+function getModelProvider(llm: BaseLanguageModel): string {
   // Use LangChain's standard _llm_type property for identification
   return (llm as any)._llm_type || llm.constructor.name.toLowerCase();
 }
 
-export function getModelName(llm: BaseLanguageModel): string {
+function getModelName(llm: BaseLanguageModel): string {
   // First try _identifying_params which may contain model info
   if ("_identifyingParams" in llm) {
     const identifyingParams = (llm as any)._identifyingParams;

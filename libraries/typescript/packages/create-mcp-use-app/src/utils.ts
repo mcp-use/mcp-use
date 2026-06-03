@@ -7,7 +7,7 @@ import { basename, join, resolve } from "node:path";
 
 // Known safe entries that may exist in a directory without considering it "non-empty"
 // Mirrors create-next-app behavior for common init artifacts
-export const SAFE_DIR_ENTRIES = new Set([
+const SAFE_DIR_ENTRIES = new Set([
   ".claude",
   ".cursor",
   ".DS_Store",
@@ -63,7 +63,7 @@ export function sanitizePackageName(raw: string): string {
 // `displayName` is the human-facing label (kept pretty when possible);
 // `packageName` is the npm-safe identifier flowed into package.json AND
 // any template files that embed it as a string literal (e.g. index.ts).
-export type ProjectInfo = {
+type ProjectInfo = {
   useCurrentDir: boolean;
   projectPath: string;
   displayName: string;

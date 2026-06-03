@@ -76,6 +76,7 @@
 | [proxy/src/server.ts](server/features/proxy/src/server.ts) | Proxy server setup |
 | [client-info/src/server.ts](server/features/client-info/src/server.ts) | Client info and capability access |
 | [session-management/src/server.ts](server/features/session-management/src/server.ts) | Memory, filesystem, and Redis session storage |
+| [public-landing-page/src/server.ts](server/features/public-landing-page/src/server.ts) | OAuth-protected server with a public browser landing page |
 
 ### OAuth
 

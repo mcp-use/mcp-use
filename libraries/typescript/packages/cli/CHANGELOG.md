@@ -1,5 +1,210 @@
 # @mcp-use/cli
 
+## 3.3.0-canary.24
+
+### Patch Changes
+
+- Updated dependencies [1c1aadf]
+  - mcp-use@1.29.0-canary.24
+  - @mcp-use/inspector@7.0.0-canary.24
+
+## 3.3.0-canary.23
+
+### Patch Changes
+
+- Updated dependencies [419941d]
+  - mcp-use@1.29.0-canary.23
+  - @mcp-use/inspector@7.0.0-canary.23
+
+## 3.3.0-canary.22
+
+### Patch Changes
+
+- Updated dependencies [583310b]
+  - @mcp-use/inspector@7.0.0-canary.22
+  - mcp-use@1.29.0-canary.22
+
+## 3.3.0-canary.21
+
+### Patch Changes
+
+- Updated dependencies [04334d8]
+  - @mcp-use/inspector@7.0.0-canary.21
+  - mcp-use@1.29.0-canary.21
+
+## 3.3.0-canary.20
+
+### Patch Changes
+
+- Updated dependencies [b43ec44]
+  - mcp-use@1.29.0-canary.20
+  - @mcp-use/inspector@7.0.0-canary.20
+
+## 3.3.0-canary.19
+
+### Minor Changes
+
+- 014ca4f: `mcp-use client screenshot` now auto-sizes screenshots to the widget's natural rendered dimensions when `--width`/`--height` are omitted, eliminating excess whitespace. Fixes screenshotting against external MCP servers (e.g. Excalidraw) — URIs like `ui://excalidraw/mcp-app.html` were breaking the preview route; they are now correctly handled as `<server>-<name>`.
+
+### Patch Changes
+
+- Updated dependencies [014ca4f]
+  - @mcp-use/inspector@7.0.0-canary.19
+  - mcp-use@1.29.0-canary.19
+
+## 3.2.1-canary.18
+
+### Patch Changes
+
+- 8f17837: Fix widget asset 404s when `MCP_URL` is set at build time. Vite's `base` and the injected `window.__getFile` now resolve to `${MCP_URL}/mcp-use/widgets/{widget}/`, matching the production static route mounted by the `mcp-use` server.
+  - mcp-use@1.29.0-canary.18
+  - @mcp-use/inspector@7.0.0-canary.18
+
+## 3.2.1-canary.17
+
+### Patch Changes
+
+- Updated dependencies [4b80127]
+  - mcp-use@1.29.0-canary.17
+  - @mcp-use/inspector@7.0.0-canary.17
+
+## 3.2.1-canary.16
+
+### Patch Changes
+
+- Updated dependencies [c9b5a8a]
+  - @mcp-use/inspector@7.0.0-canary.16
+  - mcp-use@1.29.0-canary.16
+
+## 3.2.1-canary.15
+
+### Patch Changes
+
+- Updated dependencies [ecdb0fd]
+  - mcp-use@1.29.0-canary.15
+  - @mcp-use/inspector@7.0.0-canary.15
+
+## 3.2.1-canary.14
+
+### Patch Changes
+
+- Updated dependencies [803fa89]
+  - mcp-use@1.29.0-canary.14
+  - @mcp-use/inspector@7.0.0-canary.14
+
+## 3.2.1-canary.13
+
+### Patch Changes
+
+- Updated dependencies [6a95b2c]
+  - @mcp-use/inspector@7.0.0-canary.13
+  - mcp-use@1.29.0-canary.13
+
+## 3.2.1-canary.12
+
+### Patch Changes
+
+- Updated dependencies [9c3fce4]
+  - @mcp-use/inspector@7.0.0-canary.12
+  - mcp-use@1.29.0-canary.12
+
+## 3.2.1-canary.11
+
+### Patch Changes
+
+- Updated dependencies [3fc04e5]
+  - @mcp-use/inspector@7.0.0-canary.11
+  - mcp-use@1.29.0-canary.11
+
+## 3.2.1-canary.10
+
+### Patch Changes
+
+- Updated dependencies [0fbea77]
+  - @mcp-use/inspector@7.0.0-canary.10
+  - mcp-use@1.29.0-canary.10
+
+## 3.2.1-canary.9
+
+### Patch Changes
+
+- Updated dependencies [d08b524]
+  - @mcp-use/inspector@7.0.0-canary.9
+  - mcp-use@1.29.0-canary.9
+
+## 3.2.1-canary.8
+
+### Patch Changes
+
+- Updated dependencies [64e2ae3]
+  - @mcp-use/inspector@7.0.0-canary.8
+  - mcp-use@1.29.0-canary.8
+
+## 3.2.1-canary.7
+
+### Patch Changes
+
+- Updated dependencies [3ed0b4e]
+  - @mcp-use/inspector@7.0.0-canary.7
+  - mcp-use@1.29.0-canary.7
+
+## 3.2.1-canary.6
+
+### Patch Changes
+
+- Updated dependencies [31f2104]
+  - @mcp-use/inspector@7.0.0-canary.6
+  - mcp-use@1.29.0-canary.6
+
+## 3.2.1-canary.5
+
+### Patch Changes
+
+- Updated dependencies [273b5d7]
+  - mcp-use@1.29.0-canary.5
+  - @mcp-use/inspector@7.0.0-canary.5
+
+## 3.2.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f8a6a58]
+  - mcp-use@1.29.0-canary.4
+  - @mcp-use/inspector@7.0.0-canary.4
+
+## 3.2.1-canary.3
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [680ef2f]
+  - mcp-use@1.28.1-canary.3
+  - @mcp-use/inspector@6.0.1-canary.3
+
+## 3.2.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [81cebc7]
+  - @mcp-use/inspector@6.0.1-canary.2
+  - mcp-use@1.28.1-canary.2
+
+## 3.2.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [c3a39cf]
+  - mcp-use@1.28.1-canary.1
+  - @mcp-use/inspector@6.0.1-canary.1
+
+## 3.2.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [ef32a50]
+  - mcp-use@1.28.1-canary.0
+  - @mcp-use/inspector@6.0.1-canary.0
+
 ## 3.2.0
 
 ### Minor Changes

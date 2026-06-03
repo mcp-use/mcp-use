@@ -86,10 +86,9 @@ export function ToolInputForm({
           enum?: string[];
           enumNames?: string[];
           description?: string;
-          required?: boolean;
           nullable?: boolean;
         };
-        typedProp.required = requiredFields.includes(key);
+        const isRequired = requiredFields.includes(key);
 
         // Get the current value and convert to string for display
         const currentValue = toolArgs[key];
@@ -127,9 +126,7 @@ export function ToolInputForm({
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor={key} className="text-sm font-medium">
                   {key}
-                  {typedProp?.required && (
-                    <span className="text-red-500 ml-1">*</span>
-                  )}
+                  {isRequired && <span className="text-red-500 ml-1">*</span>}
                 </Label>
                 {showSendEmptyToggle && onToggleEmpty && (
                   <div className="flex items-center gap-2 shrink-0">
@@ -182,9 +179,7 @@ export function ToolInputForm({
             <div key={key} className="space-y-2">
               <Label htmlFor={key} className="text-sm font-medium">
                 {key}
-                {typedProp.required && (
-                  <span className="text-red-500 ml-1">*</span>
-                )}
+                {isRequired && <span className="text-red-500 ml-1">*</span>}
               </Label>
               <Select
                 value={String(toolArgs[key] || "")}
@@ -222,9 +217,7 @@ export function ToolInputForm({
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor={key} className="text-sm font-medium">
                 {key}
-                {typedProp?.required && (
-                  <span className="text-red-500 ml-1">*</span>
-                )}
+                {isRequired && <span className="text-red-500 ml-1">*</span>}
               </Label>
               {showSendEmptyToggle && onToggleEmpty && (
                 <div className="flex items-center gap-2 shrink-0">

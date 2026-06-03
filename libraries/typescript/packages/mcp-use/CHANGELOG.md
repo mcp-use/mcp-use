@@ -1,5 +1,219 @@
 # mcp-use
 
+## 1.29.0-canary.24
+
+### Patch Changes
+
+- 1c1aadf: Fix built-in inspector auto-connect to use streamable HTTP for the local `/mcp` endpoint instead of SSE.
+  - @mcp-use/cli@3.3.0-canary.24
+  - @mcp-use/inspector@7.0.0-canary.24
+
+## 1.29.0-canary.23
+
+### Patch Changes
+
+- 419941d: Redact OAuth token verification errors from client responses while logging details server-side.
+  - @mcp-use/cli@3.3.0-canary.23
+  - @mcp-use/inspector@7.0.0-canary.23
+
+## 1.29.0-canary.22
+
+### Patch Changes
+
+- Updated dependencies [583310b]
+  - @mcp-use/inspector@7.0.0-canary.22
+  - @mcp-use/cli@3.3.0-canary.22
+
+## 1.29.0-canary.21
+
+### Patch Changes
+
+- Updated dependencies [04334d8]
+  - @mcp-use/inspector@7.0.0-canary.21
+  - @mcp-use/cli@3.3.0-canary.21
+
+## 1.29.0-canary.20
+
+### Patch Changes
+
+- b43ec44: Fix browser OAuth popup callback edge cases in `onMcpAuthorization()`:
+  - The popup window navigating itself to the dashboard URL when `window.opener` was severed (COOP / cross-origin redirects / browser tab grouping). Detect "is this a popup we opened?" via `window.name.startsWith("mcp_auth_")` and render an in-place close-window message instead of redirecting to `returnUrl`. The genuine popup-blocker / manual-link case (top-level navigation, not a popup window) still redirects to `returnUrl` as before.
+  - "Invalid or expired state" surfaced to the parent after a successful flow when `onMcpAuthorization()` was invoked more than once in the same page load (HMR, React strict-mode double invocation, Suspense re-mount). Re-invocations now reuse the original promise via a module-level cache, so they never re-exchange the code or post a stale `success: false` to the opener.
+  - The lost-opener popup branch saved tokens but had no way to notify the parent, leaving `useMcp` stuck in `authenticating` until a hard refresh. Both the popup callback and the parent `useMcp` now use a same-origin `BroadcastChannel("mcp_auth_callback")` as a fallback transport when `window.opener.postMessage` is unavailable — matching the pattern used by `oidc-client-ts` and MSAL.js for the same COOP-driven scenario.
+  - **`mcp-use/browser` no longer exports LangChain agents** (`MCPAgent`, `RemoteAgent`, adapters, observability, AI SDK utils). Those moved to **`mcp-use/browser/agent`** so client bundles (e.g. Next.js dashboards) that only need `MCPClient` do not pull in `@langchain/*` / `langchain`.
+  - @mcp-use/cli@3.3.0-canary.20
+  - @mcp-use/inspector@7.0.0-canary.20
+
+## 1.29.0-canary.19
+
+### Patch Changes
+
+- Updated dependencies [014ca4f]
+  - @mcp-use/cli@3.3.0-canary.19
+  - @mcp-use/inspector@7.0.0-canary.19
+
+## 1.29.0-canary.18
+
+### Patch Changes
+
+- Updated dependencies [8f17837]
+  - @mcp-use/cli@3.2.1-canary.18
+  - @mcp-use/inspector@7.0.0-canary.18
+
+## 1.29.0-canary.17
+
+### Patch Changes
+
+- 4b80127: Fix OAuth-protected `mcp-use dev` flows by normalizing `0.0.0.0` and `::` to `localhost` in the inspector's autoConnect URL, so it matches the resource metadata published by `getServerBaseUrl()` and passes the SDK's strict origin check.
+  - @mcp-use/cli@3.2.1-canary.17
+  - @mcp-use/inspector@7.0.0-canary.17
+
+## 1.29.0-canary.16
+
+### Patch Changes
+
+- Updated dependencies [c9b5a8a]
+  - @mcp-use/inspector@7.0.0-canary.16
+  - @mcp-use/cli@3.2.1-canary.16
+
+## 1.29.0-canary.15
+
+### Patch Changes
+
+- ecdb0fd: Fix `McpClientProvider.removeServer` and `McpClientProvider.updateServer` triggering React's "Cannot update a component (`McpServerWrapper`) while rendering a different component (`McpClientProvider`)" warning whenever a wrapper is torn down.
+
+  Both methods invoked `server.disconnect()` and `server.clearStorage()` _inside_ a `setServers((prev) => …)` updater. React 18+ runs updater functions during the render phase of the component that owns the state, and both wrapper callbacks make synchronous setState calls on the wrapper itself — `setLog` via `addLog("info", "Disconnecting…")` (the very first sync line of `disconnect`) and `setAuthUrl(void 0)` inside `clearStorage`. Those setStates landed during `McpClientProvider`'s render phase, producing the warning every time a consumer changed the URL of an existing wrapper or removed one.
+
+  The provider now keeps a `serversRef` mirror of `servers`, captures the wrapper to tear down BEFORE scheduling the state updates, and runs `disconnect()` / `clearStorage()` after the `setServers` / `setServerConfigs` calls return. The updaters are now pure (`(prev) => prev.filter(…)`); the wrapper's synchronous setStates fire from event-handler context and batch normally with the pending provider updates, never crossing into the render phase.
+  - @mcp-use/cli@3.2.1-canary.15
+  - @mcp-use/inspector@7.0.0-canary.15
+
+## 1.29.0-canary.14
+
+### Patch Changes
+
+- 803fa89: Treat `name` as a meaningful change in `McpServerWrapper` so alias-only edits propagate through `onUpdate` and the Inspector tile heading reflects the new alias immediately.
+  - @mcp-use/cli@3.2.1-canary.14
+  - @mcp-use/inspector@7.0.0-canary.14
+
+## 1.29.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [6a95b2c]
+  - @mcp-use/inspector@7.0.0-canary.13
+  - @mcp-use/cli@3.2.1-canary.13
+
+## 1.29.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [9c3fce4]
+  - @mcp-use/inspector@7.0.0-canary.12
+  - @mcp-use/cli@3.2.1-canary.12
+
+## 1.29.0-canary.11
+
+### Patch Changes
+
+- Updated dependencies [3fc04e5]
+  - @mcp-use/inspector@7.0.0-canary.11
+  - @mcp-use/cli@3.2.1-canary.11
+
+## 1.29.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [0fbea77]
+  - @mcp-use/inspector@7.0.0-canary.10
+  - @mcp-use/cli@3.2.1-canary.10
+
+## 1.29.0-canary.9
+
+### Patch Changes
+
+- Updated dependencies [d08b524]
+  - @mcp-use/inspector@7.0.0-canary.9
+  - @mcp-use/cli@3.2.1-canary.9
+
+## 1.29.0-canary.8
+
+### Patch Changes
+
+- Updated dependencies [64e2ae3]
+  - @mcp-use/inspector@7.0.0-canary.8
+  - @mcp-use/cli@3.2.1-canary.8
+
+## 1.29.0-canary.7
+
+### Patch Changes
+
+- Updated dependencies [3ed0b4e]
+  - @mcp-use/inspector@7.0.0-canary.7
+  - @mcp-use/cli@3.2.1-canary.7
+
+## 1.29.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [31f2104]
+  - @mcp-use/inspector@7.0.0-canary.6
+  - @mcp-use/cli@3.2.1-canary.6
+
+## 1.29.0-canary.5
+
+### Patch Changes
+
+- 273b5d7: Fix double slash in OAuth metadata proxy URL for DCR-direct providers (e.g. `oauthAuth0Provider`) by normalizing the issuer's trailing slash before appending `/.well-known/oauth-authorization-server`.
+  - @mcp-use/cli@3.2.1-canary.5
+  - @mcp-use/inspector@7.0.0-canary.5
+
+## 1.29.0-canary.4
+
+### Minor Changes
+
+- f8a6a58: Add `supabaseUrl` override to `oauthSupabaseProvider` so it can point at a local or self-hosted Supabase instance (e.g. `http://localhost:54321`) instead of the hosted `https://${projectId}.supabase.co` URL. Configurable via the new `supabaseUrl` config option or `MCP_USE_OAUTH_SUPABASE_URL` environment variable; `projectId` is now optional when `supabaseUrl` is provided.
+
+### Patch Changes
+
+- @mcp-use/cli@3.2.1-canary.4
+- @mcp-use/inspector@7.0.0-canary.4
+
+## 1.28.1-canary.3
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+- Updated dependencies [680ef2f]
+  - @mcp-use/inspector@6.0.1-canary.3
+  - @mcp-use/cli@3.2.1-canary.3
+
+## 1.28.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [81cebc7]
+  - @mcp-use/inspector@6.0.1-canary.2
+  - @mcp-use/cli@3.2.1-canary.2
+
+## 1.28.1-canary.1
+
+### Patch Changes
+
+- c3a39cf: Clarify the "Inspector: Skipped in production" log so users don't try to pass `--with-inspector` to `mcp-use start`. The flag belongs to `mcp-use build`; the new log spells out the rebuild command.
+
+  Docs: added a short note under `start` in `cli-reference.mdx` pointing readers at `build --with-inspector` for production inspector access.
+  - @mcp-use/cli@3.2.1-canary.1
+  - @mcp-use/inspector@6.0.1-canary.1
+
+## 1.28.1-canary.0
+
+### Patch Changes
+
+- ef32a50: Remove unused internal source files flagged by the TypeScript workspace Knip check.
+  - @mcp-use/cli@3.2.1-canary.0
+  - @mcp-use/inspector@6.0.1-canary.0
+
 ## 1.28.0
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.13-canary.0
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+
 ## 0.14.12
 
 ### Patch Changes

@@ -73,6 +73,10 @@ export function useChatMessages({
   const [rateLimitInfo, setRateLimitInfo] = useState<{
     loginUrl: string;
   } | null>(null);
+  const [mcpServerAuthRequired, setMcpServerAuthRequired] = useState<{
+    mcpServerUrl: string;
+    message?: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const sendMessage = useCallback(
@@ -222,6 +226,17 @@ export function useChatMessages({
               prev.filter((m) => m.id !== `assistant-${Date.now()}`)
             );
             return;
+          }
+          if (response.status === 401) {
+            const errBody = await response.json().catch(() => null);
+            if (errBody?.error === "mcp_auth_required") {
+              setMcpServerAuthRequired({
+                mcpServerUrl:
+                  (errBody.mcpServerUrl as string | undefined) ?? mcpServerUrl,
+                message: errBody.message as string | undefined,
+              });
+              return;
+            }
           }
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -548,10 +563,15 @@ export function useChatMessages({
   const clearMessages = useCallback(() => {
     setMessages([]);
     setRateLimitInfo(null);
+    setMcpServerAuthRequired(null);
   }, []);
 
   const clearRateLimitInfo = useCallback(() => {
     setRateLimitInfo(null);
+  }, []);
+
+  const clearMcpServerAuthRequired = useCallback(() => {
+    setMcpServerAuthRequired(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -597,9 +617,11 @@ export function useChatMessages({
     isLoading,
     attachments,
     rateLimitInfo,
+    mcpServerAuthRequired,
     sendMessage,
     clearMessages,
     clearRateLimitInfo,
+    clearMcpServerAuthRequired,
     setMessages,
     stop,
     addAttachment,

@@ -53,6 +53,8 @@ interface SandboxedIframeProps {
   onProxyReady?: () => void;
   /** Callback when the outer iframe has loaded */
   onLoad?: () => void;
+  /** Fired once when this sandbox instance mounts (used to detect remounts). */
+  onSandboxMount?: () => void;
   /** Callback for messages from guest UI (excluding sandbox-internal messages) */
   onMessage: (event: MessageEvent) => void;
   /** CSS class for the outer iframe */
@@ -83,6 +85,7 @@ export const SandboxedIframe = forwardRef<
     permissive,
     onProxyReady,
     onLoad,
+    onSandboxMount,
     onMessage,
     className,
     style,
@@ -92,6 +95,10 @@ export const SandboxedIframe = forwardRef<
 ) {
   const outerRef = useRef<HTMLIFrameElement>(null);
   const [proxyReady, setProxyReady] = useState(false);
+
+  useEffect(() => {
+    onSandboxMount?.();
+  }, [onSandboxMount]);
 
   // SEP-1865: Host and Sandbox MUST have different origins
   const [sandboxProxyUrl] = useState(() => {
