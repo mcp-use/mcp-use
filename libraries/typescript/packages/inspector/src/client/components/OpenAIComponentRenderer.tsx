@@ -639,10 +639,14 @@ function OpenAIComponentRendererBase({
 
             // Call the tool via the MCP connection
             // Use a 10 minute timeout for tool calls, as tools may trigger sampling
-            const result = await currentServer.callTool(toolName, params || {}, {
-              timeout: 600000, // 10 minutes
-              resetTimeoutOnProgress: true,
-            });
+            const result = await currentServer.callTool(
+              toolName,
+              params || {},
+              {
+                timeout: 600000, // 10 minutes
+                resetTimeoutOnProgress: true,
+              }
+            );
 
             // Format the result to match OpenAI's expected format
             // MCP tools return { contents: [...] }, we need to convert to OpenAI format
