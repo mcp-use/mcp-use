@@ -9,7 +9,7 @@
   "dependencies": {
     "mcp-use": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "zod": "^3.24.1"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

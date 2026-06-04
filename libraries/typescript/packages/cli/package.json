@@ -62,7 +62,7 @@
     "vite": "^8.0.5",
     "vite-plugin-singlefile": "^2.3.2",
     "ws": "^8.19.0",
-    "zod": "4.3.5"
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
