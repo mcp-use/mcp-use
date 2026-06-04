@@ -129,7 +129,7 @@
     "access": "public"
   },
   "devDependencies": {
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.60.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@types/express": "^5.0.6",
     "@vitejs/plugin-react": "^6.0.0",
