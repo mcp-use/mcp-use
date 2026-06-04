@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.14-canary.0
+
+### Patch Changes
+
+- 2ab15c6: Updated dependency `vitest` to `^4.1.0`.
+
 ## 0.14.13
 
 ### Patch Changes

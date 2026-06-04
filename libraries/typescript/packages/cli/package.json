@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/cli",
   "type": "module",
-  "version": "3.3.0",
+  "version": "3.3.1-canary.2",
   "description": "The mcp-use CLI is a tool for building and deploying MCP servers with support for ChatGPT Apps, Code Mode, OAuth, Notifications, Sampling, Observability and more.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -66,7 +66,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
-    "vitest": "^4.0.17"
+    "vitest": "^4.1.0"
   },
   "publishConfig": {
     "access": "public"
