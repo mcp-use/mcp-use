@@ -87,9 +87,13 @@ export async function setupOAuthForServer(
     };
   }
 
-  // Apply bearer auth to all /mcp routes
+  // Apply bearer auth to all MCP transport routes. The MCP JSON-RPC handler is
+  // mounted on both /mcp and /sse (see endpoints/mount-mcp.ts), so both must be
+  // guarded. /sse covers the exact mounted path and /sse/* guards subpaths.
   app.use("/mcp/*", middleware);
-  console.log("[OAuth] Bearer authentication enabled on /mcp routes");
+  app.use("/sse", middleware);
+  app.use("/sse/*", middleware);
+  console.log("[OAuth] Bearer authentication enabled on /mcp and /sse routes");
 
   return {
     provider: oauth,
