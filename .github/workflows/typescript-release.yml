@@ -252,7 +252,7 @@ jobs:
 
       - name: Upload deployment marker (Canary)
         if: github.ref == 'refs/heads/canary' && steps.has-changesets.outputs.has_changesets == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: railway-deploy-marker
           path: .railway-deploy-marker
@@ -399,7 +399,7 @@ jobs:
         if: github.ref == 'refs/heads/main' &&
             steps.check-prerelease.outputs.in_prerelease == 'false' &&
             steps.check-release.outputs.should_publish == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: railway-deploy-marker
           path: .railway-deploy-marker
