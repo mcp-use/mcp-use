@@ -25,7 +25,7 @@ jobs:
       should_draft: ${{ steps.compare.outputs.should_draft }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -85,7 +85,7 @@ jobs:
     needs: [detect-release]
     if: needs.detect-release.outputs.should_draft == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -126,7 +126,7 @@ jobs:
       version: ${{ needs.detect-release.outputs.current_version }}
       release_exists: ${{ steps.check-release.outputs.exists }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -204,7 +204,7 @@ jobs:
     outputs:
       publish_needed: ${{ steps.check-pypi.outputs.publish_needed }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -251,7 +251,7 @@ jobs:
     needs: [create-github-release, publish-pypi]
     if: needs.create-github-release.outputs.release_exists == 'false'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -282,7 +282,7 @@ jobs:
     needs: [create-github-release, publish-pypi]
     if: needs.publish-pypi.outputs.publish_needed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Prepare discussion body
         id: body
@@ -321,7 +321,7 @@ jobs:
     needs: [create-github-release, publish-pypi]
     if: needs.publish-pypi.outputs.publish_needed == 'true'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Send Discord notification
         run: |

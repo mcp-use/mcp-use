@@ -53,7 +53,7 @@ jobs:
       python: ${{ steps.compute.outputs.python }}
       typescript: ${{ steps.compute.outputs.typescript }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v3
         id: filter
         if: github.event_name != 'workflow_dispatch'
@@ -101,7 +101,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         if: needs.detect-changes.outputs.python == 'true'

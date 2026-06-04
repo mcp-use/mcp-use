@@ -12,7 +12,7 @@ jobs:
     permissions:
       issues: write # required for peter-evans/create-issue-from-file
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Link Checker
         id: lychee

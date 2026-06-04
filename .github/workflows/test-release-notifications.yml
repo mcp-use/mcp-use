@@ -17,7 +17,7 @@ jobs:
     name: Test GitHub Discussion
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Prepare discussion body
         run: |
@@ -53,7 +53,7 @@ jobs:
     name: Test Discord Notification
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Send Discord notification
         run: |

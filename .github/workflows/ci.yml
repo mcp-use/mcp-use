@@ -86,7 +86,7 @@ jobs:
       typescript: ${{ steps.out.outputs.typescript }}
       create-mcp-use-app: ${{ steps.out.outputs.create-mcp-use-app }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: dorny/paths-filter@v3
@@ -126,7 +126,7 @@ jobs:
       run:
         working-directory: libraries/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - name: Set up Python 3.11
@@ -153,7 +153,7 @@ jobs:
   #     run:
   #       working-directory: libraries/python
   #   steps:
-  #     - uses: actions/checkout@v4
+  #     - uses: actions/checkout@v6
   #       with:
   #         ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
   #     - name: Set up Python 3.11
@@ -180,7 +180,7 @@ jobs:
       run:
         working-directory: libraries/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - name: Set up Python ${{ matrix.python-version }}
@@ -212,7 +212,7 @@ jobs:
       run:
         working-directory: libraries/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - name: Set up Python 3.11
@@ -377,7 +377,7 @@ jobs:
       run:
         working-directory: libraries/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - name: Set up Python 3.11
@@ -528,7 +528,7 @@ jobs:
       run:
         working-directory: libraries/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - name: Set up Python 3.11
@@ -560,7 +560,7 @@ jobs:
       run:
         working-directory: libraries/python
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - name: Set up Python 3.11
@@ -594,7 +594,7 @@ jobs:
         working-directory: libraries/typescript
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
@@ -631,7 +631,7 @@ jobs:
         working-directory: libraries/typescript
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
 
@@ -666,7 +666,7 @@ jobs:
       run:
         working-directory: libraries/typescript
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v3
@@ -703,7 +703,7 @@ jobs:
       run:
         working-directory: libraries/typescript
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v3
@@ -745,7 +745,7 @@ jobs:
       run:
         working-directory: libraries/typescript
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v3
@@ -777,7 +777,7 @@ jobs:
       run:
         working-directory: libraries/typescript
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v3
@@ -809,7 +809,7 @@ jobs:
         working-directory: libraries/typescript
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
           fetch-depth: 0
@@ -848,7 +848,7 @@ jobs:
     name: "typescript/create-mcp-use-app/build"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v3
@@ -910,7 +910,7 @@ jobs:
           - pm: pnpm
             flag: "--dev"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_call' && inputs.ref || github.sha }}
       - uses: pnpm/action-setup@v3

@@ -21,7 +21,7 @@ jobs:
       pr-number: ${{ steps.pr-number.outputs.pr-number }}
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -59,7 +59,7 @@ jobs:
     needs: preview
     steps:
       - name: Checkout Repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Deno
         uses: denoland/setup-deno@v2

@@ -158,7 +158,7 @@ jobs:
 
       - name: Checkout Repo
         if: steps.config.outputs.should_deploy == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # For manual trigger: use input branch (already validated as canary/main)
           # For automatic trigger: use branch from validated marker (not workflow_run.head_branch for security)
