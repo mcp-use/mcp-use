@@ -223,7 +223,7 @@
     "@mcp-use/cli": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/ext-apps": "1.0.1",
-    "@modelcontextprotocol/sdk": "1.26.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "express": "5.2.1",
     "hono": "4.12.18",
     "jose": "6.1.3",
