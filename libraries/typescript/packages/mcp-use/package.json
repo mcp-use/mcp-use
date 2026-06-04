@@ -239,7 +239,7 @@
   "devDependencies": {
     "@langchain/openai": "^1.2.8",
     "@types/morgan": "^1.9.10",
-    "@vitest/coverage-v8": "~4.0.18",
+    "@vitest/coverage-v8": "~4.1.0",
     "ai": ">=5.0.52",
     "esbuild": "0.27.1",
     "eslint": "^9.39.2",
