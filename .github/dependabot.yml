@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/libraries/typescript"
+    target-branch: "canary"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "pip"
+    directory: "/libraries/python"
+    target-branch: "canary"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "canary"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10

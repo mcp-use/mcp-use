@@ -48,10 +48,12 @@ jobs:
             
             core.setOutput('head_ref', pr.head.ref);
             core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('base_ref', pr.base.ref);
             core.info(`✅ Found Dependabot PR #${prNumber}: ${pr.head.ref}`);
             return {
               head_ref: pr.head.ref,
               head_sha: pr.head.sha,
+              base_ref: pr.base.ref,
             };
 
       - name: Checkout
@@ -86,6 +88,7 @@ jobs:
             const TYPESCRIPT_DIR = "libraries/typescript";
             const CHANGESET_DIR = `${TYPESCRIPT_DIR}/.changeset`;
             const FORCE = '${{ github.event.inputs.force }}' === 'true';
+            const BASE_REF = '${{ steps.pr-info.outputs.base_ref || github.base_ref || 'canary' }}';
 
             // Check if we're on a dependabot branch
             const { stdout } = await exec.getExecOutput("git", ["branch", "--show-current"]);
@@ -120,7 +123,7 @@ jobs:
             }
 
             // Get changed package.json files from the diff against base branch
-            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", "origin/main...HEAD"]);
+            const { stdout: diffOutput } = await exec.getExecOutput("git", ["diff", "--name-only", `origin/${BASE_REF}...HEAD`]);
             const diffFiles = diffOutput.split("\n").filter(Boolean);
             
             console.log(`Found ${diffFiles.length} changed files in PR`);
@@ -239,4 +242,3 @@ jobs:
             await exec.exec("git", ["push"]);
 
             console.log("✅ Changeset committed and pushed");
-
