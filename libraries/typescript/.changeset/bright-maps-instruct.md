@@ -1,5 +1,5 @@
 ---
-"mcp-use": patch
+"mcp-use": minor
 "create-mcp-use-app": patch
 ---
 
