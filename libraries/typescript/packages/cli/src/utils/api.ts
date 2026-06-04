@@ -613,16 +613,29 @@ export class McpUseAPI {
       return { user: { login: "", id: 0, avatar_url: "" }, repos: [] };
     }
 
+    // An organization can have multiple GitHub installations (e.g. a user
+    // account and one or more GitHub orgs). Aggregate repos across all of
+    // them instead of only the first, otherwise repos owned by any other
+    // installation are reported as inaccessible.
     const inst = installResp.installations[0];
-    const reposResp = await this.request<{
-      repos: Array<{
-        id: number;
-        name: string;
-        fullName: string;
-        private: boolean;
-        ownerAvatarUrl: string | null;
-      }>;
-    }>(`/github/installations/${inst.installationId}/repos`);
+    const repoLists = await Promise.all(
+      installResp.installations.map(async (installation) => {
+        try {
+          const reposResp = await this.request<{
+            repos: Array<{
+              id: number;
+              name: string;
+              fullName: string;
+              private: boolean;
+              ownerAvatarUrl: string | null;
+            }>;
+          }>(`/github/installations/${installation.installationId}/repos`);
+          return reposResp.repos;
+        } catch {
+          return [];
+        }
+      })
+    );
 
     return {
       user: {
@@ -630,7 +643,7 @@ export class McpUseAPI {
         id: 0,
         avatar_url: inst.account?.avatar_url ?? "",
       },
-      repos: reposResp.repos.map((r) => ({
+      repos: repoLists.flat().map((r) => ({
         id: r.id,
         name: r.name,
         full_name: r.fullName,
