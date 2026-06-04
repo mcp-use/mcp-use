@@ -8,6 +8,8 @@
     "mcp-use": "1.29.0"
   },
   "changesets": [
-    "dependabot-ce13dae2"
+    "dependabot-ce13dae2",
+    "fix-sse-oauth-auth",
+    "secure-dependency-bumps"
   ]
 }
