@@ -1,5 +1,13 @@
 # @mcp-use/inspector
 
+## 7.0.1-canary.2
+
+### Patch Changes
+
+- 2ab15c6: Updated dependency `vitest` to `^4.1.0`.
+- Updated dependencies [2ab15c6]
+  - mcp-use@1.29.1-canary.2
+
 ## 7.0.1-canary.1
 
 ### Patch Changes
