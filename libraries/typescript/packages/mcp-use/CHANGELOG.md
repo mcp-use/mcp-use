@@ -1,5 +1,17 @@
 # mcp-use
 
+## 1.29.1
+
+### Patch Changes
+
+- feb8f09: Updated dependency `vitest` to `^4.1.0`.
+- feb8f09: Updated dependency `hono` to `4.12.18`.
+- feb8f09: Fix an authentication bypass on OAuth-protected MCP servers. The MCP JSON-RPC handler is mounted on both `/mcp` and `/sse`, but the bearer-auth middleware was only applied to `/mcp/*`, leaving `/sse` reachable without a token. The middleware now also covers `/sse` (and `/sse/*`), and the server advertises RFC 9728 path-scoped protected-resource metadata for `/sse`.
+- feb8f09: Resolve all open Dependabot security advisories in the TypeScript workspace. Bumps the `hono` direct dependency to `^4.12.18` and raises the pinned floors in `pnpm.overrides` for `axios`, `protobufjs`, `@protobufjs/utf8`, `ws`, `uuid`, `fast-uri`, `ip-address`, `postcss`, `langsmith`, `follow-redirects`, `dompurify`, `qs`, `react-router`, `vitest`, and `better-auth` so the lockfile resolves to patched versions. All bumps stay within compatible major lines (e.g. `protobufjs` and `uuid` are bounded to their current majors) to avoid breaking changes.
+- Updated dependencies [feb8f09]
+  - @mcp-use/cli@3.3.1
+  - @mcp-use/inspector@7.0.1
+
 ## 1.29.1-canary.2
 
 ### Patch Changes
