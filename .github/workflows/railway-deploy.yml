@@ -38,7 +38,7 @@ jobs:
 
       - name: Validate workflow run source (automatic trigger)
         if: github.event_name == 'workflow_run'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: validate-source
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -58,7 +58,7 @@ jobs:
 
       - name: Check for deployment marker (automatic trigger)
         if: github.event_name == 'workflow_run' && steps.validate-source.outputs.is_valid == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: check-marker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,7 +84,7 @@ jobs:
 
       - name: Download and parse marker file (automatic trigger)
         if: github.event_name == 'workflow_run' && steps.check-marker.outputs.packages_published == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: marker-info
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

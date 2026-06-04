@@ -28,7 +28,7 @@ jobs:
     steps:
       - name: Promote PR head into base-repo branch
         id: promote
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = Number(core.getInput('pull_number'));
@@ -54,7 +54,7 @@ jobs:
 
       - name: Detect changed areas from PR files
         id: changed
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = Number(core.getInput('pull_number'));
@@ -73,7 +73,7 @@ jobs:
             core.setOutput('create_mcp_use_app', String(create_mcp_use_app));
 
       - name: Comment on PR with promoted branch
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const prNumber = Number(core.getInput('pull_number'));
