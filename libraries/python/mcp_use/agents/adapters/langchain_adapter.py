@@ -243,10 +243,10 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                         else:
 
                             parts.append(str(content))
-                        "\n".join(parts)
 
 
-                    return parts
+
+                    return  "\n".join(parts)
                 except Exception as e:
                     if self.handle_tool_error:
                         return format_error(e, tool=self.name)  # Format the error to make LLM understand it
