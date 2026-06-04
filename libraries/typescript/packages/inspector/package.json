@@ -92,7 +92,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.13",
-    "@modelcontextprotocol/ext-apps": "^1.0.1",
+    "@modelcontextprotocol/ext-apps": "^1.7.3",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@paper-design/shaders-react": "^0.0.72",
     "@radix-ui/react-alert-dialog": "^1.1.15",
