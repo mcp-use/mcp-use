@@ -108,7 +108,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Draft Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: python-draft
           name: python-draft
@@ -187,7 +187,7 @@ jobs:
 
       - name: Create Release
         if: steps.check-release.outputs.exists == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: python-v${{ needs.detect-release.outputs.current_version }}
           name: Python v${{ needs.detect-release.outputs.current_version }}
