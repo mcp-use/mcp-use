@@ -258,7 +258,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download all test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: transport-test-results-*
           path: test-results
@@ -423,7 +423,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Download all test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: primitive-test-results-*
           path: test-results
@@ -924,7 +924,7 @@ jobs:
         if: matrix.pm == 'yarn'
         run: corepack enable
       - name: Download Package Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: workspace-packages
           path: ./packages

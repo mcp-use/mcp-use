@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Download conformance results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: conformance-results
           path: conformance-results
