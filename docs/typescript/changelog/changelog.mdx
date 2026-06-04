@@ -6,6 +6,16 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.29.1" description="June 2026">
+  ## OAuth `/sse` auth fix & security dependency bumps
+  Patch release closing an OAuth bearer-auth gap on the legacy SSE transport and resolving open Dependabot security advisories across the TypeScript workspace.
+
+- **Fix**: Require bearer auth on `/sse` (and `/sse/*`) for OAuth-protected MCP servers  -  JSON-RPC was also mounted on `/sse` but middleware only covered `/mcp/*`, so unauthenticated clients could reach the handler; servers now advertise RFC 9728 path-scoped protected-resource metadata for `/sse` (`#1628`)
+- **Update**: Bump `hono` to `^4.12.18` and raise `pnpm.overrides` floors for `axios`, `protobufjs`, `ws`, `uuid`, `fast-uri`, `postcss`, `langsmith`, `dompurify`, `qs`, `react-router`, `better-auth`, and other flagged transitive deps so the lockfile resolves to patched versions within current majors (`#1615`, `#1626`)
+- **Update**: Updated @mcp-use/inspector to v7.0.1
+- **Update**: Updated @mcp-use/cli to v3.3.1
+</Update>
+
 <Update label="v1.29.0" description="June 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.29.0&title=Public%20landing%20pages%2C%20OAuth%20callback%20hardening%20%26%20Supabase%20URL%20override&date=2026-06&lang=typescript" alt="Release 1.29.0" />
