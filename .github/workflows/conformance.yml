@@ -54,7 +54,7 @@ jobs:
       typescript: ${{ steps.compute.outputs.typescript }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name != 'workflow_dispatch'
         with:
