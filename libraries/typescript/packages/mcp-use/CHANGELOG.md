@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.30.0-canary.0
+
+### Minor Changes
+
+- f565f9c: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+
+### Patch Changes
+
+- @mcp-use/cli@3.3.2-canary.0
+- @mcp-use/inspector@8.0.0-canary.0
+
 ## 1.29.1
 
 ### Patch Changes
