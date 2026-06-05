@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.30.0-canary.1
+
+### Patch Changes
+
+- 88180d5: Fix incomplete escaping when converting Zod string literals and enums to TypeScript type strings. Backslashes are now escaped before double quotes so generated `.d.ts` output remains valid when literal values contain `\` or `"`.
+  - @mcp-use/cli@3.3.2-canary.1
+  - @mcp-use/inspector@8.0.0-canary.1
+
 ## 1.30.0-canary.0
 
 ### Minor Changes

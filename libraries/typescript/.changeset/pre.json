@@ -8,6 +8,7 @@
     "mcp-use": "1.29.1"
   },
   "changesets": [
-    "bright-maps-instruct"
+    "bright-maps-instruct",
+    "fix-zod-to-ts-string-escaping"
   ]
 }
