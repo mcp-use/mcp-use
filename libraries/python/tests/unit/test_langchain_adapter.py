@@ -9,6 +9,7 @@ from mcp.types import (
     CallToolResult,
     EmbeddedResource,
     ImageContent,
+    Resource,
     TextContent,
     TextResourceContents,
     Tool,
@@ -80,6 +81,21 @@ class TestLangChainAdapterContentConversion:
 
         assert result == "{'unexpected': 'value'}"
 
+    def test_empty_content_uses_structured_content(self):
+        """Structured tool results should not become empty LangChain tool messages."""
+        result = _mcp_content_to_langchain(
+            [],
+            structured_content={"success": True, "data": {"value": 42}},
+        )
+
+        assert result == '{"success": true, "data": {"value": 42}}'
+
+    def test_empty_content_without_structured_content_returns_placeholder(self):
+        """Empty tool results need non-empty text for providers that reject blank tool messages."""
+        result = _mcp_content_to_langchain([])
+
+        assert result == "(no content)"
+
 
 class TestLangChainAdapterToolExecution:
     """Tests for LangChain tool execution behavior."""
@@ -112,3 +128,78 @@ class TestLangChainAdapterToolExecution:
         assert result["details"] == "tool failed"
         assert result["tool"] == "failing_tool"
         assert result["tool_content"] == "tool failed"
+
+    @pytest.mark.asyncio
+    async def test_empty_tool_content_returns_structured_content(self):
+        """Tool execution should preserve structuredContent when content is empty."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+        connector.call_tool = AsyncMock(
+            return_value=CallToolResult(
+                content=[],
+                structuredContent={"success": True, "data": {"value": 42}},
+                isError=False,
+            )
+        )
+
+        tool = Tool(
+            name="structured_tool",
+            description="A tool that returns structured content",
+            inputSchema={"type": "object", "properties": {}},
+        )
+        langchain_tool = adapter._convert_tool(tool, connector)
+
+        assert langchain_tool is not None
+
+        result = await langchain_tool._arun()
+
+        connector.call_tool.assert_awaited_once_with("structured_tool", {})
+        assert result == '{"success": true, "data": {"value": 42}}'
+
+
+class TestLangChainAdapterResourceExecution:
+    """Tests for LangChain resource tool execution behavior."""
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_returns_all_content_blocks(self):
+        """Resource tools should not silently drop all but the final content block."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+        connector.read_resource = AsyncMock(
+            return_value=MagicMock(
+                contents=[
+                    TextResourceContents(uri="file:///tmp/report.txt", text="page 1"),
+                    TextResourceContents(uri="file:///tmp/report.txt", text="page 2"),
+                    BlobResourceContents(uri="file:///tmp/report.bin", blob="cGFnZSAz"),
+                ]
+            )
+        )
+        resource = Resource.model_construct(
+            uri="file:///tmp/report.txt",
+            name="report",
+            description="A multi-part report",
+        )
+        langchain_resource = adapter._convert_resource(resource, connector)
+
+        result = await langchain_resource._arun()
+
+        connector.read_resource.assert_awaited_once_with("file:///tmp/report.txt")
+        assert result == "page 1\npage 2\ncGFnZSAz"
+
+    @pytest.mark.asyncio
+    async def test_resource_tool_returns_empty_string_for_empty_contents(self):
+        """Resource tools should handle empty content lists gracefully."""
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+        connector.read_resource = AsyncMock(return_value=MagicMock(contents=[]))
+        resource = Resource.model_construct(
+            uri="file:///tmp/empty.txt",
+            name="empty",
+            description="An empty resource",
+        )
+        langchain_resource = adapter._convert_resource(resource, connector)
+
+        result = await langchain_resource._arun()
+
+        connector.read_resource.assert_awaited_once_with("file:///tmp/empty.txt")
+        assert result == ""
