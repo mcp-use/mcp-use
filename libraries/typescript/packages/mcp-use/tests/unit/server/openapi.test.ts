@@ -158,6 +158,50 @@ describe("MCPServer.fromOpenAPI", () => {
     ).toBe(false);
   });
 
+  it("preserves additionalProperties fields in object request bodies", () => {
+    const server = MCPServer.fromOpenAPI({
+      spec: {
+        openapi: "3.1.0",
+        info: { title: "Metadata API", version: "1.0.0" },
+        paths: {
+          "/metadata": {
+            post: {
+              operationId: "setMetadata",
+              requestBody: {
+                required: true,
+                content: {
+                  "application/json": {
+                    schema: {
+                      type: "object",
+                      additionalProperties: { type: "string" },
+                    },
+                  },
+                },
+              },
+              responses: { "200": { description: "ok" } },
+            },
+          },
+        },
+      },
+      baseUrl: "https://api.example.com",
+    });
+    const setMetadata = server.registrations.tools.get("setMetadata");
+
+    const parsed = setMetadata?.config.schema?.safeParse({
+      body: { color: "blue", size: "large" },
+    });
+
+    expect(parsed?.success).toBe(true);
+    expect(parsed?.data).toEqual({
+      body: { color: "blue", size: "large" },
+    });
+    expect(
+      setMetadata?.config.schema?.safeParse({
+        body: { retries: 3 },
+      }).success
+    ).toBe(false);
+  });
+
   it("calls the target API with path, query, body, and auth mapping", async () => {
     const fetchMock = vi.fn(async () => {
       return new Response(JSON.stringify({ id: "todo_123" }), {

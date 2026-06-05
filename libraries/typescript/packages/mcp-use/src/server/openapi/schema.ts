@@ -133,7 +133,18 @@ function objectSchemaToZod(
     shape[name] = required.has(name) ? described : described.optional();
   }
 
-  return z.object(shape);
+  const objectSchema = z.object(shape);
+  const additionalProperties = schema.additionalProperties;
+
+  if (additionalProperties === false) {
+    return objectSchema.strict();
+  }
+
+  if (additionalProperties && typeof additionalProperties === "object") {
+    return objectSchema.catchall(schemaToZod(spec, additionalProperties));
+  }
+
+  return objectSchema.passthrough();
 }
 
 function enumToZod(
