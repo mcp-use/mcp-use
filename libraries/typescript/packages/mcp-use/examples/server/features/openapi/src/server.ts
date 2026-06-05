@@ -7,6 +7,8 @@ const USER_AGENT =
   process.env.WEATHER_USER_AGENT ??
   "mcp-use-openapi-example/1.0 (https://github.com/mcp-use/mcp-use)";
 
+// Keep the example focused: the full weather.gov spec would generate dozens of
+// tools, which makes the inspector harder to scan for a quick OpenAPI demo.
 const includedPaths = [
   "/points/{latitude},{longitude}",
   "/gridpoints/{wfo}/{x},{y}/forecast",
