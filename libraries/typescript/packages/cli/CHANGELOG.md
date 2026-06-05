@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.3.2-canary.3
+
+### Patch Changes
+
+- a3d9aa9: Handle paginated Cloud API responses in `servers list` and `deployments list`, with a default page size of 30 and next-page guidance.
+  - mcp-use@1.30.0-canary.3
+  - @mcp-use/inspector@8.0.0-canary.3
+
 ## 3.3.2-canary.2
 
 ### Patch Changes
