@@ -25,20 +25,12 @@ jobs:
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
+      # Do not checkout PR head here — issue_comment is privileged; claude-code-action
+      # checks out PR refs safely and restores trusted config from the base branch.
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 0
-
-      - name: Checkout PR branch (if PR comment)
-        if: github.event.issue.pull_request
-        env:
-          PR_NUMBER: ${{ github.event.issue.number }}
-        run: |
-          echo "Fetching PR #$PR_NUMBER..."
-          git fetch origin pull/$PR_NUMBER/head:pr-$PR_NUMBER
-          git checkout pr-$PR_NUMBER
-          echo "Successfully checked out PR branch"
+          fetch-depth: 1
 
       - name: Run Claude Code
         id: claude
