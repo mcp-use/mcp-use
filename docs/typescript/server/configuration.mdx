@@ -23,6 +23,7 @@ const server = new MCPServer({
   // ── Identity (shown in Inspector / MCP clients) ───────────
   title: 'My Server',                   // Display name (defaults to name)
   description: 'What this server does', // Shown during discovery
+  instructions: 'Use search before fetch-details; confirm before writes.',
   websiteUrl: 'https://myserver.com',
   favicon: 'favicon.ico',               // Relative to public/ dir
   icons: [
@@ -65,6 +66,22 @@ await server.listen(3000)
 **Port resolution order:** `listen(port)` argument → `--port` CLI flag → `PORT` env var → `3000`
 
 **Base URL resolution order:** `baseUrl` config → `MCP_URL` env var → `http://{host}:{port}`
+
+### Server Instructions
+
+`instructions` are returned during MCP initialization so compatible clients can use them as model-facing guidance for your server. Use them for cross-tool workflows, constraints, and server-wide behavior that does not belong in a single tool description:
+
+```typescript
+const server = new MCPServer({
+  name: 'inventory-server',
+  version: '1.0.0',
+  description: 'Inventory lookup and order preparation',
+  instructions:
+    'Call search-products before get-product-details. Confirm availability before preparing an order.',
+})
+```
+
+Keep instructions short and specific. Tool descriptions should still explain what each individual tool does.
 
 ### Environment Variables
 
