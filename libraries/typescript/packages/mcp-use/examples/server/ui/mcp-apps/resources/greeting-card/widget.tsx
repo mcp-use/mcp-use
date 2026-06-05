@@ -13,7 +13,7 @@ export const widgetMetadata: WidgetMetadata = {
   props: propSchema,
   exposeAsTool: false,
   metadata: {
-    prefersBorder: true,
+    prefersBorder: false,
     widgetDescription: "A colorful greeting card with personalized message",
   },
   annotations: {
@@ -28,21 +28,37 @@ const GreetingCard: React.FC = () => {
 
   return (
     <McpUseProvider debugger viewControls autoSize>
-      <div className="flex items-center justify-center min-h-[240px] p-4">
-        {isPending ? (
-          <div className="rounded-3xl border border-pink-200/70 bg-gradient-to-br from-pink-100 to-rose-200 px-8 py-10 shadow-lg shadow-pink-200/40 dark:border-pink-500/30 dark:from-pink-950/40 dark:to-rose-900/40">
-            <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-pink-600 dark:border-pink-300" />
+      <div className="flex items-center justify-center min-h-[260px] p-6 bg-zinc-900/5 dark:bg-zinc-950 transition-colors duration-300">
+        <div className="w-full max-w-[380px] rounded-lg border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-950 text-zinc-400 font-mono shadow-2xl overflow-hidden text-left">
+          {/* Header */}
+          <div className="px-4 py-2.5 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200/80 dark:border-zinc-800/80 select-none">
+            <span className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200">
+              greeting-card
+            </span>
           </div>
-        ) : (
-          <div className="min-w-[360px] rounded-3xl border border-pink-200/70 bg-gradient-to-br from-fuchsia-400 via-pink-500 to-rose-500 px-10 py-12 text-center text-white shadow-2xl shadow-pink-500/30 dark:border-pink-500/30 dark:from-fuchsia-500 dark:via-pink-600 dark:to-rose-600">
-            <div className="text-4xl font-semibold leading-none tracking-tight opacity-90">
-              {props.greeting}
-            </div>
-            <div className="mt-4 text-5xl font-extrabold leading-none tracking-tight">
-              {props.name}
-            </div>
+
+          {/* Terminal Body */}
+          <div className="p-5 flex flex-col gap-1.5 bg-zinc-950">
+            {isPending ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 text-xs text-zinc-500 animate-pulse">
+                  <span>Executing...</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Greeting Line */}
+                <div className="text-lg font-bold text-zinc-100 leading-tight">
+                  {props.greeting}
+                </div>
+                {/* Name Line */}
+                <div className="text-lg font-bold text-zinc-100 leading-tight">
+                  {props.name}
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </McpUseProvider>
   );
