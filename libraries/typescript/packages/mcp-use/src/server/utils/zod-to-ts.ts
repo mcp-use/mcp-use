@@ -6,6 +6,13 @@
 import type { z } from "zod";
 
 /**
+ * Escape a string so it can be safely embedded in a TypeScript double-quoted string literal.
+ */
+function escapeTsStringLiteral(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+/**
  * Convert a Zod schema to a TypeScript type string
  * @param schema - The Zod schema to convert
  * @returns TypeScript type string representation
@@ -77,7 +84,7 @@ export function zodToTypeString(schema: z.ZodTypeAny): string {
     case "ZodLiteral": {
       const value = def.value;
       if (typeof value === "string") {
-        return `"${value.replace(/"/g, '\\"')}"`;
+        return `"${escapeTsStringLiteral(value)}"`;
       }
       if (typeof value === "number") {
         return String(value);
@@ -95,7 +102,7 @@ export function zodToTypeString(schema: z.ZodTypeAny): string {
           ? Object.values(def.entries as Record<string, string>)
           : undefined;
       if (!values || values.length === 0) return "string";
-      return values.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(" | ");
+      return values.map((v) => `"${escapeTsStringLiteral(v)}"`).join(" | ");
     }
 
     case "ZodNativeEnum": {
