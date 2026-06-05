@@ -14,8 +14,11 @@ import { OPENAI_MODEL } from "../integration/agent/constants.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const simpleServerPath = resolve(__dirname, "../servers/simple_server.ts");
+const describeIfOpenAIKey = process.env.OPENAI_API_KEY
+  ? describe
+  : describe.skip;
 
-describe("Documentation Example: MCPAgent Quick Start", () => {
+describeIfOpenAIKey("Documentation Example: MCPAgent Quick Start", () => {
   let client: MCPClient;
   let llm: ChatOpenAI;
   let agent: MCPAgent;
