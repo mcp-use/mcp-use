@@ -132,6 +132,31 @@ describe("CLI Integration Tests", () => {
       expect(result.stdout).toContain("list");
       expect(result.stdout).toContain("get");
     });
+
+    it("should show per-client notifications help", async () => {
+      const result = await runCLI([
+        "client",
+        "ci-test",
+        "notifications",
+        "--help",
+      ]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(
+        "Interact with and watch MCP notifications"
+      );
+      expect(result.stdout).toContain("watch");
+    });
+
+    it("should show per-client logs help", async () => {
+      const result = await runCLI(["client", "ci-test", "logs", "--help"]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(
+        "Manage and stream logs from the MCP server"
+      );
+      expect(result.stdout).toContain("stream");
+    });
   });
 
   describe("Server Management", () => {

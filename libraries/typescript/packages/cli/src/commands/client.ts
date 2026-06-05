@@ -80,6 +80,8 @@ export const PER_CLIENT_SCOPES = new Set([
   "disconnect",
   "interactive",
   "screenshot",
+  "notifications",
+  "logs",
 ]);
 
 async function connectCommand(
@@ -1174,6 +1176,119 @@ export function createClientCommand(): Command {
   return clientCommand;
 }
 
+export async function watchNotificationsCommand(name: string): Promise<void> {
+  try {
+    const result = await getOrRestoreSession(name);
+    if (!result) {
+      await cleanupAndExit(1);
+    }
+
+    const { session } = result!;
+
+    console.log(formatInfo(`Watching notifications from server '${name}'...`));
+    console.log(formatInfo("Press Ctrl+C to stop"));
+    console.log("");
+
+    const sigintHandler = async () => {
+      console.log("\nStopping notification watch...");
+      await cleanupAndExit(0);
+    };
+    process.once("SIGINT", sigintHandler);
+
+    session.on("notification", async (notification) => {
+      const timestamp = new Date().toLocaleTimeString();
+      console.log(
+        chalk.gray(`[${timestamp}] `) + chalk.cyan.bold(notification.method)
+      );
+      if (notification.params) {
+        console.log(formatJson(notification.params));
+        console.log(chalk.gray("─".repeat(50)));
+      }
+    });
+
+    // Keep process alive
+    await new Promise(() => {});
+  } catch (error: any) {
+    console.error(
+      formatError(`Failed to watch notifications: ${error.message}`)
+    );
+    await cleanupAndExit(1);
+  }
+}
+
+export async function streamLogsCommand(
+  name: string,
+  options: { level?: string }
+): Promise<void> {
+  try {
+    const result = await getOrRestoreSession(name);
+    if (!result) {
+      await cleanupAndExit(1);
+    }
+
+    const { session } = result!;
+    const level = options.level || "debug";
+
+    console.log(
+      formatInfo(`Requesting log level '${level}' from server '${name}'...`)
+    );
+    try {
+      await session.request("logging/setLevel", { level });
+      console.log(formatSuccess(`Log level set to '${level}'`));
+    } catch (error: any) {
+      console.log(
+        formatWarning(
+          `Failed to set log level on server: ${error.message}. ` +
+            `Server might not implement 'logging/setLevel', but we will still listen for log messages.`
+        )
+      );
+    }
+
+    console.log(formatInfo(`Streaming logs. Press Ctrl+C to stop...`));
+    console.log("");
+
+    const sigintHandler = async () => {
+      console.log("\nStopping log stream...");
+      await cleanupAndExit(0);
+    };
+    process.once("SIGINT", sigintHandler);
+
+    session.on("notification", async (notification) => {
+      if (notification.method === "notifications/message") {
+        const timestamp = new Date().toLocaleTimeString();
+        const params = notification.params as any;
+        const msgLevel = (params?.level || "info").toLowerCase();
+        let color = chalk.white;
+        if (msgLevel === "debug") color = chalk.gray;
+        else if (msgLevel === "info") color = chalk.blue;
+        else if (msgLevel === "notice") color = chalk.cyan;
+        else if (msgLevel === "warning") color = chalk.yellow;
+        else if (msgLevel === "error") color = chalk.red;
+        else if (
+          msgLevel === "critical" ||
+          msgLevel === "alert" ||
+          msgLevel === "emergency"
+        ) {
+          color = chalk.red.bold;
+        }
+
+        const loggerName = params?.logger ? ` [${params.logger}]` : "";
+        console.log(
+          chalk.gray(`[${timestamp}]`) +
+            color(` [${msgLevel.toUpperCase()}]${loggerName}:`) +
+            ` ${params?.data || JSON.stringify(params)}`
+        );
+      }
+    });
+
+    // Keep process alive
+    await new Promise(() => {});
+  } catch (error: any) {
+    console.error(formatError(`Failed to stream logs: ${error.message}`));
+    await cleanupAndExit(1);
+  }
+}
+
 /**
  * Build the per-server command subtree for a given saved-server name. The
  * name is captured in each action closure so subcommand definitions stay
@@ -1298,6 +1413,35 @@ export function createPerClientCommand(name: string): Command {
     .description("Remove stored OAuth tokens for this server's URL")
     .action(() => authLogoutCommand(name));
   cmd.addCommand(authCommand);
+
+  const notificationsCommand = new Command("notifications")
+    .description("Interact with and watch MCP notifications")
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} notifications --help\` to see available actions)`
+    );
+  notificationsCommand
+    .command("watch")
+    .description(
+      "Watch and print all notifications from the server in real-time"
+    )
+    .action(() => watchNotificationsCommand(name));
+  cmd.addCommand(notificationsCommand);
+
+  const logsCommand = new Command("logs")
+    .description("Manage and stream logs from the MCP server")
+    .showHelpAfterError(
+      `(Run \`mcp-use client ${name} logs --help\` to see available actions)`
+    );
+  logsCommand
+    .command("stream")
+    .description("Stream log messages from the server")
+    .option(
+      "--level <level>",
+      "Minimum log level (debug, info, notice, warning, error, critical, alert, emergency)",
+      "debug"
+    )
+    .action((options) => streamLogsCommand(name, options));
+  cmd.addCommand(logsCommand);
 
   cmd.addCommand(createPerClientScreenshotCommand(name));
 
