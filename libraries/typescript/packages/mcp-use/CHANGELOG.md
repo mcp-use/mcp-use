@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.30.0-canary.2
+
+### Patch Changes
+
+- b820e74: Bump `hono` to `4.12.23` to address [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5), where non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware.
+  - @mcp-use/cli@3.3.2-canary.2
+  - @mcp-use/inspector@8.0.0-canary.2
+
 ## 1.30.0-canary.1
 
 ### Patch Changes
