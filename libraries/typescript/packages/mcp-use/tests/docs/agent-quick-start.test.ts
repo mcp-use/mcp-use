@@ -15,7 +15,10 @@ import { OPENAI_MODEL } from "../integration/agent/constants.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const simpleServerPath = resolve(__dirname, "../servers/simple_server.ts");
 
-describe("Documentation Example: MCPAgent Quick Start", () => {
+// Requires OPENAI_API_KEY (skipped in fork PR CI where secrets are unavailable)
+describe.skipIf(!process.env.OPENAI_API_KEY)(
+  "Documentation Example: MCPAgent Quick Start",
+  () => {
   let client: MCPClient;
   let llm: ChatOpenAI;
   let agent: MCPAgent;
@@ -101,4 +104,5 @@ describe("Documentation Example: MCPAgent Quick Start", () => {
 
     console.log("Tools used:", agent.toolsUsedNames);
   }, 60000);
-});
+  }
+);
