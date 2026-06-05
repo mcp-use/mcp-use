@@ -677,6 +677,8 @@ if (container && Component) {
           // Import helpers for widget registration
           const { slugifyWidgetName, processWidgetHtml } =
             await import("./widget-helpers.js");
+          const { getWidgetOpenaiConfig, injectWidgetOpenaiConfig } =
+            await import("./widget-openai-config.js");
           const { buildDualProtocolMetadata, getBuildIdPart } =
             await import("./protocol-helpers.js");
 
@@ -702,6 +704,18 @@ if (container && Component) {
               widgetName,
               serverConfig.serverBaseUrl
             );
+            const openInAppUrl = getWidgetOpenaiConfig(metadata)?.openInAppUrl;
+            if (openInAppUrl) {
+              html = injectWidgetOpenaiConfig(html, openInAppUrl);
+              try {
+                await fs.writeFile(htmlPath, html, "utf8");
+              } catch (writeError) {
+                console.warn(
+                  `[WIDGET-HMR] Failed to write openInAppUrl config for ${widgetName}:`,
+                  writeError
+                );
+              }
+            }
           } catch (e) {
             console.warn(
               `[WIDGET-HMR] Failed to read HTML for ${widgetName}:`,

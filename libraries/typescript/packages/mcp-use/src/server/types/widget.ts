@@ -4,6 +4,7 @@ import type { ToolAnnotations } from "./tool.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import type { z } from "zod";
 import type { CSPConfig } from "../widgets/adapters/types.js";
+import type { WidgetOpenaiConfig } from "../widgets/widget-openai-config.js";
 
 export interface WidgetMetadata {
   /**
@@ -130,4 +131,12 @@ export interface WidgetMetadata {
      */
     invoked?: string;
   };
+
+  /**
+   * ChatGPT Apps SDK-specific widget configuration.
+   *
+   * Ignored by MCP Apps clients (Claude, Goose, etc.). Use this namespace for
+   * settings that map to `window.openai` APIs in ChatGPT only.
+   */
+  openai?: WidgetOpenaiConfig;
 }

@@ -5,6 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { applyOpenInAppUrlFromConfig } from "./apply-open-in-app-url.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { ThemeProvider } from "./ThemeProvider.js";
@@ -80,6 +81,8 @@ export function McpUseProvider({
   const lastHeightRef = useRef<number>(0);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationInProgressRef = useRef<boolean>(false);
+
+  useEffect(() => applyOpenInAppUrlFromConfig(), []);
 
   // Notify host about height changes (dual-protocol support)
   const notifyHeight = useCallback((height: number) => {

@@ -139,6 +139,12 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
   notifyIntrinsicHeight: (height: number) => Promise<void>;
 
   /**
+   * Override the fullscreen "Open in app" destination in ChatGPT.
+   * @see https://developers.openai.com/apps-sdk/reference
+   */
+  setOpenInAppUrl?: (payload: { href: string }) => Promise<void>;
+
+  /**
    * Upload a file to the host.
    * Only available in ChatGPT Apps SDK environments.
    * Use `useFiles().isSupported` to detect availability before calling.
@@ -168,6 +174,9 @@ declare global {
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
+    __mcpWidgetOpenai?: {
+      openInAppUrl?: string;
+    };
   }
 
   interface WindowEventMap {

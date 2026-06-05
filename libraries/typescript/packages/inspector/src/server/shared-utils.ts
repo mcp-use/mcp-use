@@ -827,6 +827,18 @@ export function generateWidgetContentHtml(widgetData: WidgetData): {
             window.parent.postMessage(message, '*');
           },
 
+          async setOpenInAppUrl(payload) {
+            const href = typeof payload === 'string' ? payload : payload?.href;
+            console.log('[OpenAI Widget] setOpenInAppUrl called with:', href);
+            if (!href || !String(href).trim()) {
+              throw new Error('The href parameter is required.');
+            }
+            window.parent.postMessage({
+              type: 'openai:setOpenInAppUrl',
+              href
+            }, '*');
+          },
+
           openExternal(payload) {
             const href = typeof payload === 'string' ? payload : payload?.href;
             if (href) {

@@ -1154,13 +1154,26 @@ export default {
         }
       }
 
-      // Post-process HTML for static deployments (e.g., Supabase)
-      // If MCP_SERVER_URL is set, inject window globals at build time
-      const mcpServerUrl = process.env.MCP_SERVER_URL;
-      if (mcpServerUrl) {
-        try {
-          const htmlPath = path.join(outDir, "index.html");
-          let html = await fs.readFile(htmlPath, "utf8");
+      // Post-process HTML for static deployments and ChatGPT open-in-app URL
+      try {
+        const htmlPath = path.join(outDir, "index.html");
+        let html = await fs.readFile(htmlPath, "utf8");
+
+        const openInAppUrl =
+          typeof widgetMetadata.openai?.openInAppUrl === "string"
+            ? widgetMetadata.openai.openInAppUrl
+            : undefined;
+        if (openInAppUrl && !html.includes("window.__mcpWidgetOpenai")) {
+          const openInAppScript = `<script>(function(){var c=${JSON.stringify({ openInAppUrl })};window.__mcpWidgetOpenai=c;var href=c.openInAppUrl;if(!href)return;function apply(){if(window.openai&&typeof window.openai.setOpenInAppUrl==="function"){window.openai.setOpenInAppUrl({href:href}).catch(function(err){console.error("[mcp-use] setOpenInAppUrl failed:",err);});return true;}return false;}if(!apply()){window.addEventListener("openai:set_globals",function(){apply();});}})();</script>`;
+          html = html.replace(
+            /<head[^>]*>/i,
+            `<head>\n    ${openInAppScript}`
+          );
+        }
+
+        // If MCP_SERVER_URL is set, inject window globals at build time
+        const mcpServerUrl = process.env.MCP_SERVER_URL;
+        if (mcpServerUrl) {
 
           // Inject window.__mcpPublicUrl and window.__getFile into <head>
           // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
@@ -1196,14 +1209,23 @@ export default {
           console.log(
             chalk.gray(`    → Injected MCP_SERVER_URL into ${widgetName}`)
           );
-        } catch (error) {
-          console.warn(
-            chalk.yellow(
-              `    ⚠ Failed to post-process HTML for ${widgetName}:`,
-              error
-            )
-          );
         }
+
+        if (openInAppUrl) {
+          await fs.writeFile(htmlPath, html, "utf8");
+          console.log(
+            chalk.gray(`    → Injected openInAppUrl into ${widgetName}`)
+          );
+        } else if (!mcpServerUrl) {
+          await fs.writeFile(htmlPath, html, "utf8");
+        }
+      } catch (error) {
+        console.warn(
+          chalk.yellow(
+            `    ⚠ Failed to post-process HTML for ${widgetName}:`,
+            error
+          )
+        );
       }
 
       console.log(chalk.green(`    ✓ Built ${widgetName}`));

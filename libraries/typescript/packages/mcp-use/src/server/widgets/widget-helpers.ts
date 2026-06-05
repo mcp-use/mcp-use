@@ -17,6 +17,17 @@ import {
   createUIResourceFromDefinition,
   type UrlConfig,
 } from "./mcp-ui-adapter.js";
+import {
+  getWidgetOpenaiConfig,
+  injectWidgetOpenaiConfig,
+} from "./widget-openai-config.js";
+
+export {
+  buildOpenInAppUrlInjectionScript,
+  getWidgetOpenaiConfig,
+  injectWidgetOpenaiConfig,
+} from "./widget-openai-config.js";
+export type { WidgetOpenaiConfig } from "./widget-openai-config.js";
 
 /**
  * Slugify a widget name to make it URI-safe
@@ -723,6 +734,21 @@ export async function registerWidgetFromTemplate(
 
   // Process HTML with base URL injection and path conversion
   html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+
+  const openInAppUrl = getWidgetOpenaiConfig(metadata)?.openInAppUrl;
+  if (openInAppUrl) {
+    html = injectWidgetOpenaiConfig(html, openInAppUrl);
+    if (isDev) {
+      try {
+        await fsHelpers.writeFileSync(htmlPath, html, "utf8");
+      } catch (error) {
+        console.warn(
+          `[WIDGET] Failed to write openInAppUrl config for ${widgetName}:`,
+          error
+        );
+      }
+    }
+  }
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);

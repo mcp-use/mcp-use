@@ -361,6 +361,28 @@ const WeatherDisplay: React.FC = () => {
 export default WeatherDisplay;
 ```
 
+## ChatGPT-only widget metadata (`openai`)
+
+Some widget settings only apply inside ChatGPT's Apps SDK. Put them under the top-level `openai` field in `widgetMetadata` (not inside the dual-protocol `metadata` object). MCP Apps clients ignore this namespace.
+
+### `openai.openInAppUrl`
+
+Sets the destination for ChatGPT's fullscreen **Open in app** button by calling `window.openai.setOpenInAppUrl({ href })` when the widget loads. If you omit it, ChatGPT keeps the default behavior and opens the widget's current iframe path.
+
+```tsx
+export const widgetMetadata: WidgetMetadata = {
+  description: "Product detail view",
+  props: propSchema,
+  openai: {
+    openInAppUrl: "https://example.com/products/detail",
+  },
+};
+```
+
+<Note>
+This is a ChatGPT Apps SDK feature only. It has no effect in MCP Apps hosts such as Claude Desktop.
+</Note>
+
 **The same widget code works with:**
 
 - ✅ Claude Desktop (MCP Apps protocol)
