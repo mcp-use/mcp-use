@@ -170,7 +170,7 @@ export const SandboxedIframe = forwardRef<
       },
       getIframeElement: () => outerRef.current,
     }),
-    []
+    [sandboxProxyOrigin]
   );
 
   const handleMessage = useCallback(
