@@ -198,8 +198,8 @@ class BaseConnector(ABC):
             return
 
         logger.debug("Disconnecting from MCP implementation")
-        await self._cleanup_resources()
         self._connected = False
+        await self._cleanup_resources()
         logger.debug("Disconnected from MCP implementation")
 
     async def _cleanup_resources(self) -> None:
