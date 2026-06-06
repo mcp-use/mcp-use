@@ -524,7 +524,6 @@
                     "icon": "box",
                     "pages": [
                       "typescript/server/tools",
-                      "typescript/server/openapi",
                       "typescript/server/resources",
                       "typescript/server/prompts"
                     ]
@@ -602,7 +601,8 @@
                       "typescript/server/deployment/supabase",
                       "typescript/server/deployment/google"
                     ]
-                  }
+                  },
+                  "typescript/server/openapi"
                 ]
               },
               {
