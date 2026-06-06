@@ -366,13 +366,7 @@ export function registerMcpAppsRoutes(app: Hono) {
         return c.json({ error: "Widget data not found or expired" }, 404);
       }
 
-      const {
-        resourceData,
-        toolInput,
-        toolOutput,
-        mcpAppsCsp,
-        mcpAppsPermissions,
-      } = widgetData;
+      const {resourceData,toolInput,toolOutput,mcpAppsCsp,mcpAppsPermissions,} = widgetData;
 
       // Extract HTML content from the pre-fetched resource data
       let htmlContent = "";
