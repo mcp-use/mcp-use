@@ -307,7 +307,11 @@ export function useWidget<
 
   // Extract search string to avoid dependency issues
   const searchString =
-    typeof window !== "undefined" ? window.location.search : "";
+    typeof window !== "undefined"
+      ? window.location.search ||
+        ((window as any).__MCP_USE_LOCATION_SEARCH__ as string | undefined) ||
+        ""
+      : "";
 
   const urlParams = useMemo(() => {
     // check if it has mcpUseParams

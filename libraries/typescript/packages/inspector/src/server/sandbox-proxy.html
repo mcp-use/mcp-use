@@ -177,6 +177,58 @@ document.addEventListener('securitypolicyviolation', function(e) {
       }
 
       /**
+       * Best-effort compatibility for older widgets that read props from
+       * window.location.search. srcdoc documents start at about:srcdoc, so we
+       * mirror the legacy mcpUseParams query before widget scripts run.
+       */
+      function buildLegacyLocationScript(legacyLocationSearch) {
+        if (
+          typeof legacyLocationSearch !== "string" ||
+          !legacyLocationSearch.startsWith("?")
+        ) {
+          return "";
+        }
+
+        const serializedSearch = JSON.stringify(legacyLocationSearch).replace(
+          /</g,
+          "\\u003c"
+        );
+
+        return `<script>
+(function() {
+  var search = ${serializedSearch};
+  window.__MCP_USE_LOCATION_SEARCH__ = search;
+  if (!window.location.search) {
+    try {
+      history.replaceState(null, '', 'about:srcdoc' + search);
+    } catch (_) {
+      try {
+        history.replaceState(null, '', search);
+      } catch (_) {}
+    }
+  }
+})();
+</script>`;
+      }
+
+      /**
+       * Best-effort injection of the parsed mcpUseProps object so modern widgets
+       * have a clean way to access their initial data without URL parsing.
+       */
+      function buildMcpUsePropsScript(mcpUseProps) {
+        if (mcpUseProps === undefined) return "";
+        const serializedProps = JSON.stringify(mcpUseProps).replace(
+          /</g,
+          "\\u003c"
+        );
+        return `<script>
+(function() {
+  window.mcpUseProps = ${serializedProps};
+})();
+<\/script>`;
+      }
+
+      /**
        * Remove any existing CSP meta tags from HTML to prevent restrictive
        * widget-embedded policies from overriding the injected permissive CSP.
        */
@@ -190,13 +242,16 @@ document.addEventListener('securitypolicyviolation', function(e) {
       /**
        * Inject CSP meta tag and violation listener into HTML
        */
-      function injectCSP(html, cspValue) {
+      function injectCSP(html, cspValue, legacyLocationSearch, mcpUseProps) {
         const cspMeta =
           '<meta http-equiv="Content-Security-Policy" content="' +
           cspValue +
           '">';
         const violationListener = buildViolationListenerScript();
-        const injection = cspMeta + violationListener;
+        const legacyLocationScript =
+          buildLegacyLocationScript(legacyLocationSearch);
+        const mcpUsePropsScript = buildMcpUsePropsScript(mcpUseProps);
+        const injection = cspMeta + violationListener + legacyLocationScript + mcpUsePropsScript;
 
         if (html.includes("<head>")) {
           return html.replace("<head>", "<head>" + injection);
@@ -218,15 +273,18 @@ document.addEventListener('securitypolicyviolation', function(e) {
         }
       }
 
-      // Create inner iframe immediately (before HTML arrives)
       const inner = document.createElement("iframe");
       inner.style = "width:100%; height:100%; border:none;";
-      // Default minimal sandbox before HTML arrives
-      inner.setAttribute(
-        "sandbox",
-        "allow-scripts allow-same-origin allow-forms"
-      );
+      // Default minimal sandbox before HTML arrives.
+      // NOTE: Intentionally omits allow-same-origin here too, to avoid the
+      // browser warning. The correct sandbox (with allow-same-origin for
+      // srcdoc null-origin content) is applied when the host sends the HTML.
+      inner.setAttribute("sandbox", "allow-scripts allow-forms");
       document.body.appendChild(inner);
+
+      // Track whether we've received the resource-ready message yet,
+      // so we can re-announce proxy-ready if the host sends anything before it.
+      var proxyReadyAnnounced = false;
 
       // Handle messages from parent (host) and inner (guest UI)
       window.addEventListener("message", async (event) => {
@@ -236,8 +294,17 @@ document.addEventListener('securitypolicyviolation', function(e) {
             event.data &&
             event.data.method === "ui/notifications/sandbox-resource-ready"
           ) {
+            proxyReadyAnnounced = true;
             // Load HTML into inner iframe with CSP enforcement
-            const { html, sandbox, csp, permissions, permissive } =
+            const {
+              html,
+              sandbox,
+              csp,
+              permissions,
+              permissive,
+              legacyLocationSearch,
+              mcpUseProps,
+            } =
               event.data.params || {};
 
             if (typeof sandbox === "string") {
@@ -270,23 +337,47 @@ document.addEventListener('securitypolicyviolation', function(e) {
                   "form-action *",
                 ].join("; ");
                 const strippedHtml = stripExistingCspMeta(html);
-                const processedHtml = injectCSP(strippedHtml, permissiveCsp);
+                const processedHtml = injectCSP(
+                  strippedHtml,
+                  permissiveCsp,
+                  legacyLocationSearch,
+                  mcpUseProps
+                );
                 inner.srcdoc = processedHtml;
               } else {
                 // Build CSP and inject into HTML (SEP-1865)
                 const cspValue = buildCSP(csp);
-                const processedHtml = injectCSP(html, cspValue);
+                const processedHtml = injectCSP(
+                  html,
+                  cspValue,
+                  legacyLocationSearch,
+                  mcpUseProps
+                );
                 inner.srcdoc = processedHtml;
               }
             }
           } else {
-            // Forward other messages to inner iframe (guest UI)
+            // Forward other messages to inner iframe (guest UI).
+            // Also: if the parent sends *anything* before it received our
+            // proxy-ready notification (race condition on fast page loads),
+            // re-announce ourselves so the host can retry the handshake.
+            if (!proxyReadyAnnounced) {
+              window.parent.postMessage(
+                {
+                  jsonrpc: "2.0",
+                  method: "ui/notifications/sandbox-proxy-ready",
+                  params: {},
+                },
+                "*"
+              );
+            }
             if (inner && inner.contentWindow) {
               inner.contentWindow.postMessage(event.data, "*");
             }
           }
         } else if (event.source === inner.contentWindow) {
           // Relay messages from inner (guest UI) to parent (host)
+          proxyReadyAnnounced = true;
           window.parent.postMessage(event.data, "*");
         }
       });

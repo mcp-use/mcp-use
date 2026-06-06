@@ -193,6 +193,8 @@ function MCPAppsRendererBase({
   serverRef.current = server;
   const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
   const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
+  const [legacyLocationSearch, setLegacyLocationSearch] = useState<string>();
+  const [mcpUseProps, setMcpUseProps] = useState<any>();
   const [prefersBorder, setPrefersBorder] = useState<boolean>(false);
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<DisplayMode>("inline");
@@ -400,8 +402,15 @@ function MCPAppsRendererBase({
         }
 
         const contentJson = await contentResponse.json();
-        const { html, csp, permissions, mimeTypeWarning, mimeTypeValid } =
-          contentJson;
+        const {
+          html,
+          csp,
+          permissions,
+          legacyLocationSearch,
+          mcpUseProps: parsedMcpUseProps,
+          mimeTypeWarning,
+          mimeTypeValid,
+        } = contentJson;
 
         if (!mimeTypeValid) {
           setLoadError(
@@ -418,6 +427,8 @@ function MCPAppsRendererBase({
         }
         setWidgetCsp(csp);
         setWidgetPermissions(permissions);
+        setLegacyLocationSearch(legacyLocationSearch);
+        setMcpUseProps(parsedMcpUseProps);
         setPrefersBorder(mcpAppsPrefersBorder);
 
         // Register widget in debug context
@@ -757,10 +768,11 @@ function MCPAppsRendererBase({
     const handleMessage = (event: MessageEvent) => {
       const activeIframe = sandboxRef.current?.getIframeElement();
       if (!activeIframe?.contentWindow) return;
-      // Only process messages from our sandbox proxy
-      const proxyOrigin = new URL(activeIframe.src).origin;
-      if (event.origin !== proxyOrigin) return;
+      // Validate source first — the primary security check.
+      // Also accept origin "null" which opaque-sandboxed iframes (no allow-same-origin) emit.
       if (event.source !== activeIframe.contentWindow) return;
+      const proxyOrigin = new URL(activeIframe.src).origin;
+      if (event.origin !== proxyOrigin && event.origin !== "null") return;
 
       if (event.data?.type === "iframe-console-log") {
         if (
@@ -1173,6 +1185,8 @@ function MCPAppsRendererBase({
             csp={widgetCsp}
             permissions={widgetPermissions}
             permissive={cspMode === "permissive"}
+            legacyLocationSearch={legacyLocationSearch}
+            mcpUseProps={mcpUseProps}
             onSandboxMount={handleSandboxMount}
             onLoad={() => setIsReady(true)}
             onMessage={handleSandboxMessage}

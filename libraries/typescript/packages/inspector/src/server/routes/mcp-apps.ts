@@ -177,10 +177,55 @@ window.addEventListener('unhandledrejection', function(event) {
 </\` + \`script>\`;
       }
 
-      function injectCSP(html, cspValue) {
+      function buildLegacyLocationScript(legacyLocationSearch) {
+        if (
+          typeof legacyLocationSearch !== "string" ||
+          !legacyLocationSearch.startsWith("?")
+        ) {
+          return "";
+        }
+
+        const serializedSearch = JSON.stringify(legacyLocationSearch).replace(
+          /</g,
+          "\\u003c"
+        );
+
+        return \`<script>
+(function() {
+  var search = \${serializedSearch};
+  window.__MCP_USE_LOCATION_SEARCH__ = search;
+  if (!window.location.search) {
+    try {
+      history.replaceState(null, '', 'about:srcdoc' + search);
+    } catch (_) {
+      try {
+        history.replaceState(null, '', search);
+      } catch (_) {}
+    }
+  }
+})();
+</\` + \`script>\`;
+      }
+
+      function buildMcpUsePropsScript(mcpUseProps) {
+        if (mcpUseProps === undefined) return "";
+        const serializedProps = JSON.stringify(mcpUseProps).replace(
+          /</g,
+          "\\\\u003c"
+        );
+        return \`<script>
+(function() {
+  window.mcpUseProps = \${serializedProps};
+})();
+</\` + \`script>\`;
+      }
+
+      function injectCSP(html, cspValue, legacyLocationSearch, mcpUseProps) {
         const cspMeta = '<meta http-equiv="Content-Security-Policy" content="' + cspValue + '">';
         const violationListener = buildViolationListenerScript();
-        const injection = cspMeta + violationListener;
+        const legacyLocationScript = buildLegacyLocationScript(legacyLocationSearch);
+        const mcpUsePropsScript = buildMcpUsePropsScript(mcpUseProps);
+        const injection = cspMeta + violationListener + legacyLocationScript + mcpUsePropsScript;
 
         if (html.includes("<head>")) {
           return html.replace("<head>", "<head>" + injection);
@@ -199,13 +244,22 @@ window.addEventListener('unhandledrejection', function(event) {
 
       const inner = document.createElement("iframe");
       inner.style = "width:100%; height:100%; border:none;";
-      inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+      // Default minimal sandbox before HTML arrives.
+      // Intentionally omits allow-same-origin to avoid the browser warning.
+      // The correct sandbox (including allow-same-origin for srcdoc null-origin
+      // content) is applied when the host sends the HTML payload.
+      inner.setAttribute("sandbox", "allow-scripts allow-forms");
       document.body.appendChild(inner);
+
+      // Track whether we've received the resource-ready message yet,
+      // so we can re-announce proxy-ready if the host sends anything before it.
+      var proxyReadyAnnounced = false;
 
       window.addEventListener("message", async (event) => {
         if (event.source === window.parent) {
           if (event.data && event.data.method === "ui/notifications/sandbox-resource-ready") {
-            const { html, sandbox, csp, permissions, permissive } = event.data.params || {};
+            proxyReadyAnnounced = true;
+            const { html, sandbox, csp, permissions, permissive, legacyLocationSearch, mcpUseProps } = event.data.params || {};
             if (typeof sandbox === "string") {
               inner.setAttribute("sandbox", sandbox);
             }
@@ -228,20 +282,32 @@ window.addEventListener('unhandledrejection', function(event) {
                   "base-uri *",
                   "form-action *",
                 ].join("; ");
-                const processedHtml = injectCSP(html, permissiveCsp);
+                const processedHtml = injectCSP(html, permissiveCsp, legacyLocationSearch, mcpUseProps);
                 inner.srcdoc = processedHtml;
               } else {
                 const cspValue = buildCSP(csp);
-                const processedHtml = injectCSP(html, cspValue);
+                const processedHtml = injectCSP(html, cspValue, legacyLocationSearch, mcpUseProps);
                 inner.srcdoc = processedHtml;
               }
             }
           } else {
+            // Forward other messages to inner iframe (guest UI).
+            // Also: if the parent sends *anything* before it received our
+            // proxy-ready notification (race condition on fast page loads),
+            // re-announce ourselves so the host can retry the handshake.
+            if (!proxyReadyAnnounced) {
+              window.parent.postMessage({
+                jsonrpc: "2.0",
+                method: "ui/notifications/sandbox-proxy-ready",
+                params: {},
+              }, "*");
+            }
             if (inner && inner.contentWindow) {
               inner.contentWindow.postMessage(event.data, "*");
             }
           }
         } else if (event.source === inner.contentWindow) {
+          proxyReadyAnnounced = true;
           window.parent.postMessage(event.data, "*");
         }
       });
@@ -300,7 +366,13 @@ export function registerMcpAppsRoutes(app: Hono) {
         return c.json({ error: "Widget data not found or expired" }, 404);
       }
 
-      const { resourceData, mcpAppsCsp, mcpAppsPermissions } = widgetData;
+      const {
+        resourceData,
+        toolInput,
+        toolOutput,
+        mcpAppsCsp,
+        mcpAppsPermissions,
+      } = widgetData;
 
       // Extract HTML content from the pre-fetched resource data
       let htmlContent = "";
@@ -343,17 +415,33 @@ export function registerMcpAppsRoutes(app: Hono) {
       // Determine CSP mode
       const cspMode = cspModeParam || "permissive";
       const isPermissive = cspMode === "permissive";
+      const legacyToolOutput =
+        toolOutput &&
+        typeof toolOutput === "object" &&
+        "structuredContent" in toolOutput
+          ? (toolOutput as { structuredContent?: unknown }).structuredContent
+          : toolOutput;
+      const legacyLocationSearch = `?mcpUseParams=${encodeURIComponent(
+        JSON.stringify({
+          toolInput: toolInput ?? {},
+          toolOutput: legacyToolOutput ?? null,
+          toolId,
+        })
+      )}`;
 
       // Return JSON with HTML and metadata for CSP enforcement.
       // The HTML is served as-is -- the MCP server is responsible for
       // producing fully-resolved HTML with absolute asset URLs and any
-      // runtime globals the widget framework needs.
+      // runtime globals the widget framework needs. legacyLocationSearch keeps
+      // the old mcpUseParams query-param fallback working for srcdoc embeds.
       c.header("Cache-Control", "no-cache, no-store, must-revalidate");
       return c.json({
         html: htmlContent,
         csp: isPermissive ? undefined : mcpAppsCsp,
         permissions: mcpAppsPermissions,
         permissive: isPermissive,
+        legacyLocationSearch,
+        mcpUseProps: toolInput ?? {},
         cspMode,
         mimeType,
         mimeTypeValid,

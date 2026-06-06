@@ -21,7 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { IFRAME_SANDBOX_PERMISSIONS } from "../../constants/iframe";
+import { IFRAME_SANDBOX_PERMISSIONS, PROXY_IFRAME_SANDBOX } from "../../constants/iframe";
 
 export interface SandboxedIframeHandle {
   postMessage: (data: unknown) => void;
@@ -49,6 +49,10 @@ interface SandboxedIframeProps {
   };
   /** Skip CSP injection entirely (for permissive/testing mode) */
   permissive?: boolean;
+  /** Legacy query string exposed to srcdoc widgets for mcpUseParams compatibility */
+  legacyLocationSearch?: string;
+  /** JSON object injected directly as window.mcpUseProps for easier widget access */
+  mcpUseProps?: any;
   /** Callback when sandbox proxy is ready */
   onProxyReady?: () => void;
   /** Callback when the outer iframe has loaded */
@@ -83,6 +87,8 @@ export const SandboxedIframe = forwardRef<
     csp,
     permissions,
     permissive,
+    legacyLocationSearch,
+    mcpUseProps,
     onProxyReady,
     onLoad,
     onSandboxMount,
@@ -158,20 +164,29 @@ export const SandboxedIframe = forwardRef<
     ref,
     () => ({
       postMessage: (data: unknown) => {
+        // We now use strict origin targeting since the proxy has allow-same-origin
+        // and maintains its true network origin.
         outerRef.current?.contentWindow?.postMessage(data, sandboxProxyOrigin);
       },
       getIframeElement: () => outerRef.current,
     }),
-    [sandboxProxyOrigin]
+    []
   );
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
-      // Validate origin
-      if (event.origin !== sandboxProxyOrigin && sandboxProxyOrigin !== "*") {
+      // Validate source first — this is the real security check.
+      // We don't rely solely on origin because a sandboxed iframe without
+      // allow-same-origin gets an opaque origin (reported as the string "null"),
+      // not the URL origin. Accept both the expected origin and "null".
+      if (event.source !== outerRef.current?.contentWindow) return;
+      if (
+        event.origin !== sandboxProxyOrigin &&
+        event.origin !== "null" &&
+        sandboxProxyOrigin !== "*"
+      ) {
         return;
       }
-      if (event.source !== outerRef.current?.contentWindow) return;
 
       // Handle sandbox-specific messages
       if (
@@ -196,12 +211,42 @@ export const SandboxedIframe = forwardRef<
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
 
+  // Handshake retry: if the proxy fires sandbox-proxy-ready before React
+  // attaches the message listener (race condition on fast loads), proxyReady
+  // never becomes true. After the iframe loads, poll every 150 ms for up to
+  // 3 seconds and send a ping to the proxy so it re-announces itself.
+  const proxyReadyRef = useRef(proxyReady);
+  proxyReadyRef.current = proxyReady;
+  const handleLoad = useCallback(
+    (iframeWin: Window | null | undefined) => {
+      if (!iframeWin) return;
+      let attempts = 0;
+      const maxAttempts = 20; // 20 × 150 ms = 3 s
+      const interval = setInterval(() => {
+        if (proxyReadyRef.current || attempts >= maxAttempts) {
+          clearInterval(interval);
+          return;
+        }
+        attempts++;
+        // Send a harmless ping so the proxy sees a message from the parent
+        // and re-announces sandbox-proxy-ready (see sandbox-proxy.html).
+        iframeWin.postMessage(
+          { jsonrpc: "2.0", method: "ui/ping", params: {} },
+          "*"
+        );
+      }, 150);
+      return () => clearInterval(interval);
+    },
+    []
+  );
+
   // Send HTML to proxy when ready
   // CAUTION: Each run causes proxy to set inner.srcdoc = html, fully reloading the widget
   useEffect(() => {
     if (!proxyReady || !html || !outerRef.current?.contentWindow) return;
 
-    // Send HTML via JSON-RPC notification per SEP-1865
+    // Send HTML via JSON-RPC notification per SEP-1865.
+    // Target "*" because proxy may have opaque origin (sandboxed without allow-same-origin).
     outerRef.current.contentWindow.postMessage(
       {
         jsonrpc: "2.0",
@@ -212,6 +257,8 @@ export const SandboxedIframe = forwardRef<
           csp,
           permissions,
           permissive,
+          legacyLocationSearch,
+          mcpUseProps,
         },
       },
       sandboxProxyOrigin
@@ -223,6 +270,8 @@ export const SandboxedIframe = forwardRef<
     csp,
     permissions,
     permissive,
+    legacyLocationSearch,
+    mcpUseProps,
     sandboxProxyOrigin,
   ]);
 
@@ -233,9 +282,14 @@ export const SandboxedIframe = forwardRef<
       className={className}
       style={style}
       title={title}
-      sandbox={sandbox}
+      sandbox={PROXY_IFRAME_SANDBOX}
       allow="web-share"
-      onLoad={onLoad}
+      onLoad={(e) => {
+        onLoad?.();
+        handleLoad(
+          (e.currentTarget as HTMLIFrameElement).contentWindow ?? undefined
+        );
+      }}
     />
   );
 });
