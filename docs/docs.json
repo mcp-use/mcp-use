@@ -524,6 +524,7 @@
                     "icon": "box",
                     "pages": [
                       "typescript/server/tools",
+                      "typescript/server/openapi",
                       "typescript/server/resources",
                       "typescript/server/prompts"
                     ]
