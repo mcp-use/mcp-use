@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.30.0-canary.4
+
+### Minor Changes
+
+- f8ca6bb: Add `MCPServer.fromOpenAPI` for creating MCP servers from bundled OpenAPI documents, registering included operations as tools with generated input schemas and request handling.
+
+### Patch Changes
+
+- @mcp-use/cli@3.3.2-canary.4
+- @mcp-use/inspector@8.0.0-canary.4
+
 ## 1.30.0-canary.3
 
 ### Patch Changes
