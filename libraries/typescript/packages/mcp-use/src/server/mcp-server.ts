@@ -18,6 +18,10 @@ import { getPackageVersion } from "../version.js";
 
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
 import { mountInspectorUI } from "./inspector/index.js";
+import {
+  registerOpenAPITools,
+  type FromOpenAPIOptions,
+} from "./openapi/index.js";
 import { registerPrompt } from "./prompts/index.js";
 import {
   registerResource,
@@ -225,6 +229,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public static getPackageVersion(): string {
     return getPackageVersion();
+  }
+
+  /**
+   * Create an MCP server from a parsed, bundled OpenAPI document.
+   *
+   * Each included OpenAPI operation is registered as an MCP tool.
+   */
+  public static fromOpenAPI(
+    options: FromOpenAPIOptions
+  ): MCPServerClass<false> {
+    const server = new MCPServerClass({
+      name: options.name ?? options.spec.info.title,
+      version: options.version ?? options.spec.info.version ?? "1.0.0",
+    }) as MCPServerClass<false>;
+
+    registerOpenAPITools(server, options);
+    return server;
   }
 
   /**
@@ -4161,6 +4182,7 @@ interface MCPServerConstructor {
   ): McpServerInstance<true>;
   // Overload: when OAuth is not configured, return McpServerInstance<false>
   new (config: ServerConfig): McpServerInstance<false>;
+  fromOpenAPI(options: FromOpenAPIOptions): McpServerInstance<false>;
   prototype: MCPServerClass<boolean>;
 }
 

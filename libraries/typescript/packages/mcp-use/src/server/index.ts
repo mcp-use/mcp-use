@@ -3,6 +3,12 @@ export {
   MCPServer,
   type McpServerInstance,
 } from "./mcp-server.js";
+export type {
+  FromOpenAPIOptions,
+  OpenAPIAuth,
+  OpenAPIDocument,
+  OpenAPIExcludeRule,
+} from "./openapi/index.js";
 
 // Export version information (global)
 export { getPackageVersion, VERSION } from "../version.js";
