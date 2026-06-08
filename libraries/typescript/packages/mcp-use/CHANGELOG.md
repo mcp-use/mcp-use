@@ -1,5 +1,22 @@
 # mcp-use
 
+## 1.30.0
+
+### Minor Changes
+
+- 25ae46e: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+- 25ae46e: Add `MCPServer.fromOpenAPI` for creating MCP servers from bundled OpenAPI documents, registering included operations as tools with generated input schemas and request handling.
+
+### Patch Changes
+
+- 25ae46e: Bump `hono` to `4.12.23` to address [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5), where non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware.
+- 25ae46e: Fix incomplete escaping when converting Zod string literals and enums to TypeScript type strings. Backslashes are now escaped before double quotes so generated `.d.ts` output remains valid when literal values contain `\` or `"`.
+- 25ae46e: Fix idle session cleanup to release registered refs for expired sessions.
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+  - @mcp-use/cli@3.3.2
+  - @mcp-use/inspector@8.0.0
+
 ## 1.30.0-canary.6
 
 ### Patch Changes
