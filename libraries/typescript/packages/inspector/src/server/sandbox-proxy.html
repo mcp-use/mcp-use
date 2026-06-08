@@ -177,9 +177,7 @@ document.addEventListener('securitypolicyviolation', function(e) {
       }
 
       /**
-       * Best-effort compatibility for older widgets that read props from
-       * window.location.search. srcdoc documents start at about:srcdoc, so we
-       * mirror the legacy mcpUseParams query before widget scripts run.
+       * Support legacy mcpUseParams query for srcdoc widgets.
        */
       function buildLegacyLocationScript(legacyLocationSearch) {
         if (
@@ -212,8 +210,7 @@ document.addEventListener('securitypolicyviolation', function(e) {
       }
 
       /**
-       * Best-effort injection of the parsed mcpUseProps object so modern widgets
-       * have a clean way to access their initial data without URL parsing.
+       * Inject mcpUseProps object for direct widget access.
        */
       function buildMcpUsePropsScript(mcpUseProps) {
         if (mcpUseProps === undefined) return "";
@@ -275,15 +272,13 @@ document.addEventListener('securitypolicyviolation', function(e) {
 
       const inner = document.createElement("iframe");
       inner.style = "width:100%; height:100%; border:none;";
-      // Default minimal sandbox before HTML arrives.
-      // NOTE: Intentionally omits allow-same-origin here too, to avoid the
-      // browser warning. The correct sandbox (with allow-same-origin for
-      // srcdoc null-origin content) is applied when the host sends the HTML.
+      // Minimal default sandbox.
+      // allow-same-origin is intentionally omitted to avoid warnings;
+      // the correct sandbox is applied when HTML is received.
       inner.setAttribute("sandbox", "allow-scripts allow-forms");
       document.body.appendChild(inner);
 
-      // Track whether we've received the resource-ready message yet,
-      // so we can re-announce proxy-ready if the host sends anything before it.
+      // Track resource-ready message to handle race conditions.
       var proxyReadyAnnounced = false;
 
       // Handle messages from parent (host) and inner (guest UI)
@@ -357,10 +352,9 @@ document.addEventListener('securitypolicyviolation', function(e) {
               }
             }
           } else {
-            // Forward other messages to inner iframe (guest UI).
-            // Also: if the parent sends *anything* before it received our
-            // proxy-ready notification (race condition on fast page loads),
-            // re-announce ourselves so the host can retry the handshake.
+            // Forward messages to inner iframe (guest UI).
+            // If parent sends messages before receiving proxy-ready (race condition),
+            // re-announce so host can retry handshake.
             if (!proxyReadyAnnounced) {
               window.parent.postMessage(
                 {

@@ -164,8 +164,7 @@ export const SandboxedIframe = forwardRef<
     ref,
     () => ({
       postMessage: (data: unknown) => {
-        // We now use strict origin targeting since the proxy has allow-same-origin
-        // and maintains its true network origin.
+        // Use strict origin targeting since proxy has allow-same-origin.
         outerRef.current?.contentWindow?.postMessage(data, sandboxProxyOrigin);
       },
       getIframeElement: () => outerRef.current,
@@ -175,10 +174,8 @@ export const SandboxedIframe = forwardRef<
 
   const handleMessage = useCallback(
     (event: MessageEvent) => {
-      // Validate source first — this is the real security check.
-      // We don't rely solely on origin because a sandboxed iframe without
-      // allow-same-origin gets an opaque origin (reported as the string "null"),
-      // not the URL origin. Accept both the expected origin and "null".
+      // Validate source (primary security check).
+      // Accept origin "null" for sandboxed iframes without allow-same-origin.
       if (event.source !== outerRef.current?.contentWindow) return;
       if (
         event.origin !== sandboxProxyOrigin &&
@@ -211,10 +208,7 @@ export const SandboxedIframe = forwardRef<
     return () => window.removeEventListener("message", handleMessage);
   }, [handleMessage]);
 
-  // Handshake retry: if the proxy fires sandbox-proxy-ready before React
-  // attaches the message listener (race condition on fast loads), proxyReady
-  // never becomes true. After the iframe loads, poll every 150 ms for up to
-  // 3 seconds and send a ping to the proxy so it re-announces itself.
+  // Retry handshake if we missed the proxy's ready event due to race condition.
   const proxyReadyRef = useRef(proxyReady);
   proxyReadyRef.current = proxyReady;
   const handleLoad = useCallback(
@@ -228,8 +222,7 @@ export const SandboxedIframe = forwardRef<
           return;
         }
         attempts++;
-        // Send a harmless ping so the proxy sees a message from the parent
-        // and re-announces sandbox-proxy-ready (see sandbox-proxy.html).
+        // Ping proxy to re-announce readiness
         iframeWin.postMessage(
           { jsonrpc: "2.0", method: "ui/ping", params: {} },
           "*"
@@ -245,8 +238,7 @@ export const SandboxedIframe = forwardRef<
   useEffect(() => {
     if (!proxyReady || !html || !outerRef.current?.contentWindow) return;
 
-    // Send HTML via JSON-RPC notification per SEP-1865.
-    // Target "*" because proxy may have opaque origin (sandboxed without allow-same-origin).
+    // Send HTML. Target "*" in case proxy origin is opaque.
     outerRef.current.contentWindow.postMessage(
       {
         jsonrpc: "2.0",
