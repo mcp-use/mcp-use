@@ -12,6 +12,7 @@
     "fix-cli-cloud-list-pagination",
     "fix-dependabot-hono-ip-restriction",
     "fix-zod-to-ts-string-escaping",
+    "fresh-walls-clean",
     "openapi-server-tools"
   ]
 }

@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.30.0-canary.5
+
+### Patch Changes
+
+- e4b83e4: Fix idle session cleanup to release registered refs for expired sessions.
+  - @mcp-use/cli@3.3.2-canary.5
+  - @mcp-use/inspector@8.0.0-canary.5
+
 ## 1.30.0-canary.4
 
 ### Minor Changes
