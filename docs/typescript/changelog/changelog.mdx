@@ -6,6 +6,28 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.30.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.30.0&title=OpenAPI%20server%20generation%20%26%20MCP%20instructions&date=2026-06&lang=typescript" alt="Release 1.30.0" />
+  </Frame>
+  ## OpenAPI server generation & MCP instructions
+  Minor release adding `MCPServer.fromOpenAPI()` for generating MCP tools from OpenAPI documents, server-wide `instructions` returned during MCP initialization, idle session ref cleanup, and CLI fixes for paginated cloud lists and multi-installation GitHub repo access. Inspector ships major v8.0.0 tracking the new `mcp-use` peer dependency (see inspector changelog).
+
+- **New**: `MCPServer.fromOpenAPI()`  -  create an MCP server from a parsed OpenAPI document; each included operation registers as a tool with generated input schemas and HTTP request handling (`baseUrl`, bearer token, and static header auth supported); ships with an `openapi` server example against live `api.weather.gov` (`#1583`)
+- **New**: `instructions` option on `MCPServer`  -  server-wide model instructions returned during MCP initialization for cross-tool workflows and constraints that do not belong in individual tool descriptions (`#1601`)
+- **New** (create-mcp-use-app): `starter` and `mcp-apps` templates scaffold with an `instructions` placeholder (`#1601`)
+- **Fix**: idle session cleanup releases registered refs for expired sessions instead of leaving stale registrations behind (`#1624`)
+- **Fix**: escape backslashes before double quotes when converting Zod string literals and enums to TypeScript in `zod-to-ts`, so generated `.d.ts` output stays valid when literal values contain `\` or `"` (`#1661`)
+- **Update**: bump `hono` to `4.12.23` for [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5)  -  non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware (`#1663`)
+- **Enhancement** (@mcp-use/cli): `servers list` and `deployments list` handle paginated Cloud API responses with a default page size of 30 and next-page guidance (`#1619`)
+- **Fix** (@mcp-use/cli): deploy repo access check aggregates repos across all GitHub App installations linked to the organization instead of only the first one, so deploys no longer fail with "GitHub App doesn't have access" when the repo belongs to a different installation (`#1629`, MCP-2358)
+- **Documentation**: OpenAPI server generation guide and `examples/server/features/openapi` (`#1583`)
+- **Documentation**: MCP server `instructions` in configuration, quickstart, and installation docs (`#1601`)
+- **Update**: Updated @mcp-use/inspector to v8.0.0
+- **Update**: Updated @mcp-use/cli to v3.3.2
+- **Update**: Updated create-mcp-use-app to v0.14.15
+</Update>
+
 <Update label="v1.29.1" description="June 2026">
   ## OAuth transport auth hardening & security dependency bumps
   Patch release hardening OAuth-protected MCP transport routes and resolving open Dependabot security advisories across the TypeScript workspace.
