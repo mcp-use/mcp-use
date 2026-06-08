@@ -1,5 +1,19 @@
 # @mcp-use/cli
 
+## 3.3.2
+
+### Patch Changes
+
+- 25ae46e: Handle paginated Cloud API responses in `servers list` and `deployments list`, with a default page size of 30 and next-page guidance.
+- 25ae46e: Fix repo access check during deploy to look across all GitHub App installations instead of only the first one, so deploys of repos owned by any linked installation no longer fail the access check.
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+  - mcp-use@1.30.0
+  - @mcp-use/inspector@8.0.0
+
 ## 3.3.2-canary.6
 
 ### Patch Changes
