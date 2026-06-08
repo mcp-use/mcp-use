@@ -12,6 +12,7 @@ import { createBearerAuthMiddleware } from "../../src/server/oauth/middleware.js
 import { setupOAuthRoutes } from "../../src/server/oauth/routes.js";
 import { setupOAuthForServer } from "../../src/server/oauth/setup.js";
 import { oauthProxy } from "../../src/server/oauth/oauth-proxy.js";
+import { oauthCustomProvider } from "../../src/server/oauth/providers.js";
 
 // A stub verifier that accepts any token. Used in tests that don't exercise
 // the verification path (routes, metadata, registration).
@@ -344,6 +345,67 @@ describe("server OAuth integration", () => {
     expect(metaResponse.status).toBe(200);
     const metadata = await metaResponse.json();
     expect(metadata.resource).toBe(`${svc.baseUrl}/sse`);
+  });
+
+  it("proxies OAuth metadata for path-suffix issuers at canonical well-known paths", async () => {
+    const upstream = new Hono();
+    const upstreamSvc = await listenOnRandomPort(upstream);
+    closers.push(upstreamSvc.close);
+
+    const issuer = `${upstreamSvc.baseUrl}/oauth/2.1`;
+    const upstreamMetadata = {
+      issuer,
+      authorization_endpoint: `${issuer}/authorize`,
+      token_endpoint: `${issuer}/token`,
+      registration_endpoint: `${issuer}/register`,
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
+      token_endpoint_auth_methods_supported: ["none"],
+      code_challenge_methods_supported: ["S256"],
+    };
+
+    upstream.get(
+      "/.well-known/oauth-authorization-server/oauth/2.1",
+      (c) => c.json(upstreamMetadata)
+    );
+    upstream.get(
+      "/oauth/2.1/.well-known/openid-configuration",
+      (c) => c.json({ ...upstreamMetadata, scopes_supported: ["openid"] })
+    );
+
+    const app = new Hono();
+    const provider = oauthCustomProvider({
+      issuer,
+      authEndpoint: upstreamMetadata.authorization_endpoint,
+      tokenEndpoint: upstreamMetadata.token_endpoint,
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, provider, svc.baseUrl);
+
+    const rootResponse = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server`
+    );
+    expect(rootResponse.status).toBe(200);
+    expect(await rootResponse.json()).toEqual(upstreamMetadata);
+
+    const canonicalResponse = await fetch(
+      `${svc.baseUrl}/.well-known/oauth-authorization-server/oauth/2.1`
+    );
+    expect(canonicalResponse.status).toBe(200);
+    expect(await canonicalResponse.json()).toEqual(upstreamMetadata);
+
+    const openIdResponse = await fetch(
+      `${svc.baseUrl}/.well-known/openid-configuration/oauth/2.1`
+    );
+    expect(openIdResponse.status).toBe(200);
+    expect(await openIdResponse.json()).toMatchObject({
+      issuer: upstreamMetadata.issuer,
+      scopes_supported: ["openid"],
+    });
   });
 
   it("returns configured clientId from /register endpoint", async () => {
