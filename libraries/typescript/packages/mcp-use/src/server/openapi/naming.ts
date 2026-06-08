@@ -34,9 +34,6 @@ export function createToolDescription(
 }
 
 function slugifyToolName(value: string): string {
-  // Collapsing runs of underscores first means the edge trims only ever see a
-  // single leading/trailing underscore, so we can avoid the end-anchored `_+$`
-  // pattern that CodeQL flags as polynomial ReDoS (js/polynomial-redos).
   const slug = value
     .trim()
     .replace(/[^a-zA-Z0-9_-]+/g, "_")
