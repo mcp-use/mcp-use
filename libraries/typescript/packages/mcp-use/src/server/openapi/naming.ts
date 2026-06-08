@@ -34,11 +34,17 @@ export function createToolDescription(
 }
 
 function slugifyToolName(value: string): string {
+  const MAX_LENGTH = 300;
+  if (value.length > MAX_LENGTH) {
+    value = value.substring(0, MAX_LENGTH);
+  }
+
   const slug = value
     .trim()
     .replace(/[^a-zA-Z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "")
+    .replace(/^_+/, "")
+    .replace(/_+$/, "")
     .slice(0, 64);
 
   return slug || "openapi_tool";
