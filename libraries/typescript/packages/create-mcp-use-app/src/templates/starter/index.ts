@@ -1,4 +1,4 @@
-import { MCPServer, object, text, completable } from "mcp-use/server";
+import { MCPServer, object, text, error, completable } from "mcp-use/server";
 import { z } from "zod";
 
 // Create MCP server instance
@@ -37,19 +37,30 @@ const server = new MCPServer({
 server.tool(
   {
     name: "fetch-weather",
-    description: "Fetch the weather for a city",
+    title: "Fetch Weather",
+    description:
+      "Use this when the user asks for current weather, weather conditions, or a forecast for a specific city.",
     schema: z.object({
-      city: z.string().describe("The city to fetch the weather for"),
+      city: z
+        .string()
+        .describe("City name to fetch weather for, such as 'San Francisco' or 'Tokyo'."),
     }),
     // Demo stub — no network. If you call an external weather API, set openWorldHint: true.
     annotations: {
+      title: "Fetch Weather",
       readOnlyHint: true,
       destructiveHint: false,
       openWorldHint: false,
     },
   },
   async ({ city }) => {
-    return text(`The weather in ${city} is sunny`);
+    const normalizedCity = city.trim();
+
+    if (!normalizedCity) {
+      return error("City is required. Please provide a city name, such as 'San Francisco'.");
+    }
+
+    return text(`The weather in ${normalizedCity} is sunny`);
   }
 );
 

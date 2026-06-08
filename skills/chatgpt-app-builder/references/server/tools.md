@@ -396,9 +396,31 @@ Cache expensive operations:
 const cache = new Map<string, { data: any; expires: number }>();
 
 server.tool(
-  { name: "fetch-weather", schema: z.object({ city: z.string() }) },
+  {
+    name: "fetch-weather",
+    title: "Fetch Weather",
+    description:
+      "Use this when the user asks for current weather, weather conditions, or a forecast for a specific city.",
+    schema: z.object({
+      city: z
+        .string()
+        .describe("City name to fetch weather for, such as 'San Francisco' or 'Tokyo'.")
+    }),
+    annotations: {
+      title: "Fetch Weather",
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true
+    }
+  },
   async ({ city }) => {
-    const cacheKey = `weather:${city}`;
+    const normalizedCity = city.trim();
+
+    if (!normalizedCity) {
+      return error("City is required. Please provide a city name, such as 'San Francisco'.");
+    }
+
+    const cacheKey = `weather:${normalizedCity}`;
     const cached = cache.get(cacheKey);
 
     // Return cached data if not expired
@@ -407,7 +429,7 @@ server.tool(
     }
 
     // Fetch fresh data
-    const data = await fetchWeather(city);
+    const data = await fetchWeather(normalizedCity);
 
     // Cache for 5 minutes
     cache.set(cacheKey, {
