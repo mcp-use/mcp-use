@@ -13,6 +13,7 @@
     "fix-dependabot-hono-ip-restriction",
     "fix-zod-to-ts-string-escaping",
     "fresh-walls-clean",
+    "mcp-2358-cli-repo-access",
     "openapi-server-tools"
   ]
 }

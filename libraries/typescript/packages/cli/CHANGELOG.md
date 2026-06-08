@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.3.2-canary.6
+
+### Patch Changes
+
+- 726bcbb: Fix repo access check during deploy to look across all GitHub App installations instead of only the first one, so deploys of repos owned by any linked installation no longer fail the access check.
+  - mcp-use@1.30.0-canary.6
+  - @mcp-use/inspector@8.0.0-canary.6
+
 ## 3.3.2-canary.5
 
 ### Patch Changes
