@@ -352,7 +352,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e  # Exit immediately if any command fails
-          
+
+          # Configure git identity - changesets creates annotated tags (git tag -m),
+          # which fail without user.name/user.email configured
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           # Ensure we're on the latest commit and have all remote refs
           git fetch --tags --force
           git checkout main
@@ -368,8 +373,8 @@ jobs:
           NEW_TAGS=$(git tag --points-at HEAD)
           
           if [ -z "$NEW_TAGS" ]; then
-            echo "⚠️  No tags were created by changeset tag"
-            exit 0
+            echo "❌ No tags were created by changeset tag - packages were published to npm but tagging failed"
+            exit 1
           fi
           
           echo "📦 Tags created: $NEW_TAGS"
