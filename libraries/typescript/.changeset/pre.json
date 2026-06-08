@@ -1,0 +1,19 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.3.1",
+    "create-mcp-use-app": "0.14.14",
+    "@mcp-use/inspector": "7.0.1",
+    "mcp-use": "1.29.1"
+  },
+  "changesets": [
+    "bright-maps-instruct",
+    "fix-cli-cloud-list-pagination",
+    "fix-dependabot-hono-ip-restriction",
+    "fix-zod-to-ts-string-escaping",
+    "fresh-walls-clean",
+    "mcp-2358-cli-repo-access",
+    "openapi-server-tools"
+  ]
+}

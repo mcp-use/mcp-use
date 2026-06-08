@@ -163,6 +163,63 @@ interface BuildLogsResponse {
   status: string;
 }
 
+interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  skip: number;
+}
+
+interface PaginationParams {
+  limit?: number;
+  skip?: number;
+}
+
+interface SortablePaginationParams extends PaginationParams {
+  sort?: string;
+}
+
+function normalizePaginatedResponse<T>(
+  response: PaginatedResponse<T> | T[],
+  params?: PaginationParams
+): PaginatedResponse<T> {
+  if (Array.isArray(response)) {
+    return {
+      items: response,
+      total: response.length,
+      limit: params?.limit ?? response.length,
+      skip: params?.skip ?? 0,
+    };
+  }
+
+  return {
+    items: response.items,
+    total: response.total,
+    limit: response.limit,
+    skip: response.skip,
+  };
+}
+
+function buildPaginationQuery(
+  params?: SortablePaginationParams & { organizationId?: string }
+): string {
+  const search = new URLSearchParams();
+  if (params?.organizationId) {
+    search.set("organizationId", params.organizationId);
+  }
+  if (params?.limit != null) {
+    search.set("limit", String(params.limit));
+  }
+  if (params?.skip != null) {
+    search.set("skip", String(params.skip));
+  }
+  if (params?.sort) {
+    search.set("sort", params.sort);
+  }
+  const q = search.toString();
+  return q ? `?${q}` : "";
+}
+
 // ── GitHub ──────────────────────────────────────────────────────────
 
 export interface GitHubInstallation {
@@ -392,22 +449,11 @@ export class McpUseAPI {
     limit?: number;
     skip?: number;
     sort?: string;
-  }): Promise<CloudServer[]> {
-    const search = new URLSearchParams();
-    if (params?.organizationId) {
-      search.set("organizationId", params.organizationId);
-    }
-    if (params?.limit != null) {
-      search.set("limit", String(params.limit));
-    }
-    if (params?.skip != null) {
-      search.set("skip", String(params.skip));
-    }
-    if (params?.sort) {
-      search.set("sort", params.sort);
-    }
-    const q = search.toString();
-    return this.request<CloudServer[]>(`/servers${q ? `?${q}` : ""}`);
+  }): Promise<PaginatedResponse<CloudServer>> {
+    const response = await this.request<
+      PaginatedResponse<CloudServer> | CloudServer[]
+    >(`/servers${buildPaginationQuery(params)}`);
+    return normalizePaginatedResponse(response, params);
   }
 
   async getServer(idOrSlug: string): Promise<CloudServer> {
@@ -481,8 +527,13 @@ export class McpUseAPI {
     return this.request<Deployment>(`/deployments/${deploymentId}`);
   }
 
-  async listDeployments(): Promise<Deployment[]> {
-    return this.request<Deployment[]>("/deployments");
+  async listDeployments(
+    params?: SortablePaginationParams
+  ): Promise<PaginatedResponse<Deployment>> {
+    const response = await this.request<
+      PaginatedResponse<Deployment> | Deployment[]
+    >(`/deployments${buildPaginationQuery(params)}`);
+    return normalizePaginatedResponse(response, params);
   }
 
   async deleteDeployment(deploymentId: string): Promise<void> {
@@ -562,16 +613,29 @@ export class McpUseAPI {
       return { user: { login: "", id: 0, avatar_url: "" }, repos: [] };
     }
 
+    // An organization can have multiple GitHub installations (e.g. a user
+    // account and one or more GitHub orgs). Aggregate repos across all of
+    // them instead of only the first, otherwise repos owned by any other
+    // installation are reported as inaccessible.
     const inst = installResp.installations[0];
-    const reposResp = await this.request<{
-      repos: Array<{
-        id: number;
-        name: string;
-        fullName: string;
-        private: boolean;
-        ownerAvatarUrl: string | null;
-      }>;
-    }>(`/github/installations/${inst.installationId}/repos`);
+    const repoLists = await Promise.all(
+      installResp.installations.map(async (installation) => {
+        try {
+          const reposResp = await this.request<{
+            repos: Array<{
+              id: number;
+              name: string;
+              fullName: string;
+              private: boolean;
+              ownerAvatarUrl: string | null;
+            }>;
+          }>(`/github/installations/${installation.installationId}/repos`);
+          return reposResp.repos;
+        } catch {
+          return [];
+        }
+      })
+    );
 
     return {
       user: {
@@ -579,7 +643,7 @@ export class McpUseAPI {
         id: 0,
         avatar_url: inst.account?.avatar_url ?? "",
       },
-      repos: reposResp.repos.map((r) => ({
+      repos: repoLists.flat().map((r) => ({
         id: r.id,
         name: r.name,
         full_name: r.fullName,

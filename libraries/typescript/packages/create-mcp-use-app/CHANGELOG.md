@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.15-canary.0
+
+### Patch Changes
+
+- f565f9c: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+
 ## 0.14.14
 
 ### Patch Changes

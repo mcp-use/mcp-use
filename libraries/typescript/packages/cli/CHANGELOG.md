@@ -1,5 +1,61 @@
 # @mcp-use/cli
 
+## 3.3.2-canary.6
+
+### Patch Changes
+
+- 726bcbb: Fix repo access check during deploy to look across all GitHub App installations instead of only the first one, so deploys of repos owned by any linked installation no longer fail the access check.
+  - mcp-use@1.30.0-canary.6
+  - @mcp-use/inspector@8.0.0-canary.6
+
+## 3.3.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [e4b83e4]
+  - mcp-use@1.30.0-canary.5
+  - @mcp-use/inspector@8.0.0-canary.5
+
+## 3.3.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f8ca6bb]
+  - mcp-use@1.30.0-canary.4
+  - @mcp-use/inspector@8.0.0-canary.4
+
+## 3.3.2-canary.3
+
+### Patch Changes
+
+- a3d9aa9: Handle paginated Cloud API responses in `servers list` and `deployments list`, with a default page size of 30 and next-page guidance.
+  - mcp-use@1.30.0-canary.3
+  - @mcp-use/inspector@8.0.0-canary.3
+
+## 3.3.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b820e74]
+  - mcp-use@1.30.0-canary.2
+  - @mcp-use/inspector@8.0.0-canary.2
+
+## 3.3.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [88180d5]
+  - mcp-use@1.30.0-canary.1
+  - @mcp-use/inspector@8.0.0-canary.1
+
+## 3.3.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f565f9c]
+  - mcp-use@1.30.0-canary.0
+  - @mcp-use/inspector@8.0.0-canary.0
+
 ## 3.3.1
 
 ### Patch Changes

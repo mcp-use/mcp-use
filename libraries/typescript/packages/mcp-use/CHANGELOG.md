@@ -1,5 +1,67 @@
 # mcp-use
 
+## 1.30.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [726bcbb]
+  - @mcp-use/cli@3.3.2-canary.6
+  - @mcp-use/inspector@8.0.0-canary.6
+
+## 1.30.0-canary.5
+
+### Patch Changes
+
+- e4b83e4: Fix idle session cleanup to release registered refs for expired sessions.
+  - @mcp-use/cli@3.3.2-canary.5
+  - @mcp-use/inspector@8.0.0-canary.5
+
+## 1.30.0-canary.4
+
+### Minor Changes
+
+- f8ca6bb: Add `MCPServer.fromOpenAPI` for creating MCP servers from bundled OpenAPI documents, registering included operations as tools with generated input schemas and request handling.
+
+### Patch Changes
+
+- @mcp-use/cli@3.3.2-canary.4
+- @mcp-use/inspector@8.0.0-canary.4
+
+## 1.30.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [a3d9aa9]
+  - @mcp-use/cli@3.3.2-canary.3
+  - @mcp-use/inspector@8.0.0-canary.3
+
+## 1.30.0-canary.2
+
+### Patch Changes
+
+- b820e74: Bump `hono` to `4.12.23` to address [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5), where non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware.
+  - @mcp-use/cli@3.3.2-canary.2
+  - @mcp-use/inspector@8.0.0-canary.2
+
+## 1.30.0-canary.1
+
+### Patch Changes
+
+- 88180d5: Fix incomplete escaping when converting Zod string literals and enums to TypeScript type strings. Backslashes are now escaped before double quotes so generated `.d.ts` output remains valid when literal values contain `\` or `"`.
+  - @mcp-use/cli@3.3.2-canary.1
+  - @mcp-use/inspector@8.0.0-canary.1
+
+## 1.30.0-canary.0
+
+### Minor Changes
+
+- f565f9c: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+
+### Patch Changes
+
+- @mcp-use/cli@3.3.2-canary.0
+- @mcp-use/inspector@8.0.0-canary.0
+
 ## 1.29.1
 
 ### Patch Changes
