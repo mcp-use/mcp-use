@@ -126,86 +126,30 @@ server.tool(
   }
 );
 
-// Example 2: Simple greeting widget (programmatic, auto-exposed as tool)
-// NOTE: You can also create React widgets in resources/ directory like weather-display
-server.uiResource({
-  type: "mcpApps",
-  name: "greeting-card",
-  title: "Greeting Card",
-  description: "Shows a personalized greeting message",
-  props: {
-    name: {
-      type: "string",
-      required: true,
-      description: "Name to greet",
-    },
-    greeting: {
-      type: "string",
-      required: true,
-      description: "Greeting message",
+// Example 2: Simple greeting tool backed by a React widget in resources/
+server.tool(
+  {
+    name: "greeting-card",
+    description: "Shows a personalized greeting message",
+    schema: z.object({
+      name: z.string().describe("Name to greet"),
+      greeting: z.string().describe("Greeting message"),
+    }),
+    widget: {
+      name: "greeting-card",
+      invoking: "Creating greeting card...",
+      invoked: "Greeting card ready",
     },
   },
-  htmlTemplate: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        body {
-          margin: 0;
-          padding: 20px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-        .greeting-card {
-          background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-          border-radius: 12px;
-          padding: 32px;
-          color: white;
-          text-align: center;
-          max-width: 400px;
-        }
-        .greeting {
-          font-size: 36px;
-          font-weight: 700;
-          margin-bottom: 16px;
-        }
-        .name {
-          font-size: 48px;
-          font-weight: 800;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="greeting-card">
-        <div class="greeting" id="greeting">Hello</div>
-        <div class="name" id="name">World</div>
-      </div>
-      <script>
-        // Parse props from URL (for both protocols)
-        const params = new URLSearchParams(window.location.search);
-        const propsJson = params.get('props');
-        
-        if (propsJson) {
-          try {
-            const props = JSON.parse(propsJson);
-            document.getElementById('greeting').textContent = props.greeting || 'Hello';
-            document.getElementById('name').textContent = props.name || 'World';
-          } catch (e) {
-            console.error('Failed to parse props:', e);
-          }
-        }
-      </script>
-    </body>
-    </html>
-  `,
-  metadata: {
-    prefersBorder: true,
-    widgetDescription: "A colorful greeting card with personalized message",
-  },
-  // This widget is automatically exposed as a tool
-  exposeAsTool: true,
-});
+  async ({ name, greeting }) =>
+    widget({
+      props: {
+        name,
+        greeting,
+      },
+      message: `${greeting} ${name}`,
+    })
+);
 
 // Brand info tool (returns structured data)
 server.tool(
@@ -252,7 +196,7 @@ This server demonstrates dual-protocol widget support:
 Try these tools:
 - get-weather: Get weather for a city (uses weather-display widget)
 - get-weather-delayed: Test widget lifecycle with 5s delay (Issue #930)
-- greeting-display: Auto-exposed widget with props
+- greeting-card: Personalized greeting widget backed by a React resource
 - get-info: Learn about dual-protocol support
 
 To test Issue #930 fix:
