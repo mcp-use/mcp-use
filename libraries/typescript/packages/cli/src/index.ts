@@ -2964,18 +2964,28 @@ program
     "Login with an API key directly (non-interactive, for CI/CD)"
   )
   .option("--org <slug|id|name>", "Select an organization non-interactively")
-  .action(async (opts: { apiKey?: string; org?: string }) => {
-    try {
-      await loginCommand({ apiKey: opts.apiKey, org: opts.org });
-      process.exit(0);
-    } catch (error) {
-      console.error(
-        chalk.red.bold("\n✗ Login failed:"),
-        chalk.red(error instanceof Error ? error.message : "Unknown error")
-      );
-      process.exit(1);
+  .option(
+    "--device-code <code>",
+    "Authenticate with a pre-approved device code (non-interactive; e.g. from the web onboarding flow)"
+  )
+  .action(
+    async (opts: { apiKey?: string; org?: string; deviceCode?: string }) => {
+      try {
+        await loginCommand({
+          apiKey: opts.apiKey,
+          org: opts.org,
+          deviceCode: opts.deviceCode,
+        });
+        process.exit(0);
+      } catch (error) {
+        console.error(
+          chalk.red.bold("\n✗ Login failed:"),
+          chalk.red(error instanceof Error ? error.message : "Unknown error")
+        );
+        process.exit(1);
+      }
     }
-  });
+  );
 
 program
   .command("logout")
@@ -3050,6 +3060,10 @@ program
     "--start-command <cmd>",
     "Custom start command (overrides auto-detection)"
   )
+  .option(
+    "--managed",
+    "Deploy local source without connecting GitHub (uses the platform-managed org)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -3065,6 +3079,7 @@ program
       region: options.region,
       buildCommand: options.buildCommand,
       startCommand: options.startCommand,
+      managed: options.managed,
     });
   });
 

@@ -25,6 +25,7 @@ import {
 } from "../utils/git.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
+import { packProjectTarball, sanitizeRepoName } from "../utils/tarball.js";
 import {
   loginCommand,
   promptOrgSelection,
@@ -194,6 +195,12 @@ interface DeployOptions {
   region?: "US" | "EU" | "APAC";
   buildCommand?: string;
   startCommand?: string;
+  /**
+   * Deploy the local source directly via the platform-managed GitHub org,
+   * without connecting the user's own GitHub. Uploads a tarball instead of
+   * pushing to a user repo.
+   */
+  managed?: boolean;
 }
 
 async function isMcpProject(cwd: string = process.cwd()): Promise<boolean> {
@@ -678,6 +685,130 @@ async function promptGitHubInstallation(
 }
 
 // ---------------------------------------------------------------------------
+// Managed deploy (no user GitHub) — upload local source as a tarball
+// ---------------------------------------------------------------------------
+
+/**
+ * Deploy the local project directly via the platform-managed GitHub org. No
+ * user GitHub connection, no git remote — the source is packed into a tarball
+ * and uploaded. Reuses the project link for redeploys (push source + redeploy).
+ */
+async function deployViaManagedUpload(
+  api: McpUseAPI,
+  options: DeployOptions,
+  ctx: { cwd: string; organizationId: string }
+): Promise<void> {
+  const { cwd, organizationId } = ctx;
+  const projectDir = options.rootDir ? path.resolve(cwd, options.rootDir) : cwd;
+
+  try {
+    await fs.access(projectDir);
+  } catch {
+    console.log(chalk.red(`✗ Project directory not found: ${projectDir}`));
+    process.exit(1);
+  }
+
+  const isMcp = await isMcpProject(projectDir);
+  if (!isMcp && !options.yes) {
+    console.log(
+      chalk.yellow("⚠️  This doesn't look like an MCP server project.")
+    );
+    const shouldContinue = await prompt(
+      chalk.white("Continue anyway? (y/n): ")
+    );
+    if (!shouldContinue) process.exit(0);
+    console.log();
+  }
+
+  const envVars = await buildEnvVars(options);
+  const branch = "main";
+  const projectName = options.name || (await getProjectName(projectDir));
+
+  console.log(chalk.gray("Packaging project source..."));
+  const tarball = await packProjectTarball(projectDir);
+  console.log(
+    chalk.gray(
+      `  Archive size: ${(tarball.length / 1024 / 1024).toFixed(2)} MB`
+    )
+  );
+  if (tarball.length > 80 * 1024 * 1024) {
+    console.log(
+      chalk.red(
+        "✗ Project archive exceeds 80 MB. Add large/derived files to .gitignore and retry."
+      )
+    );
+    process.exit(1);
+  }
+
+  // Redeploy an existing managed server when linked (keeps the same URL).
+  const existingLink = !options.new ? await getProjectLink(cwd) : null;
+  let serverId = existingLink?.serverId;
+  if (serverId) {
+    try {
+      const linked = await api.getServer(serverId);
+      if (linked.organizationId !== organizationId) serverId = undefined;
+    } catch {
+      serverId = undefined;
+    }
+  }
+
+  let deploymentId: string | undefined;
+
+  if (serverId) {
+    console.log(chalk.gray("Uploading source and redeploying..."));
+    if (Object.keys(envVars).length > 0) {
+      await syncEnvVarsToServer(api, serverId, envVars);
+    }
+    await api.pushSourceToServer(serverId, {
+      tarball,
+      branch,
+      commitMessage: "Redeploy from mcp-use CLI",
+    });
+    const dep = await api.createDeployment({
+      serverId,
+      branch,
+      trigger: "redeploy",
+    });
+    deploymentId = dep.id;
+    await saveProjectLink(cwd, {
+      deploymentId: dep.id,
+      deploymentName: projectName,
+      serverId,
+      linkedAt: new Date().toISOString(),
+    });
+  } else {
+    console.log(chalk.gray("Creating managed server and deploying..."));
+    const result = await api.createServerFromManagedUpload({
+      organizationId,
+      name: projectName,
+      repoName: sanitizeRepoName(projectName),
+      tarball,
+      branch,
+      commitMessage: "Deploy from mcp-use CLI",
+      port: options.port,
+      env: Object.keys(envVars).length > 0 ? envVars : undefined,
+    });
+    deploymentId = result.deploymentId ?? undefined;
+    if (result.server?.id && deploymentId) {
+      await saveProjectLink(cwd, {
+        deploymentId,
+        deploymentName: projectName,
+        serverId: result.server.id,
+        linkedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  if (!deploymentId) {
+    console.log(chalk.red("✗ No deployment was created."));
+    process.exit(1);
+  }
+
+  console.log(chalk.green("✓ Deployment created: ") + chalk.gray(deploymentId));
+  await displayDeploymentProgress(api, deploymentId, { yes: options.yes });
+}
+
+// ---------------------------------------------------------------------------
 // Main deploy command
 // ---------------------------------------------------------------------------
 
@@ -810,6 +941,14 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     api = await ensureApiSessionForDeploy(api, options, resolvedOrgId);
 
     console.log(chalk.cyan.bold("\n🚀 Deploying to Manufact cloud...\n"));
+
+    // ── Managed deploy: skip GitHub entirely, upload local source ─────
+    if (options.managed) {
+      const organizationId =
+        resolvedOrgId ?? (await api.resolveOrganizationId());
+      await deployViaManagedUpload(api, options, { cwd, organizationId });
+      return;
+    }
 
     // ── Step 3: GitHub connection ─────────────────────────────────
     const reauth = () => promptReauthenticateOn401(options, resolvedOrgId);
