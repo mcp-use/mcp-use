@@ -79,6 +79,8 @@ interface CloudServerConnectedRepository {
   repoFullName: string;
   productionBranch: string;
   isActive: boolean;
+  /** True when deployed via the platform-managed org (no user GitHub). */
+  isManaged?: boolean;
   userId: string;
   githubInstallationId: string;
   createdAt: string;

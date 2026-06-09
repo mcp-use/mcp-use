@@ -943,7 +943,21 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     console.log(chalk.cyan.bold("\n🚀 Deploying to Manufact cloud...\n"));
 
     // ── Managed deploy: skip GitHub entirely, upload local source ─────
-    if (options.managed) {
+    // Explicit via --managed, or auto-detected when redeploying a project
+    // already linked to a managed server (so --managed isn't needed again).
+    let useManaged = !!options.managed;
+    if (!useManaged && !options.new) {
+      const link = await getProjectLink(cwd);
+      if (link?.serverId) {
+        try {
+          const linked = await api.getServer(link.serverId);
+          if (linked.connectedRepository?.isManaged) useManaged = true;
+        } catch {
+          // Server gone / inaccessible — fall through to the normal flow.
+        }
+      }
+    }
+    if (useManaged) {
       const organizationId =
         resolvedOrgId ?? (await api.resolveOrganizationId());
       await deployViaManagedUpload(api, options, { cwd, organizationId });
