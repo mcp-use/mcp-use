@@ -12,11 +12,37 @@ mcp-use whoami
 
 If this fails or the user has never logged in, run `mcp-use login` first — it opens a browser for OAuth.
 
+**Non-interactive / agent contexts:** if you were handed a one-time device code
+(e.g. from the web onboarding flow), authenticate without a browser:
+
+```bash
+mcp-use login --device-code <CODE>
+```
+
+The code is short-lived and already approved, so the CLI redeems it immediately.
+
 ---
 
 ## Quick Deploy (Manufact Cloud)
 
-The fastest path to production — one command:
+There are two ways to deploy, depending on where the code should live.
+
+### Option A — Managed repo (no GitHub required)
+
+Best for getting live fast, or when the user hasn't connected GitHub. The CLI
+uploads your local source; the repo is created in the platform-managed org and
+deployed through the normal pipeline:
+
+```bash
+mcp-use deploy --managed
+```
+
+No git remote, no GitHub App install. The user can later move it to their own
+GitHub from the server's dashboard ("Connect your GitHub").
+
+### Option B — Your own GitHub
+
+Deploys from a repository in the user's GitHub account (enables push-to-deploy):
 
 ```bash
 mcp-use deploy
@@ -28,19 +54,21 @@ Or via the npm script (pre-configured in all templates):
 npm run deploy
 ```
 
-Your server is live at `https://{slug}.run.mcp-use.com/mcp`.
+Either way, your server is live at `https://{slug}.run.mcp-use.com/mcp`.
 
 ---
 
 ## Prerequisites
 
-Before running `mcp-use deploy`:
+**Managed deploy (`--managed`)** only needs you to be **logged in** (`mcp-use whoami`).
+No git, no GitHub App — the CLI uploads your local source directly.
 
-1. **Logged in** — run `mcp-use whoami` to verify, or `mcp-use login` if needed
-2. **Git repository** — your project must be a git repo
-3. **GitHub remote** — the `origin` remote must point to GitHub (SSH or HTTPS)
-4. **Changes pushed** — deployment pulls from GitHub, not your local files. Commit and push first.
-5. **GitHub App installed** — the mcp-use GitHub App must have access to the repo. The CLI will prompt you to install it if missing.
+**GitHub deploy** (`mcp-use deploy` without `--managed`) additionally needs:
+
+1. **Git repository** — your project must be a git repo
+2. **GitHub remote** — the `origin` remote must point to GitHub (SSH or HTTPS)
+3. **Changes pushed** — deployment pulls from GitHub, not your local files. Commit and push first.
+4. **GitHub App installed** — the mcp-use GitHub App must have access to the repo. The CLI prompts you to install it if missing, or install it at `github.com/apps/mcp-use/installations/new`.
 
 ---
 
@@ -50,15 +78,21 @@ Before running `mcp-use deploy`:
 mcp-use deploy [options]
 ```
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--name <name>` | Custom deployment name | `package.json` name or directory name |
-| `--port <port>` | Server port | `3000` |
-| `--runtime <runtime>` | `"node"` or `"python"` | Auto-detected from project files |
-| `--env <KEY=VALUE>` | Set environment variable (repeatable) | — |
-| `--env-file <path>` | Load env vars from a file | — |
-| `--open` | Open deployment in browser after success | `false` |
-| `--new` | Force a fresh deployment (ignore existing link) | `false` |
+| Flag                  | Description                                                  | Default                               |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------- |
+| `--managed`           | Deploy local source via the platform-managed org (no GitHub) | `false`                               |
+| `--org <slug>`        | Deploy to a specific organization (by slug or id)            | configured org                        |
+| `--name <name>`       | Custom deployment name                                       | `package.json` name or directory name |
+| `--port <port>`       | Server port                                                  | `3000`                                |
+| `--runtime <runtime>` | `"node"` or `"python"`                                       | Auto-detected from project files      |
+| `--env <KEY=VALUE>`   | Set environment variable (repeatable)                        | —                                     |
+| `--env-file <path>`   | Load env vars from a file                                    | —                                     |
+| `--open`              | Open deployment in browser after success                     | `false`                               |
+| `--new`               | Force a fresh deployment (ignore existing link)              | `false`                               |
+| `-y, --yes`           | Skip confirmation prompts (non-interactive / CI / agents)    | `false`                               |
+
+> Redeploys of a managed project are auto-detected from the linked server, so
+> `--managed` is only needed on the first deploy.
 
 ### Setting Environment Variables
 
@@ -83,6 +117,6 @@ mcp-use deploy --env-file .env.production
 - ❌ Hardcoding secrets in code or committing `.env`
   - ✅ Use `--env` / `--env-file` flags, or `mcp-use deployments env set`
 - ❌ Forgetting to install the mcp-use GitHub App on the repo
-  - ✅ The CLI will prompt you, but you can also install it at `github.com/apps/mcp-use`
+  - ✅ The CLI will prompt you, but you can also install it at `github.com/apps/mcp-use` — or skip GitHub entirely with `mcp-use deploy --managed`
 - ❌ Running `mcp-use start` without `mcp-use build` first
   - ✅ Always build before starting in production
