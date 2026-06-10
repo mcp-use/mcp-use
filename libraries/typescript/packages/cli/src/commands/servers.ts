@@ -1,5 +1,6 @@
 import chalk from "chalk";
 import { Command } from "commander";
+import type { UpdateServerBody } from "../utils/api.js";
 import { McpUseAPI } from "../utils/api.js";
 import { getMcpServerUrlForCloudServer } from "../utils/cloud-urls.js";
 import { getWebUrl, isLoggedIn, readConfig } from "../utils/config.js";
@@ -360,6 +361,67 @@ async function deleteServerCommand(
   }
 }
 
+async function updateServerCommand(
+  idOrSlug: string,
+  options: {
+    branch?: string;
+    name?: string;
+    buildCommand?: string;
+    startCommand?: string;
+    description?: string;
+    org?: string;
+  }
+): Promise<void> {
+  try {
+    if (!(await isLoggedIn())) {
+      console.log(chalk.red("✗ You are not logged in."));
+      console.log(
+        chalk.gray(
+          "Run " + chalk.white("npx mcp-use login") + " to get started."
+        )
+      );
+      process.exit(1);
+    }
+
+    const body: UpdateServerBody = {};
+    if (options.branch !== undefined) body.branch = options.branch;
+    if (options.name !== undefined) body.name = options.name;
+    if (options.buildCommand !== undefined)
+      body.buildCommand = options.buildCommand;
+    if (options.startCommand !== undefined)
+      body.startCommand = options.startCommand;
+    if (options.description !== undefined)
+      body.description = options.description;
+
+    if (Object.keys(body).length === 0) {
+      console.error(
+        chalk.red(
+          "✗ Nothing to update. Provide at least one of: --branch, --name, --build-command, --start-command, --description."
+        )
+      );
+      process.exit(1);
+    }
+
+    const api = await McpUseAPI.create();
+    await applyOrgOption(api, options.org);
+    if (options.org) console.log();
+
+    const server = await api.updateServer(idOrSlug, body);
+
+    const label = server.name || server.slug || server.id;
+    console.log(chalk.green.bold(`\n✓ Server updated: ${label}`));
+    if (server.connectedRepository) {
+      console.log(
+        chalk.gray("  Prod branch: ") +
+          chalk.cyan(server.connectedRepository.productionBranch)
+      );
+    }
+    console.log();
+  } catch (error) {
+    handleCommandError(error, "Failed to update server");
+  }
+}
+
 export function createServersCommand(): Command {
   const serversCommand = new Command("servers")
     .description("Manage cloud servers (Git-backed deploy targets)")
@@ -383,6 +445,21 @@ export function createServersCommand(): Command {
     .option("--org <slug-or-id>", "Resolve org context before fetch")
     .description("Show server details and recent deployments")
     .action(getServerCommand);
+
+  serversCommand
+    .command("update")
+    .argument("<id-or-slug>", "Server UUID or slug")
+    .description("Update server configuration (branch, name, commands, …)")
+    .option(
+      "--branch <name>",
+      "New production branch — controls which branch triggers production deploys"
+    )
+    .option("--name <name>", "Rename the server")
+    .option("--build-command <cmd>", "Override the build command")
+    .option("--start-command <cmd>", "Override the start command")
+    .option("--description <text>", "Update the server description")
+    .option("--org <slug-or-id>", "Target organization")
+    .action(updateServerCommand);
 
   serversCommand
     .command("delete")

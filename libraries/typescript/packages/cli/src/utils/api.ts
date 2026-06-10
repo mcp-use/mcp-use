@@ -253,6 +253,18 @@ interface GitHubReposResponse {
   repos: GitHubRepo[];
 }
 
+// ── Server update ───────────────────────────────────────────────────
+
+export interface UpdateServerBody {
+  name?: string;
+  description?: string;
+  // New production branch(e.g."main"). Takes effect on next deploy.
+  branch?: string;
+  buildCommand?: string;
+  startCommand?: string;
+  tags?: string[];
+}
+
 // ── Env Variables ───────────────────────────────────────────────────
 
 export type EnvEnvironment = "production" | "preview" | "development";
@@ -468,6 +480,13 @@ export class McpUseAPI {
         method: "DELETE",
       }
     );
+  }
+
+  async updateServer(id: string, body: UpdateServerBody): Promise<CloudServer> {
+    return this.request<CloudServer>(`/servers/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
   }
 
   // ── Env Variables ────────────────────────────────────────────────
