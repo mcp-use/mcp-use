@@ -196,11 +196,10 @@ interface DeployOptions {
   buildCommand?: string;
   startCommand?: string;
   /**
-   * Deploy the local source directly via the platform-managed GitHub org,
-   * without connecting the user's own GitHub. Uploads a tarball instead of
-   * pushing to a user repo.
+   * Upload local source without connecting the user's GitHub. Uses the
+   * platform-managed org and a tarball instead of pushing to a user repo.
    */
-  managed?: boolean;
+  noGithub?: boolean;
 }
 
 async function isMcpProject(cwd: string = process.cwd()): Promise<boolean> {
@@ -777,7 +776,7 @@ async function deployViaManagedUpload(
       linkedAt: new Date().toISOString(),
     });
   } else {
-    console.log(chalk.gray("Creating managed server and deploying..."));
+    console.log(chalk.gray("Uploading source (no GitHub required)..."));
     const result = await api.createServerFromManagedUpload({
       organizationId,
       name: projectName,
@@ -942,22 +941,22 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     console.log(chalk.cyan.bold("\n🚀 Deploying to Manufact cloud...\n"));
 
-    // ── Managed deploy: skip GitHub entirely, upload local source ─────
-    // Explicit via --managed, or auto-detected when redeploying a project
-    // already linked to a managed server (so --managed isn't needed again).
-    let useManaged = !!options.managed;
-    if (!useManaged && !options.new) {
+    // ── No-GitHub deploy: upload local source via platform-managed org ──
+    // Explicit via --no-github, or auto-detected when redeploying a project
+    // already linked to a platform-managed server (--no-github not needed again).
+    let useNoGithubDeploy = !!options.noGithub;
+    if (!useNoGithubDeploy && !options.new) {
       const link = await getProjectLink(cwd);
       if (link?.serverId) {
         try {
           const linked = await api.getServer(link.serverId);
-          if (linked.connectedRepository?.isManaged) useManaged = true;
+          if (linked.connectedRepository?.isManaged) useNoGithubDeploy = true;
         } catch {
           // Server gone / inaccessible — fall through to the normal flow.
         }
       }
     }
-    if (useManaged) {
+    if (useNoGithubDeploy) {
       const organizationId =
         resolvedOrgId ?? (await api.resolveOrganizationId());
       await deployViaManagedUpload(api, options, { cwd, organizationId });

@@ -3061,8 +3061,8 @@ program
     "Custom start command (overrides auto-detection)"
   )
   .option(
-    "--managed",
-    "Deploy local source without connecting GitHub (uses the platform-managed org)"
+    "--no-github",
+    "Upload local source without connecting GitHub (repo hosted in the platform-managed org)"
   )
   .action(async (options) => {
     await deployCommand({
@@ -3079,7 +3079,7 @@ program
       region: options.region,
       buildCommand: options.buildCommand,
       startCommand: options.startCommand,
-      managed: options.managed,
+      noGithub: options.github === false,
     });
   });
 
