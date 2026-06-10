@@ -1151,21 +1151,16 @@ function MCPAppsRendererBase({
               : { maxWidth: iframeStyle.maxWidth }
           }
         >
-          <div className="absolute -top-8 left-2 z-10 h-full">
-            {/* Status label above the widget — only in inline mode */}
-            {!isPip && !isFullscreen && (invoking || invoked) && (
-              <div className="whitespace-nowrap">
-                {invoking && !toolOutput && (
-                  <TextShimmer className="text-xs ">{invoking}</TextShimmer>
-                )}
-                {invoked && !!toolOutput && (
-                  <span className="text-xs text-muted-foreground">
-                    {invoked}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
+          {!isPip && !isFullscreen && (invoking || invoked) && (
+            <div className="absolute -top-8 left-2 z-10 whitespace-nowrap pointer-events-none">
+              {invoking && !toolOutput && (
+                <TextShimmer className="text-xs ">{invoking}</TextShimmer>
+              )}
+              {invoked && !!toolOutput && (
+                <span className="text-xs text-muted-foreground">{invoked}</span>
+              )}
+            </div>
+          )}
           <SandboxedIframe
             ref={sandboxRef}
             html={widgetHtml}

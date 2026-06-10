@@ -1,0 +1,16 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.3.2",
+    "create-mcp-use-app": "0.14.15",
+    "@mcp-use/inspector": "8.0.0",
+    "mcp-use": "1.30.0"
+  },
+  "changesets": [
+    "fix-zero-height-notification",
+    "inspector-widget-status-pointer-events",
+    "managed-deploy-cli",
+    "usemcp-disconnect-url-race"
+  ]
+}

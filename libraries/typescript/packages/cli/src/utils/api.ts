@@ -79,6 +79,8 @@ interface CloudServerConnectedRepository {
   repoFullName: string;
   productionBranch: string;
   isActive: boolean;
+  /** True when deployed via the platform-managed org (no user GitHub). */
+  isManaged?: boolean;
   userId: string;
   githubInstallationId: string;
   createdAt: string;
@@ -442,6 +444,100 @@ export class McpUseAPI {
       method: "POST",
       body: JSON.stringify(body),
     });
+  }
+
+  /** Multipart helper: POST/PUT a tarball + fields without the JSON Content-Type. */
+  private async uploadMultipart<T>(
+    endpoint: string,
+    form: FormData,
+    timeout = 120000
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers: Record<string, string> = {
+      "x-mcp-creation-location": "cli",
+    };
+    if (this.apiKey) headers["x-api-key"] = this.apiKey;
+    if (this.orgId) headers["x-profile-id"] = this.orgId;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: form,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (response.status === 401) throw new ApiUnauthorizedError();
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} ${errorText}`);
+      }
+      return response.json() as Promise<T>;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === "AbortError") {
+        throw new Error(`Request timeout after ${timeout / 1000}s.`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Create a server from a source tarball deployed into the platform-managed
+   * GitHub org (no user GitHub connection required).
+   */
+  async createServerFromManagedUpload(input: {
+    organizationId: string;
+    name: string;
+    repoName: string;
+    tarball: Buffer;
+    branch?: string;
+    commitMessage?: string;
+    port?: number;
+    env?: Record<string, string>;
+  }): Promise<CreateServerResponse> {
+    const form = new FormData();
+    form.set(
+      "sourceFile",
+      new Blob([new Uint8Array(input.tarball)], { type: "application/gzip" }),
+      "source.tar.gz"
+    );
+    form.set("organizationId", input.organizationId);
+    form.set("managed", "true");
+    form.set("name", input.name);
+    form.set("repoName", input.repoName);
+    form.set("private", "true");
+    form.set("branch", input.branch ?? "main");
+    form.set("commitMessage", input.commitMessage ?? "Deploy from mcp-use CLI");
+    if (input.port != null) form.set("port", String(input.port));
+    if (input.env && Object.keys(input.env).length > 0) {
+      form.set("env", JSON.stringify(input.env));
+    }
+    return this.uploadMultipart<CreateServerResponse>("/servers", form);
+  }
+
+  /** Push a new source tarball as a commit on an existing server's repo. */
+  async pushSourceToServer(
+    serverId: string,
+    input: { tarball: Buffer; branch?: string; commitMessage?: string }
+  ): Promise<{ commitSha: string; repoFullName: string; branch: string }> {
+    const form = new FormData();
+    form.set(
+      "sourceFile",
+      new Blob([new Uint8Array(input.tarball)], { type: "application/gzip" }),
+      "source.tar.gz"
+    );
+    form.set("branch", input.branch ?? "main");
+    form.set(
+      "commitMessage",
+      input.commitMessage ?? "Redeploy from mcp-use CLI"
+    );
+    return this.uploadMultipart(
+      `/servers/${encodeURIComponent(serverId)}/source`,
+      form
+    );
   }
 
   async listServers(params?: {

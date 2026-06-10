@@ -257,6 +257,7 @@ mcp-use deploy [options]
 
 | Option                  | Description                                                                          | Default        |
 | ----------------------- | ------------------------------------------------------------------------------------ | -------------- |
+| `--no-github`           | Pack and upload local source without connecting GitHub (platform-managed repo)        | false          |
 | `--name <name>`         | Custom deployment name                                                               | Auto-generated |
 | `--port <port>`         | Server port                                                                          | 3000           |
 | `--runtime <runtime>`   | Runtime: `node` or `python`                                                          | Auto-detected  |
@@ -276,6 +277,9 @@ mcp-use deploy [options]
 ```bash
 # Basic deployment
 mcp-use deploy
+
+# Deploy without connecting GitHub (uploads local source)
+mcp-use deploy --no-github
 
 # Deploy with custom name and open in browser
 mcp-use deploy --name my-server --open
@@ -300,6 +304,17 @@ mcp-use deploy --org manufact-inc --region EU --yes
 ```
 
 **Deployment Process:**
+
+**With `--no-github` (or a linked platform-managed server):**
+
+1. Packs the local project into a tarball and uploads it
+2. Creates or reuses a server in the platform-managed org
+3. Builds and deploys through the normal pipeline
+4. Returns deployment URLs (MCP endpoint and Inspector)
+
+Redeploys of a project already linked to a platform-managed server auto-detect the upload path — `--no-github` is only required on the first deploy.
+
+**Default (GitHub):**
 
 1. Checks if project is a GitHub repository
 2. Prompts to install GitHub App if needed
@@ -328,9 +343,23 @@ Starts an OAuth-style device code flow to authenticate with [Manufact Cloud](htt
 **Options:**
 
 - `--api-key <key>`  -  Skip the browser flow and save an API key directly. Intended for CI/CD.
+- `--device-code <code>`  -  Redeem a pre-approved OAuth device code without opening a browser. Used by the web onboarding flow and other non-interactive harnesses.
 - `--org <slug|id|name>`  -  Pick an organization up-front and skip the post-login prompt. Use this when running in agent harnesses or non-TTY environments where the interactive selection cannot be answered.
 
-**What happens:**
+**Examples:**
+
+```bash
+# Interactive browser login
+mcp-use login
+
+# Non-interactive login with a one-time device code (from web onboarding)
+mcp-use login --device-code ABC123
+
+# CI / agents — API key and org up front
+mcp-use login --api-key mcp_... --org my-org
+```
+
+**What happens (interactive login):**
 
 1. CLI generates a device code
 2. Opens browser to authentication page

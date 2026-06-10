@@ -466,8 +466,17 @@ export abstract class BaseMCPClient {
     } catch (e) {
       logger.error(`Error closing session for server '${serverName}': ${e}`);
     } finally {
-      delete this.sessions[serverName];
-      this.activeSessions = this.activeSessions.filter((n) => n !== serverName);
+      // Only remove the slot if it still references the session we captured.
+      // A parallel createSession() (e.g. URL/env change in useMcp) may have
+      // written a new session here while we were awaiting `session.disconnect()`;
+      // wiping that would leave consumers with `getSession() === null` and
+      // surface as "No active session found".
+      if (this.sessions[serverName] === session) {
+        delete this.sessions[serverName];
+        this.activeSessions = this.activeSessions.filter(
+          (n) => n !== serverName
+        );
+      }
     }
   }
 

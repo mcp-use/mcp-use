@@ -1,5 +1,42 @@
 # @mcp-use/cli
 
+## 3.4.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [ea4e6f1]
+  - mcp-use@1.30.1-canary.3
+  - @mcp-use/inspector@8.0.1-canary.3
+
+## 3.4.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8c00a55]
+  - mcp-use@1.30.1-canary.2
+  - @mcp-use/inspector@8.0.1-canary.2
+
+## 3.4.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [afb0e79]
+  - @mcp-use/inspector@8.0.1-canary.1
+  - mcp-use@1.30.1-canary.1
+
+## 3.4.0-canary.0
+
+### Minor Changes
+
+- bad4578: Add `mcp-use deploy --no-github` to deploy a local MCP server without connecting your own GitHub. The project source is packed into a tarball and uploaded; the server is created in the platform-managed org and deployed through the normal pipeline. Redeploys of a platform-managed project are auto-detected from the linked server, so `--no-github` is only needed on the first deploy.
+
+  Also add `mcp-use login --device-code <code>` for non-interactive authentication with a pre-approved OAuth device code (used by the web onboarding flow), skipping the browser step.
+
+### Patch Changes
+
+- mcp-use@1.30.1-canary.0
+- @mcp-use/inspector@8.0.1-canary.0
+
 ## 3.3.2
 
 ### Patch Changes

@@ -7,35 +7,69 @@ icon: "/images/logo-mcp-use.svg"
 Deploy your MCP server to **Manufact Cloud**, the recommended deployment platform for mcp-use servers. With a single command, you can deploy your server and get a production-ready URL.
 
 ## Prerequisites
-**mcp-use Account**: Sign up at [mcp-use.com](https://mcp-use.com) or login via CLI
+
+**Manufact Cloud account**: Sign up at [mcp-use.com](https://mcp-use.com) or log in via CLI:
+
+```bash
+mcp-use login
+```
+
+For non-interactive flows (web onboarding, agents), use a pre-approved device code:
+
+```bash
+mcp-use login --device-code <CODE>
+```
+
+See the [CLI reference](/typescript/server/cli-reference#login---authenticate-with-manufact-cloud) for `--api-key` and `--org` options.
 
 ## Quick Deployment
 
 Deploy your MCP server in one command:
 
-```bash 
+```bash
 # Install the CLI (if you are using create-mcp-use-app this step is not needed)
 npm install -g @mcp-use/cli
 
 # Login to Manufact Cloud
-npm run mcp-use login
+mcp-use login
 
 # Deploy your server
-npm run mcp-use deploy
+mcp-use deploy
 ```
-
 
 That's it! Your server will be built and deployed automatically.
 
+## Deploy Without GitHub
+
+You do not need a GitHub repository to deploy. Use `--no-github` to upload your local project source directly — the platform creates a managed repo and runs the normal build pipeline:
+
+```bash
+mcp-use deploy --no-github
+```
+
+This path:
+
+- ✅ Works without a git remote or GitHub App installation
+- ✅ Uploads your local files (not GitHub)
+- ✅ Creates the server in the platform-managed org
+- ✅ Supports redeploys — linked projects auto-detect the upload path, so `--no-github` is only needed on the first deploy
+
+You can later connect your own GitHub repository from the server dashboard ("Connect your GitHub") if you want push-to-deploy.
+
+<Tip>
+  Web onboarding uses `mcp-use login --device-code` followed by `mcp-use deploy --no-github -y` for a fully non-interactive first deploy.
+</Tip>
+
 ## GitHub Repository Deployment
 
-If your project is a GitHub repository, `mcp-use deploy` will automatically detect it and offer to deploy from GitHub:
+If your project is a GitHub repository, `mcp-use deploy` (without `--no-github`) automatically detects it and offers to deploy from GitHub:
 
 ```bash
 mcp-use deploy
 ```
 
 You'll see:
+
 ```
 GitHub repository detected:
   Repository: your-org/your-repo
@@ -46,11 +80,11 @@ Deploy from GitHub repository your-org/your-repo? (y/n):
 ```
 
 This approach:
+
 - ✅ Deploys directly from your GitHub repository
 - ✅ Automatically detects build and start commands
 - ✅ Uses the latest commit from your branch
-- ✅ No need to upload source code manually
-
+- ✅ Requires the mcp-use GitHub App on the repo and changes pushed to GitHub
 
 ## After Deployment
 
@@ -82,7 +116,6 @@ The `autoConnect` parameter and other Inspector URL options are documented in [I
 }
 ```
 
-
 ### Test Locally First
 
 Before deploying, test your server locally:
@@ -98,4 +131,5 @@ mcp-use start
 - [Deploying to Supabase](./supabase) - Alternative deployment option
 - [Configuration Guide](../configuration) - Advanced server configuration
 - [UI Widgets](../mcp-apps) - Building interactive widgets
+- [CLI Reference](/typescript/server/cli-reference#deploy---cloud-deployment) - All deploy and login flags
 - [API Reference](/typescript/server/index#mcpserver-api-reference) - Complete API documentation

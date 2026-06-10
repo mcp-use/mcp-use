@@ -1104,7 +1104,7 @@ function OpenAIComponentRendererBase({
           )}
         >
           {displayMode === "inline" && (invoking || invoked) && (
-            <div className="absolute -top-8 left-2 z-10 whitespace-nowrap">
+            <div className="absolute -top-8 left-2 z-10 whitespace-nowrap pointer-events-none">
               {invoking && !toolResult && (
                 <TextShimmer className="text-xs">{invoking}</TextShimmer>
               )}
