@@ -15,17 +15,17 @@ This file provides guidance for working with the Python implementation of mcp-us
 ### Setup
 
 ```bash
-# Activate virtual environment (if it exists)
-source env/bin/activate
+# Create virtual environment
+uv venv
 
-# Create virtual environment if it doesn't exist
-# python -m venv env && source env/bin/activate
+# Activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install for development
-pip install -e ".[dev,search]"
+uv pip install -e ".[dev,search]"
 
 # Install with optional dependencies
-pip install -e ".[dev,anthropic,openai,e2b,search]"
+uv pip install -e ".[dev,anthropic,openai,e2b,search]"
 ```
 
 ### Code Quality
@@ -170,7 +170,7 @@ export MCP_USE_DEBUG=2
 
 ## Code Style and Standards
 
-- **Line Length**: 200 characters (configured in ruff.toml)
+- **Line Length**: 120 characters (configured in `pyproject.toml`)
 - **Python Version**: 3.11+ required
 - **Formatting**: Use Ruff for formatting and linting
 - **Type Hints**: All public APIs should have type hints
