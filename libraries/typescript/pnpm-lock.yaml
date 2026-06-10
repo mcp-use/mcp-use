@@ -601,8 +601,8 @@ importers:
         version: 4.3.5
     optionalDependencies:
       chalk:
-        specifier: 5.6.2
-        version: 5.6.2
+        specifier: 4.1.2
+        version: 4.1.2
       cli-highlight:
         specifier: 2.1.11
         version: 2.1.11
