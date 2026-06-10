@@ -116,7 +116,8 @@ function broadcastAuthCallback(
 function renderCloseWindowMessage(
   title: string,
   body: string,
-  tone: "success" | "error" = "success"
+  tone: "success" | "error" = "success",
+  returnUrl?: string
 ): void {
   if (typeof document === "undefined") return;
   try {
@@ -153,6 +154,18 @@ function renderCloseWindowMessage(
     closePara.appendChild(closeLink);
     closePara.appendChild(document.createTextNode("."));
     container.appendChild(closePara);
+
+    // Browsers configured to open popups as tabs can't be window.close()d by
+    // script (no script-opened opener relationship after a COOP swap). Offer a
+    // way back to the app so the user isn't stranded on a blank callback tab.
+    if (returnUrl) {
+      const returnPara = document.createElement("p");
+      const returnLink = document.createElement("a");
+      returnLink.href = returnUrl;
+      returnLink.textContent = "Return to the app";
+      returnPara.appendChild(returnLink);
+      container.appendChild(returnPara);
+    }
 
     document.body.appendChild(container);
   } catch {
@@ -277,7 +290,12 @@ async function doOnMcpAuthorization() {
       );
       const isRedirectFlow = storedStateData.flowType === "redirect";
       const hasOpener = window.opener && !window.opener.closed;
-      const isPopupWindow = isMcpAuthPopupWindow();
+      // COOP browsing-context-group swaps (cross-origin hops during the auth
+      // navigation) reset `window.name`, so the runtime signal alone misses
+      // popups that crossed origins. The flowType captured at auth start in
+      // the stored state record is authoritative.
+      const isPopupWindow =
+        isMcpAuthPopupWindow() || storedStateData.flowType === "popup";
 
       const redirectWithError = (target: string) => {
         console.log(`${logPrefix} Returning to: ${target}`);
@@ -323,7 +341,8 @@ async function doOnMcpAuthorization() {
         renderCloseWindowMessage(
           "Authentication Error",
           `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
-          "error"
+          "error",
+          storedStateData.returnUrl
         );
         try {
           window.close();
@@ -479,9 +498,12 @@ async function doOnMcpAuthorization() {
     if (authResult === "AUTHORIZED") {
       console.log(`${logPrefix} Authorization successful via SDK auth().`);
 
-      // Check if this was a redirect flow (has returnUrl) or popup flow
+      // Check if this was a redirect flow (has returnUrl) or popup flow.
+      // `window.name` is reset by COOP browsing-context-group swaps, so also
+      // trust the flowType captured at auth start (see error path above).
       const isRedirectFlow = storedStateData.flowType === "redirect";
-      const isPopupWindow = isMcpAuthPopupWindow();
+      const isPopupWindow =
+        isMcpAuthPopupWindow() || storedStateData.flowType === "popup";
 
       if (isRedirectFlow && storedStateData.returnUrl) {
         // Redirect flow: navigate back to the original page
@@ -516,7 +538,9 @@ async function doOnMcpAuthorization() {
         localStorage.removeItem(stateKey);
         renderCloseWindowMessage(
           "Authentication Successful!",
-          "You're authenticated. You can close this window and return to the app."
+          "You're authenticated. You can close this window and return to the app.",
+          "success",
+          storedStateData.returnUrl
         );
         try {
           window.close();
@@ -574,10 +598,14 @@ async function doOnMcpAuthorization() {
       );
       // Optionally close even on error, depending on UX preference
       // window.close();
-    } else if (isMcpAuthPopupWindow()) {
-      // Popup whose opener was severed: signal failure to the parent via
-      // BroadcastChannel so it leaves the `authenticating` state instead of
-      // hanging forever waiting for a postMessage that can't arrive.
+    } else if (
+      isMcpAuthPopupWindow() ||
+      storedStateData?.flowType === "popup"
+    ) {
+      // Popup whose opener was severed (and possibly its window.name reset by
+      // a COOP swap): signal failure to the parent via BroadcastChannel so it
+      // leaves the `authenticating` state instead of hanging forever waiting
+      // for a postMessage that can't arrive.
       broadcastAuthCallback(false, errorMessage, failureMeta);
     }
 

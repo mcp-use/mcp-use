@@ -189,14 +189,60 @@ describe("runAuthPopup", () => {
       state: FLOW_STATE,
       tokensKey: TOKENS_KEY,
       closePollMs: 100,
+      closeGraceMs: 400,
     });
 
     popup.closed = true;
-    // Closed detected on the poll, then a short grace period before deciding.
+    // Closed detected on the poll, then the grace window before deciding.
     await vi.advanceTimersByTimeAsync(100);
     await vi.advanceTimersByTimeAsync(400);
 
     await expect(promise).resolves.toEqual({ kind: "cancelled" });
+  });
+
+  it("resolves success when tokens land during the post-close grace window (COOP false-closed)", async () => {
+    const popup = makePopupStub();
+    const promise = runAuthPopup({
+      popup: popup as unknown as Window,
+      state: FLOW_STATE,
+      tokensKey: TOKENS_KEY,
+      closePollMs: 100,
+      closeGraceMs: 10000,
+    });
+
+    // COOP swap: WindowProxy reports closed while the real window is still
+    // completing the flow.
+    popup.closed = true;
+    await vi.advanceTimersByTimeAsync(100);
+
+    // Tokens arrive a few seconds later via the storage event.
+    await vi.advanceTimersByTimeAsync(3000);
+    dispatchTokenStorageEvent('{"access_token":"x"}');
+
+    await expect(promise).resolves.toEqual({ kind: "success" });
+  });
+
+  it("resolves success when a result message arrives during the post-close grace window", async () => {
+    const popup = makePopupStub();
+    const promise = runAuthPopup({
+      popup: popup as unknown as Window,
+      state: FLOW_STATE,
+      tokensKey: TOKENS_KEY,
+      closePollMs: 100,
+      closeGraceMs: 10000,
+    });
+
+    popup.closed = true;
+    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(3000);
+
+    postCallbackMessage({
+      type: MCP_AUTH_CALLBACK_MESSAGE_TYPE,
+      success: true,
+      state: FLOW_STATE,
+    });
+
+    await expect(promise).resolves.toEqual({ kind: "success" });
   });
 
   it("resolves success when the popup closed but tokens already landed", async () => {

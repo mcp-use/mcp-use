@@ -65,6 +65,15 @@ export interface RunAuthPopupOptions {
   /** Interval for the `popup.closed` poll. Default 1s (matches auth0-spa-js). */
   closePollMs?: number;
   /**
+   * How long to keep waiting for a result after the popup reports closed
+   * without tokens, before settling `cancelled`. COOP browsing-context-group
+   * swaps (popup navigating cross-origin) make `popup.closed` report `true`
+   * while the real window is still open mid-flow, so a closed signal is only
+   * a soft hint — message/storage listeners stay alive during this grace
+   * window and can still settle `success`. Default 20s.
+   */
+  closeGraceMs?: number;
+  /**
    * Origin to accept `postMessage` results from. Defaults to the current
    * window origin. BroadcastChannel results are same-origin by definition.
    */
@@ -91,6 +100,7 @@ export function runAuthPopup({
   tokensKey,
   timeoutMs = 5 * 60_000,
   closePollMs = 1000,
+  closeGraceMs = 20_000,
   expectedOrigin = typeof window !== "undefined" ? window.location.origin : "",
 }: RunAuthPopupOptions): Promise<AuthPopupResult> {
   return new Promise<AuthPopupResult>((resolve) => {
@@ -202,14 +212,19 @@ export function runAuthPopup({
           settle({ kind: "success" });
           return;
         }
-        // Grace period: a token write / result message may be racing the close.
+        // Soft-close grace window: `popup.closed` is unreliable under COOP —
+        // a cross-origin navigation swaps the browsing context group and the
+        // original WindowProxy reports closed while the real window is still
+        // open mid-consent (observed in the field: closed at ~3s, tokens
+        // landing ~7s later). Keep the message/storage listeners alive and
+        // only settle `cancelled` if nothing arrives within the grace window.
         graceTimer = setTimeout(() => {
           settle(
             hasStoredTokens(tokensKey)
               ? { kind: "success" }
               : { kind: "cancelled" }
           );
-        }, 400);
+        }, closeGraceMs);
       }, closePollMs);
     }
 
