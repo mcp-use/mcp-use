@@ -13,10 +13,12 @@ new `connect()` and either:
 2. wipe the freshly-created session out of the underlying client's session
    map — surfacing as "No active session found" on the next tool call.
 
-`disconnect()` now only nulls `clientRef` when it still points at the client
-being closed **and** the connect epoch has not advanced (a `connectEpochRef`
-counter bumped at the start of each `connect()`). This covers the case where
-`connect()` reuses the same `BrowserMCPClient` instance for the new URL.
+`disconnect()` now only nulls `clientRef` **and** resets the hook state when
+it has not been superseded by a newer `connect()` (a `connectEpochRef` counter
+bumped at the start of each `connect()`, plus a client-identity check). This
+covers both the case where `connect()` reuses the same `BrowserMCPClient`
+instance for the new URL and a manual `disconnect()` racing a reconnect, which
+must not clobber the live connection's state back to `discovering`.
 
 `BaseMCPClient.closeSession()` now only deletes `sessions[name]` if the slot
 still references the captured session. A parallel `createSession()` from a

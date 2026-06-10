@@ -430,17 +430,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           if (!quiet) addLog("warn", "Error closing session:", err);
         }
       }
-      // Only clear if still the same client and connect epoch — a newer connect()
-      // may have reused the instance and bumped the epoch while closeSession was
-      // in flight (e.g. dashboard environment / URL change).
-      if (
-        clientRef.current === clientToClose &&
-        connectEpochRef.current === epochAtStart
-      ) {
+      // A newer connect() (e.g. dashboard environment / URL change) may have
+      // bumped the epoch — possibly reusing the same client instance — while
+      // closeSession was in flight. If so, this disconnect is stale: it must
+      // neither null the (now newer) clientRef nor reset the live state.
+      const supersededByNewerConnect =
+        connectEpochRef.current !== epochAtStart;
+
+      if (clientRef.current === clientToClose && !supersededByNewerConnect) {
         clientRef.current = null;
       }
 
-      if (isMountedRef.current && !quiet) {
+      if (isMountedRef.current && !quiet && !supersededByNewerConnect) {
         setState("discovering");
         setTools([]);
         setResources([]);
