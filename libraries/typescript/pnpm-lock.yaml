@@ -523,6 +523,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: '>=1.25.2'
         version: 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      chalk:
+        specifier: 4.1.2
+        version: 4.1.2
       express:
         specifier: 5.2.1
         version: 5.2.1
@@ -600,9 +603,6 @@ importers:
         specifier: 4.3.5
         version: 4.3.5
     optionalDependencies:
-      chalk:
-        specifier: 4.1.2
-        version: 4.1.2
       cli-highlight:
         specifier: 2.1.11
         version: 2.1.11
