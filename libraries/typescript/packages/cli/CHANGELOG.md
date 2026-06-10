@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 3.4.2-canary.1
+
+### Patch Changes
+
+- 4e34b82: After a `--no-github` (platform-managed) deploy, print a short note explaining that the source lives in a private mcp-use-managed repository (no GitHub remote in the local folder) and link to the dashboard to view it or move it to your own GitHub. Aligns the CLI with the API, which no longer exposes the managed repo's `owner/repo` name.
+- Updated dependencies [4e34b82]
+  - mcp-use@1.31.0-canary.1
+  - @mcp-use/inspector@9.0.0-canary.1
+
 ## 3.4.2-canary.0
 
 ### Patch Changes

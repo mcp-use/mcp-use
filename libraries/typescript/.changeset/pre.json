@@ -8,6 +8,8 @@
     "mcp-use": "1.30.2"
   },
   "changesets": [
-    "chalk-regular-dependency"
+    "chalk-regular-dependency",
+    "managed-deploy-source-note",
+    "opener-owned-oauth-popup"
   ]
 }
