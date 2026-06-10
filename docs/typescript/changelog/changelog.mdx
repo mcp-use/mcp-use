@@ -6,6 +6,28 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.31.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.31.0&title=OAuth%20popup%20reliability%20%26%20credential%20lifecycle&date=2026-06&lang=typescript" alt="Release 1.31.0" />
+  </Frame>
+  ## OAuth popup reliability & credential lifecycle
+  Minor release fixing browser OAuth popup flows that stranded connections in "Authenticating…", preserving credentials across routine React lifecycle churn, and clarifying platform-managed deploy feedback in the CLI. Inspector ships major v9.0.0 tracking the new peer dependency (see inspector changelog).
+
+- **New**: `runAuthPopup()` exported from `mcp-use/auth` — opener-owned popup runner that settles on a `state`-matched postMessage or BroadcastChannel result, popup close, a `storage` event for persisted tokens, or a timeout; close and timeout paths check storage before declaring cancelled so a missed message with landed tokens still succeeds (`#1703`)
+- **Enhancement**: `runAuthPopup()` keeps message and storage listeners alive for a grace window (default 20s) after `popup.closed` reports true without tokens — tolerates COOP browsing-context-group swaps that sever `window.opener` while the consent window is still open (`#1703`)
+- **Fix** (react): `useMcp().authenticate()` awaits `runAuthPopup()` and owns every terminal transition — success reconnects, cancelled/timeout return to `pending_auth` (re-enabling Authenticate), error fails the connection instead of hanging indefinitely (`#1703`)
+- **Fix** (auth): OAuth callback detects popup flow from stored `flowType` (not only `window.name`) and always broadcasts the result; result payloads carry the originating `state` and `serverUrlHash` so listeners scope to the right server and late failures do not clobber an already-`ready` connection (`#1703`)
+- **Enhancement** (auth): `renderCloseWindowMessage()` accepts an optional `returnUrl` link for tab-mode fallbacks when the popup cannot auto-close (`#1703`)
+- **Fix** (react): `McpClientProvider.removeServer()` no longer clears OAuth storage by default — pass `{ clearCredentials: true }` for explicit logout; `updateServer()` and `useMcp` unmount no longer wipe credentials on routine lifecycle churn (`#1703`)
+- **Fix**: move `chalk` from optionalDependencies to dependencies — statically imported by server logging/lifecycle code, so `pnpm install --no-optional` no longer fails at module load (`#1702`)
+- **Enhancement** (@mcp-use/cli): after `deploy --no-github`, print a note that source lives in a private platform-managed repository and link to the dashboard to view or migrate to GitHub (`#1703`)
+- **Enhancement** (@mcp-use/cli): `servers get` shows `mcp-use-managed (private)` when the connected repo has no exposed GitHub full name (`#1703`)
+- **Fix** (@mcp-use/inspector): delete-server passes `{ clearCredentials: true }` on explicit removal — see inspector changelog (`#1703`)
+- **Update**: Updated @mcp-use/inspector to v9.0.0
+- **Update**: Updated @mcp-use/cli to v3.4.2
+- **Fix**: downgrade chalk to v4 — chalk 5 is ESM-only and kept external by tsup, so the CJS bundle's `require("chalk")` on Node ≥ 22 returned the module namespace instead of the chalk instance, crashing CJS-built backends (e.g. the Next.js template) on startup with `TypeError: import_chalk.default.gray is not a function` (`#1702`)
+</Update>
+
 <Update label="v1.30.1" description="June 2026">
   ## Deploy without GitHub, device-code login & widget iframe fixes
   Patch release for `McpUseProvider` zero-height collapse, `useMcp` disconnect/reconnect race fixes, and clearer not-ready errors; `@mcp-use/cli` minor adds tarball deploy without a user GitHub repo and non-interactive device-code login for web onboarding.

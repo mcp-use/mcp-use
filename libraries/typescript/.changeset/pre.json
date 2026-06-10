@@ -1,0 +1,15 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.4.1",
+    "create-mcp-use-app": "0.14.15",
+    "@mcp-use/inspector": "8.0.2",
+    "mcp-use": "1.30.2"
+  },
+  "changesets": [
+    "chalk-regular-dependency",
+    "managed-deploy-source-note",
+    "opener-owned-oauth-popup"
+  ]
+}
