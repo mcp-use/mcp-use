@@ -125,6 +125,9 @@ Deploy your MCP server to production via [manufact.com](https://manufact.com):
 # Login to Manufact cloud
 mcp-use login
 
+# Non-interactive login with a pre-approved device code (web onboarding, agents)
+mcp-use login --device-code <code>
+
 # Non-interactive login (for agents / CI) — picks an org without prompting
 mcp-use login --org <slug|id|name>
 
@@ -140,6 +143,7 @@ mcp-use logout
 
 **Deploy Options:**
 
+- `--no-github` - Upload local source without connecting GitHub (platform-managed repo)
 - `--name <name>` - Custom deployment name
 - `--port <port>` - Server port (default: 3000)
 - `--runtime <runtime>` - Runtime environment: "node" or "python"
@@ -148,8 +152,11 @@ mcp-use logout
 **Example:**
 
 ```bash
-# Basic deployment
+# Basic deployment (from GitHub when configured)
 mcp-use deploy
+
+# Deploy without GitHub — uploads local source
+mcp-use deploy --no-github
 
 # Deploy with custom options
 mcp-use deploy --name my-server --port 8000 --open

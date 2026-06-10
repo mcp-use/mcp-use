@@ -6,6 +6,20 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.30.1" description="June 2026">
+  ## Deploy without GitHub, device-code login & widget iframe fixes
+  Patch release for `McpUseProvider` zero-height collapse; `@mcp-use/cli` minor adds tarball deploy without a user GitHub repo and non-interactive device-code login for web onboarding.
+
+- **Enhancement** (@mcp-use/cli): `mcp-use deploy --no-github` packs the local project into a tarball and uploads it to the platform-managed org so first deploy works without connecting GitHub; redeploys of a linked platform-managed server auto-detect from `connectedRepository.isManaged` (`#1691`)
+- **New** (@mcp-use/cli): `mcp-use login --device-code <code>` authenticates with a pre-approved OAuth device code for non-interactive flows (web onboarding), skipping the browser step (`#1691`)
+- **Fix**: `McpUseProvider` with `autoSize` now notifies zero height when a widget renders `null`, so host iframes collapse instead of keeping the last non-zero height (`#1693`)
+- **Fix** (@mcp-use/inspector): MCP Apps / Apps SDK status labels no longer intercept iframe pointer events  -  see inspector changelog (`#1694`, `#1678`)
+- **Documentation**: tip on `<McpUseProvider />` for widgets that conditionally return `null` with `autoSize`
+- **Documentation**: `deploy --no-github`, `login --device-code`, and dual deploy paths in the CLI reference and Manufact Cloud deployment guide
+- **Update**: Updated @mcp-use/inspector to v8.0.1
+- **Update**: Updated @mcp-use/cli to v3.4.0
+</Update>
+
 <Update label="v1.30.0" description="June 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.30.0&title=OpenAPI%20server%20generation%20%26%20MCP%20instructions&date=2026-06&lang=typescript" alt="Release 1.30.0" />
