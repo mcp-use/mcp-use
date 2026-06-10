@@ -326,7 +326,8 @@
                       "python/api-reference/mcp_use_agents_prompts_templates"
                     ]
                   },
-                  "python/api-reference/mcp_use_agents_remote"
+                  "python/api-reference/mcp_use_agents_remote",
+                  "python/api-reference/mcp_use_agents_run_trace"
                 ]
               },
               {
