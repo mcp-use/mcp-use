@@ -16,7 +16,7 @@ const NOISE_DATA_URL_FINE =
 export const MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL = NOISE_DATA_URL_FINE;
 
 /** Hash string to a non-negative 32-bit int (shared for deterministic UI seeds). */
-export function hashString(str: string): number {
+function hashString(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
@@ -27,12 +27,12 @@ export function hashString(str: string): number {
 }
 
 /** Deterministic pseudo-random in [0, 1) from integer seed and optional index. */
-export function seededRandom(seed: number, index: number = 0): number {
+function seededRandom(seed: number, index: number = 0): number {
   const x = Math.sin(seed + index) * 10000;
   return x - Math.floor(x);
 }
 
-export interface RandomGradientBackgroundProps {
+interface RandomGradientBackgroundProps {
   className?: string;
   children?: ReactNode;
   grayscaled?: boolean;

@@ -10,7 +10,7 @@ import { getEnv } from "./utils/runtime.js";
  * - `debug`: adds `args=<json>` for `tools/call` requests
  * - `trace`: includes full request/response headers and bodies (legacy DEBUG=1)
  */
-export type McpDebugLevel = "info" | "debug" | "trace";
+type McpDebugLevel = "info" | "debug" | "trace";
 
 /**
  * Resolve the active debug level from environment variables.

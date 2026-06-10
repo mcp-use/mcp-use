@@ -3,7 +3,7 @@
  * Captures console.log, console.error, console.warn, console.info, console.debug
  * and forwards them to the parent window via postMessage
  */
-export const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
+const IFRAME_CONSOLE_INTERCEPTOR_SCRIPT = `
 (function() {
   'use strict';
   

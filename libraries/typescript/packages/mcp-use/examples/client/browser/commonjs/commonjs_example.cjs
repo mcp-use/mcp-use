@@ -5,7 +5,7 @@
  * This is useful for projects that haven't migrated to ESM yet or need to use
  * CommonJS for compatibility reasons.
  *
- * Note: Make sure to have Node.js 18.0.0 or higher installed.
+ * Note: Make sure to have Node.js 20.19 or higher, or 22.12 or higher installed.
  * Required: OPENAI_API_KEY environment variable
  *
  * Usage:

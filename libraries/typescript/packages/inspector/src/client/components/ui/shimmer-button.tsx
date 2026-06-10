@@ -4,7 +4,7 @@ import React from "react";
 import { useTheme } from "@/client/context/ThemeContext";
 import { cn } from "@/client/lib/utils";
 
-export interface ShimmerButtonProps extends ComponentPropsWithoutRef<"button"> {
+interface ShimmerButtonProps extends ComponentPropsWithoutRef<"button"> {
   shimmerColor?: string;
   shimmerSize?: string;
   borderRadius?: string;

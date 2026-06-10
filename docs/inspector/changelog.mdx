@@ -6,6 +6,52 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v8.0.1" description="June 2026">
+  ## Widget status label pointer-events fix
+  Patch release paired with `mcp-use` v1.30.1  -  invoking/invoked labels in the MCP Apps preview pane no longer block iframe interactions.
+
+- **Fix**: MCP Apps preview status label used an absolutely positioned `h-full` wrapper that intercepted hover, click, and form controls along the left edge of the widget iframe; apply `pointer-events-none`, remove the full-height wrapper, and align the Apps SDK label in `OpenAIComponentRenderer` (`#1694`, `#1678`)
+- **Update**: Updated mcp-use to v1.30.1
+</Update>
+
+<Update label="v8.0.0" description="June 2026">
+  ## mcp-use v1.30.0
+  Major release paired with `mcp-use` v1.30.0  -  peer dependency moves to `>=1.30.0-canary.0`; no inspector-specific runtime changes.
+
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.30.0-canary.0`
+- **Update**: Updated mcp-use to v1.30.0
+</Update>
+
+<Update label="v7.0.1" description="June 2026">
+  ## mcp-use v1.29.1
+  Patch release paired with `mcp-use` v1.29.1  -  picks up OAuth transport auth hardening and workspace security dependency bumps; no inspector-specific runtime changes.
+
+- **Update**: Updated mcp-use to v1.29.1
+</Update>
+
+<Update label="v7.0.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=7.0.0&title=Local%20LLM%20provider%2C%20image%20tool%20results%20%26%20widget%20display%20modes&date=2026-06&lang=inspector" alt="Release 7.0.0" />
+  </Frame>
+  ## Local LLM provider, image tool results & widget display modes
+  Major release paired with `mcp-use` v1.29.0: chat against a local Ollama daemon, MCP image tool results forwarded to vision models as real images, an MCP-server reconnect banner, and a reworked widget fullscreen / picture-in-picture path  -  plus a large dead-code cleanup.
+
+- **New**: Ollama as a local LLM chat provider  -  local model discovery and streaming chat, talking to the daemon directly over CORS (no server-side proxy) with an `OLLAMA_ORIGINS` hint surfaced when the browser fetch is blocked (`#1395`)
+- **New**: MCP-server reconnect banner  -  chat recognises the cloud's `mcp_auth_required` 401 (e.g. an expired upstream OAuth token) and renders an inline reconnect banner for the affected server that refreshes the token in place, instead of pointing users at the Manufact account login (`#1485`)
+- **New**: copy button on user messages, matching the assistant-message UX (`#1556`)
+- **Enhancement**: `mcp-use client screenshot` auto-sizes to the widget's natural dimensions when `--width`/`--height` are omitted and handles external MCP server URIs (`ui://<server>/<name>.html`) (`#1579`)
+- **Enhancement**: snappier tab-switch animation timing (`#1544`)
+- **Fix**: MCP image tool results are forwarded to the model as real image content instead of base64-encoded JSON  -  image bytes route through each provider's vision channel (Anthropic `tool_result` image blocks; OpenAI / Google follow-up user turns), and text-only results now reach the model unwrapped (`#1487`)
+- **Fix**: widget fullscreen renders above embedded host chrome  -  native `requestFullscreen()` on the widget shell with an exit navbar, picture-in-picture portaled to `document.body` at `z-[100]`, and AppBridge reconnect after the sandbox iframe remounts (`#1605`)
+- **Fix**: stop `ToolInputForm` from writing an invalid per-property `required: boolean` onto the live tool `inputSchema` during render, which made Anthropic reject the chat request with `tools.0.custom.input_schema invalid` after a tool was opened in the Tools tab (`#1545`)
+- **Fix**: keep per-tab count badges visible and right-aligned in collapsed header tabs (`#1490`)
+- **Fix**: propagate server alias updates through the MCP server wrapper so the tile heading reflects a renamed alias immediately (`#1539`)
+- **Fix**: replace the trailing-slash regex in `normalizeOllamaBaseUrl` with a linear scan, resolving a CodeQL polynomial-regex alert (`#1534`)
+- **Chore**: add an OAuth redirect e2e against an emulated Google issuer, exercising both Direct and Via Proxy connection types (`#1481`, `#1609`)
+- **Chore**: remove 18 unused source files, stop generating the unused client-side `version.ts`, and drop dead barrel re-exports flagged by Knip (`#1510`, `#1533`, `#1607`)
+- **Update**: Updated mcp-use to v1.29.0
+</Update>
+
 <Update label="v6.0.0" description="May 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=6.0.0&title=Widget%20preview%20route%20%26%20dark-mode%20scrollbars&date=2026-05&lang=inspector" alt="Release 6.0.0" />

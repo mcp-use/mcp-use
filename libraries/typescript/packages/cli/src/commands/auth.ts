@@ -181,6 +181,13 @@ export async function loginCommand(options?: {
   silent?: boolean;
   apiKey?: string;
   org?: string;
+  /**
+   * A pre-approved OAuth device code (RFC 8628). When provided, skip requesting
+   * a new code + opening a browser and poll the token endpoint directly. Used by
+   * the web onboarding flow, which creates and approves the code, then embeds it
+   * in the agent's prompt.
+   */
+  deviceCode?: string;
 }): Promise<void> {
   try {
     const directKey = options?.apiKey || process.env.MCP_USE_API_KEY;
@@ -203,7 +210,9 @@ export async function loginCommand(options?: {
       return;
     }
 
-    if (await isLoggedIn()) {
+    // A provided device code means an explicit (re)login as that account —
+    // bypass the "already logged in" short-circuit and authenticate with it.
+    if (!options?.deviceCode && (await isLoggedIn())) {
       let needsReauth = false;
       try {
         await (await McpUseAPI.create()).testAuth();
@@ -241,36 +250,44 @@ export async function loginCommand(options?: {
 
     const authBaseUrl = await getAuthBaseUrl();
 
-    const deviceResp = await requestDeviceCode(authBaseUrl);
-    const {
-      device_code,
-      user_code,
-      verification_uri,
-      verification_uri_complete,
-      interval,
-    } = deviceResp;
+    let device_code: string;
+    let interval: number;
 
-    const displayCode =
-      user_code.length === 8
-        ? `${user_code.slice(0, 4)}-${user_code.slice(4)}`
-        : user_code;
+    if (options?.deviceCode) {
+      // Pre-approved device code (from the web onboarding flow): no browser, no
+      // user code prompt — just poll the token endpoint until it's redeemed.
+      device_code = options.deviceCode.trim();
+      interval = 2;
+      console.log(chalk.gray("  Authenticating with provided device code..."));
+    } else {
+      const deviceResp = await requestDeviceCode(authBaseUrl);
+      device_code = deviceResp.device_code;
+      interval = deviceResp.interval || 5;
 
-    console.log(chalk.white("  Visit: ") + chalk.cyan(verification_uri));
-    console.log(chalk.white("  Code:  ") + chalk.bold.white(displayCode));
-    console.log();
+      const { user_code, verification_uri, verification_uri_complete } =
+        deviceResp;
+      const displayCode =
+        user_code.length === 8
+          ? `${user_code.slice(0, 4)}-${user_code.slice(4)}`
+          : user_code;
 
-    const urlToOpen = verification_uri_complete || verification_uri;
-    try {
-      await open(urlToOpen);
-      console.log(chalk.gray("  Browser opened. Waiting for approval..."));
-    } catch {
-      console.log(chalk.gray("  Open the URL above in your browser."));
+      console.log(chalk.white("  Visit: ") + chalk.cyan(verification_uri));
+      console.log(chalk.white("  Code:  ") + chalk.bold.white(displayCode));
+      console.log();
+
+      const urlToOpen = verification_uri_complete || verification_uri;
+      try {
+        await open(urlToOpen);
+        console.log(chalk.gray("  Browser opened. Waiting for approval..."));
+      } catch {
+        console.log(chalk.gray("  Open the URL above in your browser."));
+      }
     }
 
     const accessToken = await pollForDeviceToken(
       authBaseUrl,
       device_code,
-      interval || 5
+      interval
     );
 
     console.log(chalk.gray("\n  Creating persistent API key..."));

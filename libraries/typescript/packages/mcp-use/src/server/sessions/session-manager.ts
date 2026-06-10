@@ -8,6 +8,7 @@
 import type { Context } from "hono";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { Implementation } from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Serializable session metadata
@@ -23,7 +24,7 @@ export interface SessionMetadata {
   /** Client capabilities advertised during initialization */
   clientCapabilities?: Record<string, unknown>;
   /** Client info (name, version) */
-  clientInfo?: Record<string, unknown>;
+  clientInfo?: Implementation;
   /** Protocol version negotiated during initialization */
   protocolVersion?: string;
   /** Progress token for current tool call (if any) */
@@ -72,6 +73,7 @@ export function startIdleCleanup(
   transports?: Map<string, { close?: () => Promise<void> | void }>,
   mcpServerInstance?: {
     cleanupSessionSubscriptions?: (sessionId: string) => void;
+    cleanupSessionRefs?: (sessionId: string) => void;
   }
 ): NodeJS.Timeout | undefined {
   if (idleTimeoutMs <= 0) {
@@ -106,10 +108,11 @@ export function startIdleCleanup(
         transports?.delete(sessionId);
 
         sessions.delete(sessionId);
-        // Clean up resource subscriptions for this session if mcpServerInstance provided
+        // Clean up server-owned per-session resources if mcpServerInstance provided
         mcpServerInstance?.cleanupSessionSubscriptions?.(sessionId);
+        mcpServerInstance?.cleanupSessionRefs?.(sessionId);
         console.log(
-          `[MCP] Cleaned up resource subscriptions for session ${sessionId}`
+          `[MCP] Cleaned up server resources for session ${sessionId}`
         );
       }
     }

@@ -389,7 +389,7 @@ export function processWidgetHtml(
  * );
  * ```
  */
-export function createWidgetRegistration(
+function createWidgetRegistration(
   widgetName: string,
   metadata:
     | Record<string, unknown>
@@ -637,7 +637,7 @@ export async function createWidgetUIResource(
  * // Returns: { description: 'Widget: kanban-board' }
  * ```
  */
-export function ensureWidgetMetadata(
+function ensureWidgetMetadata(
   metadata: Record<string, unknown>,
   widgetName: string,
   widgetDescription?: string
@@ -663,7 +663,7 @@ export function ensureWidgetMetadata(
  * const html = await readWidgetHtml('/path/to/widget/index.html', 'kanban-board');
  * ```
  */
-export async function readWidgetHtml(
+async function readWidgetHtml(
   filePath: string,
   widgetName: string
 ): Promise<string> {

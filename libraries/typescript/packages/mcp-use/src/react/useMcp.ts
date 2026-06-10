@@ -24,6 +24,7 @@ import {
   deriveOAuthClientConfigFromClientInfo,
   isOAuthDiscoveryFailure,
   startConnectionHealthMonitoring,
+  formatMcpNotReadyReason,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
@@ -322,6 +323,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
+  /** Bumped at the start of each connect(); disconnect only clears clientRef if epoch unchanged. */
+  const connectEpochRef = useRef(0);
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
 
@@ -406,10 +409,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = null;
 
-      if (clientRef.current) {
+      const epochAtStart = connectEpochRef.current;
+      const clientToClose = clientRef.current;
+      if (clientToClose) {
         try {
           const serverName = USE_MCP_SERVER_NAME;
-          const session = clientRef.current.getSession(serverName);
+          const session = clientToClose.getSession(serverName);
 
           // Clean up health check monitoring if it exists
           if (session && (session as any)._healthCheckCleanup) {
@@ -419,15 +424,23 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
           // Only try to close if session exists (avoids noisy warning logs)
           if (session) {
-            await clientRef.current.closeSession(serverName);
+            await clientToClose.closeSession(serverName);
           }
         } catch (err) {
           if (!quiet) addLog("warn", "Error closing session:", err);
         }
       }
-      clientRef.current = null;
+      // A newer connect() (e.g. dashboard environment / URL change) may have
+      // bumped the epoch — possibly reusing the same client instance — while
+      // closeSession was in flight. If so, this disconnect is stale: it must
+      // neither null the (now newer) clientRef nor reset the live state.
+      const supersededByNewerConnect = connectEpochRef.current !== epochAtStart;
 
-      if (isMountedRef.current && !quiet) {
+      if (clientRef.current === clientToClose && !supersededByNewerConnect) {
+        clientRef.current = null;
+      }
+
+      if (isMountedRef.current && !quiet && !supersededByNewerConnect) {
         setState("discovering");
         setTools([]);
         setResources([]);
@@ -495,7 +508,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
 
         // Clear client/auth refs to force fresh initialization with proxy.
-        // Keep externally provided auth providers intact.
+        // Keep externally provided auth providers intact. Synchronous clear;
+        // reconnect is deferred via setTimeout below, so no disconnect race.
         clientRef.current = null;
         if (!providedAuthProvider) {
           authProviderRef.current = null;
@@ -596,6 +610,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
 
     connectingRef.current = true;
+    connectEpochRef.current += 1;
     connectAttemptRef.current += 1;
     setError(undefined);
     setAuthUrl(undefined);
@@ -1322,7 +1337,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot call tool "${name}".`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot call tool "${name}".`
         );
       }
       addLog("info", `Calling tool: ${name}`, args);
@@ -1580,7 +1595,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const listResources = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
       throw new Error(
-        `MCP client is not ready (current state: ${state}). Cannot list resources.`
+        `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot list resources.`
       );
     }
     addLog("info", "Listing resources");
@@ -1616,7 +1631,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (uri: string) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot read resource.`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot read resource.`
         );
       }
       addLog("info", `Reading resource: ${uri}`);
@@ -1673,7 +1688,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const listPrompts = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
       throw new Error(
-        `MCP client is not ready (current state: ${state}). Cannot list prompts.`
+        `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot list prompts.`
       );
     }
     addLog("info", "Listing prompts");
@@ -1847,7 +1862,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (name: string, args?: Record<string, unknown>) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot get prompt.`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot get prompt.`
         );
       }
       addLog("info", `Getting prompt: ${name}`, args);
@@ -1889,7 +1904,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (params: CompleteRequestParams): Promise<CompleteResult> => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot request completion.`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot request completion.`
         );
       }
 
@@ -1925,55 +1940,102 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
   /**
    * Effect: Listen for OAuth callback messages from popup window
-   * Handles successful authentication and reconnection
+   *
+   * Subscribes to two transports for the same `mcp_auth_callback` payload:
+   * - `window.message` (postMessage from `window.opener`): the happy path
+   *   when the popup retained its opener reference.
+   * - `BroadcastChannel("mcp_auth_callback")`: same-origin fallback used by
+   *   the popup callback when `window.opener` has been severed by COOP,
+   *   cross-origin intermediate redirects, or browser tab grouping.
+   *   Without this, a popup that completes auth but lost its opener leaves
+   *   the parent stuck in `authenticating` forever.
+   *
+   * The popup only emits over one transport per callback, so the two
+   * listeners don't double-fire on a single auth completion.
    */
   useEffect(() => {
-    const messageHandler = (event: globalThis.MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "mcp_auth_callback") {
-        addLog("info", "Received auth callback message.", event.data);
-        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
-        authTimeoutRef.current = null;
+    const handleCallbackPayload = (
+      payload: { success?: boolean; error?: string } | undefined,
+      source: "postMessage" | "BroadcastChannel"
+    ) => {
+      addLog("info", `Received auth callback via ${source}.`, payload);
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
+      authTimeoutRef.current = null;
 
-        if (event.data.success) {
+      if (payload?.success) {
+        addLog(
+          "info",
+          "Authentication successful via popup. Reconnecting client..."
+        );
+
+        // Check if already connecting
+        if (connectingRef.current) {
           addLog(
-            "info",
-            "Authentication successful via popup. Reconnecting client..."
-          );
-
-          // Check if already connecting
-          if (connectingRef.current) {
-            addLog(
-              "debug",
-              "Connection attempt already in progress, resetting flag to allow reconnection."
-            );
-          }
-
-          // Reset the connecting flag and reconnect since auth just succeeded
-          connectingRef.current = false;
-
-          // Small delay to ensure state is clean before reconnecting
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              addLog(
-                "debug",
-                "Initiating reconnection after successful auth callback."
-              );
-              connectRef.current?.();
-            }
-          }, 100);
-        } else {
-          failConnectionRef.current?.(
-            `Authentication failed in callback: ${event.data.error || "Unknown reason."}`
+            "debug",
+            "Connection attempt already in progress, resetting flag to allow reconnection."
           );
         }
+
+        // Reset the connecting flag and reconnect since auth just succeeded
+        connectingRef.current = false;
+
+        // Small delay to ensure state is clean before reconnecting
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            addLog(
+              "debug",
+              "Initiating reconnection after successful auth callback."
+            );
+            connectRef.current?.();
+          }
+        }, 100);
+      } else {
+        failConnectionRef.current?.(
+          `Authentication failed in callback: ${payload?.error || "Unknown reason."}`
+        );
       }
+    };
+
+    const messageHandler = (event: globalThis.MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "mcp_auth_callback") return;
+      handleCallbackPayload(event.data, "postMessage");
     };
     window.addEventListener("message", messageHandler);
     addLog("debug", "Auth callback message listener added.");
+
+    let broadcastChannel: BroadcastChannel | null = null;
+    const broadcastHandler = (event: MessageEvent) => {
+      if (event.data?.type !== "mcp_auth_callback") return;
+      handleCallbackPayload(event.data, "BroadcastChannel");
+    };
+    if (typeof BroadcastChannel !== "undefined") {
+      try {
+        broadcastChannel = new BroadcastChannel("mcp_auth_callback");
+        broadcastChannel.addEventListener("message", broadcastHandler);
+        addLog("debug", "Auth callback BroadcastChannel listener added.");
+      } catch (e) {
+        addLog(
+          "warn",
+          "Failed to open auth callback BroadcastChannel; lost-opener popups will not reach this client.",
+          e as Error
+        );
+        broadcastChannel = null;
+      }
+    }
+
     return () => {
       window.removeEventListener("message", messageHandler);
       addLog("debug", "Auth callback message listener removed.");
+      if (broadcastChannel) {
+        try {
+          broadcastChannel.removeEventListener("message", broadcastHandler);
+          broadcastChannel.close();
+        } catch {
+          /* ignore */
+        }
+        addLog("debug", "Auth callback BroadcastChannel listener removed.");
+      }
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
     };
   }, [addLog]);

@@ -1,5 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
+  "rules": {
+    "optionalPeerDependencies": "off"
+  },
   "ignoreWorkspaces": [
     "packages/mcp-use/examples/**",
     "packages/create-mcp-use-app/src/templates/**"
@@ -16,7 +19,7 @@
         "tests/docs/**/*.ts"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreUnresolved": ["./version.js", "../version.js", "./src/version.js"]
+      "ignoreBinaries": ["lsof", "sleep", "dev"]
     },
     "packages/cli": {
       "project": ["src/**/*.ts", "tests/**/*.ts"],
@@ -39,7 +42,7 @@
       ]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["scripts/**/*.{js,mjs,ts}"],
+      "entry": ["src/index.tsx", "scripts/**/*.{js,mjs,ts}"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

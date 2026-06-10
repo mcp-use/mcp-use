@@ -2,7 +2,7 @@ import type { Deployment } from "./api.js";
 
 const GATEWAY_DOMAIN = "run.mcp-use.com";
 
-export function buildGatewayUrl(slugOrId: string): string {
+function buildGatewayUrl(slugOrId: string): string {
   return `https://${slugOrId}.${GATEWAY_DOMAIN}/mcp`;
 }
 

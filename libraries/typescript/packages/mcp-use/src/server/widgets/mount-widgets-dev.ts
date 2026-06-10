@@ -67,7 +67,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
 /**
  * Configuration for development widget mounting
  */
-export type MountWidgetsDevOptions = MountWidgetsOptions;
+type MountWidgetsDevOptions = MountWidgetsOptions;
 
 /**
  * Mounts local widget sources under the project's resources directory into a shared Vite dev server with HMR so they can be served and inspected during development.

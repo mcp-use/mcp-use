@@ -13,11 +13,11 @@ import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
-import { OPENROUTER_ICON_URL } from "./ConfigurationDialog";
 import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
 import type { ToolInfo } from "./ToolSelector";
 import type { LLMConfig, MessageAttachment } from "./types";
+import { ProviderIcon } from "./providerMeta";
 
 interface ChatLandingFormProps {
   mcpServerUrl: string;
@@ -199,17 +199,10 @@ export function ChatLandingForm({
                     className="pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
                     onClick={() => onConfigDialogOpenChange(true)}
                   >
-                    {llmConfig.provider !== "openai-compatible" && (
-                      <img
-                        src={
-                          llmConfig.provider === "openrouter"
-                            ? OPENROUTER_ICON_URL
-                            : `https://inspector-cdn.mcp-use.com/providers/${llmConfig.provider}.png`
-                        }
-                        alt={llmConfig.provider}
-                        className="w-4 h-4 mr-0 rounded-full"
-                      />
-                    )}
+                    <ProviderIcon
+                      provider={llmConfig.provider}
+                      className="mr-0"
+                    />
                     {llmConfig.provider}/{llmConfig.model}
                   </Badge>
                 </TooltipTrigger>

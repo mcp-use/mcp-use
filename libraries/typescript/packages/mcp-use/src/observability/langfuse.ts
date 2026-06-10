@@ -351,6 +351,5 @@ if (langfuseDisabled) {
 
 // Export getters to access the state
 export const langfuseHandler = () => langfuseState.handler;
-export const langfuseClient = () => langfuseState.client;
 export const langfuseInitPromise = () => langfuseState.initPromise;
 export { initializeLangfuse };

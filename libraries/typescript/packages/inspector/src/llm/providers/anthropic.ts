@@ -59,7 +59,28 @@ function toAnthropicContent(content: string | ContentPart[]): unknown {
   return blocks;
 }
 
-function toAnthropicMessages(messages: ProviderMessage[]): unknown[] {
+function toAnthropicToolResultContent(
+  content: string | ContentPart[]
+): unknown {
+  if (typeof content === "string") {
+    return content;
+  }
+  const blocks: unknown[] = [];
+  for (const p of content) {
+    if (p.type === "text") {
+      if (p.text) blocks.push({ type: "text", text: p.text });
+    } else if (p.type === "image") {
+      const img = buildImageBlock(p);
+      if (img) blocks.push(img);
+    }
+  }
+  if (blocks.length === 0) {
+    return "[no content]";
+  }
+  return blocks;
+}
+
+export function toAnthropicMessages(messages: ProviderMessage[]): unknown[] {
   const out: any[] = [];
   for (const m of messages) {
     if (m.role === "tool") {
@@ -68,10 +89,7 @@ function toAnthropicMessages(messages: ProviderMessage[]): unknown[] {
       const block = {
         type: "tool_result",
         tool_use_id: m.toolCallId,
-        content:
-          typeof m.content === "string"
-            ? m.content
-            : JSON.stringify(m.toolResult ?? m.content),
+        content: toAnthropicToolResultContent(m.content),
         ...(m.toolIsError ? { is_error: true } : {}),
       };
       if (last && last.role === "user" && Array.isArray(last.content)) {

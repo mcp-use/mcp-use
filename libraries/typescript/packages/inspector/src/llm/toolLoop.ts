@@ -1,4 +1,5 @@
 import { chat, streamChat } from "./providers";
+import { isToolResultError, toolResultToContent } from "./toolResultParts";
 import type {
   LlmStreamEvent,
   ProviderConfig,
@@ -6,11 +7,11 @@ import type {
   ProviderTool,
 } from "./types";
 
-export interface ToolCallFn {
+interface ToolCallFn {
   (name: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
-export interface ToolLoopParams {
+interface ToolLoopParams {
   config: ProviderConfig;
   /** Initial conversation history + the user turn that triggers the run. */
   messages: ProviderMessage[];
@@ -96,22 +97,17 @@ export async function* runToolLoop(
       let isError = false;
       try {
         result = await callTool(tc.name, tc.args);
+        isError = isToolResultError(result);
       } catch (err) {
         isError = true;
         result = {
+          isError: true,
           error: err instanceof Error ? err.message : String(err),
         };
       }
-      // Normalize result for transmission back to the model. We strip `_meta`
-      // (inspector-specific) while preserving `content` / `structuredContent`.
-      const normalized = stripMeta(result);
-      const payloadText =
-        typeof normalized === "string"
-          ? normalized
-          : JSON.stringify(normalized);
       messages.push({
         role: "tool",
-        content: payloadText,
+        content: toolResultToContent(result),
         toolCallId: tc.id,
         toolName: tc.name,
         toolResult: result,
@@ -126,14 +122,6 @@ export async function* runToolLoop(
       };
     }
   }
-}
-
-function stripMeta(value: unknown): unknown {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const { _meta: _ignored, ...rest } = value as Record<string, unknown>;
-    return rest;
-  }
-  return value;
 }
 
 /**
@@ -176,9 +164,11 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
       let isError = false;
       try {
         result = await callTool(tc.name, tc.args);
+        isError = isToolResultError(result);
       } catch (err) {
         isError = true;
         result = {
+          isError: true,
           error: err instanceof Error ? err.message : String(err),
         };
       }
@@ -187,11 +177,9 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
         args: tc.args,
         result,
       });
-      const payloadText =
-        typeof result === "string" ? result : JSON.stringify(stripMeta(result));
       messages.push({
         role: "tool",
-        content: payloadText,
+        content: toolResultToContent(result),
         toolCallId: tc.id,
         toolName: tc.name,
         toolResult: result,

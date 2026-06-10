@@ -8,7 +8,10 @@ import type {
 import fs from "node:fs";
 import path from "node:path";
 import { BaseMCPClient } from "./client/base.js";
-import type { ExecutionResult } from "./client/codeExecutor.js";
+import type {
+  ExecutionResult,
+  ToolSearchResponse,
+} from "./client/codeExecutor.js";
 import {
   BaseCodeExecutor,
   E2BCodeExecutor,
@@ -704,7 +707,7 @@ export class MCPClient extends BaseMCPClient {
   public async searchTools(
     query: string = "",
     detailLevel: "names" | "descriptions" | "full" = "full"
-  ): Promise<import("./client/codeExecutor.js").ToolSearchResponse> {
+  ): Promise<ToolSearchResponse> {
     if (!this.codeMode) {
       throw new Error("Code execution mode is not enabled");
     }

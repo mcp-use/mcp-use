@@ -36,19 +36,10 @@ import type {
 } from "./types.js";
 import { createLLMFromString, type LLMConfig } from "./utils/llm_provider.js";
 
-// Re-export types for convenience
-export type {
-  LanguageModel,
-  BaseMessage,
-  MCPAgentOptions,
-  MCPServerConfig,
-} from "./types.js";
-export type { LLMConfig } from "./utils/llm_provider.js";
-
 /**
  * Represents a single step in the agent's execution
  */
-export interface AgentStep {
+interface AgentStep {
   action: {
     tool: string;
     toolInput: any;

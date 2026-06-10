@@ -1,5 +1,41 @@
 # create-mcp-use-app
 
+## 0.14.15
+
+### Patch Changes
+
+- 25ae46e: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+
+## 0.14.15-canary.0
+
+### Patch Changes
+
+- f565f9c: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+
+## 0.14.14
+
+### Patch Changes
+
+- feb8f09: Updated dependency `vitest` to `^4.1.0`.
+
+## 0.14.14-canary.0
+
+### Patch Changes
+
+- 2ab15c6: Updated dependency `vitest` to `^4.1.0`.
+
+## 0.14.13
+
+### Patch Changes
+
+- 83271e8: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+
+## 0.14.13-canary.0
+
+### Patch Changes
+
+- 680ef2f: Prune unused exports flagged by Knip. Removes 187 unused exports and deletes 19 unused source files across packages. No public API changes — only internal helpers and barrel re-exports that no consumer was using were touched.
+
 ## 0.14.12
 
 ### Patch Changes

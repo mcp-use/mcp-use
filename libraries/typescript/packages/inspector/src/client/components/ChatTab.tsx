@@ -26,6 +26,7 @@ import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
+import { McpReconnectBanner } from "./chat/McpReconnectBanner";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { LoginModal } from "./LoginModal";
 
@@ -262,6 +263,39 @@ export function ChatTab({
   const clearRateLimitInfo = effectiveClientSide
     ? undefined
     : serverSideChat.clearRateLimitInfo;
+
+  const mcpServerAuthRequired = effectiveClientSide
+    ? null
+    : (serverSideChat.mcpServerAuthRequired ?? null);
+
+  const clearMcpServerAuthRequired = effectiveClientSide
+    ? undefined
+    : serverSideChat.clearMcpServerAuthRequired;
+
+  const handleMcpReconnect = useCallback(async () => {
+    try {
+      await connection.authenticate();
+    } catch (err) {
+      console.error("[ChatTab] MCP reconnect failed:", err);
+      toast.error(
+        err instanceof Error
+          ? `Reconnect failed: ${err.message}`
+          : "Reconnect failed"
+      );
+      return;
+    }
+    clearMcpServerAuthRequired?.();
+  }, [connection, clearMcpServerAuthRequired]);
+
+  const reconnectBannerNode = mcpServerAuthRequired ? (
+    <McpReconnectBanner
+      serverName={connection.name}
+      serverUrl={mcpServerAuthRequired.mcpServerUrl}
+      message={mcpServerAuthRequired.message}
+      onReconnect={handleMcpReconnect}
+      onDismiss={clearMcpServerAuthRequired}
+    />
+  ) : null;
 
   // Called when user clicks "Use your own API key" in the rate-limit modal.
   const handleUseApiKey = useCallback(() => {
@@ -1077,6 +1111,7 @@ export function ChatTab({
           onQuickQuestionSelect={handleQuickQuestionSelect}
           freeTierInfo={freeTierInfo}
         />
+        {reconnectBannerNode}
         {loginModalNode}
       </div>
     );
@@ -1143,11 +1178,13 @@ export function ChatTab({
 
       {loginModalNode}
 
+      {reconnectBannerNode}
+
       {/* Input Area */}
       {llmConfig && (
         <ChatInputArea
           inputValue={inputValue}
-          isConnected={isConnected && !rateLimitInfo}
+          isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
           isLoading={isLoading}
           textareaRef={textareaRef}
           promptsDropdownOpen={promptsDropdownOpen}

@@ -51,7 +51,7 @@ interface AuthTestWireResponse {
 
 // ── Server creation ────────────────────────────────────────────────
 
-export interface CreateServerBody {
+interface CreateServerBody {
   type: "github";
   organizationId: string;
   installationId: string;
@@ -68,17 +68,19 @@ export interface CreateServerBody {
   region?: string;
 }
 
-export interface CreateServerResponse {
+interface CreateServerResponse {
   server: { id: string; slug: string | null };
   deploymentId: string | null;
 }
 
 /** Connected GitHub repository (subset of OpenAPI server payload). */
-export interface CloudServerConnectedRepository {
+interface CloudServerConnectedRepository {
   id: string;
   repoFullName: string;
   productionBranch: string;
   isActive: boolean;
+  /** True when deployed via the platform-managed org (no user GitHub). */
+  isManaged?: boolean;
   userId: string;
   githubInstallationId: string;
   createdAt: string;
@@ -86,7 +88,7 @@ export interface CloudServerConnectedRepository {
 }
 
 /** Server record from `GET /servers` or `GET /servers/{id}` (fields used by CLI). */
-export interface CloudServer {
+interface CloudServer {
   id: string;
   slug: string | null;
   organizationId: string;
@@ -117,7 +119,7 @@ export interface CloudServer {
 
 // ── Deployments ────────────────────────────────────────────────────
 
-export interface CreateDeploymentInput {
+interface CreateDeploymentInput {
   serverId: string;
   name?: string;
   branch?: string;
@@ -127,7 +129,7 @@ export interface CreateDeploymentInput {
   prNumber?: number;
 }
 
-export interface CreateDeploymentResponse {
+interface CreateDeploymentResponse {
   id: string;
 }
 
@@ -156,11 +158,68 @@ export interface Deployment {
   mcpUrl?: string;
 }
 
-export interface BuildLogsResponse {
+interface BuildLogsResponse {
   logs: string;
   offset: number;
   totalLength: number;
   status: string;
+}
+
+interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  skip: number;
+}
+
+interface PaginationParams {
+  limit?: number;
+  skip?: number;
+}
+
+interface SortablePaginationParams extends PaginationParams {
+  sort?: string;
+}
+
+function normalizePaginatedResponse<T>(
+  response: PaginatedResponse<T> | T[],
+  params?: PaginationParams
+): PaginatedResponse<T> {
+  if (Array.isArray(response)) {
+    return {
+      items: response,
+      total: response.length,
+      limit: params?.limit ?? response.length,
+      skip: params?.skip ?? 0,
+    };
+  }
+
+  return {
+    items: response.items,
+    total: response.total,
+    limit: response.limit,
+    skip: response.skip,
+  };
+}
+
+function buildPaginationQuery(
+  params?: SortablePaginationParams & { organizationId?: string }
+): string {
+  const search = new URLSearchParams();
+  if (params?.organizationId) {
+    search.set("organizationId", params.organizationId);
+  }
+  if (params?.limit != null) {
+    search.set("limit", String(params.limit));
+  }
+  if (params?.skip != null) {
+    search.set("skip", String(params.skip));
+  }
+  if (params?.sort) {
+    search.set("sort", params.sort);
+  }
+  const q = search.toString();
+  return q ? `?${q}` : "";
 }
 
 // ── GitHub ──────────────────────────────────────────────────────────
@@ -177,7 +236,7 @@ export interface GitHubConnectionStatus {
   installations?: GitHubInstallation[];
 }
 
-export interface GitHubRepo {
+interface GitHubRepo {
   id: number;
   name: string;
   full_name: string;
@@ -187,7 +246,7 @@ export interface GitHubRepo {
   };
 }
 
-export interface GitHubReposResponse {
+interface GitHubReposResponse {
   user: {
     login: string;
     id: number;
@@ -211,14 +270,14 @@ export interface EnvVariable {
   updatedAt: string;
 }
 
-export interface CreateEnvVariableBody {
+interface CreateEnvVariableBody {
   key: string;
   value: string;
   environments?: EnvEnvironment[];
   sensitive?: boolean;
 }
 
-export interface UpdateEnvVariableBody {
+interface UpdateEnvVariableBody {
   value?: string;
   environments?: EnvEnvironment[];
   sensitive?: boolean;
@@ -387,27 +446,110 @@ export class McpUseAPI {
     });
   }
 
+  /** Multipart helper: POST/PUT a tarball + fields without the JSON Content-Type. */
+  private async uploadMultipart<T>(
+    endpoint: string,
+    form: FormData,
+    timeout = 120000
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    const headers: Record<string, string> = {
+      "x-mcp-creation-location": "cli",
+    };
+    if (this.apiKey) headers["x-api-key"] = this.apiKey;
+    if (this.orgId) headers["x-profile-id"] = this.orgId;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: form,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (response.status === 401) throw new ApiUnauthorizedError();
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} ${errorText}`);
+      }
+      return response.json() as Promise<T>;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === "AbortError") {
+        throw new Error(`Request timeout after ${timeout / 1000}s.`);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Create a server from a source tarball deployed into the platform-managed
+   * GitHub org (no user GitHub connection required).
+   */
+  async createServerFromManagedUpload(input: {
+    organizationId: string;
+    name: string;
+    repoName: string;
+    tarball: Buffer;
+    branch?: string;
+    commitMessage?: string;
+    port?: number;
+    env?: Record<string, string>;
+  }): Promise<CreateServerResponse> {
+    const form = new FormData();
+    form.set(
+      "sourceFile",
+      new Blob([new Uint8Array(input.tarball)], { type: "application/gzip" }),
+      "source.tar.gz"
+    );
+    form.set("organizationId", input.organizationId);
+    form.set("managed", "true");
+    form.set("name", input.name);
+    form.set("repoName", input.repoName);
+    form.set("private", "true");
+    form.set("branch", input.branch ?? "main");
+    form.set("commitMessage", input.commitMessage ?? "Deploy from mcp-use CLI");
+    if (input.port != null) form.set("port", String(input.port));
+    if (input.env && Object.keys(input.env).length > 0) {
+      form.set("env", JSON.stringify(input.env));
+    }
+    return this.uploadMultipart<CreateServerResponse>("/servers", form);
+  }
+
+  /** Push a new source tarball as a commit on an existing server's repo. */
+  async pushSourceToServer(
+    serverId: string,
+    input: { tarball: Buffer; branch?: string; commitMessage?: string }
+  ): Promise<{ commitSha: string; repoFullName: string; branch: string }> {
+    const form = new FormData();
+    form.set(
+      "sourceFile",
+      new Blob([new Uint8Array(input.tarball)], { type: "application/gzip" }),
+      "source.tar.gz"
+    );
+    form.set("branch", input.branch ?? "main");
+    form.set(
+      "commitMessage",
+      input.commitMessage ?? "Redeploy from mcp-use CLI"
+    );
+    return this.uploadMultipart(
+      `/servers/${encodeURIComponent(serverId)}/source`,
+      form
+    );
+  }
+
   async listServers(params?: {
     organizationId?: string;
     limit?: number;
     skip?: number;
     sort?: string;
-  }): Promise<CloudServer[]> {
-    const search = new URLSearchParams();
-    if (params?.organizationId) {
-      search.set("organizationId", params.organizationId);
-    }
-    if (params?.limit != null) {
-      search.set("limit", String(params.limit));
-    }
-    if (params?.skip != null) {
-      search.set("skip", String(params.skip));
-    }
-    if (params?.sort) {
-      search.set("sort", params.sort);
-    }
-    const q = search.toString();
-    return this.request<CloudServer[]>(`/servers${q ? `?${q}` : ""}`);
+  }): Promise<PaginatedResponse<CloudServer>> {
+    const response = await this.request<
+      PaginatedResponse<CloudServer> | CloudServer[]
+    >(`/servers${buildPaginationQuery(params)}`);
+    return normalizePaginatedResponse(response, params);
   }
 
   async getServer(idOrSlug: string): Promise<CloudServer> {
@@ -481,8 +623,13 @@ export class McpUseAPI {
     return this.request<Deployment>(`/deployments/${deploymentId}`);
   }
 
-  async listDeployments(): Promise<Deployment[]> {
-    return this.request<Deployment[]>("/deployments");
+  async listDeployments(
+    params?: SortablePaginationParams
+  ): Promise<PaginatedResponse<Deployment>> {
+    const response = await this.request<
+      PaginatedResponse<Deployment> | Deployment[]
+    >(`/deployments${buildPaginationQuery(params)}`);
+    return normalizePaginatedResponse(response, params);
   }
 
   async deleteDeployment(deploymentId: string): Promise<void> {
@@ -562,16 +709,29 @@ export class McpUseAPI {
       return { user: { login: "", id: 0, avatar_url: "" }, repos: [] };
     }
 
+    // An organization can have multiple GitHub installations (e.g. a user
+    // account and one or more GitHub orgs). Aggregate repos across all of
+    // them instead of only the first, otherwise repos owned by any other
+    // installation are reported as inaccessible.
     const inst = installResp.installations[0];
-    const reposResp = await this.request<{
-      repos: Array<{
-        id: number;
-        name: string;
-        fullName: string;
-        private: boolean;
-        ownerAvatarUrl: string | null;
-      }>;
-    }>(`/github/installations/${inst.installationId}/repos`);
+    const repoLists = await Promise.all(
+      installResp.installations.map(async (installation) => {
+        try {
+          const reposResp = await this.request<{
+            repos: Array<{
+              id: number;
+              name: string;
+              fullName: string;
+              private: boolean;
+              ownerAvatarUrl: string | null;
+            }>;
+          }>(`/github/installations/${installation.installationId}/repos`);
+          return reposResp.repos;
+        } catch {
+          return [];
+        }
+      })
+    );
 
     return {
       user: {
@@ -579,7 +739,7 @@ export class McpUseAPI {
         id: 0,
         avatar_url: inst.account?.avatar_url ?? "",
       },
-      repos: reposResp.repos.map((r) => ({
+      repos: repoLists.flat().map((r) => ({
         id: r.id,
         name: r.name,
         full_name: r.fullName,

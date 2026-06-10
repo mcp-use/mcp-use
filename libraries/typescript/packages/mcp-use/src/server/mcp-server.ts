@@ -18,6 +18,10 @@ import { getPackageVersion } from "../version.js";
 
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
 import { mountInspectorUI } from "./inspector/index.js";
+import {
+  registerOpenAPITools,
+  type FromOpenAPIOptions,
+} from "./openapi/index.js";
 import { registerPrompt } from "./prompts/index.js";
 import {
   registerResource,
@@ -38,23 +42,6 @@ import {
 import { generateWidgetUri } from "./widgets/widget-helpers.js";
 import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
-
-// Import and re-export tool context types for public API
-import type {
-  ElicitFormParams,
-  ElicitOptions,
-  ElicitUrlParams,
-  SampleOptions,
-  ToolContext,
-} from "./types/tool-context.js";
-
-export type {
-  ElicitFormParams,
-  ElicitOptions,
-  ElicitUrlParams,
-  SampleOptions,
-  ToolContext,
-};
 
 import { getRequestContext, runWithContext } from "./context-storage.js";
 import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
@@ -242,6 +229,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public static getPackageVersion(): string {
     return getPackageVersion();
+  }
+
+  /**
+   * Create an MCP server from a parsed, bundled OpenAPI document.
+   *
+   * Each included OpenAPI operation is registered as an MCP tool.
+   */
+  public static fromOpenAPI(
+    options: FromOpenAPIOptions
+  ): MCPServerClass<false> {
+    const server = new MCPServerClass({
+      name: options.name ?? options.spec.info.title,
+      version: options.version ?? options.spec.info.version ?? "1.0.0",
+    }) as MCPServerClass<false>;
+
+    registerOpenAPITools(server, options);
+    return server;
   }
 
   /**
@@ -2298,6 +2302,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.sessionIdleTimeoutMs - Session idle timeout (default: 86400000 = 1 day)
    * @param config.cors - Optional CORS configuration overrides
    * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation
+   * @param config.instructions - Server-wide model instructions returned during MCP initialization
    *
    * @returns Proxied server instance supporting both MCP and Hono methods
    *
@@ -2401,6 +2406,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         icons: processIconUrls(config.icons, config.baseUrl),
       },
       {
+        instructions: config.instructions,
         capabilities: {
           logging: {},
           completions: {},
@@ -2672,6 +2678,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         icons: processIconUrls(this.config.icons, this.serverBaseUrl),
       },
       {
+        instructions: this.config.instructions,
         capabilities: {
           logging: {},
           completions: {},
@@ -3905,7 +3912,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
-        this.oauthSetupState
+        this.oauthSetupState,
+        { publicLandingPage: this.config.publicLandingPage }
       );
     }
 
@@ -4034,7 +4042,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.app,
         this.oauthProvider,
         this.getServerBaseUrl(),
-        this.oauthSetupState
+        this.oauthSetupState,
+        { publicLandingPage: this.config.publicLandingPage }
       );
     }
 
@@ -4166,13 +4175,14 @@ export type MCPServer<HasOAuth extends boolean = false> =
   MCPServerClass<HasOAuth>;
 
 // Interface to properly type the MCPServer constructor with OAuth overloads
-export interface MCPServerConstructor {
+interface MCPServerConstructor {
   // Overload: when OAuth is configured, return McpServerInstance<true>
   new (
     config: ServerConfig & { oauth: NonNullable<ServerConfig["oauth"]> }
   ): McpServerInstance<true>;
   // Overload: when OAuth is not configured, return McpServerInstance<false>
   new (config: ServerConfig): McpServerInstance<false>;
+  fromOpenAPI(options: FromOpenAPIOptions): McpServerInstance<false>;
   prototype: MCPServerClass<boolean>;
 }
 

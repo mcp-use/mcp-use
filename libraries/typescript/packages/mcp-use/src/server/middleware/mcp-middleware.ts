@@ -49,20 +49,20 @@ export interface MiddlewareContext {
 }
 
 /** Params shape for `tools/call` method */
-export interface ToolsCallParams {
+interface ToolsCallParams {
   name: string;
   arguments?: Record<string, unknown>;
   _meta?: Record<string, unknown>;
 }
 
 /** Params shape for `resources/read` method */
-export interface ResourcesReadParams {
+interface ResourcesReadParams {
   uri: string;
   _meta?: Record<string, unknown>;
 }
 
 /** Params shape for `prompts/get` method */
-export interface PromptsGetParams {
+interface PromptsGetParams {
   name: string;
   arguments?: Record<string, string>;
   _meta?: Record<string, unknown>;

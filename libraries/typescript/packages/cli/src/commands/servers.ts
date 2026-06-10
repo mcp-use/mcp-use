@@ -8,6 +8,8 @@ import { formatRelativeTime } from "../utils/format.js";
 import { resolveOrgFromOption } from "./auth.js";
 import { createEnvCommand } from "./env.js";
 
+const DEFAULT_LIST_LIMIT = 30;
+
 async function prompt(question: string): Promise<boolean> {
   const readline = await import("node:readline");
   const rl = readline.createInterface({
@@ -61,6 +63,31 @@ function getStatusColor(status: string): (text: string) => string {
   return chalk.gray;
 }
 
+function formatPageHeader(label: string, count: number, total: number): string {
+  return count === total
+    ? `${label} (${total})`
+    : `${label} (${count} of ${total})`;
+}
+
+function printNextPageHint(
+  command: string,
+  page: { items: unknown[]; total: number; limit: number; skip: number },
+  extraArgs: string[] = []
+): void {
+  const nextSkip = page.skip + page.items.length;
+  if (nextSkip >= page.total) return;
+
+  const args = [
+    command,
+    "--limit",
+    String(page.limit),
+    "--skip",
+    String(nextSkip),
+    ...extraArgs,
+  ];
+  console.log(chalk.gray(`Next page: ${args.join(" ")}`));
+}
+
 async function listServersCommand(options: {
   org?: string;
   limit?: string;
@@ -82,7 +109,9 @@ async function listServersCommand(options: {
     await applyOrgOption(api, options.org);
     if (options.org) console.log();
 
-    const limit = options.limit ? parseInt(options.limit, 10) : undefined;
+    const limit = options.limit
+      ? parseInt(options.limit, 10)
+      : DEFAULT_LIST_LIMIT;
     const skip = options.skip ? parseInt(options.skip, 10) : undefined;
     if (limit !== undefined && (Number.isNaN(limit) || limit < 1)) {
       console.log(chalk.red("✗ Invalid --limit"));
@@ -93,23 +122,33 @@ async function listServersCommand(options: {
       process.exit(1);
     }
 
-    const servers = await api.listServers({
+    const page = await api.listServers({
       limit,
       skip,
       sort: options.sort,
     });
+    const servers = page.items;
 
     if (servers.length === 0) {
-      console.log(chalk.yellow("No servers found."));
-      console.log(
-        chalk.gray(
-          "\nCreate one by deploying with " + chalk.white("mcp-use deploy")
-        )
-      );
+      if (page.total === 0) {
+        console.log(chalk.yellow("No servers found."));
+        console.log(
+          chalk.gray(
+            "\nCreate one by deploying with " + chalk.white("mcp-use deploy")
+          )
+        );
+      } else {
+        console.log(chalk.yellow(`No servers found at --skip ${page.skip}.`));
+        console.log(chalk.gray(`Total servers: ${page.total}`));
+      }
       return;
     }
 
-    console.log(chalk.cyan.bold(`\n🖥  Servers (${servers.length})\n`));
+    console.log(
+      chalk.cyan.bold(
+        `\n🖥  ${formatPageHeader("Servers", servers.length, page.total)}\n`
+      )
+    );
 
     console.log(
       chalk.white.bold(
@@ -132,6 +171,10 @@ async function listServersCommand(options: {
       );
     }
 
+    const extraArgs = [];
+    if (options.sort) extraArgs.push("--sort", options.sort);
+    if (options.org) extraArgs.push("--org", options.org);
+    printNextPageHint("mcp-use servers list", page, extraArgs);
     console.log();
   } catch (error) {
     handleCommandError(error, "Failed to list servers");
@@ -329,7 +372,7 @@ export function createServersCommand(): Command {
     .alias("ls")
     .description("List servers for the current organization")
     .option("--org <slug-or-id>", "Target organization (slug, id, or name)")
-    .option("--limit <n>", "Page size (1–100, default 50)")
+    .option("--limit <n>", "Page size (default 30)")
     .option("--skip <n>", "Offset for pagination")
     .option("--sort <field:asc|desc>", "Sort (e.g. updatedAt:desc)")
     .action(listServersCommand);

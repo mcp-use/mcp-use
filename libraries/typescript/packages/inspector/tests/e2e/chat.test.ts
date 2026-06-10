@@ -2,8 +2,10 @@ import { expect, test } from "@playwright/test";
 import {
   configureLLMAPI,
   connectToConformanceServer,
+  goToInspectorWithAutoConnectAndOpenTools,
   navigateToTools,
 } from "./helpers/connection";
+import { getTestMatrix } from "./helpers/test-matrix";
 
 test.describe("Inspector Chat Tests", () => {
   // Note: To run these tests with a real MCP server:
@@ -17,14 +19,22 @@ test.describe("Inspector Chat Tests", () => {
   test.beforeEach(async ({ page, context }) => {
     // Clear localStorage and cookies before each test
     await context.clearCookies();
-    await page.goto("http://localhost:3000/inspector");
-    await page.evaluate(() => localStorage.clear());
 
-    // Connect to server using helper
-    await connectToConformanceServer(page);
+    const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
+    if (usesBuiltinInspector) {
+      await goToInspectorWithAutoConnectAndOpenTools(page, {
+        waitForWidgets: true,
+      });
+    } else {
+      await page.goto(inspectorUrl);
+      await page.evaluate(() => localStorage.clear());
 
-    // Navigate to Tools tab
-    await navigateToTools(page);
+      // Connect to server using helper
+      await connectToConformanceServer(page);
+
+      // Navigate to Tools tab
+      await navigateToTools(page);
+    }
 
     // Configure LLM API
     await configureLLMAPI(page);

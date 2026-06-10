@@ -21,6 +21,30 @@ import {
 } from "mcp-use/server";
 import { z } from "zod";
 
+// Fetch a stable seeded image from picsum.photos and cache the base64 bytes
+// for the server's lifetime. The `image()` helper takes base64-encoded image
+// bytes (per the MCP `ImageContent` spec), so we forward real bytes instead
+// of a URL — otherwise vision-capable models reject the payload as an invalid
+// base64 string.
+const PICSUM_IMAGE_URL = "https://picsum.photos/seed/mcp-use/200/200";
+let cachedPlaceholderImage: { data: string; mimeType: string } | undefined;
+async function getPlaceholderImage(): Promise<{
+  data: string;
+  mimeType: string;
+}> {
+  if (cachedPlaceholderImage) return cachedPlaceholderImage;
+  const res = await fetch(PICSUM_IMAGE_URL);
+  if (!res.ok) {
+    throw new Error(
+      `picsum.photos returned ${res.status} ${res.statusText} for ${PICSUM_IMAGE_URL}`
+    );
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  const mimeType = res.headers.get("content-type") ?? "image/jpeg";
+  cachedPlaceholderImage = { data: buf.toString("base64"), mimeType };
+  return cachedPlaceholderImage;
+}
+
 // ============================================================================
 // MOCK DATA — shared across tools, resources, and prompts
 // ============================================================================
@@ -614,19 +638,12 @@ server.tool(
 server.tool(
   {
     name: "get-placeholder-image",
-    description: "Return a placeholder image URL",
-    schema: z.object({
-      size: z
-        .number()
-        .min(50)
-        .max(500)
-        .optional()
-        .default(200)
-        .describe("Image size in pixels"),
-    }),
+    description: "Return a placeholder image",
+    schema: z.object({}),
   },
-  async ({ size }) => {
-    return image(`https://via.placeholder.com/${size}`, "image/png");
+  async () => {
+    const { data, mimeType } = await getPlaceholderImage();
+    return image(data, mimeType);
   }
 );
 
@@ -759,6 +776,7 @@ server.tool(
       Buffer.from("fake").toString("base64"),
       "audio/wav"
     );
+    const placeholder = await getPlaceholderImage();
     return mix(
       text("Plain text"),
       markdown("## Markdown heading"),
@@ -766,7 +784,7 @@ server.tool(
       xml("<item>XML</item>"),
       css("body { margin: 0; }"),
       javascript('console.log("js");'),
-      image("https://via.placeholder.com/100", "image/png"),
+      image(placeholder.data, placeholder.mimeType),
       binary(
         Buffer.from("bytes").toString("base64"),
         "application/octet-stream"

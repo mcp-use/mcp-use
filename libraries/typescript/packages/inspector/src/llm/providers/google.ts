@@ -1,6 +1,10 @@
 import { extractSystem, parseDataUrl } from "../messageFormat";
 import { sanitizeSchemaForGemini } from "../schemaUtils";
 import { parseSSE } from "../sse";
+import {
+  partitionToolContent,
+  toolImageFollowupHeader,
+} from "../toolResultParts";
 import type {
   ContentPart,
   LlmStreamEvent,
@@ -68,22 +72,46 @@ function toGeminiParts(content: string | ContentPart[]): unknown[] {
   return parts;
 }
 
-function toGeminiContents(messages: ProviderMessage[]): unknown[] {
+function buildGeminiToolResponse(content: string | ContentPart[]): {
+  response: Record<string, unknown>;
+  imageParts: ContentPart[];
+} {
+  // `functionResponse.response` must be an object; for a JSON-stringified
+  // result we parse it back so Gemini sees the structured shape.
+  if (typeof content === "string") {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      parsed = { result: content };
+    }
+    if (!parsed || typeof parsed !== "object") {
+      parsed = { result: parsed };
+    }
+    return { response: parsed as Record<string, unknown>, imageParts: [] };
+  }
+  const { text, imageParts } = partitionToolContent(content);
+  const response: Record<string, unknown> = {};
+  if (text) response.text = text;
+  if (imageParts.length > 0) {
+    response.images = imageParts.map((p) => ({
+      mimeType: p.mimeType ?? "image/*",
+      omitted: true,
+    }));
+    response.note =
+      "Image bytes were sent in the next user turn as inlineData.";
+  }
+  if (Object.keys(response).length === 0) {
+    response.result = null;
+  }
+  return { response, imageParts };
+}
+
+export function toGeminiContents(messages: ProviderMessage[]): unknown[] {
   const out: any[] = [];
   for (const m of messages) {
     if (m.role === "tool") {
-      let response: unknown;
-      try {
-        response =
-          typeof m.content === "string" ? JSON.parse(m.content) : m.toolResult;
-      } catch {
-        response = {
-          result: typeof m.content === "string" ? m.content : m.toolResult,
-        };
-      }
-      if (!response || typeof response !== "object") {
-        response = { result: response };
-      }
+      const { response, imageParts } = buildGeminiToolResponse(m.content);
       const last = out[out.length - 1];
       const part = {
         functionResponse: {
@@ -95,6 +123,16 @@ function toGeminiContents(messages: ProviderMessage[]): unknown[] {
         last.parts.push(part);
       } else {
         out.push({ role: "function", parts: [part] });
+      }
+      if (imageParts.length > 0) {
+        const userParts: unknown[] = [
+          { text: toolImageFollowupHeader(m.toolName, imageParts.length) },
+        ];
+        for (const p of imageParts) {
+          const block = buildInlineData(p);
+          if (block) userParts.push(block);
+        }
+        out.push({ role: "user", parts: userParts });
       }
       continue;
     }

@@ -1,3 +1,6 @@
+import { DEFAULT_OLLAMA_BASE_URL } from "@/llm/providers/ollama/utils";
+import type { ProviderName } from "@/llm/types";
+
 export interface MessageAttachment {
   type: "image" | "file";
   data: string; // base64 encoded
@@ -32,12 +35,7 @@ export interface Message {
 }
 
 export interface LLMConfig {
-  provider:
-    | "openai"
-    | "openai-compatible"
-    | "anthropic"
-    | "google"
-    | "openrouter";
+  provider: ProviderName;
   apiKey: string;
   model: string;
   temperature?: number;
@@ -74,10 +72,27 @@ export interface MCPConfig {
 
 export type StreamProtocol = "sse" | "data-stream";
 
-export const DEFAULT_MODELS = {
+export const DEFAULT_MODELS: Record<ProviderName, string> = {
   openai: "gpt-4o",
   "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
   openrouter: "meta-llama/llama-3.1-8b-instruct:free",
+  ollama: "qwen3",
 };
+
+const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
+  ollama: DEFAULT_OLLAMA_BASE_URL,
+};
+
+export function providerRequiresApiKey(provider: ProviderName): boolean {
+  return provider !== "ollama" && provider !== "openai-compatible";
+}
+
+export function providerSupportsBaseUrl(provider: ProviderName): boolean {
+  return provider === "ollama" || provider === "openai-compatible";
+}
+
+export function getDefaultBaseUrl(provider: ProviderName): string {
+  return DEFAULT_BASE_URLS[provider] ?? "";
+}

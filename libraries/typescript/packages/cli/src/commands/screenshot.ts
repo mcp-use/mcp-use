@@ -20,8 +20,8 @@ import {
 
 interface ScreenshotOptions {
   tool?: string;
-  width: string;
-  height: string;
+  width?: string;
+  height?: string;
   inspector?: string;
   mcp?: string;
   theme: "light" | "dark";
@@ -98,7 +98,7 @@ export function detectToolResourceUri(
   );
 }
 
-export interface CaptureToolScreenshotInputs {
+interface CaptureToolScreenshotInputs {
   session: MCPSession;
   toolName: string;
   toolArgs: Record<string, unknown>;
@@ -106,8 +106,17 @@ export interface CaptureToolScreenshotInputs {
   resourceUri: string;
 }
 
-export interface CaptureToolScreenshotOptions {
+interface CaptureToolScreenshotOptions {
+  /**
+   * Desired output width in CSS pixels. When omitted, the screenshot fits the
+   * widget's natural rendered width. When set, also overrides the inline-mode
+   * 768px max-width cap so the widget renders at the requested width.
+   */
   width?: number;
+  /**
+   * Desired output height in CSS pixels. When omitted, the screenshot fits the
+   * widget's natural rendered height.
+   */
   height?: number;
   theme?: "light" | "dark";
   output?: string;
@@ -130,9 +139,11 @@ export interface CaptureToolScreenshotOptions {
   deviceScaleFactor?: number;
 }
 
-export interface CaptureToolScreenshotResult {
+interface CaptureToolScreenshotResult {
   outputPath: string;
+  /** Final clip width in CSS pixels (what the PNG visually represents). */
   width: number;
+  /** Final clip height in CSS pixels. */
   height: number;
   view: string;
 }
@@ -148,8 +159,7 @@ export async function captureToolScreenshot(
   inputs: CaptureToolScreenshotInputs,
   options: CaptureToolScreenshotOptions = {}
 ): Promise<CaptureToolScreenshotResult> {
-  const width = options.width ?? 800;
-  const height = options.height ?? 600;
+  const { width, height } = options;
   const theme: "light" | "dark" = options.theme ?? "light";
   const timeoutMs = options.timeoutMs ?? 30000;
   const delayMs = options.delayMs ?? 0;
@@ -158,8 +168,6 @@ export async function captureToolScreenshot(
   const view = extractViewName(inputs.resourceUri);
 
   const devOptions: ScreenshotOptions = {
-    width: String(width),
-    height: String(height),
     theme,
     timeout: String(timeoutMs),
     inspector: options.inspector,
@@ -182,12 +190,18 @@ export async function captureToolScreenshot(
 
     const previewUrl = new URL(`/inspector/preview/${view}`, devHandle.url);
     previewUrl.searchParams.set("theme", theme);
+    // Width also drives the inline-mode max-width inside the iframe: when set,
+    // the widget renders at this width, then we clip to it. When unset, the
+    // widget renders at its natural width (capped at 768).
+    if (width !== undefined) {
+      previewUrl.searchParams.set("width", String(width));
+    }
 
     const ts = timestampSuffix();
     const outputPath = path.resolve(options.output ?? `./${view}-${ts}.png`);
     await mkdir(path.dirname(outputPath), { recursive: true });
 
-    await captureScreenshot({
+    const captured = await captureScreenshot({
       url: previewUrl.toString(),
       width,
       height,
@@ -202,7 +216,12 @@ export async function captureToolScreenshot(
       deviceScaleFactor: options.deviceScaleFactor,
     });
 
-    return { outputPath, width, height, view };
+    return {
+      outputPath,
+      width: captured.width,
+      height: captured.height,
+      view,
+    };
   } finally {
     killChild(devHandle?.child);
   }
@@ -398,10 +417,12 @@ export function timestampSuffix(date = new Date()): string {
 }
 
 export function extractViewName(resourceUri: string): string {
-  const m = resourceUri.match(/^ui:\/\/widget\/(.+)$/);
-  if (!m) return resourceUri;
-  // Strip trailing .html and any .<buildId> segment before it.
-  return m[1].replace(/\.html$/, "").replace(/\.[0-9a-f]+$/i, "");
+  // ui://<host>/<path>[.<buildId>].html
+  const m = resourceUri.match(/^ui:\/\/([^/]+)\/(.+)$/);
+  if (!m) return encodeURIComponent(resourceUri);
+  const name = m[2].replace(/\.html$/, "").replace(/\.[0-9a-f]+$/i, "");
+  // Built-in "widget" namespace: drop the host prefix to keep existing names short.
+  return m[1] === "widget" ? name : `${m[1]}-${name}`;
 }
 
 export function parseDimension(raw: string, name: string): number {
@@ -483,7 +504,7 @@ async function resolveSessionForScreenshot(
   return null;
 }
 
-export async function screenshotCommand(
+async function screenshotCommand(
   options: ScreenshotOptions,
   argsList: string[] | undefined,
   context: ScreenshotContext
@@ -533,8 +554,14 @@ export async function screenshotCommand(
       return;
     }
 
-    const width = parseDimension(options.width, "width");
-    const height = parseDimension(options.height, "height");
+    const width =
+      options.width !== undefined
+        ? parseDimension(options.width, "width")
+        : undefined;
+    const height =
+      options.height !== undefined
+        ? parseDimension(options.height, "height")
+        : undefined;
     const navTimeout = parseInt(options.timeout, 10) || 30000;
     const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
     const deviceScaleFactor = options.deviceScaleFactor
@@ -662,8 +689,14 @@ function withCommonScreenshotOptions(cmd: Command): Command {
       "--tool <name>",
       "Tool to call. Its UI resource is rendered with the result."
     )
-    .option("--width <px>", "Browser viewport width in pixels.", "800")
-    .option("--height <px>", "Browser viewport height in pixels.", "600")
+    .option(
+      "--width <px>",
+      "Output image width in pixels. When omitted, fits the widget's natural width. When set, the widget renders at this width (overrides the inline-mode 768px cap)."
+    )
+    .option(
+      "--height <px>",
+      "Output image height in pixels. When omitted, fits the widget's natural height."
+    )
     .option(
       "--device-scale-factor <n>",
       "Device pixel ratio for rendering (e.g. 2 for Retina). Output PNG is (width × dsf) × (height × dsf). Must be > 0 and <= 4."

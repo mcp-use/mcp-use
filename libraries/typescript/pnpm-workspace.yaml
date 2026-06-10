@@ -8,3 +8,12 @@ packages:
 onlyBuiltDependencies:
   - "@tailwindcss/oxide"
   - esbuild
+
+# Block installing npm releases newer than 3 days (value is minutes) to
+# blunt supply-chain attacks where a malicious version is yanked within
+# hours of publish. Workspace-published names are exempted.
+minimumReleaseAge: 4320
+minimumReleaseAgeExclude:
+  - mcp-use
+  - "@mcp-use/*"
+  - create-mcp-use-app

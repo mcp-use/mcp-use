@@ -1,8 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   connectToConformanceServer,
+  goToInspectorWithAutoConnectAndOpenTools,
   navigateToTools,
 } from "./helpers/connection";
+import { getTestMatrix } from "./helpers/test-matrix";
 
 let page: Page;
 
@@ -14,15 +16,23 @@ test.describe("Inspector Command Palette Tests", () => {
 
   test.beforeAll(async ({ browser }) => {
     page = await browser.newPage();
-    await page.goto("http://localhost:3000/inspector");
-    await page.waitForLoadState("networkidle");
     // Clear localStorage and cookies after navigation
     await page.context().clearCookies();
-    await page.evaluate(() => localStorage.clear());
 
-    // Connect to conformance server
-    await connectToConformanceServer(page);
-    await navigateToTools(page);
+    const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
+    if (usesBuiltinInspector) {
+      await goToInspectorWithAutoConnectAndOpenTools(page, {
+        waitForWidgets: true,
+      });
+    } else {
+      await page.goto(inspectorUrl);
+      await page.waitForLoadState("networkidle");
+      await page.evaluate(() => localStorage.clear());
+
+      // Connect to conformance server
+      await connectToConformanceServer(page);
+      await navigateToTools(page);
+    }
   });
 
   test.afterAll(async () => {

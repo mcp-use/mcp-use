@@ -58,6 +58,16 @@ export interface ServerConfig {
    */
   description?: string;
   /**
+   * Instructions for AI models using this server.
+   *
+   * Use this for server-wide guidance such as cross-tool workflows,
+   * ordering constraints, or safety requirements. Do not repeat
+   * individual tool descriptions here.
+   *
+   * @example "Call search-products before get-product-details. Confirm inventory before creating orders."
+   */
+  instructions?: string;
+  /**
    * Hostname for widget URLs and server endpoints.
    * Defaults to 'localhost' in development.
    *
@@ -287,6 +297,16 @@ export interface ServerConfig {
    * ```
    */
   oauth?: OAuthProvider;
+  /**
+   * Expose the HTML MCP landing page without bearer authentication.
+   *
+   * When OAuth is configured, `/mcp` routes require a token by default.
+   * Set to `true` to allow unauthenticated browser visits to the landing page
+   * while keeping MCP protocol traffic protected.
+   *
+   * @default false
+   */
+  publicLandingPage?: boolean;
   /**
    * Path to favicon file relative to public directory
    *

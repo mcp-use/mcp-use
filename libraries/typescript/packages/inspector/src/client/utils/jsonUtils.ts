@@ -8,7 +8,7 @@ const LARGE_JSON_THRESHOLD = 100 * 1024;
 // Maximum length for individual property values in preview (20KB)
 const MAX_VALUE_LENGTH = 1024 * 20;
 
-export interface LargeJSONInfo {
+interface LargeJSONInfo {
   isLarge: boolean;
   size: number;
   sizeFormatted: string;

@@ -41,6 +41,7 @@ import {
 } from "./utils/mcp-dir-build.js";
 import { NEXT_SERVER_RUNTIME_MODULES } from "./utils/next-server-runtime-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
+import { getWidgetAssetBase } from "./utils/widget-paths.js";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -781,10 +782,7 @@ if (container && Component) {
       widgetName
     );
 
-    // Set base URL: use MCP_URL if set, otherwise relative path
-    const baseUrl = mcpUrl
-      ? `${mcpUrl}/${widgetName}/`
-      : `/mcp-use/widgets/${widgetName}/`;
+    const baseUrl = getWidgetAssetBase(mcpUrl, widgetName);
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
@@ -1165,7 +1163,9 @@ export default {
           // Inject window.__mcpPublicUrl and window.__getFile into <head>
           // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
           // __mcpPublicAssetsUrl points to where public files are actually stored
-          const injectionScript = `<script>window.__getFile = (filename) => { return "${mcpUrl}/${widgetName}/"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpUrl}/public";</script>`;
+          const widgetAssetBase = getWidgetAssetBase(mcpUrl, widgetName);
+          const mcpOrigin = mcpUrl ? mcpUrl.replace(/\/+$/, "") : mcpServerUrl;
+          const injectionScript = `<script>window.__getFile = (filename) => { return "${widgetAssetBase}"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpOrigin}/mcp-use/public";</script>`;
 
           // Check if script tag already exists in head
           if (!html.includes("window.__mcpPublicUrl")) {
@@ -2917,18 +2917,28 @@ program
     "Login with an API key directly (non-interactive, for CI/CD)"
   )
   .option("--org <slug|id|name>", "Select an organization non-interactively")
-  .action(async (opts: { apiKey?: string; org?: string }) => {
-    try {
-      await loginCommand({ apiKey: opts.apiKey, org: opts.org });
-      process.exit(0);
-    } catch (error) {
-      console.error(
-        chalk.red.bold("\n✗ Login failed:"),
-        chalk.red(error instanceof Error ? error.message : "Unknown error")
-      );
-      process.exit(1);
+  .option(
+    "--device-code <code>",
+    "Authenticate with a pre-approved device code (non-interactive; e.g. from the web onboarding flow)"
+  )
+  .action(
+    async (opts: { apiKey?: string; org?: string; deviceCode?: string }) => {
+      try {
+        await loginCommand({
+          apiKey: opts.apiKey,
+          org: opts.org,
+          deviceCode: opts.deviceCode,
+        });
+        process.exit(0);
+      } catch (error) {
+        console.error(
+          chalk.red.bold("\n✗ Login failed:"),
+          chalk.red(error instanceof Error ? error.message : "Unknown error")
+        );
+        process.exit(1);
+      }
     }
-  });
+  );
 
 program
   .command("logout")
@@ -3003,6 +3013,10 @@ program
     "--start-command <cmd>",
     "Custom start command (overrides auto-detection)"
   )
+  .option(
+    "--no-github",
+    "Upload local source without connecting GitHub (repo hosted in the platform-managed org)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -3018,6 +3032,7 @@ program
       region: options.region,
       buildCommand: options.buildCommand,
       startCommand: options.startCommand,
+      noGithub: options.github === false,
     });
   });
 

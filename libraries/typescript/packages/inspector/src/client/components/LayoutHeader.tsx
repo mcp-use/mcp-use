@@ -66,6 +66,7 @@ import {
   MCPDeployClickEvent,
   Telemetry,
 } from "@/client/telemetry";
+import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
@@ -889,6 +890,13 @@ export function LayoutHeader({
                       data-testid={`tab-${tab.id}`}
                       icon={tab.icon}
                       showDot={showDot}
+                      badge={
+                        <TabCountBadge
+                          count={count}
+                          isActive={activeTab === tab.id}
+                          size="sm"
+                        />
+                      }
                       alwaysExpanded={
                         "alwaysExpanded" in tab && tab.alwaysExpanded
                       }
@@ -897,18 +905,6 @@ export function LayoutHeader({
                         collapsed && "pl-2"
                       )}
                     >
-                      {count > 0 && !collapsed && (
-                        <span
-                          className={cn(
-                            activeTab === tab.id
-                              ? "dark:bg-black"
-                              : "dark:bg-zinc-700",
-                            "bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                          )}
-                        >
-                          {count}
-                        </span>
-                      )}
                       <span className="sr-only">{tab.label}</span>
                     </TabsTrigger>
                   );
@@ -964,6 +960,12 @@ export function LayoutHeader({
                         data-testid={`tab-${tab.id}`}
                         icon={tab.icon}
                         showDot={showDot}
+                        badge={
+                          <TabCountBadge
+                            count={count}
+                            isActive={activeTab === tab.id}
+                          />
+                        }
                         alwaysExpanded={
                           "alwaysExpanded" in tab && tab.alwaysExpanded
                         }
@@ -973,21 +975,9 @@ export function LayoutHeader({
                         )}
                         title={tooltipText}
                       >
-                        <div className="items-center gap-2 hidden lg:flex">
+                        <span className="items-center gap-2 hidden lg:flex">
                           {tab.label}
-                          {count > 0 && (
-                            <span
-                              className={cn(
-                                activeTab === tab.id
-                                  ? " dark:bg-black "
-                                  : "dark:bg-zinc-700",
-                                "bg-zinc-200 text-zinc-700 dark:text-zinc-300 text-xs px-2 py-0.5 rounded-full font-medium"
-                              )}
-                            >
-                              {count}
-                            </span>
-                          )}
-                        </div>
+                        </span>
                       </TabsTrigger>
                     );
                   })}

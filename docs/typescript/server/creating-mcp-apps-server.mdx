@@ -26,7 +26,7 @@ By the end of this guide, you'll have:
 
 ## Prerequisites
 
-- Node.js 18+ installed
+- Node.js 20.19 or higher, or 22.12 or higher installed
 - Basic knowledge of TypeScript and React
 - Familiarity with MCP concepts (see [MCP 101](/home/mcp101))
 
@@ -457,6 +457,8 @@ const server = new MCPServer({
   name: "my-widget-server",
   version: "1.0.0",
   description: "MCP server with widget support",
+  instructions:
+    "Use search-tools for visual search results before get-product-details.",
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 

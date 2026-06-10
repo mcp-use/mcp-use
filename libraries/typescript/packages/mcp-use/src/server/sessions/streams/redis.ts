@@ -20,19 +20,6 @@ import type { StreamManager } from "./index.js";
 import type { RedisClient } from "../stores/redis.js";
 
 /**
- * Check if Redis is available as an optional dependency
- * @returns true if Redis can be imported, false otherwise
- */
-export async function isRedisAvailable(): Promise<boolean> {
-  try {
-    await import("redis");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Configuration for Redis stream manager
  */
 export interface RedisStreamManagerConfig {

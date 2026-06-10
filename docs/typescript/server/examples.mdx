@@ -38,6 +38,19 @@ pnpm run example:server:streaming-props
 
 Tools include `generate-code` and `generate-json` with a code-preview widget that updates live while arguments stream. Test in the [MCP Inspector](/inspector/index) by invoking those tools and watching the widget.
 
+## OpenAPI Server Example
+
+Generates MCP tools from a focused subset of the National Weather Service OpenAPI document using [`MCPServer.fromOpenAPI()`](/typescript/server/openapi). The example fetches the live spec, keeps the generated tool list small, and forwards the required Weather.gov headers to upstream API calls.
+
+**Example location:** `libraries/typescript/packages/mcp-use/examples/server/features/openapi`
+
+**Run from the example directory:**
+
+```bash
+cd libraries/typescript/packages/mcp-use/examples/server/features/openapi
+pnpm dev
+```
+
 ## Weather Service Server
 
 A complete weather information server with tools, resources, and UI widgets.
@@ -707,6 +720,6 @@ These examples demonstrate:
 ## Next Steps
 
 - [Getting Started](/typescript/getting-started/quickstart) - Set up your first server
-- [API Reference](./api-reference) - Complete API documentation
+- [API Reference](/typescript/server/index#mcpserver-api-reference) - Complete API documentation
 - [Tools Guide](./tools) - Deep dive into tool development
 - [UI Widgets](./mcp-apps) - Building interactive widgets
