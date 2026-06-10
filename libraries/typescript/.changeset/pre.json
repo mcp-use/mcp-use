@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "8.0.1",
     "mcp-use": "1.30.1"
   },
-  "changesets": []
+  "changesets": [
+    "chalk-v4-cjs-fix"
+  ]
 }
