@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "8.0.2",
     "mcp-use": "1.30.2"
   },
-  "changesets": []
+  "changesets": [
+    "chalk-regular-dependency"
+  ]
 }

@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 8.0.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fd4efb7]
+  - mcp-use@1.30.3-canary.0
+
 ## 8.0.2
 
 ### Patch Changes

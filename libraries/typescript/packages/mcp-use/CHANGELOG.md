@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.30.3-canary.0
+
+### Patch Changes
+
+- fd4efb7: Move chalk from optionalDependencies to dependencies. It is statically imported by server code (`src/server/logging.ts`, `src/server/utils/server-lifecycle.ts`), so installs that skip optional packages (`pnpm install --no-optional`, `npm config set optional false`) would fail at module load.
+  - @mcp-use/cli@3.4.2-canary.0
+  - @mcp-use/inspector@8.0.3-canary.0
+
 ## 1.30.2
 
 ### Patch Changes
