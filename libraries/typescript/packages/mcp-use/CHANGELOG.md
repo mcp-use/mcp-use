@@ -1,5 +1,15 @@
 # mcp-use
 
+## 1.30.1-canary.2
+
+### Patch Changes
+
+- 8c00a55: Fix iframe collapse when widget renders null by allowing zero-height notifications
+
+  Previously, the `height > 0` guard in `McpUseProvider` prevent height notifications when a widget rendered `null`, causing the iframe to persist at its last non-zero height. This fix allows zero heights to pass through unconditionally while maintaining the threshold check for positive heights, enabling proper iframe collapse for empty widgets.
+  - @mcp-use/cli@3.4.0-canary.2
+  - @mcp-use/inspector@8.0.1-canary.2
+
 ## 1.30.1-canary.1
 
 ### Patch Changes

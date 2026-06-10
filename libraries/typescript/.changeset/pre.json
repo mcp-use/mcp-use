@@ -8,6 +8,7 @@
     "mcp-use": "1.30.0"
   },
   "changesets": [
+    "fix-zero-height-notification",
     "inspector-widget-status-pointer-events",
     "managed-deploy-cli"
   ]
