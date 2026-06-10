@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.30.2
+
+### Patch Changes
+
+- 252d034: Downgrade chalk to v4 to fix CJS builds. chalk 5 is ESM-only and is kept external by tsup, so the CJS bundle's `require("chalk")` on Node ≥ 22 returned the module namespace instead of the chalk instance, crashing CJS-built backends (e.g. the Next.js template) on startup with `TypeError: import_chalk.default.gray is not a function`.
+  - @mcp-use/cli@3.4.1
+  - @mcp-use/inspector@8.0.2
+
 ## 1.30.2-canary.0
 
 ### Patch Changes
