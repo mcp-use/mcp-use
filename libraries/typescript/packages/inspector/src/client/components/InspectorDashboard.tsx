@@ -128,7 +128,8 @@ export function InspectorDashboard() {
         // ignore telemetry errors
       }
       reportedConnectionsRef.current.delete(connectionId);
-      removeConnection(connectionId);
+      // Explicit user "remove server" action — forget persisted OAuth creds too.
+      removeConnection(connectionId, { clearCredentials: true });
     },
     [removeConnection]
   );

@@ -110,7 +110,18 @@ export interface McpClientContextType {
   servers: McpServer[];
   /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
   addServer: (id: string, options: McpServerOptions) => void;
-  removeServer: (id: string) => void;
+  /**
+   * Remove a server from the provider.
+   *
+   * By default this only tears down the live connection and leaves persisted
+   * OAuth credentials (tokens / client_info / PKCE verifier) intact, so routine
+   * remove+add churn (config refetches, deployment-status flips, env-scoped
+   * wrappers sharing a URL hash) does not silently log the user out.
+   *
+   * Pass `{ clearCredentials: true }` for an explicit logout / "forget this
+   * server" action to also wipe the persisted OAuth storage.
+   */
+  removeServer: (id: string, opts?: { clearCredentials?: boolean }) => void;
   updateServerMetadata: (
     id: string,
     metadata: { name: string }
@@ -1215,7 +1226,7 @@ export function McpClientProvider({
   }, []);
 
   const removeServer = useCallback(
-    (id: string) => {
+    (id: string, opts?: { clearCredentials?: boolean }) => {
       // Capture the wrapper from the latest state BEFORE scheduling state
       // updates. The wrapper teardown (`disconnect()` / `clearStorage()`)
       // synchronously fires setState on the wrapper itself; running it here
@@ -1230,7 +1241,13 @@ export function McpClientProvider({
       setServerConfigs((prev) => prev.filter((s) => s.id !== id));
 
       if (captured?.disconnect) captured.disconnect();
-      if (captured?.clearStorage) captured.clearStorage();
+      // Only wipe persisted OAuth credentials on an explicit logout/forget.
+      // Routine removal (and the remove+add churn callers use) must preserve
+      // tokens — wrappers sharing a URL hash would otherwise destroy each
+      // other's freshly minted credentials.
+      if (opts?.clearCredentials && captured?.clearStorage) {
+        captured.clearStorage();
+      }
 
       onServerRemoved?.(id);
     },
@@ -1275,8 +1292,11 @@ export function McpClientProvider({
           return updated;
         });
 
+        // Disconnect the old wrapper but DO NOT clear OAuth storage — updating
+        // options (headers, transport, etc.) is not a logout. The `_updateVersion`
+        // key bump remounts the wrapper to apply the new options; it must not
+        // destroy the user's persisted tokens.
         if (captured?.disconnect) captured.disconnect();
-        if (captured?.clearStorage) captured.clearStorage();
       });
     },
     [serverConfigs]

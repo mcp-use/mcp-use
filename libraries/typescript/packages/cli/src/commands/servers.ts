@@ -225,7 +225,10 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
     if (server.connectedRepository) {
       const cr = server.connectedRepository;
       console.log(chalk.white("\nRepository"));
-      console.log(chalk.white("  Full name:   ") + chalk.gray(cr.repoFullName));
+      console.log(
+        chalk.white("  Full name:   ") +
+          chalk.gray(cr.repoFullName ?? "mcp-use-managed (private)")
+      );
       console.log(
         chalk.white("  Prod branch: ") + chalk.gray(cr.productionBranch)
       );

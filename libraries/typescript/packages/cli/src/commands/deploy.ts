@@ -788,6 +788,7 @@ async function deployViaManagedUpload(
       env: Object.keys(envVars).length > 0 ? envVars : undefined,
     });
     deploymentId = result.deploymentId ?? undefined;
+    if (result.server?.id) serverId = result.server.id;
     if (result.server?.id && deploymentId) {
       await saveProjectLink(cwd, {
         deploymentId,
@@ -805,6 +806,27 @@ async function deployViaManagedUpload(
 
   console.log(chalk.green("✓ Deployment created: ") + chalk.gray(deploymentId));
   await displayDeploymentProgress(api, deploymentId, { yes: options.yes });
+
+  // No git remote was created for this folder (--no-github). Explain where the
+  // source actually lives so users/agents don't go looking for a local remote
+  // or a GitHub repo they can't open.
+  console.log();
+  console.log(
+    chalk.gray(
+      "Source is stored in a private mcp-use-managed repository (no GitHub remote in this folder)."
+    )
+  );
+  if (serverId) {
+    const webUrl = (await getWebUrl()).replace(/\/$/, "");
+    const config = await readConfig();
+    const settingsUrl = config.orgSlug
+      ? `${webUrl}/cloud/${config.orgSlug}/servers/${serverId}`
+      : `${webUrl}/cloud/servers/${serverId}`;
+    console.log(
+      chalk.gray("View it or move it to your own GitHub from the dashboard: ") +
+        chalk.cyan(settingsUrl)
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------
