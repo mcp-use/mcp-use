@@ -2081,7 +2081,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // servers so unrelated useMcp instances don't all reconnect at once.
       // Payloads without a hash (older callback pages) are accepted.
       const ourHash = authProviderRef.current?.serverUrlHash;
-      if (payload?.serverUrlHash && ourHash && payload.serverUrlHash !== ourHash) {
+      if (
+        payload?.serverUrlHash &&
+        ourHash &&
+        payload.serverUrlHash !== ourHash
+      ) {
         addLog(
           "debug",
           `Ignoring auth callback via ${source} for a different server.`

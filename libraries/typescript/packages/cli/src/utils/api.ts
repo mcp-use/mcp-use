@@ -523,7 +523,11 @@ export class McpUseAPI {
   async pushSourceToServer(
     serverId: string,
     input: { tarball: Buffer; branch?: string; commitMessage?: string }
-  ): Promise<{ commitSha: string; repoFullName: string | null; branch: string }> {
+  ): Promise<{
+    commitSha: string;
+    repoFullName: string | null;
+    branch: string;
+  }> {
     const form = new FormData();
     form.set(
       "sourceFile",

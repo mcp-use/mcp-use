@@ -91,9 +91,7 @@ export function runAuthPopup({
   tokensKey,
   timeoutMs = 5 * 60_000,
   closePollMs = 1000,
-  expectedOrigin = typeof window !== "undefined"
-    ? window.location.origin
-    : "",
+  expectedOrigin = typeof window !== "undefined" ? window.location.origin : "",
 }: RunAuthPopupOptions): Promise<AuthPopupResult> {
   return new Promise<AuthPopupResult>((resolve) => {
     let settled = false;

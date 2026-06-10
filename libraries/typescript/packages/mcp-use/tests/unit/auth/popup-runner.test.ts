@@ -53,9 +53,7 @@ function postCallbackMessage(
   payload: McpAuthCallbackMessage,
   origin = window.location.origin
 ) {
-  window.dispatchEvent(
-    new MessageEvent("message", { data: payload, origin })
-  );
+  window.dispatchEvent(new MessageEvent("message", { data: payload, origin }));
 }
 
 /** Simulate another document writing tokens to localStorage (storage event). */
