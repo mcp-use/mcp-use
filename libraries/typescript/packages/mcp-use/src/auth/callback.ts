@@ -1,7 +1,22 @@
 // callback.ts
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust path
+import {
+  MCP_AUTH_BROADCAST_CHANNEL,
+  MCP_AUTH_CALLBACK_MESSAGE_TYPE,
+  type McpAuthCallbackMessage,
+} from "./popup-runner.js";
 import type { StoredState } from "./types.js"; // Adjust path, ensure definition includes providerOptions
+
+/**
+ * Identifying metadata threaded into every result payload so the opener can
+ * scope a result to the flow / server that initiated it. See
+ * {@link McpAuthCallbackMessage}.
+ */
+interface AuthCallbackMeta {
+  state?: string | null;
+  serverUrlHash?: string | null;
+}
 
 /**
  * Module-level cache of an in-flight (or completed) `onMcpAuthorization()`
@@ -35,16 +50,23 @@ function isMcpAuthPopupWindow(): boolean {
 }
 
 /**
- * Same-origin channel used as a fallback signal when the popup can't reach
- * its opener (e.g. COOP severed `window.opener`, cross-origin intermediate
- * redirects, browser tab grouping). The parent `useMcp` subscribes to a
- * channel of the same name and reacts identically to a `postMessage` of
- * `mcp_auth_callback`.
- *
- * Keep in sync with the `BroadcastChannel("mcp_auth_callback")` subscription
- * in `useMcp.ts`.
+ * Builds the result payload posted to the opener. `state` / `serverUrlHash`
+ * let the opener scope the result to the originating flow / server (see
+ * {@link McpAuthCallbackMessage}).
  */
-const MCP_AUTH_BROADCAST_CHANNEL = "mcp_auth_callback";
+function buildCallbackPayload(
+  success: boolean,
+  error: string | undefined,
+  meta: AuthCallbackMeta | undefined
+): McpAuthCallbackMessage {
+  return {
+    type: MCP_AUTH_CALLBACK_MESSAGE_TYPE,
+    success,
+    ...(success ? {} : { error: error ?? "Unknown error" }),
+    ...(meta?.state ? { state: meta.state } : {}),
+    ...(meta?.serverUrlHash ? { serverUrlHash: meta.serverUrlHash } : {}),
+  };
+}
 
 /**
  * Broadcasts an auth callback result to all same-origin browsing contexts.
@@ -52,21 +74,20 @@ const MCP_AUTH_BROADCAST_CHANNEL = "mcp_auth_callback";
  * use `window.opener.postMessage(...)` to avoid duplicate reconnect cycles
  * on the parent (BroadcastChannel does not deliver to the sender, but it
  * does deliver to every other same-origin tab/window).
+ *
+ * Keep the channel name in sync with the `BroadcastChannel` subscriptions in
+ * `popup-runner.ts` (`runAuthPopup`) and `useMcp.ts`.
  */
-function broadcastAuthCallback(success: boolean, error?: string): void {
+function broadcastAuthCallback(
+  success: boolean,
+  error?: string,
+  meta?: AuthCallbackMeta
+): void {
   if (typeof BroadcastChannel === "undefined") return;
   let channel: BroadcastChannel | null = null;
   try {
     channel = new BroadcastChannel(MCP_AUTH_BROADCAST_CHANNEL);
-    channel.postMessage(
-      success
-        ? { type: "mcp_auth_callback", success: true }
-        : {
-            type: "mcp_auth_callback",
-            success: false,
-            error: error ?? "Unknown error",
-          }
-    );
+    channel.postMessage(buildCallbackPayload(success, error, meta));
   } catch (e) {
     console.warn(
       "[mcp-callback] Failed to broadcast auth callback over BroadcastChannel:",
@@ -240,6 +261,13 @@ async function doOnMcpAuthorization() {
       );
     }
 
+    // Identifying metadata threaded into every result payload so the opener
+    // can scope this result to the flow / server that initiated it.
+    const callbackMeta: AuthCallbackMeta = {
+      state,
+      serverUrlHash: storedStateData.serverUrlHash,
+    };
+
     // Handle OAuth errors after state lookup so we can use the recovered
     // storedStateData to redirect back to the originating page with error
     // params, instead of showing a raw error page.
@@ -264,11 +292,11 @@ async function doOnMcpAuthorization() {
 
       if (hasOpener) {
         window.opener.postMessage(
-          {
-            type: "mcp_auth_callback",
-            success: false,
-            error: `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
-          },
+          buildCallbackPayload(
+            false,
+            `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
+            callbackMeta
+          ),
           window.location.origin
         );
         localStorage.removeItem(stateKey);
@@ -288,7 +316,8 @@ async function doOnMcpAuthorization() {
       if (isPopupWindow) {
         broadcastAuthCallback(
           false,
-          `${error}${errorDescription ? `: ${errorDescription}` : ""}`
+          `${error}${errorDescription ? `: ${errorDescription}` : ""}`,
+          callbackMeta
         );
         localStorage.removeItem(stateKey);
         renderCloseWindowMessage(
@@ -465,7 +494,7 @@ async function doOnMcpAuthorization() {
         // Popup flow: notify opener and close
         console.log(`${logPrefix} Popup flow complete. Notifying opener...`);
         window.opener.postMessage(
-          { type: "mcp_auth_callback", success: true },
+          buildCallbackPayload(true, undefined, callbackMeta),
           window.location.origin
         );
         localStorage.removeItem(stateKey);
@@ -483,7 +512,7 @@ async function doOnMcpAuthorization() {
         console.log(
           `${logPrefix} Popup flow complete but opener was lost; broadcasting success and rendering close-window message.`
         );
-        broadcastAuthCallback(true);
+        broadcastAuthCallback(true, undefined, callbackMeta);
         localStorage.removeItem(stateKey);
         renderCloseWindowMessage(
           "Authentication Successful!",
@@ -532,9 +561,15 @@ async function doOnMcpAuthorization() {
     const errorMessage = err instanceof Error ? err.message : String(err);
 
     // --- Notify Opener and Display Error (Failure) ---
+    // `storedStateData` may be null if we failed before state lookup; thread
+    // whatever identifying metadata we have so the opener can scope the result.
+    const failureMeta: AuthCallbackMeta = {
+      state,
+      serverUrlHash: storedStateData?.serverUrlHash,
+    };
     if (window.opener && !window.opener.closed) {
       window.opener.postMessage(
-        { type: "mcp_auth_callback", success: false, error: errorMessage },
+        buildCallbackPayload(false, errorMessage, failureMeta),
         window.location.origin
       );
       // Optionally close even on error, depending on UX preference
@@ -543,7 +578,7 @@ async function doOnMcpAuthorization() {
       // Popup whose opener was severed: signal failure to the parent via
       // BroadcastChannel so it leaves the `authenticating` state instead of
       // hanging forever waiting for a postMessage that can't arrive.
-      broadcastAuthCallback(false, errorMessage);
+      broadcastAuthCallback(false, errorMessage, failureMeta);
     }
 
     // Display error in the callback window

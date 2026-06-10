@@ -76,7 +76,8 @@ interface CreateServerResponse {
 /** Connected GitHub repository (subset of OpenAPI server payload). */
 interface CloudServerConnectedRepository {
   id: string;
-  repoFullName: string;
+  /** Null for platform-managed repos — the API never exposes the managed repo path. */
+  repoFullName: string | null;
   productionBranch: string;
   isActive: boolean;
   /** True when deployed via the platform-managed org (no user GitHub). */
@@ -522,7 +523,7 @@ export class McpUseAPI {
   async pushSourceToServer(
     serverId: string,
     input: { tarball: Buffer; branch?: string; commitMessage?: string }
-  ): Promise<{ commitSha: string; repoFullName: string; branch: string }> {
+  ): Promise<{ commitSha: string; repoFullName: string | null; branch: string }> {
     const form = new FormData();
     form.set(
       "sourceFile",
