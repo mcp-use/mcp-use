@@ -434,8 +434,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // bumped the epoch — possibly reusing the same client instance — while
       // closeSession was in flight. If so, this disconnect is stale: it must
       // neither null the (now newer) clientRef nor reset the live state.
-      const supersededByNewerConnect =
-        connectEpochRef.current !== epochAtStart;
+      const supersededByNewerConnect = connectEpochRef.current !== epochAtStart;
 
       if (clientRef.current === clientToClose && !supersededByNewerConnect) {
         clientRef.current = null;

@@ -1157,9 +1157,7 @@ function MCPAppsRendererBase({
                 <TextShimmer className="text-xs ">{invoking}</TextShimmer>
               )}
               {invoked && !!toolOutput && (
-                <span className="text-xs text-muted-foreground">
-                  {invoked}
-                </span>
+                <span className="text-xs text-muted-foreground">{invoked}</span>
               )}
             </div>
           )}

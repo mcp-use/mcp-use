@@ -8,11 +8,14 @@ tag: "New"
 
 <Update label="v1.30.1" description="June 2026">
   ## Deploy without GitHub, device-code login & widget iframe fixes
-  Patch release for `McpUseProvider` zero-height collapse; `@mcp-use/cli` minor adds tarball deploy without a user GitHub repo and non-interactive device-code login for web onboarding.
+  Patch release for `McpUseProvider` zero-height collapse, `useMcp` disconnect/reconnect race fixes, and clearer not-ready errors; `@mcp-use/cli` minor adds tarball deploy without a user GitHub repo and non-interactive device-code login for web onboarding.
 
 - **Enhancement** (@mcp-use/cli): `mcp-use deploy --no-github` packs the local project into a tarball and uploads it to the platform-managed org so first deploy works without connecting GitHub; redeploys of a linked platform-managed server auto-detect from `connectedRepository.isManaged` (`#1691`)
 - **New** (@mcp-use/cli): `mcp-use login --device-code <code>` authenticates with a pre-approved OAuth device code for non-interactive flows (web onboarding), skipping the browser step (`#1691`)
 - **Fix**: `McpUseProvider` with `autoSize` now notifies zero height when a widget renders `null`, so host iframes collapse instead of keeping the last non-zero height (`#1693`)
+- **Fix** (react): `useMcp` stale `disconnect()` after a URL change or a manual disconnect racing a reconnect no longer nulls `clientRef` or resets hook state to `discovering` when superseded by a newer `connect()` (`connectEpochRef`) — fixes "MCP client is not ready (current state: ready)" and similar races in the inspector and other embeds (`#1528`)
+- **Fix** (client): `BaseMCPClient.closeSession()` only deletes a session slot when it still references the closing session, so a parallel `createSession()` from a reconnect is not wiped — fixes "No active session found" on the next tool call after reconnect (`#1528`)
+- **Enhancement** (react): clearer "MCP client is not ready" errors via `formatMcpNotReadyReason`, distinguishing a missing client (`client disconnected`) from a non-ready state (`#1528`)
 - **Fix** (@mcp-use/inspector): MCP Apps / Apps SDK status labels no longer intercept iframe pointer events  -  see inspector changelog (`#1694`, `#1678`)
 - **Documentation**: tip on `<McpUseProvider />` for widgets that conditionally return `null` with `autoSize`
 - **Documentation**: `deploy --no-github`, `login --device-code`, and dual deploy paths in the CLI reference and Manufact Cloud deployment guide
