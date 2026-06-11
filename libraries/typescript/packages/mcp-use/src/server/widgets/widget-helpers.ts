@@ -299,6 +299,8 @@ export function getContentType(filename: string): string {
  * @param html - Original HTML content
  * @param widgetName - Widget identifier
  * @param baseUrl - Server base URL
+ * @param openInAppUrl - Optional ChatGPT "Open in app" URL, injected as
+ *   `window.__mcpOpenInAppUrl` so the widget runtime can apply it on mount
  * @returns Processed HTML with injected base tag and absolute URLs
  *
  * @example
@@ -310,7 +312,8 @@ export function getContentType(filename: string): string {
 export function processWidgetHtml(
   html: string,
   widgetName: string,
-  baseUrl: string
+  baseUrl: string,
+  openInAppUrl?: string
 ): string {
   let processedHtml = html;
 
@@ -359,9 +362,19 @@ export function processWidgetHtml(
     // Add window.__getFile and window.__mcpPublicUrl to head
     // Use slugified name for URL routing
     const slugifiedName = slugifyWidgetName(widgetName);
+    // ChatGPT-only "Open in app" URL (Apps SDK). Escape for an inline <script>:
+    // JSON.stringify handles JS string quoting, and the additional replacements
+    // neutralize "</script>" breakout and the U+2028/U+2029 line separators.
+    const openInAppUrlScript = openInAppUrl
+      ? ` window.__mcpOpenInAppUrl = ${JSON.stringify(openInAppUrl)
+          .replace(/</g, "\\u003c")
+          .replace(/>/g, "\\u003e")
+          .replace(/\u2028/g, "\\u2028")
+          .replace(/\u2029/g, "\\u2029")};`
+      : "";
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";${openInAppUrlScript}</script>`
     );
   }
 
@@ -721,8 +734,17 @@ export async function registerWidgetFromTemplate(
     return; // readWidgetHtml already logged the error
   }
 
-  // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  // Process HTML with base URL injection and path conversion.
+  // The ChatGPT-only "Open in app" URL lives under the unified metadata block.
+  const openInAppUrl = (
+    metadata?.metadata as { openai?: { openInAppUrl?: string } } | undefined
+  )?.openai?.openInAppUrl;
+  html = processWidgetHtml(
+    html,
+    widgetName,
+    serverConfig.serverBaseUrl,
+    openInAppUrl
+  );
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);

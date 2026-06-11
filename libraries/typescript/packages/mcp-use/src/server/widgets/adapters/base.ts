@@ -110,7 +110,7 @@ export abstract class BaseProtocolAdapter implements ProtocolAdapter {
     if ("metadata" in definition && definition.metadata) {
       for (const [key, value] of Object.entries(definition.metadata)) {
         if (
-          !["csp", "prefersBorder", "domain"].includes(key) &&
+          !["csp", "prefersBorder", "domain", "openai"].includes(key) &&
           value !== undefined
         ) {
           meta[key] = value;
@@ -149,7 +149,7 @@ export abstract class BaseProtocolAdapter implements ProtocolAdapter {
 
     // Transform additional fields
     for (const [key, value] of Object.entries(meta)) {
-      if (!["csp", "prefersBorder", "domain"].includes(key)) {
+      if (!["csp", "prefersBorder", "domain", "openai"].includes(key)) {
         result[this.transformMetadataKey(key)] = value;
       }
     }

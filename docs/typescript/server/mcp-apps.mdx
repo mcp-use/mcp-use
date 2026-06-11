@@ -524,9 +524,24 @@ server.uiResource({
     // ChatGPT specific (ignored by MCP Apps clients)
     widgetDescription: "Special description for ChatGPT",
     widgetDomain: "https://chatgpt.com",
+
+    // ChatGPT runtime configuration (ignored by MCP Apps clients)
+    openai: {
+      // URL ChatGPT's "Open in app" affordance links to. Applied automatically
+      // via window.openai.setOpenInAppUrl when the widget mounts in ChatGPT.
+      openInAppUrl: "https://app.example.com",
+    },
   },
 });
 ```
+
+<Note>
+`metadata.openai.openInAppUrl` is applied once on mount, ideal for a static
+"Open in app" link. For a **dynamic** URL — e.g. a deep link to the specific
+record the widget is showing — call `setOpenInAppUrl(href)` from
+[`useWidget()`](/typescript/server/widget-components/usewidget) instead. Both
+are ChatGPT-only and no-op on MCP Apps hosts.
+</Note>
 
 ## Migration from Apps SDK
 
