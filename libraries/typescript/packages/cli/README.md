@@ -187,10 +187,15 @@ mcp-use servers update my-server --branch main
 # Override build / start commands or rename the server
 mcp-use servers update my-server --build-command "npm run build" --start-command "npm start"
 mcp-use servers update my-server --name "My Server" --description "…"
+
+# Clear a build/start override (pass an empty string)
+mcp-use servers update my-server --build-command "" --start-command ""
 ```
 
 Flags: `--branch` (production branch), `--name`, `--description`,
 `--build-command`, `--start-command`, `--org`. At least one is required.
+Pass an empty string to `--build-command` or `--start-command` to remove the
+stored override.
 
 ### `servers env` — environment variables
 

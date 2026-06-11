@@ -338,10 +338,15 @@ async function updateServerCommand(
     if (options.branch !== undefined) body.productionBranch = options.branch;
 
     const config: Record<string, unknown> = {};
-    if (options.buildCommand !== undefined)
-      config.buildCommand = options.buildCommand;
-    if (options.startCommand !== undefined)
-      config.startCommand = options.startCommand;
+    if (options.buildCommand !== undefined) {
+      // Empty string clears the override (backend merge-patch: null removes key).
+      config.buildCommand =
+        options.buildCommand === "" ? null : options.buildCommand;
+    }
+    if (options.startCommand !== undefined) {
+      config.startCommand =
+        options.startCommand === "" ? null : options.startCommand;
+    }
     if (Object.keys(config).length > 0) body.config = config;
 
     if (Object.keys(body).length === 0) {
@@ -465,8 +470,14 @@ export function createServersCommand(): Command {
       "New production branch — controls which branch triggers production deploys"
     )
     .option("--name <name>", "Rename the server")
-    .option("--build-command <cmd>", "Override the build command")
-    .option("--start-command <cmd>", "Override the start command")
+    .option(
+      "--build-command <cmd>",
+      "Override the build command (pass an empty string to clear)"
+    )
+    .option(
+      "--start-command <cmd>",
+      "Override the start command (pass an empty string to clear)"
+    )
     .option("--description <text>", "Update the server description")
     .option("--org <slug-or-id>", "Target organization")
     .action(updateServerCommand);

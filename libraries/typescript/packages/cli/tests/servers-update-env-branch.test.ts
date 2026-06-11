@@ -110,6 +110,25 @@ describe("servers update field mapping", () => {
     });
   });
 
+  it("maps empty --build-command / --start-command to null (clear override)", async () => {
+    const { createServersCommand } = await import("../src/commands/servers.js");
+    mockApiInstance.updateServer.mockResolvedValue({
+      id: SERVER_ID,
+      name: "my-server",
+      slug: "my-server",
+    });
+
+    const cmd = createServersCommand();
+    await cmd.parseAsync(
+      ["update", SERVER_ID, "--build-command", "", "--start-command", ""],
+      { from: "user" }
+    );
+
+    expect(mockApiInstance.updateServer).toHaveBeenCalledWith(SERVER_ID, {
+      config: { buildCommand: null, startCommand: null },
+    });
+  });
+
   it("does not call the API when no fields are provided", async () => {
     const { createServersCommand } = await import("../src/commands/servers.js");
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((

@@ -118,6 +118,7 @@ mcp-use servers env rm     API_KEY --server <id>
 
 # Server config in place (no delete/recreate): production branch, name, commands
 mcp-use servers update <id> --branch main --build-command "npm run build"
+# Clear a build/start override: pass an empty string (--build-command "")
 ```
 
 ---
