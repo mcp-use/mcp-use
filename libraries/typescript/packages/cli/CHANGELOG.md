@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.0
+
+### Patch Changes
+
+- d64db0f: Support write-only (sensitive) environment variables. The cloud API now withholds the value of `sensitive` env vars on read (returns `null`), so `EnvVariable.value` is nullable and `env list` / `env add` / `env update` print `<sensitive>` for withheld values instead of an empty string.
+  - mcp-use@1.32.1-canary.0
+  - @mcp-use/inspector@10.0.1-canary.0
+
 ## 3.5.1
 
 ### Patch Changes

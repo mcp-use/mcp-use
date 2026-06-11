@@ -1,5 +1,11 @@
 # @mcp-use/inspector
 
+## 10.0.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.32.1-canary.0
+
 ## 10.0.0
 
 ### Patch Changes
