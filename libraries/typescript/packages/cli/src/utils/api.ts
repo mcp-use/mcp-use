@@ -73,6 +73,23 @@ interface CreateServerResponse {
   deploymentId: string | null;
 }
 
+// ── Server update ──────────────────────────────────────────────────
+
+/**
+ * Body for `PATCH /servers/:id`. Field names mirror the backend
+ * `UpdateServerBody` exactly. `productionBranch` controls which branch
+ * triggers production deploys; build/start command overrides live nested
+ * under `config` (the backend merges `config` shallowly with the existing
+ * value, so only the provided keys change).
+ */
+export interface UpdateServerBody {
+  name?: string;
+  description?: string;
+  productionBranch?: string;
+  tags?: string[];
+  config?: Record<string, unknown>;
+}
+
 /** Connected GitHub repository (subset of OpenAPI server payload). */
 interface CloudServerConnectedRepository {
   id: string;
@@ -266,6 +283,8 @@ export interface EnvVariable {
   key: string;
   value: string;
   environments: EnvEnvironment[];
+  /** Branch pin: null/omitted = production scope; a branch name = that branch's preview. */
+  branch?: string | null;
   sensitive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -275,12 +294,16 @@ interface CreateEnvVariableBody {
   key: string;
   value: string;
   environments?: EnvEnvironment[];
+  /** Branch pin (body field). Null/omitted = production scope. */
+  branch?: string | null;
   sensitive?: boolean;
 }
 
 interface UpdateEnvVariableBody {
   value?: string;
   environments?: EnvEnvironment[];
+  /** Branch pin (body field). Null/omitted = production scope. */
+  branch?: string | null;
   sensitive?: boolean;
 }
 
@@ -562,6 +585,19 @@ export class McpUseAPI {
     return this.request<CloudServer>(`/servers/${path}`);
   }
 
+  async updateServer(
+    idOrSlug: string,
+    body: UpdateServerBody
+  ): Promise<CloudServer> {
+    return this.request<CloudServer>(
+      `/servers/${encodeURIComponent(idOrSlug)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }
+    );
+  }
+
   async deleteServer(id: string): Promise<void> {
     await this.request<{ success: boolean }>(
       `/servers/${encodeURIComponent(id)}`,
@@ -573,9 +609,13 @@ export class McpUseAPI {
 
   // ── Env Variables ────────────────────────────────────────────────
 
-  async listEnvVariables(serverId: string): Promise<EnvVariable[]> {
+  async listEnvVariables(
+    serverId: string,
+    opts?: { branch?: string }
+  ): Promise<EnvVariable[]> {
+    const q = opts?.branch ? `?branch=${encodeURIComponent(opts.branch)}` : "";
     return this.request<EnvVariable[]>(
-      `/servers/${encodeURIComponent(serverId)}/env-variables`
+      `/servers/${encodeURIComponent(serverId)}/env-variables${q}`
     );
   }
 

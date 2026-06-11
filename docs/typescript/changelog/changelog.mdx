@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.31.1" description="June 2026">
+  ## Servers update & branch-scoped deploy env
+  Patch release for workspace dependency alignment; `@mcp-use/cli` minor adds `servers update` and branch-scoped environment and deploy management.
+
+- **New** (@mcp-use/cli): `mcp-use servers update <id-or-slug>` mutates server config in place (production branch, name, description, build/start commands) without delete/recreate — preserving the URL slug and env vars; `--branch` maps to `productionBranch`; pass an empty string to `--build-command`/`--start-command` to clear overrides (`#1711`)
+- **New** (@mcp-use/cli): `deploy --branch <name>` defaults to the current git branch and scopes `--env`/`--env-file` sync to that branch's preview environment (`#1711`)
+- **Enhancement** (@mcp-use/cli): `servers env list/add/update/rm` gain `--branch` for branch-scoped variables; `update`/`rm` accept a variable KEY (resolved within the branch scope) in addition to a UUID (`#1711`)
+- **Enhancement** (@mcp-use/cli): `deployments restart` gains `--branch <name>` (defaults to the deployment's branch) (`#1711`)
+- **Documentation** (@mcp-use/cli): `servers update` and branch-scoped deploy/env flags in the package README and mcp-apps-builder deploy skill reference (`#1711`)
+- **Update**: Updated @mcp-use/cli to v3.5.0
+- **Update**: Updated @mcp-use/inspector to v9.0.1
+</Update>
+
 <Update label="v1.31.0" description="June 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.31.0&title=OAuth%20popup%20reliability%20%26%20credential%20lifecycle&date=2026-06&lang=typescript" alt="Release 1.31.0" />

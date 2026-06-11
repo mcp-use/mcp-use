@@ -147,6 +147,9 @@ mcp-use logout
 - `--name <name>` - Custom deployment name
 - `--port <port>` - Server port (default: 3000)
 - `--runtime <runtime>` - Runtime environment: "node" or "python"
+- `--branch <name>` - Deploy branch (default: current git branch). Also scopes `--env` / `--env-file` sync to that branch's preview env.
+- `--env <key=value...>` - Set environment variable **values** (repeatable)
+- `--env-file <path>` - Load environment variable values from a `.env` file
 - `--open` - Open deployment in browser after success
 
 **Example:**
@@ -160,7 +163,80 @@ mcp-use deploy --no-github
 
 # Deploy with custom options
 mcp-use deploy --name my-server --port 8000 --open
+
+# Deploy a branch and scope env values to its preview env
+mcp-use deploy --branch feature-x --env API_KEY=abc123
 ```
+
+---
+
+## ☁️ Managing cloud servers
+
+After a server exists you can update its configuration and environment
+variables without redeploying from scratch.
+
+### `servers update`
+
+Mutate server-level config in place (no delete/recreate, so the URL slug and
+env vars are preserved):
+
+```bash
+# Change the production branch (which branch triggers production deploys)
+mcp-use servers update my-server --branch main
+
+# Override build / start commands or rename the server
+mcp-use servers update my-server --build-command "npm run build" --start-command "npm start"
+mcp-use servers update my-server --name "My Server" --description "…"
+
+# Clear a build/start override (pass an empty string)
+mcp-use servers update my-server --build-command "" --start-command ""
+```
+
+Flags: `--branch` (production branch), `--name`, `--description`,
+`--build-command`, `--start-command`, `--org`. At least one is required.
+Pass an empty string to `--build-command` or `--start-command` to remove the
+stored override.
+
+### `servers env` — environment variables
+
+```bash
+# List (production scope), or scope to a branch's preview env
+mcp-use servers env list --server <id>
+mcp-use servers env list --server <id> --branch feature-x
+
+# Add a variable. --env selects which environment TAGS it applies to;
+# --branch pins it to a branch's preview env (omit for production).
+mcp-use servers env add API_KEY=abc123 --server <id> --env production,preview
+mcp-use servers env add API_KEY=abc123 --server <id> --branch feature-x
+
+# Update / remove by KEY (resolved within the branch scope) or by UUID
+mcp-use servers env update API_KEY --server <id> --value newval --branch feature-x
+mcp-use servers env rm API_KEY --server <id> --branch feature-x
+```
+
+### `deployments restart`
+
+```bash
+# Restart reusing the deployment's branch, or target a different branch
+mcp-use deployments restart <deployment-id>
+mcp-use deployments restart <deployment-id> --branch feature-x
+```
+
+### Environment naming
+
+The platform models environments as `production`, `preview`, and
+`development` (the `--env` tag) plus an optional **branch** pin (`--branch`).
+There is no literal `test` environment. Common aliases map as:
+
+| You might say | Use |
+| --- | --- |
+| `prod` | `production` |
+| `dev` | `development` |
+| `staging` / per-branch | a `--branch <name>` preview (optionally tagged `preview`) |
+
+Note the two different `--env` meanings: on `deploy` it sets variable
+**values** (`KEY=VALUE`), while on `servers env` it selects the environment
+**tags** a variable applies to (`production,preview,development`).
 
 ---
 

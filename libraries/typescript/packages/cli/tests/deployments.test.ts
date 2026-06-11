@@ -832,7 +832,10 @@ describe("syncEnvVarsToServer", () => {
       { API_KEY: "abc", DATABASE_URL: "postgres://x" }
     );
 
-    expect(mockApiInstance.listEnvVariables).toHaveBeenCalledWith(SERVER_ID);
+    expect(mockApiInstance.listEnvVariables).toHaveBeenCalledWith(
+      SERVER_ID,
+      undefined
+    );
     expect(mockApiInstance.createEnvVariable).toHaveBeenCalledTimes(2);
     expect(mockApiInstance.createEnvVariable).toHaveBeenCalledWith(SERVER_ID, {
       key: "API_KEY",
