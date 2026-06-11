@@ -281,7 +281,8 @@ export interface EnvVariable {
   id: string;
   serverId: string;
   key: string;
-  value: string;
+  /** `null` for write-only `sensitive` rows — the API withholds the stored value. */
+  value: string | null;
   environments: EnvEnvironment[];
   /** Branch pin: null/omitted = production scope; a branch name = that branch's preview. */
   branch?: string | null;
