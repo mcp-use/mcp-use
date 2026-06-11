@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "9.0.1",
     "mcp-use": "1.31.1"
   },
-  "changesets": []
+  "changesets": [
+    "auth-token-endpoint"
+  ]
 }
