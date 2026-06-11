@@ -1,5 +1,217 @@
 # @mcp-use/cli
 
+## 3.5.1
+
+### Patch Changes
+
+- Updated dependencies [5b4afc8]
+  - mcp-use@1.32.0
+  - @mcp-use/inspector@10.0.0
+
+## 3.5.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a683d43]
+  - mcp-use@1.32.0-canary.0
+  - @mcp-use/inspector@10.0.0-canary.0
+
+## 3.5.0
+
+### Minor Changes
+
+- 0fb1868: Add `servers update` and branch-scoped environment management to the CLI.
+  - `mcp-use servers update <id-or-slug>` mutates server config in place (production branch, name, description, build/start commands) without deleting and recreating the server — preserving the URL slug and env vars. `--branch` maps to the backend `productionBranch`; `--build-command`/`--start-command` are stored under the server `config`. Pass an empty string to either flag to clear the override (`null` merge-patch on the backend).
+  - `mcp-use deploy` gains `--branch <name>` (defaults to the current git branch) and scopes `--env`/`--env-file` sync to that branch's preview environment.
+  - `mcp-use servers env list/add/update/rm` gain `--branch <name>` for branch-scoped variables, and `update`/`rm` now accept a variable KEY (resolved within the branch scope) in addition to a UUID.
+  - `mcp-use deployments restart` gains `--branch <name>` (defaults to the deployment's branch).
+
+### Patch Changes
+
+- mcp-use@1.31.1
+- @mcp-use/inspector@9.0.1
+
+## 3.5.0-canary.0
+
+### Minor Changes
+
+- 673a142: Add `servers update` and branch-scoped environment management to the CLI.
+  - `mcp-use servers update <id-or-slug>` mutates server config in place (production branch, name, description, build/start commands) without deleting and recreating the server — preserving the URL slug and env vars. `--branch` maps to the backend `productionBranch`; `--build-command`/`--start-command` are stored under the server `config`. Pass an empty string to either flag to clear the override (`null` merge-patch on the backend).
+  - `mcp-use deploy` gains `--branch <name>` (defaults to the current git branch) and scopes `--env`/`--env-file` sync to that branch's preview environment.
+  - `mcp-use servers env list/add/update/rm` gain `--branch <name>` for branch-scoped variables, and `update`/`rm` now accept a variable KEY (resolved within the branch scope) in addition to a UUID.
+  - `mcp-use deployments restart` gains `--branch <name>` (defaults to the deployment's branch).
+
+### Patch Changes
+
+- mcp-use@1.31.1-canary.0
+- @mcp-use/inspector@9.0.1-canary.0
+
+## 3.4.2
+
+### Patch Changes
+
+- 4d00a1f: After a `--no-github` (platform-managed) deploy, print a short note explaining that the source lives in a private mcp-use-managed repository (no GitHub remote in the local folder) and link to the dashboard to view it or move it to your own GitHub. Aligns the CLI with the API, which no longer exposes the managed repo's `owner/repo` name.
+- Updated dependencies [4d00a1f]
+- Updated dependencies [4d00a1f]
+  - mcp-use@1.31.0
+  - @mcp-use/inspector@9.0.0
+
+## 3.4.2-canary.1
+
+### Patch Changes
+
+- 4e34b82: After a `--no-github` (platform-managed) deploy, print a short note explaining that the source lives in a private mcp-use-managed repository (no GitHub remote in the local folder) and link to the dashboard to view it or move it to your own GitHub. Aligns the CLI with the API, which no longer exposes the managed repo's `owner/repo` name.
+- Updated dependencies [4e34b82]
+  - mcp-use@1.31.0-canary.1
+  - @mcp-use/inspector@9.0.0-canary.1
+
+## 3.4.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fd4efb7]
+  - mcp-use@1.30.3-canary.0
+  - @mcp-use/inspector@8.0.3-canary.0
+
+## 3.4.1
+
+### Patch Changes
+
+- Updated dependencies [252d034]
+  - mcp-use@1.30.2
+  - @mcp-use/inspector@8.0.2
+
+## 3.4.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f9fb29b]
+  - mcp-use@1.30.2-canary.0
+  - @mcp-use/inspector@8.0.2-canary.0
+
+## 3.4.0
+
+### Minor Changes
+
+- c866bda: Add `mcp-use deploy --no-github` to deploy a local MCP server without connecting your own GitHub. The project source is packed into a tarball and uploaded; the server is created in the platform-managed org and deployed through the normal pipeline. Redeploys of a platform-managed project are auto-detected from the linked server, so `--no-github` is only needed on the first deploy.
+
+  Also add `mcp-use login --device-code <code>` for non-interactive authentication with a pre-approved OAuth device code (used by the web onboarding flow), skipping the browser step.
+
+### Patch Changes
+
+- Updated dependencies [c866bda]
+- Updated dependencies [c866bda]
+- Updated dependencies [c866bda]
+  - mcp-use@1.30.1
+  - @mcp-use/inspector@8.0.1
+
+## 3.4.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [ea4e6f1]
+  - mcp-use@1.30.1-canary.3
+  - @mcp-use/inspector@8.0.1-canary.3
+
+## 3.4.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8c00a55]
+  - mcp-use@1.30.1-canary.2
+  - @mcp-use/inspector@8.0.1-canary.2
+
+## 3.4.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [afb0e79]
+  - @mcp-use/inspector@8.0.1-canary.1
+  - mcp-use@1.30.1-canary.1
+
+## 3.4.0-canary.0
+
+### Minor Changes
+
+- bad4578: Add `mcp-use deploy --no-github` to deploy a local MCP server without connecting your own GitHub. The project source is packed into a tarball and uploaded; the server is created in the platform-managed org and deployed through the normal pipeline. Redeploys of a platform-managed project are auto-detected from the linked server, so `--no-github` is only needed on the first deploy.
+
+  Also add `mcp-use login --device-code <code>` for non-interactive authentication with a pre-approved OAuth device code (used by the web onboarding flow), skipping the browser step.
+
+### Patch Changes
+
+- mcp-use@1.30.1-canary.0
+- @mcp-use/inspector@8.0.1-canary.0
+
+## 3.3.2
+
+### Patch Changes
+
+- 25ae46e: Handle paginated Cloud API responses in `servers list` and `deployments list`, with a default page size of 30 and next-page guidance.
+- 25ae46e: Fix repo access check during deploy to look across all GitHub App installations instead of only the first one, so deploys of repos owned by any linked installation no longer fail the access check.
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+  - mcp-use@1.30.0
+  - @mcp-use/inspector@8.0.0
+
+## 3.3.2-canary.6
+
+### Patch Changes
+
+- 726bcbb: Fix repo access check during deploy to look across all GitHub App installations instead of only the first one, so deploys of repos owned by any linked installation no longer fail the access check.
+  - mcp-use@1.30.0-canary.6
+  - @mcp-use/inspector@8.0.0-canary.6
+
+## 3.3.2-canary.5
+
+### Patch Changes
+
+- Updated dependencies [e4b83e4]
+  - mcp-use@1.30.0-canary.5
+  - @mcp-use/inspector@8.0.0-canary.5
+
+## 3.3.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f8ca6bb]
+  - mcp-use@1.30.0-canary.4
+  - @mcp-use/inspector@8.0.0-canary.4
+
+## 3.3.2-canary.3
+
+### Patch Changes
+
+- a3d9aa9: Handle paginated Cloud API responses in `servers list` and `deployments list`, with a default page size of 30 and next-page guidance.
+  - mcp-use@1.30.0-canary.3
+  - @mcp-use/inspector@8.0.0-canary.3
+
+## 3.3.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b820e74]
+  - mcp-use@1.30.0-canary.2
+  - @mcp-use/inspector@8.0.0-canary.2
+
+## 3.3.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [88180d5]
+  - mcp-use@1.30.0-canary.1
+  - @mcp-use/inspector@8.0.0-canary.1
+
+## 3.3.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f565f9c]
+  - mcp-use@1.30.0-canary.0
+  - @mcp-use/inspector@8.0.0-canary.0
+
 ## 3.3.1
 
 ### Patch Changes

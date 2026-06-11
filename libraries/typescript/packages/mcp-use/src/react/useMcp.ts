@@ -2,6 +2,12 @@
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import { probeAuthParams } from "../auth/probe-www-auth.js";
+import {
+  runAuthPopup,
+  MCP_AUTH_BROADCAST_CHANNEL,
+  MCP_AUTH_CALLBACK_MESSAGE_TYPE,
+  type McpAuthCallbackMessage,
+} from "../auth/popup-runner.js";
 import type {
   CompleteRequestParams,
   CompleteResult,
@@ -24,6 +30,7 @@ import {
   deriveOAuthClientConfigFromClientInfo,
   isOAuthDiscoveryFailure,
   startConnectionHealthMonitoring,
+  formatMcpNotReadyReason,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
@@ -40,9 +47,18 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   >;
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
+  getTokenEndpoint?: () => Promise<string | null>;
+  getClientCredentials?: () => Promise<{
+    client_id: string;
+    client_secret?: string;
+  } | null>;
   installFetchInterceptor?: () => void;
   restoreFetch?: () => void;
   serverUrl?: string;
+  /** localStorage key for a given suffix (e.g. "tokens"). */
+  getKey?: (keySuffix: string) => string;
+  /** Stable hash of the server URL, used to scope OAuth result messages. */
+  serverUrlHash?: string;
 };
 
 /**
@@ -322,8 +338,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
+  /** Bumped at the start of each connect(); disconnect only clears clientRef if epoch unchanged. */
+  const connectEpochRef = useRef(0);
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
+  /**
+   * True while a manual `authenticate()` popup flow owns the OAuth result.
+   * The always-on `mcp_auth_callback` listener defers to the popup runner
+   * during this window so a single completion doesn't trigger two reconnects.
+   */
+  const popupFlowActiveRef = useRef<boolean>(false);
 
   // --- Refs for values used in callbacks ---
   const stateRef = useRef(state);
@@ -406,10 +430,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = null;
 
-      if (clientRef.current) {
+      const epochAtStart = connectEpochRef.current;
+      const clientToClose = clientRef.current;
+      if (clientToClose) {
         try {
           const serverName = USE_MCP_SERVER_NAME;
-          const session = clientRef.current.getSession(serverName);
+          const session = clientToClose.getSession(serverName);
 
           // Clean up health check monitoring if it exists
           if (session && (session as any)._healthCheckCleanup) {
@@ -419,15 +445,23 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
           // Only try to close if session exists (avoids noisy warning logs)
           if (session) {
-            await clientRef.current.closeSession(serverName);
+            await clientToClose.closeSession(serverName);
           }
         } catch (err) {
           if (!quiet) addLog("warn", "Error closing session:", err);
         }
       }
-      clientRef.current = null;
+      // A newer connect() (e.g. dashboard environment / URL change) may have
+      // bumped the epoch — possibly reusing the same client instance — while
+      // closeSession was in flight. If so, this disconnect is stale: it must
+      // neither null the (now newer) clientRef nor reset the live state.
+      const supersededByNewerConnect = connectEpochRef.current !== epochAtStart;
 
-      if (isMountedRef.current && !quiet) {
+      if (clientRef.current === clientToClose && !supersededByNewerConnect) {
+        clientRef.current = null;
+      }
+
+      if (isMountedRef.current && !quiet && !supersededByNewerConnect) {
         setState("discovering");
         setTools([]);
         setResources([]);
@@ -495,7 +529,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         );
 
         // Clear client/auth refs to force fresh initialization with proxy.
-        // Keep externally provided auth providers intact.
+        // Keep externally provided auth providers intact. Synchronous clear;
+        // reconnect is deferred via setTimeout below, so no disconnect race.
         clientRef.current = null;
         if (!providedAuthProvider) {
           authProviderRef.current = null;
@@ -596,6 +631,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
 
     connectingRef.current = true;
+    connectEpochRef.current += 1;
     connectAttemptRef.current += 1;
     setError(undefined);
     setAuthUrl(undefined);
@@ -1017,6 +1053,28 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               ? Date.now() + tokens.expires_in * 1000
               : undefined;
 
+            // Best-effort: resolve the OAuth token endpoint + client credentials
+            // so consumers can persist them for server-side proactive refresh.
+            // Never blocks auth.
+            let tokenEndpoint: string | null = null;
+            let clientCreds: {
+              client_id: string;
+              client_secret?: string;
+            } | null = null;
+            try {
+              tokenEndpoint =
+                (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
+            } catch {
+              tokenEndpoint = null;
+            }
+            try {
+              clientCreds =
+                (await authProviderRef.current.getClientCredentials?.()) ??
+                null;
+            } catch {
+              clientCreds = null;
+            }
+
             if (!isMountedRef.current) {
               addLog("debug", "Skipping state update - component unmounted");
               return "failed";
@@ -1027,6 +1085,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               expires_at: expiresAt,
               refresh_token: tokens.refresh_token,
               scope: tokens.scope,
+              ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
+              ...(clientCreds?.client_id
+                ? { client_id: clientCreds.client_id }
+                : {}),
+              ...(clientCreds?.client_secret
+                ? { client_secret: clientCreds.client_secret }
+                : {}),
             });
           }
         }
@@ -1322,7 +1387,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     ) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot call tool "${name}".`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot call tool "${name}".`
         );
       }
       addLog("info", `Calling tool: ${name}`, args);
@@ -1433,7 +1498,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           return;
         }
 
-        // Clear OAuth storage to ensure fresh authentication flow
+        // Clear OAuth storage to ensure fresh authentication flow.
+        // This is an explicit, user-initiated "authenticate" action (not a
+        // lifecycle event), so wiping stale tokens/verifier here is correct.
         const clearedCount = authProviderRef.current.clearStorage?.() ?? 0;
         addLog(
           "info",
@@ -1442,6 +1509,25 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         // Update state to authenticating before redirect
         setState("authenticating");
+
+        // Capture the popup handle and OAuth `state` as the provider opens the
+        // popup, so the opener (this window) can own the flow's lifecycle via
+        // runAuthPopup() instead of waiting indefinitely for a push message.
+        let capturedPopup: globalThis.Window | null = null;
+        let capturedState: string | null = null;
+        const captureOnPopupWindow = (
+          popupUrl: string,
+          features: string,
+          popupWin: globalThis.Window | null
+        ) => {
+          capturedPopup = popupWin;
+          try {
+            capturedState = new URL(popupUrl).searchParams.get("state");
+          } catch {
+            /* non-fatal: fall back to provider's last auth URL below */
+          }
+          onPopupWindow?.(popupUrl, features, popupWin);
+        };
 
         // Recreate the auth provider WITHOUT preventAutoAuth
         const { provider: freshAuthProvider, oauthProxyUrl } =
@@ -1453,7 +1539,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false,
             useRedirectFlow,
             gatewayUrl,
-            onPopupWindow,
+            onPopupWindow: captureOnPopupWindow,
             installFetchInterceptor: !gatewayUrl,
             staticClientInfo,
             scope: oauthScope,
@@ -1473,9 +1559,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
         addLog("info", "Triggering fresh OAuth authorization...");
 
-        // Generate a fresh authorization URL and redirect immediately
-        // This will trigger the OAuth flow with the new provider
-        // The provider will redirect/popup automatically since preventAutoAuth is false
+        // Generate a fresh authorization URL and open the popup/redirect.
+        // The provider redirects/popups automatically (preventAutoAuth: false).
         const parsedUrl = new URL(url);
         const baseUrl =
           parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
@@ -1499,6 +1584,77 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         if (newAuthUrl) {
           setAuthUrl(newAuthUrl);
           addLog("info", "Updated auth URL for fallback:", newAuthUrl);
+          if (!capturedState) {
+            try {
+              capturedState = new URL(newAuthUrl).searchParams.get("state");
+            } catch {
+              /* leave null; runAuthPopup accepts state-less results */
+            }
+          }
+        }
+
+        // Redirect flow navigates the whole page away — nothing to await here.
+        if (useRedirectFlow) {
+          return;
+        }
+
+        // Opener-owned popup flow: own the lifecycle so we can never get stuck
+        // in "authenticating". Settles on result message / popup close / token
+        // storage write / timeout (see runAuthPopup).
+        const tokensKey = freshAuthProvider.getKey?.("tokens");
+        if (!tokensKey) {
+          // Without a tokens key we can't run the supervised flow; fall back to
+          // the always-on listener and leave state as authenticating.
+          addLog(
+            "warn",
+            "Could not derive tokens storage key; relying on callback listener."
+          );
+          return;
+        }
+
+        popupFlowActiveRef.current = true;
+        let result;
+        try {
+          result = await runAuthPopup({
+            popup: capturedPopup,
+            state: capturedState,
+            tokensKey,
+          });
+        } finally {
+          popupFlowActiveRef.current = false;
+        }
+
+        if (!isMountedRef.current) return;
+
+        switch (result.kind) {
+          case "success":
+            addLog(
+              "info",
+              "Authentication succeeded; reconnecting to MCP server..."
+            );
+            connectingRef.current = false;
+            connectRef.current?.();
+            break;
+          case "cancelled":
+            addLog(
+              "warn",
+              "Authentication popup was closed before completing. Returning to pending_auth."
+            );
+            setState("pending_auth");
+            break;
+          case "timeout":
+            addLog(
+              "warn",
+              "Authentication timed out waiting for the popup. Returning to pending_auth."
+            );
+            setState("pending_auth");
+            break;
+          case "error":
+            failConnection(`Authentication failed: ${result.error}`);
+            break;
+          default:
+            // Exhaustive over AuthPopupResult["kind"]; nothing to do.
+            break;
         }
       } catch (authError) {
         if (!isMountedRef.current) return;
@@ -1527,6 +1683,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [
     addLog,
     retry,
+    failConnection,
     authUrl,
     url,
     useRedirectFlow,
@@ -1580,7 +1737,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const listResources = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
       throw new Error(
-        `MCP client is not ready (current state: ${state}). Cannot list resources.`
+        `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot list resources.`
       );
     }
     addLog("info", "Listing resources");
@@ -1616,7 +1773,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (uri: string) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot read resource.`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot read resource.`
         );
       }
       addLog("info", `Reading resource: ${uri}`);
@@ -1673,7 +1830,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const listPrompts = useCallback(async () => {
     if (stateRef.current !== "ready" || !clientRef.current) {
       throw new Error(
-        `MCP client is not ready (current state: ${state}). Cannot list prompts.`
+        `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot list prompts.`
       );
     }
     addLog("info", "Listing prompts");
@@ -1847,7 +2004,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (name: string, args?: Record<string, unknown>) => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot get prompt.`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot get prompt.`
         );
       }
       addLog("info", `Getting prompt: ${name}`, args);
@@ -1889,7 +2046,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     async (params: CompleteRequestParams): Promise<CompleteResult> => {
       if (stateRef.current !== "ready" || !clientRef.current) {
         throw new Error(
-          `MCP client is not ready (current state: ${state}). Cannot request completion.`
+          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot request completion.`
         );
       }
 
@@ -1940,9 +2097,36 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    */
   useEffect(() => {
     const handleCallbackPayload = (
-      payload: { success?: boolean; error?: string } | undefined,
+      payload: McpAuthCallbackMessage | undefined,
       source: "postMessage" | "BroadcastChannel"
     ) => {
+      // Defer to runAuthPopup while a manual authenticate() flow owns the
+      // result, so a single completion doesn't trigger two reconnects.
+      if (popupFlowActiveRef.current) {
+        addLog(
+          "debug",
+          `Ignoring auth callback via ${source}; manual popup flow owns this result.`
+        );
+        return;
+      }
+
+      // Scope the result to this server. The callback page stamps the payload
+      // with the originating server's URL hash; ignore results for other
+      // servers so unrelated useMcp instances don't all reconnect at once.
+      // Payloads without a hash (older callback pages) are accepted.
+      const ourHash = authProviderRef.current?.serverUrlHash;
+      if (
+        payload?.serverUrlHash &&
+        ourHash &&
+        payload.serverUrlHash !== ourHash
+      ) {
+        addLog(
+          "debug",
+          `Ignoring auth callback via ${source} for a different server.`
+        );
+        return;
+      }
+
       addLog("info", `Received auth callback via ${source}.`, payload);
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
       authTimeoutRef.current = null;
@@ -1975,6 +2159,19 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           }
         }, 100);
       } else {
+        // Don't clobber a connection that already became ready (or moved on):
+        // a late/duplicate failure message must not knock a healthy client
+        // back to "failed".
+        if (
+          stateRef.current !== "authenticating" &&
+          stateRef.current !== "pending_auth"
+        ) {
+          addLog(
+            "debug",
+            `Ignoring stale auth failure callback (state=${stateRef.current}).`
+          );
+          return;
+        }
         failConnectionRef.current?.(
           `Authentication failed in callback: ${payload?.error || "Unknown reason."}`
         );
@@ -1983,7 +2180,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
     const messageHandler = (event: globalThis.MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type !== "mcp_auth_callback") return;
+      if (event.data?.type !== MCP_AUTH_CALLBACK_MESSAGE_TYPE) return;
       handleCallbackPayload(event.data, "postMessage");
     };
     window.addEventListener("message", messageHandler);
@@ -1991,12 +2188,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
     let broadcastChannel: BroadcastChannel | null = null;
     const broadcastHandler = (event: MessageEvent) => {
-      if (event.data?.type !== "mcp_auth_callback") return;
+      if (event.data?.type !== MCP_AUTH_CALLBACK_MESSAGE_TYPE) return;
       handleCallbackPayload(event.data, "BroadcastChannel");
     };
     if (typeof BroadcastChannel !== "undefined") {
       try {
-        broadcastChannel = new BroadcastChannel("mcp_auth_callback");
+        broadcastChannel = new BroadcastChannel(MCP_AUTH_BROADCAST_CHANNEL);
         broadcastChannel.addEventListener("message", broadcastHandler);
         addLog("debug", "Auth callback BroadcastChannel listener added.");
       } catch (e) {
@@ -2102,26 +2299,17 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // restoreFetch() is a no-op when no interceptor is active.
       authProviderRef.current?.restoreFetch?.();
 
-      // Clear OAuth state ONLY if we're in the middle of an OAuth flow
-      // This prevents "code verifier not found" errors in StrictMode double-mounting
-      // Don't clear if we're just connecting with existing valid tokens
-      if (
-        (stateRef.current === "authenticating" ||
-          stateRef.current === "pending_auth") &&
-        authProviderRef.current
-      ) {
-        try {
-          const count = authProviderRef.current.clearStorage?.() ?? 0;
-          if (count > 0) {
-            addLog(
-              "debug",
-              `Cleared ${count} OAuth state item(s) during unmount to prevent corruption`
-            );
-          }
-        } catch (err) {
-          addLog("debug", "Error clearing OAuth state during unmount:", err);
-        }
-      }
+      // NOTE: We intentionally do NOT clear OAuth storage on unmount, even
+      // mid-flow. Wrapper remounts (provider `_updateVersion` bumps, route
+      // churn, StrictMode double-mounting) would otherwise destroy the
+      // in-flight authorization state record + PKCE verifier and strand a
+      // popup that completes after the remount. Stale state records carry a
+      // 10-minute TTL (enforced in callback.ts) and the PKCE verifier is
+      // overwritten by `saveCodeVerifier()` on the next auth start, so leaving
+      // them in place is safe. Tokens that land after a remount are picked up
+      // by the state-keyed callback listener / storage event and the wrapper
+      // reconnects cleanly. Explicit logout still clears storage via
+      // `clearStorage()` / `removeServer(id, { clearCredentials: true })`.
 
       disconnect(true);
     };

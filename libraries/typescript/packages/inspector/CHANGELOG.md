@@ -1,5 +1,182 @@
 # @mcp-use/inspector
 
+## 10.0.0
+
+### Patch Changes
+
+- Updated dependencies [5b4afc8]
+  - mcp-use@1.32.0
+
+## 10.0.0-canary.0
+
+### Patch Changes
+
+- Updated dependencies [a683d43]
+  - mcp-use@1.32.0-canary.0
+
+## 9.0.1
+
+### Patch Changes
+
+- mcp-use@1.31.1
+
+## 9.0.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.31.1-canary.0
+
+## 9.0.0
+
+### Patch Changes
+
+- Updated dependencies [4d00a1f]
+- Updated dependencies [4d00a1f]
+  - mcp-use@1.31.0
+
+## 9.0.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [4e34b82]
+  - mcp-use@1.31.0-canary.1
+
+## 8.0.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [fd4efb7]
+  - mcp-use@1.30.3-canary.0
+
+## 8.0.2
+
+### Patch Changes
+
+- Updated dependencies [252d034]
+  - mcp-use@1.30.2
+
+## 8.0.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f9fb29b]
+  - mcp-use@1.30.2-canary.0
+
+## 8.0.1
+
+### Patch Changes
+
+- c866bda: fix(inspector): stop widget status labels from blocking iframe pointer events
+
+  The MCP Apps preview pane rendered the invoking/invoked status label in an
+  absolutely positioned wrapper with `h-full`, which intercepted hover, click,
+  and form control interactions in a vertical strip along the left edge of the
+  widget iframe for the entire lifetime of the panel.
+
+  Apply `pointer-events-none`, drop the full-height wrapper, and align the Apps
+  SDK status label with the same non-blocking behavior.
+
+  Closes #1678
+
+- Updated dependencies [c866bda]
+- Updated dependencies [c866bda]
+  - mcp-use@1.30.1
+
+## 8.0.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [ea4e6f1]
+  - mcp-use@1.30.1-canary.3
+
+## 8.0.1-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8c00a55]
+  - mcp-use@1.30.1-canary.2
+
+## 8.0.1-canary.1
+
+### Patch Changes
+
+- afb0e79: fix(inspector): stop widget status labels from blocking iframe pointer events
+
+  The MCP Apps preview pane rendered the invoking/invoked status label in an
+  absolutely positioned wrapper with `h-full`, which intercepted hover, click,
+  and form control interactions in a vertical strip along the left edge of the
+  widget iframe for the entire lifetime of the panel.
+
+  Apply `pointer-events-none`, drop the full-height wrapper, and align the Apps
+  SDK status label with the same non-blocking behavior.
+
+  Closes #1678
+  - mcp-use@1.30.1-canary.1
+
+## 8.0.1-canary.0
+
+### Patch Changes
+
+- mcp-use@1.30.1-canary.0
+
+## 8.0.0
+
+### Patch Changes
+
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+  - mcp-use@1.30.0
+
+## 8.0.0-canary.6
+
+### Patch Changes
+
+- mcp-use@1.30.0-canary.6
+
+## 8.0.0-canary.5
+
+### Patch Changes
+
+- Updated dependencies [e4b83e4]
+  - mcp-use@1.30.0-canary.5
+
+## 8.0.0-canary.4
+
+### Patch Changes
+
+- Updated dependencies [f8ca6bb]
+  - mcp-use@1.30.0-canary.4
+
+## 8.0.0-canary.3
+
+### Patch Changes
+
+- mcp-use@1.30.0-canary.3
+
+## 8.0.0-canary.2
+
+### Patch Changes
+
+- Updated dependencies [b820e74]
+  - mcp-use@1.30.0-canary.2
+
+## 8.0.0-canary.1
+
+### Patch Changes
+
+- Updated dependencies [88180d5]
+  - mcp-use@1.30.0-canary.1
+
+## 8.0.0-canary.0
+
+### Patch Changes
+
+- Updated dependencies [f565f9c]
+  - mcp-use@1.30.0-canary.0
+
 ## 7.0.1
 
 ### Patch Changes

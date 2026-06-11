@@ -95,6 +95,23 @@ Enable automatic height notifications for dynamic content:
 </McpUseProvider>
 ```
 
+<Tip>
+**Widgets that conditionally render `null`**: When `autoSize={true}` is enabled and your widget returns `null` (e.g., when there are no results to display), the iframe will automatically collapse to zero height. This allows hosts to properly hide empty widgets.
+
+```tsx
+function SearchWidget() {
+  const { props } = useWidget<{ results: string[] }>();
+  
+  // Widget collapses when no results
+  if (props.results?.length === 0) {
+    return null;
+  }
+  
+  return <div>{/* render results */}</div>;
+}
+```
+</Tip>
+
 ## Complete Example
 
 ```tsx

@@ -6,6 +6,8 @@ const server = new MCPServer({
   title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
   description: "MCP server with MCP Apps integration",
+  instructions:
+    "Use search-tools to find fruit matches before calling get-fruit-details. Prefer the widget result when the user wants to browse or compare options visually.",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com", // Can be customized later

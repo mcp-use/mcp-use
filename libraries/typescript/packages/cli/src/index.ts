@@ -2964,18 +2964,28 @@ program
     "Login with an API key directly (non-interactive, for CI/CD)"
   )
   .option("--org <slug|id|name>", "Select an organization non-interactively")
-  .action(async (opts: { apiKey?: string; org?: string }) => {
-    try {
-      await loginCommand({ apiKey: opts.apiKey, org: opts.org });
-      process.exit(0);
-    } catch (error) {
-      console.error(
-        chalk.red.bold("\n✗ Login failed:"),
-        chalk.red(error instanceof Error ? error.message : "Unknown error")
-      );
-      process.exit(1);
+  .option(
+    "--device-code <code>",
+    "Authenticate with a pre-approved device code (non-interactive; e.g. from the web onboarding flow)"
+  )
+  .action(
+    async (opts: { apiKey?: string; org?: string; deviceCode?: string }) => {
+      try {
+        await loginCommand({
+          apiKey: opts.apiKey,
+          org: opts.org,
+          deviceCode: opts.deviceCode,
+        });
+        process.exit(0);
+      } catch (error) {
+        console.error(
+          chalk.red.bold("\n✗ Login failed:"),
+          chalk.red(error instanceof Error ? error.message : "Unknown error")
+        );
+        process.exit(1);
+      }
     }
-  });
+  );
 
 program
   .command("logout")
@@ -3029,9 +3039,13 @@ program
   )
   .option(
     "--env <key=value...>",
-    "Environment variables (can be used multiple times)"
+    "Environment variable values as KEY=VALUE (repeatable). Note: this sets values, unlike `servers env --env` which selects environment tags."
   )
   .option("--env-file <path>", "Path to .env file with environment variables")
+  .option(
+    "--branch <name>",
+    "Deploy branch (default: current git branch). Also scopes --env/--env-file sync to that branch's preview env."
+  )
   .option(
     "--root-dir <path>",
     "Root directory within repo to deploy from (for monorepos)"
@@ -3050,6 +3064,10 @@ program
     "--start-command <cmd>",
     "Custom start command (overrides auto-detection)"
   )
+  .option(
+    "--no-github",
+    "Upload local source without connecting GitHub (repo hosted in the platform-managed org)"
+  )
   .action(async (options) => {
     await deployCommand({
       open: options.open,
@@ -3059,12 +3077,14 @@ program
       new: options.new,
       env: options.env,
       envFile: options.envFile,
+      branch: options.branch,
       rootDir: options.rootDir,
       org: options.org,
       yes: options.yes,
       region: options.region,
       buildCommand: options.buildCommand,
       startCommand: options.startCommand,
+      noGithub: options.github === false,
     });
   });
 

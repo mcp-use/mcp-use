@@ -73,6 +73,7 @@ export function startIdleCleanup(
   transports?: Map<string, { close?: () => Promise<void> | void }>,
   mcpServerInstance?: {
     cleanupSessionSubscriptions?: (sessionId: string) => void;
+    cleanupSessionRefs?: (sessionId: string) => void;
   }
 ): NodeJS.Timeout | undefined {
   if (idleTimeoutMs <= 0) {
@@ -107,10 +108,11 @@ export function startIdleCleanup(
         transports?.delete(sessionId);
 
         sessions.delete(sessionId);
-        // Clean up resource subscriptions for this session if mcpServerInstance provided
+        // Clean up server-owned per-session resources if mcpServerInstance provided
         mcpServerInstance?.cleanupSessionSubscriptions?.(sessionId);
+        mcpServerInstance?.cleanupSessionRefs?.(sessionId);
         console.log(
-          `[MCP] Cleaned up resource subscriptions for session ${sessionId}`
+          `[MCP] Cleaned up server resources for session ${sessionId}`
         );
       }
     }

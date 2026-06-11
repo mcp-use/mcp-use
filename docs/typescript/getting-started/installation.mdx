@@ -50,6 +50,7 @@ Check out [UI Widgets](/typescript/server/mcp-apps) with support to MCP-UI and O
 The generated project includes pre-configured server metadata that is visible in MCP Inspector and MCP clients:
 
 - **Name & Title**: Both set to your project name (customizable in `index.ts`)
+- **Instructions**: Model-facing guidance for cross-tool workflows and server-wide constraints
 - **Icons**: mcp-use branding icons included in `public/` folder
 - **Website URL**: Defaults to https://mcp-use.com (customizable)
 - **Favicon**: Included for browser display
@@ -69,6 +70,7 @@ const server = new MCPServer({
   title: 'My Custom Title',    // display name - shown in clients
   version: '1.0.0',
   description: 'My awesome server',
+  instructions: 'Use lookup tools before write tools; ask for confirmation before changes.',
   websiteUrl: 'https://my-site.com',  // Your website or docs
   favicon: 'favicon.ico',      // Already in public/ folder
   icons: [

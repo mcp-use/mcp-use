@@ -6,6 +6,8 @@ import { isLoggedIn } from "../utils/config.js";
 import { handleCommandError } from "../utils/errors.js";
 import { formatRelativeTime } from "../utils/format.js";
 
+const DEFAULT_LIST_LIMIT = 30;
+
 async function prompt(question: string): Promise<boolean> {
   const readline = await import("node:readline");
   const rl = readline.createInterface({
@@ -41,7 +43,36 @@ function formatId(id: string): string {
   return id;
 }
 
-async function listDeploymentsCommand(): Promise<void> {
+function formatPageHeader(label: string, count: number, total: number): string {
+  return count === total
+    ? `${label} (${total})`
+    : `${label} (${count} of ${total})`;
+}
+
+function printNextPageHint(
+  command: string,
+  page: { items: unknown[]; total: number; limit: number; skip: number },
+  extraArgs: string[] = []
+): void {
+  const nextSkip = page.skip + page.items.length;
+  if (nextSkip >= page.total) return;
+
+  const args = [
+    command,
+    "--limit",
+    String(page.limit),
+    "--skip",
+    String(nextSkip),
+    ...extraArgs,
+  ];
+  console.log(chalk.gray(`Next page: ${args.join(" ")}`));
+}
+
+async function listDeploymentsCommand(options: {
+  limit?: string;
+  skip?: string;
+  sort?: string;
+}): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
       console.log(chalk.red("✗ You are not logged in."));
@@ -53,11 +84,29 @@ async function listDeploymentsCommand(): Promise<void> {
       process.exit(1);
     }
 
+    const limit = options.limit
+      ? parseInt(options.limit, 10)
+      : DEFAULT_LIST_LIMIT;
+    const skip = options.skip ? parseInt(options.skip, 10) : undefined;
+    if (limit !== undefined && (Number.isNaN(limit) || limit < 1)) {
+      console.log(chalk.red("✗ Invalid --limit"));
+      process.exit(1);
+    }
+    if (skip !== undefined && (Number.isNaN(skip) || skip < 0)) {
+      console.log(chalk.red("✗ Invalid --skip"));
+      process.exit(1);
+    }
+
     const api = await McpUseAPI.create();
-    const [deployments, authResult] = await Promise.all([
-      api.listDeployments(),
+    const [page, authResult] = await Promise.all([
+      api.listDeployments({
+        limit,
+        skip,
+        sort: options.sort ?? "createdAt:desc",
+      }),
       api.testAuth(),
     ]);
+    const deployments = page.items;
 
     const orgMap = new Map(authResult.orgs.map((o) => [o.id, o.name]));
 
@@ -90,17 +139,31 @@ async function listDeploymentsCommand(): Promise<void> {
     );
 
     if (sortedDeployments.length === 0) {
-      console.log(chalk.yellow("No deployments found."));
-      console.log(
-        chalk.gray(
-          "\nDeploy your first MCP server with " + chalk.white("mcp-use deploy")
-        )
-      );
+      if (page.total === 0) {
+        console.log(chalk.yellow("No deployments found."));
+        console.log(
+          chalk.gray(
+            "\nDeploy your first MCP server with " +
+              chalk.white("mcp-use deploy")
+          )
+        );
+      } else {
+        console.log(
+          chalk.yellow(`No deployments found at --skip ${page.skip}.`)
+        );
+        console.log(chalk.gray(`Total deployments: ${page.total}`));
+      }
       return;
     }
 
     console.log(
-      chalk.cyan.bold(`\n📦 Deployments (${sortedDeployments.length})\n`)
+      chalk.cyan.bold(
+        `\n📦 ${formatPageHeader(
+          "Deployments",
+          sortedDeployments.length,
+          page.total
+        )}\n`
+      )
     );
 
     console.log(
@@ -127,6 +190,9 @@ async function listDeploymentsCommand(): Promise<void> {
       );
     }
 
+    const extraArgs = [];
+    if (options.sort) extraArgs.push("--sort", options.sort);
+    printNextPageHint("mcp-use deployments list", page, extraArgs);
     console.log();
   } catch (error) {
     handleCommandError(error, "Failed to list deployments");
@@ -213,7 +279,7 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
 
 async function restartDeploymentCommand(
   deploymentId: string,
-  options: { follow?: boolean }
+  options: { follow?: boolean; branch?: string }
 ): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -240,8 +306,12 @@ async function restartDeploymentCommand(
       chalk.cyan.bold(`\n🔄 Restarting deployment: ${deployment.name}\n`)
     );
 
+    // Reuse the deployment's branch by default; `--branch` overrides to target
+    // a different branch's preview.
+    const branch = options.branch ?? deployment.gitBranch ?? undefined;
     const newDep = await api.createDeployment({
       serverId: deployment.serverId,
+      ...(branch ? { branch } : {}),
       trigger: "redeploy",
     });
 
@@ -533,7 +603,10 @@ export function createDeploymentsCommand(): Command {
   deploymentsCommand
     .command("list")
     .alias("ls")
-    .description("List all deployments")
+    .description("List deployments")
+    .option("--limit <n>", "Page size (default 30)")
+    .option("--skip <n>", "Offset for pagination")
+    .option("--sort <field:asc|desc>", "Sort (e.g. createdAt:desc)")
     .action(listDeploymentsCommand);
 
   deploymentsCommand
@@ -546,6 +619,10 @@ export function createDeploymentsCommand(): Command {
     .command("restart")
     .argument("<deployment-id>", "Deployment ID")
     .option("-f, --follow", "Follow build logs")
+    .option(
+      "--branch <name>",
+      "Target branch for the redeploy (default: the deployment's branch)"
+    )
     .description(
       "Restart a deployment (triggers a new deployment on the same server)"
     )

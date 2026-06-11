@@ -90,7 +90,7 @@
       "js-yaml": ">=3.14.2 || >=4.1.1",
       "flatted": ">=3.4.2",
       "tar": ">=7.5.11",
-      "hono": ">=4.12.18",
+      "hono": ">=4.12.21",
       "@hono/node-server": ">=1.19.10",
       "express-rate-limit": ">=8.2.2",
       "dompurify": ">=3.4.0",

@@ -128,9 +128,9 @@ export function McpUseProvider({
         clearTimeout(debounceTimeoutRef.current);
       }
       debounceTimeoutRef.current = setTimeout(() => {
-        // Only notify if height changed by more than threshold and is positive
+        // Always notify zero height and for positive heights only notify if changed by more than threshold
         const heightDiff = Math.abs(height - lastHeightRef.current);
-        if (heightDiff >= MIN_HEIGHT_CHANGE_PX && height > 0) {
+        if (height === 0 || heightDiff >= MIN_HEIGHT_CHANGE_PX) {
           lastHeightRef.current = height;
           notifyHeight(height);
         }

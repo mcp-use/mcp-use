@@ -6,6 +6,55 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v9.0.2" description="June 2026">
+  ## mcp-use v1.32.0
+  Patch release paired with `mcp-use` v1.32.0 — picks up OAuth token endpoint discovery on `useMcp().authTokens`; no inspector-specific runtime changes.
+
+- **Update**: Updated mcp-use to v1.32.0
+</Update>
+
+<Update label="v9.0.1" description="June 2026">
+  ## mcp-use v1.31.1
+  Patch release paired with `mcp-use` v1.31.1 — picks up workspace dependency alignment; no inspector-specific runtime changes.
+
+- **Update**: Updated mcp-use to v1.31.1
+</Update>
+
+<Update label="v9.0.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=9.0.0&title=OAuth%20credential%20lifecycle%20%26%20mcp-use%20v1.31.0&date=2026-06&lang=inspector" alt="Release 9.0.0" />
+  </Frame>
+  ## OAuth credential lifecycle & mcp-use v1.31.0
+  Major release paired with `mcp-use` v1.31.0 — peer dependency moves to `>=1.31.0-canary.1`; explicit OAuth credential cleanup when removing a saved server.
+
+- **Fix**: delete-server passes `{ clearCredentials: true }` to `removeConnection` so an explicit user removal forgets persisted OAuth credentials instead of leaving tokens behind (`#1703`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.31.0-canary.1`
+- **Update**: Updated mcp-use to v1.31.0
+</Update>
+
+<Update label="v8.0.2" description="June 2026">
+  ## mcp-use v1.30.2
+  Patch release paired with `mcp-use` v1.30.2 — picks up the chalk CJS compatibility fix; no inspector-specific runtime changes.
+
+- **Update**: Updated mcp-use to v1.30.2
+</Update>
+
+<Update label="v8.0.1" description="June 2026">
+  ## Widget status label pointer-events fix
+  Patch release paired with `mcp-use` v1.30.1  -  invoking/invoked labels in the MCP Apps preview pane no longer block iframe interactions.
+
+- **Fix**: MCP Apps preview status label used an absolutely positioned `h-full` wrapper that intercepted hover, click, and form controls along the left edge of the widget iframe; apply `pointer-events-none`, remove the full-height wrapper, and align the Apps SDK label in `OpenAIComponentRenderer` (`#1694`, `#1678`)
+- **Update**: Updated mcp-use to v1.30.1
+</Update>
+
+<Update label="v8.0.0" description="June 2026">
+  ## mcp-use v1.30.0
+  Major release paired with `mcp-use` v1.30.0  -  peer dependency moves to `>=1.30.0-canary.0`; no inspector-specific runtime changes.
+
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.30.0-canary.0`
+- **Update**: Updated mcp-use to v1.30.0
+</Update>
+
 <Update label="v7.0.1" description="June 2026">
   ## mcp-use v1.29.1
   Patch release paired with `mcp-use` v1.29.1  -  picks up OAuth transport auth hardening and workspace security dependency bumps; no inspector-specific runtime changes.

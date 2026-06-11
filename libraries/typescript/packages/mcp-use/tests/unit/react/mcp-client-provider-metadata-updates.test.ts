@@ -130,7 +130,7 @@ describe("McpClientProvider metadata-only updates", () => {
     expect(mountCount).toBe(1);
   });
 
-  it("keeps updateServer as a reconnecting update path", async () => {
+  it("keeps updateServer as a reconnecting update path but preserves OAuth credentials", async () => {
     await act(async () => {
       create(
         React.createElement(
@@ -164,7 +164,56 @@ describe("McpClientProvider metadata-only updates", () => {
     await flushUpdates();
 
     expect(disconnectSpies[0]).toHaveBeenCalledTimes(1);
-    expect(clearStorageSpies[0]).toHaveBeenCalledTimes(1);
+    // updateServer reconnects (remount) to apply new options, but must NOT
+    // wipe persisted OAuth credentials — editing options is not a logout.
+    expect(clearStorageSpies[0]).not.toHaveBeenCalled();
     expect(mountCount).toBeGreaterThan(1);
+  });
+
+  it("removeServer preserves OAuth credentials by default, but clears them on explicit logout", async () => {
+    await act(async () => {
+      create(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+
+    await flushUpdates();
+    await flushUpdates();
+
+    const client = latestClient;
+    expect(client).toBeTruthy();
+    expect(client?.getServer("sandbox")).toBeTruthy();
+
+    // Default removal: connection torn down, credentials preserved.
+    act(() => {
+      client?.removeServer("sandbox");
+    });
+    await flushUpdates();
+
+    expect(disconnectSpies[0]).toHaveBeenCalledTimes(1);
+    expect(clearStorageSpies[0]).not.toHaveBeenCalled();
+    expect(latestClient?.getServer("sandbox")).toBeUndefined();
+
+    // Re-add and remove with explicit logout: credentials wiped this time.
+    act(() => {
+      latestClient?.addServer("sandbox", {
+        url: "http://localhost:3000/mcp",
+        name: "Sandbox MCP Server",
+      });
+    });
+    await flushUpdates();
+    await flushUpdates();
+
+    act(() => {
+      latestClient?.removeServer("sandbox", { clearCredentials: true });
+    });
+    await flushUpdates();
+
+    const lastClearStorage = clearStorageSpies[clearStorageSpies.length - 1];
+    expect(lastClearStorage).toHaveBeenCalledTimes(1);
   });
 });

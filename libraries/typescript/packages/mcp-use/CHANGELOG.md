@@ -1,5 +1,354 @@
 # mcp-use
 
+## 1.32.0
+
+### Minor Changes
+
+- 5b4afc8: Expose the resolved OAuth `token_endpoint` on `useMcp().authTokens` (and add `getTokenEndpoint()` to the browser OAuth provider / session store). This lets consumers persist the token endpoint alongside the access/refresh tokens so a backend can proactively refresh the token before it expires. The field is additive and optional — existing usage is unaffected.
+
+### Patch Changes
+
+- @mcp-use/cli@3.5.1
+- @mcp-use/inspector@10.0.0
+
+## 1.32.0-canary.0
+
+### Minor Changes
+
+- a683d43: Expose the resolved OAuth `token_endpoint` on `useMcp().authTokens` (and add `getTokenEndpoint()` to the browser OAuth provider / session store). This lets consumers persist the token endpoint alongside the access/refresh tokens so a backend can proactively refresh the token before it expires. The field is additive and optional — existing usage is unaffected.
+
+### Patch Changes
+
+- @mcp-use/cli@3.5.1-canary.0
+- @mcp-use/inspector@10.0.0-canary.0
+
+## 1.31.1
+
+### Patch Changes
+
+- Updated dependencies [0fb1868]
+  - @mcp-use/cli@3.5.0
+  - @mcp-use/inspector@9.0.1
+
+## 1.31.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [673a142]
+  - @mcp-use/cli@3.5.0-canary.0
+  - @mcp-use/inspector@9.0.1-canary.0
+
+## 1.31.0
+
+### Minor Changes
+
+- 4d00a1f: fix(react/auth): opener-owned OAuth popup flow so connections never get stuck in "authenticating"
+
+  The browser OAuth popup handoff was fire-and-forget: `authenticate()` opened the
+  popup and then relied on a single `mcp_auth_callback` push message from the
+  callback page to leave the `authenticating` state. Any lost message (popup
+  closed early, severed `window.opener` under COOP, partitioned BroadcastChannel,
+  or a provider remount racing the callback) stranded the UI on "Authenticating…"
+  until a hard refresh — even though tokens were already persisted.
+
+  Adopt the pattern used by mature browser OAuth libraries (auth0-spa-js,
+  oidc-client-ts, msal-browser): the window that opens the popup owns a promise
+  that always settles on one of four outcomes.
+  - New `runAuthPopup()` helper (exported from `mcp-use/auth`) settles on the
+    first of: a `state`-matched result message (postMessage **or**
+    BroadcastChannel), the popup being closed, a `storage` event for the flow's
+    tokens key (robust to severed/partitioned channels), or a timeout. The close
+    and timeout paths check persisted tokens before declaring
+    cancelled/timeout, so a "missed message but tokens landed" case still
+    succeeds.
+  - `useMcp().authenticate()` now awaits `runAuthPopup()` and owns every state
+    transition: success reconnects, cancelled/timeout return to `pending_auth`
+    (re-enabling the Authenticate button), and error fails the connection.
+  - The OAuth callback page stamps result payloads with the originating `state`
+    and `serverUrlHash`. The always-on callback listener now scopes results to
+    the right server and won't clobber an already-`ready` connection with a late
+    failure message.
+
+  fix(react): stop wiping OAuth credentials on routine lifecycle churn
+
+  Persisted OAuth credentials (tokens / client_info / PKCE verifier) are user
+  state, not connection state, and were being destroyed by ordinary lifecycle
+  events — silently logging users out and (when a popup completed after a
+  remount) breaking the flow entirely.
+  - `McpClientProvider`'s `removeServer(id)` no longer clears OAuth storage by
+    default. Pass `removeServer(id, { clearCredentials: true })` for an explicit
+    logout / "forget this server" action (the Inspector's delete-server button
+    now does). This is a behavior change to `removeServer`; the signature stays
+    backward compatible.
+  - `updateServer()` no longer clears OAuth storage — editing options is not a
+    logout. It still remounts to apply the new options.
+  - `useMcp` no longer wipes OAuth storage on unmount mid-flow. Stale
+    authorization state records already expire via their 10-minute TTL and the
+    PKCE verifier is overwritten on the next auth start, so a popup completing
+    after a wrapper remount now lands cleanly.
+
+### Patch Changes
+
+- 4d00a1f: Move chalk from optionalDependencies to dependencies. It is statically imported by server code (`src/server/logging.ts`, `src/server/utils/server-lifecycle.ts`), so installs that skip optional packages (`pnpm install --no-optional`, `npm config set optional false`) would fail at module load.
+- Updated dependencies [4d00a1f]
+  - @mcp-use/cli@3.4.2
+  - @mcp-use/inspector@9.0.0
+
+## 1.31.0-canary.1
+
+### Minor Changes
+
+- 4e34b82: fix(react/auth): opener-owned OAuth popup flow so connections never get stuck in "authenticating"
+
+  The browser OAuth popup handoff was fire-and-forget: `authenticate()` opened the
+  popup and then relied on a single `mcp_auth_callback` push message from the
+  callback page to leave the `authenticating` state. Any lost message (popup
+  closed early, severed `window.opener` under COOP, partitioned BroadcastChannel,
+  or a provider remount racing the callback) stranded the UI on "Authenticating…"
+  until a hard refresh — even though tokens were already persisted.
+
+  Adopt the pattern used by mature browser OAuth libraries (auth0-spa-js,
+  oidc-client-ts, msal-browser): the window that opens the popup owns a promise
+  that always settles on one of four outcomes.
+  - New `runAuthPopup()` helper (exported from `mcp-use/auth`) settles on the
+    first of: a `state`-matched result message (postMessage **or**
+    BroadcastChannel), the popup being closed, a `storage` event for the flow's
+    tokens key (robust to severed/partitioned channels), or a timeout. The close
+    and timeout paths check persisted tokens before declaring
+    cancelled/timeout, so a "missed message but tokens landed" case still
+    succeeds.
+  - `useMcp().authenticate()` now awaits `runAuthPopup()` and owns every state
+    transition: success reconnects, cancelled/timeout return to `pending_auth`
+    (re-enabling the Authenticate button), and error fails the connection.
+  - The OAuth callback page stamps result payloads with the originating `state`
+    and `serverUrlHash`. The always-on callback listener now scopes results to
+    the right server and won't clobber an already-`ready` connection with a late
+    failure message.
+
+  fix(react): stop wiping OAuth credentials on routine lifecycle churn
+
+  Persisted OAuth credentials (tokens / client_info / PKCE verifier) are user
+  state, not connection state, and were being destroyed by ordinary lifecycle
+  events — silently logging users out and (when a popup completed after a
+  remount) breaking the flow entirely.
+  - `McpClientProvider`'s `removeServer(id)` no longer clears OAuth storage by
+    default. Pass `removeServer(id, { clearCredentials: true })` for an explicit
+    logout / "forget this server" action (the Inspector's delete-server button
+    now does). This is a behavior change to `removeServer`; the signature stays
+    backward compatible.
+  - `updateServer()` no longer clears OAuth storage — editing options is not a
+    logout. It still remounts to apply the new options.
+  - `useMcp` no longer wipes OAuth storage on unmount mid-flow. Stale
+    authorization state records already expire via their 10-minute TTL and the
+    PKCE verifier is overwritten on the next auth start, so a popup completing
+    after a wrapper remount now lands cleanly.
+
+### Patch Changes
+
+- Updated dependencies [4e34b82]
+  - @mcp-use/cli@3.4.2-canary.1
+  - @mcp-use/inspector@9.0.0-canary.1
+
+## 1.30.3-canary.0
+
+### Patch Changes
+
+- fd4efb7: Move chalk from optionalDependencies to dependencies. It is statically imported by server code (`src/server/logging.ts`, `src/server/utils/server-lifecycle.ts`), so installs that skip optional packages (`pnpm install --no-optional`, `npm config set optional false`) would fail at module load.
+  - @mcp-use/cli@3.4.2-canary.0
+  - @mcp-use/inspector@8.0.3-canary.0
+
+## 1.30.2
+
+### Patch Changes
+
+- 252d034: Downgrade chalk to v4 to fix CJS builds. chalk 5 is ESM-only and is kept external by tsup, so the CJS bundle's `require("chalk")` on Node ≥ 22 returned the module namespace instead of the chalk instance, crashing CJS-built backends (e.g. the Next.js template) on startup with `TypeError: import_chalk.default.gray is not a function`.
+  - @mcp-use/cli@3.4.1
+  - @mcp-use/inspector@8.0.2
+
+## 1.30.2-canary.0
+
+### Patch Changes
+
+- f9fb29b: Downgrade chalk to v4 to fix CJS builds. chalk 5 is ESM-only and is kept external by tsup, so the CJS bundle's `require("chalk")` on Node ≥ 22 returned the module namespace instead of the chalk instance, crashing CJS-built backends (e.g. the Next.js template) on startup with `TypeError: import_chalk.default.gray is not a function`.
+  - @mcp-use/cli@3.4.1-canary.0
+  - @mcp-use/inspector@8.0.2-canary.0
+
+## 1.30.1
+
+### Patch Changes
+
+- c866bda: Fix iframe collapse when widget renders null by allowing zero-height notifications
+
+  Previously, the `height > 0` guard in `McpUseProvider` prevent height notifications when a widget rendered `null`, causing the iframe to persist at its last non-zero height. This fix allows zero heights to pass through unconditionally while maintaining the threshold check for positive heights, enabling proper iframe collapse for empty widgets.
+
+- c866bda: fix(react,client): prevent stale disconnect from wiping a reconnected MCP session
+
+  When `useMcp` reconnects after a URL change (e.g. dashboard environment
+  switch), the previous effect's async `disconnect()` could finish after the
+  new `connect()` and either:
+  1. set `clientRef` to null while React state remained `ready` — surfacing
+     as "MCP client is not ready (current state: ready)"; or
+  2. wipe the freshly-created session out of the underlying client's session
+     map — surfacing as "No active session found" on the next tool call.
+
+  `disconnect()` now only nulls `clientRef` **and** resets the hook state when
+  it has not been superseded by a newer `connect()` (a `connectEpochRef` counter
+  bumped at the start of each `connect()`, plus a client-identity check). This
+  covers both the case where `connect()` reuses the same `BrowserMCPClient`
+  instance for the new URL and a manual `disconnect()` racing a reconnect, which
+  must not clobber the live connection's state back to `discovering`.
+
+  `BaseMCPClient.closeSession()` now only deletes `sessions[name]` if the slot
+  still references the captured session. A parallel `createSession()` from a
+  newer `connect()` may have already written a new session there while we were
+  awaiting `session.disconnect()`; the previous unconditional `delete` in the
+  `finally` block would wipe that new session and break tool calls.
+
+  MCP operation errors also distinguish a missing client from a non-ready
+  state.
+
+- Updated dependencies [c866bda]
+- Updated dependencies [c866bda]
+  - @mcp-use/inspector@8.0.1
+  - @mcp-use/cli@3.4.0
+
+## 1.30.1-canary.3
+
+### Patch Changes
+
+- ea4e6f1: fix(react,client): prevent stale disconnect from wiping a reconnected MCP session
+
+  When `useMcp` reconnects after a URL change (e.g. dashboard environment
+  switch), the previous effect's async `disconnect()` could finish after the
+  new `connect()` and either:
+  1. set `clientRef` to null while React state remained `ready` — surfacing
+     as "MCP client is not ready (current state: ready)"; or
+  2. wipe the freshly-created session out of the underlying client's session
+     map — surfacing as "No active session found" on the next tool call.
+
+  `disconnect()` now only nulls `clientRef` **and** resets the hook state when
+  it has not been superseded by a newer `connect()` (a `connectEpochRef` counter
+  bumped at the start of each `connect()`, plus a client-identity check). This
+  covers both the case where `connect()` reuses the same `BrowserMCPClient`
+  instance for the new URL and a manual `disconnect()` racing a reconnect, which
+  must not clobber the live connection's state back to `discovering`.
+
+  `BaseMCPClient.closeSession()` now only deletes `sessions[name]` if the slot
+  still references the captured session. A parallel `createSession()` from a
+  newer `connect()` may have already written a new session there while we were
+  awaiting `session.disconnect()`; the previous unconditional `delete` in the
+  `finally` block would wipe that new session and break tool calls.
+
+  MCP operation errors also distinguish a missing client from a non-ready
+  state.
+  - @mcp-use/cli@3.4.0-canary.3
+  - @mcp-use/inspector@8.0.1-canary.3
+
+## 1.30.1-canary.2
+
+### Patch Changes
+
+- 8c00a55: Fix iframe collapse when widget renders null by allowing zero-height notifications
+
+  Previously, the `height > 0` guard in `McpUseProvider` prevent height notifications when a widget rendered `null`, causing the iframe to persist at its last non-zero height. This fix allows zero heights to pass through unconditionally while maintaining the threshold check for positive heights, enabling proper iframe collapse for empty widgets.
+  - @mcp-use/cli@3.4.0-canary.2
+  - @mcp-use/inspector@8.0.1-canary.2
+
+## 1.30.1-canary.1
+
+### Patch Changes
+
+- Updated dependencies [afb0e79]
+  - @mcp-use/inspector@8.0.1-canary.1
+  - @mcp-use/cli@3.4.0-canary.1
+
+## 1.30.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [bad4578]
+  - @mcp-use/cli@3.4.0-canary.0
+  - @mcp-use/inspector@8.0.1-canary.0
+
+## 1.30.0
+
+### Minor Changes
+
+- 25ae46e: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+- 25ae46e: Add `MCPServer.fromOpenAPI` for creating MCP servers from bundled OpenAPI documents, registering included operations as tools with generated input schemas and request handling.
+
+### Patch Changes
+
+- 25ae46e: Bump `hono` to `4.12.23` to address [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5), where non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware.
+- 25ae46e: Fix incomplete escaping when converting Zod string literals and enums to TypeScript type strings. Backslashes are now escaped before double quotes so generated `.d.ts` output remains valid when literal values contain `\` or `"`.
+- 25ae46e: Fix idle session cleanup to release registered refs for expired sessions.
+- Updated dependencies [25ae46e]
+- Updated dependencies [25ae46e]
+  - @mcp-use/cli@3.3.2
+  - @mcp-use/inspector@8.0.0
+
+## 1.30.0-canary.6
+
+### Patch Changes
+
+- Updated dependencies [726bcbb]
+  - @mcp-use/cli@3.3.2-canary.6
+  - @mcp-use/inspector@8.0.0-canary.6
+
+## 1.30.0-canary.5
+
+### Patch Changes
+
+- e4b83e4: Fix idle session cleanup to release registered refs for expired sessions.
+  - @mcp-use/cli@3.3.2-canary.5
+  - @mcp-use/inspector@8.0.0-canary.5
+
+## 1.30.0-canary.4
+
+### Minor Changes
+
+- f8ca6bb: Add `MCPServer.fromOpenAPI` for creating MCP servers from bundled OpenAPI documents, registering included operations as tools with generated input schemas and request handling.
+
+### Patch Changes
+
+- @mcp-use/cli@3.3.2-canary.4
+- @mcp-use/inspector@8.0.0-canary.4
+
+## 1.30.0-canary.3
+
+### Patch Changes
+
+- Updated dependencies [a3d9aa9]
+  - @mcp-use/cli@3.3.2-canary.3
+  - @mcp-use/inspector@8.0.0-canary.3
+
+## 1.30.0-canary.2
+
+### Patch Changes
+
+- b820e74: Bump `hono` to `4.12.23` to address [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5), where non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware.
+  - @mcp-use/cli@3.3.2-canary.2
+  - @mcp-use/inspector@8.0.0-canary.2
+
+## 1.30.0-canary.1
+
+### Patch Changes
+
+- 88180d5: Fix incomplete escaping when converting Zod string literals and enums to TypeScript type strings. Backslashes are now escaped before double quotes so generated `.d.ts` output remains valid when literal values contain `\` or `"`.
+  - @mcp-use/cli@3.3.2-canary.1
+  - @mcp-use/inspector@8.0.0-canary.1
+
+## 1.30.0-canary.0
+
+### Minor Changes
+
+- f565f9c: Add MCP server instructions support to TypeScript server configuration and scaffolded templates.
+
+### Patch Changes
+
+- @mcp-use/cli@3.3.2-canary.0
+- @mcp-use/inspector@8.0.0-canary.0
+
 ## 1.29.1
 
 ### Patch Changes

@@ -6,6 +6,93 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.32.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.32.0&title=OAuth%20token%20endpoint%20discovery&date=2026-06&lang=typescript" alt="Release 1.32.0" />
+  </Frame>
+  ## OAuth token endpoint discovery
+  Minor release exposing the resolved OAuth `token_endpoint` and client credentials on `useMcp().authTokens` so backends can persist everything needed for proactive server-side token refresh.
+
+- **New** (auth): `getTokenEndpoint()` on `BrowserOAuthClientProvider` and `OAuthSessionStore` — resolves and caches the OAuth token endpoint via PRM → authorization-server metadata discovery; persisted in storage for consumers (`#1714`)
+- **New** (auth): `getClientCredentials()` returns stored `client_id` / `client_secret` from Dynamic Client Registration or a static client — most token endpoints require `client_id` on refresh (`#1714`)
+- **Enhancement** (react): `useMcp().authTokens` includes optional `token_endpoint`, `client_id`, and `client_secret` after auth — best-effort resolution that never blocks the auth flow (`#1714`)
+- **Update**: Updated @mcp-use/inspector to v9.0.2
+</Update>
+
+<Update label="v1.31.1" description="June 2026">
+  ## Servers update & branch-scoped deploy env
+  Patch release for workspace dependency alignment; `@mcp-use/cli` minor adds `servers update` and branch-scoped environment and deploy management.
+
+- **New** (@mcp-use/cli): `mcp-use servers update <id-or-slug>` mutates server config in place (production branch, name, description, build/start commands) without delete/recreate — preserving the URL slug and env vars; `--branch` maps to `productionBranch`; pass an empty string to `--build-command`/`--start-command` to clear overrides (`#1711`)
+- **New** (@mcp-use/cli): `deploy --branch <name>` defaults to the current git branch and scopes `--env`/`--env-file` sync to that branch's preview environment (`#1711`)
+- **Enhancement** (@mcp-use/cli): `servers env list/add/update/rm` gain `--branch` for branch-scoped variables; `update`/`rm` accept a variable KEY (resolved within the branch scope) in addition to a UUID (`#1711`)
+- **Enhancement** (@mcp-use/cli): `deployments restart` gains `--branch <name>` (defaults to the deployment's branch) (`#1711`)
+- **Documentation** (@mcp-use/cli): `servers update` and branch-scoped deploy/env flags in the package README and mcp-apps-builder deploy skill reference (`#1711`)
+- **Update**: Updated @mcp-use/cli to v3.5.0
+- **Update**: Updated @mcp-use/inspector to v9.0.1
+</Update>
+
+<Update label="v1.31.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.31.0&title=OAuth%20popup%20reliability%20%26%20credential%20lifecycle&date=2026-06&lang=typescript" alt="Release 1.31.0" />
+  </Frame>
+  ## OAuth popup reliability & credential lifecycle
+  Minor release fixing browser OAuth popup flows that stranded connections in "Authenticating…", preserving credentials across routine React lifecycle churn, and clarifying platform-managed deploy feedback in the CLI. Inspector ships major v9.0.0 tracking the new peer dependency (see inspector changelog).
+
+- **New**: `runAuthPopup()` exported from `mcp-use/auth` — opener-owned popup runner that settles on a `state`-matched postMessage or BroadcastChannel result, popup close, a `storage` event for persisted tokens, or a timeout; close and timeout paths check storage before declaring cancelled so a missed message with landed tokens still succeeds (`#1703`)
+- **Enhancement**: `runAuthPopup()` keeps message and storage listeners alive for a grace window (default 20s) after `popup.closed` reports true without tokens — tolerates COOP browsing-context-group swaps that sever `window.opener` while the consent window is still open (`#1703`)
+- **Fix** (react): `useMcp().authenticate()` awaits `runAuthPopup()` and owns every terminal transition — success reconnects, cancelled/timeout return to `pending_auth` (re-enabling Authenticate), error fails the connection instead of hanging indefinitely (`#1703`)
+- **Fix** (auth): OAuth callback detects popup flow from stored `flowType` (not only `window.name`) and always broadcasts the result; result payloads carry the originating `state` and `serverUrlHash` so listeners scope to the right server and late failures do not clobber an already-`ready` connection (`#1703`)
+- **Enhancement** (auth): `renderCloseWindowMessage()` accepts an optional `returnUrl` link for tab-mode fallbacks when the popup cannot auto-close (`#1703`)
+- **Fix** (react): `McpClientProvider.removeServer()` no longer clears OAuth storage by default — pass `{ clearCredentials: true }` for explicit logout; `updateServer()` and `useMcp` unmount no longer wipe credentials on routine lifecycle churn (`#1703`)
+- **Fix**: move `chalk` from optionalDependencies to dependencies — statically imported by server logging/lifecycle code, so `pnpm install --no-optional` no longer fails at module load (`#1702`)
+- **Enhancement** (@mcp-use/cli): after `deploy --no-github`, print a note that source lives in a private platform-managed repository and link to the dashboard to view or migrate to GitHub (`#1703`)
+- **Enhancement** (@mcp-use/cli): `servers get` shows `mcp-use-managed (private)` when the connected repo has no exposed GitHub full name (`#1703`)
+- **Fix** (@mcp-use/inspector): delete-server passes `{ clearCredentials: true }` on explicit removal — see inspector changelog (`#1703`)
+- **Update**: Updated @mcp-use/inspector to v9.0.0
+- **Update**: Updated @mcp-use/cli to v3.4.2
+- **Fix**: downgrade chalk to v4 — chalk 5 is ESM-only and kept external by tsup, so the CJS bundle's `require("chalk")` on Node ≥ 22 returned the module namespace instead of the chalk instance, crashing CJS-built backends (e.g. the Next.js template) on startup with `TypeError: import_chalk.default.gray is not a function` (`#1702`)
+</Update>
+
+<Update label="v1.30.1" description="June 2026">
+  ## Deploy without GitHub, device-code login & widget iframe fixes
+  Patch release for `McpUseProvider` zero-height collapse, `useMcp` disconnect/reconnect race fixes, and clearer not-ready errors; `@mcp-use/cli` minor adds tarball deploy without a user GitHub repo and non-interactive device-code login for web onboarding.
+
+- **Enhancement** (@mcp-use/cli): `mcp-use deploy --no-github` packs the local project into a tarball and uploads it to the platform-managed org so first deploy works without connecting GitHub; redeploys of a linked platform-managed server auto-detect from `connectedRepository.isManaged` (`#1691`)
+- **New** (@mcp-use/cli): `mcp-use login --device-code <code>` authenticates with a pre-approved OAuth device code for non-interactive flows (web onboarding), skipping the browser step (`#1691`)
+- **Fix**: `McpUseProvider` with `autoSize` now notifies zero height when a widget renders `null`, so host iframes collapse instead of keeping the last non-zero height (`#1693`)
+- **Fix** (react): `useMcp` stale `disconnect()` after a URL change or a manual disconnect racing a reconnect no longer nulls `clientRef` or resets hook state to `discovering` when superseded by a newer `connect()` (`connectEpochRef`) — fixes "MCP client is not ready (current state: ready)" and similar races in the inspector and other embeds (`#1528`)
+- **Fix** (client): `BaseMCPClient.closeSession()` only deletes a session slot when it still references the closing session, so a parallel `createSession()` from a reconnect is not wiped — fixes "No active session found" on the next tool call after reconnect (`#1528`)
+- **Enhancement** (react): clearer "MCP client is not ready" errors via `formatMcpNotReadyReason`, distinguishing a missing client (`client disconnected`) from a non-ready state (`#1528`)
+- **Fix** (@mcp-use/inspector): MCP Apps / Apps SDK status labels no longer intercept iframe pointer events  -  see inspector changelog (`#1694`, `#1678`)
+- **Documentation**: tip on `<McpUseProvider />` for widgets that conditionally return `null` with `autoSize`
+- **Documentation**: `deploy --no-github`, `login --device-code`, and dual deploy paths in the CLI reference and Manufact Cloud deployment guide
+- **Update**: Updated @mcp-use/inspector to v8.0.1
+- **Update**: Updated @mcp-use/cli to v3.4.0
+</Update>
+
+<Update label="v1.30.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.30.0&title=OpenAPI%20server%20generation%20%26%20MCP%20instructions&date=2026-06&lang=typescript" alt="Release 1.30.0" />
+  </Frame>
+  ## OpenAPI server generation & MCP instructions
+  Minor release adding `MCPServer.fromOpenAPI()` for generating MCP tools from OpenAPI documents, server-wide `instructions` returned during MCP initialization, idle session ref cleanup, and CLI fixes for paginated cloud lists and multi-installation GitHub repo access. Inspector ships major v8.0.0 tracking the new `mcp-use` peer dependency (see inspector changelog).
+
+- **New**: `MCPServer.fromOpenAPI()`  -  create an MCP server from a parsed OpenAPI document; each included operation registers as a tool with generated input schemas and HTTP request handling (`baseUrl`, bearer token, and static header auth supported); ships with an `openapi` server example against live `api.weather.gov` (`#1583`)
+- **New**: `instructions` option on `MCPServer`  -  server-wide model instructions returned during MCP initialization for cross-tool workflows and constraints that do not belong in individual tool descriptions (`#1601`)
+- **New** (create-mcp-use-app): `starter` and `mcp-apps` templates scaffold with an `instructions` placeholder (`#1601`)
+- **Fix**: idle session cleanup releases registered refs for expired sessions instead of leaving stale registrations behind (`#1624`)
+- **Fix**: escape backslashes before double quotes when converting Zod string literals and enums to TypeScript in `zod-to-ts`, so generated `.d.ts` output stays valid when literal values contain `\` or `"` (`#1661`)
+- **Update**: bump `hono` to `4.12.23` for [CVE-2026-47674](https://github.com/advisories/GHSA-xrhx-7g5j-rcj5)  -  non-canonical IPv6 forms could bypass static deny rules in the `ip-restriction` middleware (`#1663`)
+- **Enhancement** (@mcp-use/cli): `servers list` and `deployments list` handle paginated Cloud API responses with a default page size of 30 and next-page guidance (`#1619`)
+- **Fix** (@mcp-use/cli): deploy repo access check aggregates repos across all GitHub App installations linked to the organization instead of only the first one, so deploys no longer fail with "GitHub App doesn't have access" when the repo belongs to a different installation (`#1629`, MCP-2358)
+- **Documentation**: OpenAPI server generation guide and `examples/server/features/openapi` (`#1583`)
+- **Documentation**: MCP server `instructions` in configuration, quickstart, and installation docs (`#1601`)
+- **Update**: Updated @mcp-use/inspector to v8.0.0
+- **Update**: Updated @mcp-use/cli to v3.3.2
+- **Update**: Updated create-mcp-use-app to v0.14.15
+</Update>
+
 <Update label="v1.29.1" description="June 2026">
   ## OAuth transport auth hardening & security dependency bumps
   Patch release hardening OAuth-protected MCP transport routes and resolving open Dependabot security advisories across the TypeScript workspace.

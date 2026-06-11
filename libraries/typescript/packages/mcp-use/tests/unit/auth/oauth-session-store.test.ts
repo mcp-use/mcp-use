@@ -384,6 +384,54 @@ describe("OAuthSessionStore", () => {
     });
   });
 
+  describe("getTokenEndpoint()", () => {
+    it("discovers and persists the token endpoint via PRM + AS metadata", async () => {
+      const { session, kv } = createStore();
+      discoverOAuthProtectedResourceMetadata.mockResolvedValue({
+        authorization_servers: ["https://auth.example.com"],
+      });
+      discoverAuthorizationServerMetadata.mockResolvedValue({
+        issuer: "https://auth.example.com",
+        token_endpoint: "https://auth.example.com/token",
+      });
+
+      const endpoint = await session.getTokenEndpoint();
+      expect(endpoint).toBe("https://auth.example.com/token");
+      // Persisted so a later call (or page reload) can skip discovery.
+      expect(kv.get(session.getKey("token_endpoint"))).toBe(
+        "https://auth.example.com/token"
+      );
+    });
+
+    it("returns the persisted endpoint without re-discovering", async () => {
+      const { session, kv } = createStore();
+      kv.set(
+        session.getKey("token_endpoint"),
+        "https://cached.example.com/token"
+      );
+
+      const endpoint = await session.getTokenEndpoint();
+      expect(endpoint).toBe("https://cached.example.com/token");
+      expect(discoverOAuthProtectedResourceMetadata).not.toHaveBeenCalled();
+    });
+
+    it("returns null when the server is not OAuth-protected", async () => {
+      const { session } = createStore();
+      discoverOAuthProtectedResourceMetadata.mockResolvedValue({
+        authorization_servers: [],
+      });
+      expect(await session.getTokenEndpoint()).toBeNull();
+    });
+
+    it("returns null (swallows) when discovery throws", async () => {
+      const { session } = createStore();
+      discoverOAuthProtectedResourceMetadata.mockRejectedValue(
+        new Error("network down")
+      );
+      expect(await session.getTokenEndpoint()).toBeNull();
+    });
+  });
+
   describe("codeVerifier() / saveCodeVerifier()", () => {
     it("round-trips the verifier through KVStore", async () => {
       const { session, kv } = createStore();
