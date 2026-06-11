@@ -353,4 +353,32 @@ export class OAuthSessionStore {
     if (!stored.refresh_token) return null;
     return this._dedupedRefresh(stored);
   }
+
+  /**
+   * Resolve this server's OAuth token endpoint via PRM → authorization-server
+   * metadata discovery. Cached in-memory and persisted (so consumers can store
+   * it alongside the tokens, e.g. for server-side proactive refresh). Returns
+   * `null` when the server is not OAuth-protected or discovery fails.
+   */
+  async getTokenEndpoint(): Promise<string | null> {
+    if (this._cachedMetadata?.token_endpoint) {
+      return this._cachedMetadata.token_endpoint;
+    }
+    try {
+      const persisted = await this.store.get(this.getKey("token_endpoint"));
+      if (persisted) return persisted;
+
+      const resourceMetadata = await discoverOAuthProtectedResourceMetadata(this.serverUrl);
+      const authServerUrl = resourceMetadata.authorization_servers?.[0];
+      if (!authServerUrl) return null;
+      const metadata = await discoverAuthorizationServerMetadata(authServerUrl);
+      if (!metadata?.token_endpoint) return null;
+      this._cachedAuthServerUrl = authServerUrl;
+      this._cachedMetadata = metadata as AuthorizationServerMetadata;
+      await this.store.set(this.getKey("token_endpoint"), metadata.token_endpoint);
+      return metadata.token_endpoint;
+    } catch {
+      return null;
+    }
+  }
 }

@@ -47,6 +47,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   >;
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
+  getTokenEndpoint?: () => Promise<string | null>;
   installFetchInterceptor?: () => void;
   restoreFetch?: () => void;
   serverUrl?: string;
@@ -1048,6 +1049,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               ? Date.now() + tokens.expires_in * 1000
               : undefined;
 
+            // Best-effort: resolve the OAuth token endpoint so consumers can
+            // persist it for server-side proactive refresh. Never blocks auth.
+            let tokenEndpoint: string | null = null;
+            try {
+              tokenEndpoint =
+                (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
+            } catch {
+              tokenEndpoint = null;
+            }
+
             if (!isMountedRef.current) {
               addLog("debug", "Skipping state update - component unmounted");
               return "failed";
@@ -1058,6 +1069,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               expires_at: expiresAt,
               refresh_token: tokens.refresh_token,
               scope: tokens.scope,
+              ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
             });
           }
         }
