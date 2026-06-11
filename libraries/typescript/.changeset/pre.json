@@ -8,6 +8,7 @@
     "mcp-use": "1.32.0"
   },
   "changesets": [
-    "cli-sensitive-env-vars"
+    "cli-sensitive-env-vars",
+    "server-notification-logging"
   ]
 }

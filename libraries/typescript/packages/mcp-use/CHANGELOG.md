@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.32.1-canary.1
+
+### Patch Changes
+
+- a3f3b65: Add server-side logging for outgoing notifications, printing detailed logs for sent and failed notifications with session identifiers and error details.
+  - @mcp-use/cli@3.5.2-canary.1
+  - @mcp-use/inspector@10.0.1-canary.1
+
 ## 1.32.1-canary.0
 
 ### Patch Changes
