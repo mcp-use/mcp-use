@@ -41,6 +41,54 @@ function envBadge(env: EnvEnvironment): string {
   return chalk.blue("dev");
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolve an env-var reference (UUID or KEY) to its variable id. A UUID is used
+ * directly; otherwise the key is looked up within the given branch scope
+ * (omit branch for production / branch IS NULL).
+ */
+async function resolveVarId(
+  api: McpUseAPI,
+  server: string,
+  keyOrId: string,
+  branch?: string
+): Promise<string> {
+  if (UUID_RE.test(keyOrId)) return keyOrId;
+
+  const vars = await api.listEnvVariables(
+    server,
+    branch ? { branch } : undefined
+  );
+  const matches = vars.filter((v) => v.key === keyOrId);
+  const scope = branch ? `branch "${branch}"` : "production";
+  if (matches.length === 0) {
+    console.error(
+      chalk.red(
+        `✗ No environment variable with key "${keyOrId}" in ${scope} scope.`
+      )
+    );
+    console.error(
+      chalk.gray(
+        branch
+          ? "Check the key, or omit --branch to target production scope."
+          : "Check the key, or pass --branch <name> if it lives on a branch."
+      )
+    );
+    process.exit(1);
+  }
+  if (matches.length > 1) {
+    console.error(
+      chalk.red(
+        `✗ Multiple variables match key "${keyOrId}" in ${scope} scope. Pass the variable id instead.`
+      )
+    );
+    process.exit(1);
+  }
+  return matches[0].id;
+}
+
 function printEnvVar(v: EnvVariable, showValue = false): void {
   const envs = v.environments.map(envBadge).join(" ");
   const val = v.sensitive
@@ -48,9 +96,10 @@ function printEnvVar(v: EnvVariable, showValue = false): void {
     : showValue
       ? chalk.cyan(v.value)
       : chalk.gray("(hidden — use --show-values to reveal)");
+  const branch = v.branch ? "  " + chalk.magenta(`branch:${v.branch}`) : "";
   console.log(`  ${chalk.white.bold(v.key.padEnd(32))} ${val}`);
   console.log(
-    `    ${chalk.gray("id:")} ${chalk.gray(v.id)}  ${envs}${v.sensitive ? "  " + chalk.yellow("🔒 sensitive") : ""}`
+    `    ${chalk.gray("id:")} ${chalk.gray(v.id)}  ${envs}${branch}${v.sensitive ? "  " + chalk.yellow("🔒 sensitive") : ""}`
   );
 }
 
@@ -66,22 +115,31 @@ async function requireLogin(): Promise<void> {
 
 async function listEnvCommand(options: {
   server: string;
+  branch?: string;
   showValues?: boolean;
 }): Promise<void> {
   try {
     await requireLogin();
 
     const api = await McpUseAPI.create();
-    const vars = await api.listEnvVariables(options.server);
+    const vars = await api.listEnvVariables(
+      options.server,
+      options.branch ? { branch: options.branch } : undefined
+    );
 
+    const scope = options.branch ? `branch "${options.branch}"` : "production";
     if (vars.length === 0) {
       console.log(
-        chalk.yellow("\nNo environment variables set for this server.\n")
+        chalk.yellow(
+          `\nNo environment variables set for this server (${scope} scope).\n`
+        )
       );
       return;
     }
 
-    console.log(chalk.cyan.bold(`\nEnvironment Variables (${vars.length})\n`));
+    console.log(
+      chalk.cyan.bold(`\nEnvironment Variables — ${scope} (${vars.length})\n`)
+    );
     for (const v of vars) {
       printEnvVar(v, options.showValues);
       console.log();
@@ -93,7 +151,12 @@ async function listEnvCommand(options: {
 
 async function addEnvCommand(
   assignment: string,
-  options: { server: string; env?: string; sensitive?: boolean }
+  options: {
+    server: string;
+    env?: string;
+    branch?: string;
+    sensitive?: boolean;
+  }
 ): Promise<void> {
   try {
     await requireLogin();
@@ -125,6 +188,7 @@ async function addEnvCommand(
       key,
       value,
       environments,
+      ...(options.branch ? { branch: options.branch } : {}),
       sensitive: options.sensitive ?? false,
     });
 
@@ -139,8 +203,14 @@ async function addEnvCommand(
 }
 
 async function updateEnvCommand(
-  varId: string,
-  options: { server: string; value?: string; env?: string; sensitive?: boolean }
+  keyOrId: string,
+  options: {
+    server: string;
+    value?: string;
+    env?: string;
+    branch?: string;
+    sensitive?: boolean;
+  }
 ): Promise<void> {
   try {
     await requireLogin();
@@ -164,6 +234,12 @@ async function updateEnvCommand(
     if (options.sensitive !== undefined) body.sensitive = options.sensitive;
 
     const api = await McpUseAPI.create();
+    const varId = await resolveVarId(
+      api,
+      options.server,
+      keyOrId,
+      options.branch
+    );
     const updated = await api.updateEnvVariable(options.server, varId, body);
 
     console.log(
@@ -177,16 +253,22 @@ async function updateEnvCommand(
 }
 
 async function removeEnvCommand(
-  varId: string,
-  options: { server: string }
+  keyOrId: string,
+  options: { server: string; branch?: string }
 ): Promise<void> {
   try {
     await requireLogin();
 
     const api = await McpUseAPI.create();
+    const varId = await resolveVarId(
+      api,
+      options.server,
+      keyOrId,
+      options.branch
+    );
     await api.deleteEnvVariable(options.server, varId);
 
-    console.log(chalk.green(`\n✓ Environment variable ${varId} removed.\n`));
+    console.log(chalk.green(`\n✓ Environment variable ${keyOrId} removed.\n`));
   } catch (error) {
     handleCommandError(error, "Failed to remove environment variable");
   }
@@ -202,6 +284,10 @@ export function createEnvCommand(): Command {
     .alias("ls")
     .description("List environment variables for a server")
     .requiredOption("--server <id>", "Server UUID")
+    .option(
+      "--branch <name>",
+      "Scope to a branch's preview env (omit for production)"
+    )
     .option("--show-values", "Reveal non-sensitive values in output")
     .action(listEnvCommand);
 
@@ -215,6 +301,10 @@ export function createEnvCommand(): Command {
       "Comma-separated environments: production,preview,development (default: all)"
     )
     .option(
+      "--branch <name>",
+      "Pin the variable to a branch's preview env (omit for production)"
+    )
+    .option(
       "--sensitive",
       "Mark the variable as sensitive (value masked in UI)"
     )
@@ -222,13 +312,17 @@ export function createEnvCommand(): Command {
 
   envCommand
     .command("update")
-    .argument("<var-id>", "Environment variable UUID")
+    .argument("<key-or-id>", "Environment variable KEY or UUID")
     .description("Update an existing environment variable")
     .requiredOption("--server <id>", "Server UUID")
     .option("--value <value>", "New value")
     .option(
       "--env <environments>",
       "New environments (comma-separated: production,preview,development)"
+    )
+    .option(
+      "--branch <name>",
+      "Branch scope used to resolve a KEY (omit for production)"
     )
     .option("--sensitive", "Mark as sensitive")
     .option("--no-sensitive", "Unmark as sensitive")
@@ -237,9 +331,13 @@ export function createEnvCommand(): Command {
   envCommand
     .command("remove")
     .alias("rm")
-    .argument("<var-id>", "Environment variable UUID")
+    .argument("<key-or-id>", "Environment variable KEY or UUID")
     .description("Remove an environment variable from a server")
     .requiredOption("--server <id>", "Server UUID")
+    .option(
+      "--branch <name>",
+      "Branch scope used to resolve a KEY (omit for production)"
+    )
     .action(removeEnvCommand);
 
   return envCommand;

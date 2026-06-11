@@ -2,7 +2,11 @@ import chalk from "chalk";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import open from "open";
-import type { GitHubConnectionStatus, OrgInfo } from "../utils/api.js";
+import type {
+  EnvEnvironment,
+  GitHubConnectionStatus,
+  OrgInfo,
+} from "../utils/api.js";
 import {
   ApiUnauthorizedError,
   GitHubAuthRequiredError,
@@ -115,12 +119,18 @@ function parseEnvVar(envStr: string): { key: string; value: string } {
 export async function syncEnvVarsToServer(
   api: McpUseAPI,
   serverId: string,
-  envVars: Record<string, string>
+  envVars: Record<string, string>,
+  opts?: { branch?: string; environments?: EnvEnvironment[] }
 ): Promise<{ created: number; updated: number }> {
   const entries = Object.entries(envVars);
   if (entries.length === 0) return { created: 0, updated: 0 };
 
-  const existing = await api.listEnvVariables(serverId);
+  // Scope the sync to the deploy branch's preview env when a branch is given;
+  // otherwise operate on production scope (branch IS NULL), matching prior behavior.
+  const existing = await api.listEnvVariables(
+    serverId,
+    opts?.branch ? { branch: opts.branch } : undefined
+  );
   const byKey = new Map(existing.map((v) => [v.key, v]));
 
   const results = await Promise.all(
@@ -130,7 +140,12 @@ export async function syncEnvVarsToServer(
         await api.updateEnvVariable(serverId, found.id, { value });
         return "updated" as const;
       }
-      await api.createEnvVariable(serverId, { key, value });
+      await api.createEnvVariable(serverId, {
+        key,
+        value,
+        ...(opts?.branch ? { branch: opts.branch } : {}),
+        ...(opts?.environments ? { environments: opts.environments } : {}),
+      });
       return "created" as const;
     })
   );
@@ -195,6 +210,11 @@ interface DeployOptions {
   region?: "US" | "EU" | "APAC";
   buildCommand?: string;
   startCommand?: string;
+  /**
+   * Deploy branch. Defaults to the current git branch (managed flow: "main").
+   * Also scopes env-var sync to that branch's preview env.
+   */
+  branch?: string;
   /**
    * Upload local source without connecting the user's GitHub. Uses the
    * platform-managed org and a tarball instead of pushing to a user repo.
@@ -720,7 +740,7 @@ async function deployViaManagedUpload(
   }
 
   const envVars = await buildEnvVars(options);
-  const branch = "main";
+  const branch = options.branch || "main";
   const projectName = options.name || (await getProjectName(projectDir));
 
   console.log(chalk.gray("Packaging project source..."));
@@ -756,7 +776,12 @@ async function deployViaManagedUpload(
   if (serverId) {
     console.log(chalk.gray("Uploading source and redeploying..."));
     if (Object.keys(envVars).length > 0) {
-      await syncEnvVarsToServer(api, serverId, envVars);
+      await syncEnvVarsToServer(
+        api,
+        serverId,
+        envVars,
+        options.branch ? { branch: options.branch } : undefined
+      );
     }
     await api.pushSourceToServer(serverId, {
       tarball,
@@ -1073,7 +1098,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     let gitInfo = await getGitInfo(cwd);
     let repoFullName: string | undefined;
-    let branch: string = "main";
+    let branch: string = options.branch || "main";
 
     if (!gitInfo.isGitRepo || !gitInfo.remoteUrl) {
       // No git repo or no remote — offer to create one
@@ -1271,7 +1296,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
       gitInfo = await getGitInfo(cwd);
       repoFullName = repoResult.fullName;
-      branch = gitInfo.branch || "main";
+      branch = options.branch || gitInfo.branch || "main";
     } else if (!isGitHubUrl(gitInfo.remoteUrl!)) {
       console.log(chalk.red("✗ Remote is not a GitHub repository"));
       console.log(chalk.yellow(`   Current remote: ${gitInfo.remoteUrl}\n`));
@@ -1281,7 +1306,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
       process.exit(1);
     } else {
       repoFullName = `${gitInfo.owner}/${gitInfo.repo}`;
-      branch = gitInfo.branch || "main";
+      branch = options.branch || gitInfo.branch || "main";
 
       // Resolve installation matching the repo owner
       const ownerLower = gitInfo.owner!.toLowerCase();
@@ -1451,7 +1476,12 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
           console.log(chalk.cyan(`  URL: ${getMcpServerUrl(existingDep)}\n`));
 
           if (Object.keys(envVars).length > 0) {
-            const synced = await syncEnvVarsToServer(api, serverId, envVars);
+            const synced = await syncEnvVarsToServer(
+              api,
+              serverId,
+              envVars,
+              options.branch ? { branch: options.branch } : undefined
+            );
             console.log(
               chalk.green(
                 `✓ Synced ${synced.created + synced.updated} environment variable(s)` +
@@ -1508,7 +1538,12 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
 
     if (serverId) {
       if (Object.keys(envVars).length > 0) {
-        const synced = await syncEnvVarsToServer(api, serverId, envVars);
+        const synced = await syncEnvVarsToServer(
+          api,
+          serverId,
+          envVars,
+          options.branch ? { branch: options.branch } : undefined
+        );
         console.log(
           chalk.green(
             `✓ Synced ${synced.created + synced.updated} environment variable(s)` +

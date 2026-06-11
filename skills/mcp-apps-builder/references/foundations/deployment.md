@@ -85,8 +85,9 @@ mcp-use deploy [options]
 | `--name <name>`       | Custom deployment name                                       | `package.json` name or directory name |
 | `--port <port>`       | Server port                                                  | `3000`                                |
 | `--runtime <runtime>` | `"node"` or `"python"`                                       | Auto-detected from project files      |
-| `--env <KEY=VALUE>`   | Set environment variable (repeatable)                        | —                                     |
+| `--env <KEY=VALUE>`   | Set environment variable value (repeatable)                  | —                                     |
 | `--env-file <path>`   | Load env vars from a file                                    | —                                     |
+| `--branch <name>`     | Deploy branch; also scopes `--env`/`--env-file` to its preview | current git branch                  |
 | `--open`              | Open deployment in browser after success                     | `false`                               |
 | `--new`               | Force a fresh deployment (ignore existing link)              | `false`                               |
 | `-y, --yes`           | Skip confirmation prompts (non-interactive / CI / agents)    | `false`                               |
@@ -106,6 +107,20 @@ mcp-use deploy --env-file .env.production
 
 **NEVER commit secrets to git.** Use `--env` or `--env-file` for API keys, database URLs, and other sensitive values.
 
+After the server exists, manage env vars (and other config) without redeploying:
+
+```bash
+# Env vars (production scope, or scope to a branch's preview with --branch)
+mcp-use servers env list   --server <id>
+mcp-use servers env add    API_KEY=sk-xxx --server <id> --env production,preview
+mcp-use servers env update API_KEY --server <id> --value sk-yyy   # by KEY or UUID
+mcp-use servers env rm     API_KEY --server <id>
+
+# Server config in place (no delete/recreate): production branch, name, commands
+mcp-use servers update <id> --branch main --build-command "npm run build"
+# Clear a build/start override: pass an empty string (--build-command "")
+```
+
 ---
 
 ## Common Mistakes
@@ -115,7 +130,7 @@ mcp-use deploy --env-file .env.production
 - ❌ Running `mcp-use deploy` with uncommitted/unpushed changes
   - ✅ The cloud builds from GitHub — always `git push` first
 - ❌ Hardcoding secrets in code or committing `.env`
-  - ✅ Use `--env` / `--env-file` flags, or `mcp-use deployments env set`
+  - ✅ Use `--env` / `--env-file` flags, or `mcp-use servers env add KEY=VALUE --server <id>`
 - ❌ Forgetting to install the mcp-use GitHub App on the repo
   - ✅ The CLI will prompt you, but you can also install it at `github.com/apps/mcp-use` — or skip GitHub entirely with `mcp-use deploy --no-github`
 - ❌ Running `mcp-use start` without `mcp-use build` first

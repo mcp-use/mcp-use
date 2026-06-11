@@ -279,7 +279,7 @@ async function getDeploymentCommand(deploymentId: string): Promise<void> {
 
 async function restartDeploymentCommand(
   deploymentId: string,
-  options: { follow?: boolean }
+  options: { follow?: boolean; branch?: string }
 ): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -306,8 +306,12 @@ async function restartDeploymentCommand(
       chalk.cyan.bold(`\n🔄 Restarting deployment: ${deployment.name}\n`)
     );
 
+    // Reuse the deployment's branch by default; `--branch` overrides to target
+    // a different branch's preview.
+    const branch = options.branch ?? deployment.gitBranch ?? undefined;
     const newDep = await api.createDeployment({
       serverId: deployment.serverId,
+      ...(branch ? { branch } : {}),
       trigger: "redeploy",
     });
 
@@ -615,6 +619,10 @@ export function createDeploymentsCommand(): Command {
     .command("restart")
     .argument("<deployment-id>", "Deployment ID")
     .option("-f, --follow", "Follow build logs")
+    .option(
+      "--branch <name>",
+      "Target branch for the redeploy (default: the deployment's branch)"
+    )
     .description(
       "Restart a deployment (triggers a new deployment on the same server)"
     )

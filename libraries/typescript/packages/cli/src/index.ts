@@ -3039,9 +3039,13 @@ program
   )
   .option(
     "--env <key=value...>",
-    "Environment variables (can be used multiple times)"
+    "Environment variable values as KEY=VALUE (repeatable). Note: this sets values, unlike `servers env --env` which selects environment tags."
   )
   .option("--env-file <path>", "Path to .env file with environment variables")
+  .option(
+    "--branch <name>",
+    "Deploy branch (default: current git branch). Also scopes --env/--env-file sync to that branch's preview env."
+  )
   .option(
     "--root-dir <path>",
     "Root directory within repo to deploy from (for monorepos)"
@@ -3073,6 +3077,7 @@ program
       new: options.new,
       env: options.env,
       envFile: options.envFile,
+      branch: options.branch,
       rootDir: options.rootDir,
       org: options.org,
       yes: options.yes,
