@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.32.0
+
+### Minor Changes
+
+- 5b4afc8: Expose the resolved OAuth `token_endpoint` on `useMcp().authTokens` (and add `getTokenEndpoint()` to the browser OAuth provider / session store). This lets consumers persist the token endpoint alongside the access/refresh tokens so a backend can proactively refresh the token before it expires. The field is additive and optional — existing usage is unaffected.
+
+### Patch Changes
+
+- @mcp-use/cli@3.5.1
+- @mcp-use/inspector@10.0.0
+
 ## 1.32.0-canary.0
 
 ### Minor Changes
