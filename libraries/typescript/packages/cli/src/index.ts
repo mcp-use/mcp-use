@@ -394,6 +394,47 @@ async function resolveEntryFile(
 }
 
 /**
+ * Auto-detect a conventional MCP directory (`src/mcp`, then `mcp`) so
+ * Next.js drop-ins work with bare `mcp-use dev` / `build` / `start`.
+ *
+ * Pure fallback: returns undefined whenever an explicit entry would have
+ * been found anyway (legacy top-level layouts keep their behavior), and
+ * only fires when the conventional directory actually contains an entry
+ * file. Callers must still honor --entry / --mcp-dir first.
+ */
+async function detectMcpDir(
+  projectPath: string
+): Promise<string | undefined> {
+  const legacyEntries = [
+    "index.ts",
+    "src/index.ts",
+    "server.ts",
+    "src/server.ts",
+  ];
+  for (const candidate of legacyEntries) {
+    try {
+      await access(path.join(projectPath, candidate));
+      return undefined;
+    } catch {
+      continue;
+    }
+  }
+
+  const dirEntries = ["index.ts", "index.tsx", "server.ts", "server.tsx"];
+  for (const dir of ["src/mcp", "mcp"]) {
+    for (const entry of dirEntries) {
+      try {
+        await access(path.join(projectPath, dir, entry));
+        return dir;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
  * Resolve the widgets directory.
  * Priority: --widgets-dir flag > <mcpDir>/resources > "resources".
  */
@@ -1402,8 +1443,16 @@ program
 
       displayPackageVersions(projectPath);
 
-      // Resolve mcpDir for widgets + server entry
-      const mcpDir = options.mcpDir as string | undefined;
+      // Resolve mcpDir for widgets + server entry. When neither --mcp-dir
+      // nor --entry is given, fall back to the src/mcp | mcp convention so
+      // Next.js drop-ins build with a bare `mcp-use build`.
+      let mcpDir = options.mcpDir as string | undefined;
+      if (!mcpDir && !options.entry) {
+        mcpDir = await detectMcpDir(projectPath);
+        if (mcpDir) {
+          console.log(chalk.gray(`Detected MCP directory: ${mcpDir}`));
+        }
+      }
       const widgetsDir = resolveWidgetsDir(options.widgetsDir, mcpDir);
 
       // Build widgets first (this generates schemas)
@@ -1419,7 +1468,7 @@ program
         sourceServerFile = await findServerFile(
           projectPath,
           options.entry,
-          options.mcpDir
+          mcpDir
         );
       } catch (err) {
         if (mcpDir) {
@@ -1535,17 +1584,21 @@ program
         }
       }
 
-      // Copy public folder if it exists
-      const publicDir = path.join(projectPath, "public");
-      try {
-        await fs.access(publicDir);
-        console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
-          recursive: true,
-        });
-        console.log(chalk.green("✓ Public assets copied"));
-      } catch {
-        // Public folder doesn't exist, skip
+      // Copy public folder if it exists. Skipped in --mcp-dir mode: there
+      // `public/` belongs to the host Next.js app (served by `next start`),
+      // and duplicating it into dist/ only bloats the MCP build output.
+      if (!mcpDir) {
+        const publicDir = path.join(projectPath, "public");
+        try {
+          await fs.access(publicDir);
+          console.log(chalk.gray("Copying public assets..."));
+          await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+            recursive: true,
+          });
+          console.log(chalk.green("✓ Public assets copied"));
+        } catch {
+          // Public folder doesn't exist, skip
+        }
       }
 
       // Create build manifest
@@ -1652,11 +1705,21 @@ program
         port = availablePort;
       }
 
+      // Resolve mcpDir (explicit flag, else src/mcp | mcp convention when no
+      // --entry was given) so Next.js drop-ins run with a bare `mcp-use dev`.
+      let devMcpDir = options.mcpDir as string | undefined;
+      if (!devMcpDir && !options.entry) {
+        devMcpDir = await detectMcpDir(projectPath);
+        if (devMcpDir) {
+          console.log(chalk.gray(`Detected MCP directory: ${devMcpDir}`));
+        }
+      }
+
       // Find the main source file (honors --entry / --mcp-dir flags and mcp-use.config.json)
       const serverFile = await findServerFile(
         projectPath,
         options.entry,
-        options.mcpDir
+        devMcpDir
       );
 
       // Resolve the widgets directory and expose it via an env var so the
@@ -1665,7 +1728,6 @@ program
       // The env var is the contract: mcp-use/server reads it when no
       // explicit `resourcesDir` is passed to mountWidgets.
       {
-        const devMcpDir = options.mcpDir as string | undefined;
         const devWidgetsDir = resolveWidgetsDir(options.widgetsDir, devMcpDir);
         if (devWidgetsDir !== "resources") {
           process.env.MCP_USE_WIDGETS_DIR = devWidgetsDir;
@@ -2730,7 +2792,13 @@ program
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
-      const startMcpDir = options.mcpDir as string | undefined;
+      let startMcpDir = options.mcpDir as string | undefined;
+      if (!startMcpDir) {
+        // Same src/mcp | mcp convention as dev/build, so a bare
+        // `mcp-use start` finds the drop-in artifact and applies the
+        // TypeScript-source rejection for stale manifests.
+        startMcpDir = await detectMcpDir(projectPath);
+      }
 
       try {
         const manifestContent = await readFile(manifestPath, "utf-8");

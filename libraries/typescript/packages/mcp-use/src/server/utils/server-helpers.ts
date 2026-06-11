@@ -166,7 +166,6 @@ export function getServerBaseUrl(
 export function getCSPUrls(): string[] {
   const cspUrlsEnv = getEnv("CSP_URLS");
   if (!cspUrlsEnv) {
-    console.log("[CSP] No CSP_URLS environment variable found");
     return [];
   }
 

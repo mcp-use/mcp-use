@@ -136,6 +136,34 @@ console.log(session);
     expect(manifest.entryPoint).toBe("dist/mcp/index.cjs");
   }, 90000);
 
+  it("auto-detects src/mcp with a bare `mcp-use build` (no --mcp-dir)", async () => {
+    // Drop-in convention: when no --mcp-dir/--entry is passed and no legacy
+    // top-level entry exists, src/mcp is discovered automatically.
+    const result = await runCLI(["build"], projectDir);
+    const combined = result.stdout + result.stderr;
+
+    expect(result.exitCode).toBe(0);
+    expect(combined).toMatch(/Detected MCP directory: src[/\\]mcp/);
+    expect(combined).toMatch(/MCP server built to dist[/\\]mcp[/\\]index\.cjs/);
+    expect(existsSync(join(projectDir, "dist", "mcp", "index.cjs"))).toBe(true);
+    // mcp-dir mode must not duplicate the host app's public/ into dist/.
+    expect(existsSync(join(projectDir, "dist", "public"))).toBe(false);
+  }, 90000);
+
+  it("prefers a legacy top-level entry over the src/mcp convention", async () => {
+    // A standalone project with index.ts at the root must keep its behavior
+    // even if a src/mcp directory also exists.
+    writeFileSync(
+      join(projectDir, "index.ts"),
+      `export const standalone = true;\nconsole.log(standalone);\n`
+    );
+
+    const result = await runCLI(["build", "--no-typecheck"], projectDir);
+    const combined = result.stdout + result.stderr;
+
+    expect(combined).not.toMatch(/Detected MCP directory/);
+  }, 90000);
+
   it("builds an ESM artifact when the host package.json is type: module", async () => {
     // Output format must follow the host's runtime module system (package.json
     // "type"), not tsconfig "module" — so a type:module host yields .mjs.

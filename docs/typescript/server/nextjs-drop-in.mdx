@@ -44,9 +44,9 @@ Inside an existing Next.js app (App Router, `src/` layout):
     {
       "scripts": {
         "dev": "next dev",
-        "mcp:dev": "mcp-use dev --mcp-dir src/mcp",
-        "mcp:build": "mcp-use build --mcp-dir src/mcp",
-        "mcp:start": "mcp-use start --mcp-dir src/mcp"
+        "mcp:dev": "mcp-use dev",
+        "mcp:build": "mcp-use build",
+        "mcp:start": "mcp-use start"
       },
       "dependencies": {
         "mcp-use": "^1",
@@ -89,8 +89,11 @@ my-next-app/
 │               └── widget.tsx
 ```
 
-`src/mcp/index.ts` is auto-discovered when you pass `--mcp-dir src/mcp`. You
-can override the entry with `--entry src/mcp/server.ts`.
+`src/mcp/` is discovered automatically: when you don't pass `--mcp-dir` or
+`--entry` and the project has no legacy top-level entry (`index.ts`,
+`src/index.ts`, ...), the CLI looks for `src/mcp/` and then `mcp/`. Pass
+`--mcp-dir <dir>` to use a different folder, or `--entry src/mcp/server.ts`
+to pin the entry file.
 
 Widgets in `src/mcp/resources/` are picked up by `mcp-use build` / `dev`
 automatically - they can `import "@/components/..."` and those aliases resolve
@@ -195,7 +198,7 @@ These work on `dev`, `build`, and `start`:
 
 | Flag                  | Description                                                                     |
 | --------------------- | ------------------------------------------------------------------------------- |
-| `--mcp-dir <dir>`     | Folder holding the MCP entry + `resources/` (e.g. `src/mcp`).                   |
+| `--mcp-dir <dir>`     | Folder holding the MCP entry + `resources/`. Auto-detected (`src/mcp`, `mcp`) when omitted. |
 | `--entry <file>`      | Explicit entry file, relative to project root. Overrides `--mcp-dir` discovery. |
 | `--widgets-dir <dir>` | Widgets directory (defaults to `<mcp-dir>/resources`).                          |
 
@@ -213,6 +216,8 @@ build:
 - **No `tsc --noEmit` typecheck.** `next build` already does this for you.
 - Widget builds still run - they produce static assets in
   `dist/resources/widgets/<name>/`.
+- **No `public/` copy.** The host Next.js app owns and serves `public/`;
+  the MCP build does not duplicate it into `dist/`.
 
 If the MCP server graph imports Next.js server-runtime modules such as
 `server-only`, `next/headers`, or `next/cache`, the build replaces those imports
@@ -230,7 +235,7 @@ ports:
 {
   "scripts": {
     "dev": "next dev",
-    "mcp:dev": "mcp-use dev --mcp-dir src/mcp --port 3001"
+    "mcp:dev": "mcp-use dev --port 3001"
   }
 }
 ```
@@ -240,7 +245,7 @@ Or run them together with [concurrently](https://www.npmjs.com/package/concurren
 ```json
 {
   "scripts": {
-    "dev:all": "concurrently \"next dev\" \"mcp-use dev --mcp-dir src/mcp --port 3001\""
+    "dev:all": "concurrently \"next dev\" \"mcp-use dev --port 3001\""
   }
 }
 ```
