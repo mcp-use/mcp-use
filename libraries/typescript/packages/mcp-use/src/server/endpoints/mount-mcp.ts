@@ -26,6 +26,45 @@ import { getDebugLevel } from "../logging.js";
 import { generateUUID } from "../utils/runtime.js";
 
 // ---------------------------------------------------------------------------
+// URL reconstruction from proxy headers
+// ---------------------------------------------------------------------------
+
+/**
+ * Reconstruct the public-facing URL for a request, honoring proxy headers.
+ *
+ * `X-Forwarded-Proto` / `X-Forwarded-Host` become comma-separated lists when a
+ * request passes through multiple proxies. Tunnel chains are the common case:
+ * the edge sets `X-Forwarded-Proto: https`, then the local tunnel hop appends
+ * its own scheme, so the origin server sees `https,http`. The leftmost value is
+ * the original client-facing one, so we take it. Without this, naive
+ * interpolation yields an invalid URL like `https,http://host/mcp` that throws
+ * in `new URL()` (`TypeError: Invalid URL`).
+ */
+export function buildForwardedUrl(opts: {
+  reqUrl: string;
+  path: string;
+  forwardedProto?: string;
+  forwardedProtocol?: string;
+  forwardedHost?: string;
+  host?: string;
+}): string {
+  const firstForwardedValue = (value: string | undefined): string | undefined =>
+    value?.split(",")[0]?.trim() || undefined;
+
+  const proto =
+    firstForwardedValue(opts.forwardedProto) ||
+    firstForwardedValue(opts.forwardedProtocol) ||
+    new URL(opts.reqUrl).protocol.replace(":", "");
+
+  const host =
+    firstForwardedValue(opts.forwardedHost) ||
+    opts.host ||
+    new URL(opts.reqUrl).host;
+
+  return `${proto}://${host}${opts.path}`;
+}
+
+// ---------------------------------------------------------------------------
 // Helpers for distributed SSE stream routing via StreamManager
 // ---------------------------------------------------------------------------
 
@@ -213,22 +252,16 @@ export async function mountMcp(
   }
 
   // Helper function to construct the full URL considering proxy headers
-  const getFullUrl = (c: Context): string => {
-    // Check for proxy headers (common in production deployments)
-    const proto =
-      c.req.header("X-Forwarded-Proto") ||
-      c.req.header("X-Forwarded-Protocol") ||
-      new URL(c.req.url).protocol.replace(":", "");
-
-    const host =
-      c.req.header("X-Forwarded-Host") ||
-      c.req.header("Host") ||
-      new URL(c.req.url).host;
-
-    const path = c.req.path;
-
-    return `${proto}://${host}${path}`;
-  };
+  // (common in production deployments and tunnel chains). See buildForwardedUrl.
+  const getFullUrl = (c: Context): string =>
+    buildForwardedUrl({
+      reqUrl: c.req.url,
+      path: c.req.path,
+      forwardedProto: c.req.header("X-Forwarded-Proto"),
+      forwardedProtocol: c.req.header("X-Forwarded-Protocol"),
+      forwardedHost: c.req.header("X-Forwarded-Host"),
+      host: c.req.header("Host"),
+    });
 
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)
   const handleRequest = async (c: Context) => {
