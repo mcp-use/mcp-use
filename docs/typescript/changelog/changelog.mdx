@@ -6,6 +6,19 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.32.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.32.0&title=OAuth%20token%20endpoint%20discovery&date=2026-06&lang=typescript" alt="Release 1.32.0" />
+  </Frame>
+  ## OAuth token endpoint discovery
+  Minor release exposing the resolved OAuth `token_endpoint` and client credentials on `useMcp().authTokens` so backends can persist everything needed for proactive server-side token refresh.
+
+- **New** (auth): `getTokenEndpoint()` on `BrowserOAuthClientProvider` and `OAuthSessionStore` — resolves and caches the OAuth token endpoint via PRM → authorization-server metadata discovery; persisted in storage for consumers (`#1714`)
+- **New** (auth): `getClientCredentials()` returns stored `client_id` / `client_secret` from Dynamic Client Registration or a static client — most token endpoints require `client_id` on refresh (`#1714`)
+- **Enhancement** (react): `useMcp().authTokens` includes optional `token_endpoint`, `client_id`, and `client_secret` after auth — best-effort resolution that never blocks the auth flow (`#1714`)
+- **Update**: Updated @mcp-use/inspector to v9.0.2
+</Update>
+
 <Update label="v1.31.1" description="June 2026">
   ## Servers update & branch-scoped deploy env
   Patch release for workspace dependency alignment; `@mcp-use/cli` minor adds `servers update` and branch-scoped environment and deploy management.
