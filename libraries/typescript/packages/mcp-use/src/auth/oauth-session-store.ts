@@ -368,14 +368,19 @@ export class OAuthSessionStore {
       const persisted = await this.store.get(this.getKey("token_endpoint"));
       if (persisted) return persisted;
 
-      const resourceMetadata = await discoverOAuthProtectedResourceMetadata(this.serverUrl);
+      const resourceMetadata = await discoverOAuthProtectedResourceMetadata(
+        this.serverUrl
+      );
       const authServerUrl = resourceMetadata.authorization_servers?.[0];
       if (!authServerUrl) return null;
       const metadata = await discoverAuthorizationServerMetadata(authServerUrl);
       if (!metadata?.token_endpoint) return null;
       this._cachedAuthServerUrl = authServerUrl;
       this._cachedMetadata = metadata as AuthorizationServerMetadata;
-      await this.store.set(this.getKey("token_endpoint"), metadata.token_endpoint);
+      await this.store.set(
+        this.getKey("token_endpoint"),
+        metadata.token_endpoint
+      );
       return metadata.token_endpoint;
     } catch {
       return null;

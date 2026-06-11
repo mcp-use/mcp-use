@@ -405,7 +405,10 @@ describe("OAuthSessionStore", () => {
 
     it("returns the persisted endpoint without re-discovering", async () => {
       const { session, kv } = createStore();
-      kv.set(session.getKey("token_endpoint"), "https://cached.example.com/token");
+      kv.set(
+        session.getKey("token_endpoint"),
+        "https://cached.example.com/token"
+      );
 
       const endpoint = await session.getTokenEndpoint();
       expect(endpoint).toBe("https://cached.example.com/token");
