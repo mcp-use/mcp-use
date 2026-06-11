@@ -333,7 +333,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const connectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(true);
   const connectAttemptRef = useRef<number>(0);
-  /** Bumped at the start of each connect(); disconnect only clears clientRef if epoch unchanged. */
+  /** Bumped at the start of each connect(); stale disconnect() skips UI reset when superseded. */
   const connectEpochRef = useRef(0);
   const authTimeoutRef = useRef<number | null>(null);
   const retryScheduledRef = useRef<boolean>(false);
@@ -427,6 +427,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
       const epochAtStart = connectEpochRef.current;
       const clientToClose = clientRef.current;
+
+      // Drop the live ref before awaiting teardown so a parallel connect() always
+      // owns a fresh BrowserMCPClient; stale disconnect() only closes the
+      // captured instance.
+      if (clientRef.current === clientToClose) {
+        clientRef.current = null;
+      }
+
       if (clientToClose) {
         try {
           const serverName = USE_MCP_SERVER_NAME;
@@ -446,15 +454,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           if (!quiet) addLog("warn", "Error closing session:", err);
         }
       }
-      // A newer connect() (e.g. dashboard environment / URL change) may have
-      // bumped the epoch — possibly reusing the same client instance — while
-      // closeSession was in flight. If so, this disconnect is stale: it must
-      // neither null the (now newer) clientRef nor reset the live state.
-      const supersededByNewerConnect = connectEpochRef.current !== epochAtStart;
 
-      if (clientRef.current === clientToClose && !supersededByNewerConnect) {
-        clientRef.current = null;
-      }
+      const supersededByNewerConnect = connectEpochRef.current !== epochAtStart;
 
       if (isMountedRef.current && !quiet && !supersededByNewerConnect) {
         setState("discovering");
@@ -673,12 +674,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         `BrowserOAuthClientProvider initialized with URL: ${effectiveOAuthUrl}, proxy: ${oauthProxyUrl ? "enabled" : "disabled"}, gateway: ${gatewayUrl ? "enabled" : "disabled"}`
       );
     }
-    if (!clientRef.current) {
-      clientRef.current = new BrowserMCPClient();
-      addLog("debug", "BrowserMCPClient initialized in connect.");
-    } else {
-      addLog("debug", "BrowserMCPClient already exists, reusing.");
-    }
+    clientRef.current = new BrowserMCPClient();
+    addLog("debug", "BrowserMCPClient created for connection lifecycle.");
 
     const tryConnectWithTransport = async (
       transportTypeParam: TransportType
