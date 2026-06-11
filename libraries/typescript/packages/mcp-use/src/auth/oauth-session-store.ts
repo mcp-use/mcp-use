@@ -355,6 +355,29 @@ export class OAuthSessionStore {
   }
 
   /**
+   * Return the stored OAuth client credentials (from Dynamic Client
+   * Registration or a pre-registered static client). Consumers can persist
+   * these alongside the tokens so a backend can perform a server-side refresh
+   * (most token endpoints require at least the `client_id` on refresh).
+   * Returns `null` when no client info is available.
+   */
+  async getClientCredentials(): Promise<{
+    client_id: string;
+    client_secret?: string;
+  } | null> {
+    try {
+      const info = await this.clientInformation();
+      if (!info?.client_id) return null;
+      return {
+        client_id: info.client_id,
+        ...(info.client_secret ? { client_secret: info.client_secret } : {}),
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Resolve this server's OAuth token endpoint via PRM → authorization-server
    * metadata discovery. Cached in-memory and persisted (so consumers can store
    * it alongside the tokens, e.g. for server-side proactive refresh). Returns

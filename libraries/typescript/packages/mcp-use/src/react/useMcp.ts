@@ -48,6 +48,10 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   clearStorage?: () => number;
   getLastAttemptedAuthUrl?: () => string | null | undefined;
   getTokenEndpoint?: () => Promise<string | null>;
+  getClientCredentials?: () => Promise<{
+    client_id: string;
+    client_secret?: string;
+  } | null>;
   installFetchInterceptor?: () => void;
   restoreFetch?: () => void;
   serverUrl?: string;
@@ -1049,14 +1053,26 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               ? Date.now() + tokens.expires_in * 1000
               : undefined;
 
-            // Best-effort: resolve the OAuth token endpoint so consumers can
-            // persist it for server-side proactive refresh. Never blocks auth.
+            // Best-effort: resolve the OAuth token endpoint + client credentials
+            // so consumers can persist them for server-side proactive refresh.
+            // Never blocks auth.
             let tokenEndpoint: string | null = null;
+            let clientCreds: {
+              client_id: string;
+              client_secret?: string;
+            } | null = null;
             try {
               tokenEndpoint =
                 (await authProviderRef.current.getTokenEndpoint?.()) ?? null;
             } catch {
               tokenEndpoint = null;
+            }
+            try {
+              clientCreds =
+                (await authProviderRef.current.getClientCredentials?.()) ??
+                null;
+            } catch {
+              clientCreds = null;
             }
 
             if (!isMountedRef.current) {
@@ -1070,6 +1086,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               refresh_token: tokens.refresh_token,
               scope: tokens.scope,
               ...(tokenEndpoint ? { token_endpoint: tokenEndpoint } : {}),
+              ...(clientCreds?.client_id
+                ? { client_id: clientCreds.client_id }
+                : {}),
+              ...(clientCreds?.client_secret
+                ? { client_secret: clientCreds.client_secret }
+                : {}),
             });
           }
         }

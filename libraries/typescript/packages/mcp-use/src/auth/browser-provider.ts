@@ -349,6 +349,18 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
+   * Return the stored OAuth client credentials (DCR or static). Lets consumers
+   * persist the `client_id`/`client_secret` for server-side refresh. Returns
+   * `null` when unavailable.
+   */
+  getClientCredentials(): Promise<{
+    client_id: string;
+    client_secret?: string;
+  } | null> {
+    return this.session.getClientCredentials();
+  }
+
+  /**
    * Generates and persists `StoredState` for an authorization request,
    * applies browser-only resource rewriting, and returns the sanitized URL
    * with the `state` param appended. Does NOT open a popup or redirect —
