@@ -412,6 +412,19 @@ export type UseMcpResult = {
     expires_at?: number;
     refresh_token?: string;
     scope?: string;
+    /**
+     * OAuth token endpoint resolved during discovery (when available). Lets
+     * consumers persist it so a backend can proactively refresh the token.
+     */
+    token_endpoint?: string;
+    /**
+     * OAuth client id (from Dynamic Client Registration or a static client).
+     * Most token endpoints require it on refresh, so consumers can persist it
+     * for server-side proactive refresh.
+     */
+    client_id?: string;
+    /** OAuth client secret, when the provider issued a confidential client. */
+    client_secret?: string;
   };
   /** Array of internal log messages (useful for debugging) */
   log: {
