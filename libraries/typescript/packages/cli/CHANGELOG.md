@@ -1,5 +1,20 @@
 # @mcp-use/cli
 
+## 3.5.0
+
+### Minor Changes
+
+- 0fb1868: Add `servers update` and branch-scoped environment management to the CLI.
+  - `mcp-use servers update <id-or-slug>` mutates server config in place (production branch, name, description, build/start commands) without deleting and recreating the server — preserving the URL slug and env vars. `--branch` maps to the backend `productionBranch`; `--build-command`/`--start-command` are stored under the server `config`. Pass an empty string to either flag to clear the override (`null` merge-patch on the backend).
+  - `mcp-use deploy` gains `--branch <name>` (defaults to the current git branch) and scopes `--env`/`--env-file` sync to that branch's preview environment.
+  - `mcp-use servers env list/add/update/rm` gain `--branch <name>` for branch-scoped variables, and `update`/`rm` now accept a variable KEY (resolved within the branch scope) in addition to a UUID.
+  - `mcp-use deployments restart` gains `--branch <name>` (defaults to the deployment's branch).
+
+### Patch Changes
+
+- mcp-use@1.31.1
+- @mcp-use/inspector@9.0.1
+
 ## 3.5.0-canary.0
 
 ### Minor Changes
