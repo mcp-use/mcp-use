@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "9.0.0",
     "mcp-use": "1.31.0"
   },
-  "changesets": []
+  "changesets": [
+    "cli-servers-update-env-branch"
+  ]
 }
