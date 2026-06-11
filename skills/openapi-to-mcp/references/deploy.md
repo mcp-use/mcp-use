@@ -45,7 +45,14 @@ The deployed container starts with no env vars. Open the project page in the Man
 - Whatever auth vars you used locally — `API_KEY`, `BEARER_TOKEN`, etc. Use **production** credentials, not your dev key.
 - `PORT` — usually not needed; Manufact sets it automatically.
 
-Restart the deployment after setting vars (the dashboard has a "Restart" button) or push a no-op commit.
+You can also set these from the CLI instead of the dashboard:
+
+```bash
+mcp-use servers env add API_KEY=sk-prod --server <id>
+mcp-use servers env add BASE_URL=https://api.example.com --server <id>
+```
+
+Restart the deployment after setting vars (the dashboard has a "Restart" button, or run `mcp-use deployments restart <deployment-id>`) or push a no-op commit.
 
 Verify the deployed server is up:
 
