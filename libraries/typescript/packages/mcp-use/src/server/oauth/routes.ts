@@ -21,7 +21,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
 import {
   buildLocalOAuthAuthorizationServerPath,
-  buildLocalOpenIdConfigurationPath,
   buildOAuthAuthorizationServerMetadataUrl,
   buildOpenIdConfigurationMetadataUrl,
   getIssuerPath,
@@ -314,7 +313,7 @@ export function setupOAuthRoutes(
       return c.json(
         {
           error: "server_error",
-          error_description: `Failed to fetch provider metadata: ${response.status}`,
+          error_description: "Failed to fetch provider metadata",
         },
         500
       );
@@ -349,10 +348,11 @@ export function setupOAuthRoutes(
       const metadataUrl = buildOAuthAuthorizationServerMetadataUrl(issuer);
       return await fetchUpstreamMetadata(metadataUrl, c);
     } catch (error) {
+      console.error(`[OAuth] Error fetching provider metadata:`, error);
       return c.json(
         {
           error: "server_error",
-          error_description: `Failed to fetch provider metadata: ${error}`,
+          error_description: "Failed to fetch provider metadata",
         },
         500
       );
@@ -378,19 +378,21 @@ export function setupOAuthRoutes(
       const metadataUrl = buildOpenIdConfigurationMetadataUrl(issuer);
       return await fetchUpstreamMetadata(metadataUrl, c);
     } catch (error) {
+      console.error(`[OAuth] Error fetching provider metadata:`, error);
       return c.json(
         {
           error: "server_error",
-          error_description: `Failed to fetch provider metadata: ${error}`,
+          error_description: "Failed to fetch provider metadata",
         },
         500
       );
     }
   };
 
-  // Mount root and RFC 8414 canonical path-suffixed discovery endpoints.
-  // In proxy mode the local server is the AS (no issuer path); in DCR-direct
-  // mode the upstream issuer path determines the canonical mount suffix.
+  // OAuth Authorization Server Metadata: mount the root route plus the RFC 8414
+  // canonical path-suffixed route. In proxy mode the local server is the AS
+  // (no issuer path); in DCR-direct mode the upstream issuer path determines
+  // the canonical mount suffix.
   const issuerPath = proxyMode ? "" : getIssuerPath(oauth.getIssuer());
   const oauthMetadataPaths = [
     buildLocalOAuthAuthorizationServerPath(""),
@@ -398,17 +400,17 @@ export function setupOAuthRoutes(
       ? [buildLocalOAuthAuthorizationServerPath(issuerPath)]
       : []),
   ];
-  const openIdMetadataPaths = [
-    buildLocalOpenIdConfigurationPath(""),
-    ...(issuerPath ? [buildLocalOpenIdConfigurationPath(issuerPath)] : []),
-  ];
-
   for (const path of oauthMetadataPaths) {
     app.get(path, handleOAuthAuthorizationServerMetadata);
   }
-  for (const path of openIdMetadataPaths) {
-    app.get(path, handleOpenIdConfigurationMetadata);
-  }
+
+  // OpenID Provider Configuration: only the root route is mounted. OIDC
+  // Discovery appends the well-known segment to the issuer rather than
+  // inserting it after the host, so there is no path-suffixed form that lives
+  // under the `/.well-known/openid-configuration` prefix — and no client flow
+  // reaches a path-suffixed local route regardless (DCR-direct clients query
+  // the upstream issuer directly; legacy clients query the local origin root).
+  app.get("/.well-known/openid-configuration", handleOpenIdConfigurationMetadata);
 
   /**
    * OAuth Protected Resource Metadata

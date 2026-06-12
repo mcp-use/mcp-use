@@ -398,8 +398,10 @@ describe("server OAuth integration", () => {
     expect(canonicalResponse.status).toBe(200);
     expect(await canonicalResponse.json()).toEqual(upstreamMetadata);
 
+    // OIDC discovery is served only at the root local route, which fetches the
+    // append-form upstream URL (`{issuer}/.well-known/openid-configuration`).
     const openIdResponse = await fetch(
-      `${svc.baseUrl}/.well-known/openid-configuration/oauth/2.1`
+      `${svc.baseUrl}/.well-known/openid-configuration`
     );
     expect(openIdResponse.status).toBe(200);
     expect(await openIdResponse.json()).toMatchObject({

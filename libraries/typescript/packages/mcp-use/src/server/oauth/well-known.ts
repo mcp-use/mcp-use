@@ -34,8 +34,3 @@ export function buildLocalOAuthAuthorizationServerPath(
 ): string {
   return `/.well-known/oauth-authorization-server${issuerPath}`;
 }
-
-/** Local MCP server mount path for OpenID Configuration discovery. */
-export function buildLocalOpenIdConfigurationPath(issuerPath: string): string {
-  return `/.well-known/openid-configuration${issuerPath}`;
-}

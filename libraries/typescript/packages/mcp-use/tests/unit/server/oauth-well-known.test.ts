@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   buildLocalOAuthAuthorizationServerPath,
-  buildLocalOpenIdConfigurationPath,
   buildOAuthAuthorizationServerMetadataUrl,
   buildOpenIdConfigurationMetadataUrl,
   getIssuerPath,
@@ -52,9 +51,6 @@ describe("OAuth well-known URL helpers", () => {
     );
     expect(buildLocalOAuthAuthorizationServerPath("/oauth/2.1")).toBe(
       "/.well-known/oauth-authorization-server/oauth/2.1"
-    );
-    expect(buildLocalOpenIdConfigurationPath("/api/auth")).toBe(
-      "/.well-known/openid-configuration/api/auth"
     );
   });
 });
