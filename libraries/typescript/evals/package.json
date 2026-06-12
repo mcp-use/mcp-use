@@ -1,0 +1,25 @@
+{
+  "name": "@mcp-use/sdk-evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agentic-readiness evals: how well coding agents build MCP servers with the mcp-use SDK (MCP-2072)",
+  "type": "module",
+  "scripts": {
+    "eval": "tsx --env-file-if-exists=.env src/run.ts",
+    "trends": "tsx src/trends.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.169",
+    "@anthropic-ai/sdk": ">=0.88.0 <1.0.0",
+    "mcp-use": "workspace:*",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
+  }
+}

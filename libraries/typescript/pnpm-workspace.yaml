@@ -1,5 +1,7 @@
 packages:
   - packages/*
+  # SDK agentic-readiness evals (private, not published)
+  - evals
   # examples
   - packages/mcp-use/examples/**/*
   - packages/create-mcp-use-app/src/templates/**/*

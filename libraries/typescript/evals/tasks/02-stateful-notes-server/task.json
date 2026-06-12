@@ -1,0 +1,68 @@
+{
+  "title": "Stateful notes server",
+  "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
+  "requiresZodSchema": true,
+  "expectedTools": [
+    { "name": "save_note", "requiredProps": ["id", "title", "content"] },
+    { "name": "get_note", "requiredProps": ["id"] },
+    { "name": "list_notes" },
+    { "name": "delete_note", "requiredProps": ["id"] }
+  ],
+  "calls": [
+    {
+      "tool": "save_note",
+      "args": { "id": "alpha", "title": "Groceries", "content": "milk and eggs" },
+      "expect": { "type": "contains", "value": "alpha" }
+    },
+    {
+      "tool": "save_note",
+      "args": { "id": "beta", "title": "Workout", "content": "easy run, then stretch" },
+      "expect": { "type": "contains", "value": "beta" }
+    },
+    {
+      "tool": "get_note",
+      "args": { "id": "alpha" },
+      "expect": { "type": "contains", "value": "milk and eggs" }
+    },
+    {
+      "tool": "get_note",
+      "args": { "id": "alpha" },
+      "expect": { "type": "contains", "value": "Groceries" }
+    },
+    {
+      "tool": "list_notes",
+      "args": {},
+      "expect": { "type": "contains", "value": "Groceries" }
+    },
+    {
+      "tool": "list_notes",
+      "args": {},
+      "expect": { "type": "contains", "value": "Workout" }
+    },
+    {
+      "tool": "delete_note",
+      "args": { "id": "alpha" },
+      "expect": { "type": "contains", "value": "alpha" }
+    },
+    {
+      "tool": "get_note",
+      "args": { "id": "alpha" },
+      "expect": { "type": "contains", "value": "not found" }
+    },
+    {
+      "tool": "delete_note",
+      "args": { "id": "ghost" },
+      "expect": { "type": "contains", "value": "not found" }
+    },
+    {
+      "tool": "list_notes",
+      "args": {},
+      "expect": { "type": "not-contains", "value": "Groceries" }
+    },
+    {
+      "tool": "list_notes",
+      "args": {},
+      "expect": { "type": "number-equals", "value": 1 }
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Basic tool server",
+  "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
+  "requiresZodSchema": true,
+  "expectedTools": [{ "name": "add", "requiredProps": ["a", "b"] }],
+  "calls": [
+    { "tool": "add", "args": { "a": 2, "b": 3 }, "expect": { "type": "number-equals", "value": 5 } },
+    { "tool": "add", "args": { "a": -4, "b": 1.5 }, "expect": { "type": "number-equals", "value": -2.5 } }
+  ]
+}

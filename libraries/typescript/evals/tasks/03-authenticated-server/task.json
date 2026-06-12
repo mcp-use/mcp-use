@@ -1,0 +1,22 @@
+{
+  "title": "Bearer-authenticated server",
+  "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
+  "requiresZodSchema": true,
+  "auth": { "tokenEnv": "MCP_AUTH_TOKEN", "token": "eval-secret-token-91c4" },
+  "expectedTools": [
+    { "name": "whoami" },
+    { "name": "add", "requiredProps": ["a", "b"] }
+  ],
+  "calls": [
+    {
+      "tool": "whoami",
+      "args": {},
+      "expect": { "type": "contains", "value": "agent@example.com" }
+    },
+    {
+      "tool": "add",
+      "args": { "a": 20, "b": 22 },
+      "expect": { "type": "number-equals", "value": 42 }
+    }
+  ]
+}
