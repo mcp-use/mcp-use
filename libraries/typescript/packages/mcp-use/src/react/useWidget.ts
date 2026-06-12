@@ -649,6 +649,22 @@ export function useWidget<
     [provider]
   );
 
+  const setOpenInAppUrl = useCallback(
+    (href: string): void => {
+      // ChatGPT Apps SDK only; MCP Apps and the URL-params fallback have no
+      // equivalent affordance, so this is a no-op there.
+      if (provider !== "openai") {
+        return;
+      }
+      // Older ChatGPT hosts may not expose this method.
+      if (!window.openai?.setOpenInAppUrl) {
+        return;
+      }
+      window.openai.setOpenInAppUrl({ href });
+    },
+    [provider]
+  );
+
   const requestDisplayMode = useCallback(
     async (mode: DisplayMode): Promise<{ mode: DisplayMode }> => {
       if (provider === "mcp-apps") {
@@ -731,6 +747,19 @@ export function useWidget<
     },
     [provider, widgetState, localWidgetState]
   );
+
+  // Apply the declarative `metadata.openai.openInAppUrl` (injected by the server
+  // as window.__mcpOpenInAppUrl) once the ChatGPT Apps SDK is available. Static
+  // counterpart to the imperative setOpenInAppUrl action.
+  const openInAppUrlAppliedRef = useRef(false);
+  useEffect(() => {
+    if (openInAppUrlAppliedRef.current) return;
+    if (provider !== "openai" || typeof window === "undefined") return;
+    const href = window.__mcpOpenInAppUrl;
+    if (!href || !window.openai?.setOpenInAppUrl) return;
+    window.openai.setOpenInAppUrl({ href });
+    openInAppUrlAppliedRef.current = true;
+  }, [provider]);
 
   // Determine if tool is still executing
   const isPending = useMemo(() => {
@@ -831,6 +860,7 @@ export function useWidget<
     sendFollowUpMessage,
     openExternal,
     requestDisplayMode,
+    setOpenInAppUrl,
 
     // Availability
     isAvailable: isOpenAiAvailable || isMcpAppsConnected,

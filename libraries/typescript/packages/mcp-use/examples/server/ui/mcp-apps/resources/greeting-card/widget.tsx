@@ -15,6 +15,11 @@ export const widgetMetadata: WidgetMetadata = {
   metadata: {
     prefersBorder: false,
     widgetDescription: "A colorful greeting card with personalized message",
+    openai: {
+      // ChatGPT-only: link the "Open in app" affordance to this URL. Applied
+      // automatically via window.openai.setOpenInAppUrl when mounted in ChatGPT.
+      openInAppUrl: "https://www.example.com",
+    },
   },
   annotations: {
     readOnlyHint: true,

@@ -129,5 +129,23 @@ export interface WidgetMetadata {
      * Auto-default: `"{name} ready"`
      */
     invoked?: string;
+    /**
+     * ChatGPT-specific runtime configuration (Apps SDK only, ignored by MCP Apps).
+     *
+     * Unlike the other `metadata` fields — which are passthrough metadata the
+     * host reads directly — these drive imperative `window.openai` calls made
+     * by the widget runtime when it mounts inside ChatGPT.
+     */
+    openai?: {
+      /**
+       * URL that ChatGPT's "Open in app" affordance links to.
+       *
+       * Applied automatically via `window.openai.setOpenInAppUrl` when the
+       * widget mounts inside ChatGPT. For a dynamic href (e.g. a deep link to
+       * the specific record being shown), call `setOpenInAppUrl` from
+       * `useWidget()` instead.
+       */
+      openInAppUrl?: string;
+    };
   };
 }

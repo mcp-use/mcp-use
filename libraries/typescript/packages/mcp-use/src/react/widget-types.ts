@@ -151,6 +151,14 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
    * Use `useFiles().isSupported` to detect availability before calling.
    */
   getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
+
+  /**
+   * Set the URL that ChatGPT's "Open in app" affordance links to.
+   *
+   * ChatGPT Apps SDK only. May be absent on older hosts — feature-detect
+   * before calling (`useWidget().setOpenInAppUrl` handles this for you).
+   */
+  setOpenInAppUrl?: (args: { href: string }) => void;
 }
 
 // Event types
@@ -168,6 +176,7 @@ declare global {
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
+    __mcpOpenInAppUrl?: string;
   }
 
   interface WindowEventMap {
@@ -404,6 +413,18 @@ interface UseWidgetResultBase<
    * (e.g. policy violation or invalid URL) — errors are logged but not thrown.
    */
   openExternal: (href: string) => void;
+
+  /**
+   * Set the URL that ChatGPT's "Open in app" button links to.
+   *
+   * ChatGPT Apps SDK only — calls `window.openai.setOpenInAppUrl`. No-op on
+   * MCP Apps hosts, the URL-params fallback, and ChatGPT hosts that don't
+   * expose the method. Use this for a dynamic deep link (e.g. to the specific
+   * record the widget is displaying); for a static URL, set
+   * `metadata.openai.openInAppUrl` in the widget definition to have it applied
+   * automatically on mount.
+   */
+  setOpenInAppUrl: (href: string) => void;
 
   /**
    * Request the host to change the widget's display mode.

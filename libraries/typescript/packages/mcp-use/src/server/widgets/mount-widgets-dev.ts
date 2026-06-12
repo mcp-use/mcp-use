@@ -697,10 +697,16 @@ if (container && Component) {
           let html = "";
           try {
             html = await fsHelpers.readFileSync(htmlPath);
+            const openInAppUrl = (
+              metadata?.metadata as
+                | { openai?: { openInAppUrl?: string } }
+                | undefined
+            )?.openai?.openInAppUrl;
             html = processWidgetHtml(
               html,
               widgetName,
-              serverConfig.serverBaseUrl
+              serverConfig.serverBaseUrl,
+              openInAppUrl
             );
           } catch (e) {
             console.warn(

@@ -99,6 +99,7 @@ useWidget<
 | `sendFollowUpMessage`   | `(content: string \| MessageContentBlock[]) => Promise<void>`                | Send a follow-up message; string shorthand or full content block array (SEP-1865) |
 | `openExternal`          | `(href: string) => void`                                                     | Open an external URL in a new tab                            |
 | `requestDisplayMode`    | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>`                      | Request a different display mode                             |
+| `setOpenInAppUrl`       | `(href: string) => void`                                                     | ChatGPT only: set the URL the "Open in app" affordance links to (no-op on other hosts) |
 | `notifyIntrinsicHeight` | `(height: number) => Promise<void>`                                          | Notify OpenAI about intrinsic height changes for auto-sizing |
 
 ### Availability
@@ -448,6 +449,37 @@ const handleFullscreen = async () => {
   // result.mode is the granted mode (may differ from requested)
 };
 ```
+
+### 9. Open in app URL (ChatGPT only)
+
+Control the link ChatGPT's "Open in app" affordance points to. Use the
+imperative action for a dynamic, per-record deep link:
+
+```tsx
+const { props, setOpenInAppUrl } = useWidget();
+
+useEffect(() => {
+  if (props.id) {
+    setOpenInAppUrl(`https://app.example.com/records/${props.id}`);
+  }
+}, [props.id]);
+```
+
+For a static URL, declare it once in the widget definition and it is applied
+automatically when the widget mounts inside ChatGPT:
+
+```ts
+metadata: {
+  openai: {
+    openInAppUrl: "https://app.example.com",
+  },
+}
+```
+
+<Note>
+Both are ChatGPT Apps SDK features. On MCP Apps hosts (and the local
+URL-params fallback) they are a no-op.
+</Note>
 
 ## Default Values
 
