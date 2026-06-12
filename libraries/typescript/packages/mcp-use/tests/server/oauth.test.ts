@@ -364,13 +364,11 @@ describe("server OAuth integration", () => {
       code_challenge_methods_supported: ["S256"],
     };
 
-    upstream.get(
-      "/.well-known/oauth-authorization-server/oauth/2.1",
-      (c) => c.json(upstreamMetadata)
+    upstream.get("/.well-known/oauth-authorization-server/oauth/2.1", (c) =>
+      c.json(upstreamMetadata)
     );
-    upstream.get(
-      "/oauth/2.1/.well-known/openid-configuration",
-      (c) => c.json({ ...upstreamMetadata, scopes_supported: ["openid"] })
+    upstream.get("/oauth/2.1/.well-known/openid-configuration", (c) =>
+      c.json({ ...upstreamMetadata, scopes_supported: ["openid"] })
     );
 
     const app = new Hono();

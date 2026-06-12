@@ -396,9 +396,7 @@ export function setupOAuthRoutes(
   const issuerPath = proxyMode ? "" : getIssuerPath(oauth.getIssuer());
   const oauthMetadataPaths = [
     buildLocalOAuthAuthorizationServerPath(""),
-    ...(issuerPath
-      ? [buildLocalOAuthAuthorizationServerPath(issuerPath)]
-      : []),
+    ...(issuerPath ? [buildLocalOAuthAuthorizationServerPath(issuerPath)] : []),
   ];
   for (const path of oauthMetadataPaths) {
     app.get(path, handleOAuthAuthorizationServerMetadata);
@@ -410,7 +408,10 @@ export function setupOAuthRoutes(
   // under the `/.well-known/openid-configuration` prefix — and no client flow
   // reaches a path-suffixed local route regardless (DCR-direct clients query
   // the upstream issuer directly; legacy clients query the local origin root).
-  app.get("/.well-known/openid-configuration", handleOpenIdConfigurationMetadata);
+  app.get(
+    "/.well-known/openid-configuration",
+    handleOpenIdConfigurationMetadata
+  );
 
   /**
    * OAuth Protected Resource Metadata
