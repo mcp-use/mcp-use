@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.32.1-canary.2
+
+### Patch Changes
+
+- 8d626cb: Fix OAuth metadata discovery for authorization servers with path-suffix issuers (RFC 8414). Construct the upstream OAuth and OpenID metadata URLs correctly and additionally mount the canonical `/.well-known/oauth-authorization-server{issuer-path}` route. Closes #1576.
+  - @mcp-use/cli@3.5.2-canary.2
+  - @mcp-use/inspector@10.0.1-canary.2
+
 ## 1.32.1-canary.1
 
 ### Patch Changes

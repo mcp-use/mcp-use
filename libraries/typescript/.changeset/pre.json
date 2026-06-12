@@ -9,6 +9,7 @@
   },
   "changesets": [
     "cli-sensitive-env-vars",
+    "fix-oauth-well-known-canonical-paths",
     "server-notification-logging"
   ]
 }
