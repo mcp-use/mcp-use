@@ -19,6 +19,12 @@ import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
+import {
+  buildLocalOAuthAuthorizationServerPath,
+  buildOAuthAuthorizationServerMetadataUrl,
+  buildOpenIdConfigurationMetadataUrl,
+  getIssuerPath,
+} from "./well-known.js";
 
 /**
  * Type guard to check if oauth config is a proxy
@@ -274,6 +280,54 @@ export function setupOAuthRoutes(
     });
   }
 
+  const synthesizeProxyMetadata = () => {
+    const proxy = oauth as OAuthProxy;
+    console.log(`[OAuth] Returning proxy mode metadata`);
+
+    return {
+      issuer: baseUrl,
+      authorization_endpoint: `${baseUrl}/authorize`,
+      token_endpoint: `${baseUrl}/token`,
+      registration_endpoint: `${baseUrl}/register`,
+      scopes_supported: oauth.getScopesSupported(),
+      response_types_supported: ["code"],
+      grant_types_supported: oauth.getGrantTypesSupported(),
+      token_endpoint_auth_methods_supported: proxy.clientSecret
+        ? ["client_secret_post", "none"]
+        : ["none"],
+      code_challenge_methods_supported: ["S256"],
+    };
+  };
+
+  const fetchUpstreamMetadata = async (
+    metadataUrl: string,
+    c: Context
+  ): Promise<Response> => {
+    console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
+    const response = await fetch(metadataUrl);
+
+    if (!response.ok) {
+      console.error(
+        `[OAuth] Failed to fetch provider metadata: ${response.status}`
+      );
+      return c.json(
+        {
+          error: "server_error",
+          error_description: "Failed to fetch provider metadata",
+        },
+        500
+      );
+    }
+
+    const metadata = await response.json();
+    console.log(`[OAuth] Provider metadata retrieved successfully`);
+    console.log(`[OAuth]   - Issuer: ${metadata.issuer}`);
+    console.log(
+      `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint || "not available (using pre-registered client)"}`
+    );
+    return c.json(metadata);
+  };
+
   /**
    * OAuth Authorization Server Metadata
    * As per RFC 8414: https://tools.ietf.org/html/rfc8414
@@ -281,76 +335,82 @@ export function setupOAuthRoutes(
    * DCR-direct mode: Fetches and returns metadata from upstream provider.
    * Proxy mode: Synthesizes metadata pointing to local endpoints.
    */
-  const handleAuthorizationServerMetadata = async (c: Context) => {
+  const handleOAuthAuthorizationServerMetadata = async (c: Context) => {
     const requestPath = new URL(c.req.url).pathname;
-    console.log(`[OAuth] Metadata request: ${requestPath}`);
+    console.log(`[OAuth] OAuth metadata request: ${requestPath}`);
 
-    // In proxy mode, synthesize metadata pointing to local endpoints
     if (proxyMode) {
-      const proxy = oauth as OAuthProxy;
-      console.log(`[OAuth] Returning proxy mode metadata`);
-
-      return c.json({
-        issuer: baseUrl,
-        authorization_endpoint: `${baseUrl}/authorize`,
-        token_endpoint: `${baseUrl}/token`,
-        registration_endpoint: `${baseUrl}/register`,
-        scopes_supported: oauth.getScopesSupported(),
-        response_types_supported: ["code"],
-        grant_types_supported: oauth.getGrantTypesSupported(),
-        token_endpoint_auth_methods_supported: proxy.clientSecret
-          ? ["client_secret_post", "none"]
-          : ["none"],
-        code_challenge_methods_supported: ["S256"],
-      });
+      return c.json(synthesizeProxyMetadata());
     }
 
-    // DCR-direct mode: proxy to upstream
     try {
       const issuer = oauth.getIssuer();
-      const metadataUrl = `${issuer.replace(/\/+$/, "")}/.well-known/oauth-authorization-server`;
-      console.log(`[OAuth] Fetching metadata from provider: ${metadataUrl}`);
-      const response = await fetch(metadataUrl);
-
-      if (!response.ok) {
-        console.error(
-          `[OAuth] Failed to fetch provider metadata: ${response.status}`
-        );
-        return c.json(
-          {
-            error: "server_error",
-            error_description: `Failed to fetch provider metadata: ${response.status}`,
-          },
-          500
-        );
-      }
-
-      const metadata = await response.json();
-      console.log(`[OAuth] Provider metadata retrieved successfully`);
-      console.log(`[OAuth]   - Issuer: ${metadata.issuer}`);
-      console.log(
-        `[OAuth]   - Registration endpoint: ${metadata.registration_endpoint || "not available (using pre-registered client)"}`
-      );
-      return c.json(metadata);
+      const metadataUrl = buildOAuthAuthorizationServerMetadataUrl(issuer);
+      return await fetchUpstreamMetadata(metadataUrl, c);
     } catch (error) {
+      console.error(`[OAuth] Error fetching provider metadata:`, error);
       return c.json(
         {
           error: "server_error",
-          error_description: `Failed to fetch provider metadata: ${error}`,
+          error_description: "Failed to fetch provider metadata",
         },
         500
       );
     }
   };
 
-  // Register the handler for both OAuth and OpenID Connect discovery endpoints
-  app.get(
-    "/.well-known/oauth-authorization-server",
-    handleAuthorizationServerMetadata
-  );
+  /**
+   * OpenID Provider Configuration
+   *
+   * DCR-direct mode: Fetches OIDC metadata from upstream (appended to issuer).
+   * Proxy mode: Synthesizes metadata pointing to local endpoints.
+   */
+  const handleOpenIdConfigurationMetadata = async (c: Context) => {
+    const requestPath = new URL(c.req.url).pathname;
+    console.log(`[OAuth] OpenID metadata request: ${requestPath}`);
+
+    if (proxyMode) {
+      return c.json(synthesizeProxyMetadata());
+    }
+
+    try {
+      const issuer = oauth.getIssuer();
+      const metadataUrl = buildOpenIdConfigurationMetadataUrl(issuer);
+      return await fetchUpstreamMetadata(metadataUrl, c);
+    } catch (error) {
+      console.error(`[OAuth] Error fetching provider metadata:`, error);
+      return c.json(
+        {
+          error: "server_error",
+          error_description: "Failed to fetch provider metadata",
+        },
+        500
+      );
+    }
+  };
+
+  // OAuth Authorization Server Metadata: mount the root route plus the RFC 8414
+  // canonical path-suffixed route. In proxy mode the local server is the AS
+  // (no issuer path); in DCR-direct mode the upstream issuer path determines
+  // the canonical mount suffix.
+  const issuerPath = proxyMode ? "" : getIssuerPath(oauth.getIssuer());
+  const oauthMetadataPaths = [
+    buildLocalOAuthAuthorizationServerPath(""),
+    ...(issuerPath ? [buildLocalOAuthAuthorizationServerPath(issuerPath)] : []),
+  ];
+  for (const path of oauthMetadataPaths) {
+    app.get(path, handleOAuthAuthorizationServerMetadata);
+  }
+
+  // OpenID Provider Configuration: only the root route is mounted. OIDC
+  // Discovery appends the well-known segment to the issuer rather than
+  // inserting it after the host, so there is no path-suffixed form that lives
+  // under the `/.well-known/openid-configuration` prefix — and no client flow
+  // reaches a path-suffixed local route regardless (DCR-direct clients query
+  // the upstream issuer directly; legacy clients query the local origin root).
   app.get(
     "/.well-known/openid-configuration",
-    handleAuthorizationServerMetadata
+    handleOpenIdConfigurationMetadata
   );
 
   /**
