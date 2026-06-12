@@ -10,6 +10,7 @@ import type { InspectorMode } from "./shared-static.js";
 import { registerStaticRoutes } from "./shared-static.js";
 import { setServerPort } from "./tunnel.js";
 import { findAvailablePort, isValidUrl } from "./utils.js";
+import { getInspectorVersion } from "./version.js";
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -18,7 +19,11 @@ let startPort = 8080;
 let noOpen = false;
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--url" && i + 1 < args.length) {
+  if (args[i] === "--url") {
+    if (i + 1 >= args.length || args[i + 1].startsWith("-")) {
+      console.error("Error: --url requires a value");
+      process.exit(1);
+    }
     const url = args[i + 1];
     if (!isValidUrl(url)) {
       console.error(`Error: Invalid URL format: ${url}`);
@@ -27,7 +32,11 @@ for (let i = 0; i < args.length; i++) {
     }
     mcpUrl = url;
     i++;
-  } else if (args[i] === "--port" && i + 1 < args.length) {
+  } else if (args[i] === "--port") {
+    if (i + 1 >= args.length || args[i + 1].startsWith("-")) {
+      console.error("Error: --port requires a value");
+      process.exit(1);
+    }
     const parsedPort = Number.parseInt(args[i + 1], 10);
     if (Number.isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) {
       console.error(
@@ -39,6 +48,9 @@ for (let i = 0; i < args.length; i++) {
     i++;
   } else if (args[i] === "--no-open") {
     noOpen = true;
+  } else if (args[i] === "--version" || args[i] === "-v") {
+    console.log(getInspectorVersion());
+    process.exit(0);
   } else if (args[i] === "--help" || args[i] === "-h") {
     console.log(`
 MCP Inspector - Inspect and debug MCP servers
@@ -50,6 +62,7 @@ Options:
   --url <url>    MCP server URL to auto-connect to (e.g., http://localhost:3000/mcp)
   --port <port>  Starting port to try (default: 8080, will find next available)
   --no-open      Do not auto-open inspector in browser
+  --version, -v  Show the inspector version
   --help, -h     Show this help message
 
 Examples:
@@ -63,6 +76,10 @@ Examples:
   npx @mcp-use/inspector
 `);
     process.exit(0);
+  } else {
+    console.error(`Error: Unknown option: ${args[i]}`);
+    console.error("Run with --help to see available options.");
+    process.exit(1);
   }
 }
 
