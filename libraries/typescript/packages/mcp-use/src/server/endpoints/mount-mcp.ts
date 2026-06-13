@@ -400,6 +400,7 @@ export async function mountMcp(
         const server = mcpServerInstance.getServerForSession(sessionId);
         const transport = new WebStandardStreamableHTTPServerTransport({
           sessionIdGenerator: () => sessionId,
+          enableJsonResponse: true,
 
           onsessioninitialized: async (sid: string) => {
             if (getDebugLevel() !== "info") {
@@ -516,6 +517,7 @@ export async function mountMcp(
       const server = mcpServerInstance.getServerForSession(newSessionId);
       const transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: () => newSessionId,
+        enableJsonResponse: true,
 
         onsessioninitialized: async (sid: string) => {
           if (getDebugLevel() !== "info") {
