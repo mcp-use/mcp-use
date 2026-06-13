@@ -137,6 +137,20 @@ export function jwksVerifier(config: JwksVerifierConfig): VerifyToken {
   const jwks = createRemoteJWKSet(new URL(config.jwksUrl));
 
   return async (token) => {
+    // A signed JWT has exactly three dot-separated segments. Opaque tokens —
+    // what Auth0 and others issue when the authorize request carries no valid
+    // `audience` — have none, and would otherwise fail deep inside jose as the
+    // cryptic "JWSInvalid: Invalid Compact JWS". Catch it early with a hint
+    // that points at the actual cause.
+    if (token.split(".").length !== 3) {
+      throw new Error(
+        "Access token is not a signed JWT, so it can't be verified against the JWKS. " +
+          "Many providers — Auth0 included — only issue JWT access tokens when the " +
+          "authorization request specifies a valid `audience` (your API identifier). " +
+          "Check your `audience` configuration."
+      );
+    }
+
     try {
       const result = await jwtVerify(token, jwks, {
         issuer: config.issuer,

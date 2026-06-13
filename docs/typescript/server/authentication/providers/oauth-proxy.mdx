@@ -23,11 +23,16 @@ Common proxy targets: **Google, GitHub, Okta, Azure AD (Microsoft Entra ID), Aut
 ## How it works
 
 1. Your server exposes a `/register` endpoint that returns the configured `clientId`.
-2. The MCP client runs PKCE authorization against the upstream using that `clientId`.
-3. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
-4. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
+2. The MCP client starts PKCE authorization at your server's `/authorize`, which redirects to the upstream with the server's own `/oauth/callback` as the redirect URI.
+3. The upstream redirects back to `<your-server>/oauth/callback`, and your server forwards the authorization code to the client's original redirect URI.
+4. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
+5. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
 
-Your server holds the client credentials and mediates every token exchange. Tokens are passed through  -  the proxy does not mint its own.
+Your server holds the client credentials and mediates every token exchange. Tokens are passed through  -  the proxy does not mint its own, and PKCE runs end-to-end between the MCP client and the upstream provider.
+
+<Note>
+  Register exactly one redirect URI in your provider's dashboard: `<your-server-domain>/oauth/callback` (e.g. `http://localhost:3000/oauth/callback` during development). MCP clients never need their own redirect URIs registered upstream  -  the server brokers the callback for all of them.
+</Note>
 
 ## Quick start (Google)
 

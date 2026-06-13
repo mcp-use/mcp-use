@@ -11,7 +11,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBearerAuthMiddleware } from "../../src/server/oauth/middleware.js";
 import { setupOAuthRoutes } from "../../src/server/oauth/routes.js";
 import { setupOAuthForServer } from "../../src/server/oauth/setup.js";
-import { oauthProxy } from "../../src/server/oauth/oauth-proxy.js";
+import {
+  oauthProxy,
+  jwksVerifier,
+} from "../../src/server/oauth/oauth-proxy.js";
 import { oauthCustomProvider } from "../../src/server/oauth/providers.js";
 
 // A stub verifier that accepts any token. Used in tests that don't exercise
@@ -127,14 +130,207 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(200);
     expect(data.access_token).toBe("abc");
     expect(tokenSpy).toHaveBeenCalledTimes(1);
-    // Verify that client credentials were injected
+    // Verify that client credentials were injected and redirect_uri was
+    // rewritten to the brokered callback (it must match the authorize request)
     expect(tokenSpy.mock.calls[0][0].body).toMatchObject({
       grant_type: "authorization_code",
       code: "code-123",
-      redirect_uri: "http://localhost:3000/callback",
+      redirect_uri: `${svc.baseUrl}/oauth/callback`,
       client_id: "my-client-id",
       client_secret: "my-client-secret",
     });
+  });
+
+  it("brokers the authorize redirect through the local /oauth/callback", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "my-client-id",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    authorizeUrl.searchParams.set("client_id", "dcr-cached-client");
+    authorizeUrl.searchParams.set(
+      "redirect_uri",
+      "https://client.example.com/inspector/oauth/callback?session=42"
+    );
+    authorizeUrl.searchParams.set("response_type", "code");
+    authorizeUrl.searchParams.set("code_challenge", "challenge-abc");
+    authorizeUrl.searchParams.set("code_challenge_method", "S256");
+    authorizeUrl.searchParams.set("state", "client-state-xyz");
+
+    const response = await fetch(authorizeUrl, { redirect: "manual" });
+    expect(response.status).toBe(302);
+
+    const upstream = new URL(response.headers.get("location")!);
+    // Upstream sees only the proxy's callback — clients never need their own
+    // redirect URIs registered on the provider
+    expect(upstream.searchParams.get("redirect_uri")).toBe(
+      `${svc.baseUrl}/oauth/callback`
+    );
+    // PKCE passes through end-to-end
+    expect(upstream.searchParams.get("code_challenge")).toBe("challenge-abc");
+    expect(upstream.searchParams.get("client_id")).toBe("my-client-id");
+    // The client's redirect_uri and state ride inside the upstream state
+    const upstreamState = upstream.searchParams.get("state")!;
+    expect(upstreamState).not.toBe("client-state-xyz");
+
+    // Simulate the upstream provider redirecting back to the broker
+    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    callbackUrl.searchParams.set("code", "upstream-code-123");
+    callbackUrl.searchParams.set("state", upstreamState);
+
+    const callback = await fetch(callbackUrl, { redirect: "manual" });
+    expect(callback.status).toBe(302);
+
+    const clientRedirect = new URL(callback.headers.get("location")!);
+    expect(clientRedirect.origin).toBe("https://client.example.com");
+    expect(clientRedirect.pathname).toBe("/inspector/oauth/callback");
+    // Pre-existing query params on the client redirect_uri survive
+    expect(clientRedirect.searchParams.get("session")).toBe("42");
+    expect(clientRedirect.searchParams.get("code")).toBe("upstream-code-123");
+    expect(clientRedirect.searchParams.get("state")).toBe("client-state-xyz");
+  });
+
+  it("forwards upstream errors to the client's redirect_uri", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "my-client-id",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    authorizeUrl.searchParams.set("client_id", "client");
+    authorizeUrl.searchParams.set(
+      "redirect_uri",
+      "https://client.example.com/callback"
+    );
+    authorizeUrl.searchParams.set("response_type", "code");
+    authorizeUrl.searchParams.set("code_challenge", "challenge");
+    authorizeUrl.searchParams.set("state", "client-state");
+
+    const response = await fetch(authorizeUrl, { redirect: "manual" });
+    const upstreamState = new URL(
+      response.headers.get("location")!
+    ).searchParams.get("state")!;
+
+    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    callbackUrl.searchParams.set("error", "access_denied");
+    callbackUrl.searchParams.set("error_description", "User cancelled");
+    callbackUrl.searchParams.set("state", upstreamState);
+
+    const callback = await fetch(callbackUrl, { redirect: "manual" });
+    expect(callback.status).toBe(302);
+
+    const clientRedirect = new URL(callback.headers.get("location")!);
+    expect(clientRedirect.searchParams.get("error")).toBe("access_denied");
+    expect(clientRedirect.searchParams.get("error_description")).toBe(
+      "User cancelled"
+    );
+    expect(clientRedirect.searchParams.get("state")).toBe("client-state");
+    expect(clientRedirect.searchParams.get("code")).toBeNull();
+  });
+
+  it("falls through /oauth/callback when state is not a broker transaction", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "my-client-id",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    // A same-origin frontend may serve its own callback page at this path
+    // (useMcp defaults to `<origin>/oauth/callback`)
+    app.get("/oauth/callback", (c) => c.text("frontend callback page"));
+
+    const response = await fetch(
+      `${svc.baseUrl}/oauth/callback?code=abc&state=random-client-state`
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("frontend callback page");
+
+    // Without a downstream route, an unrecognized state 404s
+    const app2 = new Hono();
+    const svc2 = await listenOnRandomPort(app2);
+    closers.push(svc2.close);
+    setupOAuthRoutes(app2, proxy, svc2.baseUrl);
+
+    const notFound = await fetch(
+      `${svc2.baseUrl}/oauth/callback?code=abc&state=garbage`
+    );
+    expect(notFound.status).toBe(404);
+  });
+
+  it("jwksVerifier rejects opaque (non-JWT) tokens with an actionable hint", async () => {
+    const verify = jwksVerifier({
+      jwksUrl: "https://issuer.example.com/.well-known/jwks.json",
+      issuer: "https://issuer.example.com/",
+      audience: "https://api.example.com",
+    });
+
+    // An opaque Auth0 token (no dots) is rejected before any network/JWKS call,
+    // with a message that points at the missing `audience` rather than jose's
+    // cryptic "Invalid Compact JWS".
+    await expect(verify("opaque-token-without-dots")).rejects.toThrow(
+      /not a signed JWT.*audience/s
+    );
+
+    // A malformed two-segment token is likewise caught early.
+    await expect(verify("header.payload")).rejects.toThrow(/not a signed JWT/);
+  });
+
+  it("rejects authorize requests with an invalid redirect_uri", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "my-client-id",
+      verifyToken: stubVerifyToken,
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    setupOAuthRoutes(app, proxy, svc.baseUrl);
+
+    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    authorizeUrl.searchParams.set("client_id", "client");
+    authorizeUrl.searchParams.set("redirect_uri", "not-a-url");
+    authorizeUrl.searchParams.set("response_type", "code");
+    authorizeUrl.searchParams.set("code_challenge", "challenge");
+
+    const response = await fetch(authorizeUrl, { redirect: "manual" });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("invalid_request");
   });
 
   it("allows browser GET to /mcp through OAuth when publicLandingPage is enabled", async () => {

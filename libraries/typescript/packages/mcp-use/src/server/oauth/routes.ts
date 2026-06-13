@@ -10,12 +10,14 @@
  * 2. **Proxy mode (OAuthProxy):** For providers that don't support DCR
  *    (e.g., Google, GitHub). The MCP server:
  *    - Exposes /register returning the configured clientId
- *    - Redirects /authorize to upstream with extra params
+ *    - Redirects /authorize to upstream, brokering the callback through its
+ *      own /oauth/callback so only `<baseUrl>/oauth/callback` needs to be
+ *      registered with the upstream provider
  *    - Forwards /token requests with injected credentials
  *    - Synthesizes `.well-known` metadata pointing to local endpoints
  */
 
-import type { Context, Hono } from "hono";
+import type { Context, Hono, Next } from "hono";
 import { cors } from "hono/cors";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
@@ -36,16 +38,88 @@ export function isOAuthProxy(
 }
 
 /**
+ * Callback transaction carried through the upstream `state` parameter.
+ *
+ * In proxy mode the client's redirect_uri and state are packed into the
+ * `state` value sent upstream (base64url JSON), so /oauth/callback can
+ * restore them without any server-side storage. This keeps the broker
+ * stateless — it survives restarts and multi-instance deployments.
+ */
+interface CallbackTxn {
+  /** Client's original redirect_uri */
+  redirectUri: string;
+  /** Client's original state, if any */
+  state?: string;
+}
+
+function base64UrlEncode(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+function base64UrlDecode(value: string): string {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeCallbackTxn(txn: CallbackTxn): string {
+  return base64UrlEncode(JSON.stringify(txn));
+}
+
+function decodeCallbackTxn(value: string): CallbackTxn | null {
+  try {
+    const parsed = JSON.parse(base64UrlDecode(value));
+    if (
+      typeof parsed?.redirectUri !== "string" ||
+      !isValidRedirectUri(parsed.redirectUri)
+    ) {
+      return null;
+    }
+    return {
+      redirectUri: parsed.redirectUri,
+      state: typeof parsed.state === "string" ? parsed.state : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isValidRedirectUri(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Authorization endpoint handler
  *
  * In DCR-direct mode (OAuthProvider): Dormant — clients reach upstream directly.
- * In proxy mode (OAuthProxy): Active — redirects to upstream with extra params.
+ * In proxy mode (OAuthProxy): Active — redirects to upstream, replacing the
+ * client's redirect_uri with the local /oauth/callback so only the proxy's
+ * callback needs to be registered upstream. The client's redirect_uri and
+ * state are packed into the upstream `state` and restored at the callback.
+ * PKCE parameters pass through untouched, so the challenge/verifier pair
+ * stays end-to-end between the MCP client and the upstream provider.
  *
  * @param oauth - The OAuth provider or proxy
+ * @param baseUrl - The base URL of this server (for the brokered callback)
  * @returns Hono handler that redirects to the upstream authorize endpoint
  */
 function createAuthorizeHandler(
-  oauth: OAuthProvider | OAuthProxy
+  oauth: OAuthProvider | OAuthProxy,
+  baseUrl: string
 ): (c: Context) => Promise<Response> {
   return async (c: Context) => {
     const params =
@@ -74,12 +148,21 @@ function createAuthorizeHandler(
       );
     }
 
+    if (!isValidRedirectUri(redirectUri as string)) {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "redirect_uri must be a valid http(s) URL",
+        },
+        400
+      );
+    }
+
     // Get authorization endpoint - uniform for both provider and proxy
     const authEndpoint = oauth.getAuthEndpoint();
 
     // Build provider authorization URL
     const authUrl = new URL(authEndpoint);
-    authUrl.searchParams.set("redirect_uri", redirectUri as string);
     authUrl.searchParams.set("response_type", responseType as string);
     authUrl.searchParams.set("code_challenge", codeChallenge as string);
     authUrl.searchParams.set(
@@ -87,11 +170,21 @@ function createAuthorizeHandler(
       (codeChallengeMethod as string) || "S256"
     );
 
-    if (state) authUrl.searchParams.set("state", state as string);
     if (scope) authUrl.searchParams.set("scope", scope as string);
     if (audience) authUrl.searchParams.set("audience", audience as string);
 
     if (isOAuthProxy(oauth)) {
+      // Broker the callback: send upstream to the local /oauth/callback and
+      // carry the client's redirect_uri + state inside the upstream state.
+      // Only `<baseUrl>/oauth/callback` needs to be registered upstream.
+      authUrl.searchParams.set("redirect_uri", `${baseUrl}/oauth/callback`);
+      authUrl.searchParams.set(
+        "state",
+        encodeCallbackTxn({
+          redirectUri: redirectUri as string,
+          state: state ? (state as string) : undefined,
+        })
+      );
       // Override with the configured upstream client_id; the incoming value
       // may be stale DCR cache.
       authUrl.searchParams.set("client_id", oauth.clientId);
@@ -101,6 +194,8 @@ function createAuthorizeHandler(
         }
       }
     } else {
+      authUrl.searchParams.set("redirect_uri", redirectUri as string);
+      if (state) authUrl.searchParams.set("state", state as string);
       authUrl.searchParams.set("client_id", clientId as string);
     }
 
@@ -110,16 +205,87 @@ function createAuthorizeHandler(
 }
 
 /**
+ * Brokered callback endpoint handler (proxy mode only)
+ *
+ * Receives the upstream provider's redirect at `<baseUrl>/oauth/callback`,
+ * restores the client's original redirect_uri + state from the upstream
+ * `state` parameter, and forwards the authorization code (or upstream error)
+ * to the client. The code itself passes through untouched — the client
+ * exchanges it at the local /token endpoint, which rewrites redirect_uri to
+ * match what was sent upstream.
+ *
+ * If the `state` parameter doesn't decode to a broker transaction, the
+ * request falls through to later routes: browser clients (e.g. `useMcp`)
+ * default their own redirect URI to `/oauth/callback` on their origin, and a
+ * frontend served from the same origin as this server must keep receiving
+ * its callback page.
+ *
+ * @returns Hono handler that redirects back to the MCP client's callback
+ */
+function createCallbackHandler(): (
+  c: Context,
+  next: Next
+) => Promise<Response | void> {
+  return async (c: Context, next: Next) => {
+    const query = c.req.query();
+
+    const txn = query.state ? decodeCallbackTxn(query.state) : null;
+    if (!txn) {
+      // No decodable broker transaction in `state`. This is expected when a
+      // same-origin frontend serves its own callback page at /oauth/callback,
+      // so pass through to let its route handle the request. If you expected
+      // the proxy to handle this redirect, the upstream provider isn't
+      // echoing back the `state` the proxy sent at /authorize.
+      return next();
+    }
+
+    const redirect = new URL(txn.redirectUri);
+
+    if (query.error) {
+      // Forward upstream errors (e.g. access_denied) to the client
+      redirect.searchParams.set("error", query.error);
+      if (query.error_description) {
+        redirect.searchParams.set("error_description", query.error_description);
+      }
+      if (query.error_uri) {
+        redirect.searchParams.set("error_uri", query.error_uri);
+      }
+    } else if (query.code) {
+      redirect.searchParams.set("code", query.code);
+    } else {
+      return c.json(
+        {
+          error: "invalid_request",
+          error_description: "Callback is missing both code and error",
+        },
+        400
+      );
+    }
+
+    if (txn.state !== undefined) {
+      redirect.searchParams.set("state", txn.state);
+    }
+
+    return c.redirect(redirect.toString(), 302);
+  };
+}
+
+/**
  * Token endpoint handler
  *
  * In DCR-direct mode (OAuthProvider): Dormant — clients call upstream directly.
- * In proxy mode (OAuthProxy): Active — injects clientId/clientSecret before forwarding.
+ * In proxy mode (OAuthProxy): Active — injects clientId/clientSecret and
+ * rewrites redirect_uri to the brokered /oauth/callback before forwarding
+ * (RFC 6749 §4.1.3 requires it to match the authorize request, which used
+ * the local callback rather than the client's).
  *
  * @param oauth - The OAuth provider or proxy
+ * @param baseUrl - The base URL of this server (for the brokered callback)
  * @returns Hono handler that forwards form-encoded token exchanges upstream
  */
 function createTokenHandler(
-  oauth: OAuthProvider | OAuthProxy
+  oauth: OAuthProvider | OAuthProxy,
+  baseUrl: string
 ): (c: Context) => Promise<Response> {
   return async (c: Context) => {
     try {
@@ -139,6 +305,13 @@ function createTokenHandler(
         // Add client_secret if configured (for confidential clients)
         if (oauth.clientSecret) {
           requestBody.set("client_secret", oauth.clientSecret);
+        }
+
+        // The authorize request used the brokered /oauth/callback, so the
+        // token exchange must present the same redirect_uri — not the
+        // client's own callback.
+        if (requestBody.has("redirect_uri")) {
+          requestBody.set("redirect_uri", `${baseUrl}/oauth/callback`);
         }
       }
 
@@ -189,8 +362,10 @@ function createTokenHandler(
  *
  * **Proxy mode (OAuthProxy):**
  * - POST /register - Returns configured clientId (fake DCR endpoint)
- * - GET/POST /authorize - Redirects to upstream with extra params
- * - POST /token - Forwards with injected credentials
+ * - GET/POST /authorize - Redirects to upstream, brokering the callback locally
+ * - GET /oauth/callback - Receives the upstream redirect and forwards the
+ *   code to the MCP client's original redirect_uri
+ * - POST /token - Forwards with injected credentials and the brokered redirect_uri
  * - GET /.well-known/* - Synthesized metadata pointing to local endpoints
  *
  * @param app - The Hono application instance
@@ -239,15 +414,20 @@ export function setupOAuthRoutes(
   );
 
   // Mount /authorize and /token handlers
-  const handleAuthorize = createAuthorizeHandler(oauth);
+  const handleAuthorize = createAuthorizeHandler(oauth, baseUrl);
   app.get("/authorize", handleAuthorize);
   app.post("/authorize", handleAuthorize);
-  app.post("/token", createTokenHandler(oauth));
+  app.post("/token", createTokenHandler(oauth, baseUrl));
 
   // In proxy mode, add /register endpoint that returns the configured clientId
   // This allows MCP clients to "register" even though the client is pre-registered
   if (proxyMode) {
     const proxy = oauth as OAuthProxy;
+
+    // Brokered upstream callback. This is a top-level browser navigation
+    // (no CORS needed) — register `<baseUrl>/oauth/callback` as the only
+    // redirect URI on the upstream provider.
+    app.get("/oauth/callback", createCallbackHandler());
 
     app.use(
       "/register",
