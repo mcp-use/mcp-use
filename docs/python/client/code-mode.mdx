@@ -9,7 +9,17 @@ tag: "New"
 Code Mode enables AI agents to interact with MCP tools through code execution instead of direct tool calls. Based on research from [Anthropic](https://www.anthropic.com/engineering/code-execution-with-mcp) and [Cloudflare](https://blog.cloudflare.com/code-mode/), this approach reduces context consumption by up to **98.7%** for complex workflows.
 </Card>
 
+<Warning>
+**Code Mode executes agent-generated code.** By default that code runs **in-process**
+for speed. In-process execution is **not a security boundary**: restricting Python's
+namespace cannot contain hostile code (introspection can reach arbitrary objects), so a
+prompt-injected agent could run anything the host process can.
 
+- **Trusted code only** (local dev, your own prompts, CI): the default in-process
+  executor is fine. It applies best-effort hardening, not isolation.
+- **Untrusted or production input**: isolate execution. Pass a custom `code_executor`
+  (see [Security](#security)) so code runs in a real sandbox (e.g. an E2B cloud sandbox).
+</Warning>
 
 ## Quick Start
 
@@ -230,18 +240,85 @@ return {"renamed": len(file_list), "total_files": len(lines)}
   By writing code instead of chaining tool calls, the agent processed the file list locally and only returned the summary. This avoided passing the raw directory listing (and each rename confirmation) through the LLM context.
 </Info>
 
+## Security
+
+Code Mode runs agent-generated Python. **Where that code runs is a security decision.**
+
+### The default executor is not a sandbox
+
+With `code_mode=True`, code runs in-process via the `VMCodeExecutor`, which uses `exec`.
+This is **not a security boundary** and is only appropriate for trusted code. Restricting
+the namespace does not stop a determined payload: chains like
+`().__class__.__base__.__subclasses__()` reach arbitrary objects and can rebuild
+`__import__`. This is a known limitation of in-process execution, not a bug.
+
+As defense-in-depth (risk reduction, not a guarantee) the in-process executor:
+
+- rejects `import`, dunder attribute access (`__class__`, `__subclasses__`, ...), denied
+  names, and dunder string literals **before** running the code, and
+- withholds introspection builtins such as `getattr` and `type` from the namespace.
+
+These make accidental and low-effort escapes harder. They do not make in-process
+execution safe for untrusted input.
+
+### Running untrusted code
+
+For untrusted or production input, isolate execution with your own executor via the
+`code_executor` parameter:
+
+```python
+from mcp_use import MCPClient
+from mcp_use.client.executors import BaseCodeExecutor
+
+class MySandboxExecutor(BaseCodeExecutor):
+    async def execute(self, code: str, timeout: float = 30.0):
+        # Run `code` in a real sandbox (container, microVM, E2B, ...),
+        # proxying MCP tool calls back to the host.
+        ...
+        return {"result": ..., "logs": [], "error": None, "execution_time": 0.0}
+
+client = MCPClient(config="config.json", code_mode=True, code_executor=MySandboxExecutor)
+```
+
+`code_executor` accepts:
+
+- `None` or `"vm"` (default) — the in-process `VMCodeExecutor` (trusted code only)
+- a `BaseCodeExecutor` subclass — instantiated with the client (as shown above)
+- a `BaseCodeExecutor` instance — your own pre-built sandboxed backend
+- a `(code, timeout)` callable — returns an execution-result dict. Custom executors
+  own timeout enforcement (the built-in VM executor honors `timeout`).
+
+<Warning>
+Isolating the *interpreter* is only half the job. A sandboxed executor still proxies MCP
+tool calls back to the host, so a prompt-injected script can invoke any tool the client is
+connected to (a confused-deputy risk). Scope tool access to what the workload actually
+needs in addition to sandboxing the code.
+</Warning>
+
+<Note>
+This executor seam mirrors the TypeScript SDK, which ships both a VM executor and an E2B
+cloud-sandbox executor. A built-in E2B executor for Python is planned; until then,
+implement `BaseCodeExecutor` to plug in the sandbox of your choice.
+</Note>
+
 ## API Reference
 
 ### MCPClient
 
-#### `__init__(code_mode=True)`
+#### `__init__(code_mode=True, code_executor=None)`
 
 ```python
 client = MCPClient(
     config="config.json",
-    code_mode=True  # Enable code execution mode
+    code_mode=True,        # Enable code execution mode
+    code_executor=None,    # None/"vm" (default, in-process), a BaseCodeExecutor, or a callable
 )
 ```
+
+<Warning>
+The default `code_executor` runs code in-process and is not a security boundary. For
+untrusted input, pass a sandboxed `code_executor`. See [Security](#security).
+</Warning>
 
 #### `execute_code(code: str, timeout: float = 30.0)`
 
@@ -287,7 +364,9 @@ Search available tools across all servers.
 # Exceptions: Exception, ValueError, TypeError, etc.
 ```
 
-**Restricted:** `import`, `open`, `eval`, file I/O
+**Blocked (defense-in-depth, not a sandbox):** `import`, `open`, `eval`/`exec`, dunder
+attribute access (`__class__`, ...), and introspection builtins like `getattr`/`type`. This
+hardens the in-process executor but does not isolate it. See [Security](#security).
 
 ## Performance
 
