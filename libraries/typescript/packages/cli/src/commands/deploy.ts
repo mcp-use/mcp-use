@@ -577,12 +577,7 @@ async function checkRepoAccess(
   owner: string,
   repo: string
 ): Promise<boolean> {
-  try {
-    const resp = await api.getGitHubRepos(true);
-    return resp.repos.some((r) => r.full_name === `${owner}/${repo}`);
-  } catch {
-    return false;
-  }
+  return api.checkGitHubRepoAccess(owner, repo);
 }
 
 async function promptGitHubInstallation(
