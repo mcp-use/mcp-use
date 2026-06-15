@@ -15,6 +15,7 @@ import {
 import type {
   CallToolResponse,
   DisplayMode,
+  HostContext,
   MessageContentBlock,
   SafeArea,
   Theme,
@@ -118,7 +119,8 @@ export function useWidget<
     string,
     unknown
   > | null>(null);
-  const [mcpAppsHostContext, setMcpAppsHostContext] = useState<any>(null);
+  const [mcpAppsHostContext, setMcpAppsHostContext] =
+    useState<HostContext | null>(null);
   const [mcpAppsHostInfo, setMcpAppsHostInfo] = useState<{
     name: string;
     version: string;
@@ -562,6 +564,7 @@ export function useWidget<
     // Host identity (MCP Apps only)
     hostInfo: mcpAppsHostInfo ?? undefined,
     hostCapabilities: mcpAppsHostCapabilities ?? undefined,
+    hostContext: mcpAppsHostContext ?? undefined,
   } as UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>;
 }
 

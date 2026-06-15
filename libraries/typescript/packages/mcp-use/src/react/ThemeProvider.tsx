@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
+import { applyHostStyleVariables } from "./host-styles.js";
 import { useWidget } from "./useWidget.js";
 
 /**
@@ -17,7 +18,7 @@ export const ThemeProvider: React.FC<{
   children: React.ReactNode;
   colorScheme?: boolean;
 }> = ({ children, colorScheme = false }) => {
-  const { theme, isAvailable } = useWidget();
+  const { theme, isAvailable, hostContext, hostInfo } = useWidget();
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
       if (typeof window === "undefined") return "light";
@@ -71,6 +72,13 @@ export const ThemeProvider: React.FC<{
       root.style.colorScheme = "";
     }
   }, [effectiveTheme, colorScheme]);
+
+  useLayoutEffect(() => {
+    applyHostStyleVariables(hostContext, {
+      source: "ThemeProvider",
+      hostName: hostInfo?.name,
+    });
+  }, [hostContext, hostInfo?.name]);
 
   return <>{children}</>;
 };
