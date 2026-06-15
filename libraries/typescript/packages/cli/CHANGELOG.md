@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.4
+
+### Patch Changes
+
+- 72efb63: Fix `mcp-use deploy` falsely reporting that the GitHub App cannot access a repository. The pre-flight repo-access check no longer lists/paginates an installation's repos (which only inspected the first page, so repos on later pages were missed, and fully paginating hung on very large orgs). It now asks the backend an authoritative per-installation question (a single GitHub `repos.get`), trying the installation whose account matches the repo owner first and falling back to the others. Requires the backend `GET /github/installations/:installationId/repos/:owner/:repo/access` endpoint.
+  - mcp-use@1.32.1-canary.4
+  - @mcp-use/inspector@10.0.1-canary.4
+
 ## 3.5.2-canary.3
 
 ### Patch Changes

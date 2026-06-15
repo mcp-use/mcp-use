@@ -9,6 +9,7 @@
   },
   "changesets": [
     "cli-sensitive-env-vars",
+    "deploy-repo-access-targeted-check",
     "fix-oauth-well-known-canonical-paths",
     "inspector-localhost-chat-fallback",
     "server-notification-logging"
