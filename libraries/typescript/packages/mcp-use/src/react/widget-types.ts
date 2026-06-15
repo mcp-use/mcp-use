@@ -61,6 +61,34 @@ export type UserAgent = {
   };
 };
 
+export interface HostContext {
+  theme?: Theme;
+  displayMode?: DisplayMode;
+  availableDisplayModes?: DisplayMode[];
+  containerDimensions?: {
+    width?: number;
+    height?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+  };
+  locale?: string;
+  timeZone?: string;
+  platform?: "web" | "desktop" | "mobile";
+  userAgent?: string;
+  deviceCapabilities?: {
+    touch?: boolean;
+    hover?: boolean;
+  };
+  safeAreaInsets?: SafeAreaInsets;
+  styles?: {
+    variables?: Record<string, string>;
+    css?: {
+      fonts?: string;
+    };
+  };
+  [key: string]: unknown;
+}
+
 export type CallToolResponse = {
   content: Array<{
     type: string;
@@ -471,6 +499,14 @@ interface UseWidgetResultBase<
    * ```
    */
   hostCapabilities?: Record<string, unknown>;
+
+  /**
+   * Raw host context received through the MCP Apps bridge.
+   *
+   * Includes standardized host style variables at
+   * `hostContext.styles.variables` when provided by the host.
+   */
+  hostContext?: HostContext;
 }
 
 /**

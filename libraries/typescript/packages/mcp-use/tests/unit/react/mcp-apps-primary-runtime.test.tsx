@@ -112,6 +112,13 @@ beforeEach(() => {
     containerDimensions: { maxHeight: 444, maxWidth: 333 },
     safeAreaInsets: { top: 1, right: 2, bottom: 3, left: 4 },
     deviceCapabilities: { hover: false, touch: true },
+    styles: {
+      variables: {
+        "--color-background-primary": "transparent",
+        "--color-background-secondary": "rgb(12 13 14)",
+        "--color-text-primary": "rgb(250 250 250)",
+      },
+    },
   });
   bridge.getPartialToolInput.mockReturnValue(null);
   bridge.getHostInfo.mockReturnValue({ name: "chatgpt", version: "1.0.0" });
@@ -138,6 +145,7 @@ afterEach(() => {
   delete (window as any).openai;
   vi.unstubAllGlobals();
   vi.useRealTimers();
+  document.documentElement.removeAttribute("style");
 });
 
 describe("MCP Apps primary widget runtime", () => {
@@ -246,5 +254,27 @@ describe("MCP Apps primary widget runtime", () => {
 
     expect(bridge.sendSizeChanged).toHaveBeenCalledWith({ height: 260 });
     expect(window.openai?.notifyIntrinsicHeight).not.toHaveBeenCalled();
+  });
+
+  it("applies host context CSS variables through McpUseProvider", async () => {
+    await act(async () => {
+      create(
+        <McpUseProvider>
+          <div>content</div>
+        </McpUseProvider>
+      );
+      await flushMicrotasks();
+    });
+
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--color-background-secondary"
+      )
+    ).toBe("rgb(12 13 14)");
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--color-background-primary"
+      )
+    ).toBe("transparent");
   });
 });
