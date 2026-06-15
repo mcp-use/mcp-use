@@ -2,8 +2,6 @@
  * Type definitions for the window.openai extension API.
  */
 
-/* global CustomEvent */
-
 export type UnknownObject = Record<string, unknown>;
 
 /**
@@ -152,25 +150,12 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
   getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
 }
 
-// Event types
-export const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
-
-export class SetGlobalsEvent extends CustomEvent<{
-  globals: Partial<OpenAiGlobals>;
-}> {
-  readonly type = SET_GLOBALS_EVENT_TYPE;
-}
-
 declare global {
   interface Window {
     openai?: API<any> & OpenAiGlobals<any, any, any, any>;
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
-  }
-
-  interface WindowEventMap {
-    [SET_GLOBALS_EVENT_TYPE]: SetGlobalsEvent;
   }
 }
 
