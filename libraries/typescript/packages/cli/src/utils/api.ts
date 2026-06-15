@@ -254,25 +254,6 @@ export interface GitHubConnectionStatus {
   installations?: GitHubInstallation[];
 }
 
-interface GitHubRepo {
-  id: number;
-  name: string;
-  full_name: string;
-  private: boolean;
-  owner: {
-    login: string;
-  };
-}
-
-interface GitHubReposResponse {
-  user: {
-    login: string;
-    id: number;
-    avatar_url: string;
-  };
-  repos: GitHubRepo[];
-}
-
 // ── Env Variables ───────────────────────────────────────────────────
 
 export type EnvEnvironment = "production" | "preview" | "development";
@@ -737,62 +718,58 @@ export class McpUseAPI {
     };
   }
 
-  async getGitHubRepos(_refresh?: boolean): Promise<GitHubReposResponse> {
-    const orgId = await this.resolveOrganizationId();
-    const installResp = await this.request<{
-      installations: Array<{
-        id: string;
-        installationId: string;
-        account: {
-          login: string;
-          avatar_url: string | null;
-          type: string;
-        } | null;
-      }>;
-    }>(`/github/installations?organizationId=${orgId}`);
+  /**
+   * Returns true if the GitHub App can access `${owner}/${repo}` via any of the
+   * organization's installations.
+   *
+   * An organization can have multiple GitHub installations (e.g. a personal
+   * account and one or more GitHub orgs), so we check across all of them.
+   *
+   * Each check is a single authoritative backend call (`repos.get` with the
+   * installation token) rather than listing repos. The old listing approach
+   * only returned the first page — so a repo on a later page was wrongly
+   * reported inaccessible — and fully paginating it hung on very large orgs.
+   * We try the installation whose account matches the repo owner first to
+   * minimize GitHub calls.
+   */
+  async checkGitHubRepoAccess(owner: string, repo: string): Promise<boolean> {
+    const status = await this.getGitHubConnectionStatus();
+    const installations = status.installations ?? [];
+    if (installations.length === 0) return false;
 
-    if (installResp.installations.length === 0) {
-      return { user: { login: "", id: 0, avatar_url: "" }, repos: [] };
+    const ownerLower = owner.toLowerCase();
+    const ordered = [...installations].sort((a, b) => {
+      const aMatch = a.account_login.toLowerCase() === ownerLower ? 0 : 1;
+      const bMatch = b.account_login.toLowerCase() === ownerLower ? 0 : 1;
+      return aMatch - bMatch;
+    });
+
+    for (const installation of ordered) {
+      const hasAccess = await this.installationCanAccessRepo(
+        installation.installation_id,
+        owner,
+        repo
+      );
+      if (hasAccess) return true;
     }
+    return false;
+  }
 
-    // An organization can have multiple GitHub installations (e.g. a user
-    // account and one or more GitHub orgs). Aggregate repos across all of
-    // them instead of only the first, otherwise repos owned by any other
-    // installation are reported as inaccessible.
-    const inst = installResp.installations[0];
-    const repoLists = await Promise.all(
-      installResp.installations.map(async (installation) => {
-        try {
-          const reposResp = await this.request<{
-            repos: Array<{
-              id: number;
-              name: string;
-              fullName: string;
-              private: boolean;
-              ownerAvatarUrl: string | null;
-            }>;
-          }>(`/github/installations/${installation.installationId}/repos`);
-          return reposResp.repos;
-        } catch {
-          return [];
-        }
-      })
-    );
-
-    return {
-      user: {
-        login: inst.account?.login ?? "",
-        id: 0,
-        avatar_url: inst.account?.avatar_url ?? "",
-      },
-      repos: repoLists.flat().map((r) => ({
-        id: r.id,
-        name: r.name,
-        full_name: r.fullName,
-        private: r.private,
-        owner: { login: r.fullName.split("/")[0] ?? "" },
-      })),
-    };
+  private async installationCanAccessRepo(
+    installationId: string,
+    owner: string,
+    repo: string
+  ): Promise<boolean> {
+    try {
+      const resp = await this.request<{ hasAccess: boolean }>(
+        `/github/installations/${installationId}/repos/${encodeURIComponent(
+          owner
+        )}/${encodeURIComponent(repo)}/access`
+      );
+      return resp.hasAccess;
+    } catch {
+      return false;
+    }
   }
 
   async getGitHubAppName(): Promise<string> {
