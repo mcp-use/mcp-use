@@ -31,7 +31,7 @@ interface McpUseProviderProps {
   viewControls?: boolean | "pip" | "fullscreen";
   /**
    * Automatically notify host about container height changes for auto-sizing
-   * Supports both ChatGPT Apps SDK (window.openai) and MCP Apps (postMessage bridge)
+   * Uses MCP Apps `ui/notifications/size-changed`.
    * Uses ResizeObserver to monitor the children container
    * @default false
    */
@@ -62,9 +62,7 @@ interface McpUseProviderProps {
  * @example
  * ```tsx
  * <McpUseProvider debugger viewControls autoSize>
- *   <AppsSDKUIProvider linkComponent={Link}>
- *     <div>My widget content</div>
- *   </AppsSDKUIProvider>
+ *   <div>My widget content</div>
  * </McpUseProvider>
  * ```
  */
@@ -81,42 +79,28 @@ export function McpUseProvider({
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationInProgressRef = useRef<boolean>(false);
 
-  // Notify host about height changes (dual-protocol support)
+  // Notify host about height changes via MCP Apps.
   const notifyHeight = useCallback((height: number) => {
     if (typeof window === "undefined") return;
 
     notificationInProgressRef.current = true;
 
-    // Try ChatGPT Apps SDK first
-    if (window.openai?.notifyIntrinsicHeight) {
-      window.openai
-        .notifyIntrinsicHeight(height)
-        .then(() => {
-          notificationInProgressRef.current = false;
-        })
-        .catch((error) => {
-          notificationInProgressRef.current = false;
-          console.error(
-            "[McpUseProvider] Failed to notify intrinsic height (ChatGPT):",
-            error
-          );
-        });
+    if (window === window.parent) {
+      notificationInProgressRef.current = false;
       return;
     }
 
-    // Fall back to MCP Apps bridge
-    // Always try to send - the bridge will handle if not connected yet
     try {
       const bridge = getMcpAppsBridge();
       bridge.sendSizeChanged({ height });
       console.log("[McpUseProvider] Sent size-changed notification:", height);
-      notificationInProgressRef.current = false;
     } catch (error) {
-      notificationInProgressRef.current = false;
       console.error(
         "[McpUseProvider] Failed to notify size change (MCP Apps):",
         error
       );
+    } finally {
+      notificationInProgressRef.current = false;
     }
   }, []);
 
