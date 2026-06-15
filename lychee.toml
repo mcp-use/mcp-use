@@ -21,6 +21,10 @@ exclude = [
   
   # Lychee GitHub repository - self-reference
   "^https://github\\.com/lycheeverse/lychee",
+
+  # Langfuse Cloud API endpoints - 403s from bot protection in CI, valid defaults
+  "^https://(us\\.|jp\\.|hipaa\\.)?cloud\\.langfuse\\.com",
+  "cloud\\.langfuse\\.com",
   
   # Example/template URLs
   "^https://github\\.com/your-org/",
