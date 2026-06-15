@@ -295,6 +295,52 @@ test.describe("Inspector Chat Tests", () => {
     expect(clipboardText).toContain("What is 2+2?");
   });
 
+  test("should show scroll-to-bottom button when not at bottom", async ({
+    page,
+  }) => {
+    // Create enough content to overflow the messages container.
+    // Keep this short enough to avoid timeouts, but long enough to force scrolling.
+    for (let i = 0; i < 6; i++) {
+      await page
+        .getByTestId("chat-input")
+        .fill(`Write a short list of 10 items. Iteration ${i + 1}.`);
+      await page.getByTestId("chat-send-button").click();
+      await expect(page.getByTestId("chat-message-user")).toBeVisible({
+        timeout: 3000,
+      });
+      await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
+        timeout: 45000,
+      });
+    }
+
+    const container = page.getByTestId("chat-messages-scroll-container");
+    await expect(container).toBeVisible();
+
+    // Scroll away from the bottom.
+    await container.evaluate((el) => {
+      el.scrollTop = 0;
+    });
+
+    // Button should appear when not near the bottom.
+    const scrollButton = page.getByTestId("chat-scroll-to-bottom");
+    await expect(scrollButton).toBeVisible({ timeout: 3000 });
+
+    // Click button and ensure we end up at the bottom.
+    await scrollButton.click();
+
+    await container.evaluate((el) => {
+      const distanceFromBottom =
+        el.scrollHeight - (el.scrollTop + el.clientHeight);
+      if (distanceFromBottom > 80) {
+        throw new Error(
+          `Expected to be near bottom, distance=${distanceFromBottom}`
+        );
+      }
+    });
+
+    await expect(scrollButton).not.toBeVisible({ timeout: 3000 });
+  });
+
   test("should export chat as JSON when export JSON is clicked", async ({
     page,
     context,
