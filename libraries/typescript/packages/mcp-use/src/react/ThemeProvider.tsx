@@ -5,7 +5,7 @@ import { useWidget } from "./useWidget.js";
  * ThemeProvider that manages dark mode class on document root
  *
  * Priority:
- * 1. useWidget theme (from OpenAI Apps SDK)
+ * 1. useWidget theme (from host context)
  * 2. System preference (prefers-color-scheme: dark)
  *
  * Sets the "dark" class and data-theme attribute on document.documentElement.
@@ -45,7 +45,7 @@ export const ThemeProvider: React.FC<{
 
   // Apply theme synchronously before browser paint to prevent flash
   // Sets CSS class (for Tailwind dark mode) and data-theme attribute
-  // (for OpenAI Apps SDK UI design tokens).
+  // (for UI design tokens).
   useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
@@ -55,7 +55,7 @@ export const ThemeProvider: React.FC<{
     root.classList.remove("light", "dark");
     root.classList.add(effectiveTheme === "dark" ? "dark" : "light");
 
-    // Set data-theme attribute (OpenAI Apps SDK UI design tokens)
+    // Set data-theme attribute (UI design tokens)
     root.setAttribute(
       "data-theme",
       effectiveTheme === "dark" ? "dark" : "light"
