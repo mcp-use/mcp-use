@@ -798,6 +798,17 @@ async function subscribeResourceCommand(
 
     console.log(formatInfo("Listening for updates... (Press Ctrl+C to stop)"));
 
+    // Handle Ctrl+C (SIGINT) to unsubscribe cleanly
+    process.once("SIGINT", async () => {
+      console.log(formatInfo("\nUnsubscribing and shutting down..."));
+      try {
+        await session.unsubscribeFromResource(uri);
+      } catch (e) {
+        // ignore errors during shutdown
+      }
+      await cleanupAndExit(0);
+    });
+
     await new Promise(() => {});
   } catch (error: any) {
     console.error(
