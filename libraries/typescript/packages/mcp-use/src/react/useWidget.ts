@@ -4,13 +4,7 @@
  * available for extension APIs.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getMcpAppsBridge } from "./mcp-apps-bridge.js";
 import { WIDGET_DEFAULTS } from "./constants.js";
 import { normalizeCallToolResponse } from "./widget-utils.js";
@@ -136,22 +130,19 @@ export function useWidget<
 
   const latestModelContextDescriptionRef = useRef<string | null>(null);
 
-  const pushModelContextToMcpApps = useCallback(
-    (description: string): void => {
-      const bridge = getMcpAppsBridge();
-      if (!bridge.isConnected()) return;
+  const pushModelContextToMcpApps = useCallback((description: string): void => {
+    const bridge = getMcpAppsBridge();
+    if (!bridge.isConnected()) return;
 
-      bridge
-        .updateModelContext({
-          structuredContent: { [MODEL_CONTEXT_KEY]: description },
-          content: [{ type: "text", text: description }],
-        })
-        .catch((err: unknown) => {
-          console.warn("[ModelContext] Failed to update model context:", err);
-        });
-    },
-    []
-  );
+    bridge
+      .updateModelContext({
+        structuredContent: { [MODEL_CONTEXT_KEY]: description },
+        content: [{ type: "text", text: description }],
+      })
+      .catch((err: unknown) => {
+        console.warn("[ModelContext] Failed to update model context:", err);
+      });
+  }, []);
 
   // Initialize MCP Apps bridge for hosted widget iframes. ChatGPT may also
   // expose window.openai, but MCP Apps remains the base protocol.
@@ -421,15 +412,12 @@ export function useWidget<
     []
   );
 
-  const openExternal = useCallback(
-    (href: string): void => {
-      const bridge = getMcpAppsBridge();
-      bridge.openLink(href).catch((error) => {
-        console.error("Failed to open link:", error);
-      });
-    },
-    []
-  );
+  const openExternal = useCallback((href: string): void => {
+    const bridge = getMcpAppsBridge();
+    bridge.openLink(href).catch((error) => {
+      console.error("Failed to open link:", error);
+    });
+  }, []);
 
   const requestDisplayMode = useCallback(
     async (mode: DisplayMode): Promise<{ mode: DisplayMode }> => {
@@ -498,12 +486,7 @@ export function useWidget<
       return toolOutput === null || toolOutput === undefined;
     }
     return false;
-  }, [
-    provider,
-    mcpAppsToolOutput,
-    toolOutput,
-    urlParams.toolId,
-  ]);
+  }, [provider, mcpAppsToolOutput, toolOutput, urlParams.toolId]);
 
   // Partial/streaming tool input (available during LLM argument generation)
   const partialToolInput = useMemo(() => {

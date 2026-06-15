@@ -36,9 +36,7 @@ vi.mock("../../../src/react/mcp-apps-bridge.js", () => ({
 
 const { useWidget } = await import("../../../src/react/useWidget.js");
 const { useCallTool } = await import("../../../src/react/useCallTool.js");
-const { McpUseProvider } = await import(
-  "../../../src/react/McpUseProvider.js"
-);
+const { McpUseProvider } = await import("../../../src/react/McpUseProvider.js");
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -178,7 +176,7 @@ describe("MCP Apps primary widget runtime", () => {
     expect(window.openai?.callTool).not.toHaveBeenCalled();
     expect(bridge.updateModelContext).toHaveBeenCalledWith({
       structuredContent: { selected: "mcp" },
-      content: [{ type: "text", text: "{\"selected\":\"mcp\"}" }],
+      content: [{ type: "text", text: '{"selected":"mcp"}' }],
     });
     expect(window.openai?.setWidgetState).not.toHaveBeenCalled();
   });
@@ -234,12 +232,15 @@ describe("MCP Apps primary widget runtime", () => {
     });
 
     await act(async () => {
-      resizeCallback?.([
-        {
-          contentRect: { height: 240 },
-          target: { scrollHeight: 260 },
-        },
-      ] as ResizeObserverEntry[], {} as ResizeObserver);
+      resizeCallback?.(
+        [
+          {
+            contentRect: { height: 240 },
+            target: { scrollHeight: 260 },
+          },
+        ] as ResizeObserverEntry[],
+        {} as ResizeObserver
+      );
       vi.advanceTimersByTime(150);
     });
 
