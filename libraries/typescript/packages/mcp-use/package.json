@@ -241,7 +241,7 @@
     "@types/morgan": "^1.9.10",
     "@vitest/coverage-v8": "~4.1.0",
     "ai": ">=5.0.52",
-    "esbuild": "0.27.1",
+    "esbuild": "0.28.1",
     "eslint": "^9.39.2",
     "express-rate-limit": ">=8.2.2",
     "husky": "^9.1.7",
