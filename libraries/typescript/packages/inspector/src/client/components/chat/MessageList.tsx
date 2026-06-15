@@ -1,7 +1,15 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { Button } from "@/client/components/ui/button";
 import { ArrowDown } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import type { MessageContentBlock } from "mcp-use/react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
@@ -56,7 +64,7 @@ interface MessageListProps {
   /** Handler called when the user cancels an elicitation. */
   onRejectElicitation?: (requestId: string, error?: string) => void;
   /** Scroll container element (the overflow-y parent). Enables scroll-to-bottom UX. */
-  scrollContainerRef?: React.RefObject<HTMLElement | null>;
+  scrollContainerRef?: RefObject<HTMLElement | null>;
 }
 
 export const MessageList = memo(
@@ -83,7 +91,8 @@ export const MessageList = memo(
     const measureIsNearBottom = useCallback(() => {
       const el = scrollContainerRef?.current;
       if (!el) return;
-      const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+      const distanceFromBottom =
+        el.scrollHeight - (el.scrollTop + el.clientHeight);
       setIsNearBottom(distanceFromBottom <= bottomThresholdPx);
     }, [scrollContainerRef]);
 
@@ -94,6 +103,7 @@ export const MessageList = memo(
 
         el.scrollTo({ top: el.scrollHeight, behavior });
         messagesEndRef.current?.scrollIntoView({ behavior, block: "start" });
+        setIsNearBottom(true);
       },
       [scrollContainerRef]
     );
@@ -207,26 +217,6 @@ export const MessageList = memo(
       const lastMessage = messages[messages.length - 1];
       return message.id === lastMessage.id && lastMessage.role === "assistant";
     };
-
-    const scrollButtonNode = useMemo(() => {
-      if (!showScrollToBottom) return null;
-
-      return (
-        <div className="sticky bottom-4 flex justify-end pointer-events-none">
-          <Button
-            type="button"
-            variant="secondary"
-            className="pointer-events-auto h-9 w-9 rounded-full p-0 shadow-md"
-            onClick={() => scrollToBottom("smooth")}
-            aria-label="Scroll to bottom"
-            title="Scroll to bottom"
-            data-testid="chat-scroll-to-bottom"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </Button>
-        </div>
-      );
-    }, [scrollToBottom, showScrollToBottom]);
 
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
@@ -425,7 +415,31 @@ export const MessageList = memo(
         {/* Reference for scrolling to bottom */}
         <div ref={messagesEndRef} />
 
-        {scrollButtonNode}
+        <div className="sticky bottom-4 z-20 h-0 -translate-y-4 pointer-events-none">
+          <AnimatePresence>
+            {showScrollToBottom && (
+              <motion.div
+                className="flex justify-center"
+                initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+              >
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="pointer-events-auto size-9 rounded-full border bg-background/95 p-0 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80"
+                  onClick={() => scrollToBottom("smooth")}
+                  aria-label="Scroll to bottom"
+                  title="Scroll to bottom"
+                  data-testid="chat-scroll-to-bottom"
+                >
+                  <ArrowDown className="size-4" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     );
   }

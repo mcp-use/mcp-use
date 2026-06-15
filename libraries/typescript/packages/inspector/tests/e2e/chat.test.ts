@@ -318,9 +318,12 @@ test.describe("Inspector Chat Tests", () => {
     await scrollButton.click();
 
     await container.evaluate((el) => {
-      const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+      const distanceFromBottom =
+        el.scrollHeight - (el.scrollTop + el.clientHeight);
       if (distanceFromBottom > 80) {
-        throw new Error(`Expected to be near bottom, distance=${distanceFromBottom}`);
+        throw new Error(
+          `Expected to be near bottom, distance=${distanceFromBottom}`
+        );
       }
     });
 
