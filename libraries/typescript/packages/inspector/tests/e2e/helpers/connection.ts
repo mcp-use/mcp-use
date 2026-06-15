@@ -183,6 +183,20 @@ export async function enableHostedChatMode(
     await route.fulfill({ status: 502, body: "Bad Gateway" });
   });
 
+  // Setting chatApiUrl also mounts HostedUserMenu, which fetches
+  // `<cloud origin>/api/auth/get-session`. Stub it with an unauthenticated
+  // session so the tests never reach the real cloud backend (CI flakiness/slow).
+  await page.route(
+    `${new URL(cloudChatUrl).origin}/api/auth/get-session**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "null",
+      });
+    }
+  );
+
   return { calls };
 }
 
