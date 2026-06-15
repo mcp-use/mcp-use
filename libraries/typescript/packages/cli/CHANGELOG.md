@@ -1,5 +1,14 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.5
+
+### Patch Changes
+
+- 1a16878: Updated dependency `esbuild` to `0.28.1`.
+- Updated dependencies [1a16878]
+  - mcp-use@1.32.1-canary.5
+  - @mcp-use/inspector@10.0.1-canary.5
+
 ## 3.5.2-canary.4
 
 ### Patch Changes
