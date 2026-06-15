@@ -383,7 +383,8 @@ test.describe("Inspector Chat Tests", () => {
 test.describe("Inspector Chat Tests - hosted mode + localhost server", () => {
   // The conformance server runs on localhost across every matrix config, so the
   // loopback fallback should always engage here.
-  const CLOUD_CHAT_URL = "https://cloud.manufact.com/api/v1/inspector/chat/stream";
+  const CLOUD_CHAT_URL =
+    "https://cloud.manufact.com/api/v1/inspector/chat/stream";
 
   let cloudCalls: string[];
 

@@ -171,8 +171,9 @@ export async function enableHostedChatMode(
   cloudChatUrl: string
 ): Promise<{ calls: string[] }> {
   await page.addInitScript((url) => {
-    (window as unknown as { __MANUFACT_CHAT_URL__?: string }).__MANUFACT_CHAT_URL__ =
-      url;
+    (
+      window as unknown as { __MANUFACT_CHAT_URL__?: string }
+    ).__MANUFACT_CHAT_URL__ = url;
   }, cloudChatUrl);
 
   // Record + short-circuit any call to the cloud endpoint so the test never
