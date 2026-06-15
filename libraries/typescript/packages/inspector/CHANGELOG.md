@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 10.0.1-canary.3
+
+### Patch Changes
+
+- 2038e04: Fix chat for localhost MCP servers in the hosted inspector (MCP-2419). When the inspector runs in hosted mode the Chat tab streams through the managed cloud backend, which connects to the MCP server from the server side and cannot reach a user's `localhost` server — the request returns a 502 that surfaces in the browser as an opaque CORS / "Failed to fetch" error. Loopback server URLs now fall back to client-side (in-browser) chat streaming, and the configure-key empty state explains why the managed key is unavailable and that a personal API key is needed. The notice only appears in hosted mode; the local inspector is unchanged.
+  - mcp-use@1.32.1-canary.3
+
 ## 10.0.1-canary.2
 
 ### Patch Changes
