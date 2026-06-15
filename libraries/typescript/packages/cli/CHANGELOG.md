@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.8
+
+### Patch Changes
+
+- afe0806: Cleanly unsubscribe from resource subscriptions when stopping the CLI with Ctrl+C.
+  - mcp-use@1.32.1-canary.8
+  - @mcp-use/inspector@10.0.1-canary.8
+
 ## 3.5.2-canary.7
 
 ### Patch Changes

@@ -8,6 +8,7 @@
     "mcp-use": "1.32.0"
   },
   "changesets": [
+    "clean-cli-subscribe-sigint",
     "cli-sensitive-env-vars",
     "dependabot-f7c29352",
     "deploy-repo-access-targeted-check",
