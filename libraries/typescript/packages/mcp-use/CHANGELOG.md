@@ -1,5 +1,16 @@
 # mcp-use
 
+## 1.32.1-canary.6
+
+### Patch Changes
+
+- 6e7e9bf: Silence dev-mode widget startup logs when a project has no widgets. An empty or
+  absent `resources/` directory no longer prints the `[WIDGETS]` mounting/serving/
+  watching messages. The Vite watcher still starts so widgets created later (e.g.
+  Mango/E2B sandboxes) are picked up and logged when they appear.
+  - @mcp-use/cli@3.5.2-canary.6
+  - @mcp-use/inspector@10.0.1-canary.6
+
 ## 1.32.1-canary.5
 
 ### Patch Changes
