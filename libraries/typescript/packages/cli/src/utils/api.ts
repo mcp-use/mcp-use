@@ -62,6 +62,8 @@ interface CreateServerBody {
   port?: number;
   buildCommand?: string;
   startCommand?: string;
+  /** Path to a non-default Dockerfile, relative to rootDir (or repo root). */
+  dockerfilePath?: string;
   env?: Record<string, string>;
   description?: string;
   tags?: string[];
