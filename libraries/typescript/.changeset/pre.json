@@ -8,6 +8,7 @@
     "mcp-use": "1.32.1"
   },
   "changesets": [
+    "codex-skills-folder",
     "hono-4-12-25"
   ]
 }

@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.3-canary.1
+
+### Patch Changes
+
+- d962eab: Fix Codex skills installation to use `.agents/skills` instead of the unsupported `.agent/skills` path.
+  - mcp-use@1.32.2-canary.1
+  - @mcp-use/inspector@10.0.2-canary.1
+
 ## 3.5.3-canary.0
 
 ### Patch Changes
