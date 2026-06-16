@@ -140,11 +140,11 @@ export function useWidget<
     const currentState =
       (latestWidgetStateRef.current as Record<string, unknown> | null) ?? {};
     const description = latestModelContextDescriptionRef.current;
-    const hasDescription = description !== null && description.trim().length > 0;
-    const structuredContent =
-      hasDescription
-        ? { ...currentState, [MODEL_CONTEXT_KEY]: description }
-        : currentState;
+    const hasDescription =
+      description !== null && description.trim().length > 0;
+    const structuredContent = hasDescription
+      ? { ...currentState, [MODEL_CONTEXT_KEY]: description }
+      : currentState;
     const visibleState = Object.fromEntries(
       Object.entries(currentState).filter(([key]) => key !== MODEL_CONTEXT_KEY)
     );

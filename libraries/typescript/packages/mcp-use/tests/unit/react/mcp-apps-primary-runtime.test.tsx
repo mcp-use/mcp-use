@@ -37,9 +37,8 @@ vi.mock("../../../src/react/mcp-apps-bridge.js", () => ({
 const { useWidget } = await import("../../../src/react/useWidget.js");
 const { useCallTool } = await import("../../../src/react/useCallTool.js");
 const { McpUseProvider } = await import("../../../src/react/McpUseProvider.js");
-const { ModelContext, _resetModelContextForTesting } = await import(
-  "../../../src/react/model-context.js"
-);
+const { ModelContext, _resetModelContextForTesting } =
+  await import("../../../src/react/model-context.js");
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
