@@ -81,7 +81,7 @@ export interface HostContext {
   };
   safeAreaInsets?: SafeAreaInsets;
   styles?: {
-    variables?: Record<string, string>;
+    variables?: Record<string, string | undefined>;
     css?: {
       fonts?: string;
     };
