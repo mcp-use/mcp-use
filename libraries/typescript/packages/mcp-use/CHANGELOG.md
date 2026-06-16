@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.32.2-canary.4
+
+### Patch Changes
+
+- b9324be: Use the MCP Apps bridge as the primary widget runtime even when `window.openai` is present, while keeping OpenAI extension APIs such as file upload and download available through `useFiles`.
+  - @mcp-use/cli@3.5.3-canary.4
+  - @mcp-use/inspector@10.0.2-canary.4
+
 ## 1.32.2-canary.3
 
 ### Patch Changes
