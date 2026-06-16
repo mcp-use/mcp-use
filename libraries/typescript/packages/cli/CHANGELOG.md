@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.13
+
+### Patch Changes
+
+- ab4fcd2: Allow updating CLI environment variable values to an empty string.
+  - mcp-use@1.32.1-canary.13
+  - @mcp-use/inspector@10.0.1-canary.13
+
 ## 3.5.2-canary.12
 
 ### Patch Changes
