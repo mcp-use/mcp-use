@@ -124,5 +124,29 @@ describe("next-shims-noop (CJS)", () => {
       expect(ua.isBot).toBe(false);
       expect(ua.ua).toBe("");
     });
+
+    it("after() runs the callback asynchronously", async () => {
+      let ran = false;
+      noop.after(() => {
+        ran = true;
+      });
+      expect(ran).toBe(false);
+      await Promise.resolve();
+      expect(ran).toBe(true);
+    });
+
+    it("after() swallows callback errors instead of throwing", async () => {
+      expect(() =>
+        noop.after(() => {
+          throw new Error("boom");
+        })
+      ).not.toThrow();
+      // A rejected callback must not produce an unhandled rejection.
+      await Promise.resolve();
+    });
+
+    it("after() ignores non-function arguments", () => {
+      expect(() => noop.after(undefined)).not.toThrow();
+    });
   });
 });

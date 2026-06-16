@@ -117,6 +117,11 @@ function userAgent() {
     isBot: false,
   };
 }
+function after(callback) {
+  if (typeof callback === "function") {
+    Promise.resolve().then(callback).catch(() => {});
+  }
+}
 
 // --- export surface --------------------------------------------------------
 // `server-only` / `client-only` exports nothing; the import itself is the
@@ -143,4 +148,5 @@ module.exports = {
   NextResponse,
   NextRequest,
   userAgent,
+  after,
 };

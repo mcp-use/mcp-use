@@ -47,8 +47,6 @@ export async function mountWidgetsProduction(
     "widgets"
   );
 
-  console.log("widgetsDir", widgetsDir);
-
   // Discover built widgets from manifest
   const manifestPath = "./dist/mcp-use.json";
   let widgets: string[] = [];
@@ -123,11 +121,6 @@ export async function mountWidgetsProduction(
     const mcp_connect_domain = serverConfig.serverBaseUrl
       ? new URL(serverConfig.serverBaseUrl || "").origin
       : null;
-
-    console.log("[CSP] mcp_connect_domain", mcp_connect_domain);
-    console.log("[CSP] cspUrls", serverConfig.cspUrls);
-    console.log("[CSP] metadata.appsSdkMetadata", metadata.appsSdkMetadata);
-    console.log("[CSP] metadata._meta", metadata._meta);
 
     // Use the extracted helper to register the widget
     await registerWidgetFromTemplate(

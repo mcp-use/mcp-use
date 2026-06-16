@@ -35,6 +35,11 @@ import {
   registerNextShimsInProcess,
   withNextShimsEnv,
 } from "./utils/next-shims.js";
+import {
+  MCP_DIR_SERVER_OUTPUTS,
+  buildMcpDirServer,
+} from "./utils/mcp-dir-build.js";
+import { NEXT_SERVER_RUNTIME_MODULES } from "./utils/next-server-runtime-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 import { getWidgetAssetBase } from "./utils/widget-paths.js";
 const program = new Command();
@@ -389,6 +394,47 @@ async function resolveEntryFile(
 }
 
 /**
+ * Auto-detect a conventional MCP directory (`src/mcp`, then `mcp`) so
+ * Next.js drop-ins work with bare `mcp-use dev` / `build` / `start`.
+ *
+ * Pure fallback: returns undefined whenever an explicit entry would have
+ * been found anyway (legacy top-level layouts keep their behavior), and
+ * only fires when the conventional directory actually contains an entry
+ * file. Callers must still honor --entry / --mcp-dir first.
+ */
+async function detectMcpDir(
+  projectPath: string
+): Promise<string | undefined> {
+  const legacyEntries = [
+    "index.ts",
+    "src/index.ts",
+    "server.ts",
+    "src/server.ts",
+  ];
+  for (const candidate of legacyEntries) {
+    try {
+      await access(path.join(projectPath, candidate));
+      return undefined;
+    } catch {
+      continue;
+    }
+  }
+
+  const dirEntries = ["index.ts", "index.tsx", "server.ts", "server.tsx"];
+  for (const dir of ["src/mcp", "mcp"]) {
+    for (const entry of dirEntries) {
+      try {
+        await access(path.join(projectPath, dir, entry));
+        return dir;
+      } catch {
+        continue;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
  * Resolve the widgets directory.
  * Priority: --widgets-dir flag > <mcpDir>/resources > "resources".
  */
@@ -412,14 +458,7 @@ function resolveWidgetsDir(cliWidgetsDir?: string, mcpDir?: string): string {
  * stays import-free for the source-mode tests that load it via tsx.
  */
 function makeWidgetServerOnlyGuard(widgetName: string) {
-  const rejected = new Set([
-    "server-only",
-    "client-only",
-    "next/cache",
-    "next/headers",
-    "next/navigation",
-    "next/server",
-  ]);
+  const rejected = new Set<string>(NEXT_SERVER_RUNTIME_MODULES);
   return {
     name: "mcp-use-widget-server-only-guard",
     enforce: "pre" as const,
@@ -1404,8 +1443,16 @@ program
 
       displayPackageVersions(projectPath);
 
-      // Resolve mcpDir for widgets + server entry
-      const mcpDir = options.mcpDir as string | undefined;
+      // Resolve mcpDir for widgets + server entry. When neither --mcp-dir
+      // nor --entry is given, fall back to the src/mcp | mcp convention so
+      // Next.js drop-ins build with a bare `mcp-use build`.
+      let mcpDir = options.mcpDir as string | undefined;
+      if (!mcpDir && !options.entry) {
+        mcpDir = await detectMcpDir(projectPath);
+        if (mcpDir) {
+          console.log(chalk.gray(`Detected MCP directory: ${mcpDir}`));
+        }
+      }
       const widgetsDir = resolveWidgetsDir(options.widgetsDir, mcpDir);
 
       // Build widgets first (this generates schemas)
@@ -1421,13 +1468,14 @@ program
         sourceServerFile = await findServerFile(
           projectPath,
           options.entry,
-          options.mcpDir
+          mcpDir
         );
       } catch (err) {
+        if (mcpDir) {
+          throw err;
+        }
         // No server file found. Widget-only projects hit this on purpose,
-        // but a misconfigured --mcp-dir is a user error worth surfacing so
-        // it doesn't cascade into a manifest without an entryPoint and an
-        // unclear start-time failure.
+        // but legacy widget-only builds can continue without an entry point.
         console.log(
           chalk.yellow(
             `⚠ Could not locate a server entry file: ${err instanceof Error ? err.message : String(err)}`
@@ -1469,25 +1517,15 @@ program
 
       // Transpile TypeScript with esbuild (fast, no OOM on complex types).
       // Type checking is a separate step via tsc --noEmit (skippable with --no-typecheck).
-      //
-      // SKIPPED when --mcp-dir is set (drop-in Next.js layout). The host app
-      // (Next.js) owns its own build; trying to transpile every .ts/.tsx in
-      // a Next.js project chokes on files like `tailwind.config.ts` that are
-      // never meant to be runtime-compiled and on RSC-only files that
-      // esbuild doesn't understand. In --mcp-dir mode, `mcp-use start` runs
-      // the TypeScript source directly via tsx (same setup as `mcp-use dev`,
-      // minus HMR), so there's nothing to transpile ahead of time. The
-      // manifest written below still records the .ts source as the entry.
+      let entryPoint: string | undefined;
       if (!mcpDir) {
         console.log(chalk.gray("Building TypeScript..."));
         await transpileWithEsbuild(projectPath);
         console.log(chalk.green("✓ TypeScript build complete!"));
-      } else {
-        console.log(
-          chalk.gray(
-            "Skipping TypeScript transpile (--mcp-dir mode runs source via tsx at start time)"
-          )
-        );
+      } else if (sourceServerFile) {
+        console.log(chalk.gray("Building MCP server entry..."));
+        entryPoint = await buildMcpDirServer(projectPath, sourceServerFile);
+        console.log(chalk.green(`✓ MCP server built to ${entryPoint}`));
       }
 
       // Type-check with tsc --noEmit (separate from transpilation).
@@ -1522,48 +1560,45 @@ program
         }
       }
 
-      // Determine the entry point `mcp-use start` should run.
-      //   - Legacy layout: the file was transpiled to dist/ above; record
-      //     the compiled .js path.
-      //   - --mcp-dir layout: no transpile step ran, so point the manifest
-      //     at the .ts source. `mcp-use start` loads it via tsx (same setup
-      //     as `mcp-use dev`, minus HMR).
-      let entryPoint: string | undefined;
-      if (sourceServerFile) {
-        if (mcpDir) {
-          entryPoint = sourceServerFile;
-        } else {
-          // Check possible output locations based on common tsconfig patterns
-          // tsc may or may not preserve the src/ prefix depending on rootDir setting
-          const baseName = path.basename(sourceServerFile, ".ts") + ".js";
-          const possibleOutputs = [
-            `dist/${baseName}`, // rootDir set to project root or src
-            `dist/src/${baseName}`, // no rootDir, source in src/
-            `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
-          ];
-          for (const candidate of possibleOutputs) {
-            try {
-              await access(path.join(projectPath, candidate));
-              entryPoint = candidate;
-              break;
-            } catch {
-              continue;
-            }
+      // Determine the entry point `mcp-use start` should run for the legacy
+      // layout. In --mcp-dir mode the scoped server build above writes the
+      // deterministic dist/mcp/index.{cjs,mjs} artifact directly (extension
+      // depends on the host package.json "type").
+      if (sourceServerFile && !mcpDir) {
+        // Check possible output locations based on common tsconfig patterns
+        // tsc may or may not preserve the src/ prefix depending on rootDir setting
+        const baseName = path.basename(sourceServerFile, ".ts") + ".js";
+        const possibleOutputs = [
+          `dist/${baseName}`, // rootDir set to project root or src
+          `dist/src/${baseName}`, // no rootDir, source in src/
+          `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+        ];
+        for (const candidate of possibleOutputs) {
+          try {
+            await access(path.join(projectPath, candidate));
+            entryPoint = candidate;
+            break;
+          } catch {
+            continue;
           }
         }
       }
 
-      // Copy public folder if it exists
-      const publicDir = path.join(projectPath, "public");
-      try {
-        await fs.access(publicDir);
-        console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
-          recursive: true,
-        });
-        console.log(chalk.green("✓ Public assets copied"));
-      } catch {
-        // Public folder doesn't exist, skip
+      // Copy public folder if it exists. Skipped in --mcp-dir mode: there
+      // `public/` belongs to the host Next.js app (served by `next start`),
+      // and duplicating it into dist/ only bloats the MCP build output.
+      if (!mcpDir) {
+        const publicDir = path.join(projectPath, "public");
+        try {
+          await fs.access(publicDir);
+          console.log(chalk.gray("Copying public assets..."));
+          await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+            recursive: true,
+          });
+          console.log(chalk.green("✓ Public assets copied"));
+        } catch {
+          // Public folder doesn't exist, skip
+        }
       }
 
       // Create build manifest
@@ -1670,11 +1705,21 @@ program
         port = availablePort;
       }
 
+      // Resolve mcpDir (explicit flag, else src/mcp | mcp convention when no
+      // --entry was given) so Next.js drop-ins run with a bare `mcp-use dev`.
+      let devMcpDir = options.mcpDir as string | undefined;
+      if (!devMcpDir && !options.entry) {
+        devMcpDir = await detectMcpDir(projectPath);
+        if (devMcpDir) {
+          console.log(chalk.gray(`Detected MCP directory: ${devMcpDir}`));
+        }
+      }
+
       // Find the main source file (honors --entry / --mcp-dir flags and mcp-use.config.json)
       const serverFile = await findServerFile(
         projectPath,
         options.entry,
-        options.mcpDir
+        devMcpDir
       );
 
       // Resolve the widgets directory and expose it via an env var so the
@@ -1683,7 +1728,6 @@ program
       // The env var is the contract: mcp-use/server reads it when no
       // explicit `resourcesDir` is passed to mountWidgets.
       {
-        const devMcpDir = options.mcpDir as string | undefined;
         const devWidgetsDir = resolveWidgetsDir(options.widgetsDir, devMcpDir);
         if (devWidgetsDir !== "resources") {
           process.env.MCP_USE_WIDGETS_DIR = devWidgetsDir;
@@ -2748,14 +2792,25 @@ program
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
       const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      let startMcpDir = options.mcpDir as string | undefined;
+      if (!startMcpDir) {
+        // Same src/mcp | mcp convention as dev/build, so a bare
+        // `mcp-use start` finds the drop-in artifact and applies the
+        // TypeScript-source rejection for stale manifests.
+        startMcpDir = await detectMcpDir(projectPath);
+      }
 
       try {
         const manifestContent = await readFile(manifestPath, "utf-8");
         const manifest = JSON.parse(manifestContent);
-        if (manifest.entryPoint) {
+        const manifestEntry = manifest.entryPoint as string | undefined;
+        const isSourceEntry = manifestEntry
+          ? /\.(ts|tsx|mts|cts)$/.test(manifestEntry)
+          : false;
+        if (manifestEntry && (!startMcpDir || !isSourceEntry)) {
           // Verify the entry point exists
-          await access(path.join(projectPath, manifest.entryPoint));
-          serverFile = manifest.entryPoint;
+          await access(path.join(projectPath, manifestEntry));
+          serverFile = manifestEntry;
         }
       } catch {
         // Manifest doesn't exist or entryPoint not set, fall back to searching
@@ -2763,20 +2818,9 @@ program
 
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
-        // Resolve mcpDir from CLI flag so `--mcp-dir src/mcp` finds the
-        // entry at dist/src/mcp/index.js (legacy transpile mode) or the TS
-        // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
-        // and `start` runs the source via tsx).
-        const startMcpDir = options.mcpDir as string | undefined;
-
         const serverCandidates = [
           ...(startMcpDir
-            ? [
-                `${startMcpDir}/index.ts`,
-                `${startMcpDir}/index.tsx`,
-                `dist/${startMcpDir}/index.js`,
-                `dist/${startMcpDir}/server.js`,
-              ]
+            ? [...MCP_DIR_SERVER_OUTPUTS, path.join("dist", "mcp", "index.js")]
             : []),
           "dist/index.js",
           "dist/server.js",
@@ -2798,7 +2842,7 @@ program
       if (!serverFile) {
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with built entryPoint)\n  - ${MCP_DIR_SERVER_OUTPUTS.join("\n  - ")}\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
           )
         );
         process.exit(1);
@@ -2835,39 +2879,16 @@ program
       }
       const env = isNextJsProject ? withNextShimsEnv(baseEnv) : baseEnv;
 
-      // If the recorded entry is a TypeScript source (the --mcp-dir mode,
-      // where `build` deliberately skips full-project transpilation), run
-      // it through tsx. Otherwise the legacy path of `node dist/index.js`.
-      const isTsEntry = /\.(ts|tsx|mts|cts)$/.test(serverFile);
-      let spawnCmd = "node";
-      let spawnArgs: string[] = [serverFile];
-      if (isTsEntry) {
-        try {
-          const projectRequire = createRequire(
-            path.join(projectPath, "package.json")
-          );
-          const tsxPkgPath = projectRequire.resolve("tsx/package.json");
-          const tsxPkg = JSON.parse(await readFile(tsxPkgPath, "utf-8"));
-          const binField =
-            typeof tsxPkg.bin === "string"
-              ? tsxPkg.bin
-              : (tsxPkg.bin?.tsx ?? Object.values(tsxPkg.bin ?? {})[0]);
-          if (!binField) throw new Error("tsx bin entry not found");
-          const tsxBin = path.resolve(path.dirname(tsxPkgPath), binField);
-          spawnCmd = "node";
-          spawnArgs = [tsxBin, serverFile];
-        } catch (error) {
-          console.log(
-            chalk.yellow(
-              `Could not resolve local tsx (${error instanceof Error ? error.message : String(error)}); falling back to npx`
-            )
-          );
-          spawnCmd = "npx";
-          spawnArgs = ["tsx", serverFile];
-        }
+      if (/\.(ts|tsx|mts|cts)$/.test(serverFile)) {
+        console.error(
+          chalk.red(
+            `Built server entry points to TypeScript source (${serverFile}). Run 'mcp-use build' again to create a JavaScript server artifact.`
+          )
+        );
+        process.exit(1);
       }
 
-      const serverProc = spawn(spawnCmd, spawnArgs, {
+      const serverProc = spawn("node", [serverFile], {
         cwd: projectPath,
         stdio: "inherit",
         env,

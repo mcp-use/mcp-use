@@ -5,9 +5,9 @@ icon: "layers"
 ---
 
 The Next.js drop-in lets you colocate an MCP server inside an existing Next.js
-app  -  same repo, same `@/*` aliases, same shared components, same `.env` files
- -  without spinning up a separate project. Your Next.js routes keep working, and
-a single `mcp-use dev` (or `build` / `start`) runs the MCP server beside them.
+app: same repo, same `@/*` aliases, same shared components, same `.env` files,
+and no separate project. Your Next.js routes keep working, and a single
+`mcp-use dev` (or `build` / `start`) runs the MCP server beside them.
 
 ## Quick Start
 
@@ -44,9 +44,9 @@ Inside an existing Next.js app (App Router, `src/` layout):
     {
       "scripts": {
         "dev": "next dev",
-        "mcp:dev": "mcp-use dev --mcp-dir src/mcp",
-        "mcp:build": "mcp-use build --mcp-dir src/mcp",
-        "mcp:start": "mcp-use start --mcp-dir src/mcp"
+        "mcp:dev": "mcp-use dev",
+        "mcp:build": "mcp-use build",
+        "mcp:start": "mcp-use start"
       },
       "dependencies": {
         "mcp-use": "^1",
@@ -89,11 +89,14 @@ my-next-app/
 │               └── widget.tsx
 ```
 
-`src/mcp/index.ts` is auto-discovered when you pass `--mcp-dir src/mcp`. You
-can override the entry with `--entry src/mcp/server.ts`.
+`src/mcp/` is discovered automatically: when you don't pass `--mcp-dir` or
+`--entry` and the project has no legacy top-level entry (`index.ts`,
+`src/index.ts`, ...), the CLI looks for `src/mcp/` and then `mcp/`. Pass
+`--mcp-dir <dir>` to use a different folder, or `--entry src/mcp/server.ts`
+to pin the entry file.
 
 Widgets in `src/mcp/resources/` are picked up by `mcp-use build` / `dev`
-automatically  -  they can `import "@/components/..."` and those aliases resolve
+automatically - they can `import "@/components/..."` and those aliases resolve
 through your app's `tsconfig.json`.
 
 ## How It Works
@@ -121,14 +124,14 @@ These modules are designed to throw or do nothing outside a Next.js request
 context. When the CLI detects `next` in your `package.json`, it installs
 runtime shims that replace the following specifiers with inert stand-ins:
 
-| Module            | Stub behavior                                                        |
-| ----------------- | -------------------------------------------------------------------- |
-| `server-only`     | No-op (the import itself is the whole side effect in the real pkg). |
-| `client-only`     | No-op.                                                               |
-| `next/cache`      | `revalidatePath`/`revalidateTag` no-op, `unstable_cache` returns fn. |
+| Module            | Stub behavior                                                         |
+| ----------------- | --------------------------------------------------------------------- |
+| `server-only`     | No-op (the import itself is the whole side effect in the real pkg).   |
+| `client-only`     | No-op.                                                                |
+| `next/cache`      | `revalidatePath`/`revalidateTag` no-op, `unstable_cache` returns fn.  |
 | `next/headers`    | `headers()` returns empty `Headers`, `cookies()` returns empty store. |
-| `next/navigation` | `redirect()`/`notFound()` still throw, so callers fail loudly.       |
-| `next/server`     | Minimal `NextResponse`/`NextRequest` stubs.                          |
+| `next/navigation` | `redirect()`/`notFound()` still throw, so callers fail loudly.        |
+| `next/server`     | Minimal `NextResponse`/`NextRequest` stubs.                           |
 
 Shims run on both the ESM side (via a Node `module.register()` loader) and the
 CJS side (via a `Module._resolveFilename` patch), so `require("server-only")`
@@ -150,7 +153,7 @@ up the same way Next.js sees it.
 ## Widgets inside a Next.js app
 
 Widgets run in a browser iframe and **cannot** use server APIs, even though
-they live inside the Next.js tree. The drop-in enforces this at build time  - 
+they live inside the Next.js tree. The drop-in enforces this at build time -
 if a widget (or a module it transitively imports) pulls in `server-only`,
 `next/headers`, etc., the build fails with an actionable error:
 
@@ -182,7 +185,7 @@ server.tool(
     widget({
       props: { user: await getCurrentUser() },
       message: "Profile rendered",
-    })
+    }),
 );
 ```
 
@@ -193,11 +196,11 @@ import shared components pick up the same design tokens your app uses.
 
 These work on `dev`, `build`, and `start`:
 
-| Flag                  | Description                                                                      |
-| --------------------- | -------------------------------------------------------------------------------- |
-| `--mcp-dir <dir>`     | Folder holding the MCP entry + `resources/` (e.g. `src/mcp`).                    |
+| Flag                  | Description                                                                     |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `--mcp-dir <dir>`     | Folder holding the MCP entry + `resources/`. Auto-detected (`src/mcp`, `mcp`) when omitted. |
 | `--entry <file>`      | Explicit entry file, relative to project root. Overrides `--mcp-dir` discovery. |
-| `--widgets-dir <dir>` | Widgets directory (defaults to `<mcp-dir>/resources`).                           |
+| `--widgets-dir <dir>` | Widgets directory (defaults to `<mcp-dir>/resources`).                          |
 
 Entry file discovery in `--mcp-dir` mode tries, in order:
 `<dir>/index.ts`, `<dir>/index.tsx`, `<dir>/server.ts`, `<dir>/server.tsx`.
@@ -207,13 +210,21 @@ Entry file discovery in `--mcp-dir` mode tries, in order:
 `mcp-use build --mcp-dir` is intentionally **lighter** than the standalone
 build:
 
-- **No esbuild transpile step.** The host Next.js app owns its build; trying
-  to transpile every `.ts`/`.tsx` in a Next project blows up on files like
-  `tailwind.config.ts` and RSC-only files. The manifest records the `.ts`
-  source path and `mcp-use start` runs it through `tsx` directly.
+- **Scoped MCP server build.** The host Next.js app still owns the app build,
+  so the CLI does not transpile every `.ts`/`.tsx` file in the project. It
+  bundles only the MCP entry dependency graph into `dist/mcp/index.mjs`.
 - **No `tsc --noEmit` typecheck.** `next build` already does this for you.
-- Widget builds still run  -  they produce static assets in
+- Widget builds still run - they produce static assets in
   `dist/resources/widgets/<name>/`.
+- **No `public/` copy.** The host Next.js app owns and serves `public/`;
+  the MCP build does not duplicate it into `dist/`.
+
+If the MCP server graph imports Next.js server-runtime modules such as
+`server-only`, `next/headers`, or `next/cache`, the build replaces those imports
+with inert MCP shims and prints a warning naming the importing file. This keeps
+production `mcp-use start --mcp-dir` symmetrical with the normal CLI flow:
+`start` runs the built JavaScript artifact with Node, not the TypeScript source
+through `tsx`.
 
 ## Running alongside Next.js
 
@@ -224,7 +235,7 @@ ports:
 {
   "scripts": {
     "dev": "next dev",
-    "mcp:dev": "mcp-use dev --mcp-dir src/mcp --port 3001"
+    "mcp:dev": "mcp-use dev --port 3001"
   }
 }
 ```
@@ -234,19 +245,19 @@ Or run them together with [concurrently](https://www.npmjs.com/package/concurren
 ```json
 {
   "scripts": {
-    "dev:all": "concurrently \"next dev\" \"mcp-use dev --mcp-dir src/mcp --port 3001\""
+    "dev:all": "concurrently \"next dev\" \"mcp-use dev --port 3001\""
   }
 }
 ```
 
 ## Requirements
 
-- Next.js 13+ (App Router or Pages Router  -  the shims cover both).
+- Next.js 13+ (App Router or Pages Router - the shims cover both).
 - A project-root `tsconfig.json` with your `@/*` paths. The drop-in picks these
-  up via Vite's `resolve.tsconfigPaths` (for widgets) and `tsx`'s tsconfig
-  support (for the server).
+  up via Vite's `resolve.tsconfigPaths` (for widgets) and the scoped server
+  bundle's tsconfig-aware resolver.
 - `tailwindcss` in your `dependencies` if you use it in widgets (`@tailwindcss/vite`
-  alone is not enough  -  the widget pipeline needs `tailwindcss` directly
+  alone is not enough - the widget pipeline needs `tailwindcss` directly
   resolvable from the project).
 
 ## Example
