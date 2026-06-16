@@ -38,11 +38,11 @@ Initialize remote agent.
 ><ParamField body="agent_id" type="str" required="True" >   The ID of the remote agent to execute </ParamField>
 ><ParamField body="chat_id" type="str | None" default="None" >   The ID of the chat session to use. If None, a new chat session will be created. </ParamField>
 ><ParamField body="api_key" type="str | None" default="None" >   API key for authentication. If None, will check MCP_USE_API_KEY env var </ParamField>
-><ParamField body="base_url" type="str" default='https://cloud.mcp-use.com' >   Base URL for the remote API </ParamField>
+><ParamField body="base_url" type="str" default='https://cloud.manufact.com' >   Base URL for the remote API </ParamField>
 
 **Signature**
 ```python wrap
-def __init__(agent_id: str, chat_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.mcp-use.com"):
+def __init__(agent_id: str, chat_id: str | None = None, api_key: str | None = None, base_url: str = "https://cloud.manufact.com"):
 ```
 
 </Card>
