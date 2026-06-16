@@ -28,6 +28,7 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { useChatSessions } from "../context/ChatSessionsContext";
 import { LoginModal } from "./LoginModal";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
@@ -171,9 +172,12 @@ export function ChatTab({
     setTempModel,
     tempBaseUrl,
     setTempBaseUrl,
-    saveLLMConfig,
-    clearConfig,
+    saveLLMConfig: globalSaveLLMConfig,
+    clearConfig: globalClearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
+
+  const { activeSessionId, sessions, updateSessionMessages, updateSessionLlmConfig, updateSessionTitle } = useChatSessions();
+  const activeSession = sessions.find(s => s.id === activeSessionId);
 
   // ── Hosted-mode / client-side override ──────────────────────────────────
   // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
@@ -208,9 +212,17 @@ export function ChatTab({
   // selector, and local llmConfig to take over. Without this, clicking "Use
   // your own API key" in the LoginModal would leave `isManaged=true`, hiding
   // the ConfigurationDialog and config button.
+  
+  // Per-session overrides: Use the active session's llmConfig if we are in a session.
+  // We explicitly want to use `null` if the session's config is `null` so the user is forced
+  // to pick a model for the new chat, rather than automatically inheriting the global config.
+  const effectiveLocalLlmConfig = activeSession 
+    ? activeSession.llmConfig 
+    : localLlmConfig;
+
   const llmConfig = effectiveClientSide
-    ? localLlmConfig
-    : (managedLlmConfig ?? localLlmConfig);
+    ? effectiveLocalLlmConfig
+    : (managedLlmConfig ?? effectiveLocalLlmConfig);
   const isManaged = !effectiveClientSide && !!managedLlmConfig;
 
   const { getAllModelContexts } = useWidgetDebug();
@@ -225,6 +237,7 @@ export function ChatTab({
     readResource,
     widgetModelContexts,
     disabledTools,
+    initialMessages,
   };
 
   const serverSideChat = useChatMessages({
@@ -254,8 +267,55 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
+    clearAttachments,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
 
+  // Sync messages back to the active session in ChatSessionsContext
+  useEffect(() => {
+    if (activeSessionId) {
+      updateSessionMessages(activeSessionId, messages);
+    }
+  }, [messages, activeSessionId, updateSessionMessages]);
+
+  const saveLLMConfig = useCallback(() => {
+    // Call the global config saver first
+    globalSaveLLMConfig();
+    
+    // Then save this config to the active session specifically
+    if (activeSessionId) {
+      updateSessionLlmConfig(activeSessionId, {
+        provider: tempProvider,
+        apiKey: tempApiKey,
+        model: tempModel,
+        baseUrl: tempBaseUrl,
+      });
+
+      // Update the chat title to reflect the model if it's currently "New Chat"
+      const activeSession = sessions.find((s) => s.id === activeSessionId);
+      if (activeSession && activeSession.title === "New Chat") {
+        updateSessionTitle(activeSessionId, `${tempProvider} - ${tempModel}`);
+      }
+    }
+  }, [
+    globalSaveLLMConfig,
+    activeSessionId,
+    updateSessionLlmConfig,
+    tempProvider,
+    tempApiKey,
+    tempModel,
+    tempBaseUrl,
+    sessions,
+    updateSessionTitle,
+  ]);
+
+  const clearConfig = useCallback(() => {
+    globalClearConfig();
+    if (activeSessionId) {
+      updateSessionLlmConfig(activeSessionId, null);
+    }
+  }, [globalClearConfig, activeSessionId, updateSessionLlmConfig]);
+
+  // When focusing the textarea, try to determine if we should show the prompt dropdown.
   const rateLimitInfo = effectiveClientSide
     ? null
     : (serverSideChat.rateLimitInfo ?? null);

@@ -25,23 +25,13 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
   const [tempBaseUrl, setTempBaseUrl] = useState(getDefaultBaseUrl("openai"));
 
-  // Load API keys per provider from localStorage
+  // API keys are now strictly per-session, so we no longer load them globally from localStorage
   const getApiKeys = useCallback((): Record<string, string> => {
-    const saved = localStorage.getItem("mcp-inspector-api-keys");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (error) {
-        console.error("Failed to load API keys:", error);
-        return {};
-      }
-    }
     return {};
   }, []);
 
-  // Save API keys per provider to localStorage
   const saveApiKeys = useCallback((apiKeys: Record<string, string>) => {
-    localStorage.setItem("mcp-inspector-api-keys", JSON.stringify(apiKeys));
+    // Disabled global save
   }, []);
 
   const getBaseUrls = useCallback((): Record<string, string> => {

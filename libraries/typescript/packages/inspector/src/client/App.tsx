@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+import { ChatSessionsProvider } from "./context/ChatSessionsContext";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -205,24 +206,26 @@ function App() {
             );
           }}
         >
-          <InspectorProvider>
-            <InspectorTabSync activeTabRef={activeTabRef} />
-            <Router basename="/inspector">
-              <Routes>
-                <Route path="/oauth/callback" element={<OAuthCallback />} />
-                <Route path="/preview/:view" element={<ViewPreview />} />
-                <Route
-                  path="/"
-                  element={
-                    <Layout>
-                      <InspectorDashboard />
-                    </Layout>
-                  }
-                />
-              </Routes>
-            </Router>
-            <Toaster position="top-center" />
-          </InspectorProvider>
+          <ChatSessionsProvider>
+            <InspectorProvider>
+              <InspectorTabSync activeTabRef={activeTabRef} />
+              <Router basename="/inspector">
+                <Routes>
+                  <Route path="/oauth/callback" element={<OAuthCallback />} />
+                  <Route path="/preview/:view" element={<ViewPreview />} />
+                  <Route
+                    path="/"
+                    element={
+                      <Layout>
+                        <InspectorDashboard />
+                      </Layout>
+                    }
+                  />
+                </Routes>
+              </Router>
+              <Toaster position="top-center" />
+            </InspectorProvider>
+          </ChatSessionsProvider>
         </McpClientProvider>
       </WidgetDebugProvider>
     </ThemeProvider>

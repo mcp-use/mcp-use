@@ -451,10 +451,10 @@ function TunnelBadge({
               : undefined
         }
         className={cn(
-          "flex items-center gap-2 h-9 px-3 border rounded-full transition-colors",
+          "flex items-center gap-2 h-9 px-4 border rounded-full transition-colors",
           canStart && !loadingDev
-            ? "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/50 cursor-pointer"
-            : "bg-violet-50/60 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800 cursor-not-allowed opacity-70"
+            ? "bg-violet-50 dark:bg-[#130624] border-violet-200 dark:border-violet-600 hover:bg-violet-100 dark:hover:bg-[#1e0a38] cursor-pointer"
+            : "bg-violet-50/60 dark:bg-[#130624]/50 border-violet-200 dark:border-violet-600/50 cursor-not-allowed opacity-70"
         )}
       >
         {loadingDev ? (
@@ -630,7 +630,7 @@ export function LayoutHeader({
   };
 
   return (
-    <header className="w-full mx-auto">
+    <header className="w-full mx-auto px-2 sm:px-4 pt-4 pb-3 flex-shrink-0">
       {/* Mobile Layout */}
       <div className="flex lg:hidden flex-col gap-3">
         <div className="flex items-center justify-between w-full">
@@ -708,16 +708,16 @@ export function LayoutHeader({
                         trigger={
                           <Button
                             variant="ghost"
-                            className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full transition-colors px-3 flex items-center justify-center p-2"
+                            className="h-9 rounded-full bg-[#27272a] hover:bg-[#3f3f46] text-white transition-all px-4 flex items-center justify-center border-0"
                             aria-label="Add to Client"
                           >
-                            <span className="xl:hidden hidden sm:flex items-center gap-1">
-                              <Plus className="size-3" />
+                            <span className="xl:hidden hidden sm:flex items-center gap-1.5 font-medium text-sm">
+                              <Plus className="size-4" />
                               Client
                             </span>
-                            <span className="hidden xl:flex items-center gap-1">
+                            <span className="hidden xl:flex items-center gap-1.5 font-medium text-sm">
                               Add to Client
-                              <ChevronDown className="size-3" />
+                              <ChevronDown className="size-4" />
                             </span>
                           </Button>
                         }
@@ -916,84 +916,80 @@ export function LayoutHeader({
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:flex items-center justify-between gap-3">
-        {/* Left side: Server dropdown + Tabs + Tunnel Badge */}
-        <div className="flex items-center flex-wrap gap-2 md:space-x-6 space-x-2">
-          {/* Server Selection Dropdown - Hidden in embedded mode */}
+      <div className="hidden lg:flex items-center justify-between gap-3 w-full">
+        {/* Left side: Server dropdown */}
+        <div className="flex items-center gap-4 shrink-0">
           {!embedded && (
-            <ServerDropdown
-              connections={connections}
-              selectedServer={selectedServer}
-              onServerSelect={onServerSelect}
-              onOpenConnectionOptions={onOpenConnectionOptions}
-            />
-          )}
-
-          {/* Tabs */}
-          {selectedServer && (
-            <div className="flex items-center gap-2">
-              <Tabs
-                value={activeTab}
-                onValueChange={(tab) => onTabChange(tab as TabType)}
-                collapsed={collapsed}
-                onCollapsedChange={setCollapsed}
-              >
-                <TabsList className="overflow-x-auto" collapsible>
-                  {filteredTabs.map((tab) => {
-                    if (tab.id === "separator") {
-                      return (
-                        <div
-                          key="separator"
-                          className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
-                        />
-                      );
-                    }
-                    const count = getTabCount(tab.id, selectedServer);
-                    const tooltipText =
-                      count > 0 ? `${tab.label} (${count})` : tab.label;
-                    const showDot = shouldShowDot(tab.id, count, collapsed);
-
-                    return (
-                      <TabsTrigger
-                        key={tab.id}
-                        value={tab.id}
-                        data-testid={`tab-${tab.id}`}
-                        icon={tab.icon}
-                        showDot={showDot}
-                        badge={
-                          <TabCountBadge
-                            count={count}
-                            isActive={activeTab === tab.id}
-                          />
-                        }
-                        alwaysExpanded={
-                          "alwaysExpanded" in tab && tab.alwaysExpanded
-                        }
-                        className={cn(
-                          "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
-                          collapsed && "pl-4"
-                        )}
-                        title={tooltipText}
-                      >
-                        <span className="items-center gap-2 hidden lg:flex">
-                          {tab.label}
-                        </span>
-                      </TabsTrigger>
-                    );
-                  })}
-                </TabsList>
-              </Tabs>
-              <CollapseButton
-                collapsed={collapsed}
-                onToggle={() => setCollapsed(!collapsed)}
+              <ServerDropdown
+                connections={connections}
+                selectedServer={selectedServer}
+                onServerSelect={onServerSelect}
+                onOpenConnectionOptions={onOpenConnectionOptions}
               />
-            </div>
           )}
         </div>
 
-        {/* Right side: Tunnel Badge + Add to Client + Theme Toggle + Command Palette + GitHub Button + Logo - Hidden in embedded mode */}
+        {/* Center: Tabs */}
+        {selectedServer && (
+          <div className="flex items-center justify-start flex-1 px-2">
+            <Tabs
+              value={activeTab}
+              onValueChange={(tab) => onTabChange(tab as TabType)}
+              collapsed={collapsed}
+              onCollapsedChange={setCollapsed}
+            >
+              <TabsList className="overflow-x-auto" collapsible>
+                {filteredTabs.map((tab) => {
+                  if (tab.id === "separator") {
+                    return (
+                      <div
+                        key="separator"
+                        className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
+                      />
+                    );
+                  }
+                  const count = getTabCount(tab.id, selectedServer);
+                  const tooltipText =
+                    count > 0 ? `${tab.label} (${count})` : tab.label;
+                  const showDot = shouldShowDot(tab.id, count, collapsed);
+
+                  return (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      data-testid={`tab-${tab.id}`}
+                      icon={tab.icon}
+                      showDot={showDot}
+                      badge={
+                        <TabCountBadge
+                          count={count}
+                          isActive={activeTab === tab.id}
+                        />
+                      }
+                      alwaysExpanded={
+                        "alwaysExpanded" in tab && tab.alwaysExpanded
+                      }
+                      className={cn(
+                        "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
+                        collapsed && "pl-4"
+                      )}
+                      title={tooltipText}
+                    >
+                      <span className="items-center gap-2 hidden lg:flex">
+                        {tab.label}
+                      </span>
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </Tabs>
+          </div>
+        )}
+
+        {/* Right side: Actions */}
         {!embedded && (
-          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          <div className="flex items-center justify-end gap-2 sm:gap-4 flex-1">
+
             {selectedServer &&
               (() => {
                 const displayName = getServerDisplayName(selectedServer);
@@ -1043,16 +1039,16 @@ export function LayoutHeader({
                       trigger={
                         <Button
                           variant="ghost"
-                          className="bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 rounded-full transition-colors px-3 flex items-center justify-center"
+                          className="h-9 rounded-full bg-[#27272a] hover:bg-[#3f3f46] text-white transition-all px-4 flex items-center justify-center border-0"
                           aria-label="Add to Client"
                         >
-                          <span className="xl:hidden hidden sm:flex items-center gap-1">
-                            <Plus className="size-3" />
+                          <span className="xl:hidden hidden sm:flex items-center gap-1.5 font-medium text-sm">
+                            <Plus className="size-4" />
                             Client
                           </span>
-                          <span className="hidden xl:flex items-center gap-1">
+                          <span className="hidden xl:flex items-center gap-1.5 font-medium text-sm">
                             Add to Client
-                            <ChevronDown className="size-3" />
+                            <ChevronDown className="size-4" />
                           </span>
                         </Button>
                       }
@@ -1082,7 +1078,7 @@ export function LayoutHeader({
                   </>
                 );
               })()}
-            {/* Tunnel Badge */}
+
             {showTunnelBadge && (
               <TunnelBadge
                 tunnelUrl={tunnelUrl}
@@ -1094,9 +1090,10 @@ export function LayoutHeader({
                 handleCopy={handleCopy}
               />
             )}
+
             <Button
               asChild
-              className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4"
+              className="h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 border-0 transition-all shadow-none"
             >
               <a
                 href={
@@ -1120,8 +1117,8 @@ export function LayoutHeader({
                   }
                 }}
               >
-                <Rocket className="size-4" />
-                <span className="hidden sm:inline">Deploy</span>
+                <Rocket className="size-4 mr-1.5" />
+                <span className="hidden sm:inline font-medium text-sm">Deploy</span>
               </a>
             </Button>
             <DropdownMenu>
@@ -1203,27 +1200,12 @@ export function LayoutHeader({
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* In hosted mode: avatar left, logo right.
-                Logo is always visible at ≥1400px; at narrower widths it falls
-                back as a placeholder only when the user is unauthenticated. */}
             {embeddedConfig.chatApiUrl ? (
-              <div className="flex items-center gap-2">
-                {/* Avatar (or nothing when unauthenticated — logo handles branding) */}
-                <HostedUserMenu
-                  chatApiUrl={embeddedConfig.chatApiUrl}
-                  onUserResolved={(u) => setIsLoggedIn(!!u)}
-                  fallback={
-                    /* Narrow screens only: show logo as fallback when not authed */
-                    <span className="[@media(min-width:1400px)]:hidden">
-                      <LogoAnimated state="expanded" />
-                    </span>
-                  }
-                />
-                {/* Logo: always visible at ≥1400px (rightmost) */}
-                <span className="hidden [@media(min-width:1400px)]:block">
-                  <LogoAnimated state="expanded" />
-                </span>
-              </div>
+              <HostedUserMenu
+                chatApiUrl={embeddedConfig.chatApiUrl}
+                onUserResolved={(u) => setIsLoggedIn(!!u)}
+                fallback={<LogoAnimated state="expanded" />}
+              />
             ) : (
               <LogoAnimated state="expanded" />
             )}

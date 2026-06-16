@@ -2,6 +2,7 @@ import type { McpServer } from "mcp-use/react";
 import type { ReactNode, RefObject } from "react";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
+import { useChatSessions } from "../context/ChatSessionsContext";
 import { ChatTab } from "./ChatTab";
 import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";
@@ -40,6 +41,7 @@ export function LayoutContent({
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
+  const { activeSessionId, activeMessages, isMessagesLoading } = useChatSessions();
 
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
@@ -180,11 +182,20 @@ export function LayoutContent({
       {isTabVisible("chat") && (
         <div
           style={{ display: activeTab === "chat" ? "block" : "none" }}
-          className="h-full"
+          className="h-full relative"
         >
-          <ChatTab
-            key={`chat-${selectedServer.id}`}
+          {isMessagesLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-background z-50">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                Loading chat history...
+              </div>
+            </div>
+          ) : (
+            <ChatTab
+              key={`chat-${selectedServer.id}-${activeSessionId || 'default'}`}
             connection={selectedServer}
+            initialMessages={activeMessages}
             isConnected={
               embeddedConfig.forceConnected || selectedServer.state === "ready"
             }
@@ -238,6 +249,7 @@ export function LayoutContent({
             streamProtocol={embeddedConfig.chatStreamProtocol}
             credentials={embeddedConfig.chatCredentials}
           />
+          )}
         </div>
       )}
       {isTabVisible("sampling") && (

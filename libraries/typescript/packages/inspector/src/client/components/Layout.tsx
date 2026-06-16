@@ -28,6 +28,8 @@ import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
+import { SidebarLeft } from "./SidebarLeft";
+import { SidebarRight } from "./SidebarRight";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 
 interface LayoutProps {
@@ -769,11 +771,11 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+    : "h-screen bg-[#f3f3f3] dark:bg-[#0f1115] flex flex-col";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
-    : "flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto";
+    : "flex-1 w-full bg-white dark:bg-[#000000] p-0 overflow-hidden flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm";
 
   return (
     <TooltipProvider>
@@ -792,18 +794,29 @@ export function Layout({ children }: LayoutProps) {
           />
         )}
 
-        {/* Main Content */}
-        <main className={mainClassName}>
-          <LayoutContent
-            selectedServer={selectedServer}
-            activeTab={activeTab}
-            toolsSearchRef={toolsSearchRef}
-            promptsSearchRef={promptsSearchRef}
-            resourcesSearchRef={resourcesSearchRef}
-          >
-            {children}
-          </LayoutContent>
-        </main>
+        {/* 3-Column Layout Container */}
+        <div className="flex-1 flex overflow-hidden min-h-0 w-full px-2 sm:px-4 pb-2 sm:pb-4 gap-2 sm:gap-4">
+          {/* Left Sidebar */}
+          {!isSingleTab && activeTab === "chat" && <SidebarLeft />}
+
+          {/* Main Content */}
+          <main className={mainClassName}>
+            <LayoutContent
+              selectedServer={selectedServer}
+              activeTab={activeTab}
+              toolsSearchRef={toolsSearchRef}
+              promptsSearchRef={promptsSearchRef}
+              resourcesSearchRef={resourcesSearchRef}
+            >
+              {children}
+            </LayoutContent>
+          </main>
+
+          {/* Right Sidebar */}
+          {!isSingleTab && activeTab === "chat" && (
+            <SidebarRight selectedServer={selectedServer ?? undefined} />
+          )}
+        </div>
 
         {/* Command Palette */}
         <CommandPalette
