@@ -216,7 +216,11 @@ async function updateEnvCommand(
   try {
     await requireLogin();
 
-    if (!options.value && !options.env && options.sensitive === undefined) {
+    if (
+      options.value === undefined &&
+      !options.env &&
+      options.sensitive === undefined
+    ) {
       console.error(
         chalk.red(
           "✗ Nothing to update. Provide at least one of --value, --env, --sensitive."
