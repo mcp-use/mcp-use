@@ -116,7 +116,9 @@ beforeEach(() => {
       variables: {
         "--color-background-primary": "transparent",
         "--color-background-secondary": "rgb(12 13 14)",
+        "--color-background-tertiary": undefined,
         "--color-text-primary": "rgb(250 250 250)",
+        color: "red",
       },
     },
   });
@@ -276,5 +278,12 @@ describe("MCP Apps primary widget runtime", () => {
         "--color-background-primary"
       )
     ).toBe("transparent");
+    expect(
+      document.documentElement.style.getPropertyValue(
+        "--color-background-tertiary"
+      )
+    ).toBe("");
+    expect(document.documentElement.style.getPropertyValue("color")).toBe("");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
   });
 });

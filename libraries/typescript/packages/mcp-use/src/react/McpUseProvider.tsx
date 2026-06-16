@@ -40,11 +40,9 @@ interface McpUseProviderProps {
    * Set color-scheme on the document root to match the active theme.
    * Enables native dark scrollbars and CSS light-dark() function.
    *
-   * Leave disabled (default) when you want a transparent iframe background.
-   * Setting color-scheme to an explicit value ("dark"/"light") causes browsers
-   * to paint an opaque canvas behind iframes when the widget and host documents
-   * use different schemes, making background-color: transparent ineffective.
-   * @default false
+   * Disable only when you need the browser canvas to stay transparent in hosts
+   * that render widgets over a differently-themed background.
+   * @default true
    */
   colorScheme?: boolean;
 }
@@ -71,7 +69,7 @@ export function McpUseProvider({
   debugger: enableDebugger = false,
   viewControls = false,
   autoSize = true,
-  colorScheme = false,
+  colorScheme = true,
 }: McpUseProviderProps) {
   const [containerElement, setContainerElement] =
     useState<HTMLDivElement | null>(null);
