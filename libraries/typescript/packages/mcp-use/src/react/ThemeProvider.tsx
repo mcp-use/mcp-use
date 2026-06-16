@@ -6,7 +6,7 @@ import { useWidget } from "./useWidget.js";
  * ThemeProvider that manages dark mode class on document root
  *
  * Priority:
- * 1. useWidget theme (from host context)
+ * 1. Explicit host context theme
  * 2. System preference (prefers-color-scheme: dark)
  *
  * Sets the "dark" class and data-theme attribute on document.documentElement.
@@ -17,7 +17,7 @@ export const ThemeProvider: React.FC<{
   children: React.ReactNode;
   colorScheme?: boolean;
 }> = ({ children, colorScheme = true }) => {
-  const { theme, isAvailable, hostContext } = useWidget();
+  const { hostContext } = useWidget();
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
       if (typeof window === "undefined") return "light";
@@ -40,8 +40,14 @@ export const ThemeProvider: React.FC<{
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Calculate effective theme
-  const effectiveTheme = isAvailable ? theme : systemPreference;
+  // Calculate effective theme. useWidget() normalizes a missing host theme to
+  // "light" for consumers, so ThemeProvider reads the raw host context to avoid
+  // treating an omitted host value as an explicit light-mode preference.
+  const hostTheme =
+    hostContext?.theme === "dark" || hostContext?.theme === "light"
+      ? hostContext.theme
+      : undefined;
+  const effectiveTheme = hostTheme ?? systemPreference;
 
   // Apply theme synchronously before browser paint to prevent flash
   // Sets CSS class (for Tailwind dark mode) and data-theme attribute
