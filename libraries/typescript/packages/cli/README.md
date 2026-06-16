@@ -464,7 +464,7 @@ For deploying to Manufact cloud, see the environment variables in this section f
 MCP_WEB_URL=https://mcp-use.com
 
 # Backend API URL (where /api/v1 endpoints are)
-MCP_API_URL=https://cloud.mcp-use.com
+MCP_API_URL=https://cloud.manufact.com
 
 # Example: Local development
 export MCP_WEB_URL=http://localhost:3000

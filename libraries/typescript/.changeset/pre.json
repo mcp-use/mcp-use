@@ -1,0 +1,27 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.5.1",
+    "create-mcp-use-app": "0.14.15",
+    "@mcp-use/inspector": "10.0.0",
+    "mcp-use": "1.32.0"
+  },
+  "changesets": [
+    "clean-cli-subscribe-sigint",
+    "cli-dockerfile-flag",
+    "cli-sensitive-env-vars",
+    "dependabot-ced99e3a",
+    "dependabot-f7c29352",
+    "deploy-repo-access-targeted-check",
+    "empty-env-value-update",
+    "fix-oauth-well-known-canonical-paths",
+    "inspector-localhost-chat-fallback",
+    "oauth-proxy-brokered-callback",
+    "quiet-dragons-scroll",
+    "repl-screenshot-feature",
+    "server-notification-logging",
+    "shaggy-yaks-grow",
+    "silence-empty-widget-logs"
+  ]
+}

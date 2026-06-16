@@ -1,5 +1,11 @@
 # create-mcp-use-app
 
+## 0.14.16-canary.0
+
+### Patch Changes
+
+- 7126253: Updated dependency `tar` to `^7.5.16`.
+
 ## 0.14.15
 
 ### Patch Changes

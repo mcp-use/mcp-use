@@ -1,5 +1,131 @@
 # mcp-use
 
+## 1.32.1-canary.14
+
+### Patch Changes
+
+- Updated dependencies [7126253]
+  - @mcp-use/cli@3.5.2-canary.14
+  - @mcp-use/inspector@10.0.1-canary.14
+
+## 1.32.1-canary.13
+
+### Patch Changes
+
+- Updated dependencies [ab4fcd2]
+  - @mcp-use/cli@3.5.2-canary.13
+  - @mcp-use/inspector@10.0.1-canary.13
+
+## 1.32.1-canary.12
+
+### Patch Changes
+
+- c9e1696: OAuth proxy mode now brokers the upstream callback through the server's own `/oauth/callback` instead of forwarding each MCP client's redirect URI upstream. Register a single redirect URI on your OAuth provider — `<your-server-domain>/oauth/callback` — and every MCP client (Claude, ChatGPT, the inspector, ...) can authenticate without registering its own callback. The client's redirect URI and state are carried statelessly through the upstream `state` parameter, PKCE stays end-to-end between the client and the upstream, and `/token` rewrites `redirect_uri` to match the brokered authorize request.
+
+  If you previously registered client callback URLs (e.g. `http://localhost:3000/inspector/oauth/callback`) on your provider, add `<your-server-domain>/oauth/callback` instead.
+  - @mcp-use/cli@3.5.2-canary.12
+  - @mcp-use/inspector@10.0.1-canary.12
+
+## 1.32.1-canary.11
+
+### Patch Changes
+
+- Updated dependencies [048ec9c]
+  - @mcp-use/cli@3.5.2-canary.11
+  - @mcp-use/inspector@10.0.1-canary.11
+
+## 1.32.1-canary.10
+
+### Patch Changes
+
+- Updated dependencies [8849f0f]
+  - @mcp-use/cli@3.5.2-canary.10
+  - @mcp-use/inspector@10.0.1-canary.10
+
+## 1.32.1-canary.9
+
+### Patch Changes
+
+- Updated dependencies [cdc3b13]
+  - @mcp-use/cli@3.5.2-canary.9
+  - @mcp-use/inspector@10.0.1-canary.9
+
+## 1.32.1-canary.8
+
+### Patch Changes
+
+- Updated dependencies [afe0806]
+  - @mcp-use/cli@3.5.2-canary.8
+  - @mcp-use/inspector@10.0.1-canary.8
+
+## 1.32.1-canary.7
+
+### Patch Changes
+
+- Updated dependencies [1fb87d2]
+  - @mcp-use/inspector@10.0.1-canary.7
+  - @mcp-use/cli@3.5.2-canary.7
+
+## 1.32.1-canary.6
+
+### Patch Changes
+
+- 6e7e9bf: Silence dev-mode widget startup logs when a project has no widgets. An empty or
+  absent `resources/` directory no longer prints the `[WIDGETS]` mounting/serving/
+  watching messages. The Vite watcher still starts so widgets created later (e.g.
+  Mango/E2B sandboxes) are picked up and logged when they appear.
+  - @mcp-use/cli@3.5.2-canary.6
+  - @mcp-use/inspector@10.0.1-canary.6
+
+## 1.32.1-canary.5
+
+### Patch Changes
+
+- 1a16878: Updated dependency `esbuild` to `0.28.1`.
+- Updated dependencies [1a16878]
+  - @mcp-use/cli@3.5.2-canary.5
+  - @mcp-use/inspector@10.0.1-canary.5
+
+## 1.32.1-canary.4
+
+### Patch Changes
+
+- Updated dependencies [72efb63]
+  - @mcp-use/cli@3.5.2-canary.4
+  - @mcp-use/inspector@10.0.1-canary.4
+
+## 1.32.1-canary.3
+
+### Patch Changes
+
+- Updated dependencies [2038e04]
+  - @mcp-use/inspector@10.0.1-canary.3
+  - @mcp-use/cli@3.5.2-canary.3
+
+## 1.32.1-canary.2
+
+### Patch Changes
+
+- 8d626cb: Fix OAuth metadata discovery for authorization servers with path-suffix issuers (RFC 8414). Construct the upstream OAuth and OpenID metadata URLs correctly and additionally mount the canonical `/.well-known/oauth-authorization-server{issuer-path}` route. Closes #1576.
+  - @mcp-use/cli@3.5.2-canary.2
+  - @mcp-use/inspector@10.0.1-canary.2
+
+## 1.32.1-canary.1
+
+### Patch Changes
+
+- a3f3b65: Add server-side logging for outgoing notifications, printing detailed logs for sent and failed notifications with session identifiers and error details.
+  - @mcp-use/cli@3.5.2-canary.1
+  - @mcp-use/inspector@10.0.1-canary.1
+
+## 1.32.1-canary.0
+
+### Patch Changes
+
+- Updated dependencies [d64db0f]
+  - @mcp-use/cli@3.5.2-canary.0
+  - @mcp-use/inspector@10.0.1-canary.0
+
 ## 1.32.0
 
 ### Minor Changes

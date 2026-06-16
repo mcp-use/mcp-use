@@ -25,10 +25,10 @@ export async function sendNotificationToAll(
   for (const [sessionId, session] of sessions.entries()) {
     try {
       await session.transport.send(notification);
+      console.log(`[MCP] Sent notification to session ${sessionId}: ${method}`);
     } catch (error) {
       console.warn(
-        `[MCP] Failed to send notification to session ${sessionId}:`,
-        error
+        `[MCP] Failed to send notification to session ${sessionId}: ${error}`
       );
     }
   }
@@ -58,11 +58,11 @@ export async function sendNotificationToSession(
 
   try {
     await session.transport.send(notification);
+    console.log(`[MCP] Sent notification to session ${sessionId}: ${method}`);
     return true;
   } catch (error) {
     console.warn(
-      `[MCP] Failed to send notification to session ${sessionId}:`,
-      error
+      `[MCP] Failed to send notification to session ${sessionId}: ${error}`
     );
     return false;
   }

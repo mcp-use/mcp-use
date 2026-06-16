@@ -1,6 +1,6 @@
 {
   "name": "create-mcp-use-app",
-  "version": "0.14.15",
+  "version": "0.14.16-canary.0",
   "type": "module",
   "description": "Create MCP-Use apps with one command",
   "author": "mcp-use, Inc.",
@@ -53,7 +53,7 @@
     "ink-text-input": "^6.0.0",
     "ora": "^9.0.0",
     "react": "^19.2.3",
-    "tar": "^7.5.11"
+    "tar": "^7.5.16"
   },
   "devDependencies": {
     "vitest": "^4.1.0"
