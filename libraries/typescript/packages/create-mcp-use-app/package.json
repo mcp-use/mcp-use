@@ -53,7 +53,7 @@
     "ink-text-input": "^6.0.0",
     "ora": "^9.0.0",
     "react": "^19.2.3",
-    "tar": "^7.5.11"
+    "tar": "^7.5.16"
   },
   "devDependencies": {
     "vitest": "^4.1.0"
