@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 10.0.2-canary.3
+
+### Patch Changes
+
+- e1bcc3f: Read the inspector version from package.json so canary builds and CLI version output stay in sync.
+  - mcp-use@1.32.2-canary.3
+
 ## 10.0.2-canary.2
 
 ### Patch Changes

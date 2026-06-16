@@ -10,6 +10,7 @@
   "changesets": [
     "codex-skills-folder",
     "dependabot-7b594246",
-    "hono-4-12-25"
+    "hono-4-12-25",
+    "slow-buckets-film"
   ]
 }
