@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.11
+
+### Patch Changes
+
+- 048ec9c: Add `--dockerfile` flag to `mcp-use deploy` for selecting a non-default Dockerfile path (relative to `--root-dir` or the repo root). Root `Dockerfile` is still auto-detected without the flag.
+  - mcp-use@1.32.1-canary.11
+  - @mcp-use/inspector@10.0.1-canary.11
+
 ## 3.5.2-canary.10
 
 ### Patch Changes
