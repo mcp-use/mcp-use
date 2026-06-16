@@ -3065,6 +3065,10 @@ program
     "Custom start command (overrides auto-detection)"
   )
   .option(
+    "--dockerfile <path>",
+    "Path to a non-default Dockerfile (relative to rootDir / repo root)"
+  )
+  .option(
     "--no-github",
     "Upload local source without connecting GitHub (repo hosted in the platform-managed org)"
   )
@@ -3084,6 +3088,7 @@ program
       region: options.region,
       buildCommand: options.buildCommand,
       startCommand: options.startCommand,
+      dockerfile: options.dockerfile,
       noGithub: options.github === false,
     });
   });

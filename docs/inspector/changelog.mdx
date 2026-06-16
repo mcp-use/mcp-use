@@ -6,10 +6,21 @@ rss: true
 tag: "New"
 ---
 
-<Update label="v9.0.2" description="June 2026">
-  ## mcp-use v1.32.0
-  Patch release paired with `mcp-use` v1.32.0 — picks up OAuth token endpoint discovery on `useMcp().authTokens`; no inspector-specific runtime changes.
+<Update label="v10.0.1" description="June 2026">
+  ## Hosted localhost chat & chat scroll helper
+  Patch release paired with `mcp-use` v1.32.1 — hosted inspector chat falls back to browser-side streaming for loopback MCP servers and adds a scroll-to-bottom affordance in long chats.
 
+- **Fix**: Hosted inspector chat detects localhost and loopback MCP server URLs and uses client-side streaming because the managed cloud backend cannot reach a user's local server; the configure-key empty state explains why a personal API key is needed (`#1736`)
+- **New**: Centered animated scroll-to-bottom button appears when viewing older chat messages (`#1538`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.32.1-canary.0`
+- **Update**: Updated mcp-use to v1.32.1
+</Update>
+
+<Update label="v10.0.0" description="June 2026">
+  ## mcp-use v1.32.0
+  Major release paired with `mcp-use` v1.32.0 — peer dependency moves to `>=1.32.0-canary.0`; no inspector-specific runtime changes.
+
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.32.0-canary.0`
 - **Update**: Updated mcp-use to v1.32.0
 </Update>
 

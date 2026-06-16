@@ -93,6 +93,13 @@ export interface ChatTabProps {
   /** Extra headers to send with every streaming request. */
   extraHeaders?: Record<string, string>;
   /**
+   * True when the hosted inspector's managed key isn't usable because the
+   * selected server is on localhost (the managed backend can't reach it).
+   * Surfaces an explanatory notice on the configure-key empty state so the
+   * BYOK fallback is explained rather than silent. Default: false.
+   */
+  managedKeyUnavailable?: boolean;
+  /**
    * Custom body builder for the streaming request.
    * Use to send only `{ messages }` to a server-managed backend.
    */
@@ -135,6 +142,7 @@ export function ChatTab({
   credentials,
   extraHeaders,
   body,
+  managedKeyUnavailable = false,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -1154,11 +1162,13 @@ export function ChatTab({
       {/* Messages Area */}
       <div
         ref={messagesAreaRef}
+        data-testid="chat-messages-scroll-container"
         className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
       >
         {!llmConfig ? (
           <ConfigureEmptyState
             onConfigureClick={() => setConfigDialogOpen(true)}
+            managedKeyUnavailable={managedKeyUnavailable}
           />
         ) : (
           <MessageList
@@ -1172,6 +1182,7 @@ export function ChatTab({
             pendingElicitationRequests={connection.pendingElicitationRequests}
             onApproveElicitation={connection.approveElicitation}
             onRejectElicitation={connection.rejectElicitation}
+            scrollContainerRef={messagesAreaRef}
           />
         )}
       </div>
