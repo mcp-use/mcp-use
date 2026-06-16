@@ -1,0 +1,26 @@
+{
+  "title": "Clerk-protected server",
+  "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
+  "requiresZodSchema": true,
+  "oauth": {
+    "backend": "clerk",
+    "frontendApiUrl": "https://sought-kit-32.clerk.accounts.dev"
+  },
+  "readinessBudgets": { "turns": 40, "costUsd": 2.25, "durationMs": 360000 },
+  "expectedTools": [
+    { "name": "whoami" },
+    { "name": "add", "requiredProps": ["a", "b"] }
+  ],
+  "calls": [
+    {
+      "tool": "whoami",
+      "args": {},
+      "expect": { "type": "contains", "value": "user_eval2f81aa01" }
+    },
+    {
+      "tool": "add",
+      "args": { "a": 20, "b": 22 },
+      "expect": { "type": "number-equals", "value": 42 }
+    }
+  ]
+}

@@ -6,15 +6,16 @@ Evals run against the **published npm package** — what agents in the wild actu
 
 ## How it works
 
-Each trial: prepare a fresh sandbox (OS tmpdir) → run an agent against a task prompt → evaluate the result three ways (two scores + one set of diagnostics):
+Each trial: prepare a fresh sandbox (OS tmpdir) → run an agent against a task prompt → evaluate the result with deterministic scores plus advisory judge notes:
 
-| Layer                                   | How                                                                                                                                                                                                                                                                                                                                                                      | Measures                         |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
-| **Outcome** (score)                     | Deterministic check ladder: `tsc --noEmit` (20) → server starts (20) → expected tools listed via our own `MCPClient` (30) → tool calls return correct results (30). Auth tasks (`auth` in task.json) insert a 5th check — unauthenticated and wrong-token requests must get HTTP 401 — and reweight to 15/15/20/25/25; the grading client then connects with the task's bearer token. | Does it work?                    |
-| **Frictions** (diagnostics, not scored) | Deterministic pattern detectors (`raw-sdk-import`, `hand-rolled-content-block`, `missing-zod-schema`, …) — see `src/graders/idiom.ts`. The catalog _is_ our definition of idiomatic mcp-use. Detector hits measure SDK discoverability, not agent quality, so they're reported as findings and tracked as per-detector hit rates over time — never blended into a score. | Where does our API fight agents? |
-| **Judge** (score)                       | LLM judge (pinned model) over code + transcript: binary yes/no/unknown assertions (including overall helper/idiom usage) plus process findings (where the agent struggled, hallucinated APIs, skipped self-verification)                                                                                                                                                 | Quality + process                |
+| Layer                      | How                                                                                                                                                                                                                                                                                                                                                                      | Measures                                               |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------ |
+| **Outcome** (score)        | Deterministic check ladder: `tsc --noEmit` (20) → server starts (20) → expected tools listed via our own `MCPClient` (30) → tool calls return correct results (30). OAuth tasks (`oauth` in task.json) insert a 5th check — source must use the task's intended SDK OAuth provider, unauthenticated and wrong-token requests must get HTTP 401, and an IdP-issued token must be accepted — and reweight to 15/15/20/25/25; the grading client then connects with a token obtained from the IdP. | Does it work?                                          |
+| **Readiness** (score)      | Deterministic penalty score over final-code idioms, transcript/process evidence, and task-level effort budgets. Starts at 100, subtracts penalties, clamps to 0, and is capped by Outcome when the contract failed.                                                                                                                                                       | Could an agent find and use the intended SDK path?     |
+| **Penalties** (diagnostic) | Deterministic readiness detectors (`raw-sdk-import`, `package-export-confusing`, `deep-type-spelunking`, `compile-repair-loop`, …). Direct type/artifact inspection is neutral unless it shows costly public-API discoverability friction.                                                                                                                                | Which docs / skill / SDK / template lever should move? |
+| **Judge Notes**            | LLM judge (pinned model) over code + transcript. Judge output is advisory only: useful observations should be promoted into deterministic readiness detectors before they affect scorecards or trends.                                                                                                                                                                   | Qualitative mining for future detectors                |
 
-Every variant×trial runs in a fresh sandbox; findings aggregate into a per-run `report.md` with a "Top friction points" section — each entry names the improvement lever (docs / skill / SDK / template).
+Every variant×trial runs in a fresh sandbox; readiness penalties aggregate into a per-run `report.md` with a "Top Readiness Penalties" section — each entry names the improvement lever (docs / skill / SDK / template / process).
 
 ### Variants
 
@@ -32,13 +33,13 @@ Requires: `ANTHROPIC_API_KEY` — used by both the agent runs (Claude Agent SDK,
 pnpm install && pnpm --filter mcp-use build
 
 # smoke-test the graders without an agent (copies the task's golden solution)
-pnpm --filter @mcp-use/sdk-evals eval -- --agent golden --skip-judge
+pnpm --filter @mcp-use/sdk-evals eval --agent golden --skip-judge
 
 # quick single run during iteration
-pnpm --filter @mcp-use/sdk-evals eval -- --task 01-basic-tool-server --variant noskill+blank
+pnpm --filter @mcp-use/sdk-evals eval --task 01-basic-tool-server --variant noskill+blank
 
 # recorded run: full matrix, 3 trials per cell
-pnpm --filter @mcp-use/sdk-evals eval -- --variant all --trials 3
+pnpm --filter @mcp-use/sdk-evals eval --variant all --trials 3
 
 # cross-run trend table
 pnpm --filter @mcp-use/sdk-evals trends
@@ -51,13 +52,14 @@ Results land in `results/<runId>/` (gitignored), where the run id leads with wha
 - Run **≥3 trials** for any run you intend to compare over time; report success rate, not single-trial pass/fail.
 - The **judge model is pinned** (`--judge-model`, default in `src/graders/judge.ts`). Changing it re-calibrates the judge trend — do it deliberately and note it.
 - **Never edit a task in place** — results carry a `promptHash`; a changed prompt is a different task. Add a new task dir instead.
-- Outcome and judge scores are reported separately on purpose. Don't blend them.
-- Friction detectors are deliberately unscored — watch per-detector hit rates in `pnpm trends` instead. A new detector changes what's measured; note it when comparing across runs.
+- Outcome and Readiness are reported separately on purpose. Outcome is the functional contract; Readiness is the deterministic agent-readiness score.
+- Judge findings are advisory only. Don't blend them into scorecards or trends; promote recurring judge observations into deterministic readiness detectors.
+- Readiness penalties are scored and trended. A new detector changes what's measured; note it when comparing across runs.
 
 ## Adding a task
 
 1. `tasks/<nn-name>/prompt.md` — pin the _observable contract_ (exact tool names, behavior, entry file, PORT handling) and leave implementation free, so the deterministic grader never fails a legitimate solution.
-2. `tasks/<nn-name>/task.json` — expected tools, fixture calls (`contains` / `not-contains` / `number-equals` expectations; calls run in order on one session, so sequenced calls can assert stateful behavior), valid variants. For auth tasks, add `"auth": { "tokenEnv": "...", "token": "..." }` — the grader sets the env var when starting the server, probes for 401s, and authenticates the tools/calls checks with the token.
+2. `tasks/<nn-name>/task.json` — expected tools, fixture calls (`contains` / `not-contains` / `number-equals` expectations; calls run in order on one session, so sequenced calls can assert stateful behavior), optional `readinessBudgets`, and valid variants. For OAuth tasks, add `"oauth": { "backend": "clerk" | "okta" }` — the harness runs a local IdP (a [vercel-labs/emulate](https://github.com/vercel-labs/emulate) backend, `src/oauth-backends.ts`) live during the agent phase, then grades against a **fresh** instance on a different port: it injects the IdP env vars when starting the server, checks that source uses the expected SDK provider (`oauthClerkProvider()` for Clerk, `oauthCustomProvider()` for the custom IdP), probes for 401s, obtains a token via a headless authorization-code flow, and authenticates the tools/calls checks with it. Clerk tasks may also set `oauth.frontendApiUrl`; that real Clerk Frontend API URL is exposed only to the agent phase as `MCP_USE_OAUTH_CLERK_FRONTEND_API_URL`, while grading still uses the deterministic local issuer. The Clerk backend is a JWT/JWKS-compatible local issuer and intentionally does not emulate Dynamic Client Registration; DCR belongs in a separate integration test or a purpose-built fake. `whoami`-style call expectations must use the seed constants exported from `src/oauth-backends.ts` (a test enforces this).
 3. `tasks/<nn-name>/golden/` — a known-good solution; `--agent golden` must score 100/100 before you trust agent runs.
 4. New SDK feature agents should adopt? Add a detector to `src/graders/idiom.ts`.
 
@@ -67,7 +69,9 @@ Results land in `results/<runId>/` (gitignored), where the run id leads with wha
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `01-basic-tool-server`      | Single tool, zod schema, streamable HTTP, PORT handling — the SDK happy path                                        |
 | `02-stateful-notes-server`  | Four CRUD tools over shared in-memory state, sequenced lifecycle calls, "not found" error contract, count reporting |
-| `03-authenticated-server`   | Bearer auth from an env token (401 on missing/wrong token), identity propagation into a tool via the auth context   |
+| `03-oauth-clerk`            | Clerk-protected server via `oauthClerkProvider()` zero-config env, JWKS verification, identity from the auth context |
+| `04-oauth-custom-idp`       | Generic OIDC IdP via `oauthCustomProvider` + `jwksVerifier` (issuer/audience claim checks), env-driven configuration |
+| `05-job-board-context`      | Job board browsing with current liked-listing state, ambiguous "Am I qualified for this?" follow-up, model-context UI |
 
 ## Known v1 limitations
 

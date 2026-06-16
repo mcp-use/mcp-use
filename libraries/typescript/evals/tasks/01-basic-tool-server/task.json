@@ -2,6 +2,7 @@
   "title": "Basic tool server",
   "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
   "requiresZodSchema": true,
+  "readinessBudgets": { "turns": 20, "costUsd": 0.75, "durationMs": 150000 },
   "expectedTools": [{ "name": "add", "requiredProps": ["a", "b"] }],
   "calls": [
     { "tool": "add", "args": { "a": 2, "b": 3 }, "expect": { "type": "number-equals", "value": 5 } },

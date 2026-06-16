@@ -1,0 +1,76 @@
+{
+  "title": "Job board contextual qualification",
+  "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
+  "requiresZodSchema": true,
+  "readinessBudgets": { "turns": 30, "costUsd": 1.15, "durationMs": 240000 },
+  "expectedTools": [
+    { "name": "browse_jobs" },
+    { "name": "like_listing", "requiredProps": ["listingId"] },
+    { "name": "am_i_qualified", "requiredProps": ["candidateProfile"] }
+  ],
+  "calls": [
+    {
+      "tool": "am_i_qualified",
+      "args": { "candidateProfile": "I know React and TypeScript." },
+      "expect": { "type": "contains", "value": "no current listing" }
+    },
+    {
+      "tool": "browse_jobs",
+      "args": {},
+      "expect": { "type": "contains", "value": "frontend-platform" }
+    },
+    {
+      "tool": "browse_jobs",
+      "args": { "search": "data" },
+      "expect": { "type": "contains", "value": "data-product-analyst" }
+    },
+    {
+      "tool": "browse_jobs",
+      "args": { "search": "data" },
+      "expect": { "type": "not-contains", "value": "developer-advocate" }
+    },
+    {
+      "tool": "like_listing",
+      "args": { "listingId": "frontend-platform" },
+      "expect": { "type": "contains", "value": "Frontend Platform Engineer" }
+    },
+    {
+      "tool": "am_i_qualified",
+      "args": {
+        "candidateProfile": "5 years building React and TypeScript interfaces, accessibility audits, design systems, and frontend testing."
+      },
+      "expect": { "type": "contains", "value": "Frontend Platform Engineer" }
+    },
+    {
+      "tool": "am_i_qualified",
+      "args": {
+        "candidateProfile": "5 years building React and TypeScript interfaces, accessibility audits, design systems, and frontend testing."
+      },
+      "expect": { "type": "contains", "value": "likely qualified" }
+    },
+    {
+      "tool": "like_listing",
+      "args": { "listingId": "data-product-analyst" },
+      "expect": { "type": "contains", "value": "Data Product Analyst" }
+    },
+    {
+      "tool": "am_i_qualified",
+      "args": {
+        "candidateProfile": "I use SQL and Python to build dashboards, run experiments, and communicate insights to stakeholders."
+      },
+      "expect": { "type": "contains", "value": "Data Product Analyst" }
+    },
+    {
+      "tool": "am_i_qualified",
+      "args": {
+        "candidateProfile": "I use SQL and Python to build dashboards, run experiments, and communicate insights to stakeholders."
+      },
+      "expect": { "type": "contains", "value": "likely qualified" }
+    },
+    {
+      "tool": "like_listing",
+      "args": { "listingId": "ghost-role" },
+      "expect": { "type": "contains", "value": "not found" }
+    }
+  ]
+}

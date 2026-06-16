@@ -1,5 +1,13 @@
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { flattenCallResult, matchExpectation } from "../src/graders/outcome.js";
+import {
+  flattenCallResult,
+  matchExpectation,
+  oauthProviderContractProblem,
+} from "../src/graders/outcome.js";
+import type { TaskConfig } from "../src/types.js";
 
 describe("matchExpectation", () => {
   it("contains: substring match", () => {
@@ -82,5 +90,43 @@ describe("flattenCallResult", () => {
     expect(flattenCallResult({ content: [{ type: "image", data: "…" }] })).toBe(
       ""
     );
+  });
+});
+
+describe("oauthProviderContractProblem", () => {
+  const clerkTask = {
+    id: "03-oauth-clerk",
+    title: "Clerk",
+    entryCandidates: ["src/server.ts"],
+    requiresZodSchema: true,
+    expectedTools: [],
+    calls: [],
+    oauth: { backend: "clerk" },
+  } satisfies TaskConfig;
+
+  it("passes when the Clerk task uses oauthClerkProvider", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "oauth-provider-ok-"));
+    await mkdir(join(workspace, "src"));
+    await writeFile(
+      join(workspace, "src", "server.ts"),
+      "import { oauthClerkProvider } from 'mcp-use/server';\nconst oauth = oauthClerkProvider();\n"
+    );
+
+    await expect(
+      oauthProviderContractProblem(workspace, clerkTask)
+    ).resolves.toBeNull();
+  });
+
+  it("fails the Clerk task when code uses generic OAuth instead", async () => {
+    const workspace = await mkdtemp(join(tmpdir(), "oauth-provider-bad-"));
+    await mkdir(join(workspace, "src"));
+    await writeFile(
+      join(workspace, "src", "server.ts"),
+      "import { oauthCustomProvider } from 'mcp-use/server';\nconst oauth = oauthCustomProvider({});\n"
+    );
+
+    await expect(
+      oauthProviderContractProblem(workspace, clerkTask)
+    ).resolves.toContain("oauthClerkProvider()");
   });
 });

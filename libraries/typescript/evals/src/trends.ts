@@ -1,7 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { RESULTS_DIR } from "./tasks.js";
-import type { RunResult } from "./types.js";
+import { TrendRunSchema, type TrendRun } from "./types.js";
 
 /** Cross-run trend table: tasks×variants as rows, runs as columns, success rate per cell. */
 async function main(): Promise<void> {
@@ -15,17 +15,20 @@ async function main(): Promise<void> {
     return;
   }
 
-  const runs: RunResult[] = [];
+  const runs: TrendRun[] = [];
   for (const dir of runDirs) {
+    let raw: string;
     try {
-      runs.push(
-        JSON.parse(
-          await readFile(join(RESULTS_DIR, dir, "run.json"), "utf8")
-        ) as RunResult
-      );
+      raw = await readFile(join(RESULTS_DIR, dir, "run.json"), "utf8");
     } catch {
-      /* incomplete run dir */
+      continue; // no run.json — incomplete or foreign dir, skip quietly
     }
+    const parsed = TrendRunSchema.safeParse(tryJson(raw));
+    if (!parsed.success) {
+      console.warn(`⚠️  skipping ${dir}: run.json is not a valid run result`);
+      continue;
+    }
+    runs.push(parsed.data);
   }
   // Run ids lead with the task name, so chronological order comes from startedAt.
   runs.sort((a, b) => a.startedAt.localeCompare(b.startedAt));
@@ -56,32 +59,49 @@ async function main(): Promise<void> {
   console.log("Success rate");
   printTable(successTable);
 
-  // Friction trends: per detector, the share of trials it fired in. This is
-  // the longitudinal idiom view — each detector trends independently instead
-  // of being blended into a score.
+  const readinessTable: string[][] = [["task · variant", ...runLabels]];
+  for (const row of [...rows].sort()) {
+    const [task, variant] = row.split(" · ");
+    const cells = runs.map((run) => {
+      const scores = run.trials
+        .filter((t) => t.task === task && t.variant === variant)
+        .map((t) => t.readiness?.score)
+        .filter((score): score is number => typeof score === "number");
+      if (scores.length === 0) return "—";
+      return String(mean(scores));
+    });
+    readinessTable.push([row, ...cells]);
+  }
+  console.log("\nMean readiness");
+  printTable(readinessTable);
+
+  // Penalty trends: per deterministic readiness detector, the share of trials
+  // it fired in. Judge findings are advisory and deliberately excluded.
   const detectors = new Set<string>();
   for (const run of runs)
     for (const t of run.trials)
-      for (const f of [
-        ...t.idiom.findings,
-        ...(t.judge?.processFindings ?? []),
-      ])
-        detectors.add(f.detector);
+      for (const p of t.readiness?.penalties ?? []) detectors.add(p.detector);
   if (detectors.size > 0) {
-    const frictionTable: string[][] = [["detector", ...runLabels]];
+    const penaltyTable: string[][] = [["detector", ...runLabels]];
     for (const detector of [...detectors].sort()) {
       const cells = runs.map((run) => {
         const hit = run.trials.filter((t) =>
-          [...t.idiom.findings, ...(t.judge?.processFindings ?? [])].some(
-            (f) => f.detector === detector
-          )
+          (t.readiness?.penalties ?? []).some((p) => p.detector === detector)
         ).length;
         return `${hit}/${run.trials.length}`;
       });
-      frictionTable.push([detector, ...cells]);
+      penaltyTable.push([detector, ...cells]);
     }
-    console.log("\nFriction rate (trials hit / trials)");
-    printTable(frictionTable);
+    console.log("\nReadiness penalty rate (trials hit / trials)");
+    printTable(penaltyTable);
+  }
+}
+
+function tryJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
   }
 }
 
@@ -92,6 +112,10 @@ function printTable(table: string[][]): void {
   for (const row of table) {
     console.log(row.map((c, i) => c.padEnd(widths[i])).join("  "));
   }
+}
+
+function mean(xs: number[]): number {
+  return Math.round(xs.reduce((a, b) => a + b, 0) / xs.length);
 }
 
 main().catch((err) => {

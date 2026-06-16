@@ -45,6 +45,28 @@ const RESPONSE_HELPERS = [
 
 const DETECTORS: Detector[] = [
   {
+    // The eval's golden path is the explicit class constructor. The factory is
+    // still a public API, but in these tasks it tends to hide the canonical
+    // MCPServer surface agents should learn.
+    id: "create-mcp-server-factory",
+    lever: "docs",
+    appliesTo: () => true,
+    detect: (files) =>
+      grepFiles(
+        files,
+        /\bcreateMCPServer\s*\(/,
+        (file, line, text) => ({
+          detector: "create-mcp-server-factory",
+          file,
+          line,
+          evidence:
+            text.trim() ||
+            "createMCPServer() used instead of `new MCPServer(...)`",
+          lever: "docs",
+        })
+      ),
+  },
+  {
     // Agent bypassed mcp-use and built on the raw protocol SDK — the single
     // clearest "couldn't discover our API" signal.
     id: "raw-sdk-import",
@@ -82,6 +104,35 @@ const DETECTORS: Detector[] = [
       ),
   },
   {
+    // Widget code should go through mcp-use/react helpers (useWidget,
+    // useCallTool, ModelContext/modelContext) instead of reaching directly for
+    // the host bridge. Direct window.openai usage means the app is coupled to
+    // one bridge shape and bypasses the model-context abstraction we want
+    // agents to discover.
+    id: "direct-window-openai",
+    lever: "docs",
+    appliesTo: () => true,
+    detect: (files) => {
+      const findings: Finding[] = [];
+      for (const [file, content] of files) {
+        const lines = content.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          if (!/\bwindow\.openai\b/.test(lines[i])) continue;
+          const trimmed = lines[i].trim();
+          if (/^(?:\/\/|\/\*|\*)/.test(trimmed)) continue;
+          findings.push({
+            detector: "direct-window-openai",
+            file,
+            line: i + 1,
+            evidence: trimmed,
+            lever: "docs",
+          });
+        }
+      }
+      return findings;
+    },
+  },
+  {
     // Registers tools but never imports a response helper from mcp-use/server
     id: "no-response-helper-import",
     lever: "docs",
@@ -115,12 +166,12 @@ const DETECTORS: Detector[] = [
     },
   },
   {
-    // Auth task solved without the SDK's oauth support (`oauth:` server config
-    // with a provider such as oauthCustomProvider) — the agent hand-rolled
+    // OAuth task solved without the SDK's oauth support (`oauth:` server config
+    // with a provider such as oauthClerkProvider) — the agent hand-rolled
     // middleware/header checks instead, i.e. never discovered the affordance.
     id: "hand-rolled-auth",
     lever: "docs",
-    appliesTo: (task) => Boolean(task.auth),
+    appliesTo: (task) => Boolean(task.oauth),
     detect: (files) => {
       for (const content of files.values()) {
         if (
@@ -133,10 +184,69 @@ const DETECTORS: Detector[] = [
         {
           detector: "hand-rolled-auth",
           evidence:
-            "bearer auth implemented without the SDK's oauth support (no `oauth:` server config / oauth*Provider factory)",
+            "OAuth implemented without the SDK's oauth support (no `oauth:` server config / oauth*Provider factory)",
           lever: "docs",
         },
       ];
+    },
+  },
+  {
+    // SDK oauth support was found, but not the provider factory the task's
+    // IdP calls for (oauthClerkProvider for Clerk, oauthCustomProvider for a
+    // generic OIDC IdP) — a provider-discoverability gap rather than a
+    // missed-affordance one. Silent when no oauth usage exists at all
+    // (that's hand-rolled-auth's finding).
+    id: "wrong-oauth-provider",
+    lever: "docs",
+    appliesTo: (task) => Boolean(task.oauth),
+    detect: (files, task) => {
+      const expected =
+        task.oauth!.backend === "clerk"
+          ? "oauthClerkProvider"
+          : "oauthCustomProvider";
+      let usesSdkOauth = false;
+      for (const content of files.values()) {
+        if (new RegExp(`\\b${expected}\\s*\\(`).test(content)) return [];
+        if (
+          /\boauth\s*:/.test(content) ||
+          /\boauth\w*(Provider|Proxy)\s*\(/.test(content)
+        )
+          usesSdkOauth = true;
+      }
+      if (!usesSdkOauth) return [];
+      return [
+        {
+          detector: "wrong-oauth-provider",
+          evidence: `SDK oauth config is used, but not via ${expected}() — the documented factory for this task's IdP`,
+          lever: "docs",
+        },
+      ];
+    },
+  },
+  {
+    // Custom-IdP task verified tokens by wiring jose directly instead of the
+    // SDK's jwksVerifier() helper — the helper wasn't discovered.
+    id: "hand-rolled-jwks-verify",
+    lever: "docs",
+    appliesTo: (task) => task.oauth?.backend === "okta",
+    detect: (files) => {
+      let usesJoseDirectly = false;
+      let usesHelper = false;
+      for (const content of files.values()) {
+        if (/\bcreateRemoteJWKSet\s*\(/.test(content)) usesJoseDirectly = true;
+        if (/\bjwksVerifier\s*\(/.test(content)) usesHelper = true;
+      }
+      if (usesJoseDirectly && !usesHelper) {
+        return [
+          {
+            detector: "hand-rolled-jwks-verify",
+            evidence:
+              "token verification wires jose's createRemoteJWKSet directly instead of the SDK's jwksVerifier() helper",
+            lever: "docs",
+          },
+        ];
+      }
+      return [];
     },
   },
   {

@@ -1,8 +1,9 @@
 {
-  "title": "Bearer-authenticated server",
+  "title": "Custom OIDC IdP server",
   "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
   "requiresZodSchema": true,
-  "auth": { "tokenEnv": "MCP_AUTH_TOKEN", "token": "eval-secret-token-91c4" },
+  "oauth": { "backend": "okta" },
+  "readinessBudgets": { "turns": 40, "costUsd": 2.25, "durationMs": 360000 },
   "expectedTools": [
     { "name": "whoami" },
     { "name": "add", "requiredProps": ["a", "b"] }
@@ -11,7 +12,7 @@
     {
       "tool": "whoami",
       "args": {},
-      "expect": { "type": "contains", "value": "agent@example.com" }
+      "expect": { "type": "contains", "value": "00ueval2f81aa01" }
     },
     {
       "tool": "add",

@@ -137,9 +137,21 @@ importers:
         specifier: 4.3.5
         version: 4.3.5
     devDependencies:
+      '@emulators/clerk':
+        specifier: 0.6.0
+        version: 0.6.0
+      '@emulators/core':
+        specifier: 0.6.0
+        version: 0.6.0
+      '@emulators/okta':
+        specifier: 0.6.0
+        version: 0.6.0
       '@types/node':
         specifier: ^25.3.0
         version: 25.6.0
+      jose:
+        specifier: 6.1.3
+        version: 6.1.3
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -1847,6 +1859,15 @@ packages:
 
   '@emnapi/wasi-threads@1.2.1':
     resolution: {integrity: sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==}
+
+  '@emulators/clerk@0.6.0':
+    resolution: {integrity: sha512-Mq0QGPh83ecOZKXa5CtqBb0WcIMwf+NXy5v1zDMo40mQTTRAUDk5a/jPdwOuTQq+3zgO8zOU1sjFcwWXY+iUlQ==}
+
+  '@emulators/core@0.6.0':
+    resolution: {integrity: sha512-HFGyF4yA3NoUCYq/5lg7YNXx5Cfaz8oMUz5gfJ/8X+tFdZbi2oKAmQoAzfXV9kiAUWvXlkiahZ1EZDpxeC36gA==}
+
+  '@emulators/okta@0.6.0':
+    resolution: {integrity: sha512-gK9WFS4ACsOILsCRM3EG/zIzLlOfj/UOUaBMSmb52Q7mGBc9h/z7n/hjohyc4qH1V2j7oq2iumY4ANs0jske0w==}
 
   '@esbuild/aix-ppc64@0.27.1':
     resolution: {integrity: sha512-HHB50pdsBX6k47S4u5g/CaLjqS3qwaOVE5ILsq64jyzgMhLuCuZ8rGzM9yhsAjfjkbgUPMzZEPa7DAp7yz6vuA==}
@@ -5855,6 +5876,9 @@ packages:
   jose@6.1.3:
     resolution: {integrity: sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==}
 
+  jose@6.2.3:
+    resolution: {integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==}
+
   joycon@3.1.1:
     resolution: {integrity: sha512-34wB/Y7MW7bzjKRjUKTa46I2Z7eV62Rkhva+KkopW7Qvv/OSWBqvkSY7vusOPrNuZcUG3tApvdVgNB8POj3SPw==}
     engines: {node: '>=10'}
@@ -8423,6 +8447,20 @@ snapshots:
     dependencies:
       tslib: 2.8.1
     optional: true
+
+  '@emulators/clerk@0.6.0':
+    dependencies:
+      '@emulators/core': 0.6.0
+      jose: 6.1.3
+
+  '@emulators/core@0.6.0':
+    dependencies:
+      jose: 6.2.3
+
+  '@emulators/okta@0.6.0':
+    dependencies:
+      '@emulators/core': 0.6.0
+      jose: 6.1.3
 
   '@esbuild/aix-ppc64@0.27.1':
     optional: true
@@ -13171,6 +13209,8 @@ snapshots:
       '@standard-schema/spec': 1.1.0
 
   jose@6.1.3: {}
+
+  jose@6.2.3: {}
 
   joycon@3.1.1: {}
 

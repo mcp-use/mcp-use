@@ -2,6 +2,7 @@
   "title": "Stateful notes server",
   "entryCandidates": ["src/server.ts", "index.ts", "server.ts", "src/index.ts"],
   "requiresZodSchema": true,
+  "readinessBudgets": { "turns": 25, "costUsd": 0.95, "durationMs": 210000 },
   "expectedTools": [
     { "name": "save_note", "requiredProps": ["id", "title", "content"] },
     { "name": "get_note", "requiredProps": ["id"] },

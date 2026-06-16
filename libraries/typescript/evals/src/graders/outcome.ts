@@ -1,7 +1,8 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { createServer, connect } from "node:net";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { MCPClient } from "mcp-use";
+import { startOAuthBackend, type OAuthBackend } from "../oauth-backends.js";
 import { run, sanitizedEnv, spawnDaemon } from "../proc.js";
 import type {
   CheckResult,
@@ -11,7 +12,7 @@ import type {
 } from "../types.js";
 
 const WEIGHTS = { compiles: 20, starts: 20, tools: 30, calls: 30 } as const;
-/** auth tasks add a 5th check; weights reallocate so the ladder still sums to 100 */
+/** oauth tasks add a 5th check; weights reallocate so the ladder still sums to 100 */
 const AUTH_WEIGHTS = {
   compiles: 15,
   starts: 15,
@@ -21,12 +22,21 @@ const AUTH_WEIGHTS = {
 } as const;
 type CheckId = keyof typeof AUTH_WEIGHTS;
 const START_TIMEOUT_MS = 30_000;
+const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs"]);
+const EXCLUDED_SOURCE_DIRS = new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".mcp-use",
+  ".claude",
+]);
 
 export async function gradeOutcome(
   workspace: string,
   task: TaskConfig
 ): Promise<OutcomeGrade> {
-  const weights: Partial<Record<CheckId, number>> = task.auth
+  const weights: Partial<Record<CheckId, number>> = task.oauth
     ? AUTH_WEIGHTS
     : WEIGHTS;
   const checkIds = Object.keys(weights) as CheckId[];
@@ -85,11 +95,18 @@ export async function gradeOutcome(
       "starts",
       `no entry file found (tried: ${task.entryCandidates.join(", ")})`
     );
-    if (task.auth) fail("auth", "server not running");
+    if (task.oauth) fail("auth", "server not running");
     fail("tools", "server not running");
     fail("calls", "server not running");
     return finalize(checks);
   }
+
+  // Fresh IdP per grading run — deliberately on a different port than the
+  // agent phase, so a server that hardcoded the dev-time issuer URL instead
+  // of reading the env vars fails here (same contract as the PORT check).
+  const backend: OAuthBackend | null = task.oauth
+    ? await startOAuthBackend(task.oauth.backend, await freePort())
+    : null;
 
   const port = await freePort();
   const server = spawnDaemon("npx", ["-y", "tsx", entry], {
@@ -98,7 +115,7 @@ export async function gradeOutcome(
       ...sanitizedEnv(),
       PORT: String(port),
       NODE_ENV: "production",
-      ...(task.auth ? { [task.auth.tokenEnv]: task.auth.token } : {}),
+      ...(backend ? backend.env : {}),
     },
   });
 
@@ -120,17 +137,24 @@ export async function gradeOutcome(
         "starts",
         `server did not come up within ${START_TIMEOUT_MS}ms. Output:\n${tail(server.output())}`
       );
-      if (task.auth) fail("auth", "server not running");
+      if (task.oauth) fail("auth", "server not running");
       fail("tools", "server not running");
       fail("calls", "server not running");
       return finalize(checks);
     }
 
-    // 3. auth — unauthenticated and wrong-token requests must be rejected with 401.
-    // Probed with raw fetch (a well-formed initialize request) so a legitimate
-    // implementation is never failed for transport reasons.
-    if (task.auth) {
+    // 3. auth — unauthenticated and wrong-token requests must be rejected with
+    // 401, and a token issued by the IdP must be accepted. Probed with raw
+    // fetch (a well-formed initialize request) so a legitimate implementation
+    // is never failed for transport reasons.
+    const token = backend ? await backend.getToken() : null;
+    if (task.oauth) {
       const problems: string[] = [];
+      const providerProblem = await oauthProviderContractProblem(
+        workspace,
+        task
+      );
+      if (providerProblem) problems.push(providerProblem);
       const noToken = await probeMcpStatus(activePort);
       if (noToken !== 401)
         problems.push(
@@ -138,24 +162,32 @@ export async function gradeOutcome(
         );
       const wrongToken = await probeMcpStatus(
         activePort,
-        "definitely-not-the-accepted-token"
+        "definitely-not-a-token-the-idp-issued"
       );
       if (wrongToken !== 401)
         problems.push(
           `request with a wrong bearer token → HTTP ${wrongToken ?? "unreachable"} (expected 401)`
         );
+      const validToken = await probeMcpStatus(activePort, token!);
+      if (validToken === 401 || validToken === null)
+        problems.push(
+          `request with a valid ${task.oauth.backend} token → ${validToken === null ? "unreachable" : "HTTP 401"} (expected acceptance)`
+        );
       if (problems.length === 0)
-        pass("auth", "401 for missing and wrong bearer token");
+        pass(
+          "auth",
+          "401 for missing and wrong bearer token; IdP-issued token accepted"
+        );
       else fail("auth", problems.join("; "));
     }
 
     // 4 + 5. tools listed / calls correct — graded with our own MCPClient,
-    // authenticating with the task's bearer token when the task requires auth
+    // authenticating with the IdP-issued token when the task requires auth
     const client = new MCPClient({
       mcpServers: {
         sut: {
           url: `http://localhost:${activePort}/mcp`,
-          ...(task.auth ? { authToken: task.auth.token } : {}),
+          ...(token ? { authToken: token } : {}),
         },
       },
     });
@@ -220,9 +252,67 @@ export async function gradeOutcome(
     }
   } finally {
     server.stop();
+    await backend?.stop();
   }
 
   return finalize(checks);
+}
+
+/**
+ * OAuth tasks are intentionally provider-specific. Runtime token probes catch
+ * broken auth behavior; this source contract catches generic/hand-rolled OAuth
+ * code that happens to accept the local emulator's JWTs but misses the SDK path
+ * the task exists to evaluate.
+ */
+export async function oauthProviderContractProblem(
+  workspace: string,
+  task: TaskConfig
+): Promise<string | null> {
+  if (!task.oauth) return null;
+
+  const expectedProvider =
+    task.oauth.backend === "clerk"
+      ? "oauthClerkProvider"
+      : "oauthCustomProvider";
+  const sources = await sourceFiles(workspace);
+  const usesExpectedProvider = sources.some((content) =>
+    new RegExp(`\\b${expectedProvider}\\s*\\(`).test(content)
+  );
+
+  if (usesExpectedProvider) return null;
+  return `source does not use ${expectedProvider}(), the required SDK OAuth provider for the ${task.oauth.backend} task`;
+}
+
+async function sourceFiles(root: string): Promise<string[]> {
+  const files: string[] = [];
+
+  async function walk(dir: string): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (!EXCLUDED_SOURCE_DIRS.has(entry.name))
+          await walk(join(dir, entry.name));
+        continue;
+      }
+      if (!entry.isFile() || !SOURCE_EXTENSIONS.has(extname(entry.name)))
+        continue;
+
+      try {
+        files.push(await readFile(join(dir, entry.name), "utf8"));
+      } catch {
+        /* file disappeared between readdir/readFile */
+      }
+    }
+  }
+
+  await walk(root);
+  return files;
 }
 
 /** Extract input-schema property names, tolerating MCP/SDK naming variants. */
@@ -318,7 +408,7 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-function freePort(): Promise<number> {
+export function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const srv = createServer();
     srv.listen(0, () => {

@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { LoadedTask, TaskConfig } from "./types.js";
+import { z } from "zod";
+import { TaskConfigSchema, type LoadedTask } from "./types.js";
 
 const EVALS_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const TASKS_DIR = join(EVALS_ROOT, "tasks");
@@ -27,10 +28,15 @@ export async function listTaskIds(): Promise<string[]> {
 
 export async function loadTask(id: string): Promise<LoadedTask> {
   const dir = join(TASKS_DIR, id);
-  const config = JSON.parse(
-    await readFile(join(dir, "task.json"), "utf8")
-  ) as TaskConfig;
-  config.id = id;
+  const parsed = TaskConfigSchema.safeParse(
+    JSON.parse(await readFile(join(dir, "task.json"), "utf8"))
+  );
+  if (!parsed.success) {
+    throw new Error(
+      `invalid ${join(dir, "task.json")}:\n${z.prettifyError(parsed.error)}`
+    );
+  }
+  const config = { ...parsed.data, id };
   const prompt = await readFile(join(dir, "prompt.md"), "utf8");
   const promptHash = createHash("sha256")
     .update(prompt)

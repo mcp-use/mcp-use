@@ -4,7 +4,13 @@ import { parseArgs } from "node:util";
 import { assertAgentAuth, runClaudeAgent } from "./agent.js";
 import { gradeIdiom, collectSourceFiles } from "./graders/idiom.js";
 import { DEFAULT_JUDGE_MODEL, gradeWithJudge } from "./graders/judge.js";
-import { gradeOutcome, installedSdkVersion } from "./graders/outcome.js";
+import {
+  freePort,
+  gradeOutcome,
+  installedSdkVersion,
+} from "./graders/outcome.js";
+import { gradeReadiness } from "./graders/readiness.js";
+import { startOAuthBackend } from "./oauth-backends.js";
 import { consoleSummary, renderReport } from "./report.js";
 import { applyGolden, prepareWorkspace, snapshotWorkspace } from "./sandbox.js";
 import { listTaskIds, loadTask, RESULTS_DIR } from "./tasks.js";
@@ -14,6 +20,7 @@ import {
   variantId,
   type LoadedTask,
   type RunResult,
+  type TaskOAuth,
   type TrialResult,
   type Variant,
 } from "./types.js";
@@ -114,11 +121,8 @@ async function main(): Promise<void> {
           runDir,
         });
         run.trials.push(result);
-        const frictionCount =
-          result.idiom.findings.length +
-          (result.judge?.processFindings.length ?? 0);
         console.log(
-          `  outcome ${result.outcome.score}${result.outcome.success ? " ✅" : ""} · frictions ${frictionCount} · judge ${result.judge?.score ?? "—"}${result.error ? ` · ⚠️ ${result.error}` : ""}`
+          `  outcome ${result.outcome.score}${result.outcome.success ? " ✅" : ""} · readiness ${result.readiness.score} · penalties ${result.readiness.penalties.length} · judge notes ${result.judge?.processFindings.length ?? "—"}${result.error ? ` · ⚠️ ${result.error}` : ""}`
         );
       }
     }
@@ -174,7 +178,7 @@ async function runTrial(opts: {
   );
   await mkdir(trialDir, { recursive: true });
 
-  const base: Omit<TrialResult, "outcome" | "idiom" | "judge"> = {
+  const base: Omit<TrialResult, "outcome" | "idiom" | "readiness" | "judge"> = {
     task: task.config.id,
     variant: vid,
     trial: opts.trial,
@@ -182,16 +186,17 @@ async function runTrial(opts: {
     agentRunner: opts.agentRunner,
     agentModel:
       opts.model ?? (opts.agentRunner === "golden" ? "golden" : "default"),
-    sdkSource: "npm",
     sdkVersion: null,
     durationMs: null,
     turns: null,
     costUsd: null,
     transcriptPath: null,
     timestamp: new Date().toISOString(),
+    error: null,
   };
 
   const empty = { score: 0, success: false, checks: [] };
+  const emptyReadiness = { score: 0, penalties: [] };
   const sandbox = await prepareWorkspace(variant).catch((err) => {
     return { error: String(err) } as const;
   });
@@ -200,6 +205,7 @@ async function runTrial(opts: {
       ...base,
       outcome: empty,
       idiom: { findings: [] },
+      readiness: emptyReadiness,
       judge: null,
       error: `sandbox: ${sandbox.error}`,
     };
@@ -212,12 +218,27 @@ async function runTrial(opts: {
     if (opts.agentRunner === "golden") {
       await applyGolden(task.dir, sandbox.workspace);
     } else {
-      const info = await runClaudeAgent({
-        workspace: sandbox.workspace,
-        prompt: task.prompt,
-        model: opts.model,
-        timeoutMs: opts.timeoutMs,
-      });
+      // OAuth tasks get a live IdP for the whole agent session so the agent
+      // can inspect/probe the issuer. Grading later starts its own fresh
+      // instance on a different port (state isolation + catches hardcoded
+      // issuer URLs).
+      const agentBackend = task.config.oauth
+        ? await startOAuthBackend(task.config.oauth.backend, await freePort())
+        : null;
+      let info;
+      try {
+        info = await runClaudeAgent({
+          workspace: sandbox.workspace,
+          prompt: task.prompt,
+          model: opts.model,
+          timeoutMs: opts.timeoutMs,
+          extraEnv: agentBackend
+            ? agentPhaseOAuthEnv(task.config.oauth!, agentBackend.env)
+            : undefined,
+        });
+      } finally {
+        await agentBackend?.stop();
+      }
       base.durationMs = info.durationMs;
       base.turns = info.turns;
       base.costUsd = info.costUsd;
@@ -234,6 +255,16 @@ async function runTrial(opts: {
     // ── grading phase ──
     const outcome = await gradeOutcome(sandbox.workspace, task.config);
     const idiom = await gradeIdiom(sandbox.workspace, task.config);
+    const readiness = gradeReadiness({
+      task: task.config,
+      variant: vid,
+      outcome,
+      idiom,
+      transcript,
+      turns: base.turns,
+      costUsd: base.costUsd,
+      durationMs: base.durationMs,
+    });
     base.sdkVersion = await installedSdkVersion(sandbox.workspace);
 
     let judge = null;
@@ -255,8 +286,9 @@ async function runTrial(opts: {
       ...base,
       outcome,
       idiom,
+      readiness,
       judge,
-      ...(trialError ? { error: trialError } : {}),
+      error: trialError ?? null,
     };
   } catch (err) {
     await snapshotWorkspace(
@@ -267,12 +299,26 @@ async function runTrial(opts: {
       ...base,
       outcome: empty,
       idiom: { findings: [] },
+      readiness: emptyReadiness,
       judge: null,
       error: String(err instanceof Error ? (err.stack ?? err.message) : err),
     };
   } finally {
     await sandbox.cleanup().catch(() => {});
   }
+}
+
+function agentPhaseOAuthEnv(
+  oauth: TaskOAuth,
+  backendEnv: Record<string, string>
+): Record<string, string> {
+  if (oauth.backend === "clerk" && oauth.frontendApiUrl) {
+    return {
+      ...backendEnv,
+      MCP_USE_OAUTH_CLERK_FRONTEND_API_URL: oauth.frontendApiUrl,
+    };
+  }
+  return backendEnv;
 }
 
 main().catch((err) => {

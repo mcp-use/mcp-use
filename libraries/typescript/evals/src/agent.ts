@@ -24,6 +24,8 @@ export async function runClaudeAgent(opts: {
   prompt: string;
   model?: string;
   timeoutMs?: number;
+  /** trial-specific env (e.g. the OAuth task's live IdP config) */
+  extraEnv?: Record<string, string>;
 }): Promise<AgentRunInfo> {
   const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const abort = new AbortController();
@@ -43,7 +45,7 @@ export async function runClaudeAgent(opts: {
         settingSources: ["project"],
         // Replaces the subprocess env entirely (SDK semantics) — keeps
         // ANTHROPIC_API_KEY, drops harness/user-shell leakage.
-        env: sanitizedEnv(),
+        env: { ...sanitizedEnv(), ...opts.extraEnv },
         abortController: abort,
         stderr: (data) => {
           stderrTail = (stderrTail + data).slice(-2000);
