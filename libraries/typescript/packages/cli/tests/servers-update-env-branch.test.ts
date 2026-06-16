@@ -230,6 +230,40 @@ describe("env-var branch scoping + resolve-by-key", () => {
     );
   });
 
+  it("allows updating an env var value to an empty string", async () => {
+    const { createEnvCommand } = await import("../src/commands/env.js");
+    mockApiInstance.listEnvVariables.mockResolvedValue([
+      {
+        id: VAR_ID,
+        key: "API_KEY",
+        value: "old",
+        environments: ["production"],
+        branch: null,
+        sensitive: false,
+      },
+    ]);
+    mockApiInstance.updateEnvVariable.mockResolvedValue({
+      id: VAR_ID,
+      key: "API_KEY",
+      value: "",
+      environments: ["production"],
+      branch: null,
+      sensitive: false,
+    });
+
+    const cmd = createEnvCommand();
+    await cmd.parseAsync(
+      ["update", "API_KEY", "--server", SERVER_ID, "--value", ""],
+      { from: "user" }
+    );
+
+    expect(mockApiInstance.updateEnvVariable).toHaveBeenCalledWith(
+      SERVER_ID,
+      VAR_ID,
+      expect.objectContaining({ value: "" })
+    );
+  });
+
   it("remove by UUID skips the key lookup", async () => {
     const { createEnvCommand } = await import("../src/commands/env.js");
     mockApiInstance.deleteEnvVariable.mockResolvedValue(undefined);
