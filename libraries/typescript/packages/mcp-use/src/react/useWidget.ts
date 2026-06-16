@@ -131,15 +131,37 @@ export function useWidget<
   > | null>(null);
 
   const latestModelContextDescriptionRef = useRef<string | null>(null);
+  const latestWidgetStateRef = useRef<TState | null>(null);
 
-  const pushModelContextToMcpApps = useCallback((description: string): void => {
+  const pushModelContextToMcpApps = useCallback((): void => {
     const bridge = getMcpAppsBridge();
     if (!bridge.isConnected()) return;
 
+    const currentState =
+      (latestWidgetStateRef.current as Record<string, unknown> | null) ?? {};
+    const description = latestModelContextDescriptionRef.current;
+    const hasDescription = description !== null && description.trim().length > 0;
+    const structuredContent =
+      hasDescription
+        ? { ...currentState, [MODEL_CONTEXT_KEY]: description }
+        : currentState;
+    const visibleState = Object.fromEntries(
+      Object.entries(currentState).filter(([key]) => key !== MODEL_CONTEXT_KEY)
+    );
+    const hasVisibleState = Object.keys(visibleState).length > 0;
+    const text =
+      hasDescription && hasVisibleState
+        ? `${description}\n\nState: ${JSON.stringify(visibleState)}`
+        : hasDescription
+          ? description
+          : hasVisibleState
+            ? JSON.stringify(visibleState)
+            : "";
+
     bridge
       .updateModelContext({
-        structuredContent: { [MODEL_CONTEXT_KEY]: description },
-        content: [{ type: "text", text: description }],
+        structuredContent,
+        content: [{ type: "text", text }],
       })
       .catch((err: unknown) => {
         console.warn("[ModelContext] Failed to update model context:", err);
@@ -179,9 +201,11 @@ export function useWidget<
         if (hostInfo) setMcpAppsHostInfo(hostInfo);
         if (hostCapabilities) setMcpAppsHostCapabilities(hostCapabilities);
 
-        const description = latestModelContextDescriptionRef.current;
-        if (description !== null) {
-          pushModelContextToMcpApps(description);
+        if (
+          latestModelContextDescriptionRef.current !== null ||
+          latestWidgetStateRef.current !== null
+        ) {
+          pushModelContextToMcpApps();
         }
       })
       .catch((error) => {
@@ -367,6 +391,7 @@ export function useWidget<
   // Use local state for widget state. MCP Apps state is local + model context
   // updates via ui/update-model-context.
   const [localWidgetState, setLocalWidgetState] = useState<TState | null>(null);
+  latestWidgetStateRef.current = localWidgetState;
 
   // Keep a ref to the current provider so the flush handler always uses the
   // latest value without needing to re-register on every provider change.
@@ -382,7 +407,7 @@ export function useWidget<
       const currentProvider = providerRef.current;
 
       if (currentProvider === "mcp-apps") {
-        pushModelContextToMcpApps(description);
+        pushModelContextToMcpApps();
       }
     });
     return deregister;
@@ -433,37 +458,18 @@ export function useWidget<
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      const currentState = localWidgetState;
+      const currentState = latestWidgetStateRef.current;
       const newState =
         typeof state === "function"
           ? (state as (prevState: TState | null) => TState)(currentState)
           : state;
 
+      latestWidgetStateRef.current = newState;
       setLocalWidgetState(newState);
 
-      const bridge = getMcpAppsBridge();
-      const structuredContent = newState as Record<string, unknown>;
-      bridge
-        .updateModelContext({
-          structuredContent,
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
-                Object.fromEntries(
-                  Object.entries(structuredContent).filter(
-                    ([k]) => k !== MODEL_CONTEXT_KEY
-                  )
-                )
-              ),
-            },
-          ],
-        })
-        .catch((err) => {
-          console.warn("[useWidget] Failed to update model context:", err);
-        });
+      pushModelContextToMcpApps();
     },
-    [localWidgetState]
+    [pushModelContextToMcpApps]
   );
 
   // Determine if tool is still executing

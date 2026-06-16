@@ -37,6 +37,9 @@ vi.mock("../../../src/react/mcp-apps-bridge.js", () => ({
 const { useWidget } = await import("../../../src/react/useWidget.js");
 const { useCallTool } = await import("../../../src/react/useCallTool.js");
 const { McpUseProvider } = await import("../../../src/react/McpUseProvider.js");
+const { ModelContext, _resetModelContextForTesting } = await import(
+  "../../../src/react/model-context.js"
+);
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -77,6 +80,7 @@ async function flushMicrotasks() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  _resetModelContextForTesting();
 
   vi.stubGlobal(
     "matchMedia",
@@ -140,6 +144,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  _resetModelContextForTesting();
   Object.defineProperty(window, "parent", {
     configurable: true,
     value: originalParent,
@@ -189,6 +194,46 @@ describe("MCP Apps primary widget runtime", () => {
       content: [{ type: "text", text: '{"selected":"mcp"}' }],
     });
     expect(window.openai?.setWidgetState).not.toHaveBeenCalled();
+  });
+
+  it("preserves ModelContext annotations when widget state is overwritten", async () => {
+    let latest: ReturnType<typeof useWidget> | undefined;
+
+    function TestComponent() {
+      latest = useWidget();
+      return <ModelContext content="Viewing product A" />;
+    }
+
+    await act(async () => {
+      create(<TestComponent />);
+      await flushMicrotasks();
+    });
+
+    expect(bridge.updateModelContext).toHaveBeenCalledWith({
+      structuredContent: {
+        __model_context: "- Viewing product A",
+      },
+      content: [{ type: "text", text: "- Viewing product A" }],
+    });
+
+    bridge.updateModelContext.mockClear();
+
+    await act(async () => {
+      await latest!.setState({ selectedTab: "reviews" });
+    });
+
+    expect(bridge.updateModelContext).toHaveBeenCalledWith({
+      structuredContent: {
+        selectedTab: "reviews",
+        __model_context: "- Viewing product A",
+      },
+      content: [
+        {
+          type: "text",
+          text: '- Viewing product A\n\nState: {"selectedTab":"reviews"}',
+        },
+      ],
+    });
   });
 
   it("routes useCallTool through the MCP Apps bridge before window.openai", async () => {
