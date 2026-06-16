@@ -43,7 +43,7 @@
     "dev:client": "rimraf node_modules/.vite && vite --port 3000",
     "dev:server": "VITE_DEV=true tsx watch src/server/server.ts",
     "dev:standalone": "tsx watch src/server/server.ts",
-    "build": "node scripts/generate-version.mjs && npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:cdn",
+    "build": "npm run build:client && npm run build:client-exports && npm run build:server && npm run build:cli && npm run build:cdn",
     "build:cdn": "vite build --config vite.cdn.config.ts",
     "build:client": "vite build",
     "build:client-exports": "tsup --config tsup.client.ts && tsc -p tsconfig.client.json --emitDeclarationOnly --declaration",
