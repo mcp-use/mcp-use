@@ -1,9 +1,6 @@
 /**
- * Type definitions for OpenAI Apps SDK window.openai API
- * Based on: https://developers.openai.com/apps-sdk/build/custom-ux
+ * Type definitions for the window.openai extension API.
  */
-
-/* global CustomEvent */
 
 export type UnknownObject = Record<string, unknown>;
 
@@ -63,6 +60,34 @@ export type UserAgent = {
     touch: boolean;
   };
 };
+
+export interface HostContext {
+  theme?: Theme;
+  displayMode?: DisplayMode;
+  availableDisplayModes?: DisplayMode[];
+  containerDimensions?: {
+    width?: number;
+    height?: number;
+    maxWidth?: number;
+    maxHeight?: number;
+  };
+  locale?: string;
+  timeZone?: string;
+  platform?: "web" | "desktop" | "mobile";
+  userAgent?: string;
+  deviceCapabilities?: {
+    touch?: boolean;
+    hover?: boolean;
+  };
+  safeAreaInsets?: SafeAreaInsets;
+  styles?: {
+    variables?: Record<string, string | undefined>;
+    css?: {
+      fonts?: string;
+    };
+  };
+  [key: string]: unknown;
+}
 
 export type CallToolResponse = {
   content: Array<{
@@ -140,26 +165,17 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
 
   /**
    * Upload a file to the host.
-   * Only available in ChatGPT Apps SDK environments.
+   * Only available when the OpenAI window.openai extension exposes file APIs.
    * Use `useFiles().isSupported` to detect availability before calling.
    */
   uploadFile?: (file: File) => Promise<FileMetadata>;
 
   /**
    * Get a temporary download URL for a previously uploaded file.
-   * Only available in ChatGPT Apps SDK environments.
+   * Only available when the OpenAI window.openai extension exposes file APIs.
    * Use `useFiles().isSupported` to detect availability before calling.
    */
   getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
-}
-
-// Event types
-export const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
-
-export class SetGlobalsEvent extends CustomEvent<{
-  globals: Partial<OpenAiGlobals>;
-}> {
-  readonly type = SET_GLOBALS_EVENT_TYPE;
 }
 
 declare global {
@@ -168,10 +184,6 @@ declare global {
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
-  }
-
-  interface WindowEventMap {
-    [SET_GLOBALS_EVENT_TYPE]: SetGlobalsEvent;
   }
 }
 
@@ -188,9 +200,9 @@ interface UseWidgetResultBase<
    * The arguments the model passed when calling the tool.
    *
    * Delivered via `ui/notifications/tool-input` (SEP-1865) once after the
-   * `ui/initialize` handshake completes, or via `window.openai.toolInput` in
-   * the ChatGPT Apps SDK. This reflects exactly what the LLM decided to send —
-   * useful for displaying a "requested" summary alongside the rendered result.
+   * `ui/initialize` handshake completes. This reflects exactly what the LLM
+   * decided to send — useful for displaying a "requested" summary alongside
+   * the rendered result.
    */
   toolInput: TToolInput;
 
@@ -201,8 +213,7 @@ interface UseWidgetResultBase<
    * from the tool response, not `structuredContent`. Use `output` (i.e. `props`)
    * to pass rich, structured data to the widget without polluting the model context.
    *
-   * Delivered via `ui/notifications/tool-result` (SEP-1865) /
-   * `window.openai.toolOutput` (Apps SDK). `null` while the tool is still
+   * Delivered via `ui/notifications/tool-result` (SEP-1865). `null` while the tool is still
    * executing (`isPending === true`).
    */
   output: TOutput | null;
@@ -219,9 +230,8 @@ interface UseWidgetResultBase<
   /**
    * Persisted widget state that the model can read on future turns.
    *
-   * On MCP Apps, calling `setState` sends a `ui/update-model-context` request
-   * (SEP-1865) so the updated state is available to the LLM in the next
-   * conversation turn. On ChatGPT, it calls `window.openai.setWidgetState`.
+   * Calling `setState` sends a `ui/update-model-context` request (SEP-1865) so
+   * the updated state is available to the LLM in the next conversation turn.
    * Use this to keep the model informed about user interactions (selected items,
    * filters, current view, etc.) without requiring an explicit tool call.
    */
@@ -231,9 +241,8 @@ interface UseWidgetResultBase<
    * Update the persisted widget state.
    *
    * Accepts either a new state value or a functional updater `(prev) => next`.
-   * On MCP Apps, sends `ui/update-model-context` (SEP-1865) with the new state
-   * so the LLM can reason about it on future turns. On ChatGPT Apps SDK, calls
-   * `window.openai.setWidgetState`. Multiple rapid updates before the next user
+   * Sends `ui/update-model-context` (SEP-1865) with the new state so the LLM
+   * can reason about it on future turns. Multiple rapid updates before the next user
    * message are deduplicated by the host — only the last value is sent to the
    * model.
    */
@@ -247,8 +256,7 @@ interface UseWidgetResultBase<
    * The host's current color-scheme preference.
    *
    * `"light"` or `"dark"`. Changes are notified via
-   * `ui/notifications/host-context-changed` (SEP-1865) / `openai:set_globals`
-   * (Apps SDK). Use the standardized `--color-*` CSS variables provided by the
+   * `ui/notifications/host-context-changed` (SEP-1865). Use the standardized `--color-*` CSS variables provided by the
    * host for automatic theming, or branch on this value to apply your own
    * styles.
    *
@@ -270,8 +278,7 @@ interface UseWidgetResultBase<
    *
    * Changes when the host responds to a `requestDisplayMode` call or when the
    * host initiates a layout change. Updated via
-   * `ui/notifications/host-context-changed` (SEP-1865) / `openai:set_globals`
-   * (Apps SDK).
+   * `ui/notifications/host-context-changed` (SEP-1865).
    *
    * @see requestDisplayMode
    */
@@ -299,7 +306,7 @@ interface UseWidgetResultBase<
    * When provided, the container is in *flexible* mode: the widget controls its
    * own height up to this ceiling. When omitted (undefined in raw host context),
    * height is unbounded. From `HostContext.containerDimensions.maxHeight`
-   * (SEP-1865) / `window.openai.maxHeight` (Apps SDK).
+   * (SEP-1865).
    *
    * Use this to cap scrollable lists or lazy-rendered content so the widget
    * doesn't overflow the host's layout.
@@ -309,9 +316,8 @@ interface UseWidgetResultBase<
   /**
    * Maximum width the widget container can grow to, in pixels.
    *
-   * Behaves the same as `maxHeight` but for the horizontal axis. Only provided
-   * by MCP Apps hosts (SEP-1865 `HostContext.containerDimensions.maxWidth`);
-   * the ChatGPT Apps SDK does not expose a max-width constraint.
+   * Behaves the same as `maxHeight` but for the horizontal axis. Provided by
+   * MCP Apps hosts through SEP-1865 `HostContext.containerDimensions.maxWidth`.
    * `undefined` when unbounded or unavailable.
    */
   maxWidth?: number;
@@ -322,8 +328,7 @@ interface UseWidgetResultBase<
    * Use `userAgent.device.type` (`"mobile"`, `"tablet"`, `"desktop"`) to adapt
    * layout density, and `userAgent.capabilities.hover` / `.touch` to decide
    * whether to show hover-only UI elements or touch-friendly hit targets.
-   * From `HostContext.platform` and `HostContext.deviceCapabilities` (SEP-1865)
-   * / `window.openai.userAgent` (Apps SDK).
+   * From `HostContext.platform` and `HostContext.deviceCapabilities` (SEP-1865).
    */
   userAgent: UserAgent;
 
@@ -333,7 +338,7 @@ interface UseWidgetResultBase<
    *
    * Use this to initialize `Intl` formatters, load the correct translation
    * bundle, or set the `lang` attribute on the root element. From
-   * `HostContext.locale` (SEP-1865) / `window.openai.locale` (Apps SDK).
+   * `HostContext.locale` (SEP-1865).
    */
   locale: string;
 
@@ -341,10 +346,9 @@ interface UseWidgetResultBase<
    * The user's timezone as an IANA identifier (e.g. `"America/New_York"`,
    * `"Europe/Paris"`).
    *
-   * Pass to `Intl.DateTimeFormat` when displaying local times. On ChatGPT the
-   * Apps SDK does not expose a timezone, so this falls back to the browser's
-   * own `Intl.DateTimeFormat().resolvedOptions().timeZone`. From
-   * `HostContext.timeZone` (SEP-1865).
+   * Pass to `Intl.DateTimeFormat` when displaying local times. From
+   * `HostContext.timeZone` (SEP-1865), with a browser timezone fallback when
+   * host context is not yet available.
    */
   timeZone: string;
 
@@ -383,9 +387,8 @@ interface UseWidgetResultBase<
   /**
    * Add a user-role message to the conversation and trigger a new model turn.
    *
-   * On MCP Apps, sends a `ui/message` request (SEP-1865) with
-   * `role: "user"`. On ChatGPT Apps SDK, calls
-   * `window.openai.sendFollowUpMessage`. The host may request user consent
+   * Sends a `ui/message` request (SEP-1865) with
+   * `role: "user"`. The host may request user consent
    * before adding the message.
    *
    * Use this to let the widget drive the conversation — for example, when the
@@ -399,8 +402,7 @@ interface UseWidgetResultBase<
   /**
    * Ask the host to open a URL in the user's default browser or a new tab.
    *
-   * On MCP Apps, sends a `ui/open-link` request (SEP-1865). On ChatGPT Apps
-   * SDK, calls `window.openai.openExternal`. The host may deny the request
+   * Sends a `ui/open-link` request (SEP-1865). The host may deny the request
    * (e.g. policy violation or invalid URL) — errors are logged but not thrown.
    */
   openExternal: (href: string) => void;
@@ -408,8 +410,7 @@ interface UseWidgetResultBase<
   /**
    * Request the host to change the widget's display mode.
    *
-   * Sends `ui/request-display-mode` (SEP-1865) /
-   * `window.openai.requestDisplayMode` (Apps SDK). The host returns the
+   * Sends `ui/request-display-mode` (SEP-1865). The host returns the
    * *actual* granted mode, which may differ from the requested one — always
    * check the response `mode` field. PiP (`"pip"`) is coerced to
    * `"fullscreen"` on mobile by the ChatGPT host.
@@ -426,8 +427,7 @@ interface UseWidgetResultBase<
   /**
    * Whether the widget runtime is connected and ready.
    *
-   * `true` when either `window.openai` (ChatGPT Apps SDK) or the MCP Apps
-   * `postMessage` bridge (SEP-1865) has successfully initialized. `false` while
+   * `true` when the MCP Apps `postMessage` bridge (SEP-1865) has initialized. `false` while
    * still connecting, or when the widget is rendered outside a supported host
    * (e.g. during local development via URL params).
    */
@@ -444,8 +444,7 @@ interface UseWidgetResultBase<
    * `null` when the LLM has finished generating arguments or when the host does
    * not support partial streaming.
    *
-   * Only available on MCP Apps hosts; always `null` on ChatGPT Apps SDK and URL
-   * params fallback.
+   * Only available on MCP Apps hosts; always `null` on the URL params fallback.
    *
    * @see isStreaming
    */
@@ -460,7 +459,8 @@ interface UseWidgetResultBase<
    *
    * Becomes `false` once `ui/notifications/tool-input` (the complete arguments)
    * is received. Only `true` on MCP Apps hosts that send
-   * `ui/notifications/tool-input-partial`; always `false` on ChatGPT Apps SDK.
+   * `ui/notifications/tool-input-partial`; always `false` on the URL params
+   * fallback.
    *
    * @see partialToolInput
    */
@@ -470,8 +470,7 @@ interface UseWidgetResultBase<
    * Name and version of the MCP Apps host as reported during the
    * `ui/initialize` handshake (SEP-1865).
    *
-   * `undefined` when running inside ChatGPT (Apps SDK path) or outside a
-   * supported MCP Apps host. Use this to conditionally tailor the UI for
+   * `undefined` when running outside a supported MCP Apps host. Use this to conditionally tailor the UI for
    * specific host environments.
    *
    * @example
@@ -486,8 +485,8 @@ interface UseWidgetResultBase<
    * Host capabilities advertised during the `ui/initialize` handshake
    * (SEP-1865 `HostCapabilities` object).
    *
-   * `undefined` when running inside ChatGPT (Apps SDK path), outside a
-   * supported MCP Apps host, or when the host did not include capabilities.
+   * `undefined` when running outside a supported MCP Apps host or when the
+   * host did not include capabilities.
    * Use this to check for optional host features such as `openLinks`,
    * `serverTools`, or `serverResources`.
    *
@@ -500,6 +499,14 @@ interface UseWidgetResultBase<
    * ```
    */
   hostCapabilities?: Record<string, unknown>;
+
+  /**
+   * Raw host context received through the MCP Apps bridge.
+   *
+   * Includes standardized host style variables at
+   * `hostContext.styles.variables` when provided by the host.
+   */
+  hostContext?: HostContext;
 }
 
 /**
@@ -529,8 +536,7 @@ export type UseWidgetResult<
          * `true` while the tool is still executing.
          *
          * On MCP Apps, becomes `false` once `ui/notifications/tool-result` is
-         * received (SEP-1865). On ChatGPT Apps SDK, becomes `false` once
-         * `toolResponseMetadata` is non-null. While `true`, `props` is typed as
+         * received (SEP-1865). While `true`, `props` is typed as
          * `Partial<TProps>` — guard on this value before accessing required fields.
          */
         isPending: true;
@@ -538,7 +544,7 @@ export type UseWidgetResult<
          * Widget props — partial while the tool is still executing.
          *
          * Populated from `structuredContent` in the tool result (delivered via
-         * `ui/notifications/tool-result` / `window.openai.toolOutput`). Fields
+         * `ui/notifications/tool-result`). Fields
          * may be `undefined` until the tool completes. Guard on `isPending` to
          * narrow the type to the full `TProps` shape.
          */

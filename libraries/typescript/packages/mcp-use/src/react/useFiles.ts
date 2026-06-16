@@ -1,8 +1,8 @@
 /**
  * useFiles — React hook for file upload and download in widgets.
  *
- * File operations are only supported in the ChatGPT Apps SDK environment.
- * The MCP Apps spec (SEP-1865) has deferred file handling:
+ * File operations are only supported through the OpenAI window.openai extension.
+ * The MCP Apps spec (SEP-1865) has deferred standard file handling:
  * https://github.com/modelcontextprotocol/ext-apps/issues/201
  *
  * Always check `isSupported` before calling `upload` or `getDownloadUrl`.
@@ -39,7 +39,7 @@ export interface UseFilesResult {
   /**
    * Whether the host supports file operations.
    *
-   * `true` only in the ChatGPT Apps SDK environment where
+   * `true` only when the OpenAI window.openai extension exposes
    * `window.openai.uploadFile` and `window.openai.getFileDownloadUrl`
    * are available. Always check this flag before calling `upload` or
    * `getDownloadUrl`.
@@ -74,7 +74,8 @@ export interface UseFilesResult {
 /**
  * Hook for file upload and download operations in widgets.
  *
- * File operations are **only available in the ChatGPT Apps SDK** environment.
+ * File operations are **only available through the OpenAI window.openai
+ * extension**.
  * Always guard usage with the `isSupported` flag:
  *
  * ```tsx
@@ -112,7 +113,7 @@ export function useFiles(): UseFilesResult {
           throw new Error(
             "[useFiles] File upload is not supported in this host. " +
               "Check `isSupported` before calling `upload`. " +
-              "File operations are only available in the ChatGPT Apps SDK environment."
+              "File operations are only available through the OpenAI window.openai extension."
           );
         }
 
@@ -151,7 +152,7 @@ export function useFiles(): UseFilesResult {
           throw new Error(
             "[useFiles] File download is not supported in this host. " +
               "Check `isSupported` before calling `getDownloadUrl`. " +
-              "File operations are only available in the ChatGPT Apps SDK environment."
+              "File operations are only available through the OpenAI window.openai extension."
           );
         }
         return (window.openai as any).getFileDownloadUrl(file) as Promise<{
