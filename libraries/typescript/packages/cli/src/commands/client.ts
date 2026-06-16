@@ -520,6 +520,99 @@ async function describeToolCommand(
   await cleanupAndExit(0);
 }
 
+async function processToolScreenshot(
+  session: MCPSession,
+  toolName: string,
+  args: Record<string, unknown>,
+  callResult: any,
+  options?: {
+    screenshot?: boolean;
+    screenshotOutput?: string;
+    screenshotDeviceScaleFactor?: string;
+  }
+): Promise<void> {
+  const toolWithMeta = session.tools.find((t) => t.name === toolName);
+  const resourceUri = detectToolResourceUri(toolWithMeta);
+  const wantsScreenshot =
+    options?.screenshot === true ||
+    options?.screenshotOutput !== undefined ||
+    options?.screenshotDeviceScaleFactor !== undefined;
+
+  let screenshot: {
+    path: string;
+    width: number;
+    height: number;
+    view: string;
+  } | null = null;
+  let screenshotError: string | null = null;
+  let widgetHintUri: string | null = null;
+
+  if (resourceUri) {
+    if (wantsScreenshot) {
+      console.error(
+        formatInfo(`Capturing widget screenshot (${resourceUri})...`)
+      );
+      try {
+        const screenshotOpts: {
+          output?: string;
+          deviceScaleFactor?: number;
+        } = {};
+        if (options?.screenshotOutput) {
+          screenshotOpts.output = options.screenshotOutput;
+        }
+        if (options?.screenshotDeviceScaleFactor) {
+          screenshotOpts.deviceScaleFactor = parseDeviceScaleFactor(
+            options.screenshotDeviceScaleFactor
+          );
+        }
+        const shot = await captureToolScreenshot(
+          {
+            session,
+            toolName,
+            toolArgs: args,
+            toolOutput: callResult,
+            resourceUri,
+          },
+          screenshotOpts
+        );
+        screenshot = {
+          path: shot.outputPath,
+          width: shot.width,
+          height: shot.height,
+          view: shot.view,
+        };
+      } catch (err: any) {
+        screenshotError = err?.message ?? String(err);
+      }
+    } else {
+      widgetHintUri = resourceUri;
+    }
+  }
+
+  if (screenshot) {
+    // Always announce the screenshot on stderr so `--json` stdout stays a
+    // clean CallToolResult — agents piping JSON shouldn't have to filter
+    // status lines out of their parse target.
+    console.error(
+      formatSuccess(
+        `Saved widget screenshot: ${screenshot.path} (${screenshot.width}×${screenshot.height})`
+      )
+    );
+  }
+  if (screenshotError) {
+    console.error(
+      formatWarning(`Skipped widget screenshot: ${screenshotError}`)
+    );
+  }
+  if (widgetHintUri) {
+    console.error(
+      formatInfo(
+        `This tool renders a widget (${widgetHintUri}). Re-run with --screenshot to save a PNG of it.`
+      )
+    );
+  }
+}
+
 async function callToolCommand(
   name: string,
   toolName: string,
@@ -588,95 +681,12 @@ async function callToolCommand(
       timeout: options?.timeout,
     });
 
-    // Screenshot is opt-in via --screenshot. Any of the screenshot-related
-    // flags also implies opt-in so users don't have to pass `--screenshot`
-    // alongside `--screenshot-output`. Capture before printing so the path is
-    // part of the printed result — agents reading `--json` output get it
-    // inside the JSON. Failures don't fail the tool call.
-    const toolWithMeta = session.tools.find((t) => t.name === toolName);
-    const resourceUri = detectToolResourceUri(toolWithMeta);
-    const wantsScreenshot =
-      options?.screenshot === true ||
-      options?.screenshotOutput !== undefined ||
-      options?.screenshotDeviceScaleFactor !== undefined;
-
-    let screenshot: {
-      path: string;
-      width: number;
-      height: number;
-      view: string;
-    } | null = null;
-    let screenshotError: string | null = null;
-    let widgetHintUri: string | null = null;
-    if (resourceUri) {
-      if (wantsScreenshot) {
-        console.error(
-          formatInfo(`Capturing widget screenshot (${resourceUri})...`)
-        );
-        try {
-          const screenshotOpts: {
-            output?: string;
-            deviceScaleFactor?: number;
-          } = {};
-          if (options?.screenshotOutput) {
-            screenshotOpts.output = options.screenshotOutput;
-          }
-          if (options?.screenshotDeviceScaleFactor) {
-            screenshotOpts.deviceScaleFactor = parseDeviceScaleFactor(
-              options.screenshotDeviceScaleFactor
-            );
-          }
-          const shot = await captureToolScreenshot(
-            {
-              session,
-              toolName,
-              toolArgs: args,
-              toolOutput: callResult,
-              resourceUri,
-            },
-            screenshotOpts
-          );
-          screenshot = {
-            path: shot.outputPath,
-            width: shot.width,
-            height: shot.height,
-            view: shot.view,
-          };
-        } catch (err: any) {
-          screenshotError = err?.message ?? String(err);
-        }
-      } else {
-        widgetHintUri = resourceUri;
-      }
-    }
+    await processToolScreenshot(session, toolName, args, callResult, options);
 
     if (options?.json) {
       console.log(formatJson(callResult));
     } else {
       console.log(formatToolCall(callResult));
-    }
-
-    if (screenshot) {
-      // Always announce the screenshot on stderr so `--json` stdout stays a
-      // clean CallToolResult — agents piping JSON shouldn't have to filter
-      // status lines out of their parse target.
-      console.error(
-        formatSuccess(
-          `Saved widget screenshot: ${screenshot.path} (${screenshot.width}×${screenshot.height})`
-        )
-      );
-    }
-    if (screenshotError) {
-      console.error(
-        formatWarning(`Skipped widget screenshot: ${screenshotError}`)
-      );
-    }
-    if (widgetHintUri) {
-      console.error(
-        formatInfo(
-          `This tool renders a widget (${widgetHintUri}). Re-run with --screenshot to save a PNG of it.`
-        )
-      );
     }
 
     if (callResult.isError) {
@@ -969,7 +979,7 @@ async function interactiveCommand(name: string): Promise<void> {
     console.log(chalk.gray("  tools list              - List available tools"));
     console.log(
       chalk.gray(
-        "  tools call <name>       - Call a tool (will prompt for args)"
+        "  tools call <name> [--screenshot] - Call a tool (will prompt for args)"
       )
     );
     console.log(chalk.gray("  tools describe <name>   - Show tool details"));
@@ -1023,8 +1033,8 @@ async function interactiveCommand(name: string): Promise<void> {
               )
             );
           } else if (command === "call" && arg) {
-            // TODO(mcp-1566): mirror the auto widget-screenshot flow from
-            // `client tools call` here. Skipped for now to keep the REPL terse.
+            const wantsScreenshot = parts.includes("--screenshot");
+            // Implements auto widget-screenshot flow for the REPL
             rl.question(
               "Arguments (JSON, or press Enter for none): ",
               async (argsInput) => {
@@ -1032,6 +1042,10 @@ async function interactiveCommand(name: string): Promise<void> {
                   const args = argsInput.trim() ? JSON.parse(argsInput) : {};
                   const result = await session.callTool(arg, args);
                   console.log(formatToolCall(result));
+                  // Trigger the screenshot flow if a widget is present and flag was passed
+                  await processToolScreenshot(session, arg, args, result, {
+                    screenshot: wantsScreenshot,
+                  });
                 } catch (error: any) {
                   console.error(formatError(error.message));
                 }
