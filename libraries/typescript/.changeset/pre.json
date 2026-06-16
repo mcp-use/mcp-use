@@ -15,6 +15,7 @@
     "fix-oauth-well-known-canonical-paths",
     "inspector-localhost-chat-fallback",
     "quiet-dragons-scroll",
+    "repl-screenshot-feature",
     "server-notification-logging",
     "silence-empty-widget-logs"
   ]

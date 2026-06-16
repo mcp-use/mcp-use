@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.9
+
+### Patch Changes
+
+- cdc3b13: Add support for the `--screenshot` option in REPL/interactive mode when calling tools that support widgets.
+  - mcp-use@1.32.1-canary.9
+  - @mcp-use/inspector@10.0.1-canary.9
+
 ## 3.5.2-canary.8
 
 ### Patch Changes
