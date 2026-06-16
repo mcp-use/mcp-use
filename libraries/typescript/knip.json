@@ -19,7 +19,6 @@
         "tests/docs/**/*.ts"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreUnresolved": ["\\.?\\./(src/)?version\\.js"],
       "ignoreBinaries": ["lsof", "sleep", "dev"]
     },
     "packages/cli": {
