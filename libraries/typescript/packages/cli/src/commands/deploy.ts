@@ -1411,7 +1411,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     if (options.region)
       console.log(chalk.gray(`  Region:        `) + chalk.cyan(options.region));
     if (options.dockerfile)
-      console.log(chalk.gray(`  Dockerfile:    `) + chalk.cyan(options.dockerfile));
+      console.log(
+        chalk.gray(`  Dockerfile:    `) + chalk.cyan(options.dockerfile)
+      );
     if (options.buildCommand)
       console.log(
         chalk.gray(`  Build command: `) + chalk.cyan(options.buildCommand)
