@@ -20,7 +20,7 @@
     "next": "^15.5.18",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "vite": "^8.0.5",
+    "vite": "^8.0.16",
     "zod": "4.3.5"
   },
   "devDependencies": {
