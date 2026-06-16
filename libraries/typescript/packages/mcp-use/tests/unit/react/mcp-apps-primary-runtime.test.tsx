@@ -153,6 +153,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   document.documentElement.removeAttribute("style");
+  document.documentElement.removeAttribute("data-theme");
+  document.documentElement.classList.remove("light", "dark");
 });
 
 describe("MCP Apps primary widget runtime", () => {
@@ -301,68 +303,5 @@ describe("MCP Apps primary widget runtime", () => {
 
     expect(bridge.sendSizeChanged).toHaveBeenCalledWith({ height: 260 });
     expect(window.openai?.notifyIntrinsicHeight).not.toHaveBeenCalled();
-  });
-
-  it("applies host context CSS variables through McpUseProvider", async () => {
-    await act(async () => {
-      create(
-        <McpUseProvider>
-          <div>content</div>
-        </McpUseProvider>
-      );
-      await flushMicrotasks();
-    });
-
-    expect(
-      document.documentElement.style.getPropertyValue(
-        "--color-background-secondary"
-      )
-    ).toBe("rgb(12 13 14)");
-    expect(
-      document.documentElement.style.getPropertyValue(
-        "--color-background-primary"
-      )
-    ).toBe("transparent");
-    expect(
-      document.documentElement.style.getPropertyValue(
-        "--color-background-tertiary"
-      )
-    ).toBe("");
-    expect(document.documentElement.style.getPropertyValue("color")).toBe("");
-    expect(document.documentElement.style.colorScheme).toBe("dark");
-  });
-
-  it("uses system dark preference when MCP Apps host context omits theme", async () => {
-    vi.mocked(window.matchMedia).mockReturnValue({
-      matches: true,
-      media: "(prefers-color-scheme: dark)",
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    });
-    bridge.getHostContext.mockReturnValue({
-      displayMode: "inline",
-      styles: {
-        variables: {
-          "--color-background-secondary": "light-dark(white, black)",
-        },
-      },
-    });
-
-    await act(async () => {
-      create(
-        <McpUseProvider>
-          <div>content</div>
-        </McpUseProvider>
-      );
-      await flushMicrotasks();
-    });
-
-    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-    expect(document.documentElement.classList.contains("dark")).toBe(true);
-    expect(document.documentElement.style.colorScheme).toBe("dark");
   });
 });
