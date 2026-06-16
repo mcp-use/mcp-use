@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.32.2-canary.0
+
+### Patch Changes
+
+- c242a0c: Bump hono from 4.12.23 to 4.12.25.
+  - @mcp-use/cli@3.5.3-canary.0
+  - @mcp-use/inspector@10.0.2-canary.0
+
 ## 1.32.1
 
 ### Patch Changes
