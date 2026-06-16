@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.10
+
+### Patch Changes
+
+- 8849f0f: fix(cli): update manufact api endpoint
+  - mcp-use@1.32.1-canary.10
+  - @mcp-use/inspector@10.0.1-canary.10
+
 ## 3.5.2-canary.9
 
 ### Patch Changes
