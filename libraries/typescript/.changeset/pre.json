@@ -11,6 +11,7 @@
     "clean-cli-subscribe-sigint",
     "cli-dockerfile-flag",
     "cli-sensitive-env-vars",
+    "dependabot-ced99e3a",
     "dependabot-f7c29352",
     "deploy-repo-access-targeted-check",
     "empty-env-value-update",

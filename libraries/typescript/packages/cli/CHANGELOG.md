@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.2-canary.14
+
+### Patch Changes
+
+- 7126253: Updated dependency `tar` to `^7.5.16`.
+  - mcp-use@1.32.1-canary.14
+  - @mcp-use/inspector@10.0.1-canary.14
+
 ## 3.5.2-canary.13
 
 ### Patch Changes
