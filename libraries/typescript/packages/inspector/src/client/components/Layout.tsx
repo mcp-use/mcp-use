@@ -770,11 +770,11 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : "h-screen bg-[#f3f3f3] dark:bg-[#0f1115] flex flex-col";
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
-    : "flex-1 w-full bg-white dark:bg-[#000000] p-0 overflow-hidden flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm";
+    : "flex-1 w-full bg-white dark:bg-black p-0 overflow-hidden flex flex-col rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm";
 
   return (
     <TooltipProvider>
