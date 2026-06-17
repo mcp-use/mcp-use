@@ -906,7 +906,6 @@ export function LayoutHeader({
                       )}
                     >
                       <span className="sr-only">{tab.label}</span>
-                            <span className="sr-only">{tab.label}</span>
                     </TabsTrigger>
                   );
                 })}
@@ -918,7 +917,7 @@ export function LayoutHeader({
 
       {/* Desktop Layout */}
       <div className="hidden lg:flex items-center justify-between gap-3">
-        {/* Left side: Server dropdown + Tabs */}
+        {/* Left side: Server dropdown + Tabs + Tunnel Badge */}
         <div className="flex items-center flex-wrap gap-2 md:space-x-6 space-x-2">
           {/* Server Selection Dropdown - Hidden in embedded mode */}
           {!embedded && (

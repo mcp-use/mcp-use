@@ -25,8 +25,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
   const [tempModel, setTempModel] = useState(DEFAULT_MODELS.openai);
   const [tempBaseUrl, setTempBaseUrl] = useState(getDefaultBaseUrl("openai"));
 
-  // Load API keys per provider from localStorage (used as global fallback; session-specific
-  // configs stored in ChatSessionsContext take precedence when available)
+  // Load API keys per provider from localStorage
   const getApiKeys = useCallback((): Record<string, string> => {
     const saved = localStorage.getItem("mcp-inspector-api-keys");
     if (saved) {
