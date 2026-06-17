@@ -296,7 +296,7 @@ const ConditionalTooltip = ({
   return (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger>{children}</TooltipTrigger>
+        <TooltipTrigger asChild>{children}</TooltipTrigger>
         <TooltipContent>{title}</TooltipContent>
       </Tooltip>
     </TooltipProvider>

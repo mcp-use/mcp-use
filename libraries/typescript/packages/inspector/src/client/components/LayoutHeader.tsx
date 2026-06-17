@@ -26,6 +26,7 @@ import {
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
+import { isLocalhostServerUrl } from "@/client/utils/serverUrl";
 import {
   ArrowUpRight,
   Bell,
@@ -156,18 +157,6 @@ function CollapseButton({
       </TooltipContent>
     </Tooltip>
   );
-}
-
-function isLocalhostServerUrl(serverUrl: string): boolean {
-  try {
-    const u = new URL(serverUrl);
-    const h = u.hostname.toLowerCase();
-    return (
-      h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "0.0.0.0"
-    );
-  } catch {
-    return false;
-  }
 }
 
 function isMcpUseTunnelUrl(serverUrl: string): boolean {
@@ -451,7 +440,7 @@ function TunnelBadge({
               : undefined
         }
         className={cn(
-          "flex items-center gap-2 h-9 px-3 border rounded-full transition-colors",
+          "flex items-center gap-2 h-9 px-4 border rounded-full transition-colors",
           canStart && !loadingDev
             ? "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/50 cursor-pointer"
             : "bg-violet-50/60 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800 cursor-not-allowed opacity-70"
@@ -630,7 +619,7 @@ export function LayoutHeader({
   };
 
   return (
-    <header className="w-full mx-auto">
+    <header className="w-full mx-auto px-2 sm:px-4 pt-4 pb-3 flex-shrink-0">
       {/* Mobile Layout */}
       <div className="flex lg:hidden flex-col gap-3">
         <div className="flex items-center justify-between w-full">

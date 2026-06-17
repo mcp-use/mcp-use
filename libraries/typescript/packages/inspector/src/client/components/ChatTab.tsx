@@ -28,6 +28,7 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import { useChatSessions } from "../context/ChatSessionsContext";
 import { LoginModal } from "./LoginModal";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
@@ -93,6 +94,13 @@ export interface ChatTabProps {
   /** Extra headers to send with every streaming request. */
   extraHeaders?: Record<string, string>;
   /**
+   * True when the hosted inspector's managed key isn't usable because the
+   * selected server is on localhost (the managed backend can't reach it).
+   * Surfaces an explanatory notice on the configure-key empty state so the
+   * BYOK fallback is explained rather than silent. Default: false.
+   */
+  managedKeyUnavailable?: boolean;
+  /**
    * Custom body builder for the streaming request.
    * Use to send only `{ messages }` to a server-managed backend.
    */
@@ -135,6 +143,7 @@ export function ChatTab({
   credentials,
   extraHeaders,
   body,
+  managedKeyUnavailable = false,
 }: ChatTabProps) {
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
@@ -171,9 +180,12 @@ export function ChatTab({
     setTempModel,
     tempBaseUrl,
     setTempBaseUrl,
-    saveLLMConfig,
-    clearConfig,
+    saveLLMConfig: globalSaveLLMConfig,
+    clearConfig: globalClearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
+
+  const { activeSessionId, sessions, updateSessionMessages, updateSessionLlmConfig } = useChatSessions();
+  const activeSession = sessions.find(s => s.id === activeSessionId);
 
   // ── Hosted-mode / client-side override ──────────────────────────────────
   // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
@@ -208,9 +220,17 @@ export function ChatTab({
   // selector, and local llmConfig to take over. Without this, clicking "Use
   // your own API key" in the LoginModal would leave `isManaged=true`, hiding
   // the ConfigurationDialog and config button.
+
+  // Per-session overrides: Use the active session's llmConfig if we are in a session.
+  // We explicitly want to use `null` if the session's config is `null` so the user is forced
+  // to pick a model for the new chat, rather than automatically inheriting the global config.
+  const effectiveLocalLlmConfig = activeSession
+    ? activeSession.llmConfig
+    : localLlmConfig;
+
   const llmConfig = effectiveClientSide
-    ? localLlmConfig
-    : (managedLlmConfig ?? localLlmConfig);
+    ? effectiveLocalLlmConfig
+    : (managedLlmConfig ?? effectiveLocalLlmConfig);
   const isManaged = !effectiveClientSide && !!managedLlmConfig;
 
   const { getAllModelContexts } = useWidgetDebug();
@@ -225,6 +245,7 @@ export function ChatTab({
     readResource,
     widgetModelContexts,
     disabledTools,
+    initialMessages,
   };
 
   const serverSideChat = useChatMessages({
@@ -254,7 +275,46 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
+    clearAttachments,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
+
+  // Sync messages back to the active session in ChatSessionsContext
+  useEffect(() => {
+    if (activeSessionId) {
+      updateSessionMessages(activeSessionId, messages);
+    }
+  }, [messages, activeSessionId, updateSessionMessages]);
+
+  const saveLLMConfig = useCallback(() => {
+    // Call the global config saver first
+    globalSaveLLMConfig();
+
+    // Then save this config to the active session specifically
+    if (activeSessionId) {
+      updateSessionLlmConfig(activeSessionId, {
+        provider: tempProvider,
+        apiKey: tempApiKey,
+        model: tempModel,
+        baseUrl: tempBaseUrl,
+      });
+    }
+  }, [
+    globalSaveLLMConfig,
+    activeSessionId,
+    updateSessionLlmConfig,
+    tempProvider,
+    tempApiKey,
+    tempModel,
+    tempBaseUrl,
+    sessions,
+  ]);
+
+  const clearConfig = useCallback(() => {
+    globalClearConfig();
+    if (activeSessionId) {
+      updateSessionLlmConfig(activeSessionId, null);
+    }
+  }, [globalClearConfig, activeSessionId, updateSessionLlmConfig]);
 
   const rateLimitInfo = effectiveClientSide
     ? null
@@ -1154,11 +1214,13 @@ export function ChatTab({
       {/* Messages Area */}
       <div
         ref={messagesAreaRef}
+        data-testid="chat-messages-scroll-container"
         className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
       >
         {!llmConfig ? (
           <ConfigureEmptyState
             onConfigureClick={() => setConfigDialogOpen(true)}
+            managedKeyUnavailable={managedKeyUnavailable}
           />
         ) : (
           <MessageList
@@ -1172,6 +1234,7 @@ export function ChatTab({
             pendingElicitationRequests={connection.pendingElicitationRequests}
             onApproveElicitation={connection.approveElicitation}
             onRejectElicitation={connection.rejectElicitation}
+            scrollContainerRef={messagesAreaRef}
           />
         )}
       </div>
