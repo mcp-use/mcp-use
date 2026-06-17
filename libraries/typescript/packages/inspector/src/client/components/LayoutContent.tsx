@@ -3,7 +3,6 @@ import type { ReactNode, RefObject } from "react";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
 import { useChatSessions } from "../context/ChatSessionsContext";
-import { isLocalhostServerUrl } from "@/client/utils/serverUrl";
 import { ChatTab } from "./ChatTab";
 import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";
@@ -115,20 +114,6 @@ export function LayoutContent({
     "notifications",
   ];
 
-  // The hosted chat backend (`chatApiUrl`, e.g. cloud.manufact.com) runs
-  // server-side and connects to the MCP server itself. It cannot reach a user's
-  // localhost MCP server, so that request 502s and surfaces in the browser as
-  // an opaque CORS / "Failed to fetch" error (MCP-2419). The browser already
-  // holds a direct session to the localhost server, so fall back to client-side
-  // (in-browser) streaming for these URLs and ignore the cloud backend.
-  const forceLocalhostClientSide =
-    !!embeddedConfig.chatApiUrl &&
-    !!selectedServer.url &&
-    isLocalhostServerUrl(selectedServer.url);
-  const chatApiUrl = forceLocalhostClientSide
-    ? undefined
-    : embeddedConfig.chatApiUrl;
-
   // Render all visible tabs but hide inactive ones to preserve state
   return (
     <>
@@ -230,27 +215,29 @@ export function LayoutContent({
               )
             }
             readResource={selectedServer.readResource}
-            useClientSide={!chatApiUrl}
-            chatApiUrl={chatApiUrl}
+            useClientSide={!embeddedConfig.chatApiUrl}
+            chatApiUrl={embeddedConfig.chatApiUrl}
             managedLlmConfig={
-              forceLocalhostClientSide
-                ? undefined
-                : (embeddedConfig.managedLlmConfig ??
-                  (chatApiUrl
-                    ? {
-                        // Stub surfaced on the chat badge. Mirrors the model the
-                        // hosted `/inspector/chat/stream` backend uses by default
-                        // (see cloud.mcp-use/src/lib/mcp-chat-stream.ts).
-                        provider: "anthropic",
-                        model: "claude-haiku-4-5",
-                        apiKey: "server-managed",
-                      }
-                    : undefined))
+              embeddedConfig.managedLlmConfig ??
+              (embeddedConfig.chatApiUrl
+                ? {
+                    // Stub surfaced on the chat badge. Mirrors the model the
+                    // hosted `/inspector/chat/stream` backend uses by default
+                    // (see cloud.mcp-use/src/lib/mcp-chat-stream.ts).
+                    provider: "anthropic",
+                    model: "claude-haiku-4-5",
+                    apiKey: "server-managed",
+                  }
+                : undefined)
             }
             enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
             hideTitle={embeddedConfig.chatHideTitle}
-            hideModelBadge={embeddedConfig.chatHideModelBadge ?? !!chatApiUrl}
-            hideServerUrl={embeddedConfig.chatHideServerUrl ?? !!chatApiUrl}
+            hideModelBadge={
+              embeddedConfig.chatHideModelBadge ?? !!embeddedConfig.chatApiUrl
+            }
+            hideServerUrl={
+              embeddedConfig.chatHideServerUrl ?? !!embeddedConfig.chatApiUrl
+            }
             clearButtonLabel={embeddedConfig.chatClearButtonLabel}
             clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
             clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
@@ -261,7 +248,6 @@ export function LayoutContent({
             hideToolSelector={embeddedConfig.chatHideToolSelector}
             streamProtocol={embeddedConfig.chatStreamProtocol}
             credentials={embeddedConfig.chatCredentials}
-            managedKeyUnavailable={forceLocalhostClientSide}
           />
           )}
         </div>

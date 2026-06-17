@@ -232,6 +232,8 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
     []
   );
 
+
+
   const clearAllSessions = useCallback(async () => {
     await clear(sessionsStore);
     await clear(messagesStore);
