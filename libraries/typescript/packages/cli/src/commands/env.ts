@@ -91,11 +91,12 @@ async function resolveVarId(
 
 function printEnvVar(v: EnvVariable, showValue = false): void {
   const envs = v.environments.map(envBadge).join(" ");
-  const val = v.sensitive
-    ? chalk.gray("<sensitive>")
-    : showValue
-      ? chalk.cyan(v.value)
-      : chalk.gray("(hidden — use --show-values to reveal)");
+  const val =
+    v.sensitive || v.value === null
+      ? chalk.gray("<sensitive>")
+      : showValue
+        ? chalk.cyan(v.value)
+        : chalk.gray("(hidden — use --show-values to reveal)");
   const branch = v.branch ? "  " + chalk.magenta(`branch:${v.branch}`) : "";
   console.log(`  ${chalk.white.bold(v.key.padEnd(32))} ${val}`);
   console.log(
@@ -215,7 +216,11 @@ async function updateEnvCommand(
   try {
     await requireLogin();
 
-    if (!options.value && !options.env && options.sensitive === undefined) {
+    if (
+      options.value === undefined &&
+      !options.env &&
+      options.sensitive === undefined
+    ) {
       console.error(
         chalk.red(
           "✗ Nothing to update. Provide at least one of --value, --env, --sensitive."

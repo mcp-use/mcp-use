@@ -40,7 +40,7 @@ class RemoteAgent:
         agent_id: str,
         chat_id: str | None = None,
         api_key: str | None = None,
-        base_url: str = "https://cloud.mcp-use.com",
+        base_url: str = "https://cloud.manufact.com",
     ):
         """Initialize remote agent.
 
@@ -71,7 +71,7 @@ class RemoteAgent:
             raise ValueError(
                 "API key is required for remote execution. "
                 "Please provide it as a parameter or set the MCP_USE_API_KEY environment variable. "
-                "You can get an API key from https://cloud.mcp-use.com"
+                "You can get an API key from https://cloud.manufact.com"
             )
 
         self.api_key = api_key

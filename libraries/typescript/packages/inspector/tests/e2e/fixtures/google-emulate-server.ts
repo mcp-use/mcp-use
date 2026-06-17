@@ -15,6 +15,7 @@ import { MCPServer, oauthProxy, text } from "mcp-use/server";
 
 const GOOGLE_EMULATOR_PORT = 4101;
 const MCP_SERVER_PORT = 4201;
+const MCP_SERVER_OAUTH_CALLBACK = `http://localhost:${MCP_SERVER_PORT}/oauth/callback`;
 
 const STATIC_CLIENT_ID = "mcp-emulate-test-client.apps.googleusercontent.com";
 const STATIC_CLIENT_SECRET = "GOCSPX-mcp-emulate-test-secret";
@@ -45,7 +46,7 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
           {
             client_id: STATIC_CLIENT_ID,
             client_secret: STATIC_CLIENT_SECRET,
-            redirect_uris: ["http://localhost:3000/inspector/oauth/callback"],
+            redirect_uris: [MCP_SERVER_OAUTH_CALLBACK],
           },
         ],
       },

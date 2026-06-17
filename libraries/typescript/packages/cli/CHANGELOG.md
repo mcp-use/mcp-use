@@ -1,5 +1,149 @@
 # @mcp-use/cli
 
+## 3.5.2
+
+### Patch Changes
+
+- efa7fe7: Cleanly unsubscribe from resource subscriptions when stopping the CLI with Ctrl+C.
+- efa7fe7: Add `--dockerfile` flag to `mcp-use deploy` for selecting a non-default Dockerfile path (relative to `--root-dir` or the repo root). Root `Dockerfile` is still auto-detected without the flag.
+- efa7fe7: Support write-only (sensitive) environment variables. The cloud API now withholds the value of `sensitive` env vars on read (returns `null`), so `EnvVariable.value` is nullable and `env list` / `env add` / `env update` print `<sensitive>` for withheld values instead of an empty string.
+- efa7fe7: Updated dependency `tar` to `^7.5.16`.
+- efa7fe7: Updated dependency `esbuild` to `0.28.1`.
+- efa7fe7: Fix `mcp-use deploy` falsely reporting that the GitHub App cannot access a repository. The pre-flight repo-access check no longer lists/paginates an installation's repos (which only inspected the first page, so repos on later pages were missed, and fully paginating hung on very large orgs). It now asks the backend an authoritative per-installation question (a single GitHub `repos.get`), trying the installation whose account matches the repo owner first and falling back to the others. Requires the backend `GET /github/installations/:installationId/repos/:owner/:repo/access` endpoint.
+- efa7fe7: Allow updating CLI environment variable values to an empty string.
+- efa7fe7: Add support for the `--screenshot` option in REPL/interactive mode when calling tools that support widgets.
+- efa7fe7: fix(cli): update manufact api endpoint
+- Updated dependencies [efa7fe7]
+- Updated dependencies [efa7fe7]
+- Updated dependencies [efa7fe7]
+- Updated dependencies [efa7fe7]
+- Updated dependencies [efa7fe7]
+- Updated dependencies [efa7fe7]
+- Updated dependencies [efa7fe7]
+  - mcp-use@1.32.1
+  - @mcp-use/inspector@10.0.1
+
+## 3.5.2-canary.14
+
+### Patch Changes
+
+- 7126253: Updated dependency `tar` to `^7.5.16`.
+  - mcp-use@1.32.1-canary.14
+  - @mcp-use/inspector@10.0.1-canary.14
+
+## 3.5.2-canary.13
+
+### Patch Changes
+
+- ab4fcd2: Allow updating CLI environment variable values to an empty string.
+  - mcp-use@1.32.1-canary.13
+  - @mcp-use/inspector@10.0.1-canary.13
+
+## 3.5.2-canary.12
+
+### Patch Changes
+
+- Updated dependencies [c9e1696]
+  - mcp-use@1.32.1-canary.12
+  - @mcp-use/inspector@10.0.1-canary.12
+
+## 3.5.2-canary.11
+
+### Patch Changes
+
+- 048ec9c: Add `--dockerfile` flag to `mcp-use deploy` for selecting a non-default Dockerfile path (relative to `--root-dir` or the repo root). Root `Dockerfile` is still auto-detected without the flag.
+  - mcp-use@1.32.1-canary.11
+  - @mcp-use/inspector@10.0.1-canary.11
+
+## 3.5.2-canary.10
+
+### Patch Changes
+
+- 8849f0f: fix(cli): update manufact api endpoint
+  - mcp-use@1.32.1-canary.10
+  - @mcp-use/inspector@10.0.1-canary.10
+
+## 3.5.2-canary.9
+
+### Patch Changes
+
+- cdc3b13: Add support for the `--screenshot` option in REPL/interactive mode when calling tools that support widgets.
+  - mcp-use@1.32.1-canary.9
+  - @mcp-use/inspector@10.0.1-canary.9
+
+## 3.5.2-canary.8
+
+### Patch Changes
+
+- afe0806: Cleanly unsubscribe from resource subscriptions when stopping the CLI with Ctrl+C.
+  - mcp-use@1.32.1-canary.8
+  - @mcp-use/inspector@10.0.1-canary.8
+
+## 3.5.2-canary.7
+
+### Patch Changes
+
+- Updated dependencies [1fb87d2]
+  - @mcp-use/inspector@10.0.1-canary.7
+  - mcp-use@1.32.1-canary.7
+
+## 3.5.2-canary.6
+
+### Patch Changes
+
+- Updated dependencies [6e7e9bf]
+  - mcp-use@1.32.1-canary.6
+  - @mcp-use/inspector@10.0.1-canary.6
+
+## 3.5.2-canary.5
+
+### Patch Changes
+
+- 1a16878: Updated dependency `esbuild` to `0.28.1`.
+- Updated dependencies [1a16878]
+  - mcp-use@1.32.1-canary.5
+  - @mcp-use/inspector@10.0.1-canary.5
+
+## 3.5.2-canary.4
+
+### Patch Changes
+
+- 72efb63: Fix `mcp-use deploy` falsely reporting that the GitHub App cannot access a repository. The pre-flight repo-access check no longer lists/paginates an installation's repos (which only inspected the first page, so repos on later pages were missed, and fully paginating hung on very large orgs). It now asks the backend an authoritative per-installation question (a single GitHub `repos.get`), trying the installation whose account matches the repo owner first and falling back to the others. Requires the backend `GET /github/installations/:installationId/repos/:owner/:repo/access` endpoint.
+  - mcp-use@1.32.1-canary.4
+  - @mcp-use/inspector@10.0.1-canary.4
+
+## 3.5.2-canary.3
+
+### Patch Changes
+
+- Updated dependencies [2038e04]
+  - @mcp-use/inspector@10.0.1-canary.3
+  - mcp-use@1.32.1-canary.3
+
+## 3.5.2-canary.2
+
+### Patch Changes
+
+- Updated dependencies [8d626cb]
+  - mcp-use@1.32.1-canary.2
+  - @mcp-use/inspector@10.0.1-canary.2
+
+## 3.5.2-canary.1
+
+### Patch Changes
+
+- Updated dependencies [a3f3b65]
+  - mcp-use@1.32.1-canary.1
+  - @mcp-use/inspector@10.0.1-canary.1
+
+## 3.5.2-canary.0
+
+### Patch Changes
+
+- d64db0f: Support write-only (sensitive) environment variables. The cloud API now withholds the value of `sensitive` env vars on read (returns `null`), so `EnvVariable.value` is nullable and `env list` / `env add` / `env update` print `<sensitive>` for withheld values instead of an empty string.
+  - mcp-use@1.32.1-canary.0
+  - @mcp-use/inspector@10.0.1-canary.0
+
 ## 3.5.1
 
 ### Patch Changes

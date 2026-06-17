@@ -58,7 +58,7 @@ export class RemoteAgent {
 
   constructor(options: { agentId: string; apiKey?: string; baseUrl?: string }) {
     this.agentId = options.agentId;
-    this.baseUrl = options.baseUrl ?? "https://cloud.mcp-use.com";
+    this.baseUrl = options.baseUrl ?? "https://cloud.manufact.com";
 
     // Handle API key validation
     const apiKey =
@@ -68,7 +68,7 @@ export class RemoteAgent {
       throw new Error(
         "API key is required for remote execution. " +
           "Please provide it as a parameter or set the MCP_USE_API_KEY environment variable. " +
-          "You can get an API key from https://cloud.mcp-use.com"
+          "You can get an API key from https://cloud.manufact.com"
       );
     }
     this.apiKey = apiKey;

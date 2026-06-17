@@ -157,12 +157,11 @@ export class ResourceSubscriptionManager {
         try {
           await session.server.server.sendResourceUpdated({ uri });
           console.log(
-            `[MCP] Sent resource update notification to session ${sessionId}`
+            `[MCP] Sent notification to session ${sessionId}: notifications/resources/updated`
           );
         } catch (error) {
-          console.error(
-            `[MCP] Failed to send resource update notification to session ${sessionId}:`,
-            error
+          console.warn(
+            `[MCP] Failed to send notification to session ${sessionId}: ${error}`
           );
         }
       }

@@ -86,7 +86,6 @@ export async function mountWidgets(
     (server as any).publicRoutesMode = "production";
     await mountWidgetsProduction(app, serverConfig, registerWidget, options);
   } else {
-    console.log("[WIDGETS] Mounting widgets in development mode");
     await mountWidgetsDev(
       app,
       serverConfig,

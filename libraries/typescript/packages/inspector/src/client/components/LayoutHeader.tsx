@@ -26,6 +26,7 @@ import {
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
+import { isLocalhostServerUrl } from "@/client/utils/serverUrl";
 import {
   ArrowUpRight,
   Bell,
@@ -156,18 +157,6 @@ function CollapseButton({
       </TooltipContent>
     </Tooltip>
   );
-}
-
-function isLocalhostServerUrl(serverUrl: string): boolean {
-  try {
-    const u = new URL(serverUrl);
-    const h = u.hostname.toLowerCase();
-    return (
-      h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "0.0.0.0"
-    );
-  } catch {
-    return false;
-  }
 }
 
 function isMcpUseTunnelUrl(serverUrl: string): boolean {

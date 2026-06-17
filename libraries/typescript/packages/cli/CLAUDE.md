@@ -94,7 +94,7 @@ Key flow:
 - API client (`src/utils/api.ts`) handles all backend communication
 
 **Environment Variable Configuration:**
-- `MCP_API_URL`: Backend API URL (e.g., `http://localhost:8000` or `https://cloud.mcp-use.com/api/v1`)
+- `MCP_API_URL`: Backend API URL (e.g., `http://localhost:8000` or `https://cloud.manufact.com/api/v1`)
 - `MCP_WEB_URL`: Frontend URL for auth pages (e.g., `http://localhost:3000` or `https://mcp-use.com`)
 - For local development: Set both environment variables to match your local setup
 
