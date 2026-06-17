@@ -12,10 +12,11 @@ In the [Auth0 Dashboard](https://manage.auth0.com):
 
 1. Go to **Applications → Create Application**
 2. Choose **Regular Web Application**
-3. Under **Allowed Callback URLs**, add your MCP client's redirect URI, e.g.:
+3. Under **Allowed Callback URLs**, add your **MCP server's** callback URL:
    ```
-   http://localhost:3000/inspector/oauth/callback
+   http://localhost:3000/oauth/callback
    ```
+   The server brokers the callback for every MCP client, so this is the only URL you register — clients never need their own redirect URIs added here.
 4. Save changes and copy the **Client ID** and **Client Secret**
 
 ### 2. Create an API
@@ -54,7 +55,8 @@ Server starts on port 3000. Open `http://localhost:3000/inspector` to test the O
 ```
 Client → /register         → receives pre-registered client_id
 Client → /authorize        → MCP server redirects to Auth0 /authorize
-Auth0  → redirect_uri      → returns authorization code to client
+Auth0  → /oauth/callback   → MCP server receives the authorization code
+Server → client redirect   → forwards the code to the client's own callback
 Client → /token            → MCP server injects credentials, forwards to Auth0
 Auth0  → access_token (JWT)→ returned to client
 Client → /mcp/...          → MCP server verifies JWT via Auth0 JWKS

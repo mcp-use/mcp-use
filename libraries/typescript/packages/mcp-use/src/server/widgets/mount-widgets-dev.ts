@@ -104,12 +104,11 @@ export async function mountWidgetsDev(
   // Ensure resources directory exists - create it if missing.
   // In dynamic workflows (e.g., Mango/E2B), widgets are created after the server starts,
   // so we need the directory to exist for the Vite file watcher to monitor it.
+  // Created silently: a project that never uses widgets shouldn't be told about
+  // a directory it didn't ask for.
   try {
     await fs.access(srcDir);
   } catch {
-    console.log(
-      `[WIDGETS] No ${resourcesDir}/ directory found - creating it for widget watching`
-    );
     await fs.mkdir(srcDir, { recursive: true });
   }
 
@@ -146,18 +145,19 @@ export async function mountWidgetsDev(
         }
       }
     }
-  } catch (error) {
-    console.log(`[WIDGETS] No widgets found in ${resourcesDir}/ directory`);
+  } catch {
+    // resources/ couldn't be read - nothing to mount, stay silent.
     return;
   }
 
-  if (entries.length === 0) {
-    console.log(
-      `[WIDGETS] No widgets found in ${resourcesDir}/ directory yet - watching for new widgets...`
-    );
-    // Don't return - still start the Vite dev server so it watches for new widget files.
-    // This is critical for workflows where widgets are created after the server starts
-    // (e.g., Mango/E2B sandboxes where Claude creates widgets dynamically).
+  // Only emit widget startup logs when the project actually has widgets. An
+  // empty (or freshly-created) resources/ directory means this project isn't
+  // using widgets yet, so we do the setup silently. We still start the Vite
+  // watcher below so widgets created later (e.g. Mango/E2B sandboxes where
+  // widgets are created after startup) are picked up - those emit their own logs.
+  const hasWidgets = entries.length > 0;
+  if (hasWidgets) {
+    console.log("[WIDGETS] Mounting widgets in development mode");
   }
 
   // Create a temp directory for widget entry files
@@ -346,9 +346,11 @@ if (container && Component) {
   // Note: WebSocket protocol (ws/wss) is auto-detected by Vite client from the page URL
 
   // Create a single shared Vite dev server for all widgets
-  console.log(
-    `[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`
-  );
+  if (hasWidgets) {
+    console.log(
+      `[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`
+    );
+  }
 
   // Create a plugin to handle CSS imports in SSR only
   const ssrCssPlugin = {
@@ -395,7 +397,9 @@ if (container && Component) {
       // This ensures HMR works when widget source files change
       const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
       server.watcher.add(resourcesPath);
-      console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+      if (hasWidgets) {
+        console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+      }
 
       // Watch for file deletions and clean up corresponding .mcp-use directories
       server.watcher.on("unlink", async (filePath: string) => {
@@ -1290,9 +1294,11 @@ export default PostHog;
     (viteServer.config.server.hmr as { port?: number })?.port ??
     DEFAULT_HMR_PORT;
   if (viteHmrPort) {
-    console.log(
-      `[WIDGETS] Vite HMR WebSocket on port ${viteHmrPort}, setting up proxy on main server`
-    );
+    if (hasWidgets) {
+      console.log(
+        `[WIDGETS] Vite HMR WebSocket on port ${viteHmrPort}, setting up proxy on main server`
+      );
+    }
 
     // Store the proxy setup function - it will be called when the HTTP server is available
     const hmrPort = viteHmrPort;

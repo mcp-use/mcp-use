@@ -210,6 +210,8 @@ interface DeployOptions {
   region?: "US" | "EU" | "APAC";
   buildCommand?: string;
   startCommand?: string;
+  /** Path to a non-default Dockerfile (relative to rootDir / repo root). */
+  dockerfile?: string;
   /**
    * Deploy branch. Defaults to the current git branch (managed flow: "main").
    * Also scopes env-var sync to that branch's preview env.
@@ -577,12 +579,7 @@ async function checkRepoAccess(
   owner: string,
   repo: string
 ): Promise<boolean> {
-  try {
-    const resp = await api.getGitHubRepos(true);
-    return resp.repos.some((r) => r.full_name === `${owner}/${repo}`);
-  } catch {
-    return false;
-  }
+  return api.checkGitHubRepoAccess(owner, repo);
 }
 
 async function promptGitHubInstallation(
@@ -1408,6 +1405,10 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
     console.log(chalk.gray(`  Port:          `) + chalk.cyan(port));
     if (options.region)
       console.log(chalk.gray(`  Region:        `) + chalk.cyan(options.region));
+    if (options.dockerfile)
+      console.log(
+        chalk.gray(`  Dockerfile:    `) + chalk.cyan(options.dockerfile)
+      );
     if (options.buildCommand)
       console.log(
         chalk.gray(`  Build command: `) + chalk.cyan(options.buildCommand)
@@ -1605,6 +1606,7 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         region: options.region,
         buildCommand: options.buildCommand,
         startCommand: options.startCommand,
+        dockerfilePath: options.dockerfile,
       });
 
       deploymentId = serverResult.deploymentId ?? "";

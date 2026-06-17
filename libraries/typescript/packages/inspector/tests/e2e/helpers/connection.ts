@@ -158,6 +158,50 @@ export async function goToInspectorWithAutoConnectAndOpenTools(
 }
 
 /**
+ * Simulate the hosted inspector (e.g. inspector.manufact.com) by injecting the
+ * runtime `window.__MANUFACT_CHAT_URL__` the server normally bakes in. This
+ * flips the Chat tab to route through the managed cloud backend at `chatApiUrl`.
+ *
+ * Must be called before navigating to the inspector. Returns a list that
+ * records every request made to the cloud chat endpoint, so tests can assert
+ * whether (or not) chat was routed there.
+ */
+export async function enableHostedChatMode(
+  page: Page,
+  cloudChatUrl: string
+): Promise<{ calls: string[] }> {
+  await page.addInitScript((url) => {
+    (
+      window as unknown as { __MANUFACT_CHAT_URL__?: string }
+    ).__MANUFACT_CHAT_URL__ = url;
+  }, cloudChatUrl);
+
+  // Record + short-circuit any call to the cloud endpoint so the test never
+  // depends on a real backend and a regression surfaces immediately.
+  const calls: string[] = [];
+  await page.route(`${cloudChatUrl}**`, async (route) => {
+    calls.push(route.request().url());
+    await route.fulfill({ status: 502, body: "Bad Gateway" });
+  });
+
+  // Setting chatApiUrl also mounts HostedUserMenu, which fetches
+  // `<cloud origin>/api/auth/get-session`. Stub it with an unauthenticated
+  // session so the tests never reach the real cloud backend (CI flakiness/slow).
+  await page.route(
+    `${new URL(cloudChatUrl).origin}/api/auth/get-session**`,
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "null",
+      });
+    }
+  );
+
+  return { calls };
+}
+
+/**
  * Configure LLM API key for sampling/chat features.
  * Reusable across chat and sampling tests.
  */

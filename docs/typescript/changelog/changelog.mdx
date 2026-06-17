@@ -6,6 +6,23 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.32.1" description="June 2026">
+  ## OAuth proxy callbacks, deploy fixes & hosted localhost chat
+  Patch release for OAuth proxy callback routing, server notification logs, dev-widget noise reduction, and CLI deploy/env fixes. Inspector ships v10.0.1 with hosted-localhost chat fallback and a chat scroll helper (see inspector changelog).
+
+- **Fix** (server/oauth): OAuth proxy mode brokers the upstream provider callback through the server's own `/oauth/callback`, so providers only need one registered redirect URI per server while MCP clients keep their own redirect URI and state (`#1728`)
+- **Fix** (server/oauth): OAuth metadata discovery now mounts the RFC 8414 canonical `/.well-known/oauth-authorization-server{issuer-path}` route for authorization servers with path-suffix issuers (`#1684`)
+- **New** (server): outgoing notifications log sent and failed deliveries with session identifiers and error details (`#1674`)
+- **Fix** (server/widgets): dev mode no longer prints widget mounting, serving, or watcher logs when a project has no widgets; the watcher still detects widgets created later (`#1730`)
+- **Enhancement** (@mcp-use/cli): `mcp-use deploy --dockerfile <path>` selects a non-default Dockerfile relative to `--root-dir` or the repo root while keeping root `Dockerfile` auto-detection (`#1746`)
+- **Enhancement** (@mcp-use/cli): REPL/interactive tool calls support `--screenshot`, and resource subscription mode unsubscribes cleanly on Ctrl+C (`#1592`, `#1687`)
+- **Fix** (@mcp-use/cli): sensitive env vars returned without values render as `<sensitive>` and `EnvVariable.value` accepts `null`; remote API calls use the `manufact.com` base URL (`#1717`, `#1745`)
+- **Fix** (@mcp-use/cli): deploy repo-access checks use the backend's authoritative per-installation repo endpoint, avoiding false "GitHub App cannot access repository" failures on large or multi-installation orgs (`#1737`)
+- **Update**: Bumped `esbuild` to v0.28.1 (`#1734`)
+- **Update**: Updated @mcp-use/cli to v3.5.2
+- **Update**: Updated @mcp-use/inspector to v10.0.1
+</Update>
+
 <Update label="v1.32.0" description="June 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.32.0&title=OAuth%20token%20endpoint%20discovery&date=2026-06&lang=typescript" alt="Release 1.32.0" />
@@ -16,7 +33,7 @@ tag: "New"
 - **New** (auth): `getTokenEndpoint()` on `BrowserOAuthClientProvider` and `OAuthSessionStore` — resolves and caches the OAuth token endpoint via PRM → authorization-server metadata discovery; persisted in storage for consumers (`#1714`)
 - **New** (auth): `getClientCredentials()` returns stored `client_id` / `client_secret` from Dynamic Client Registration or a static client — most token endpoints require `client_id` on refresh (`#1714`)
 - **Enhancement** (react): `useMcp().authTokens` includes optional `token_endpoint`, `client_id`, and `client_secret` after auth — best-effort resolution that never blocks the auth flow (`#1714`)
-- **Update**: Updated @mcp-use/inspector to v9.0.2
+- **Update**: Updated @mcp-use/inspector to v10.0.0
 </Update>
 
 <Update label="v1.31.1" description="June 2026">
