@@ -29,7 +29,6 @@ import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
 import { SidebarLeft } from "./SidebarLeft";
-import { SidebarRight } from "./SidebarRight";
 import { ServerConnectionModal } from "./ServerConnectionModal";
 
 interface LayoutProps {
@@ -812,10 +811,6 @@ export function Layout({ children }: LayoutProps) {
             </LayoutContent>
           </main>
 
-          {/* Right Sidebar */}
-          {!isSingleTab && activeTab === "chat" && (
-            <SidebarRight selectedServer={selectedServer ?? undefined} />
-          )}
         </div>
 
         {/* Command Palette */}

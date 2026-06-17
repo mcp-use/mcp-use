@@ -315,7 +315,6 @@ export function ChatTab({
     }
   }, [globalClearConfig, activeSessionId, updateSessionLlmConfig]);
 
-  // When focusing the textarea, try to determine if we should show the prompt dropdown.
   const rateLimitInfo = effectiveClientSide
     ? null
     : (serverSideChat.rateLimitInfo ?? null);
