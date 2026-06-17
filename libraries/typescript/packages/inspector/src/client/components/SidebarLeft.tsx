@@ -1,5 +1,4 @@
 import { Button } from "@/client/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/client/components/ui/avatar";
 import { Plus, Trash2, MessageSquare, Check, X } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useChatSessions, type ChatSession } from "../context/ChatSessionsContext";
@@ -17,6 +16,7 @@ export function SidebarLeft() {
 
   const [isNaming, setIsNaming] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Focus the input whenever it becomes visible
@@ -26,10 +26,6 @@ export function SidebarLeft() {
     }
   }, [isNaming]);
 
-  const handleNewSessionClick = () => {
-    setNewSessionName("");
-    setIsNaming(true);
-  };
 
   const handleConfirm = async () => {
     const name = newSessionName.trim() || "New Session";
@@ -173,7 +169,7 @@ export function SidebarLeft() {
           <Button
             variant="outline"
             className="w-full justify-between bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            onClick={handleNewSessionClick}
+            onClick={() => { setNewSessionName(""); setIsNaming(true); }}
           >
             <span className="flex items-center gap-2">
               <Plus className="size-4" />
@@ -203,18 +199,38 @@ export function SidebarLeft() {
       {/* Footer / Clear All */}
       {sessions.length > 0 && (
         <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
-          <Button 
-            variant="ghost" 
-            className="w-full text-muted-foreground hover:text-red-500 text-xs justify-start px-3"
-            onClick={() => {
-              if (window.confirm("Are you sure you want to clear all chat history?")) {
-                clearAllSessions();
-              }
-            }}
-          >
-            <Trash2 className="size-3.5 mr-2" />
-            Clear All Chats
-          </Button>
+          {isConfirmingClear ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground px-1">Delete all chat history?</p>
+              <div className="flex gap-1.5">
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 px-2"
+                  onClick={() => { clearAllSessions(); setIsConfirmingClear(false); }}
+                >
+                  <Check className="size-3 mr-1" />
+                  Yes, clear
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-xs text-muted-foreground hover:text-foreground px-2"
+                  onClick={() => setIsConfirmingClear(false)}
+                >
+                  <X className="size-3 mr-1" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground hover:text-red-500 text-xs justify-start px-3"
+              onClick={() => setIsConfirmingClear(true)}
+            >
+              <Trash2 className="size-3.5 mr-2" />
+              Clear All Chats
+            </Button>
+          )}
         </div>
       )}
     </aside>

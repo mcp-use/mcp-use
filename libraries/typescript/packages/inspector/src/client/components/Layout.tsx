@@ -796,7 +796,7 @@ export function Layout({ children }: LayoutProps) {
         {/* 3-Column Layout Container */}
         <div className="flex-1 flex overflow-hidden min-h-0 w-full px-2 sm:px-4 pb-2 sm:pb-4 gap-2 sm:gap-4">
           {/* Left Sidebar */}
-          {!isSingleTab && activeTab === "chat" && <SidebarLeft />}
+          {!isSingleTab && activeTab === "chat" && selectedServer && <SidebarLeft />}
 
           {/* Main Content */}
           <main className={mainClassName}>
