@@ -8,6 +8,7 @@ import {
 } from "@/client/components/ui/dialog";
 import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
+import { Textarea } from "@/client/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -18,7 +19,7 @@ import {
 import { Switch } from "@/client/components/ui/switch";
 import { cn } from "@/client/lib/utils";
 import { copyToClipboard } from "@/client/utils/clipboard";
-import { Cog, Copy, FileText, Shield } from "lucide-react";
+import { Cog, Copy, FileCode, FileText, Shield } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { CustomHeader } from "./CustomHeadersEditor";
@@ -57,6 +58,7 @@ interface ConnectionSettingsFormProps {
 
   // Callbacks
   onConnect?: () => void;
+  onOpenApiConnect?: (spec: string) => void;
   onSave?: () => void;
   onCancel?: () => void;
 
@@ -110,6 +112,7 @@ export function ConnectionSettingsForm({
   autoSwitch,
   setAutoSwitch,
   onConnect,
+  onOpenApiConnect,
   onSave,
   onCancel,
   variant = "default",
@@ -122,6 +125,7 @@ export function ConnectionSettingsForm({
   const [headersDialogOpen, setHeadersDialogOpen] = useState(false);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [inputMode, setInputMode] = useState<"mcp" | "openapi">("mcp");
   const isComposingRef = useRef(false);
 
   // Note: we compute header enablement on-demand where needed to avoid unused vars
@@ -337,14 +341,54 @@ export function ConnectionSettingsForm({
       </div>
 
       <div className="space-y-2">
-        <Label className={labelClassName}>URL</Label>
-        <Input
-          data-testid="connection-form-url-input"
-          placeholder="http://localhost:3000"
+        <div className="flex items-center justify-between">
+          <Label className={labelClassName}>
+            {inputMode === "openapi" ? "OpenAPI Specification" : "URL"}
+          </Label>
+          {onOpenApiConnect && (
+            <div className="flex rounded-md overflow-hidden border border-white/20 text-xs">
+              <button
+                type="button"
+                onClick={() => { setInputMode("mcp"); setUrl(""); }}
+                className={cn(
+                  "px-2 py-0.5 transition-colors",
+                  inputMode === "mcp"
+                    ? "bg-white/20 text-white"
+                    : "text-white/50 hover:text-white/80"
+                )}
+              >
+                MCP URL
+              </button>
+              <button
+                type="button"
+                onClick={() => { setInputMode("openapi"); setUrl(""); }}
+                className={cn(
+                  "px-2 py-0.5 transition-colors",
+                  inputMode === "openapi"
+                    ? "bg-white/20 text-white"
+                    : "text-white/50 hover:text-white/80"
+                )}
+              >
+                OpenAPI
+              </button>
+            </div>
+          )}
+        </div>
+        <Textarea
+          data-testid={inputMode === "openapi" ? "connection-form-openapi-input" : "connection-form-url-input"}
+          placeholder={
+            inputMode === "openapi"
+              ? "https://api.example.com/openapi.json\n\nor paste raw JSON or YAML:\n\nopenapi: \"3.0.0\"\ninfo:\n  title: ..."
+              : "http://localhost:3000"
+          }
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          onPaste={handlePaste}
-          className={inputClassName}
+          onPaste={inputMode === "mcp" ? handlePaste : undefined}
+          rows={1}
+          className={cn(
+            "h-[200px] resize-none font-mono text-xs",
+            inputClassName
+          )}
         />
         <p
           className={cn(
@@ -352,13 +396,14 @@ export function ConnectionSettingsForm({
             isStyled ? "text-white/60" : ""
           )}
         >
-          Tip: You can paste a copied connection config (JSON) to auto-populate
-          the form
+          {inputMode === "openapi"
+            ? "Paste a URL, raw JSON, or YAML. Each operation becomes an MCP tool."
+            : "Tip: You can paste a copied connection config (JSON) to auto-populate the form"}
         </p>
       </div>
 
       {/* Connection Type */}
-      <div className="space-y-2">
+      <div className={cn("space-y-2", inputMode === "openapi" && "invisible pointer-events-none")}>
         <div className="flex items-center justify-between">
           <Label className={labelClassName}>Connection Type</Label>
           {setAutoSwitch && (
@@ -401,6 +446,15 @@ export function ConnectionSettingsForm({
           </SelectContent>
         </Select>
       </div>
+
+      {/* API key note — always rendered (invisible in MCP mode) to avoid layout shift */}
+      <p className={cn(
+        "text-xs -mt-1",
+        isStyled ? "text-white/60" : "text-muted-foreground",
+        inputMode === "mcp" && "invisible pointer-events-none"
+      )}>
+        Add headers below for API keys or auth tokens — they'll be sent with every request.
+      </p>
 
       {/* Configuration Buttons Row */}
       <div className="flex flex-row gap-3 @lg:flex-col">
@@ -599,7 +653,7 @@ export function ConnectionSettingsForm({
       {showConnectButton && (
         <Button
           data-testid="connection-form-connect-button"
-          onClick={onConnect}
+          onClick={inputMode === "openapi" ? () => onOpenApiConnect?.(url) : onConnect}
           disabled={!url.trim() || isConnecting}
           className={cn(
             "w-full font-semibold",
@@ -621,7 +675,12 @@ export function ConnectionSettingsForm({
                   d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                 />
               </svg>
-              Connecting...
+              {inputMode === "openapi" ? "Starting MCP Server..." : "Connecting..."}
+            </>
+          ) : inputMode === "openapi" ? (
+            <>
+              <FileCode className="w-4 h-4 mr-2" />
+              Connect from OpenAPI
             </>
           ) : (
             <>
