@@ -30,6 +30,7 @@ export interface ChatSessionsContextType {
   updateSessionTitle: (id: string, title: string) => Promise<void>;
   clearAllSessions: () => Promise<void>;
   isLoading: boolean;
+  isMessagesLoading: boolean;
 }
 
 const ChatSessionsContext = createContext<ChatSessionsContextType | undefined>(

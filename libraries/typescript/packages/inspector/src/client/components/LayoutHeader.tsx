@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -29,6 +30,7 @@ import { cn } from "@/client/lib/utils";
 import {
   ArrowUpRight,
   Bell,
+  BookOpen,
   Bug,
   Check,
   CheckSquare,
@@ -916,29 +918,268 @@ export function LayoutHeader({
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:flex items-center justify-between gap-3 w-full">
-        {/* Left side: Server dropdown */}
-        <div className="flex items-center gap-4 shrink-0">
-          {!embedded && (
-              <ServerDropdown
-                connections={connections}
-                selectedServer={selectedServer}
-                onServerSelect={onServerSelect}
-                onOpenConnectionOptions={onOpenConnectionOptions}
+      <div className="hidden lg:flex flex-col gap-0 w-full">
+
+        {/* Row 1: Server | (tabs when collapsed) | Actions */}
+        <div className="flex items-center justify-between gap-3 w-full">
+          {/* Left side: Server dropdown */}
+          <div className="flex items-center gap-4 shrink-0">
+            {!embedded && (
+                <ServerDropdown
+                  connections={connections}
+                  selectedServer={selectedServer}
+                  onServerSelect={onServerSelect}
+                  onOpenConnectionOptions={onOpenConnectionOptions}
+                />
+            )}
+          </div>
+
+          {/* Center: Tabs only when collapsed (icon-only mode inline) */}
+          {selectedServer && collapsed && (
+            <div className="flex items-center justify-start flex-1 px-2 gap-1 min-w-0 overflow-hidden">
+              <Tabs
+                value={activeTab}
+                onValueChange={(tab) => onTabChange(tab as TabType)}
+                collapsed={true}
+                onCollapsedChange={setCollapsed}
+              >
+                <TabsList className="overflow-x-auto">
+                  {filteredTabs.map((tab) => {
+                    if (tab.id === "separator") {
+                      return (
+                        <div
+                          key="separator"
+                          className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 shrink-0"
+                        />
+                      );
+                    }
+                    const count = getTabCount(tab.id, selectedServer);
+                    const tooltipText =
+                      count > 0 ? `${tab.label} (${count})` : tab.label;
+                    const showDot = shouldShowDot(tab.id, count, true);
+
+                    return (
+                      <TabsTrigger
+                        key={tab.id}
+                        value={tab.id}
+                        data-testid={`tab-${tab.id}`}
+                        icon={tab.icon}
+                        showDot={showDot}
+                        badge={
+                          <TabCountBadge
+                            count={count}
+                            isActive={activeTab === tab.id}
+                          />
+                        }
+                        alwaysExpanded={
+                          "alwaysExpanded" in tab && tab.alwaysExpanded
+                        }
+                        className={cn(
+                          "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative pl-4"
+                        )}
+                        title={tooltipText}
+                      >
+                        <span className="items-center gap-2 hidden lg:flex">
+                          {tab.label}
+                        </span>
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </Tabs>
+              <CollapseButton
+                collapsed={true}
+                onToggle={() => setCollapsed(false)}
               />
+            </div>
+          )}
+
+          {/* When expanded: spacer + collapse button stays in row 1 */}
+          {selectedServer && !collapsed && (
+            <div className="flex items-center justify-end flex-1 px-2">
+              <CollapseButton
+                collapsed={false}
+                onToggle={() => setCollapsed(true)}
+              />
+            </div>
+          )}
+
+          {/* If no server selected, add spacer */}
+          {!selectedServer && <div className="flex-1" />}
+
+          {/* Right side: Actions */}
+          {!embedded && (
+            <div className="flex items-center justify-end gap-2 sm:gap-4 shrink-0">
+
+              {selectedServer &&
+                (() => {
+                  const displayName = getServerDisplayName(selectedServer);
+                  return (
+                    <>
+                      <AddToClientDropdown
+                        serverConfig={{
+                          url: tunnelUrl
+                            ? `${tunnelUrl}/mcp`
+                            : selectedServer.url,
+                          name: displayName,
+                          headers: (selectedServer as any).customHeaders,
+                          serverId: selectedServer.id,
+                        }}
+                        onSuccess={(client: string) =>
+                          toast.success(`Opening in ${client}...`)
+                        }
+                        onError={(error: Error) =>
+                          toast.error(`Failed: ${error.message}`)
+                        }
+                        additionalItems={[
+                          {
+                            id: "ts-sdk",
+                            label: "TypeScript SDK",
+                            icon: (
+                              <img
+                                src="https://cdn.simpleicons.org/typescript"
+                                alt="TypeScript"
+                                className="h-4 w-4"
+                              />
+                            ),
+                            onClick: () => setTsSdkModalOpen(true),
+                          },
+                          {
+                            id: "py-sdk",
+                            label: "Python SDK",
+                            icon: (
+                              <img
+                                src="https://cdn.simpleicons.org/python"
+                                alt="Python"
+                                className="h-4 w-4"
+                              />
+                            ),
+                            onClick: () => setPySdkModalOpen(true),
+                          },
+                        ]}
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            className="h-9 rounded-full bg-[#27272a] hover:bg-[#3f3f46] text-white transition-all px-4 flex items-center justify-center border-0"
+                            aria-label="Add to Client"
+                          >
+                            <span className="xl:hidden hidden sm:flex items-center gap-1.5 font-medium text-sm">
+                              <Plus className="size-4" />
+                              Client
+                            </span>
+                            <span className="hidden xl:flex items-center gap-1.5 font-medium text-sm">
+                              Add to Client
+                            </span>
+                          </Button>
+                        }
+                      />
+
+                      {showTunnelBadge && (
+                        <TunnelBadge
+                          tunnelUrl={tunnelUrl}
+                          isTunnelStarting={isTunnelStarting}
+                          setTunnelUrl={setTunnelUrl}
+                          setIsTunnelStarting={setIsTunnelStarting}
+                          copied={copied}
+                          setCopied={setCopied}
+                          handleCopy={handleCopy}
+                        />
+                      )}
+
+                      <Button
+                        asChild
+                        className="h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 border-0 transition-all shadow-none"
+                      >
+                        <a
+                          href={
+                            isLoggedIn
+                              ? "https://manufact.com/cloud?ref=mcp-use-inspector"
+                              : "https://manufact.com/signup?ref=mcp-use-inspector"
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => {
+                            try {
+                              Telemetry.getInstance()
+                                .capture(
+                                  new MCPDeployClickEvent({
+                                    referrer: "mcp-use-inspector",
+                                  })
+                                )
+                                .catch(() => {});
+                            } catch {
+                              // ignore telemetry errors
+                            }
+                          }}
+                        >
+                          <Rocket className="size-4 mr-1.5" />
+                          <span className="hidden sm:inline font-medium text-sm">Deploy</span>
+                        </a>
+                      </Button>
+                    </>
+                  );
+                })()}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full"
+                    aria-label="Settings"
+                  >
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <a
+                      href="https://modelcontextprotocol.io/docs"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      MCP Documentation
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a
+                      href="https://github.com/mcp-use/mcp-use/issues/new?labels=inspector&template=bug_report.md&title=%5BInspector%5D+"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Bug className="h-4 w-4 mr-2" />
+                      Report a Bug
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {embeddedConfig.chatApiUrl ? (
+                <HostedUserMenu
+                  chatApiUrl={embeddedConfig.chatApiUrl}
+                  onUserResolved={(u) => setIsLoggedIn(!!u)}
+                  fallback={<LogoAnimated state="expanded" />}
+                />
+              ) : (
+                <LogoAnimated state="expanded" />
+              )}
+            </div>
           )}
         </div>
 
-        {/* Center: Tabs */}
-        {selectedServer && (
-          <div className="flex items-center justify-start flex-1 px-2">
+        {/* Row 2: Full tabs — only shown when expanded */}
+        {selectedServer && !collapsed && (
+          <div className="flex items-center justify-center w-full pt-2 pb-1 animate-in fade-in slide-in-from-top-1 duration-200">
             <Tabs
               value={activeTab}
               onValueChange={(tab) => onTabChange(tab as TabType)}
-              collapsed={collapsed}
+              collapsed={false}
               onCollapsedChange={setCollapsed}
             >
-              <TabsList className="overflow-x-auto" collapsible>
+              <TabsList>
                 {filteredTabs.map((tab) => {
                   if (tab.id === "separator") {
                     return (
@@ -951,7 +1192,7 @@ export function LayoutHeader({
                   const count = getTabCount(tab.id, selectedServer);
                   const tooltipText =
                     count > 0 ? `${tab.label} (${count})` : tab.label;
-                  const showDot = shouldShowDot(tab.id, count, collapsed);
+                  const showDot = shouldShowDot(tab.id, count, false);
 
                   return (
                     <TabsTrigger
@@ -966,13 +1207,8 @@ export function LayoutHeader({
                           isActive={activeTab === tab.id}
                         />
                       }
-                      alwaysExpanded={
-                        "alwaysExpanded" in tab && tab.alwaysExpanded
-                      }
-                      className={cn(
-                        "[&>svg]:mr-0 lg:[&>svg]:mr-2 relative",
-                        collapsed && "pl-4"
-                      )}
+                      alwaysExpanded={true}
+                      className="[&>svg]:mr-0 lg:[&>svg]:mr-2 relative"
                       title={tooltipText}
                     >
                       <span className="items-center gap-2 hidden lg:flex">
@@ -986,232 +1222,8 @@ export function LayoutHeader({
           </div>
         )}
 
-        {/* Right side: Actions */}
-        {!embedded && (
-          <div className="flex items-center justify-end gap-2 sm:gap-4 flex-1">
-
-            {selectedServer &&
-              (() => {
-                const displayName = getServerDisplayName(selectedServer);
-                return (
-                  <>
-                    <AddToClientDropdown
-                      serverConfig={{
-                        url: tunnelUrl
-                          ? `${tunnelUrl}/mcp`
-                          : selectedServer.url,
-                        name: displayName,
-                        headers: (selectedServer as any).customHeaders,
-                        serverId: selectedServer.id,
-                      }}
-                      onSuccess={(client: string) =>
-                        toast.success(`Opening in ${client}...`)
-                      }
-                      onError={(error: Error) =>
-                        toast.error(`Failed: ${error.message}`)
-                      }
-                      additionalItems={[
-                        {
-                          id: "ts-sdk",
-                          label: "TypeScript SDK",
-                          icon: (
-                            <img
-                              src="https://cdn.simpleicons.org/typescript"
-                              alt="TypeScript"
-                              className="h-4 w-4"
-                            />
-                          ),
-                          onClick: () => setTsSdkModalOpen(true),
-                        },
-                        {
-                          id: "py-sdk",
-                          label: "Python SDK",
-                          icon: (
-                            <img
-                              src="https://cdn.simpleicons.org/python"
-                              alt="Python"
-                              className="h-4 w-4"
-                            />
-                          ),
-                          onClick: () => setPySdkModalOpen(true),
-                        },
-                      ]}
-                      trigger={
-                        <Button
-                          variant="ghost"
-                          className="h-9 rounded-full bg-[#27272a] hover:bg-[#3f3f46] text-white transition-all px-4 flex items-center justify-center border-0"
-                          aria-label="Add to Client"
-                        >
-                          <span className="xl:hidden hidden sm:flex items-center gap-1.5 font-medium text-sm">
-                            <Plus className="size-4" />
-                            Client
-                          </span>
-                          <span className="hidden xl:flex items-center gap-1.5 font-medium text-sm">
-                            Add to Client
-                            <ChevronDown className="size-4" />
-                          </span>
-                        </Button>
-                      }
-                    />
-                    <SdkIntegrationModal
-                      open={tsSdkModalOpen}
-                      onOpenChange={setTsSdkModalOpen}
-                      serverUrl={
-                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
-                      }
-                      serverName={displayName}
-                      serverId={undefined}
-                      headers={(selectedServer as any).customHeaders}
-                      language="typescript"
-                    />
-                    <SdkIntegrationModal
-                      open={pySdkModalOpen}
-                      onOpenChange={setPySdkModalOpen}
-                      serverUrl={
-                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
-                      }
-                      serverName={displayName}
-                      serverId={undefined}
-                      headers={(selectedServer as any).customHeaders}
-                      language="python"
-                    />
-                  </>
-                );
-              })()}
-
-            {showTunnelBadge && (
-              <TunnelBadge
-                tunnelUrl={tunnelUrl}
-                isTunnelStarting={isTunnelStarting}
-                setTunnelUrl={setTunnelUrl}
-                setIsTunnelStarting={setIsTunnelStarting}
-                copied={copied}
-                setCopied={setCopied}
-                handleCopy={handleCopy}
-              />
-            )}
-
-            <Button
-              asChild
-              className="h-9 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 border-0 transition-all shadow-none"
-            >
-              <a
-                href={
-                  isLoggedIn
-                    ? "https://manufact.com/cloud?ref=mcp-use-inspector"
-                    : "https://manufact.com/signup?ref=mcp-use-inspector"
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => {
-                  try {
-                    Telemetry.getInstance()
-                      .capture(
-                        new MCPDeployClickEvent({
-                          referrer: "mcp-use-inspector",
-                        })
-                      )
-                      .catch(() => {});
-                  } catch {
-                    // ignore telemetry errors
-                  }
-                }}
-              >
-                <Rocket className="size-4 mr-1.5" />
-                <span className="hidden sm:inline font-medium text-sm">Deploy</span>
-              </a>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"
-                  aria-label="Settings"
-                >
-                  <Settings className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={onCommandPaletteOpen}
-                  data-testid="command-palette-trigger-button"
-                >
-                  <Command className="size-4 mr-2" />
-                  Command Palette
-                  <span className="ml-auto text-xs text-muted-foreground">
-                    {"\u2318"}K
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>
-                    {theme === "light" ? (
-                      <SunDim className="size-4 mr-2" />
-                    ) : theme === "dark" ? (
-                      <Moon className="size-4 mr-2" />
-                    ) : (
-                      <Monitor className="size-4 mr-2" />
-                    )}
-                    Theme
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    <DropdownMenuRadioGroup
-                      value={theme}
-                      onValueChange={(v) =>
-                        setTheme(v as "light" | "dark" | "system")
-                      }
-                    >
-                      <DropdownMenuRadioItem value="light">
-                        <SunDim className="size-4 mr-2" />
-                        Light
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="dark">
-                        <Moon className="size-4 mr-2" />
-                        Dark
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="system">
-                        <Monitor className="size-4 mr-2" />
-                        System
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a
-                    href="https://github.com/mcp-use/mcp-use"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <GithubIcon className="h-4 w-4 mr-2" />
-                    GitHub
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a
-                    href="https://github.com/mcp-use/mcp-use/issues/new?labels=inspector&template=bug_report.md&title=%5BInspector%5D+"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Bug className="size-4 mr-2" />
-                    Report a Bug
-                  </a>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {embeddedConfig.chatApiUrl ? (
-              <HostedUserMenu
-                chatApiUrl={embeddedConfig.chatApiUrl}
-                onUserResolved={(u) => setIsLoggedIn(!!u)}
-                fallback={<LogoAnimated state="expanded" />}
-              />
-            ) : (
-              <LogoAnimated state="expanded" />
-            )}
-          </div>
-        )}
       </div>
     </header>
   );
 }
+
