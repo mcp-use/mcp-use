@@ -1,8 +1,8 @@
 import { Button } from "@/client/components/ui/button";
-import { Plus, Trash2, MessageSquare, Check, X } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Check, X, Database } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useChatSessions, type ChatSession } from "../context/ChatSessionsContext";
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export function SidebarLeft() {
   const { 
@@ -11,8 +11,24 @@ export function SidebarLeft() {
     setActiveSessionId, 
     createSession, 
     deleteSession, 
-    clearAllSessions 
+    clearAllSessions,
+    storageEstimate
   } = useChatSessions();
+
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const usagePercentage = storageEstimate && storageEstimate.quota > 0 
+    ? (storageEstimate.usage / storageEstimate.quota) * 100 
+    : 0;
+  
+  // Warn if > 80% quota or > 500MB (since 500MB of JSON text is huge for this app)
+  const isWarning = usagePercentage > 80 || (storageEstimate?.usage || 0) > 500 * 1024 * 1024;
 
   const [isNaming, setIsNaming] = useState(false);
   const [newSessionName, setNewSessionName] = useState("");
@@ -26,7 +42,6 @@ export function SidebarLeft() {
     }
   }, [isNaming]);
 
-
   const handleConfirm = async () => {
     const name = newSessionName.trim() || "New Session";
     await createSession(name);
@@ -39,86 +54,33 @@ export function SidebarLeft() {
     setNewSessionName("");
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleConfirm();
-    } else if (e.key === "Escape") {
-      handleCancel();
-    }
-  };
-
-  // Group sessions by time
-  const groupedSessions = useMemo(() => {
-    const now = Date.now();
-    const msInDay = 24 * 60 * 60 * 1000;
-    
-    const today: ChatSession[] = [];
-    const yesterday: ChatSession[] = [];
-    const last7Days: ChatSession[] = [];
-    const older: ChatSession[] = [];
-
-    sessions.forEach(session => {
-      const diff = now - session.updatedAt;
-      if (diff < msInDay) {
-        today.push(session);
-      } else if (diff < msInDay * 2) {
-        yesterday.push(session);
-      } else if (diff < msInDay * 7) {
-        last7Days.push(session);
-      } else {
-        older.push(session);
-      }
-    });
-
-    return { today, yesterday, last7Days, older };
-  }, [sessions]);
-
-  const renderGroup = (title: string, group: ChatSession[]) => {
-    if (group.length === 0) return null;
+  const renderSession = (chat: ChatSession) => {
+    const isActive = chat.id === activeSessionId;
     
     return (
-      <div className="space-y-1">
-        <h3 className="px-2 text-xs font-medium text-muted-foreground mb-2">{title}</h3>
-        {group.map((chat) => {
-          const isActive = chat.id === activeSessionId;
-          const timeLabel = new Intl.DateTimeFormat('en-US', { 
-            hour: 'numeric', minute: 'numeric', 
-            ...(title !== "Today" && title !== "Yesterday" && { weekday: 'short' })
-          }).format(new Date(chat.updatedAt));
+      <div
+        key={chat.id}
+        className={cn(
+          "group relative w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer",
+          isActive 
+            ? "bg-zinc-100 dark:bg-zinc-800 text-foreground font-medium" 
+            : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-foreground/80 hover:text-foreground"
+        )}
+        onClick={() => setActiveSessionId(chat.id)}
+      >
+        <span className="truncate pr-8">{chat.title}</span>
 
-          return (
-            <div
-              key={chat.id}
-              className={cn(
-                "group relative w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer",
-                isActive 
-                  ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 font-medium" 
-                  : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50 text-foreground/80 hover:text-foreground"
-              )}
-              onClick={() => setActiveSessionId(chat.id)}
-            >
-              <span className="truncate pr-8">{chat.title}</span>
-              
-              {/* Time Label (hides on hover to show trash icon) */}
-              <span className="text-xs text-muted-foreground shrink-0 group-hover:hidden">
-                {timeLabel}
-              </span>
-
-              {/* Delete Button (shows on hover) */}
-              <button 
-                className="absolute right-2 p-1 text-muted-foreground hover:text-red-500 hidden group-hover:block transition-colors"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteSession(chat.id);
-                }}
-                title="Delete Chat"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </div>
-          );
-        })}
+        {/* Delete Button (shows on hover) */}
+        <button 
+          className="absolute right-2 p-1 text-muted-foreground hover:text-red-500 hidden group-hover:block transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteSession(chat.id);
+          }}
+          title="Delete Chat"
+        >
+          <Trash2 className="size-3.5" />
+        </button>
       </div>
     );
   };
@@ -136,29 +98,28 @@ export function SidebarLeft() {
                 type="text"
                 value={newSessionName}
                 onChange={(e) => setNewSessionName(e.target.value)}
-                onKeyDown={handleKeyDown}
                 placeholder="e.g. Debug session..."
                 maxLength={50}
                 className={cn(
                   "flex-1 min-w-0 text-sm px-3 py-1.5 rounded-md border",
                   "bg-transparent border-zinc-300 dark:border-zinc-700",
                   "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400",
+                  "focus:outline-none focus:ring-2 focus:ring-zinc-500 dark:focus:ring-zinc-400",
                   "transition-shadow"
                 )}
               />
               {/* Confirm */}
               <button
                 onClick={handleConfirm}
-                title="Create session (Enter)"
-                className="p-1.5 rounded-md text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors shrink-0"
+                title="Create session"
+                className="p-1.5 rounded-md text-foreground hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors shrink-0"
               >
                 <Check className="size-4" />
               </button>
               {/* Cancel */}
               <button
                 onClick={handleCancel}
-                title="Cancel (Esc)"
+                title="Cancel"
                 className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
               >
                 <X className="size-4" />
@@ -187,49 +148,72 @@ export function SidebarLeft() {
             <p>No chat history</p>
           </div>
         ) : (
-          <>
-            {renderGroup("Today", groupedSessions.today)}
-            {renderGroup("Yesterday", groupedSessions.yesterday)}
-            {renderGroup("Last 7 Days", groupedSessions.last7Days)}
-            {renderGroup("Older", groupedSessions.older)}
-          </>
+          <div className="space-y-1">
+            {sessions.map(renderSession)}
+          </div>
         )}
       </div>
 
       {/* Footer / Clear All */}
-      {sessions.length > 0 && (
-        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
-          {isConfirmingClear ? (
-            <div className="space-y-1.5">
-              <p className="text-xs text-muted-foreground px-1">Delete all chat history?</p>
-              <div className="flex gap-1.5">
-                <Button
-                  variant="ghost"
-                  className="flex-1 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 px-2"
-                  onClick={() => { clearAllSessions(); setIsConfirmingClear(false); }}
-                >
-                  <Check className="size-3 mr-1" />
-                  Yes, clear
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="flex-1 text-xs text-muted-foreground hover:text-foreground px-2"
-                  onClick={() => setIsConfirmingClear(false)}
-                >
-                  <X className="size-3 mr-1" />
-                  Cancel
-                </Button>
+      {(sessions.length > 0 || (storageEstimate && storageEstimate.usage > 0)) && (
+        <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-2">
+          {storageEstimate && storageEstimate.usage > 0 && (
+            <div className="px-3 pb-1 pt-1">
+              <div className="flex justify-between items-center text-[10px] text-muted-foreground mb-1.5">
+                <span className="flex items-center gap-1">
+                  <Database className="size-3" /> Storage
+                </span>
+                <span className={cn(isWarning && "text-amber-500 font-medium")}>
+                  {formatBytes(storageEstimate.usage)}
+                </span>
               </div>
+              <div className="h-1 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                <div 
+                  className={cn("h-full bg-zinc-300 dark:bg-zinc-600 transition-all duration-500", isWarning && "bg-amber-500")}
+                  style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                />
+              </div>
+              {isWarning && (
+                <p className="text-[10px] text-amber-500 mt-1.5 leading-tight text-center">
+                  Storage is large. Consider clearing old chats.
+                </p>
+              )}
             </div>
-          ) : (
-            <Button
-              variant="ghost"
-              className="w-full text-muted-foreground hover:text-red-500 text-xs justify-start px-3"
-              onClick={() => setIsConfirmingClear(true)}
-            >
-              <Trash2 className="size-3.5 mr-2" />
-              Clear All Chats
-            </Button>
+          )}
+
+          {sessions.length > 0 && (
+            isConfirmingClear ? (
+              <div className="space-y-1.5">
+                <p className="text-xs text-muted-foreground px-1">Delete all chat history?</p>
+                <div className="flex gap-1.5">
+                  <Button
+                    variant="ghost"
+                    className="flex-1 text-xs text-red-500 px-2"
+                    onClick={() => { clearAllSessions(); setIsConfirmingClear(false); }}
+                  >
+                    <Check className="size-3 mr-1" />
+                    Yes, clear
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="flex-1 text-xs text-muted-foreground px-2"
+                    onClick={() => setIsConfirmingClear(false)}
+                  >
+                    <X className="size-3 mr-1" />
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                className="w-full text-muted-foreground text-xs justify-start px-3"
+                onClick={() => setIsConfirmingClear(true)}
+              >
+                <Trash2 className="size-3.5 mr-2" />
+                Clear All Chats
+              </Button>
+            )
           )}
         </div>
       )}

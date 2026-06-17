@@ -176,7 +176,7 @@ export function ChatTab({
     clearConfig: globalClearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
 
-  const { activeSessionId, sessions, updateSessionMessages, updateSessionLlmConfig, updateSessionTitle } = useChatSessions();
+  const { activeSessionId, sessions, updateSessionMessages, updateSessionLlmConfig } = useChatSessions();
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   // ── Hosted-mode / client-side override ──────────────────────────────────
@@ -289,12 +289,6 @@ export function ChatTab({
         model: tempModel,
         baseUrl: tempBaseUrl,
       });
-
-      // Update the chat title to reflect the model if it's currently "New Chat"
-      const activeSession = sessions.find((s) => s.id === activeSessionId);
-      if (activeSession && activeSession.title === "New Chat") {
-        updateSessionTitle(activeSessionId, `${tempProvider} - ${tempModel}`);
-      }
     }
   }, [
     globalSaveLLMConfig,
@@ -305,7 +299,6 @@ export function ChatTab({
     tempModel,
     tempBaseUrl,
     sessions,
-    updateSessionTitle,
   ]);
 
   const clearConfig = useCallback(() => {

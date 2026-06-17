@@ -6,7 +6,7 @@ import React, {
   useCallback,
   ReactNode,
 } from "react";
-import { get, set, del, clear, createStore, UseStore } from "idb-keyval";
+import { get, set, del, clear, createStore } from "idb-keyval";
 import { toast } from "sonner";
 import type { Message, LLMConfig } from "../components/chat/types";
 
@@ -18,6 +18,11 @@ export interface ChatSession {
   updatedAt: number;
 }
 
+export interface StorageEstimate {
+  usage: number;
+  quota: number;
+}
+
 export interface ChatSessionsContextType {
   sessions: ChatSession[];
   activeSessionId: string | null;
@@ -27,10 +32,9 @@ export interface ChatSessionsContextType {
   deleteSession: (id: string) => Promise<void>;
   updateSessionMessages: (id: string, messages: Message[]) => Promise<void>;
   updateSessionLlmConfig: (id: string, config: LLMConfig | null) => Promise<void>;
-  updateSessionTitle: (id: string, title: string) => Promise<void>;
   clearAllSessions: () => Promise<void>;
-  isLoading: boolean;
   isMessagesLoading: boolean;
+  storageEstimate: StorageEstimate | null;
 }
 
 const ChatSessionsContext = createContext<ChatSessionsContextType | undefined>(
@@ -50,10 +54,27 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
   );
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [storageEstimate, setStorageEstimate] = useState<StorageEstimate | null>(null);
+
+  const updateStorageEstimate = useCallback(async () => {
+    if (navigator.storage && navigator.storage.estimate) {
+      try {
+        const estimate = await navigator.storage.estimate();
+        setStorageEstimate({
+          usage: estimate.usage || 0,
+          quota: estimate.quota || 0,
+        });
+      } catch (e) {
+        console.error("Failed to estimate storage", e);
+      }
+    }
+  }, []);
 
   // Load all sessions metadata on mount
   useEffect(() => {
+    updateStorageEstimate();
+    const interval = setInterval(updateStorageEstimate, 60000); // Every minute
+    
     const loadSessions = async () => {
       try {
         const storedSessions = await get<ChatSession[]>("all-sessions", sessionsStore);
@@ -68,12 +89,12 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
         }
       } catch (error) {
         console.error("Failed to load chat sessions:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
     loadSessions();
-  }, []);
+    
+    return () => clearInterval(interval);
+  }, [updateStorageEstimate]);
 
   // Whenever activeSessionId changes, load its messages
   useEffect(() => {
@@ -140,6 +161,7 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
       const newSessions = sessions.filter((s) => s.id !== id);
       await persistSessions(newSessions);
       await del(id, messagesStore);
+      updateStorageEstimate();
 
       if (activeSessionId === id) {
         if (newSessions.length > 0) {
@@ -168,26 +190,15 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
       setSessions((prevSessions) => {
         const newSessions = prevSessions.map((s) => {
           if (s.id === id) {
-            let updatedTitle = s.title;
-            if (
-              s.title === "New Chat" &&
-              messages.length > 0 &&
-              messages[0].role === "user"
-            ) {
-              const firstContent = messages[0].content;
-              if (typeof firstContent === "string") {
-                updatedTitle =
-                  firstContent.slice(0, 30) +
-                  (firstContent.length > 30 ? "..." : "");
-              }
-            }
-            return { ...s, title: updatedTitle, updatedAt: Date.now() };
+            return { ...s, updatedAt: Date.now() };
           }
           return s;
         });
 
         // Save messages without awaiting in the state updater
-        set(id, messages, messagesStore).catch((error: any) => {
+        set(id, messages, messagesStore).then(() => {
+          updateStorageEstimate();
+        }).catch((error: any) => {
           if (error.name === "QuotaExceededError" || error.message?.includes("quota")) {
             toast.error("Storage limit reached. Please delete old chats to free up space.");
           } else {
@@ -221,18 +232,7 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
     []
   );
 
-  const updateSessionTitle = useCallback(
-    async (id: string, title: string) => {
-      setSessions((prev) => {
-        const newSessions = prev.map((s) =>
-          s.id === id ? { ...s, title, updatedAt: Date.now() } : s
-        );
-        set("all-sessions", newSessions, sessionsStore).catch(console.error);
-        return newSessions;
-      });
-    },
-    []
-  );
+
 
   const clearAllSessions = useCallback(async () => {
     await clear(sessionsStore);
@@ -253,7 +253,8 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
     setSessions([newSession]);
     setActiveSessionIdState(newId);
     setActiveMessages([]);
-  }, []);
+    updateStorageEstimate();
+  }, [updateStorageEstimate]);
 
   const setActiveSessionId = useCallback((id: string | null) => {
     setActiveSessionIdState(id);
@@ -270,10 +271,9 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
         deleteSession,
         updateSessionMessages,
         updateSessionLlmConfig,
-        updateSessionTitle,
         clearAllSessions,
-        isLoading,
         isMessagesLoading,
+        storageEstimate,
       }}
     >
       {children}
