@@ -1,10 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import open from "open";
 import type { McpUseAPI } from "../src/utils/api.js";
 import {
   gitHubInstallUrl,
   promptGitHubInstallation,
   resolveInstallFlowMode,
 } from "../src/commands/deploy.js";
+
+// Stub the browser launcher so the non-interactive path can assert it is never
+// invoked — a regression that fell through to open() would otherwise launch a
+// real browser in CI instead of failing the test.
+vi.mock("open", () => ({ default: vi.fn() }));
 
 /**
  * Unit tests for the MCP-2243 deploy GitHub-App installation flow. The deploy
@@ -18,14 +24,9 @@ describe("gitHubInstallUrl", () => {
     expect(gitHubInstallUrl("mcp-use")).toBe(
       "https://github.com/apps/mcp-use/installations/new"
     );
-  });
-
-  it("respects non-production app slugs", () => {
+    // Non-production slugs are interpolated, not hardcoded.
     expect(gitHubInstallUrl("mcp-use-dev")).toBe(
       "https://github.com/apps/mcp-use-dev/installations/new"
-    );
-    expect(gitHubInstallUrl("mcp-use-local")).toBe(
-      "https://github.com/apps/mcp-use-local/installations/new"
     );
   });
 });
@@ -52,9 +53,8 @@ describe("resolveInstallFlowMode", () => {
 /**
  * Drives the real promptGitHubInstallation() through the non-interactive path
  * (no TTY, no --yes) — the agent/CI scenario from MCP-2243. We assert it prints
- * the install URL and bails cleanly, rather than blocking on a prompt. A
- * stubbed API supplies the app slug; reaching the prompt or `open()` would hang
- * the test, so the absence of a hang is itself part of what's verified.
+ * the install URL, never opens a browser, and bails cleanly rather than blocking
+ * on a prompt. A stubbed API supplies the app slug.
  */
 describe("promptGitHubInstallation (non-interactive)", () => {
   const originalIsTTY = process.stdin.isTTY;
@@ -102,6 +102,7 @@ describe("promptGitHubInstallation (non-interactive)", () => {
     );
 
     expect(result.ok).toBe(false);
+    expect(open).not.toHaveBeenCalled();
     const output = logs.join("\n");
     expect(output).toContain(
       "https://github.com/apps/mcp-use/installations/new"
@@ -122,6 +123,7 @@ describe("promptGitHubInstallation (non-interactive)", () => {
     );
 
     expect(result.ok).toBe(false);
+    expect(open).not.toHaveBeenCalled();
     const output = logs.join("\n");
     expect(output).toContain(
       "https://github.com/apps/mcp-use/installations/new"

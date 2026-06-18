@@ -619,6 +619,7 @@ export async function promptGitHubInstallation(
 ): Promise<{ ok: boolean; api: McpUseAPI }> {
   const yes = !!opts?.yes;
   const reauth = opts?.reauth;
+  const noAccess = reason === "no_access";
   let client = api;
 
   // Resolve the install URL up front so it is ALWAYS surfaced — before any
@@ -642,10 +643,7 @@ export async function promptGitHubInstallation(
   const installUrl = gitHubInstallUrl(appName);
 
   console.log();
-  if (reason === "not_connected") {
-    console.log(chalk.yellow("⚠️  GitHub account not connected"));
-    console.log(chalk.white("Deployments require a connected GitHub account."));
-  } else {
+  if (noAccess) {
     console.log(
       chalk.yellow("⚠️  GitHub App doesn't have access to this repository")
     );
@@ -654,17 +652,20 @@ export async function promptGitHubInstallation(
         `The GitHub App needs permission to access ${chalk.cyan(repoName || "this repository")}.`
       )
     );
+  } else {
+    console.log(chalk.yellow("⚠️  GitHub account not connected"));
+    console.log(chalk.white("Deployments require a connected GitHub account."));
   }
 
   // Always print the install URL so it is actionable even when the prompt is
   // declined or stdin is non-interactive.
   console.log(
     chalk.white(
-      `\nInstall${reason === "no_access" ? " / configure" : ""} the GitHub App to continue:`
+      `\nInstall${noAccess ? " / configure" : ""} the GitHub App to continue:`
     )
   );
   console.log(chalk.cyan.bold(`  ${installUrl}`));
-  if (reason === "no_access") {
+  if (noAccess) {
     console.log(
       chalk.gray(
         `  Grant access to ${repoName || "your repository"} on the app's settings page.`
@@ -688,7 +689,7 @@ export async function promptGitHubInstallation(
   if (mode === "interactive") {
     const shouldInstall = await prompt(
       chalk.white(
-        `\nWould you like to ${reason === "not_connected" ? "connect" : "configure"} GitHub now? (Y/n): `
+        `\nWould you like to ${noAccess ? "configure" : "connect"} GitHub now? (Y/n): `
       ),
       "y"
     );
@@ -706,7 +707,7 @@ export async function promptGitHubInstallation(
   // browser to the install page.
   try {
     console.log(chalk.cyan(`\nOpening browser...`));
-    if (reason === "no_access") {
+    if (noAccess) {
       console.log(
         chalk.white("Please add ") +
           chalk.cyan.bold(repoName || "your repository") +
