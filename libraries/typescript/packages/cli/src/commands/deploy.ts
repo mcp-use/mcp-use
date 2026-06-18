@@ -597,7 +597,7 @@ export function gitHubInstallUrl(appName: string): string {
  *   a prompt that will never be answered, so the caller prints the install URL
  *   and bails cleanly instead of hanging.
  */
-export type InstallFlowMode = "auto" | "interactive" | "non-interactive";
+type InstallFlowMode = "auto" | "interactive" | "non-interactive";
 
 export function resolveInstallFlowMode(opts: {
   yes: boolean;
