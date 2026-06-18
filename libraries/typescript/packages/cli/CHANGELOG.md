@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.3-canary.5
+
+### Patch Changes
+
+- dfa7562: `mcp-use deploy` now surfaces the GitHub App installation URL up front when the app isn't connected or lacks repo access, before any prompt. In a non-interactive context (an agent or CI, without `--yes`) it prints the URL and clear next steps and exits cleanly instead of hanging on an unanswerable prompt.
+  - mcp-use@1.32.2-canary.5
+  - @mcp-use/inspector@10.0.2-canary.5
+
 ## 3.5.3-canary.4
 
 ### Patch Changes
