@@ -244,7 +244,7 @@ function buildPaginationQuery(
 
 // ── GitHub ──────────────────────────────────────────────────────────
 
-export interface GitHubInstallation {
+interface GitHubInstallation {
   id: string;
   installation_id: string;
   account_login: string;
