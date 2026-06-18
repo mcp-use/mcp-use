@@ -139,6 +139,24 @@ Add custom HTTP headers to all requests sent to the MCP server.
 - **Version Headers**: `X-API-Version: v2`
 - **Request IDs**: `X-Request-ID: <uuid>`
 
+### Authenticated Remote MCP Example
+
+Xquik exposes a streamable HTTP MCP endpoint at `https://xquik.com/mcp`.
+Use a bearer header when connecting it through the inspector:
+
+```json
+{
+  "url": "https://xquik.com/mcp",
+  "transportType": "http",
+  "connectionType": "Direct",
+  "headers": {
+    "Authorization": "Bearer <XQUIK_API_KEY>"
+  }
+}
+```
+
+Keep copied configs private when they include API keys.
+
 ### Security Considerations
 
 <Warning>
