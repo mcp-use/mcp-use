@@ -1,5 +1,13 @@
 # @mcp-use/cli
 
+## 3.5.3-canary.6
+
+### Patch Changes
+
+- d639509: `mcp-use deployments list` now preserves the deployment ordering returned by the API instead of re-sorting by creation date on the client. This keeps the displayed order consistent with the server's pagination and sort.
+  - mcp-use@1.32.2-canary.6
+  - @mcp-use/inspector@10.0.2-canary.6
+
 ## 3.5.3-canary.5
 
 ### Patch Changes

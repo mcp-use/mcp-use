@@ -8,6 +8,7 @@
     "mcp-use": "1.32.1"
   },
   "changesets": [
+    "cli-deployments-list-sort-order",
     "codex-skills-folder",
     "dependabot-7b594246",
     "deploy-github-install-url",
