@@ -360,12 +360,18 @@ Search available tools across all servers.
 # Data: list, dict, set, tuple, str, int, float, bool
 # Iteration: range, enumerate, zip, map, filter
 # Aggregation: len, sum, min, max, sorted, any, all
-# Async: asyncio
+# Async: asyncio (curated subset: sleep, gather, wait_for, wait, shield,
+#         as_completed, Lock, Event, Semaphore, Queue, ...)
 # Exceptions: Exception, ValueError, TypeError, etc.
 ```
 
+`asyncio` is a curated facade, not the real module: the real one transitively re-exposes
+`os`/`subprocess` through plain attribute chains (e.g. `asyncio.base_events.os`), so only the
+coroutine helpers above are exposed.
+
 **Blocked (defense-in-depth, not a sandbox):** `import`, `open`, `eval`/`exec`, dunder
-attribute access (`__class__`, ...), and introspection builtins like `getattr`/`type`. This
+attribute access (`__class__`, ...), interpreter-introspection attributes (`f_globals`,
+`gi_frame`, `tb_frame`, ...), and introspection builtins like `getattr`/`type`. This
 hardens the in-process executor but does not isolate it. See [Security](#security).
 
 ## Performance

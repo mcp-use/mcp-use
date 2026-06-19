@@ -17,9 +17,29 @@
 
 To make accidental and low-effort escapes harder, this executor still applies
 defense-in-depth: a strict AST check rejects imports, dunder attribute access,
-and known escape primitives before execution, and the dangerous introspection
-builtins (``getattr``, ``type``, ...) are withheld from the namespace. Treat
-this as risk reduction, never as a guarantee.
+non-dunder interpreter-introspection attributes (``f_globals``, ``gi_frame``,
+``tb_frame``, ...), and known escape primitives before execution; the dangerous
+introspection builtins (``getattr``, ``type``, ...) are withheld from the
+namespace; and only a curated facade of :mod:`asyncio` is exposed instead of the
+real module (the real one transitively re-exposes ``os``/``subprocess`` through
+plain attribute chains like ``asyncio.base_events.os``). Treat all of this as
+risk reduction, never as a guarantee: a sufficiently determined payload can
+still escape an in-process interpreter, which is why untrusted code belongs in a
+real sandbox. The execution timeout likewise bounds only ``await`` points, not
+synchronous CPU- or memory-bound code; hard resource limits require the
+out-of-process (E2B) executor.
+
+One residual is worth calling out explicitly: ``str.format``/``format_map`` and
+f-strings perform attribute and item access at *runtime* (``"{0.attr}".format(x)``),
+so a dynamically built format string (e.g. ``"{0.__glo" + "bals__}"``) can read a
+dunder the AST never sees and walk an exposed object's ``__globals__`` to module
+state. This is **information disclosure only**, not code execution: the format
+machinery stringifies whatever it reaches, it cannot call it or return a live
+handle, so it yields a repr (which may still leak env vars or paths), never an
+``os.system`` style payload. It is inherent to exposing any real callable next to
+``str.format`` in-process and cannot be closed without breaking legitimate string
+formatting; treat env/secret confidentiality as another reason to use the E2B
+executor for untrusted input.
 """
 
 import ast
@@ -49,6 +69,49 @@ class UnsafeCodeError(ValueError):
 
 # Dunder attributes / names that gate every known namespace-escape chain.
 _DUNDER_RE = re.compile(r"^__\w+__$")
+
+# Non-dunder introspection attributes that expose interpreter internals (frames,
+# code objects, generator/coroutine/traceback state). These are *not* dunders, so
+# the regex above misses them, yet they are a direct escape route: from any frame
+# you can read ``f_globals``/``f_builtins`` (plain dicts holding the real
+# ``__import__``) or walk ``f_back`` to a host frame that already imported ``os``.
+# A generator/coroutine an agent defines exposes its frame via ``gi_frame``/
+# ``cr_frame``; ``sys.exc_info()`` hands back a traceback whose ``tb_frame`` does
+# the same. Legitimate code-mode code never touches these, so rejecting them is
+# cheap defense-in-depth with negligible false-positive risk.
+_DENIED_ATTRS = frozenset(
+    {
+        # frame objects
+        "f_globals",
+        "f_builtins",
+        "f_locals",
+        "f_back",
+        "f_code",
+        "f_trace",
+        # generator objects
+        "gi_frame",
+        "gi_code",
+        "gi_yieldfrom",
+        # coroutine objects
+        "cr_frame",
+        "cr_code",
+        "cr_await",
+        "cr_origin",
+        # async-generator objects
+        "ag_frame",
+        "ag_code",
+        # traceback objects
+        "tb_frame",
+        "tb_next",
+        # event-loop accessors on asyncio Futures/Tasks/sync primitives. The
+        # curated asyncio facade still returns real Future/Lock/... objects, and
+        # the running loop exposes os/subprocess (e.g. loop.subprocess_shell). The
+        # loop is only reachable through these names, so block them.
+        "get_loop",
+        "_get_loop",
+        "_loop",
+    }
+)
 
 # Names withheld from the namespace AND rejected by the AST check. Most are not in
 # the safe builtins to begin with; rejecting them up front gives a clear error and
@@ -91,8 +154,14 @@ _DENIED_NAMES = frozenset(
 # This is an explicit denylist rather than "reject every __\\w+__ string" on purpose:
 # the retrieval primitives a string escape needs (getattr/hasattr/type) are already
 # withheld, so this rule is bonus defense-in-depth and we keep it permissive enough to
-# allow common data like "__init__.py" filenames. A dynamically built dunder string is
-# inert here because nothing can use it to fetch an attribute.
+# allow common data like "__init__.py" filenames. A dunder string built at runtime
+# (e.g. "__cl" + "ass__") evades this literal scan. ``str.format``/``format_map`` then
+# perform real attribute/item access for that field, so a dynamically built field can
+# walk an exposed object's ``__globals__`` (or a generator's frame) all the way to real
+# modules and ``__builtins__``. That is information disclosure, NOT code execution: the
+# format machinery only ever returns the *repr string* of what it reaches, never a live
+# or callable handle, so it cannot escalate to RCE (getattr/type are also withheld). See
+# the module docstring's residual note; in-process execution cannot close this.
 _DANGEROUS_DUNDER_STRINGS = (
     "__class__",
     "__subclasses__",
@@ -111,6 +180,53 @@ _DANGEROUS_DUNDER_STRINGS = (
     "__func__",
     "__self__",
 )
+
+
+class _AsyncioFacade:
+    """A closed, curated subset of :mod:`asyncio` exposed to executed code.
+
+    Code mode needs *some* of ``asyncio`` (e.g. ``await asyncio.sleep(...)`` and
+    ``asyncio.gather(...)`` for concurrent tool calls), but injecting the real
+    module hands hostile code a transitive path to the host: ``asyncio`` imports
+    ``os``/``sys``/``subprocess``, all reachable through plain non-dunder
+    attribute chains such as ``asyncio.base_events.os`` or
+    ``asyncio.events.sys.modules``. This facade exposes only the coroutine
+    helpers an agent legitimately needs.
+
+    It is a **closed allowlist**, not a forwarding proxy: ``__slots__`` is empty
+    and there is no ``__getattr__``, so any attribute that is not listed below
+    (``base_events``, ``events``, ``get_event_loop``, ``run``, ...) simply raises
+    ``AttributeError``. The exposed callables do not themselves leak a module
+    graph: a function's ``__globals__`` is a dunder attribute already blocked by
+    the AST check. (This narrows the surface; it is not a security boundary on
+    its own -- see the module docstring.)
+    """
+
+    __slots__ = ()
+
+    # Coroutine combinators.
+    sleep = staticmethod(asyncio.sleep)
+    gather = staticmethod(asyncio.gather)
+    wait = staticmethod(asyncio.wait)
+    wait_for = staticmethod(asyncio.wait_for)
+    as_completed = staticmethod(asyncio.as_completed)
+    shield = staticmethod(asyncio.shield)
+    # Synchronization primitives / queues for structuring concurrent work.
+    Lock = asyncio.Lock
+    Event = asyncio.Event
+    Condition = asyncio.Condition
+    Semaphore = asyncio.Semaphore
+    BoundedSemaphore = asyncio.BoundedSemaphore
+    Queue = asyncio.Queue
+    QueueEmpty = asyncio.QueueEmpty
+    QueueFull = asyncio.QueueFull
+    # Exception types for error handling around the above.
+    TimeoutError = asyncio.TimeoutError
+    CancelledError = asyncio.CancelledError
+
+
+# Single shared instance; it is immutable (empty __slots__) so sharing is safe.
+_ASYNCIO_FACADE = _AsyncioFacade()
 
 
 class VMCodeExecutor(BaseCodeExecutor):
@@ -272,7 +388,9 @@ class VMCodeExecutor(BaseCodeExecutor):
         """
         namespace: dict[str, Any] = {
             "__builtins__": self._safe_builtins(),
-            "asyncio": asyncio,  # Allow async/await
+            # A curated facade, NOT the real module: the real asyncio transitively
+            # re-exposes os/sys/subprocess via non-dunder attribute chains.
+            "asyncio": _ASYNCIO_FACADE,
         }
 
         # Add search_tools function
@@ -292,9 +410,10 @@ class VMCodeExecutor(BaseCodeExecutor):
     def _validate_ast(cls, source: str) -> None:
         """Reject code containing known sandbox-escape patterns.
 
-        Best-effort defense-in-depth. Blocks imports, dunder attribute access,
-        denied/dunder names, and dunder string literals. It does not (and cannot)
-        catch every vector, e.g. a dunder name built dynamically at runtime.
+        Best-effort defense-in-depth. Blocks imports, dunder and interpreter-
+        introspection attribute access (``__class__``, ``f_globals``, ``gi_frame``,
+        ...), denied/dunder names, and dunder string literals. It does not (and
+        cannot) catch every vector, e.g. a dunder name built dynamically at runtime.
 
         Args:
             source: The (wrapped) Python source to validate.
@@ -304,17 +423,40 @@ class VMCodeExecutor(BaseCodeExecutor):
             SyntaxError: If the source is not valid Python.
         """
         tree = ast.parse(source)
+
+        # Names the code binds locally (assignments, for-targets, with/except-as,
+        # function args, comprehension vars). A Load of such a name refers to the
+        # local, not the builtin, so it is safe and must not be rejected by rule 3
+        # (otherwise harmless code like `type = row["type"]; use(type)` breaks).
+        assigned_names: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+                assigned_names.add(node.id)
+            elif isinstance(node, ast.arg):
+                assigned_names.add(node.arg)
+
         for node in ast.walk(tree):
             # 1) No imports.
             if isinstance(node, (ast.Import, ast.ImportFrom)):
                 raise UnsafeCodeError("import statements are not allowed in code mode")
 
-            # 2) No dunder attribute access (kills the __class__/__subclasses__ walk).
-            if isinstance(node, ast.Attribute) and _DUNDER_RE.match(node.attr):
-                raise UnsafeCodeError(f"access to dunder attribute '{node.attr}' is not allowed")
+            # 2) No dunder attribute access (kills the __class__/__subclasses__ walk)
+            #    and no non-dunder interpreter-introspection attributes (frame/code/
+            #    generator/coroutine/traceback state that re-expose real globals).
+            if isinstance(node, ast.Attribute) and (_DUNDER_RE.match(node.attr) or node.attr in _DENIED_ATTRS):
+                raise UnsafeCodeError(f"access to attribute '{node.attr}' is not allowed")
 
-            # 3) No denied names or bare dunder names.
-            if isinstance(node, ast.Name) and (node.id in _DENIED_NAMES or _DUNDER_RE.match(node.id)):
+            # 3) No denied names or bare dunder names, but only where they are READ
+            #    (ast.Load). Rejecting Store/Del too would break harmless locals like
+            #    `type = row["type"]`; the danger is only invoking the real builtin,
+            #    which requires a Load. (The builtins themselves are not in the
+            #    namespace, so this rule is for clear errors + indirect-lookup defense.)
+            if (
+                isinstance(node, ast.Name)
+                and isinstance(node.ctx, ast.Load)
+                and node.id not in assigned_names
+                and (node.id in _DENIED_NAMES or _DUNDER_RE.match(node.id))
+            ):
                 raise UnsafeCodeError(f"use of name '{node.id}' is not allowed")
 
             # 4) No dunder string literals (blocks getattr/str.format-style escapes).
@@ -322,15 +464,34 @@ class VMCodeExecutor(BaseCodeExecutor):
                 if any(token in node.value for token in _DANGEROUS_DUNDER_STRINGS):
                     raise UnsafeCodeError("string literals referencing dunder attributes are not allowed")
 
+            # 5) No dunder / introspection attribute names in class match patterns.
+            #    `case Cls(__class__=x)` performs getattr(subject, "__class__")
+            #    internally; the attribute name lives in MatchClass.kwd_attrs as a
+            #    plain string, so rules 2-4 never see it. Block the same attribute
+            #    set here so pattern matching is not a getattr bypass.
+            if isinstance(node, ast.MatchClass):
+                for attr_name in node.kwd_attrs:
+                    if _DUNDER_RE.match(attr_name) or attr_name in _DENIED_ATTRS:
+                        raise UnsafeCodeError(f"access to attribute '{attr_name}' is not allowed")
+
     @classmethod
     def _warn_insecure_once(cls) -> None:
-        """Emit the in-process execution warning a single time per process."""
+        """Emit the in-process execution warning a single time per process.
+
+        Guarded so it can never raise: under warnings-as-errors
+        (``warnings.simplefilter("error")``) ``warnings.warn`` would otherwise
+        raise out of :meth:`execute`, breaking its always-return-an-
+        :class:`ExecutionResult` contract.
+        """
         if not cls._warned:
             cls._warned = True
-            warnings.warn(
-                "VMCodeExecutor runs agent code in-process and is NOT a security boundary. "
-                "Only use it for trusted code. For untrusted input, run code in an isolated "
-                "sandbox (e.g. an E2B cloud sandbox) instead.",
-                InsecureCodeExecutionWarning,
-                stacklevel=3,
-            )
+            try:
+                warnings.warn(
+                    "VMCodeExecutor runs agent code in-process and is NOT a security boundary. "
+                    "Only use it for trusted code. For untrusted input, run code in an isolated "
+                    "sandbox (e.g. an E2B cloud sandbox) instead.",
+                    InsecureCodeExecutionWarning,
+                    stacklevel=3,
+                )
+            except InsecureCodeExecutionWarning:
+                pass
