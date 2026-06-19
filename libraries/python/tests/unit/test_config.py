@@ -12,6 +12,7 @@ from mcp_use.client.auth.bearer import BearerAuth
 from mcp_use.client.config import create_connector_from_config, load_config_file
 from mcp_use.client.connectors import HttpConnector, SandboxConnector, StdioConnector, WebSocketConnector
 from mcp_use.client.connectors.sandbox import SandboxOptions
+from mcp_use.client.middleware import Middleware
 
 
 class TestConfigLoading(unittest.TestCase):
@@ -143,6 +144,36 @@ class TestConnectorCreation(unittest.TestCase):
         self.assertIsInstance(connector, WebSocketConnector)
         self.assertEqual(connector.url, "ws://test.com")
         self.assertEqual(connector.headers, {})
+
+    def test_create_websocket_connector_preserves_common_options(self):
+        """WebSocket connectors receive the same common options as other transports."""
+        server_config = {"ws_url": "ws://test.com"}
+        middleware = Middleware()
+        sampling_callback = object()
+        elicitation_callback = object()
+        message_handler = object()
+        logging_callback = object()
+        roots = []
+        list_roots_callback = object()
+
+        connector = create_connector_from_config(
+            server_config,
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
+            middleware=[middleware],
+            roots=roots,
+            list_roots_callback=list_roots_callback,
+        )
+
+        self.assertIs(connector.sampling_callback, sampling_callback)
+        self.assertIs(connector.elicitation_callback, elicitation_callback)
+        self.assertIs(connector.message_handler, message_handler)
+        self.assertIs(connector.logging_callback, logging_callback)
+        self.assertEqual(connector.get_roots(), roots)
+        self.assertIs(connector._user_list_roots_callback, list_roots_callback)
+        self.assertIn(middleware, connector.middleware_manager.middlewares)
 
     def test_create_stdio_connector(self):
         """Test creating a stdio connector from config."""

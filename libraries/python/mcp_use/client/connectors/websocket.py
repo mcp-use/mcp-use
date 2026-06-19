@@ -11,10 +11,12 @@ import uuid
 from typing import Any
 
 import httpx
+from mcp.client.session import ElicitationFnT, ListRootsFnT, LoggingFnT, MessageHandlerFnT, SamplingFnT
 from mcp.types import Tool
 from websockets import ClientConnection
 
 from mcp_use.client.connectors.base import BaseConnector
+from mcp_use.client.middleware import Middleware
 from mcp_use.client.task_managers import ConnectionManager, WebSocketConnectionManager
 from mcp_use.logging import logger
 
@@ -31,6 +33,13 @@ class WebSocketConnector(BaseConnector):
         url: str,
         headers: dict[str, str] | None = None,
         auth: str | dict[str, Any] | httpx.Auth | None = None,
+        sampling_callback: SamplingFnT | None = None,
+        elicitation_callback: ElicitationFnT | None = None,
+        message_handler: MessageHandlerFnT | None = None,
+        logging_callback: LoggingFnT | None = None,
+        middleware: list[Middleware] | None = None,
+        roots: list[Any] | None = None,
+        list_roots_callback: ListRootsFnT | None = None,
     ):
         """Initialize a new WebSocket connector.
 
@@ -42,6 +51,15 @@ class WebSocketConnector(BaseConnector):
                 - A dict: Not supported for WebSocket (will log warning)
                 - An httpx.Auth object: Not supported for WebSocket (will log warning)
         """
+        super().__init__(
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
+            middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
+        )
         self.url = url
         self.headers = headers or {}
 
@@ -225,7 +243,7 @@ class WebSocketConnector(BaseConnector):
     @property
     def tools(self) -> list[Tool]:
         """Get the list of available tools."""
-        if not self._tools:
+        if self._tools is None:
             raise RuntimeError("MCP client is not initialized")
         return self._tools
 

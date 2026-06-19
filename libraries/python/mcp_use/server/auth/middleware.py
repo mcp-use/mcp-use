@@ -46,13 +46,17 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         super().__init__(app)
         self.auth_provider = auth_provider
-        self.exclude_paths = exclude_paths or [
-            "/health",
-            "/docs",
-            "/inspector",
-            "/openmcp.json",
-        ]
-        self.protected_paths = protected_paths or ["/mcp"]
+        self.exclude_paths = (
+            [
+                "/health",
+                "/docs",
+                "/inspector",
+                "/openmcp.json",
+            ]
+            if exclude_paths is None
+            else exclude_paths
+        )
+        self.protected_paths = ["/mcp"] if protected_paths is None else protected_paths
 
     def _is_protected_path(self, path: str) -> bool:
         """Check if the path requires authentication."""

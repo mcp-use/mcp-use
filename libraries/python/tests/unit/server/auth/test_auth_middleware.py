@@ -234,6 +234,41 @@ class TestAuthMiddlewareCustomPaths:
         response = client.get("/public")
         assert response.status_code == 200
 
+    def test_empty_protected_paths_disable_default_mcp_protection(self):
+        """An explicit empty protected path list should not fall back to /mcp."""
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/mcp", endpoint, methods=["GET"])])
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            protected_paths=[],
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        response = client.get("/mcp")
+        assert response.status_code == 200
+
+    def test_empty_exclude_paths_disable_default_exclusions(self):
+        """An explicit empty exclude path list should not keep default exclusions."""
+
+        async def endpoint(request: Request) -> JSONResponse:
+            return JSONResponse({"ok": True})
+
+        app = Starlette(routes=[Route("/docs", endpoint, methods=["GET"])])
+        app.add_middleware(
+            AuthMiddleware,
+            auth_provider=MockAuthProvider(),
+            exclude_paths=[],
+            protected_paths=["/docs"],
+        )
+        client = TestClient(app, raise_server_exceptions=False)
+
+        response = client.get("/docs")
+        assert response.status_code == 401
+
 
 class TestAuthMiddlewarePathMatchingSecurity:
     """Test that path matching is secure against prefix attacks."""
