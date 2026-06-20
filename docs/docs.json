@@ -30,18 +30,7 @@
   "icons": {
     "library": "lucide"
   },
-  "feedback": {
-    "thumbsRating": true,
-    "suggestEdit": true,
-    "raiseIssue": true
-  },
   "navigation": {
-    "anchors": [
-      {
-        "anchor": "python/getting-started/quickstart",
-        "icon": "rocket"
-      }
-    ],
     "products": [
       {
         "product": "Home",
