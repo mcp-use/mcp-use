@@ -77,7 +77,12 @@ export function createBrowserOAuthProvider(params: {
     features: string,
     window: globalThis.Window | null
   ) => void;
-  installFetchInterceptor: boolean;
+  /**
+   * Whether the provider should route OAuth requests through the derived
+   * OAuth proxy (to bypass CORS). The provider exposes this via its scoped
+   * `getProxyFetch()` — it never patches the global `fetch`.
+   */
+  proxyOAuthRequests: boolean;
   staticClientInfo?: OAuthClientInformation;
   scope?: string;
 }): {
@@ -97,13 +102,10 @@ export function createBrowserOAuthProvider(params: {
     oauthProxyUrl,
     connectionUrl: params.gatewayUrl,
     onPopupWindow: params.onPopupWindow,
+    proxyOAuthRequests: params.proxyOAuthRequests,
     staticClientInfo: params.staticClientInfo,
     scope: params.scope,
   });
-
-  if (oauthProxyUrl && params.installFetchInterceptor) {
-    provider.installFetchInterceptor();
-  }
 
   return { provider, oauthProxyUrl };
 }
