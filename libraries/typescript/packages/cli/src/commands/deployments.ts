@@ -133,12 +133,14 @@ async function listDeploymentsCommand(options: {
       }
     }
 
-    const sortedDeployments = [...deployments].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const displayDeployments = options.sort
+      ? deployments
+      : [...deployments].sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
 
-    if (sortedDeployments.length === 0) {
+    if (displayDeployments.length === 0) {
       if (page.total === 0) {
         console.log(chalk.yellow("No deployments found."));
         console.log(
@@ -160,7 +162,7 @@ async function listDeploymentsCommand(options: {
       chalk.cyan.bold(
         `\n📦 ${formatPageHeader(
           "Deployments",
-          sortedDeployments.length,
+          displayDeployments.length,
           page.total
         )}\n`
       )
@@ -173,7 +175,7 @@ async function listDeploymentsCommand(options: {
     );
     console.log(chalk.gray("─".repeat(155)));
 
-    for (const deployment of sortedDeployments) {
+    for (const deployment of displayDeployments) {
       const id = formatId(deployment.id).padEnd(40);
       const name = deployment.name.substring(0, 24).padEnd(25);
       const orgName = deployment.serverId

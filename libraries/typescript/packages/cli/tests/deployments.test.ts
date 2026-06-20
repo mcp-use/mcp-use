@@ -4,6 +4,8 @@ import type { Deployment, EnvVariable } from "../src/utils/api.js";
 // Create a mock API instance
 const mockApiInstance = {
   listDeployments: vi.fn(),
+  testAuth: vi.fn(),
+  getServer: vi.fn(),
   getDeployment: vi.fn(),
   deleteDeployment: vi.fn(),
   updateDeployment: vi.fn(),
@@ -508,6 +510,7 @@ describe("Deployment Command Integration", () => {
   let consoleErrors: string[];
 
   beforeEach(() => {
+    vi.clearAllMocks();
     consoleOutput = [];
     consoleErrors = [];
     originalConsoleLog = console.log;
@@ -544,6 +547,90 @@ describe("Deployment Command Integration", () => {
       vi.mocked(isLoggedIn).mockResolvedValue(true);
 
       expect(await isLoggedIn()).toBe(true);
+    });
+  });
+
+  describe("list command", () => {
+    it("preserves the API order when --sort is provided", async () => {
+      const { isLoggedIn } = await import("../src/utils/config.js");
+      vi.mocked(isLoggedIn).mockResolvedValue(true);
+      mockApiInstance.testAuth.mockResolvedValue({ orgs: [] });
+      mockApiInstance.getServer.mockResolvedValue({ organizationId: "org_1" });
+      mockApiInstance.listDeployments.mockResolvedValue({
+        items: [
+          {
+            ...mockDeployment,
+            id: "dep_alpha",
+            name: "alpha",
+            createdAt: "2024-01-01T00:00:00Z",
+            serverId: "srv_1",
+          },
+          {
+            ...mockDeployment,
+            id: "dep_beta",
+            name: "beta",
+            createdAt: "2024-02-01T00:00:00Z",
+            serverId: "srv_1",
+          },
+        ],
+        total: 2,
+        limit: 30,
+        skip: 0,
+      });
+
+      const { createDeploymentsCommand } =
+        await import("../src/commands/deployments.js");
+      const cmd = createDeploymentsCommand();
+      await cmd.parseAsync(["list", "--sort", "name:asc"], { from: "user" });
+
+      const output = consoleOutput.join("\n");
+      expect(output.indexOf("alpha")).toBeLessThan(output.indexOf("beta"));
+      expect(mockApiInstance.listDeployments).toHaveBeenCalledWith({
+        limit: 30,
+        skip: undefined,
+        sort: "name:asc",
+      });
+    });
+
+    it("keeps createdAt descending display order when --sort is omitted", async () => {
+      const { isLoggedIn } = await import("../src/utils/config.js");
+      vi.mocked(isLoggedIn).mockResolvedValue(true);
+      mockApiInstance.testAuth.mockResolvedValue({ orgs: [] });
+      mockApiInstance.getServer.mockResolvedValue({ organizationId: "org_1" });
+      mockApiInstance.listDeployments.mockResolvedValue({
+        items: [
+          {
+            ...mockDeployment,
+            id: "dep_alpha",
+            name: "alpha",
+            createdAt: "2024-01-01T00:00:00Z",
+            serverId: "srv_1",
+          },
+          {
+            ...mockDeployment,
+            id: "dep_beta",
+            name: "beta",
+            createdAt: "2024-02-01T00:00:00Z",
+            serverId: "srv_1",
+          },
+        ],
+        total: 2,
+        limit: 30,
+        skip: 0,
+      });
+
+      const { createDeploymentsCommand } =
+        await import("../src/commands/deployments.js");
+      const cmd = createDeploymentsCommand();
+      await cmd.parseAsync(["list"], { from: "user" });
+
+      const output = consoleOutput.join("\n");
+      expect(output.indexOf("beta")).toBeLessThan(output.indexOf("alpha"));
+      expect(mockApiInstance.listDeployments).toHaveBeenCalledWith({
+        limit: 30,
+        skip: undefined,
+        sort: "createdAt:desc",
+      });
     });
   });
 
