@@ -55,8 +55,8 @@ async def main():
         print("Sending initial prompt to Ollama...")
         # Note: Replace 'llama3.1' with whatever local model you have installed.
         response = ollama_client.chat.completions.create(
-            model="Jaahas/qwen3.5-uncensored:2b", #feel free to use any, i had this one already on system
-            messages=messages, 
+            model="Jaahas/qwen3.5-uncensored:2b",  # feel free to use any, i had this one already on system
+            messages=messages,
             tools=openai_tools,
         )
 
