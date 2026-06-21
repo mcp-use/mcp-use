@@ -55,3 +55,4 @@
 | [blender_use.py](blender_use.py) | Blender MCP server |
 | [browser_use.py](browser_use.py) | Browser automation MCP server |
 | [filesystem_use.py](filesystem_use.py) | Filesystem operations MCP server |
+| [xquik_use.py](xquik_use.py) | Xquik remote MCP server |
