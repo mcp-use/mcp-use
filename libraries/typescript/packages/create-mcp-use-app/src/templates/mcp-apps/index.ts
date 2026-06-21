@@ -47,6 +47,8 @@ const fruits = [
   { fruit: "lemon", color: "bg-[#feeecd] dark:bg-[#feeecd]/10" },
 ];
 
+// structuredContent schema for the search-tools result. The widget renders this
+// data (it arrives as the widget's tool output / structuredContent).
 const fruitRowSchema = z.object({
   fruit: z.string(),
   color: z.string(),
@@ -85,6 +87,8 @@ server.tool(
     // let's emulate a delay to show the loading state
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
+    // `props` become the tool result's structuredContent (delivered to the
+    // widget) and are type-checked against the outputSchema above.
     return widget({
       props: { query: query ?? "", results },
       output: text(

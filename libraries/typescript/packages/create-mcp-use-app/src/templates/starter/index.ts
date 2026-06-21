@@ -58,6 +58,8 @@ server.tool(
       openWorldHint: false,
     },
   },
+  // The returned object is type-checked against the `outputSchema` above:
+  // returning the wrong shape is a compile-time error.
   async ({ city }) => {
     return object({ city, conditions: "sunny", temperature: "22°C" });
   }
