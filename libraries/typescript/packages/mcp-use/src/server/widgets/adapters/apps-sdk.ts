@@ -119,6 +119,22 @@ export class AppsSdkAdapter extends BaseProtocolAdapter {
     // Use base implementation
     const result = super.buildResourceMetadata(definition);
 
+    // Default openai/widgetDescription from the widget's description when it is
+    // not set explicitly. The widget description is a human-readable summary the
+    // model reads when the widget loads; without this fallback hosts (and the
+    // publishing checklist) see no widget description even though one exists.
+    if (!result._meta?.["openai/widgetDescription"]) {
+      const fallbackDescription =
+        (typeof (definition as { description?: unknown }).description === "string"
+          ? ((definition as { description?: string }).description as string)
+          : undefined) ??
+        ("metadata" in definition ? definition.metadata?.description : undefined);
+      if (fallbackDescription) {
+        result._meta = result._meta || {};
+        result._meta["openai/widgetDescription"] = fallbackDescription;
+      }
+    }
+
     // Add fallback to appsSdkMetadata for fields not in unified metadata
     if ("appsSdkMetadata" in definition && definition.appsSdkMetadata) {
       const appsMeta = definition.appsSdkMetadata;

@@ -39,9 +39,17 @@ const server = new MCPServer({
 server.tool(
   {
     name: "fetch-weather",
+    title: "Fetch weather",
     description: "Fetch the weather for a city",
     schema: z.object({
       city: z.string().describe("The city to fetch the weather for"),
+    }),
+    // Declare outputSchema for any tool that returns structuredContent so clients
+    // can validate results and the model can reason about follow-up calls.
+    outputSchema: z.object({
+      city: z.string().describe("The city the weather is for"),
+      conditions: z.string().describe("Human-readable weather conditions"),
+      temperature: z.string().describe("Current temperature"),
     }),
     // Demo stub — no network. If you call an external weather API, set openWorldHint: true.
     annotations: {
@@ -51,7 +59,7 @@ server.tool(
     },
   },
   async ({ city }) => {
-    return text(`The weather in ${city} is sunny`);
+    return object({ city, conditions: "sunny", temperature: "22°C" });
   }
 );
 

@@ -55,6 +55,7 @@ const fruitRowSchema = z.object({
 server.tool(
   {
     name: "search-tools",
+    title: "Search fruits",
     description: "Search for fruits and display the results in a visual widget",
     schema: z.object({
       query: z.string().optional().describe("Search query to filter fruits"),
@@ -96,6 +97,7 @@ server.tool(
 server.tool(
   {
     name: "get-fruit-details",
+    title: "Get fruit details",
     description: "Get detailed information about a specific fruit",
     schema: z.object({
       fruit: z.string().describe("The fruit name"),
