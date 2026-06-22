@@ -1,27 +1,22 @@
 ---
 title: "Introduction"
-description: "Build AI agents powered by MCP servers"
+description: "Build AI agents that call MCP server tools, with LLM integration, streaming, structured output, and memory."
 icon: "list-start"
 ---
 
-import { CodeSandbox } from '/snippets/codesandbox.jsx'
+`MCPAgent` connects an LLM to one or more MCP servers. It discovers the servers' tools, lets the LLM call them to complete a task, and returns the result. You provide an LLM, and the agent handles tool selection, multi-step execution, and conversation memory.
 
-# MCP Agents
+## Key features
 
-**mcp-use** provides a complete agent framework for building AI applications that leverage MCP servers. The MCPAgent combines LLM integration, tool orchestration, and memory management to create powerful, autonomous AI agents.
-
-## Key Features
-
-- **LLM Integration**: Support for OpenAI, Anthropic, Google, and Groq
-- **Automatic tool calling**: Agents automatically select and execute appropriate tools
-- **Multi-server orchestration**: Connect to multiple MCP servers simultaneously
-- **Structured output**: Type-safe responses with Zod schema validation
-- **Streaming support**: Real-time streaming of agent responses
-- **Memory management**: Built-in conversation history and context management
+- **LLM tool calling**: Connect a supported LLM to MCP server tools and run a multi-step loop until the task is done.
+- **Multiple providers**: OpenAI, Anthropic, Google, and Groq. See [LLM Integration](/typescript/agent/llm-integration).
+- **Streaming**: Stream each step or low-level events as the agent runs. See [Streaming](/typescript/agent/streaming).
+- **Conversation memory**: Remember earlier turns across `run` calls, on by default. See [Memory Management](/typescript/agent/memory-management).
+- **Multi-server**: Connect to several servers and let a [Server Manager](/typescript/agent/server-manager) pick the right tools.
 
 ## Installation
 
-The agent framework is included with the mcp-use package:
+Install `mcp-use` and one LangChain provider package for the LLM you want to use.
 
 <CodeGroup>
 ```bash npm
@@ -34,8 +29,6 @@ pnpm add mcp-use
 yarn add mcp-use
 ```
 </CodeGroup>
-
-You'll also need a LangChain LLM provider package:
 
 <CodeGroup>
 ```bash OpenAI
@@ -52,79 +45,40 @@ npm install @langchain/groq
 ```
 </CodeGroup>
 
-## Quick Start
+Set the matching API key in your environment: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, or `GROQ_API_KEY`.
 
-Here's a basic example of creating and running an agent:
+## Quick start
+
+This agent connects to the filesystem MCP server and answers a question about the current directory. It uses OpenAI, so set `OPENAI_API_KEY` before running.
+
+Pass a `"provider/model"` string and your server config. The agent builds the LLM and MCP client for you.
 
 ```typescript
-import { MCPAgent, MCPClient } from "mcp-use";
-import { ChatOpenAI } from "@langchain/openai";
+import { MCPAgent } from "mcp-use"
 
-const client = new MCPClient({
+const agent = new MCPAgent({
+  llm: "openai/gpt-4o",
   mcpServers: {
     filesystem: {
       command: "npx",
       args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
     },
   },
-});
+})
 
-const llm = new ChatOpenAI({ model: "gpt-5.5" });
+const result = await agent.run({ prompt: "What is in the current folder?" })
+console.log(result)
 
-const agent = new MCPAgent({ llm, client, maxSteps: 50 });
-
-agent.run({ 
-  prompt: "What is in the current folder?" 
-}).then(async (response) => {
-  console.log(response);
-  await agent.close();
-});
+await agent.close()
 ```
 
+`agent.run()` returns the final answer as a string. `maxSteps` (default `5`) caps how many tool-calling steps the agent takes before it must answer; raise it for complex tasks with `new MCPAgent({ ..., maxSteps: 10 })` or per call with `agent.run({ prompt, maxSteps: 10 })`. Always call `agent.close()` to shut down the server connections.
 
-<CodeSandbox title="Edit mcp-use-get-started-agent" id="sweet-drake-m76ys6"></CodeSandbox>
+## Core capabilities
 
+### Structured output
 
-
-## Architecture Overview
-
-
-
-The MCPAgent framework is built around several core components that work together to enable intelligent, tool-using AI applications.
-
-### **Agent Core**
-
-The `MCPAgent` class orchestrates all agent functionality, managing LLM interactions, tool execution, and response generation.
-
-**Learn more**: [Agent Configuration →](/typescript/agent/agent-configuration)
-
-### **LLM Integration**
-
-Native support for multiple LLM providers with a unified interface. Each provider is automatically detected and configured based on the LLM instance you provide.
-
-**Supported providers**:
-- OpenAI (gpt-5.5, gpt-5.5-mini)
-- Anthropic (claude-opus-4-7, claude-sonnet-4-6)
-- Google (gemini-3.1-pro, gemini-3.1-flash)
-- Groq (Llama, Mixtral, and more)
-
-**Learn more**: [LLM Integration →](/typescript/agent/llm-integration)
-
-### **Tool Orchestration**
-
-Agents automatically discover tools from connected MCP servers and intelligently select the right tools for each task. The framework handles:
-
-- Tool discovery and schema conversion
-- Automatic tool selection by the LLM
-- Parameter validation and type safety
-- Error handling and retries
-- Multi-step workflows
-
-**Learn more**: [Client Configuration →](/typescript/client/client-configuration)
-
-### **Structured Output**
-
-Generate type-safe responses with Zod schema validation. The agent can return structured data instead of plain text, enabling programmatic use of agent results.
+Pass a Zod `schema` to `run` to get a typed object back instead of a string.
 
 ```typescript
 import { z } from 'zod'
@@ -138,72 +92,109 @@ const result = await agent.run({
   })
 })
 
-// result is fully typed!
-console.log(result.totalFiles)
+console.log(result.totalFiles) // typed as number
 ```
 
-**Learn more**: [Structured Output →](/typescript/agent/structured-output)
+See [Structured Output](/typescript/agent/structured-output) for details.
 
-### **Streaming**
+### Streaming
 
-Stream agent responses in real-time for better user experience and immediate feedback:
+Iterate over `agent.stream` to receive each step as the agent runs.
 
 ```typescript
-// Step-by-step streaming
 for await (const step of agent.stream({ prompt: 'Write a report' })) {
   console.log(`Tool: ${step.action.tool}`)
 }
-
-// Pretty formatted streaming (great for CLI tools)
-for await (const _ of agent.prettyStreamEvents({ 
-  prompt: 'Analyze the codebase',
-  maxSteps: 20 
-})) {
-  // Automatic syntax highlighting and formatting
-}
-
-// Low-level event streaming
-for await (const event of agent.streamEvents({ prompt: 'Generate content' })) {
-  if (event.event === 'on_chat_model_stream') {
-    process.stdout.write(event.data?.chunk?.content || '')
-  }
-}
 ```
 
-**Learn more**: [Streaming →](/typescript/agent/streaming)
+`agent.prettyStreamEvents` and `agent.streamEvents` give formatted and low-level output. See [Streaming](/typescript/agent/streaming).
 
-### **Memory Management**
+### Memory
 
-Control conversation history with built-in memory management. The agent automatically maintains context across multiple interactions:
+Conversation memory is on by default, so the agent remembers earlier turns across `run` calls.
 
 ```typescript
-const agent = new MCPAgent({
-  llm,
-  client,
-  memoryEnabled: true  // Enable automatic memory management
-})
-
 await agent.run({ prompt: "Hello, my name is Alice" })
-await agent.run({ prompt: "What's my name?" })  // Agent remembers Alice
+await agent.run({ prompt: "What's my name?" }) // the agent remembers Alice
 
-// Clear history when needed
-agent.clearConversationHistory()
+agent.clearConversationHistory() // reset the history
 ```
 
-**Learn more**: [Memory Management →](/typescript/agent/memory-management)
+Pass `memoryEnabled: false` to `new MCPAgent({ ... })` to disable it. See [Memory Management](/typescript/agent/memory-management).
 
-## Next Steps
+## API reference
+
+`MCPAgent` accepts options in one of two modes:
+
+```typescript
+// Explicit mode: you build the LLM and client
+interface ExplicitModeOptions {
+  llm: BaseChatModel                          // a LangChain chat model, e.g. new ChatOpenAI(...)
+  client?: MCPClient
+  connectors?: BaseConnector[]
+  maxSteps?: number                           // default 5
+  memoryEnabled?: boolean                     // default true
+  systemPrompt?: string
+  useServerManager?: boolean                  // let the agent manage multiple servers
+  verbose?: boolean
+}
+
+// Simplified mode: the agent builds the LLM and client from your config
+interface SimplifiedModeOptions {
+  llm: string                                 // "provider/model", e.g. "openai/gpt-4o"
+  mcpServers: Record<string, MCPServerConfig>
+  llmConfig?: LLMConfig                        // temperature, maxTokens, apiKey, ...
+  maxSteps?: number                           // default 5
+  memoryEnabled?: boolean                      // default true
+  systemPrompt?: string
+}
+```
+
+Methods and run options:
+
+```typescript
+class MCPAgent {
+  constructor(options: ExplicitModeOptions | SimplifiedModeOptions)
+
+  run(options: RunOptions): Promise<string>
+  run<T>(options: RunOptions<T>): Promise<T>             // with a schema
+  stream(options: RunOptions): AsyncGenerator<AgentStep, string>
+  streamEvents(options: RunOptions): AsyncGenerator      // low-level LangChain events
+  clearConversationHistory(): void
+  close(): Promise<void>
+}
+
+interface RunOptions<T = string> {
+  prompt: string
+  maxSteps?: number
+  schema?: ZodSchema<T>            // return a typed object instead of a string
+  signal?: AbortSignal             // cancel the run
+  externalHistory?: BaseMessage[]
+}
+```
+
+## Next steps
 
 <CardGroup cols={3}>
   <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
-    Configure your agent and LLM settings
+    Configure your agent and LLM settings.
   </Card>
   <Card title="LLM Integration" icon="brain-circuit" href="/typescript/agent/llm-integration">
-    Integrate with OpenAI, Anthropic, Google, or Groq
+    Connect OpenAI, Anthropic, Google, or Groq.
   </Card>
   <Card title="Structured Output" icon="braces" href="/typescript/agent/structured-output">
-    Generate type-safe responses with Zod schemas
+    Return typed responses with Zod schemas.
   </Card>
- 
+  <Card title="Streaming" icon="wifi" href="/typescript/agent/streaming">
+    Stream steps and events as the agent runs.
+  </Card>
+  <Card title="Memory Management" icon="database" href="/typescript/agent/memory-management">
+    Keep or reset conversation history across runs.
+  </Card>
+  <Card title="Server Manager" icon="server" href="/typescript/agent/server-manager">
+    Manage tools across multiple MCP servers.
+  </Card>
+  <Card title="Observability" icon="chart-line" href="/typescript/agent/observability">
+    Trace and monitor agent runs.
+  </Card>
 </CardGroup>
-
