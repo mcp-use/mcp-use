@@ -1,0 +1,119 @@
+import type { CallbackConfig } from "../config.js";
+import { normalizeClientInfo, resolveCallbacks } from "../config.js";
+import type { BaseConnector } from "../connectors/base.js";
+import { HttpConnector } from "../connectors/http.js";
+import { logger } from "@mcp-use/core";
+import { Tel } from "../telemetry/telemetry-browser.js";
+import { getPackageVersion } from "../version.js";
+import { BaseMCPClient } from "./base.js";
+
+/**
+ * Browser-compatible MCPClient implementation
+ *
+ * This client works in both browser and Node.js environments by avoiding
+ * Node.js-specific APIs (like fs, path). It supports:
+ * - Multiple servers via addServer()
+ * - HTTP connector
+ * - All base client functionality
+ */
+function trackBrowserClientInit(config: Record<string, any>): void {
+  const servers = Object.keys(config.mcpServers ?? {});
+  Tel.getInstance()
+    .trackMCPClientInit({
+      codeMode: false,
+      sandbox: false,
+      allCallbacks: false,
+      verify: false,
+      servers,
+      numServers: servers.length,
+      isBrowser: true,
+    })
+    .catch((e) => logger.debug(`Failed to track BrowserMCPClient init: ${e}`));
+}
+
+export class BrowserMCPClient extends BaseMCPClient {
+  /**
+   * Get the mcp-use package version.
+   * Works in all environments (Node.js, browser, Cloudflare Workers, Deno, etc.)
+   */
+  public static getPackageVersion(): string {
+    return getPackageVersion();
+  }
+
+  constructor(config?: Record<string, any>) {
+    super(config);
+    trackBrowserClientInit(this.config);
+  }
+
+  public static fromDict(cfg: Record<string, any>): BrowserMCPClient {
+    return new BrowserMCPClient(cfg);
+  }
+
+  /**
+   * Create a connector from server configuration (Browser version)
+   * Supports HTTP connector only
+   */
+  protected createConnectorFromConfig(
+    serverConfig: Record<string, any>
+  ): BaseConnector {
+    const {
+      url,
+      headers,
+      fetch,
+      authToken,
+      authProvider,
+      wrapTransport,
+      clientOptions,
+      disableSseFallback,
+      preferSse,
+      timeout,
+      sseReadTimeout,
+      gatewayUrl,
+      serverId,
+      reconnectionOptions,
+    } = serverConfig;
+
+    if (!url) {
+      throw new Error("Server URL is required");
+    }
+
+    // Resolve callbacks: per-server overrides global (from config root)
+    const globalDefaults = this.config as CallbackConfig;
+    const resolved = resolveCallbacks(
+      serverConfig as CallbackConfig,
+      globalDefaults
+    );
+
+    // Root clientInfo as fallback when server config omits it
+    const clientInfo = normalizeClientInfo(
+      serverConfig.clientInfo ?? this.config.clientInfo
+    );
+
+    // Prepare connector options
+    const connectorOptions = {
+      headers,
+      fetch,
+      authToken,
+      authProvider,
+      wrapTransport,
+      clientOptions,
+      onSampling: resolved.onSampling,
+      onElicitation: resolved.onElicitation,
+      onNotification: resolved.onNotification,
+      disableSseFallback,
+      preferSse,
+      timeout,
+      sseReadTimeout,
+      clientInfo,
+      gatewayUrl,
+      serverId,
+      reconnectionOptions,
+    };
+
+    logger.debug(
+      `[BrowserMCPClient] Connector options prepared (clientOptions: ${clientOptions ? "provided" : "none"})`
+    );
+
+    return new HttpConnector(url, connectorOptions);
+  }
+}
