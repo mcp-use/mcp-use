@@ -12,10 +12,10 @@ Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server. Secure you
 
 <Tabs>
   <Tab title="Remote Auth (WorkOS)">
-    Use a built-in provider when your identity provider supports remote authentication. Clients register and authenticate directly with the upstream provider  -  your server only verifies the resulting bearer token.
+    Use a built-in provider when your identity provider supports remote authentication. Clients register and authenticate directly with the upstream provider, and your server only verifies the resulting bearer token.
 
     ```typescript
-    import { MCPServer, oauthWorkOSProvider } from 'mcp-use/server'
+    import { MCPServer, oauthWorkOSProvider, object } from 'mcp-use/server'
 
     const server = new MCPServer({
       name: 'my-secure-server',
@@ -30,7 +30,7 @@ Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server. Secure you
       description: 'Get the authenticated user profile',
       cb: async (params, context) => {
         const user = context.auth.user
-        return { userId: user.userId, email: user.email, name: user.name }
+        return object({ userId: user.userId, email: user.email, name: user.name })
       }
     })
 
@@ -41,7 +41,7 @@ Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server. Secure you
     Use `oauthProxy` when your provider doesn't support Dynamic Client Registration (Google, GitHub, Okta, Azure AD, etc.). Your server holds pre-registered client credentials and mediates the token exchange.
 
     ```typescript
-    import { MCPServer, oauthProxy, jwksVerifier } from 'mcp-use/server'
+    import { MCPServer, oauthProxy, jwksVerifier, object } from 'mcp-use/server'
 
     const server = new MCPServer({
       name: 'my-secure-server',
@@ -67,7 +67,7 @@ Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server. Secure you
       description: 'Get the authenticated user profile',
       cb: async (params, context) => {
         const user = context.auth.user
-        return { userId: user.userId, email: user.email, name: user.name }
+        return object({ userId: user.userId, email: user.email, name: user.name })
       }
     })
 
@@ -86,24 +86,24 @@ Not sure which to use? Use a remote auth provider if your identity provider supp
 
 Clients register and authenticate directly with the provider. 
 
-- [Auth0](/typescript/server/authentication/providers/auth0)  -  Full OAuth 2.1 with PKCE and JWKS verification
-- [Better Auth](/typescript/server/authentication/providers/better-auth)  -  Self-hosted OAuth 2.1 via the Better Auth OAuth Provider plugin
-- [WorkOS](/typescript/server/authentication/providers/workos)  -  Enterprise SSO via WorkOS AuthKit
-- [Supabase](/typescript/server/authentication/providers/supabase)  -  Authentication for Supabase projects
-- [Keycloak](/typescript/server/authentication/providers/keycloak)  -  Enterprise SSO with realm roles
-- [Custom Provider](/typescript/server/authentication/providers/custom)  -  Any DCR-capable provider with a custom `verifyToken` function
+- [Auth0](/typescript/server/authentication/providers/auth0): Full OAuth 2.1 with PKCE and JWKS verification
+- [Better Auth](/typescript/server/authentication/providers/better-auth): Self-hosted OAuth 2.1 via the Better Auth OAuth Provider plugin
+- [WorkOS](/typescript/server/authentication/providers/workos): Enterprise SSO via WorkOS AuthKit
+- [Supabase](/typescript/server/authentication/providers/supabase): Authentication for Supabase projects
+- [Keycloak](/typescript/server/authentication/providers/keycloak): Enterprise SSO with realm roles
+- [Custom Provider](/typescript/server/authentication/providers/custom): Any DCR-capable provider with a custom `verifyToken` function
 
 ### OAuth Proxy
 
-For providers that don't support remote client registration  -  Google, GitHub, Okta, Azure AD, or any provider where you register an application in a dashboard and receive a fixed `clientId`/`clientSecret`  -  use `oauthProxy`:
+For providers that don't support remote client registration (Google, GitHub, Okta, Azure AD, or any provider where you register an application in a dashboard and receive a fixed `clientId`/`clientSecret`), use `oauthProxy`:
 
-- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy)  -  Bridge non-DCR providers with pre-registered client credentials, including ready-to-copy configs for Google, Okta, Azure AD, Auth0, and GitHub.
+- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy): Bridge non-DCR providers with pre-registered client credentials, including ready-to-copy configs for Google, Okta, Azure AD, Auth0, and GitHub.
 
 ## How it works
 
 ### Remote auth flow
 
-1. Your server exposes `.well-known/*` endpoints that pass through the upstream provider's OAuth metadata  -  including its `registration_endpoint`.
+1. Your server exposes `.well-known/*` endpoints that pass through the upstream provider's OAuth metadata, including its `registration_endpoint`.
 2. MCP clients fetch that metadata, register themselves directly with the upstream provider, then run the full authorization + token exchange against it.
 3. On each `/mcp/*` request, your server verifies the bearer token (JWKS signature check, issuer, audience).
 
@@ -120,7 +120,7 @@ Your server holds the client credentials and mediates every token exchange.
 
 When OAuth is configured, your server exposes these discovery endpoints:
 
-```
+```text
 GET /.well-known/oauth-authorization-server
 GET /.well-known/openid-configuration
 GET /.well-known/oauth-protected-resource
@@ -133,12 +133,12 @@ The authorization-server endpoints pass through the upstream provider's metadata
 
 All `/mcp/*` endpoints require a valid bearer token when OAuth is configured:
 
-```
+```text
 Authorization: Bearer eyJhbGci...
 ```
 
 ## Next Steps
 
-- [Client Authentication](/typescript/client/authentication)  -  Connect to OAuth servers from clients
-- [useMcp Hook](/typescript/client/usemcp)  -  React hook with OAuth support
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+- [Client Authentication](/typescript/client/authentication): Connect to OAuth servers from clients
+- [useMcp Hook](/typescript/client/usemcp): React hook with OAuth support
+- [User Context](/typescript/server/authentication/user-context): Access user information in tools

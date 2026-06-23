@@ -4,7 +4,7 @@ description: "Configure Clerk OAuth 2.0 authentication for your MCP server"
 icon: "/images/icons/clerk.svg"
 ---
 
-Clerk uses Dynamic Client Registration (DCR). MCP clients discover Clerk's OAuth endpoints via `.well-known` passthrough and register themselves directly with Clerk. Your server only verifies the resulting tokens  -  it never handles authorization or token exchange directly.
+Clerk uses Dynamic Client Registration (DCR). MCP clients discover Clerk's OAuth endpoints via `.well-known` passthrough and register themselves directly with Clerk. Your server only verifies the resulting tokens. It never handles authorization or token exchange directly.
 
 ## Setup
 
@@ -53,9 +53,6 @@ oauth: oauthClerkProvider({
   // Optional: restrict token acceptance to a specific audience
   audience: 'https://my-mcp-api.example.com',
 
-  // Disable JWT verification during development only
-  verifyJwt: process.env.NODE_ENV === 'production',
-
   // Override advertised scopes
   // Default: ['profile', 'email', 'offline_access']
   scopesSupported: ['profile', 'email', 'offline_access'],
@@ -71,25 +68,28 @@ Never disable `verifyJwt` in production. It skips signature verification and acc
 Clerk provides standard OIDC claims plus organization context when using Clerk Organizations:
 
 ```typescript
+import { object } from 'mcp-use/server'
+
 server.tool(
   {
     name: 'get-profile',
     description: 'Get authenticated user profile',
   },
-  async (_args, ctx) => ({
-    userId: ctx.auth.user.userId,
-    email: ctx.auth.user.email,
-    name: ctx.auth.user.name,
-    username: ctx.auth.user.username,
-    picture: ctx.auth.user.picture,
-    // Organization context (when using Clerk Organizations)
-    orgId: ctx.auth.user.org_id,
-    orgRole: ctx.auth.user.org_role,
-    orgSlug: ctx.auth.user.org_slug,
-    roles: ctx.auth.user.roles,
-    permissions: ctx.auth.permissions,
-    scopes: ctx.auth.scopes,
-  })
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+      username: ctx.auth.user.username,
+      picture: ctx.auth.user.picture,
+      // Organization context (when using Clerk Organizations)
+      orgId: ctx.auth.user.org_id,
+      orgRole: ctx.auth.user.org_role,
+      orgSlug: ctx.auth.user.org_slug,
+      roles: ctx.auth.user.roles,
+      permissions: ctx.auth.permissions,
+      scopes: ctx.auth.scopes,
+    })
 )
 ```
 
@@ -98,6 +98,8 @@ server.tool(
 When using [Clerk Organizations](https://clerk.com/docs/organizations/overview), the JWT includes `org_id`, `org_role`, `org_slug`, and `org_permissions`. Use these to implement multi-tenant access control:
 
 ```typescript
+import { error, object } from 'mcp-use/server'
+
 server.tool(
   {
     name: 'get-documents',
@@ -107,17 +109,14 @@ server.tool(
     const orgId = ctx.auth.user.org_id as string | undefined
 
     if (!orgId) {
-      return {
-        content: [{ type: 'text', text: 'Organization context required' }],
-        isError: true,
-      }
+      return error('Organization context required')
     }
 
     const documents = await db.documents.findMany({
       where: { organizationId: orgId },
     })
 
-    return { content: [{ type: 'text', text: JSON.stringify(documents) }] }
+    return object({ documents })
   }
 )
 ```
@@ -125,6 +124,8 @@ server.tool(
 Check organization permissions (set in the Clerk Dashboard under **Organizations → Roles & Permissions**):
 
 ```typescript
+import { error, text } from 'mcp-use/server'
+
 server.tool(
   {
     name: 'delete-document',
@@ -132,14 +133,11 @@ server.tool(
   },
   async ({ documentId }, ctx) => {
     if (!ctx.auth.permissions?.includes('org:documents:delete')) {
-      return {
-        content: [{ type: 'text', text: 'Forbidden: org:documents:delete permission required' }],
-        isError: true,
-      }
+      return error('Forbidden: org:documents:delete permission required')
     }
 
     await db.documents.delete({ id: documentId })
-    return { content: [{ type: 'text', text: 'Document deleted' }] }
+    return text('Document deleted')
   }
 )
 ```
@@ -152,4 +150,4 @@ server.tool(
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+- [User Context](/typescript/server/authentication/user-context): Access user information in tools

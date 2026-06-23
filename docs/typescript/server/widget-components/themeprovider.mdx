@@ -4,7 +4,7 @@ description: "Theme provider component for consistent theme management across wi
 icon: "palette"
 ---
 
-The `ThemeProvider` component manages dark mode by setting the `dark` class on the document root. It prioritizes the widget theme from OpenAI Apps SDK, falling back to system preference if the widget API is not available.
+The `ThemeProvider` component manages theme by toggling the `light`/`dark` class, setting a `data-theme` attribute, and (optionally) the `color-scheme` style on the document root. It prioritizes an explicit theme from the host context, falling back to system preference when the host does not provide one.
 
 <Tip>
   You can use `<McpUseProvider />` to automatically include the `<ThemeProvider />` component.
@@ -21,13 +21,14 @@ import { ThemeProvider } from 'mcp-use/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `children` | `React.ReactNode` | **required** | The widget content to wrap |
+| `colorScheme` | `boolean` | `true` | When true, sets `document.documentElement.style.colorScheme` to the active theme so CSS `light-dark()` resolves correctly. |
 
 ## Theme Priority
 
 The provider uses the following priority:
 
-1. **Widget theme** (from `window.openai.theme`) - When Apps SDK is available
-2. **System preference** (`prefers-color-scheme: dark`) - Fallback when widget API is not available
+1. **Host theme** (from `useWidget().hostContext.theme`) - When the host provides an explicit `"dark"` or `"light"` value
+2. **System preference** (`prefers-color-scheme: dark`) - Fallback when the host does not provide an explicit theme
 
 ## Basic Usage
 

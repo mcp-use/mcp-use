@@ -21,7 +21,7 @@ import { ErrorBoundary } from 'mcp-use/react';
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `children` | `React.ReactNode` | **required** | The widget content to wrap |
-| `fallback` | `ReactNode \| (error: Error) => ReactNode` | Built-in error card | Custom UI to render when an error is caught |
+| `fallback` | `React.ReactNode \| ((error: Error) => React.ReactNode)` | Built-in error card | Custom UI to render when an error is caught |
 | `onError` | `(error: Error, errorInfo: React.ErrorInfo) => void` |  -  | Callback invoked when an error is caught |
 
 ## Basic Usage

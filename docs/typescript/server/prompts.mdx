@@ -14,9 +14,11 @@ Every prompt has three main components:
 server.prompt({
   name: 'prompt_name',              // Unique identifier
   description: 'What it generates',  // Clear description
-  schema: z.object({...}),                 // Argument definitions
+  schema: z.object({...}),                 // Argument definitions (optional)
 }, async (args) => {...}) // generator function
 ```
+
+`schema` is optional. Prompts without arguments can omit it entirely.
 
 ## Input Validation with Zod
 
@@ -39,8 +41,11 @@ server.prompt(
     return {
       messages: [
         {
-          role: "system",
-          content: `You are a helpful assistant that can answer questions about ${topic}.`,
+          role: "user",
+          content: {
+            type: "text",
+            text: `You are a helpful assistant that can answer questions about ${topic}.`,
+          },
         },
       ],
     };
@@ -79,8 +84,11 @@ server.prompt(
     return {
       messages: [
         {
-          role: "system",
-          content: `You are an expert ${language} developer. Review this code: ${code}`,
+          role: "user",
+          content: {
+            type: "text",
+            text: `You are an expert ${language} developer. Review this code: ${code}`,
+          },
         },
       ],
     };
@@ -165,7 +173,9 @@ server.prompt(
     schema: z.object({ topic: z.string() }),
   },
   async ({ topic }) => ({
-    messages: [{ role: "system", content: `Expert in ${topic}` }],
+    messages: [
+      { role: "user", content: { type: "text", text: `Expert in ${topic}` } },
+    ],
   })
 );
 
@@ -206,8 +216,11 @@ server.prompt(
     return {
       messages: [
         {
-          role: "system",
-          content: `Review this ${language} code: ${code}`,
+          role: "user",
+          content: {
+            type: "text",
+            text: `Review this ${language} code: ${code}`,
+          },
         },
       ],
     };
@@ -239,8 +252,11 @@ server.prompt(
     return {
       messages: [
         {
-          role: "system",
-          content: `Analyzing project ${projectId}...`,
+          role: "user",
+          content: {
+            type: "text",
+            text: `Analyzing project ${projectId}...`,
+          },
         },
       ],
     };

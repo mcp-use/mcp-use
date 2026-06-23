@@ -24,7 +24,8 @@ import { McpUseProvider } from "mcp-use/react";
 | `children`     | `React.ReactNode`                  | **required** | The widget content to wrap                                                                                             |
 | `debugger`     | `boolean`                          | `false`      | Enable debug button in WidgetControls component                                                                        |
 | `viewControls` | `boolean \| "pip" \| "fullscreen"` | `false`      | Enable view controls (fullscreen/pip). `true` shows both, `"pip"` shows only pip, `"fullscreen"` shows only fullscreen |
-| `autoSize`     | `boolean`                          | `false`      | Automatically notify the host about container height changes using ResizeObserver                                      |
+| `autoSize`     | `boolean`                          | `true`       | Automatically notify the host about container height changes using ResizeObserver                                      |
+| `colorScheme`  | `boolean`                          | `true`       | Set `color-scheme` on the document root to match the active theme (native dark scrollbars, CSS `light-dark()`)         |
 
 ## What's Included
 

@@ -17,7 +17,7 @@ Resource subscriptions implement the MCP protocol's `resources/subscribe` and `r
 - **Automatic notifications**: Push updates to clients when resources change
 - **Session tracking**: Per-session subscription management
 - **Automatic cleanup**: Subscriptions are cleaned up when sessions close
-- **Efficient**: No polling required - clients receive updates only when resources change
+- **Efficient**: No polling required, so clients receive updates only when resources change
 
 ## How It Works
 
@@ -52,7 +52,7 @@ const session = await client.createSession('my-server');
 await session.connector.subscribeToResource('config://app-settings');
 
 // Listen for update notifications
-session.on('notification', (notification) => {
+session.on('notification', async (notification) => {
   if (notification.method === 'notifications/resources/updated') {
     console.log('Resource updated:', notification.params.uri);
     // Fetch the updated resource
@@ -71,7 +71,8 @@ The server automatically handles subscription requests and tracks which sessions
 When a resource changes, use `server.notifyResourceUpdated()` to notify all subscribed clients:
 
 ```typescript
-import { MCPServer, object } from 'mcp-use/server';
+import { MCPServer, object, text } from 'mcp-use/server';
+import { z } from 'zod';
 
 const server = new MCPServer({
   name: 'config-server',

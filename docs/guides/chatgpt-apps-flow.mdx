@@ -13,13 +13,13 @@ ChatGPT now supports **MCP Apps**. For new projects, use [Creating MCP Apps Serv
 <Info>
 This guide focuses on shipping an MCP App to ChatGPT specifically. For the general reference on widgets, props, CSP, and auto-discovery across clients, see [MCP Apps](/typescript/server/mcp-apps).
 
-**Best Practice**: Build widgets once with the MCP Apps stack  -  they run in ChatGPT, Claude, and any MCP-compatible client from a single codebase.
+**Best Practice**: Build widgets once with the MCP Apps stack. They run in ChatGPT, Claude, and any MCP-compatible client from a single codebase.
 
 </Info>
 
 ## Introduction
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools - all within the ChatGPT interface.
+ChatGPT Apps enable developers to build rich, interactive user interfaces that go beyond simple text responses. Using the **ChatGPT Apps SDK**, you can create widgets that display dynamic content, handle user interactions, maintain state, and call tools, all within the ChatGPT interface.
 
 Widgets transform static responses into interactive experiences:
 
@@ -33,7 +33,7 @@ However, building widgets with the official OpenAI Apps SDK involves manual setu
 **mcp-use simplifies this entire process** by providing:
 
 - Zero-config widget development with automatic bundling
-- **Dual-protocol support** - widgets work with ChatGPT AND MCP Apps clients
+- **Dual-protocol support**: widgets work with ChatGPT AND MCP Apps clients
 - Built-in hooks that abstract protocol differences
 - Seamless integration with MCP servers
 
@@ -73,7 +73,7 @@ flowchart LR
 
 **Project Structure:**
 
-```
+```text
 app/
 ├── server/                 # Python or Node MCP server
 │   ├── main.py
@@ -250,7 +250,7 @@ mcp-use eliminates all the manual setup and provides a zero-config development e
 With mcp-use, you get:
 
 1. **Single Command Setup**: `npx create-mcp-use-app my-app --template mcp-apps`
-2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder - they're automatically registered
+2. **Automatic Widget Discovery**: Drop `.tsx` files in `resources/` folder and they're automatically registered
 3. **Built-in Bundling**: Hot reload and production builds work out of the box
 4. **Pre-built React Hooks**: Use `useWidget()` for props, state, tool calls, and display modes; [streaming tool input](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for live previews when the host supports it (MCP Apps / Inspector)
 5. **Automatic CSP Configuration**: Content Security Policy is configured automatically
@@ -273,7 +273,7 @@ flowchart LR
 
 **Project Structure:**
 
-```
+```text
 my-app/
 ├── resources/              # 👈 Just drop widgets here
 │   └── weather-display.tsx
@@ -288,6 +288,7 @@ my-app/
 
 ```tsx
 // resources/weather-display.tsx
+import React from "react";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
 
@@ -382,10 +383,10 @@ server.tool(
   },
 );
 
-server.start();
+await server.listen(3000); // omit the port to use the default (3000); for serverless use server.getHandler()
 ```
 
-That's it! No build configuration, no custom hooks, no manual mounting - just write your widget and mcp-use handles the rest.
+That's it! No build configuration, no custom hooks, no manual mounting, just write your widget and mcp-use handles the rest.
 
 ## Widget Interaction Flow
 
@@ -443,7 +444,7 @@ When a user asks a question, ChatGPT:
 
 Widgets can maintain state across interactions:
 
-- State is saved to ChatGPT's localStorage
+- State is persisted by the host (for example, ChatGPT, Claude, or the Inspector)
 - Survives page reloads and conversation history
 - Accessible via `useWidget()` hook
 - Updates trigger UI re-renders
@@ -621,6 +622,7 @@ Build command: `esbuild src/weather.tsx --bundle --outfile=dist/weather.js`
 
 ```tsx
 // resources/weather.tsx - that's it, one file!
+import React from "react";
 import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
 import { z } from "zod";
 
@@ -650,7 +652,7 @@ const WeatherWidget: React.FC = () => {
 export default WeatherWidget;
 ```
 
-No build configuration needed - auto-bundled on `npm run dev`!
+No build configuration needed, auto-bundled on `npm run dev`!
 
   </Tab>
 </Tabs>

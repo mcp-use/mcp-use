@@ -26,12 +26,15 @@ Returns plain text content. The most common response type for tools and resource
 
 ```typescript
 import { text } from 'mcp-use/server';
+import { z } from 'zod';
 
-server.tool({
-  name: 'greet',
-  schema: z.object({ name: z.string() }),
+server.tool(
+  {
+    name: 'greet',
+    schema: z.object({ name: z.string() }),
+  },
   async ({ name }) => text(`Hello, ${name}!`)
-});
+);
 
 server.resource(
   { name: 'greeting', uri: 'app://greeting' },
@@ -53,10 +56,10 @@ server.resource(
   async () => markdown('# Welcome\n\nGetting started with our API...')
 );
 
-server.tool({
-  name: 'format-docs',
+server.tool(
+  { name: 'format-docs' },
   async () => markdown('## Documentation\n\n- Item 1\n- Item 2')
-});
+);
 ```
 
 **Returns**: `CallToolResult` with `text/markdown` MIME type
@@ -73,8 +76,8 @@ server.resource(
   async () => html('<h1>Dashboard</h1><p>Welcome to your dashboard</p>')
 );
 
-server.tool({
-  name: 'generate-report',
+server.tool(
+  { name: 'generate-report' },
   async ({ data }) => html(`
     <div class="report">
       <h2>Report</h2>
@@ -83,7 +86,7 @@ server.tool({
       </table>
     </div>
   `)
-});
+);
 ```
 
 **Returns**: `CallToolResult` with `text/html` MIME type
@@ -138,10 +141,13 @@ Returns JSON object with both text representation and typed structured content.
 
 ```typescript
 import { object } from 'mcp-use/server';
+import { z } from 'zod';
 
-server.tool({
-  name: 'get-user-info',
-  schema: z.object({ userId: z.string() }),
+server.tool(
+  {
+    name: 'get-user-info',
+    schema: z.object({ userId: z.string() }),
+  },
   async ({ userId }) => {
     const user = await fetchUser(userId);
     return object({
@@ -151,7 +157,7 @@ server.tool({
       createdAt: user.createdAt
     });
   }
-});
+);
 
 server.resource(
   { name: 'config', uri: 'config://settings' },
@@ -178,13 +184,13 @@ Returns array data wrapped in an object with a `data` field.
 ```typescript
 import { array } from 'mcp-use/server';
 
-server.tool({
-  name: 'list-items',
+server.tool(
+  { name: 'list-items' },
   async () => {
     const items = await getItems();
     return array(items);
   }
-});
+);
 ```
 
 **Returns**: `TypedCallToolResult<{ data: T }>` with structured content
@@ -203,13 +209,13 @@ Returns image content with base64 data or data URL.
 ```typescript
 import { image } from 'mcp-use/server';
 
-server.tool({
-  name: 'generate-chart',
+server.tool(
+  { name: 'generate-chart' },
   async ({ data }) => {
     const chartImage = await generateChart(data);
     return image(chartImage, 'image/png');
   }
-});
+);
 
 server.resource(
   { name: 'logo', uri: 'asset://logo' },
@@ -232,10 +238,10 @@ Returns audio content. Supports both base64 data and file paths.
 import { audio } from 'mcp-use/server';
 
 // With base64 data (synchronous)
-server.tool({
-  name: 'generate-audio',
+server.tool(
+  { name: 'generate-audio' },
   async () => audio(base64AudioData, 'audio/wav')
-});
+);
 
 // With file path (asynchronous)
 server.resource(
@@ -290,14 +296,14 @@ Creates embedded resource content. Supports two patterns:
 ```typescript
 import { resource } from 'mcp-use/server';
 
-server.tool({
-  name: 'get-config',
+server.tool(
+  { name: 'get-config' },
   async () => resource(
     'config://app',
     'application/json',
     JSON.stringify({ api: 'v2', timeout: 30 })
   )
-});
+);
 ```
 
 **Pattern 2: Two arguments (uri, content helper result)**
@@ -306,16 +312,16 @@ server.tool({
 import { resource, text, object } from 'mcp-use/server';
 
 // With text helper
-server.tool({
-  name: 'get-greeting',
+server.tool(
+  { name: 'get-greeting' },
   async () => resource('test://greeting', text('Hello'))
-});
+);
 
 // With object helper
-server.tool({
-  name: 'get-data',
+server.tool(
+  { name: 'get-data' },
   async () => resource('data://user', object({ id: 1, name: 'Alice' }))
-});
+);
 ```
 
 **Returns**: `CallToolResult` with embedded resource content
@@ -327,33 +333,39 @@ server.tool({
 Returns an error response with the `isError` flag set.
 
 ```typescript
-import { error, text } from 'mcp-use/server';
+import { error, object, text } from 'mcp-use/server';
+import { z } from 'zod';
 
-server.tool({
-  name: 'divide',
-  schema: z.object({
-    a: z.number(),
-    b: z.number()
-  }),
+server.tool(
+  {
+    name: 'divide',
+    schema: z.object({
+      a: z.number(),
+      b: z.number()
+    }),
+  },
   async ({ a, b }) => {
     if (b === 0) {
       return error('Division by zero is not allowed');
     }
     return text(`Result: ${a / b}`);
   }
-});
+);
 
-server.tool({
-  name: 'fetch-data',
+server.tool(
+  {
+    name: 'fetch-data',
+    schema: z.object({ url: z.string() }),
+  },
   async ({ url }) => {
     try {
       const data = await fetch(url);
       return object(data);
     } catch (err) {
-      return error(`Failed to fetch data: ${err.message}`);
+      return error(`Failed to fetch data: ${(err as Error).message}`);
     }
   }
-});
+);
 ```
 
 **Returns**: `CallToolResult` with `isError: true`
@@ -371,10 +383,14 @@ Combines multiple content types into a single response. Perfect for returning te
 
 ```typescript
 import { mix, text, image, resource, object } from 'mcp-use/server';
+import { z } from 'zod';
 
 // Text + Image
-server.tool({
-  name: 'generate-report',
+server.tool(
+  {
+    name: 'generate-report',
+    schema: z.object({ data: z.any() }),
+  },
   async ({ data }) => {
     const chart = await generateChart(data);
     return mix(
@@ -382,11 +398,11 @@ server.tool({
       image(chart, 'image/png')
     );
   }
-});
+);
 
 // Text + Image + Resource
-server.tool({
-  name: 'test_multiple_content_types',
+server.tool(
+  { name: 'test_multiple_content_types' },
   async () => mix(
     text('Multiple content types test:'),
     image(RED_PIXEL_PNG, 'image/png'),
@@ -395,11 +411,14 @@ server.tool({
       object({ test: 'data', value: 123 })
     )
   )
-});
+);
 
 // Multiple text messages
-server.tool({
-  name: 'batch-process',
+server.tool(
+  {
+    name: 'batch-process',
+    schema: z.object({ items: z.array(z.string()) }),
+  },
   async ({ items }) => {
     const results = [];
     for (const item of items) {
@@ -408,7 +427,7 @@ server.tool({
     }
     return mix(...results);
   }
-});
+);
 ```
 
 **Returns**: `CallToolResult` with merged content array and combined metadata
@@ -440,7 +459,7 @@ Per the [MCP Apps specification](https://github.com/modelcontextprotocol/ext-app
 
 ```typescript
 import { widget, text } from "mcp-use/server";
-import z from "zod";
+import { z } from "zod";
 
 server.tool(
   {
@@ -610,7 +629,7 @@ server.resourceTemplate(
 Response helpers are fully typed for TypeScript users:
 
 ```typescript
-import { object, TypedCallToolResult } from "mcp-use/server";
+import { object, type TypedCallToolResult } from "mcp-use/server";
 
 // Type inference
 const response = object({ userId: "123", name: "Alice" });
@@ -633,4 +652,4 @@ function getUserResponse(user: UserData): TypedCallToolResult<UserData> {
 - [Tools](./tools) - Learn about creating MCP tools
 - [Resources](./resources) - Managing static and dynamic content
 - [Prompts](./prompts) - Building interactive prompts
-- [UI Widgets](./mcp-apps) - Creating OpenAI Apps SDK widgets
+- [UI Widgets](./mcp-apps) - Creating MCP App widgets

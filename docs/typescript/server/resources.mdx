@@ -18,7 +18,7 @@ Resources are:
 - **Typed**: Each resource has a MIME type
 - **Annotated**: Metadata helps clients understand resource purpose
 
-## Resources
+## Static Resources
 
 Fixed content that doesn't change based on parameters. Use response helpers for cleaner code:
 
@@ -65,8 +65,8 @@ server.resource({
 
 </CodeGroup>
 
-You can use any mime type you want.
-To help you defining resources, you can use the response helpers to create the resource content.
+You can use any MIME type you want.
+To define resource content, use the response helpers.
 Here are some of the helpers you can use:
 
 ```typescript
@@ -206,22 +206,22 @@ server.resource({
 
 ## Callback Signature Variations
 
-Resource templates support multiple callback signatures. Use the simplest one that meets your needs:
+Static resources and resource templates support multiple callback signatures. Use the simplest one that meets your needs:
 
 ```typescript
-import { text, object } from 'mcp-use/server';
+import { text, object, error } from 'mcp-use/server';
 
-// No parameters - for static templates
+// No parameters - a static resource with fixed content
 server.resource({
     name: 'welcome',
     uri: 'app://welcome'
   }, async () => text('Welcome to our API!')
 )
 
-// Just URI - when you need the full URI
-server.resource({
+// Just URI - when you need the matched URI
+server.resourceTemplate({
     name: 'echo',
-    uri: 'echo://{path}'
+    uriTemplate: 'echo://{path}'
   }, async (uri) => text(`You requested: ${uri.toString()}`)
 )
 
@@ -237,14 +237,14 @@ server.resourceTemplate({
 )
 
 // With context - for auth or request access
-server.resourceTemplate(
-  {
+server.resourceTemplate({
     name: 'private',
-    resourceTemplate: { uriTemplate: 'private://{id}' }
+    uriTemplate: 'private://{id}'
   },
   async (uri, { id }, ctx) => {
-    // Access authenticated user
-    const user = ctx.auth;
+    // Access the authenticated user
+    if (!ctx.auth) return error('Not authenticated');
+    const user = ctx.auth.user; // UserInfo
     const data = await getPrivateData(id, user);
     return object(data);
   }

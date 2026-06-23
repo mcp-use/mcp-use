@@ -24,7 +24,7 @@ This ensures:
 - CSP includes your server domain
 - Works behind proxies and custom domains
 
-The server origin is auto-injected into each widget's `connectDomains`, `resourceDomains`, and `baseUriDomains` - you don't need to add it manually.
+The server origin is auto-injected into each widget's `connectDomains`, `resourceDomains`, and `baseUriDomains`, so you don't need to add it manually.
 
 ## Per-Widget Configuration
 
@@ -32,9 +32,17 @@ For widgets that need additional domains (APIs, CDNs, etc.), configure CSP in yo
 
 ### MCP Apps (all compatible clients, ChatGPT, Claude etc..)
 
-With `type: "mcpApps"`, use camelCase in `metadata.csp`:
+For file-based widgets, declare CSP with camelCase keys in `metadata.csp` on your exported `widgetMetadata`:
 
-```typescript
+```tsx
+import { type WidgetMetadata } from "mcp-use/react";
+import { z } from "zod";
+
+const propSchema = z.object({
+  city: z.string(),
+  temperature: z.number(),
+});
+
 export const widgetMetadata: WidgetMetadata = {
   description: "Display weather",
   props: propSchema,
@@ -50,9 +58,9 @@ export const widgetMetadata: WidgetMetadata = {
 };
 ```
 
-### Apps SDK Format (ChatGPT only - DEPRECATED)
+### Apps SDK Format (ChatGPT only, DEPRECATED)
 
-With `type: "appsSdk"`, use snake_case in `appsSdkMetadata["openai/widgetCSP"]`:
+For legacy ChatGPT-only widgets, declare CSP with snake_case keys under `appsSdkMetadata["openai/widgetCSP"]`:
 
 ```typescript
 export const appsSdkMetadata = {
@@ -84,10 +92,10 @@ Your CSP domains are merged with your server's base URL automatically. For ChatG
 ## Environment Variables
 
 ```env
-# Base URL  -  auto-included in widget CSP
+# Base URL: auto-included in widget CSP
 MCP_URL=https://myserver.com
 
-# Additional domains (comma-separated)  -  appended to widget CSP
+# Additional domains (comma-separated): appended to widget CSP
 CSP_URLS=https://api.example.com,https://cdn.example.com
 ```
 
@@ -112,8 +120,8 @@ See [Supabase deployment](./deployment/supabase) for a complete setup.
 
 The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 
-- **Permissive**  -  Relaxed CSP for debugging
-- **Widget-Declared**  -  Enforces the widget's declared CSP (production-like)
+- **Permissive**: Relaxed CSP for debugging
+- **Widget-Declared**: Enforces the widget's declared CSP (production-like)
 
 <Warning>
 CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
@@ -124,7 +132,7 @@ See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for details.
 
 ## Next Steps
 
-- [MCP Apps](./mcp-apps)  -  Unified metadata format for both protocols
-- [ChatGPT Apps SDK](./mcp-apps)  -  Widget metadata and registration
-- [Supabase Deployment](./deployment/supabase)  -  Static deployment with CSP
-- [Debugging Widgets](/inspector/debugging-chatgpt-apps)  -  Test CSP in the Inspector
+- [MCP Apps](./mcp-apps): Unified metadata format for both protocols
+- [ChatGPT Apps SDK](./mcp-apps): Widget metadata and registration
+- [Supabase Deployment](./deployment/supabase): Static deployment with CSP
+- [Debugging Widgets](/inspector/debugging-chatgpt-apps): Test CSP in the Inspector

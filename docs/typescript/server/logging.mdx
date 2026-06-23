@@ -12,7 +12,7 @@ HTTP request logging is controlled by the `MCP_DEBUG_LEVEL` environment variable
 
 ### Info (Default)
 
-One compact line per request  -  session, client, the MCP method, and the outcome:
+One compact line per request, including session, client, the MCP method, and the outcome:
 
 ```bash
 node server.js
@@ -20,7 +20,7 @@ node server.js
 
 **Output:**
 
-```
+```text
 [19:44:56.927] POST /mcp [initialize: my-client/0.1.0] → session=92c4e0b OK (1ms)
 [19:44:56.935] sess=92c4e0b POST /mcp [notifications/initialized] OK (1ms)
 [19:44:56.943] sess=92c4e0b POST /mcp [tools/list] OK (1ms)
@@ -39,14 +39,14 @@ MCP_DEBUG_LEVEL=debug node server.js
 
 **Output:**
 
-```
+```text
 [19:44:57.918] sess=f93f8b1 POST /mcp [tools/call: greet] args={"name":"Andrew","formal":true} OK (1ms)
 [19:44:57.926] sess=f93f8b1 POST /mcp [tools/call: divide] args={"a":10,"b":0} ERROR cannot divide by zero (0ms)
 ```
 
 ### Trace
 
-Full request and response dump (headers and bodies) following the summary line  -  useful for protocol-level debugging:
+Full request and response dump (headers and bodies) following the summary line, useful for protocol-level debugging:
 
 ```bash
 MCP_DEBUG_LEVEL=trace node server.js
@@ -67,7 +67,7 @@ The server uses a lightweight logging system that provides structured logs witho
 Configure the logger programmatically using the `Logger` class:
 
 ```typescript
-import { Logger } from "mcp-use/server";
+import { Logger } from "mcp-use";
 
 // Configure logging level and format
 Logger.configure({
@@ -76,17 +76,18 @@ Logger.configure({
 });
 
 // Or set debug level using numeric values
-Logger.setDebug(0); // Production mode (info level)
-Logger.setDebug(1); // Debug mode (info level)
-Logger.setDebug(2); // Verbose mode (debug level)
+Logger.setDebug(0); // info level
+Logger.setDebug(1); // info level (same as 0)
+Logger.setDebug(2); // debug level
 ```
 
 ### Log Levels
 
-The logger supports seven log levels (from least to most verbose):
+The logger supports eight log levels (from least to most verbose):
 
 | Level     | Use Case                                 |
 | --------- | ---------------------------------------- |
+| `silent`  | Disable all log output                   |
 | `error`   | Error conditions that need attention     |
 | `warn`    | Warning messages for potential issues    |
 | `info`    | General informational messages (default) |
@@ -103,7 +104,7 @@ Choose from three output formats:
 
 Clean, simple output with timestamp and level:
 
-```
+```text
 14:23:45 [mcp-use] info: Server mounted at /mcp
 14:23:46 [mcp-use] info: Session initialized: abc123
 ```
@@ -112,9 +113,18 @@ Clean, simple output with timestamp and level:
 
 More verbose output with full context:
 
-```
+```text
 14:23:45 [mcp-use] INFO: Server mounted at /mcp (Streamable HTTP Transport)
 14:23:46 [mcp-use] INFO: Session initialized: abc123
+```
+
+#### Emoji Format
+
+Same as minimal but prefixes each line with a level emoji for quick visual scanning:
+
+```text
+14:23:45 [mcp-use] ℹ️ INFO: Server mounted at /mcp
+14:23:46 [mcp-use] ℹ️ INFO: Session initialized: abc123
 ```
 
 ### Using the Logger
@@ -122,7 +132,7 @@ More verbose output with full context:
 Get a logger instance for custom logging:
 
 ```typescript
-import { Logger } from "mcp-use/server";
+import { Logger } from "mcp-use";
 
 const logger = Logger.get("my-component");
 
@@ -137,7 +147,7 @@ The built-in logger works in both Node.js and browser environments without any c
 
 ```typescript
 // Same logger works everywhere
-import { Logger } from "mcp-use/server";
+import { Logger } from "mcp-use";
 
 // In Node.js
 Logger.configure({ level: "debug", format: "detailed" });
@@ -166,7 +176,7 @@ logger.info("Server started");
 **After (SimpleConsoleLogger):**
 
 ```typescript
-import { Logger } from "mcp-use/server";
+import { Logger } from "mcp-use";
 
 Logger.configure({
   level: "info",
@@ -182,6 +192,9 @@ logger.info("Server started");
 Tools can send log messages directly to clients during execution using `ctx.log()`. This allows real-time visibility into what your tool is doing, which is especially useful for long-running operations or debugging tool behavior.
 
 ```typescript
+import { text } from "mcp-use/server";
+import { z } from "zod";
+
 server.tool(
   {
     name: "process_data",

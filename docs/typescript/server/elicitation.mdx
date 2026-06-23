@@ -22,7 +22,7 @@ When a tool needs user input, it can use `ctx.elicit()` to send a request to the
 Use the `elicit()` method on the context object within tool callbacks. The API automatically detects the mode from your parameters:
 
 ```typescript
-import { MCPServer, text } from 'mcp-use/server';
+import { MCPServer, text, error } from 'mcp-use/server';
 import { z } from 'zod';
 
 const server = new MCPServer({
@@ -125,9 +125,9 @@ server.tool({
       }
 
       return text('Account creation cancelled');
-    } catch (error) {
+    } catch (err) {
       // Validation error or other failure
-      return error(`Validation failed: ${error.message}`);
+      return error(`Validation failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 });
 ```
@@ -239,7 +239,7 @@ Supported SEP-1330 variants:
 
 ```typescript
 import { z } from 'zod';
-import { text } from 'mcp-use/server';
+import { text, error } from 'mcp-use/server';
 
 server.tool({
   name: 'register-user',
@@ -328,7 +328,9 @@ The `elicit()` method returns an `ElicitResult` object:
 ```typescript
 interface ElicitResult {
   action: 'accept' | 'decline' | 'cancel';
-  data?: any;  // Only present for 'accept' action in form mode
+  // In form mode, `data` is strongly typed as `z.infer<typeof yourSchema>`
+  // and is only present for the 'accept' action.
+  data?: unknown;
 }
 ```
 
@@ -410,9 +412,9 @@ server.tool({
     }
 
     return text('No response');
-  } catch (error) {
+  } catch (err) {
     // Timeout or validation error
-    return error(`Request failed: ${error.message}`);
+    return error(`Request failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 });
 ```
@@ -438,9 +440,9 @@ server.tool({
       }
 
       return text('No data provided');
-    } catch (error: unknown) {
+    } catch (err: unknown) {
       // Client doesn't support elicitation or request failed
-      return error(`Error: ${error instanceof Error ? error.message : String(error)}. Please ensure your client supports elicitation.`);
+      return error(`Error: ${err instanceof Error ? err.message : String(err)}. Please ensure your client supports elicitation.`);
     }
   });
 ```

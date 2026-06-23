@@ -41,7 +41,7 @@ Don't want to build it from scratch? Start from the [mcp-oauth-supabase-template
 # Required (hosted Supabase)  -  read by oauthSupabaseProvider()
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
 
-# Optional override — point the provider at a self-hosted or local Supabase
+# Optional override. Points the provider at a self-hosted or local Supabase
 # instance (e.g. `supabase start`). Required instead of PROJECT_ID when you
 # aren't on supabase.co.
 # MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
@@ -74,8 +74,9 @@ oauthSupabaseProvider({
   projectId: "your-project-id",                 // hosted Supabase
   // supabaseUrl: "http://localhost:54321",     // self-hosted / local
 
-  // Skip JWT verification  -  development only
-  verifyJwt: process.env.NODE_ENV === "production",
+  // JWT signature verification is ON by default. New ES256 projects
+  // auto-fetch the JWKS, so no secret is needed. Legacy HS256 projects only:
+  // jwtSecret: process.env.MCP_USE_OAUTH_SUPABASE_JWT_SECRET,
 
   // Override advertised scopes
   scopesSupported: ["openid", "profile", "email"],
@@ -105,23 +106,26 @@ MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
 `supabaseUrl` takes precedence over `projectId` when both are set. The provider derives the issuer and JWKS endpoint from this URL, so the local Supabase stack must expose `/auth/v1/.well-known/openid-configuration` (it does, by default).
 
 <Tip>
-  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint  -  the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
+  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint, and the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
 </Tip>
 
 ## Accessing user info in tools
 
 ```typescript
+import { object } from "mcp-use/server";
+
 server.tool(
   {
     name: "get-user-info",
     description: "Get authenticated user info",
   },
-  async (_args, ctx) => ({
-    userId: ctx.auth.user.userId,
-    email: ctx.auth.user.email,
-    name: ctx.auth.user.name,
-    scopes: ctx.auth.scopes,
-  }),
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+      scopes: ctx.auth.scopes,
+    }),
 );
 ```
 

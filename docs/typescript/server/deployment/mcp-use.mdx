@@ -41,7 +41,7 @@ That's it! Your server will be built and deployed automatically.
 
 ## Deploy Without GitHub
 
-You do not need a GitHub repository to deploy. Use `--no-github` to upload your local project source directly — the platform creates a managed repo and runs the normal build pipeline:
+You do not need a GitHub repository to deploy. Use `--no-github` to upload your local project source directly. The platform creates a managed repo and runs the normal build pipeline:
 
 ```bash
 mcp-use deploy --no-github
@@ -52,7 +52,7 @@ This path:
 - ✅ Works without a git remote or GitHub App installation
 - ✅ Uploads your local files (not GitHub)
 - ✅ Creates the server in the platform-managed org
-- ✅ Supports redeploys — linked projects auto-detect the upload path, so `--no-github` is only needed on the first deploy
+- ✅ Supports redeploys (linked projects auto-detect the upload path, so `--no-github` is only needed on the first deploy)
 
 You can later connect your own GitHub repository from the server dashboard ("Connect your GitHub") if you want push-to-deploy.
 
@@ -70,7 +70,7 @@ mcp-use deploy
 
 You'll see:
 
-```
+```text
 GitHub repository detected:
   Repository: your-org/your-repo
   Branch:     main
@@ -125,14 +125,14 @@ Once deployment completes, you'll receive:
 
 ### Deployment URLs
 
-```
+```text
 ✓ Deployment successful!
 
 🌐 MCP Server URL:
-   https://your-deployment/id.deploy.mcp-use.com/mcp
+   https://your-server-id.run.mcp-use.com/mcp
 
 🔍 Inspector URL:
-   https://inspector.mcp-use.com/inspect?autoConnect=https://your-deployment/id.deploy.mcp-use.com/mcp
+   https://inspector.mcp-use.com/inspector?autoConnect=https://your-server-id.run.mcp-use.com/mcp
 ```
 
 The `autoConnect` parameter and other Inspector URL options are documented in [Inspector URL parameters](/inspector/url-parameters).
@@ -143,7 +143,7 @@ The `autoConnect` parameter and other Inspector URL options are documented in [I
 {
   "mcpServers": {
     "my-server": {
-      "url": "https://your-deployment/id.deploy.mcp-use.com/mcp"
+      "url": "https://your-server-id.run.mcp-use.com/mcp"
     }
   }
 }

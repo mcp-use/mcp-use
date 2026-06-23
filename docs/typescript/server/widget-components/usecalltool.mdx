@@ -34,12 +34,12 @@ const MyWidget = () => {
       {isPending && <p>Searching...</p>}
       {isSuccess && (
         <ul>
-          {data.structuredContent.flights.map(flight => (
+          {data?.structuredContent?.flights?.map(flight => (
             <li key={flight.id}>{flight.price}</li>
           ))}
         </ul>
       )}
-      {isError && <p>Error: {error.message}</p>}
+      {isError && <p>Error: {String(error)}</p>}
     </div>
   );
 };
@@ -61,8 +61,8 @@ The hook uses a discriminated union state machine similar to TanStack Query:
 type State =
   | { status: "idle"; data: undefined; error: undefined }
   | { status: "pending"; data: undefined; error: undefined }
-  | { status: "success"; data: CallToolResult; error: undefined }
-  | { status: "error"; data: undefined; error: Error }
+  | { status: "success"; data: CallToolResponse; error: undefined }
+  | { status: "error"; data: undefined; error: unknown }
 ```
 
 This ensures type-safe access to `data` and `error` based on the current status.
@@ -76,8 +76,8 @@ This ensures type-safe access to `data` and `error` based on the current status.
 | `isPending`     | `boolean`                                                     | True while the tool is executing                  |
 | `isSuccess`     | `boolean`                                                     | True when the tool call succeeded                 |
 | `isError`       | `boolean`                                                     | True when the tool call failed                    |
-| `data`          | `CallToolResult \| undefined`                                 | Tool result (only available when `isSuccess`)     |
-| `error`         | `Error \| undefined`                                          | Error object (only available when `isError`)      |
+| `data`          | `CallToolResponse \| undefined`                               | Tool result (only available when `isSuccess`)     |
+| `error`         | `unknown`                                                     | Error value (only available when `isError`)       |
 | `callTool`      | `Function`                                                    | Fire-and-forget method with callbacks             |
 | `callToolAsync` | `Function`                                                    | Promise-based method for async/await              |
 
@@ -99,7 +99,7 @@ callTool(
     },
     onError: (error) => {
       console.error("Booking failed:", error);
-      showError(error.message);
+      showError(String(error));
     },
     onSettled: (data, error, input) => {
       console.log("Request complete", { data, error, input });
@@ -111,11 +111,11 @@ callTool(
 
 **Callback Types:**
 
-| Callback     | Signature                                        | Description                       |
-| ------------ | ------------------------------------------------ | --------------------------------- |
-| `onSuccess`  | `(data: CallToolResult, input: any) => void`     | Called when tool succeeds         |
-| `onError`    | `(error: Error, input: any) => void`             | Called when tool fails            |
-| `onSettled`  | `(data?, error?, input: any) => void`            | Called after success or error     |
+| Callback     | Signature                                                           | Description                       |
+| ------------ | ------------------------------------------------------------------- | --------------------------------- |
+| `onSuccess`  | `(data: CallToolResponse, args: TArgs) => void`                     | Called when tool succeeds         |
+| `onError`    | `(error: unknown, args: TArgs) => void`                             | Called when tool fails            |
+| `onSettled`  | `(data: CallToolResponse \| undefined, error: unknown \| undefined, args: TArgs) => void` | Called after success or error     |
 
 ### Async/Await Pattern
 
@@ -131,11 +131,11 @@ const handleSearch = async () => {
       date: "2024-12-01" 
     });
     
-    console.log("Found flights:", result.structuredContent.flights);
-    setFlights(result.structuredContent.flights);
+    console.log("Found flights:", result.structuredContent?.flights);
+    setFlights(result.structuredContent?.flights);
   } catch (error) {
     console.error("Search failed:", error);
-    showError(error.message);
+    showError(String(error));
   }
 };
 ```
@@ -149,19 +149,23 @@ Use `callToolAsync` when you need to:
 
 ## Response Structure
 
-Tool calls return a `CallToolResult` object:
+Tool calls return a normalized `CallToolResponse` object:
 
 ```typescript
-interface CallToolResult {
-  content: Array<TextContent | ImageContent | EmbeddedResource>;
+type CallToolResponse = {
+  content: Array<{ type: string; text?: string; [key: string]: any }>;
+
+  // Structured content (if the tool returned it)
+  structuredContent?: Record<string, unknown>;
+
   isError?: boolean;
-  
-  // Structured content (if tool returned it)
-  structuredContent?: any;
-  
-  // MCP Apps specific
-  metadata?: Record<string, unknown>;
-}
+
+  // Text content joined together as a convenience
+  result: string;
+
+  // MCP Apps metadata
+  _meta?: Record<string, unknown>;
+};
 ```
 
 **Accessing structured content:**
@@ -172,7 +176,7 @@ const { data } = useCallTool("get-weather");
 if (data) {
   // Structured content is strongly typed based on your tool definition
   const weather = data.structuredContent;
-  console.log(weather.temperature, weather.conditions);
+  console.log(weather?.temperature, weather?.conditions);
 }
 ```
 
@@ -184,23 +188,28 @@ The hook automatically uses types from `.mcp-use/tool-registry.d.ts`:
 
 ```typescript
 // index.ts
-server.tool({
-  name: "search-flights",
-  description: "Search for flights",
-  schema: z.object({
-    destination: z.string(),
-    date: z.string().optional(),
-  }),
-  execute: async ({ destination, date }) => {
+import { object } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool(
+  {
+    name: "search-flights",
+    description: "Search for flights",
+    schema: z.object({
+      destination: z.string(),
+      date: z.string().optional(),
+    }),
+  },
+  async ({ destination, date }) => {
     // ... implementation
     return object({
-      flights: array(object({
-        id: string(),
-        price: number(),
-      })),
+      flights: [
+        { id: "fl-1", price: 199 },
+        { id: "fl-2", price: 249 },
+      ],
     });
   }
-});
+);
 ```
 
 **Generated types:**
@@ -228,8 +237,8 @@ callTool({ destination: "NYC", date: "2024-12-01" });
 
 // Strongly typed output
 if (data) {
-  data.structuredContent.flights.forEach(flight => {
-    //                   ^ Autocomplete for output structure
+  data.structuredContent?.flights.forEach(flight => {
+    //                    ^ Autocomplete for output structure
     console.log(flight.id, flight.price);
   });
 }
@@ -278,18 +287,18 @@ The protocol is detected automatically - your code stays identical.
 
 Handle errors using the state flags or callbacks:
 
-```typescript
+```tsx
 const { callTool, isError, error } = useCallTool("create-booking");
 
 // State-based error handling
 if (isError) {
-  return <div className="error">{error.message}</div>;
+  return <div className="error">{String(error)}</div>;
 }
 
 // Callback-based error handling
 callTool(input, {
   onError: (error) => {
-    if (error.message.includes("unavailable")) {
+    if (String(error).includes("unavailable")) {
       showNotification("Flight is no longer available");
     } else {
       showError("An error occurred. Please try again.");
@@ -314,7 +323,7 @@ const FlightSearchWidget = () => {
       { destination },
       {
         onSuccess: (result) => {
-          console.log(`Found ${result.structuredContent.flights.length} flights`);
+          console.log(`Found ${result.structuredContent?.flights?.length ?? 0} flights`);
         },
         onError: (err) => {
           console.error("Search failed:", err);
@@ -337,12 +346,12 @@ const FlightSearchWidget = () => {
       </button>
 
       {isError && (
-        <div className="error">Error: {error.message}</div>
+        <div className="error">Error: {String(error)}</div>
       )}
 
       {data && (
         <ul className="results">
-          {data.structuredContent.flights.map((flight) => (
+          {data.structuredContent?.flights?.map((flight) => (
             <li key={flight.id}>
               {flight.departure} → {flight.arrival} - ${flight.price}
             </li>

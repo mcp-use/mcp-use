@@ -4,7 +4,7 @@ description: "Configure Keycloak OAuth for your MCP server using Dynamic Client 
 icon: "/images/icons/keycloak.svg"
 ---
 
-Keycloak exposes full OAuth 2.1 + OIDC endpoints on every realm, including native [Dynamic Client Registration](https://www.keycloak.org/securing-apps/client-registration) (RFC 7591). MCP clients discover Keycloak via `.well-known` metadata, register themselves, complete a PKCE authorization flow, and send the resulting access token as a bearer token on MCP requests  -  **the MCP server only verifies the JWT against Keycloak's JWKS**. No OAuth traffic is proxied through your server.
+Keycloak exposes full OAuth 2.1 + OIDC endpoints on every realm, including native [Dynamic Client Registration](https://www.keycloak.org/securing-apps/client-registration) (RFC 7591). MCP clients discover Keycloak via `.well-known` metadata, register themselves, complete a PKCE authorization flow, and send the resulting access token as a bearer token on MCP requests. **The MCP server only verifies the JWT against Keycloak's JWKS.** No OAuth traffic is proxied through your server.
 
 <Note>
   You need a reachable Keycloak realm with DCR enabled. The provider handles everything on the MCP-server side, but Keycloak itself must permit anonymous DCR from the hosts your MCP clients will register from.
@@ -24,7 +24,7 @@ Keycloak exposes `/{realm}/clients-registrations/openid-connect` on every realm.
 4. Make sure **Client URIs Must Match** is enabled so `redirect_uris` in the registration request are validated
 
 <Warning>
-  Browser-based MCP clients (like the inspector) also need the **Allowed Registration Web Origins** policy (Keycloak 26.6+) listing every origin the client runs from  -  without it, DCR requests are blocked by CORS with `403 Invalid origin`.
+  Browser-based MCP clients (like the inspector) also need the **Allowed Registration Web Origins** policy (Keycloak 26.6+) listing every origin the client runs from. Without it, DCR requests are blocked by CORS with `403 Invalid origin`.
 </Warning>
 
 For non-localhost redirect URIs, mint an **Initial Access Token** (Realm settings → Client registration → Initial access token) and have clients pass it on the DCR POST.
@@ -32,7 +32,7 @@ For non-localhost redirect URIs, mint an **Initial Access Token** (Realm setting
 ### 2. Environment variables
 
 ```bash
-# Base URL of your Keycloak server  -  no trailing slash, no /realms path
+# Base URL of your Keycloak server (no trailing slash, no /realms path)
 MCP_USE_OAUTH_KEYCLOAK_SERVER_URL=http://localhost:8080
 
 # Realm name
@@ -47,7 +47,7 @@ MCP_USE_OAUTH_KEYCLOAK_REALM=demo
 
 ```typescript
 // server.ts
-import { MCPServer, oauthKeycloakProvider, object } from "mcp-use/server";
+import { MCPServer, oauthKeycloakProvider, object, error, text } from "mcp-use/server";
 
 const server = new MCPServer({
   name: "my-server",
@@ -67,7 +67,7 @@ server.tool(
       username: ctx.auth.user.username,
       email: ctx.auth.user.email,
       roles: ctx.auth.user.roles,
-      permissions: ctx.auth.permissions,
+      permissions: ctx.auth.user.permissions,
       scopes: ctx.auth.scopes,
     }),
 );
@@ -82,11 +82,8 @@ oauth: oauthKeycloakProvider({
   serverUrl: "https://keycloak.example.com",
   realm: "demo",
 
-  // Optional: required `aud` claim  -  needs an Audience mapper in Keycloak
+  // Optional: required `aud` claim, needs an Audience mapper in Keycloak
   audience: "https://my-mcp-server.example.com/mcp",
-
-  // Disable JWT verification during development only
-  verifyJwt: process.env.NODE_ENV === "production",
 
   // Override advertised scopes
   // Default: ["openid", "profile", "email", "offline_access", "roles"]
@@ -96,7 +93,7 @@ oauth: oauthKeycloakProvider({
 
 ## The flow
 
-```
+```text
 MCP Client ──(1) GET /.well-known/oauth-protected-resource   ─▶ MCP Server
 MCP Client ──(2) GET /.well-known/oauth-authorization-server ─▶ MCP Server ─▶ Keycloak
 MCP Client ──(3) POST /clients-registrations/openid-connect  ─▶ Keycloak      (DCR)
@@ -105,7 +102,7 @@ MCP Client ──(5) POST /protocol/openid-connect/token         ─▶ Keycloak
 MCP Client ──(6) MCP request + Bearer <token>                ─▶ MCP Server    (verifies JWT via JWKS)
 ```
 
-Step 2 is a passthrough from the MCP server back to Keycloak's metadata  -  it's what tells the client where to register and where to send the user for login. Everything else goes directly to Keycloak.
+Step 2 is a passthrough from the MCP server back to Keycloak's metadata. It's what tells the client where to register and where to send the user for login. Everything else goes directly to Keycloak.
 
 ## Accessing user info in tools
 
@@ -127,7 +124,7 @@ server.tool(
       roles: ctx.auth.user.roles,
 
       // Resource roles as "client:role" strings
-      permissions: ctx.auth.permissions,
+      permissions: ctx.auth.user.permissions,
 
       scopes: ctx.auth.scopes,
     }),
@@ -164,14 +161,11 @@ server.tool(
   },
   async (_args, ctx) => {
     if (!ctx.auth.user.roles?.includes("admin")) {
-      return {
-        content: [{ type: "text", text: "Forbidden: admin role required" }],
-        isError: true,
-      };
+      return error("Forbidden: admin role required");
     }
 
     // ... admin logic
-    return { content: [{ type: "text", text: "Done" }] };
+    return text("Done");
   },
 );
 ```
@@ -181,7 +175,7 @@ server.tool(
 - **Audience enforcement.** Keycloak doesn't set `aud` to the resource server by default. To require it, add an *Audience* protocol mapper to the client scope in Keycloak and set `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE` to the matching value. Without the mapper, tokens will be rejected.
 - **Anonymous DCR.** Fine for local development, risky in production. Disable anonymous access and issue Initial Access Tokens (Realm settings → Client registration → Initial access token) that clients pass on the DCR request.
 - **Transport.** Always serve Keycloak and the MCP server over HTTPS outside of local dev.
-- **Scope of realm roles.** `ctx.auth.user.roles` only contains realm roles. Use `ctx.auth.permissions` (formatted as `client:role`) for per-client roles.
+- **Scope of realm roles.** `ctx.auth.user.roles` only contains realm roles. Use `ctx.auth.user.permissions` (formatted as `client:role`) for per-client roles.
 
 ## Resources
 
@@ -192,4 +186,4 @@ server.tool(
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+- [User Context](/typescript/server/authentication/user-context): Access user information in tools

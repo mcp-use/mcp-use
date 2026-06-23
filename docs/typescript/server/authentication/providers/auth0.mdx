@@ -76,8 +76,8 @@ Auth0 supports two integration modes depending on whether you have access to Aut
       domain: 'your-tenant.auth0.com',
       audience: 'https://your-api.example.com',
 
-      // Disable JWT verification during development only
-      verifyJwt: process.env.NODE_ENV === 'production',
+      // JWT signature verification is on by default. Leave it enabled.
+      // Do NOT disable it: an unverified token can be forged.
 
       // Override advertised scopes
       scopesSupported: ['openid', 'profile', 'email', 'offline_access'],
@@ -86,7 +86,7 @@ Auth0 supports two integration modes depending on whether you have access to Aut
 
   </Tab>
   <Tab title="OAuth Proxy">
-    Use `oauthProxy` with a standard Auth0 **Regular Web Application**  -  no Early Access required. Your server mediates the token exchange using pre-registered credentials.
+    Use `oauthProxy` with a standard Auth0 **Regular Web Application** (no Early Access required). Your server mediates the token exchange using pre-registered credentials.
 
     ## Auth0 Setup
 
@@ -97,15 +97,15 @@ Auth0 supports two integration modes depending on whether you have access to Aut
     1. Go to **Applications → Create Application**
     2. Choose **Regular Web Application**
     3. Under **Allowed Callback URLs**, add your **MCP server's** callback URL:
-       ```
+       ```text
        http://localhost:3000/oauth/callback
        ```
-       The server brokers the OAuth callback for every MCP client (Claude, ChatGPT, the inspector, ...), so this is the only URL you register  -  individual clients never need their own redirect URIs added here. In production, use your deployed server's domain, e.g. `https://my-server.example.com/oauth/callback`.
+       The server brokers the OAuth callback for every MCP client (Claude, ChatGPT, the inspector, ...), so this is the only URL you register. Individual clients never need their own redirect URIs added here. In production, use your deployed server's domain, e.g. `https://my-server.example.com/oauth/callback`.
     4. Copy the **Client ID** and **Client Secret**
 
     ### 2. Create an API
 
-    This gives you JWT access tokens (required  -  opaque tokens can't be verified locally):
+    This gives you JWT access tokens (required, opaque tokens can't be verified locally):
 
     1. Go to **APIs → Create API**
     2. Set an identifier, e.g. `https://my-mcp-api/`
@@ -151,7 +151,7 @@ Auth0 supports two integration modes depending on whether you have access to Aut
     ```
 
     The OAuth flow in proxy mode:
-    ```
+    ```text
     Client → /register         → receives pre-registered client_id
     Client → /authorize        → MCP server redirects to Auth0 /authorize
     Auth0  → /oauth/callback   → MCP server receives the authorization code
@@ -167,20 +167,23 @@ Auth0 supports two integration modes depending on whether you have access to Aut
 ## Accessing user info in tools
 
 ```typescript
+import { object } from 'mcp-use/server'
+
 server.tool(
   {
     name: 'get-user-info',
     description: 'Get authenticated user info',
   },
-  async (_args, ctx) => ({
-    userId: ctx.auth.user.userId,
-    email: ctx.auth.user.email,
-    name: ctx.auth.user.name,
-    nickname: ctx.auth.user.nickname,
-    picture: ctx.auth.user.picture,
-    permissions: ctx.auth.permissions,
-    scopes: ctx.auth.scopes,
-  })
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+      nickname: ctx.auth.user.nickname,
+      picture: ctx.auth.user.picture,
+      permissions: ctx.auth.permissions,
+      scopes: ctx.auth.scopes,
+    })
 )
 ```
 
@@ -189,18 +192,22 @@ server.tool(
 Auth0 includes permissions directly in the access token when you use the `rfc9068_profile_authz` token dialect. Check them in tool callbacks:
 
 ```typescript
+import { z } from 'zod'
+import { text, error } from 'mcp-use/server'
+
 server.tool(
   {
     name: 'delete-document',
     description: 'Delete a document (requires delete:documents)',
+    schema: { documentId: z.string() },
   },
   async ({ documentId }, ctx) => {
     if (!ctx.auth.permissions?.includes('delete:documents')) {
-      return { content: [{ type: 'text', text: 'Forbidden: delete:documents permission required' }], isError: true }
+      return error('Forbidden: delete:documents permission required')
     }
 
     await db.documents.delete({ id: documentId })
-    return { content: [{ type: 'text', text: 'Document deleted' }] }
+    return text('Document deleted')
   }
 )
 ```
@@ -214,4 +221,4 @@ server.tool(
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+- [User Context](/typescript/server/authentication/user-context): Access user information in tools

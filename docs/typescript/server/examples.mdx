@@ -56,7 +56,8 @@ pnpm dev
 A complete weather information server with tools, resources, and UI widgets.
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer, text, object, error } from 'mcp-use/server'
+import { z } from 'zod'
 import axios from 'axios'
 
 // Types
@@ -156,8 +157,8 @@ server.tool({
                 `Humidity: ${weather.humidity}%\n` +
                 `Wind Speed: ${weather.windSpeed} mph\n` +
                 `Pressure: ${weather.pressure} mb`);
-    } catch (error) {
-      return error(`Error fetching weather for ${city}: ${error.message}`);
+    } catch (err) {
+      return error(`Error fetching weather for ${city}: ${(err as Error).message}`);
     }
   }
 );
@@ -186,8 +187,8 @@ server.tool({
       ).join('\n\n')
 
       return text(`${days}-day forecast for ${city}:\n\n${forecastText}`);
-    } catch (error) {
-      return error(`Error fetching forecast: ${error.message}`);
+    } catch (err) {
+      return error(`Error fetching forecast: ${(err as Error).message}`);
     }
   }
 );
@@ -232,7 +233,7 @@ server.resourceTemplate({
         forecast,
         timestamp: new Date().toISOString()
       });
-    } catch (error) {
+    } catch (err) {
       return error(`Error: Unable to fetch weather for ${params.cityName}`);
     }
   }
@@ -260,12 +261,12 @@ server.prompt({
     return {
       messages: [
         {
-          role: 'system',
-          content: `You are a weather reporter. ${styleInstructions[style] || styleInstructions.professional}.`
-        },
-        {
           role: 'user',
-          content: `Please provide a weather report for ${city}. Current conditions: ${JSON.stringify(weather)}. 3-day forecast: ${JSON.stringify(forecast)}. Include current conditions, forecast summary, and any weather advisories.`
+          content: {
+            type: 'text',
+            text: `You are a weather reporter. ${styleInstructions[style] || styleInstructions.professional}.\n\n` +
+                  `Please provide a weather report for ${city}. Current conditions: ${JSON.stringify(weather)}. 3-day forecast: ${JSON.stringify(forecast)}. Include current conditions, forecast summary, and any weather advisories.`
+          }
         }
       ]
     }
@@ -297,8 +298,8 @@ server.get('/api/weather/:city', async (c) => {
     const city = c.req.param('city')
     const weather = await weatherService.getCurrentWeather(city)
     return c.json(weather)
-  } catch (error) {
-    return c.json({ error: error.message }, 500)
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 500)
   }
 })
 
@@ -308,8 +309,8 @@ server.get('/api/forecast/:city', async (c) => {
   try {
     const forecast = await weatherService.getForecast(city, days)
     return c.json(forecast)
-  } catch (error) {
-    return c.json({ error: error.message }, 500)
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 500)
   }
 })
 
@@ -326,11 +327,10 @@ server.get('/health', (c) => {
 // Start server
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000
 
-server.listen(PORT).then(() => {
-  console.log(`Weather Service MCP Server running on port ${PORT}`)
-  console.log(`MCP endpoint: http://localhost:${PORT}/mcp`)
-  console.log(`Inspector: http://localhost:${PORT}/inspector`)
-})
+await server.listen(PORT)
+console.log(`Weather Service MCP Server running on port ${PORT}`)
+console.log(`MCP endpoint: http://localhost:${PORT}/mcp`)
+console.log(`Inspector: http://localhost:${PORT}/inspector`)
 ```
 
 ## Database Management Server
@@ -338,9 +338,9 @@ server.listen(PORT).then(() => {
 A server for database operations with schema inspection and query execution.
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer, text, object, error } from 'mcp-use/server'
+import { z } from 'zod'
 import { Pool } from 'pg' // PostgreSQL client
-import sqlFormatter from 'sql-formatter'
 
 // Create server
 const server = new MCPServer({
@@ -384,8 +384,8 @@ server.tool({
 
       return text(`Query executed successfully.\nRows returned: ${result.rowCount}\n\n` +
                 `Results:\n${JSON.stringify(result.rows, null, 2)}`)
-    } catch (error) {
-      return error(`Query error: ${error.message}`)
+    } catch (err) {
+      return error(`Query error: ${(err as Error).message}`)
     }
   }
 )
@@ -426,8 +426,8 @@ server.tool({
       ).join('\n')
 
       return text(`Schema for table '${tableName}':\n\n${schema}`)
-    } catch (error) {
-      return error(`Error fetching schema: ${error.message}`)
+    } catch (err) {
+      return error(`Error fetching schema: ${(err as Error).message}`)
     }
   }
 )
@@ -467,8 +467,8 @@ server.resource({
         topTables: tableStats.rows,
         timestamp: new Date().toISOString()
       })
-    } catch (error) {
-      return error(`Error fetching statistics: ${error.message}`)
+    } catch (err) {
+      return error(`Error fetching statistics: ${(err as Error).message}`)
     }
   }
 )
@@ -496,18 +496,18 @@ server.prompt({
     return {
       messages: [
         {
-          role: 'system',
-          content: 'You are a SQL expert. Generate efficient, safe SQL queries based on requirements.'
-        },
-        {
           role: 'user',
-          content: `Generate a SQL query for the following requirement: "${description}"\n\n` +
-                   `Available tables: ${tables.join(', ')}\n\n` +
-                   `Requirements:\n` +
-                   `- Use proper JOIN syntax\n` +
-                   `- Include appropriate WHERE clauses\n` +
-                   `- Add LIMIT for large result sets\n` +
-                   `- Use parameterized queries for any user input`
+          content: {
+            type: 'text',
+            text: `You are a SQL expert. Generate efficient, safe SQL queries based on requirements.\n\n` +
+                  `Generate a SQL query for the following requirement: "${description}"\n\n` +
+                  `Available tables: ${tables.join(', ')}\n\n` +
+                  `Requirements:\n` +
+                  `- Use proper JOIN syntax\n` +
+                  `- Include appropriate WHERE clauses\n` +
+                  `- Add LIMIT for large result sets\n` +
+                  `- Use parameterized queries for any user input`
+          }
         }
       ]
     }
@@ -582,13 +582,13 @@ server.post('/api/query', async (c) => {
       rowCount: result.rowCount,
       rows: result.rows
     })
-  } catch (error) {
-    return c.json({ error: error.message }, 500)
+  } catch (err) {
+    return c.json({ error: (err as Error).message }, 500)
   }
 })
 
 // Start server
-server.listen(3000)
+await server.listen(3000)
 ```
 
 ## File System Manager
@@ -596,7 +596,8 @@ server.listen(3000)
 A server for browsing and managing files with content preview.
 
 ```typescript
-import { MCPServer } from 'mcp-use/server'
+import { MCPServer, text, error, binary } from 'mcp-use/server'
+import { z } from 'zod'
 import fs from 'fs/promises'
 import path from 'path'
 import mime from 'mime-types'
@@ -628,13 +629,16 @@ server.tool({
     path: z.string().describe('Directory path relative to base').optional().default('.'),
     showHidden: z.boolean().describe('Show hidden files').optional().default(false),
   }),
-}, async ({ path: dirPath = '.', showHidden = false }) => {   
+}, async ({ path: dirPath = '.', showHidden = false }) => {
     try {
       const fullPath = validatePath(dirPath)
       const items = await fs.readdir(fullPath, { withFileTypes: true })
-      return text(`Contents of ${dirPath}:\n\n${items.join('\n')}`)
-    } catch (error) {
-      return error(`Error listing directory: ${error.message}`)
+      const names = items
+        .filter(item => showHidden || !item.name.startsWith('.'))
+        .map(item => item.name)
+      return text(`Contents of ${dirPath}:\n\n${names.join('\n')}`)
+    } catch (err) {
+      return error(`Error listing directory: ${(err as Error).message}`)
     }
   }
 )
@@ -660,8 +664,8 @@ server.tool({
       const mimeType = mime.lookup(fullPath) || 'text/plain'
 
       return text(`File: ${filePath}\nType: ${mimeType}\nSize: ${stats.size} bytes\n\n---\n\n${content}`)
-    } catch (error) {
-      return error(`Error reading file: ${error.message}`)
+    } catch (err) {
+      return error(`Error reading file: ${(err as Error).message}`)
     }
   }
 )
@@ -692,8 +696,8 @@ server.resourceTemplate({
         const content = await fs.readFile(fullPath)
         return binary(content.toString('base64'), mimeType)
       }
-    } catch (error) {
-      return error(`Error: ${error.message}`)
+    } catch (err) {
+      return error(`Error: ${(err as Error).message}`)
     }
   }
 )

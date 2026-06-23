@@ -87,7 +87,7 @@ const server = new MCPServer({
   stateless: false  // Explicitly enable stateful mode
 });
 
-server.start({ port: 3000 });
+await server.listen(3000);
 ```
 
 **Auto-detection:** When `stateless` is not explicitly set, the server automatically detects mode per-request:
@@ -122,7 +122,7 @@ const server = new MCPServer({
   stateless: true  // Force stateless mode
 });
 
-server.start({ port: 3000 });
+await server.listen(3000);
 ```
 
 **Features:**
@@ -192,7 +192,8 @@ const server = new MCPServer({
 - ✅ No external dependencies
 - ❌ Sessions lost on restart
 - ❌ Can't scale horizontally
-### Persistent Sessions 
+
+### Persistent Sessions
 
 Session metadata survives restarts, but still single server:
 
@@ -219,6 +220,7 @@ const server = new MCPServer({
 </Card>
 
 ### Distributed
+
 Complete horizontal scaling with all MCP features:
 
 ```typescript

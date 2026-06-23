@@ -19,7 +19,7 @@ In the WorkOS Dashboard, go to **Connect → Configuration** and enable **Dynami
 ### 3. Configure redirect URIs
 
 Go to **Configuration → Redirects** and add your redirect URI:
-```
+```text
 http://localhost:3000/callback
 ```
 
@@ -50,8 +50,7 @@ Or pass config explicitly:
 oauth: oauthWorkOSProvider({
   subdomain: 'your-company.authkit.app',
 
-  // Disable JWT verification during development only
-  verifyJwt: process.env.NODE_ENV === 'production',
+  // JWT verification is enabled by default. Leave it on; do not disable it per-environment.
 
   // Override advertised scopes
   // Default: ['email', 'offline_access', 'openid', 'profile']
@@ -60,7 +59,7 @@ oauth: oauthWorkOSProvider({
 ```
 
 <Tip>
-If you need to call the WorkOS Management API from your tool handlers, store your API key in any env var you like (e.g. `WORKOS_API_KEY`) and read it inside the tool  -  it isn't part of the OAuth provider config.
+If you need to call the WorkOS Management API from your tool handlers, store your API key in any env var you like (e.g. `WORKOS_API_KEY`) and read it inside the tool. It isn't part of the OAuth provider config.
 </Tip>
 
 ## Accessing user info in tools
@@ -68,12 +67,14 @@ If you need to call the WorkOS Management API from your tool handlers, store you
 WorkOS provides standard OIDC claims plus organization context:
 
 ```typescript
+import { object } from 'mcp-use/server'
+
 server.tool(
   {
     name: 'get-profile',
     description: 'Get authenticated user profile',
   },
-  async (_args, ctx) => ({
+  async (_args, ctx) => object({
     userId: ctx.auth.user.userId,
     email: ctx.auth.user.email,
     name: ctx.auth.user.name,
@@ -95,7 +96,7 @@ server.tool(
     description: 'Get documents for the authenticated organization',
   },
   async (_args, ctx) => {
-    // Custom claims come back as `unknown`  -  narrow before use
+    // Custom claims come back as `unknown`, so narrow before use
     const orgId = ctx.auth.user.organization_id as string | undefined
 
     if (!orgId) {
@@ -119,4 +120,4 @@ server.tool(
 
 ## Next Steps
 
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+- [User Context](/typescript/server/authentication/user-context): Access user information in tools

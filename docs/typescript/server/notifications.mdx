@@ -43,7 +43,7 @@ await server.sendNotification("custom/status-update", {
   timestamp: Date.now()
 });
 
-// you can also send to a speocific client by session ID
+// You can also send to a specific client by session ID
 await server.sendNotificationToSession(sessionId, "custom/status-update", {
   status: "ready",
   timestamp: Date.now()
@@ -56,11 +56,14 @@ await server.sendNotificationToSession(sessionId, "custom/status-update", {
 Send a notification to the current client:
 
 ```typescript
+import { text } from "mcp-use/server";
+
 server.tool({
   name: 'send-notification',
   description: 'Send a notification to the current client',
 }, async (params, ctx) => {
   await ctx.sendNotification("custom/welcome", { message: "Hello, client!" });
+  return text("Notification sent");
 });
 ```
 
@@ -134,10 +137,10 @@ Progress notifications (`notifications/progress`) are used to keep clients infor
 
 **Automatic Progress in Sampling**
 
-When using `ctx.sample()` in tool callbacks, progress notifications are automatically sent every 5 seconds:
+When using `ctx.sample()` in tool callbacks, progress notifications are automatically sent every 5 seconds, but only when the client supplied a `progressToken` on the tool call:
 
 ```typescript
-import { text } from 'mcp-use/server';
+import { text, type ToolContext } from 'mcp-use/server';
 
 server.tool({
   name: 'long_llm_task',
@@ -145,6 +148,7 @@ server.tool({
     if (!ctx) return text('No context')
     
     // Progress notifications are sent automatically every 5 seconds
+    // (only when the client supplied a progressToken on the tool call)
     const result = await ctx.sample({
       messages: [{ role: 'user', content: { type: 'text', text: params.prompt } }]
     })
@@ -159,7 +163,7 @@ server.tool({
 You can also send progress notifications manually using `ctx.reportProgress()`:
 
 ```typescript
-import { text } from 'mcp-use/server';
+import { text, type ToolContext } from 'mcp-use/server';
 
 server.tool({
   name: 'process_data',

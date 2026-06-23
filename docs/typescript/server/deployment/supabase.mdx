@@ -220,7 +220,7 @@ A full working example is available in the repository: [Supabase Example](https:
 ```typescript
 // supabase/functions/mcp-server/index.ts
 
-import { MCPServer } from "https://esm.sh/mcp-use@latest/server";
+import { MCPServer, text } from "npm:mcp-use/server";
 
 const PROJECT_REF = Deno.env.get("SUPABASE_PROJECT_REF") || "your-project-ref";
 const BASE_URL =
@@ -237,15 +237,16 @@ const server = new MCPServer({
 });
 
 // Define your tools
-import { text } from 'mcp-use/server';
-
-server.tool({
-  name: "get-my-city",
-  description: "Get my city",
-  cb: async () => {
-    return text(`My city is San Francisco`);
+server.tool(
+  {
+    name: "get-my-city",
+    description: "Get my city",
   },
-});
+  async () => {
+    return text(`My city is San Francisco`);
+  }
+);
+
 await server.listen();
 ```
 
@@ -361,7 +362,7 @@ const mcpUrl = `https://YOUR_PROJECT_ID.supabase.co/functions/v1/mcp-server/mcp`
 ### Browser/Client-Side Usage
 
 ```typescript
-import { BrowserMCPClient } from "mcp-use";
+import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
 
 const client = new BrowserMCPClient({
   mcpServers: {

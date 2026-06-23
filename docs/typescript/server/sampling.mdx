@@ -55,7 +55,7 @@ server.tool({
      Just output a single word. Text: ${params.text}`
   );
 
-  return text(`Sentiment: ${response.content[0].text}`);
+  return text(`Sentiment: ${response.content.text}`);
 });
 
 await server.listen();
@@ -82,7 +82,7 @@ server.tool({
     `Summarize this text in one sentence: ${params.text}`
   );
   
-  return text(response.content[0].text);
+  return text(response.content.text);
 });
 ```
 
@@ -131,7 +131,7 @@ server.tool({
     maxTokens: 100,
   });
 
-  return text(response.content[0].text);
+  return text(response.content.text);
 });
 ```
 
@@ -164,7 +164,7 @@ server.tool({
     }
   );
   
-  return text(response.content[0].text);
+  return text(response.content.text);
 });
 ```
 
@@ -197,7 +197,7 @@ server.tool({
   }
 
   const response = await ctx.sample(`Analyze: ${params.text}`);
-  return text(`LLM Analysis: ${response.content[0].text}`);
+  return text(`LLM Analysis: ${response.content.text}`);
 });
 ```
 
@@ -216,11 +216,11 @@ server.tool({
   if (ctx.client.can('sampling') && ctx.client.can('elicitation')) {
     // Use both sampling and elicitation
     const analysis = await ctx.sample(`Analyze: ${params.input}`);
-    return text(`Advanced analysis: ${analysis.content[0].text}`);
+    return text(`Advanced analysis: ${analysis.content.text}`);
   } else if (ctx.client.can('sampling')) {
     // Use only sampling
     const result = await ctx.sample(`Process: ${params.input}`);
-    return text(`Result: ${result.content[0].text}`);
+    return text(`Result: ${result.content.text}`);
   } else {
     // Basic functionality only
     return text(`Basic processing: ${params.input.length} characters`);
@@ -233,6 +233,8 @@ server.tool({
 Use `ctx.client.info()` to get the client's name and version from the MCP initialize handshake. Use `ctx.client.extension(id)` to access any MCP extension (SEP-1724), and `ctx.client.supportsApps()` as a convenience check for MCP Apps support (SEP-1865, `io.modelcontextprotocol/ui` extension):
 
 ```typescript
+import { widget, text } from 'mcp-use/server';
+
 server.tool({
   name: 'conditional-widget',
   description: 'Returns a widget for MCP Apps clients, plain text otherwise',
@@ -248,6 +250,7 @@ server.tool({
 
   // Convenience check for MCP Apps support (SEP-1865)
   if (ctx.client.supportsApps()) {
+    // fetchData is a placeholder for your own data-loading logic
     const result = await fetchData(params.query);
     return widget({ props: result, output: text(`Found ${result.length} items`) });
   }
@@ -284,7 +287,7 @@ Just output a single word - 'positive', 'negative', or 'neutral'.
 Text to analyze: ${params.text}`;
 
   const response = await ctx.sample(prompt);
-  const sentiment = response.content[0].text.trim().toLowerCase();
+  const sentiment = response.content.text.trim().toLowerCase();
   
   return text(`Sentiment: ${sentiment}`);
 });
@@ -336,7 +339,7 @@ interface CreateMessageResult {
     mimeType?: string;
   };
   model: string;
-  stopReason?: 'endTurn' | 'maxTokens' | 'stopSequence';
+  stopReason?: 'endTurn' | 'maxTokens' | 'stopSequence' | string;
 }
 ```
 

@@ -438,7 +438,7 @@ UI state describes **how** data is being viewed, not the data itself. Use `setSt
 ```tsx
 type MyState = { favorites: string[] };
 
-const { props, state, setState } = useWidget<Props, Output, Meta, MyState>();
+const { props, state, setState } = useWidget<Props, MyState>();
 
 const favorites = state?.favorites ?? [];
 
@@ -465,43 +465,6 @@ const toggleFavorite = (id: string) => {
 ### Cross-Session State (Backend-Owned)
 
 For state that must persist across conversations, store it on your backend. Use `callTool` from the widget to read/write preferences via your server's tools  -  don't rely on `localStorage`.
-
-## MCP Apps Bridge API
-
-For widgets that need direct protocol access, mcp-use provides the MCP Apps bridge:
-
-```typescript
-import { getMcpAppsBridge } from 'mcp-use/react';
-
-function MyWidget() {
-  const bridge = getMcpAppsBridge();
-
-  // The bridge automatically connects
-  // All methods return promises
-
-  // Call an MCP tool
-  const result = await bridge.callTool('search', { query: 'hello' });
-
-  // Read an MCP resource
-  const data = await bridge.readResource('file:///data.json');
-
-  // Send a message to the host
-  await bridge.sendMessage({ type: 'info', text: 'Processing...' });
-
-  // Open a link
-  await bridge.openLink('https://example.com');
-
-  // Request display mode change
-  await bridge.requestDisplayMode('fullscreen');
-
-  return <div>My Widget</div>;
-}
-```
-
-<Info>
-  Most widgets won't need the bridge directly. The `useWidget()` hook provides a
-  simplified API that works across both protocols automatically.
-</Info>
 
 ## Protocol-Specific Metadata
 

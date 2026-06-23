@@ -56,14 +56,15 @@ The hook handles all protocol-specific communication behind the scenes.
 
 ## Type Parameters
 
-The hook accepts four optional type parameters:
+The hook accepts five optional type parameters:
 
 ```typescript
 useWidget<
-  TProps, // Props type (from toolInput)
-  TOutput, // Output type (from toolOutput/structuredContent)
-  TMetadata, // Metadata type (from toolResponseMetadata)
-  TState // State type (for widgetState)
+  TProps,     // Props type (from structuredContent)
+  TState,     // Persisted widget state type
+  TOutput,    // Output type (from toolOutput/structuredContent)
+  TMetadata,  // Metadata type (from toolResponseMetadata)
+  TToolInput  // Tool call input arguments type
 >();
 ```
 
@@ -74,6 +75,7 @@ useWidget<
 | Property   | Type                                                                     | Description                                                                      |
 | ---------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
 | `props`    | `Partial<TProps>`                                                        | Widget props (mapped from widget-only data). Empty `{}` when `isPending` is true |
+| `toolInput` | `TToolInput`                                                            | The tool call input arguments that produced this widget                          |
 | `output`   | `TOutput \| null`                                                        | Tool output from the last execution                                              |
 | `metadata` | `TMetadata \| null`                                                      | Response metadata from the tool                                                  |
 | `state`    | `TState \| null`                                                         | Persisted widget state                                                           |
@@ -87,8 +89,10 @@ useWidget<
 | `displayMode` | `"inline" \| "pip" \| "fullscreen"` | Current display mode                           |
 | `safeArea`    | `SafeArea`                          | Safe area insets for mobile layout             |
 | `maxHeight`   | `number`                            | Maximum height available (pixels)              |
+| `maxWidth`    | `number \| undefined`               | Maximum width available (pixels), when provided by the host |
 | `userAgent`   | `UserAgent`                         | Device capabilities (`device`, `capabilities`) |
 | `locale`      | `string`                            | Current locale (e.g., `"en-US"`)               |
+| `timeZone`    | `string`                            | Current IANA time zone (e.g., `"America/New_York"`), with a browser fallback |
 | `mcp_url`     | `string`                            | MCP server base URL for making API requests    |
 
 ### Actions
@@ -99,7 +103,6 @@ useWidget<
 | `sendFollowUpMessage`   | `(content: string \| MessageContentBlock[]) => Promise<void>`                | Send a follow-up message; string shorthand or full content block array (SEP-1865) |
 | `openExternal`          | `(href: string) => void`                                                     | Open an external URL in a new tab                            |
 | `requestDisplayMode`    | `(mode: DisplayMode) => Promise<{ mode: DisplayMode }>`                      | Request a different display mode                             |
-| `notifyIntrinsicHeight` | `(height: number) => Promise<void>`                                          | Notify OpenAI about intrinsic height changes for auto-sizing |
 
 ### Availability
 
@@ -116,6 +119,7 @@ useWidget<
 | ------------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `hostInfo`         | `{ name: string; version: string } \| undefined` | Name and version of the MCP Apps host, from the `ui/initialize` handshake. `undefined` in ChatGPT Apps SDK.  |
 | `hostCapabilities` | `Record<string, unknown> \| undefined`        | Capabilities advertised by the MCP Apps host (SEP-1865 `HostCapabilities`). `undefined` in ChatGPT Apps SDK.   |
+| `hostContext`      | `HostContext \| undefined`                    | Full SEP-1865 host context (styles, container dimensions, platform, locale, etc.). `undefined` in ChatGPT Apps SDK. |
 
 These fields are only populated when the widget is running inside an MCP Apps host (Claude, Goose, or any client implementing SEP-1865). They are `undefined` in the ChatGPT Apps SDK environment.
 
@@ -171,11 +175,10 @@ const ProductWidget: React.FC = () => {
     sendFollowUpMessage,
     openExternal,
     requestDisplayMode,
-    notifyIntrinsicHeight,
 
     // Availability
     isAvailable,
-  } = useWidget<ProductProps, ProductOutput, {}, ProductState>();
+  } = useWidget<ProductProps, ProductState, ProductOutput, {}>();
 
   const handleAddToFavorites = async () => {
     const newFavorites = [...(state?.favorites || []), props.productId];
@@ -355,11 +358,10 @@ const MyWidget: React.FC = () => {
 
 ### 2. Automatic Provider Detection
 
-The hook automatically detects whether it's running in:
+The hook automatically detects which provider is active:
 
-- **Apps SDK** (ChatGPT): Reads from `window.openai`
-- **MCP-UI**: Reads from URL parameters
-- **Standalone**: Uses default props
+- **mcp-apps**: Hosted iframe using SEP-1865 postMessage (Claude, Goose, ChatGPT via Apps SDK, and any SEP-1865 host)
+- **mcp-ui**: URL parameters fallback (e.g. the Inspector or dev environments); safe defaults are applied when no data is present
 
 ### 3. Reactive Updates
 
@@ -372,25 +374,22 @@ The hook subscribes to all `window.openai` global changes via the `openai:set_gl
 
 ### 4. Auto-sizing Support
 
-Use `notifyIntrinsicHeight` to notify OpenAI about height changes:
+Height notifications are handled automatically. Wrap your widget in [`McpUseProvider`](./mcpuseprovider) with `autoSize={true}` (the default) and the provider observes your content and reports intrinsic height changes to the host for you, including zero-height collapse when your widget conditionally renders `null`.
 
 ```tsx
-const { notifyIntrinsicHeight } = useWidget();
+import { McpUseProvider } from "mcp-use/react";
 
-useEffect(() => {
-  const height = containerRef.current?.scrollHeight || 0;
-  notifyIntrinsicHeight(height);
-}, [content]);
+<McpUseProvider autoSize>
+  <MyWidget />
+</McpUseProvider>;
 ```
-
-Or use [`McpUseProvider`](./mcpuseprovider) with `autoSize={true}` for automatic height notifications — including zero-height collapse when your widget conditionally renders `null`.
 
 ### 5. State Management
 
 Widget state persists across widget interactions and is shown to the model:
 
 ```tsx
-const { state, setState } = useWidget<{}, {}, {}, { favorites: string[] }>();
+const { state, setState } = useWidget<{}, { favorites: string[] }>();
 
 // Update state
 await setState({ favorites: ["item1", "item2"] });
@@ -428,7 +427,7 @@ const handleRequestInfo = async () => {
   await sendFollowUpMessage("Show me more details about this product");
 };
 
-// Full content array (MCP Apps  -  supports text, image, resource blocks)
+// Full content array (MCP Apps: supports text, image, resource blocks)
 const handleRichMessage = async () => {
   await sendFollowUpMessage([
     { type: "text", text: "Show me more details about this product" },
