@@ -707,6 +707,10 @@
       "destination": "/python/changelog/changelog"
     },
     {
+      "source": "/typescript/server",
+      "destination": "/typescript/server/index"
+    },
+    {
       "source": "/typescript/server/ui-widgets",
       "destination": "/typescript/server/mcp-apps"
     },
