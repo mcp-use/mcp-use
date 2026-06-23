@@ -380,12 +380,11 @@ async function doOnMcpAuthorization() {
     // Infer OAuth proxy URL from callback URL if not stored
     // The callback URL is like: http://localhost:3000/inspector/oauth/callback
     // The OAuth proxy URL should be: http://localhost:3000/inspector/api/oauth
-    // Only infer when connectionUrl is set (meaning a proxy was used for the connection).
-    // When connecting directly to a CORS-enabled server (no proxy), inferring an OAuth proxy
-    // would cause PRM resource mismatch since the proxy rewrites the resource field.
+    // Direct browser connections still use the proxy for token exchange because
+    // many OAuth servers do not expose CORS on /token.
     let oauthProxyUrl = providerOptions.oauthProxyUrl;
     const connectionUrl = callbackConnectionUrl;
-    if (!oauthProxyUrl && connectionUrl) {
+    if (!oauthProxyUrl) {
       try {
         const callbackUrl = new URL(window.location.href);
         // Check if this looks like an inspector callback
@@ -403,9 +402,9 @@ async function doOnMcpAuthorization() {
           // - The hosted inspector serves the callback at /oauth/callback (via Next.js page)
           // - But the OAuth proxy is mounted at /inspector/api/oauth (via inspector package)
           if (!basePath || basePath === "") {
-            const isGatewayConnection = /run\.mcp-use\.com|mcp-use\.run/.test(
-              connectionUrl
-            );
+            const isGatewayConnection =
+              connectionUrl &&
+              /run\.mcp-use\.com|mcp-use\.run/.test(connectionUrl);
             if (isGatewayConnection) {
               console.log(
                 `${logPrefix} Gateway connection detected; skipping default /inspector OAuth proxy inference`
