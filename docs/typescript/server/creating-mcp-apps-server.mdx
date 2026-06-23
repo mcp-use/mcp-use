@@ -1,5 +1,5 @@
 ---
-title: "Creating an MCP Server with Widgets"
+title: "Creating your first MCP App"
 description: "Complete guide to building an MCP server with interactive widget support for both ChatGPT and Claude"
 icon: "rocket"
 ---
@@ -163,7 +163,7 @@ export default ProductSearchResult;
 </Warning>
 
 <Tip>
-See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete patterns, and [Streaming tool arguments](/typescript/server/widget-components/usewidget#streaming-tool-arguments) for live previews while the model streams.
+See [Widget Lifecycle](/typescript/react/usewidget#widget-lifecycle) for complete patterns, and [Streaming tool arguments](/typescript/react/usewidget#streaming-tool-arguments) for live previews while the model streams.
 </Tip>
 
 ## Step 4: Add Traditional MCP Tools
@@ -229,7 +229,7 @@ return (
 **Type Safety**: `mcp-use dev` generates types from your tool definitions. The `callTool` function gets autocomplete for tool names and parameters.
 </Info>
 
-See [useCallTool()](/typescript/server/widget-components/usecalltool) for more patterns.
+See [useCallTool()](/typescript/react/usecalltool) for more patterns.
 
 ## Step 6: Widget Metadata (Advanced)
 
@@ -286,7 +286,7 @@ const MyWidget: React.FC = () => {
 
 ### Calling Other Tools
 
-`useWidget()` also exposes a lower-level `callTool(name, args)` that resolves to a single promise. Prefer the [`useCallTool`](/typescript/server/widget-components/usecalltool) hook from Step 5 when you want loading and error state managed for you; reach for `useWidget().callTool` only for one-off, fire-and-forget calls:
+`useWidget()` also exposes a lower-level `callTool(name, args)` that resolves to a single promise. Prefer the [`useCallTool`](/typescript/react/usecalltool) hook from Step 5 when you want loading and error state managed for you; reach for `useWidget().callTool` only for one-off, fire-and-forget calls:
 
 ```tsx
 const MyWidget: React.FC = () => {
@@ -456,7 +456,7 @@ if (isPending) return <div>Loading...</div>;
 
 - [MCP Apps](./mcp-apps) - Learn about the standard MCP Apps protocol
 - [ChatGPT Apps SDK](./mcp-apps) - Deep dive into ChatGPT-specific features
-- [Widget Components](./widget-components/usewidget) - Explore React hooks and components
+- [Widget Components](/typescript/react/usewidget) - Explore React hooks and components
 - [Debugging Widgets](/inspector/debugging-chatgpt-apps) - Test with the Inspector
 - [Content Security Policy](./content-security-policy) - CSP configuration for widgets
 - [Deployment Guide](./deployment/mcp-use) - Deploy your server to production

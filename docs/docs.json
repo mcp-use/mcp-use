@@ -44,15 +44,6 @@
             ]
           },
           {
-            "group": "MCP Apps",
-            "icon": "app-window-mac",
-            "pages": [
-              "typescript/server/mcp-apps",
-              "typescript/server/creating-mcp-apps-server",
-              "guides/chatgpt-apps-flow"
-            ]
-          },
-          {
             "group": "Templates",
             "icon": "layout-template",
             "pages": [
@@ -127,7 +118,6 @@
                 "pages": [
                   "typescript/server/index",
                   "typescript/server/configuration",
-                  "typescript/server/cli-reference",
                   "typescript/server/examples",
                   {
                     "group": "Core Components",
@@ -135,26 +125,8 @@
                     "pages": [
                       "typescript/server/tools",
                       "typescript/server/resources",
-                      "typescript/server/prompts"
-                    ]
-                  },
-                  "typescript/server/response-helpers",
-                  {
-                    "group": "MCP Apps",
-                    "icon": "app-window-mac",
-                    "pages": [
-                      "typescript/server/mcp-apps",
-                      "typescript/server/creating-mcp-apps-server",
-                      "typescript/server/content-security-policy",
-                      "typescript/server/widget-components/usewidget",
-                      "typescript/server/widget-components/usecalltool",
-                      "typescript/server/widget-components/mcpuseprovider",
-                      "typescript/server/widget-components/widgetcontrols",
-                      "typescript/server/widget-components/errorboundary",
-                      "typescript/server/widget-components/image",
-                      "typescript/server/widget-components/themeprovider",
-                      "typescript/server/widget-components/modelcontext",
-                      "typescript/server/widget-components/usefiles"
+                      "typescript/server/prompts",
+                      "typescript/server/response-helpers"
                     ]
                   },
                   {
@@ -178,7 +150,7 @@
                       "typescript/server/subscriptions",
                       "typescript/server/notifications",
                       "typescript/server/logging",
-                      "typescript/server/nextjs-drop-in"
+                      "typescript/server/openapi"
                     ]
                   },
                   {
@@ -208,11 +180,36 @@
                     "icon": "rocket",
                     "pages": [
                       "typescript/server/deployment/mcp-use",
+                      "typescript/server/deployment/google",
                       "typescript/server/deployment/supabase",
-                      "typescript/server/deployment/google"
+                      "typescript/server/nextjs-drop-in"
                     ]
-                  },
-                  "typescript/server/openapi"
+                  }
+                ]
+              },
+              {
+                "group": "MCP Apps",
+                "icon": "app-window-mac",
+                "pages": [
+                  "typescript/server/mcp-apps",
+                  "typescript/server/creating-mcp-apps-server",
+                  "typescript/server/content-security-policy",
+                  "guides/chatgpt-apps-flow",
+                  {
+                    "group": "React",
+                    "icon": "atom",
+                    "pages": [
+                      "typescript/react/usewidget",
+                      "typescript/react/usecalltool",
+                      "typescript/react/usefiles",
+                      "typescript/react/mcpuseprovider",
+                      "typescript/react/widgetcontrols",
+                      "typescript/react/modelcontext",
+                      "typescript/react/themeprovider",
+                      "typescript/react/image",
+                      "typescript/react/errorboundary"
+                    ]
+                  }
                 ]
               },
               {
@@ -267,6 +264,13 @@
                     ]
                   },
                   "typescript/agent/observability"
+                ]
+              },
+              {
+                "group": "Tooling",
+                "icon": "wrench",
+                "pages": [
+                  "typescript/server/cli-reference"
                 ]
               },
               {
@@ -725,6 +729,42 @@
     {
       "source": "/typescript/server/api-reference",
       "destination": "/typescript/server/index#mcpserver-api-reference"
+    },
+    {
+      "source": "/typescript/server/widget-components/usewidget",
+      "destination": "/typescript/react/usewidget"
+    },
+    {
+      "source": "/typescript/server/widget-components/usecalltool",
+      "destination": "/typescript/react/usecalltool"
+    },
+    {
+      "source": "/typescript/server/widget-components/usefiles",
+      "destination": "/typescript/react/usefiles"
+    },
+    {
+      "source": "/typescript/server/widget-components/mcpuseprovider",
+      "destination": "/typescript/react/mcpuseprovider"
+    },
+    {
+      "source": "/typescript/server/widget-components/widgetcontrols",
+      "destination": "/typescript/react/widgetcontrols"
+    },
+    {
+      "source": "/typescript/server/widget-components/modelcontext",
+      "destination": "/typescript/react/modelcontext"
+    },
+    {
+      "source": "/typescript/server/widget-components/themeprovider",
+      "destination": "/typescript/react/themeprovider"
+    },
+    {
+      "source": "/typescript/server/widget-components/image",
+      "destination": "/typescript/react/image"
+    },
+    {
+      "source": "/typescript/server/widget-components/errorboundary",
+      "destination": "/typescript/react/errorboundary"
     },
     {
       "source": "/typescript/development/security",
