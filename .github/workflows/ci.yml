@@ -18,7 +18,7 @@ permissions:
 #
 # 2. Python Tests (runs if libraries/python/** changed)
 #    ├─ python-lint: Ruff linting and formatting checks
-#    ├─ python-unit-tests: Matrix [Python 3.11, 3.12]
+#    ├─ python-unit-tests: Matrix [Python 3.11, 3.12, 3.13, 3.14]
 #    ├─ python-transport-tests: Matrix [stdio, sse, streamable_http]
 #    │  └─ python-transport-tests-report: Posts PR comment with test results table
 #    ├─ python-primitive-tests: Matrix [7 MCP primitives]
@@ -174,7 +174,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         deps: ["latest", "minimum"]
     defaults:
       run:
