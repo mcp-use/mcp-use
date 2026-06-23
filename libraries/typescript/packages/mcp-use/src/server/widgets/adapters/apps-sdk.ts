@@ -125,10 +125,13 @@ export class AppsSdkAdapter extends BaseProtocolAdapter {
     // publishing checklist) see no widget description even though one exists.
     if (!result._meta?.["openai/widgetDescription"]) {
       const fallbackDescription =
-        (typeof (definition as { description?: unknown }).description === "string"
+        (typeof (definition as { description?: unknown }).description ===
+        "string"
           ? ((definition as { description?: string }).description as string)
           : undefined) ??
-        ("metadata" in definition ? definition.metadata?.description : undefined);
+        ("metadata" in definition
+          ? definition.metadata?.description
+          : undefined);
       if (fallbackDescription) {
         result._meta = result._meta || {};
         result._meta["openai/widgetDescription"] = fallbackDescription;

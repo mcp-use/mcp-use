@@ -30,8 +30,6 @@ export const widgetMetadata: WidgetMetadata = {
     prefersBorder: false,
     invoking: "Loading product search results...",
     invoked: "Product search results loaded",
-    // Dedicated origin associated with the hosted widget (required for app submission).
-    domain: "https://mcp-use.com",
     csp: {
       // Widget-specific
       resourceDomains: ["https://cdn.openai.com"],
