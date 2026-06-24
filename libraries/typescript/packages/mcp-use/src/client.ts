@@ -528,11 +528,13 @@ export class MCPClient extends BaseMCPClient {
         command: string;
         args: string[];
         env?: Record<string, string>;
+        cwd?: string;
       };
       return new StdioConnector({
         command: stdioConfig.command,
         args: stdioConfig.args,
         env: stdioConfig.env,
+        cwd: stdioConfig.cwd,
         clientInfo: normalizeClientInfo(merged.clientInfo),
         onSampling: resolved.onSampling,
         onElicitation: resolved.onElicitation,
