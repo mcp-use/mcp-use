@@ -94,6 +94,7 @@ export interface StdioServerConfig extends BaseServerConfig {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  cwd?: string;
 }
 
 /**
