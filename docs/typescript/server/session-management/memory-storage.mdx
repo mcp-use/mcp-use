@@ -1,48 +1,77 @@
 ---
 title: "In-Memory Storage"
-description: "Using in-memory session storage for development and single-instance deployments"
+description: "Use in-memory session storage for single-instance TypeScript MCP servers."
 icon: memory-stick
 ---
 
+Use `InMemorySessionStore` when one server instance can own all session metadata and losing sessions on restart is acceptable. It stores session metadata in a JavaScript `Map`, so it has no external dependency and no persistence.
 
-`InMemorySessionStore` stores session metadata in the server's memory. This is the default storage provider when no custom `sessionStore` is provided.
+This guide focuses on when to use in-memory storage. Use the [Sessions API reference](/typescript/api-reference/server/sessions#inmemorysessionstore) for exact method behavior and the `SessionStore` contract.
 
-## Usage
+## Use it for simple single-instance servers
+
+In-memory storage is the production default when you do not pass a custom `sessionStore`. It is a good fit for small deployments, local prototypes, and services where clients can reconnect after a restart.
 
 ```typescript
-import { MCPServer, InMemorySessionStore } from 'mcp-use/server';
+import { MCPServer, InMemorySessionStore } from "mcp-use/server";
 
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  sessionStore: new InMemorySessionStore()  // Default, can be omitted
+  name: "single-instance-server",
+  version: "1.0.0",
+  sessionStore: new InMemorySessionStore(),
 });
+
+await server.listen(3000);
 ```
 
-## Characteristics
+You can omit `sessionStore` in production when in-memory storage is the behavior you want.
 
-### Advantages
+## Know what is stored
 
-- ✅ **Fast** - No I/O overhead, all operations are in-memory
-- ✅ **No dependencies** - Works out of the box, no Redis or database needed
-- ✅ **Simple** - Zero configuration required
-- ✅ **All features work** - Notifications, sampling, subscriptions all work on a single server
+Session storage keeps serializable session metadata, such as client capabilities, client info, protocol version, log level, and access timestamps. It does not persist active transports, stream controllers, or runtime objects.
 
-### Limitations
+In-memory storage means:
 
-- ❌ **Sessions lost on restart** - All session data is cleared when the server restarts
-- ❌ **Not distributed** - Cannot share sessions across multiple server instances
-- ❌ **Memory bound** - All sessions must fit in server memory
+- Sessions disappear when the process restarts.
+- Other server instances cannot read the same sessions.
 
-## When to Upgrade
+The default stream manager is also in-memory. That separate default means server-to-client workflows only reach clients connected to the same instance.
 
-Upgrade to [Redis Storage](/typescript/server/session-management/redis-storage) when you need:
-- Sessions to persist across server restarts
-- Multiple server instances behind a load balancer
-- Distributed notifications/sampling across servers
+## Choose another store when sessions must survive
 
-## Related Documentation
+Use a different store when your deployment needs persistence or distribution.
 
-- [Sessions API reference](/typescript/api-reference/server/sessions)
-- [File System Storage](/typescript/server/session-management/filesystem-storage)
-- [Redis Storage](/typescript/server/session-management/redis-storage)
+| Need | Use |
+| --- | --- |
+| Hot reload during local development | [File System Storage](/typescript/server/session-management/filesystem-storage) |
+| Load-balanced or distributed servers | [Redis Storage](/typescript/server/session-management/redis-storage) |
+| Durable metadata outside the process | Redis or a custom `SessionStore` |
+
+For distributed notifications, resource updates, or responses to server-to-client requests such as sampling and elicitation, a shared `sessionStore` is not enough. Configure a distributed `streamManager` as well.
+
+## Verify the behavior
+
+Use this store when these checks are acceptable:
+
+- Restarting the server creates fresh sessions.
+- A single process handles each connected client.
+- You do not need to route server-to-client messages across instances.
+
+If any check fails, choose file system storage for development persistence or Redis for distributed deployments.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="File System Storage" icon="folder" href="/typescript/server/session-management/filesystem-storage">
+    Keep sessions across hot reloads in local development.
+  </Card>
+  <Card title="Redis Storage" icon="/images/icons/redis.svg" href="/typescript/server/session-management/redis-storage">
+    Share session metadata and streams across server instances.
+  </Card>
+  <Card title="Sessions API reference" icon="terminal" href="/typescript/api-reference/server/sessions">
+    Look up session store methods, defaults, and contracts.
+  </Card>
+  <Card title="ServerConfig API reference" icon="server" href="/typescript/api-reference/server/server-config">
+    Look up `sessionStore` and `streamManager` configuration.
+  </Card>
+</CardGroup>

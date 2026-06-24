@@ -23,8 +23,8 @@ import {
 
 Pick a store and a stream manager based on your deployment:
 
-- Single instance, sessions can reset on restart: `InMemorySessionStore` + `InMemoryStreamManager` (the defaults).
-- Single instance with hot reload, sessions should survive a restart: `FileSystemSessionStore`.
+- Single instance, sessions can reset on restart: `InMemorySessionStore` + `InMemoryStreamManager` (the production defaults).
+- Single instance with hot reload, sessions should survive a restart: `FileSystemSessionStore` (the default when `NODE_ENV !== "production"`).
 - Distributed or load-balanced deployment: `RedisSessionStore` + `RedisStreamManager`.
 
 ## InMemorySessionStore

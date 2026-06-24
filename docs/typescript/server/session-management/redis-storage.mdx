@@ -1,96 +1,122 @@
 ---
 title: "Redis Storage"
-description: "Using Redis for persistent, distributed session storage with full MCP feature support"
+description: "Use Redis-backed session storage for distributed TypeScript MCP server deployments."
 icon: "/images/icons/redis.svg"
 ---
 
-Redis storage consists of two components:
+Use Redis when session metadata or server-to-client workflows must work across restarts, deploys, or multiple server instances. Redis gives you two pieces: `RedisSessionStore` for serializable session metadata and `RedisStreamManager` for routing active stream messages across instances.
 
-1. **`RedisSessionStore`** - Stores serializable session metadata (capabilities, client info, etc.)
-2. **`RedisStreamManager`** - Manages distributed notifications via Redis Pub/Sub
+This guide focuses on choosing and wiring Redis. Use the [Sessions API reference](/typescript/api-reference/server/sessions) for constructor options, defaults, method behavior, Redis command details, and stream-manager contracts.
 
-Together, they enable horizontal scaling with full MCP feature support.
+## Choose the Redis pieces you need
 
-## Architecture
+Use the session store alone when you only need session metadata persistence or ordinary request recovery across instances. Add the stream manager when active server-to-client delivery must cross instance boundaries.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant ServerA as Server A<br/>(has SSE connection)
-    participant RedisSessionStore as RedisSessionStore
-    participant RedisStreamManager as RedisStreamManager
-    participant Redis as Redis
-    participant ServerB as Server B<br/>(handles request)
-    
-    Note over Client,ServerA: 1. Client opens SSE connection
-    Client->>ServerA: GET /mcp<br/>Accept: text/event-stream
-    ServerA->>RedisStreamManager: Register SSE controller
-    RedisStreamManager->>Redis: SUBSCRIBE channel
-    
-    Note over Client,ServerB: 2. Load balancer routes HTTP request
-    Client->>ServerB: POST /mcp<br/>session-id: abc-123
-    ServerB->>RedisSessionStore: Get session metadata
-    RedisSessionStore->>Redis: GET session:abc-123
-    Redis-->>RedisSessionStore: Session data
-    RedisSessionStore-->>ServerB: Session metadata
-    
-    Note over ServerB,Client: 3. Server B needs to send notification
-    ServerB->>RedisStreamManager: Send notification
-    RedisStreamManager->>Redis: PUBLISH channel<br/>event data
-    Redis-->>RedisStreamManager: Message delivered
-    RedisStreamManager-->>ServerA: Receive via Pub/Sub
-    ServerA->>Client: Push via SSE<br/>event: notification
-```
+| Deployment need | Configure |
+| --- | --- |
+| Sessions survive restarts on one server | `RedisSessionStore` |
+| Load-balanced servers share session metadata | `RedisSessionStore` |
+| Notifications or resource updates must reach clients connected to another instance | `RedisSessionStore` plus `RedisStreamManager` |
+| Sampling, elicitation, or roots requests need client responses routed back across instances | `RedisSessionStore` plus `RedisStreamManager` |
 
-## Installation
+`RedisSessionStore` does not store active stream controllers. Use `RedisStreamManager` for distributed server-to-client delivery.
 
-Install the Redis client library:
+## Install Redis support
+
+Install a Redis client library and provide an already-connected client to mcp-use.
 
 ```bash
-yarn add redis
-# or
-yarn add ioredis
+npm install redis
 ```
 
-## Basic Setup
+The Redis classes are also compatible with clients that implement the minimal Redis client contract documented in the API reference. Distributed stream routing requires Pub/Sub support, including subscribe and unsubscribe operations on the Pub/Sub client.
 
-### Session Metadata Only
+## Persist session metadata
 
-For single-server deployments with persistent sessions:
+Use `RedisSessionStore` when reconnecting clients should keep session metadata after a restart or deploy.
 
 ```typescript
-import { MCPServer, RedisSessionStore } from 'mcp-use/server';
-import { createClient } from 'redis';
+import { MCPServer, RedisSessionStore } from "mcp-use/server";
+import { createClient } from "redis";
 
 const redis = createClient({
   url: process.env.REDIS_URL,
-  password: process.env.REDIS_PASSWORD,
 });
 
 await redis.connect();
 
-const sessionStore = new RedisSessionStore({
-  client: redis,
-  prefix: 'mcp:session:',     // Optional: custom key prefix
-  defaultTTL: 3600,            // Optional: 1 hour default TTL (in seconds)
-});
-
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  sessionStore
+  name: "redis-session-server",
+  version: "1.0.0",
+  sessionStore: new RedisSessionStore({
+    client: redis,
+  }),
 });
 
 await server.listen(3000);
 ```
 
+Use the API reference when you need custom key prefixes, TTLs, or shutdown behavior.
 
-## Full Example
+## Add distributed stream routing
 
-See the [Redis session management example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/session-management) for a complete, runnable server with session recovery and notifications across restarts.
+Use `RedisStreamManager` when an active client stream may live on one server while another server needs to send a notification or route the response to a server-to-client request. Pub/Sub needs a dedicated Redis connection, so create a duplicate client.
 
-## Related Documentation
+```typescript
+import {
+  MCPServer,
+  RedisSessionStore,
+  RedisStreamManager,
+} from "mcp-use/server";
+import { createClient } from "redis";
 
-- [Sessions API reference](/typescript/api-reference/server/sessions)
-- [In-Memory Storage](/typescript/server/session-management/memory-storage)
-- [File System Storage](/typescript/server/session-management/filesystem-storage)
+const redis = createClient({ url: process.env.REDIS_URL });
+const pubSubRedis = redis.duplicate();
+
+await redis.connect();
+await pubSubRedis.connect();
+
+const server = new MCPServer({
+  name: "distributed-session-server",
+  version: "1.0.0",
+  sessionStore: new RedisSessionStore({
+    client: redis,
+  }),
+  streamManager: new RedisStreamManager({
+    client: redis,
+    pubSubClient: pubSubRedis,
+  }),
+});
+
+await server.listen(3000);
+```
+
+Use separate Redis connections for normal commands and Pub/Sub. A client in subscriber mode cannot reliably publish or run ordinary commands.
+
+## Verify distributed behavior
+
+Before using Redis in production, verify these cases in an environment that resembles your deployment:
+
+- Restarting one server does not force clients to re-initialize.
+- A notification or resource update published by one instance reaches a client stream connected to another instance.
+- Sampling, elicitation, or other server-to-client request responses route back to the instance waiting for them.
+- Redis connection shutdown is handled when the server exits.
+
+If you only run one instance and can lose sessions on restart, [In-Memory Storage](/typescript/server/session-management/memory-storage) is simpler.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Redis session store API reference" icon="database" href="/typescript/api-reference/server/sessions#redissessionstore">
+    Look up Redis session store options and methods.
+  </Card>
+  <Card title="Redis stream manager API reference" icon="radio" href="/typescript/api-reference/server/sessions#redisstreammanager">
+    Look up distributed stream routing options and methods.
+  </Card>
+  <Card title="ServerConfig API reference" icon="server" href="/typescript/api-reference/server/server-config">
+    Look up `sessionStore` and `streamManager` fields.
+  </Card>
+  <Card title="Session management example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/session-management">
+    Compare your setup with a runnable Redis-backed example.
+  </Card>
+</CardGroup>
