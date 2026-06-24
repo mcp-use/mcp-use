@@ -18,6 +18,7 @@ export class StdioConnector extends BaseConnector {
   private readonly command: string;
   private readonly args: string[];
   private readonly env?: Record<string, string>;
+  private readonly cwd?: string;
   private readonly errlog: Writable;
   private readonly clientInfo: ClientInfo;
 
@@ -25,12 +26,15 @@ export class StdioConnector extends BaseConnector {
     command = "npx",
     args = [],
     env,
+    cwd,
     errlog = process.stderr,
     ...rest
   }: {
     command?: string;
     args?: string[];
     env?: Record<string, string>;
+    /** Working directory for the spawned process. */
+    cwd?: string;
     errlog?: Writable;
   } & StdioConnectorOptions = {}) {
     super(rest);
@@ -38,6 +42,7 @@ export class StdioConnector extends BaseConnector {
     this.command = command;
     this.args = args;
     this.env = env;
+    this.cwd = cwd;
     this.errlog = errlog;
     this.clientInfo = rest.clientInfo ?? {
       name: "stdio-connector",
@@ -74,6 +79,7 @@ export class StdioConnector extends BaseConnector {
         command: this.command,
         args: this.args,
         env: mergedEnv,
+        ...(this.cwd !== undefined ? { cwd: this.cwd } : {}),
       };
 
       // 2. Start the connection manager -> returns a live transport
