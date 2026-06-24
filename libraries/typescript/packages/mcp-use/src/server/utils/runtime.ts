@@ -79,16 +79,85 @@ export const fsHelpers = {
   },
 };
 
+/**
+ * Collapse `.`/`..` segments in a `/`-joined path. Pure and cross-runtime (no
+ * `node:path`, so it stays synchronous and works in Deno).
+ *
+ * ponytail: lexical-only normalization — no symlink/realpath resolution. This is
+ * defense-in-depth: a normalized *absolute* path can still point outside an
+ * intended base dir, so handlers serving request-derived paths MUST still reject
+ * traversal up front via `safeSubpath`/`safeSegment`. The real containment guard
+ * lives at the route handlers, not here.
+ */
+function normalizePosix(path: string): string {
+  const isAbsolute = path.startsWith("/");
+  const out: string[] = [];
+  for (const seg of path.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") {
+      if (out.length > 0 && out[out.length - 1] !== "..") out.pop();
+      else if (!isAbsolute) out.push("..");
+      // For absolute paths, a leading `..` that would escape root is dropped.
+    } else {
+      out.push(seg);
+    }
+  }
+  const joined = out.join("/");
+  if (isAbsolute) return "/" + joined;
+  return joined === "" ? "." : joined;
+}
+
+/**
+ * Validate a request-derived static-file subpath, rejecting path traversal.
+ *
+ * Returns the original `raw` value when safe (so the caller reads exactly what
+ * the runtime handed it), or `null` when the request must be refused. Both the
+ * raw and percent-decoded views are checked so encoded `..` (e.g. `%2e%2e`) is
+ * caught even on embeddings that don't pre-decode the path (e.g. mounting the
+ * Hono app under Express). Mainstream runtimes (Node/Deno/Bun/Workers) already
+ * collapse `..` when constructing the WHATWG Request, so this is defense-in-depth.
+ */
+export function safeSubpath(raw: string): string | null {
+  if (raw.includes("\0")) return null;
+  const views = [raw];
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded !== raw) views.push(decoded);
+  } catch {
+    // Malformed percent-encoding can't be a decoded traversal the OS resolves;
+    // fall through and validate the raw form only.
+  }
+  for (const view of views) {
+    const norm = view.replace(/\\/g, "/");
+    // Reject absolute paths (POSIX root, UNC `//`, or Windows drive `C:`).
+    if (norm.startsWith("/") || /^[A-Za-z]:/.test(norm)) return null;
+    if (norm.split("/").some((s) => s === ".." || s === ".")) return null;
+  }
+  return raw;
+}
+
+/**
+ * Like {@link safeSubpath} but for a single path segment (e.g. a `:widget` route
+ * param): additionally rejects path separators and empty input.
+ */
+export function safeSegment(raw: string): string | null {
+  const safe = safeSubpath(raw);
+  if (
+    safe === null ||
+    safe === "" ||
+    safe.includes("/") ||
+    safe.includes("\\")
+  ) {
+    return null;
+  }
+  return safe;
+}
+
 // Runtime-aware path helpers
 export const pathHelpers = {
   join(...paths: string[]): string {
-    if (isDeno) {
-      // Use simple path joining for Deno (web-standard approach)
-      return paths.join("/").replace(/\/+/g, "/");
-    }
-    // For Node, we need to use the sync version or cache the import
-    // We'll use a simple implementation that works for both
-    return paths.join("/").replace(/\/+/g, "/");
+    // Collapse `.`/`..` and redundant slashes. Cross-runtime; see normalizePosix.
+    return normalizePosix(paths.join("/"));
   },
 
   relative(from: string, to: string): string {
