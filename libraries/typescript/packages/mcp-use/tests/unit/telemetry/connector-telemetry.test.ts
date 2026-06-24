@@ -22,6 +22,28 @@ vi.mock("../../../src/telemetry/telemetry-node.js", () => ({
   },
 }));
 
+// These module-scope mocks are required by the "Integration tests" describe block.
+// vi.mock is always hoisted by Vitest regardless of nesting; keeping them here
+// avoids the "should be at the top-level" warning (and future error).
+vi.mock("posthog-node", () => ({
+  PostHog: class MockPostHog {
+    capture = vi.fn();
+    flush = vi.fn();
+    shutdown = vi.fn();
+  },
+}));
+
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn().mockReturnValue(false),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue("test-user-id"),
+}));
+
+vi.mock("node:os", () => ({
+  homedir: vi.fn().mockReturnValue("/mock/home"),
+}));
+
 describe("Connector Telemetry Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -229,30 +251,16 @@ describe("Connector Telemetry Integration", () => {
   });
 
   describe("Integration tests - actual connector connection", () => {
-    // Mock PostHog for integration tests
+    // mockCapture/mockFlush/mockShutdown are referenced by the module-scope
+    // vi.mock("posthog-node") factory below (Vitest hoists vi.mock calls).
     const mockCapture = vi.fn();
     const mockFlush = vi.fn();
     const mockShutdown = vi.fn();
 
     beforeEach(() => {
-      vi.mock("posthog-node", () => {
-        return {
-          PostHog: class MockPostHog {
-            capture = mockCapture;
-            flush = mockFlush;
-            shutdown = mockShutdown;
-          },
-        };
-      });
-      vi.mock("node:fs", () => ({
-        existsSync: vi.fn().mockReturnValue(false),
-        mkdirSync: vi.fn(),
-        writeFileSync: vi.fn(),
-        readFileSync: vi.fn().mockReturnValue("test-user-id"),
-      }));
-      vi.mock("node:os", () => ({
-        homedir: vi.fn().mockReturnValue("/mock/home"),
-      }));
+      // vi.mock factories have already been hoisted to module scope by Vitest.
+      // Only reset call history here so each test starts clean.
+      vi.clearAllMocks();
     });
 
     it("should track HttpConnector init when connect() is called", async () => {
