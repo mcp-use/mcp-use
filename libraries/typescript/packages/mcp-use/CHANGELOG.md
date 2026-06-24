@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.32.2-canary.8
+
+### Patch Changes
+
+- bf90128: exposed the cwd argument for stdio
+  - @mcp-use/cli@3.5.3-canary.8
+  - @mcp-use/inspector@10.0.2-canary.8
+
 ## 1.32.2-canary.7
 
 ### Patch Changes
