@@ -1,0 +1,454 @@
+---
+title: "MCPSession"
+description: "Call tools, read resources, and fetch prompts from TypeScript MCP sessions"
+icon: "cable"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/session.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/session.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/session.ts</a>
+</Callout>
+
+`MCPSession` represents one live connection to one MCP server. It wraps a connector and exposes high-level methods for lifecycle, tools, resources, prompts, completion, roots, notifications, and raw requests.
+
+Sessions are usually created with [`MCPClient.createSession()`](/typescript/api-reference/client/mcp-client#createsession).
+
+```ts
+import { MCPClient, type MCPSession } from "mcp-use";
+```
+
+```ts wrap
+const client = new MCPClient({
+  mcpServers: {
+    api: { url: "http://localhost:3000/mcp" },
+  },
+});
+
+const session = await client.createSession("api");
+const result = await session.callTool("search", { query: "mcp" });
+```
+
+## Constructor
+
+Creates a session around a connector. This is an advanced path; most applications should create sessions through `MCPClient`.
+
+**Parameters**
+><ParamField body="connector" type="BaseConnector" required="true">Connector that owns the transport and protocol client.</ParamField>
+><ParamField body="autoConnect" type="boolean" default="true">When `true`, `initialize()` connects before running the MCP initialize handshake.</ParamField>
+
+**Signature**
+```ts wrap
+constructor(connector: BaseConnector, autoConnect?: boolean)
+```
+
+## Lifecycle
+
+### connect
+
+Starts the underlying transport without running the MCP initialize handshake.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+connect(): Promise<void>
+```
+
+### initialize
+
+Runs the MCP initialize handshake. If `autoConnect` is `true` and the session is not connected, this method connects first.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Example**
+```ts wrap
+const session = await client.createSession("api", false);
+await session.connect();
+await session.initialize();
+```
+
+**Signature**
+```ts wrap
+initialize(): Promise<void>
+```
+
+### disconnect
+
+Closes the underlying transport and releases connection resources.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+disconnect(): Promise<void>
+```
+
+### isConnected
+
+Returns whether the underlying connector is connected.
+
+**Returns**
+><ResponseField name="returns" type="boolean" />
+
+**Signature**
+```ts wrap
+get isConnected(): boolean
+```
+
+## Tools
+
+### tools
+
+Returns the connector's cached tool list.
+
+**Returns**
+><ResponseField name="returns" type="Tool[]" />
+
+**Signature**
+```ts wrap
+get tools(): Tool[]
+```
+
+### listTools
+
+Fetches the current tool list from the server.
+
+**Parameters**
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<Tool[]>" />
+
+**Signature**
+```ts wrap
+listTools(options?: RequestOptions): Promise<Tool[]>
+```
+
+### callTool
+
+Calls a tool on the server.
+
+**Parameters**
+><ParamField body="name" type="string" required="true">Tool name.</ParamField>
+><ParamField body="args" type="Record<string, any>" default="{}">Tool arguments.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options, such as timeout and progress handling.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<CallToolResult>" />
+
+**Example**
+```ts wrap
+const result = await session.callTool("add", { a: 5, b: 3 });
+console.log(result.content);
+```
+
+**Signature**
+```ts wrap
+callTool(
+  name: string,
+  args?: Record<string, any>,
+  options?: RequestOptions
+): Promise<CallToolResult>
+```
+
+## Resources
+
+### listResources
+
+Lists resources from the server with optional pagination.
+
+**Parameters**
+><ParamField body="cursor" type="string | undefined" default="undefined">Pagination cursor returned by a previous response.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ListResourcesResult>" />
+
+**Signature**
+```ts wrap
+listResources(cursor?: string, options?: RequestOptions): Promise<ListResourcesResult>
+```
+
+### listAllResources
+
+Lists every resource from the server by following pagination.
+
+**Parameters**
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ListResourcesResult>" />
+
+**Signature**
+```ts wrap
+listAllResources(options?: RequestOptions): Promise<ListResourcesResult>
+```
+
+### listResourceTemplates
+
+Lists parameterized resource templates exposed by the server.
+
+**Parameters**
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ListResourceTemplatesResult>" />
+
+**Signature**
+```ts wrap
+listResourceTemplates(options?: RequestOptions): Promise<ListResourceTemplatesResult>
+```
+
+### readResource
+
+Reads a resource by URI.
+
+**Parameters**
+><ParamField body="uri" type="string" required="true">Resource URI.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ReadResourceResult>" />
+
+**Example**
+```ts wrap
+const resource = await session.readResource("file:///tmp/report.txt");
+console.log(resource.contents);
+```
+
+**Signature**
+```ts wrap
+readResource(uri: string, options?: RequestOptions): Promise<ReadResourceResult>
+```
+
+### subscribeToResource
+
+Subscribes to resource update notifications for a URI.
+
+**Parameters**
+><ParamField body="uri" type="string" required="true">Resource URI to subscribe to.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<SubscribeResult>" />
+
+**Signature**
+```ts wrap
+subscribeToResource(uri: string, options?: RequestOptions): Promise<SubscribeResult>
+```
+
+### unsubscribeFromResource
+
+Unsubscribes from resource update notifications for a URI.
+
+**Parameters**
+><ParamField body="uri" type="string" required="true">Resource URI to unsubscribe from.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<UnsubscribeResult>" />
+
+**Signature**
+```ts wrap
+unsubscribeFromResource(uri: string, options?: RequestOptions): Promise<UnsubscribeResult>
+```
+
+## Prompts and completion
+
+### listPrompts
+
+Lists prompt templates exposed by the server.
+
+**Returns**
+><ResponseField name="returns" type="Promise<ListPromptsResult>" />
+
+**Signature**
+```ts wrap
+listPrompts(): Promise<ListPromptsResult>
+```
+
+### getPrompt
+
+Fetches a prompt by name with arguments.
+
+**Parameters**
+><ParamField body="name" type="string" required="true">Prompt name.</ParamField>
+><ParamField body="args" type="Record<string, any>" required="true">Prompt arguments.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<GetPromptResult>" />
+
+**Signature**
+```ts wrap
+getPrompt(name: string, args: Record<string, any>): Promise<GetPromptResult>
+```
+
+### complete
+
+Requests completion suggestions for a prompt or resource template argument.
+
+**Parameters**
+><ParamField body="params" type="CompleteRequestParams" required="true">Completion request parameters.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<CompleteResult>" />
+
+**Example**
+```ts wrap
+const result = await session.complete({
+  ref: { type: "ref/prompt", name: "translate" },
+  argument: { name: "language", value: "py" },
+});
+```
+
+**Signature**
+```ts wrap
+complete(
+  params: CompleteRequestParams,
+  options?: RequestOptions
+): Promise<CompleteResult>
+```
+
+## Roots and notifications
+
+### setRoots
+
+Sets the roots advertised to the server and sends the corresponding notification.
+
+**Parameters**
+><ParamField body="roots" type="Root[]" required="true">Roots with `file://` URIs and optional names.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Example**
+```ts wrap
+await session.setRoots([
+  { uri: "file:///Users/alex/project", name: "Project" },
+]);
+```
+
+**Signature**
+```ts wrap
+setRoots(roots: Root[]): Promise<void>
+```
+
+### getRoots
+
+Returns the roots currently advertised to the server.
+
+**Returns**
+><ResponseField name="returns" type="Root[]" />
+
+**Signature**
+```ts wrap
+getRoots(): Root[]
+```
+
+### on
+
+Registers a session event handler. The current public event is `"notification"`.
+
+**Parameters**
+><ParamField body="event" type='"notification"' required="true">Event name.</ParamField>
+><ParamField body="handler" type="NotificationHandler" required="true">Handler called with each notification.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Example**
+```ts wrap
+session.on("notification", async (notification) => {
+  if (notification.method === "notifications/tools/list_changed") {
+    await session.listTools();
+  }
+});
+```
+
+**Signature**
+```ts wrap
+on(event: "notification", handler: NotificationHandler): void
+```
+
+## Server metadata
+
+### serverCapabilities
+
+Returns server capabilities from the initialize response.
+
+**Returns**
+><ResponseField name="returns" type="Record<string, unknown>" />
+
+**Signature**
+```ts wrap
+get serverCapabilities(): Record<string, unknown>
+```
+
+### serverInfo
+
+Returns server name and version from the initialize response, or `null` when unavailable.
+
+**Returns**
+><ResponseField name="returns" type="{ name: string; version?: string } | null" />
+
+**Signature**
+```ts wrap
+get serverInfo(): { name: string; version?: string } | null
+```
+
+## Raw requests
+
+### request
+
+Sends a raw JSON-RPC request through the connector. Use this for custom MCP methods when no helper exists.
+
+**Parameters**
+><ParamField body="method" type="string" required="true">MCP method name.</ParamField>
+><ParamField body="params" type="Record<string, any> | null" default="null">Request parameters.</ParamField>
+><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<unknown>" />
+
+**Signature**
+```ts wrap
+request(
+  method: string,
+  params?: Record<string, any> | null,
+  options?: RequestOptions
+): Promise<unknown>
+```
+
+## Types
+
+### Root
+
+Directory or file root advertised to a server.
+
+**Fields**
+><ResponseField name="uri" type="string">Root URI. Use `file://` URIs.</ResponseField>
+><ResponseField name="name" type="string">Optional display name.</ResponseField>
+
+### Tool
+
+Tool metadata returned by `listTools()` and the `tools` getter. This type is re-exported from the MCP SDK.
+
+### CallToolResult
+
+Result returned by `callTool()`. This type is re-exported from the MCP SDK.
+
+### Notification
+
+Server notification object passed to notification handlers. This type is re-exported from the MCP SDK.
+
+## Related
+
+- [`MCPClient`](/typescript/api-reference/client/mcp-client): create sessions and manage client configuration.
+- [Tools](/typescript/client/tools): guide to listing and calling tools.
+- [Resources](/typescript/client/resources): guide to reading resources.
+- [Prompts](/typescript/client/prompts): guide to listing and getting prompts.
+- [Notifications](/typescript/client/notifications): guide to notification handlers and roots.

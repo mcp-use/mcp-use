@@ -323,6 +323,14 @@
                   "typescript/api-reference/react/image",
                   "typescript/api-reference/react/modelcontext"
                 ]
+              },
+              {
+                "group": "Client",
+                "icon": "router",
+                "pages": [
+                  "typescript/api-reference/client/mcp-client",
+                  "typescript/api-reference/client/mcp-session"
+                ]
               }
             ]
           },
