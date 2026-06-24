@@ -156,6 +156,7 @@ export function ChatTab({
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
   // Track position of trigger for removal in textarea
   const triggerSpanRef = useRef<{ start: number; end: number } | null>(null);
+  const generatingTitleForSessionRef = useRef<string | null>(null);
 
   const toolInfos: ToolInfo[] = useMemo(
     () =>
@@ -184,7 +185,7 @@ export function ChatTab({
     clearConfig: globalClearConfig,
   } = useConfig({ mcpServerUrl: connection.url });
 
-  const { activeSessionId, sessions, updateSessionMessages, updateSessionLlmConfig } = useChatSessions();
+  const { activeSessionId, sessions, updateSessionMessages, updateSessionLlmConfig, updateSessionTitle } = useChatSessions();
   const activeSession = sessions.find(s => s.id === activeSessionId);
 
   // ── Hosted-mode / client-side override ──────────────────────────────────
@@ -284,6 +285,76 @@ export function ChatTab({
       updateSessionMessages(activeSessionId, messages);
     }
   }, [messages, activeSessionId, updateSessionMessages]);
+
+  // Auto-generate session title from the first user message.
+  // Fires when the session is still using the default "Untitled Session" placeholder
+  // and the user has sent at least one message.
+  useEffect(() => {
+    if (!llmConfig) return;
+    if (!activeSessionId || !activeSession) return;
+    if (activeSession.title !== "Untitled Session") return; // already named, skip
+    if (generatingTitleForSessionRef.current === activeSessionId) return; // already generating
+
+    const firstUserMessage = messages.find((m) => m.role === "user");
+    if (!firstUserMessage) return;
+
+    // Extract plain text from the message (handles string, array, or parts)
+    let text = "";
+    if (typeof firstUserMessage.content === "string") {
+      text = firstUserMessage.content.trim();
+    } else if (Array.isArray(firstUserMessage.content)) {
+      text = firstUserMessage.content
+        .map((item: any) => (typeof item === "string" ? item : (item.text ?? "")))
+        .join(" ")
+        .trim();
+    } else if (firstUserMessage.parts && firstUserMessage.parts.length > 0) {
+      text = (firstUserMessage.parts as any[])
+        .filter((p: any) => p.type === "text" && p.text)
+        .map((p: any) => p.text)
+        .join(" ")
+        .trim();
+    }
+
+    if (!text) return;
+
+    // Collapse newlines/extra whitespace
+    const collapsed = text.replace(/\s+/g, " ");
+
+    generatingTitleForSessionRef.current = activeSessionId;
+    import("../../llm/providers")
+      .then(({ chat }) => {
+        return chat({
+          config: {
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+            apiKey: llmConfig.apiKey,
+            temperature: 0.3,
+            baseUrl: llmConfig.baseUrl,
+          },
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a title generator. Generate a very short, concise, and descriptive title (max 5 words) for the following chat message. Do not use quotes, punctuation or prefixes like 'Title:'.",
+            },
+            { role: "user", content: collapsed },
+          ],
+        });
+      })
+      .then((result) => {
+        if (result.text) {
+          updateSessionTitle(activeSessionId, result.text.trim());
+        }
+      })
+      .catch((err) => {
+        console.error("[ChatTab] Failed to generate title with LLM", err);
+        // If it failed, reset the tracker so it can try again on the next message
+        // (e.g. if the user realizes their API key was wrong and fixes it)
+        if (generatingTitleForSessionRef.current === activeSessionId) {
+          generatingTitleForSessionRef.current = null;
+        }
+      });
+  }, [messages, activeSessionId, activeSession, updateSessionTitle, llmConfig]);
 
   const saveLLMConfig = useCallback(() => {
     // Call the global config saver first

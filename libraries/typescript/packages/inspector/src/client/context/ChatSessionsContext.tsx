@@ -3,10 +3,11 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
   useCallback,
   ReactNode,
 } from "react";
-import { get, set, del, clear, createStore } from "idb-keyval";
+import { get, set, del, createStore } from "idb-keyval";
 import { toast } from "sonner";
 import type { Message, LLMConfig } from "../components/chat/types";
 
@@ -32,6 +33,8 @@ export interface ChatSessionsContextType {
   deleteSession: (id: string) => Promise<void>;
   updateSessionMessages: (id: string, messages: Message[]) => Promise<void>;
   updateSessionLlmConfig: (id: string, config: LLMConfig | null) => Promise<void>;
+  /** Renames a session. Used by auto-title logic after the first user message. */
+  updateSessionTitle: (id: string, title: string) => Promise<void>;
   clearAllSessions: () => Promise<void>;
   isMessagesLoading: boolean;
   storageEstimate: StorageEstimate | null;
@@ -45,9 +48,19 @@ const ChatSessionsContext = createContext<ChatSessionsContextType | undefined>(
 const sessionsStore = createStore("mcp-inspector-sessions-db", "sessions");
 const messagesStore = createStore("mcp-inspector-messages-db", "messages");
 
-export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
-  children,
-}) => {
+/**
+ * Derives a safe storage key from a serverId (or "no-server" fallback).
+ * We prefix with "sessions-" to namespace per-server session lists.
+ */
+function sessionListKey(serverId: string | null): string {
+  return `sessions-${serverId ?? "no-server"}`;
+}
+
+export const ChatSessionsProvider: React.FC<{
+  children: ReactNode;
+  /** The active MCP server ID. Sessions are scoped to this value. */
+  serverId: string | null;
+}> = ({ children, serverId }) => {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionIdState] = useState<string | null>(
     null
@@ -55,6 +68,11 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
   const [activeMessages, setActiveMessages] = useState<Message[]>([]);
   const [isMessagesLoading, setIsMessagesLoading] = useState(false);
   const [storageEstimate, setStorageEstimate] = useState<StorageEstimate | null>(null);
+
+  // Track the current serverId synchronously via a ref so that async callbacks
+  // can guard against stale writes when the server switches mid-flight.
+  const serverIdRef = useRef(serverId);
+  serverIdRef.current = serverId;
 
   const updateStorageEstimate = useCallback(async () => {
     if (navigator.storage && navigator.storage.estimate) {
@@ -70,21 +88,28 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
-  // Load all sessions metadata on mount
+  // Load sessions for the current serverId whenever it changes.
+  // This scopes the session list to the active MCP server.
   useEffect(() => {
     updateStorageEstimate();
     const interval = setInterval(updateStorageEstimate, 60000); // Every minute
 
+    // Reset state immediately so we don't show stale sessions from the previous server
+    setSessions([]);
+    setActiveSessionIdState(null);
+    setActiveMessages([]);
+
     const loadSessions = async () => {
       try {
-        const storedSessions = await get<ChatSession[]>("all-sessions", sessionsStore);
+        const key = sessionListKey(serverId);
+        const storedSessions = await get<ChatSession[]>(key, sessionsStore);
         if (storedSessions && storedSessions.length > 0) {
           // Sort by updated descending
           const sorted = storedSessions.sort((a, b) => b.updatedAt - a.updatedAt);
           setSessions(sorted);
           setActiveSessionIdState(sorted[0].id);
         } else {
-          // If no sessions exist, we can start with an empty state
+          // No sessions yet for this server — start with empty state
           setSessions([]);
         }
       } catch (error) {
@@ -94,7 +119,7 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
     loadSessions();
 
     return () => clearInterval(interval);
-  }, [updateStorageEstimate]);
+  }, [serverId, updateStorageEstimate]);
 
   // Whenever activeSessionId changes, load its messages
   useEffect(() => {
@@ -129,14 +154,17 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, [activeSessionId]);
 
-  // Helper to persist sessions array
-  const persistSessions = async (newSessions: ChatSession[]) => {
+  // Helper to persist sessions array scoped to the current server.
+  // Guarded: skips write if serverId has changed since the callback was created.
+  const persistSessions = async (newSessions: ChatSession[], forServerId: string | null) => {
+    if (serverIdRef.current !== forServerId) return; // stale — another server is now active
     setSessions(newSessions);
-    await set("all-sessions", newSessions, sessionsStore);
+    await set(sessionListKey(forServerId), newSessions, sessionsStore);
   };
 
   const createSession = useCallback(
-    async (title = "New Chat", initialMessages: Message[] = [], config: LLMConfig | null = null) => {
+    async (title = "Untitled Session", initialMessages: Message[] = [], config: LLMConfig | null = null) => {
+      const capturedServerId = serverIdRef.current;
       const id = crypto.randomUUID();
       const newSession: ChatSession = {
         id,
@@ -147,9 +175,10 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
       };
 
       const newSessions = [newSession, ...sessions];
-      await persistSessions(newSessions);
+      await persistSessions(newSessions, capturedServerId);
       await set(id, initialMessages, messagesStore);
 
+      setActiveMessages(initialMessages);
       setActiveSessionIdState(id);
       return id;
     },
@@ -158,12 +187,14 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
 
   const deleteSession = useCallback(
     async (id: string) => {
+      const capturedServerId = serverIdRef.current;
       const newSessions = sessions.filter((s) => s.id !== id);
-      await persistSessions(newSessions);
+      await persistSessions(newSessions, capturedServerId);
       await del(id, messagesStore);
       updateStorageEstimate();
 
       if (activeSessionId === id) {
+        setActiveMessages([]); // Clear synchronously to prevent flash of old messages
         if (newSessions.length > 0) {
           setActiveSessionIdState(newSessions[0].id);
         } else {
@@ -171,12 +202,12 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
           const newId = crypto.randomUUID();
           const newSession: ChatSession = {
             id: newId,
-            title: "New Chat",
+            title: "Untitled Session",
             llmConfig: null,
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
-          await persistSessions([newSession]);
+          await persistSessions([newSession], capturedServerId);
           await set(newId, [], messagesStore);
           setActiveSessionIdState(newId);
         }
@@ -187,6 +218,10 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
 
   const updateSessionMessages = useCallback(
     async (id: string, messages: Message[]) => {
+      const capturedServerId = serverIdRef.current;
+      // Guard: do not write if the server has changed since this callback was scheduled
+      if (capturedServerId !== serverId) return;
+
       setSessions((prevSessions) => {
         const newSessions = prevSessions.map((s) => {
           if (s.id === id) {
@@ -206,8 +241,8 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
           }
         });
 
-        // Also save the session list
-        set("all-sessions", newSessions, sessionsStore).catch(console.error);
+        // Also save the session list scoped to the current server
+        set(sessionListKey(capturedServerId), newSessions, sessionsStore).catch(console.error);
 
         return newSessions;
       });
@@ -216,49 +251,75 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
         setActiveMessages(messages);
       }
     },
-    [activeSessionId]
+    [serverId, activeSessionId, updateStorageEstimate]
   );
 
   const updateSessionLlmConfig = useCallback(
     async (id: string, config: LLMConfig | null) => {
+      const capturedServerId = serverIdRef.current;
+      if (capturedServerId !== serverId) return; // stale
       setSessions((prev) => {
         const newSessions = prev.map((s) =>
           s.id === id ? { ...s, llmConfig: config, updatedAt: Date.now() } : s
         );
-        set("all-sessions", newSessions, sessionsStore).catch(console.error);
+        set(sessionListKey(capturedServerId), newSessions, sessionsStore).catch(console.error);
         return newSessions;
       });
     },
-    []
+    [serverId]
+  );
+
+  const updateSessionTitle = useCallback(
+    async (id: string, title: string) => {
+      const capturedServerId = serverIdRef.current;
+      if (capturedServerId !== serverId) return; // stale
+      setSessions((prev) => {
+        const newSessions = prev.map((s) =>
+          s.id === id ? { ...s, title, updatedAt: Date.now() } : s
+        );
+        set(sessionListKey(capturedServerId), newSessions, sessionsStore).catch(console.error);
+        return newSessions;
+      });
+    },
+    [serverId]
   );
 
 
-
   const clearAllSessions = useCallback(async () => {
-    await clear(sessionsStore);
-    await clear(messagesStore);
+    // Only clear sessions belonging to the current server
+    const key = sessionListKey(serverId);
+    const existingSessions = await get<ChatSession[]>(key, sessionsStore);
+    if (existingSessions) {
+      // Delete each session's messages from the messages store
+      await Promise.all(existingSessions.map((s) => del(s.id, messagesStore)));
+    }
+    // Remove this server's session list entry
+    await del(key, sessionsStore);
 
     // Auto-create a fresh new chat after clearing
     const newId = crypto.randomUUID();
     const newSession: ChatSession = {
       id: newId,
-      title: "New Chat",
+      title: "Untitled Session",
       llmConfig: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    await set("all-sessions", [newSession], sessionsStore);
+    await set(key, [newSession], sessionsStore);
     await set(newId, [], messagesStore);
 
     setSessions([newSession]);
     setActiveSessionIdState(newId);
     setActiveMessages([]);
     updateStorageEstimate();
-  }, [updateStorageEstimate]);
+  }, [serverId, updateStorageEstimate]);
 
   const setActiveSessionId = useCallback((id: string | null) => {
+    if (id !== activeSessionId) {
+      setActiveMessages([]); // Clear synchronously so UI doesn't render old messages
+    }
     setActiveSessionIdState(id);
-  }, []);
+  }, [activeSessionId]);
 
   return (
     <ChatSessionsContext.Provider
@@ -271,6 +332,7 @@ export const ChatSessionsProvider: React.FC<{ children: ReactNode }> = ({
         deleteSession,
         updateSessionMessages,
         updateSessionLlmConfig,
+        updateSessionTitle,
         clearAllSessions,
         isMessagesLoading,
         storageEstimate,

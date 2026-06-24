@@ -35,6 +35,26 @@ function InspectorTabSync({
 }
 
 /**
+ * Bridge component that lives inside InspectorProvider so it can read
+ * selectedServerId and pass it to ChatSessionsProvider.
+ *
+ * IMPORTANT: The `key` prop on ChatSessionsProvider is intentional and critical.
+ * When `selectedServerId` changes, React completely unmounts the old provider
+ * and mounts a fresh one — all useState values reset to their initial values
+ * instantly. This prevents any stale messages from a previous server leaking
+ * into the new server's view, even for the brief render cycle before useEffect
+ * cleanup runs.
+ */
+function ChatSessionsBridge({ children }: { children: React.ReactNode }) {
+  const { selectedServerId } = useInspector();
+  return (
+    <ChatSessionsProvider key={selectedServerId ?? 'no-server'} serverId={selectedServerId}>
+      {children}
+    </ChatSessionsProvider>
+  );
+}
+
+/**
  * Root React component that configures application providers, routing, and toast-based handlers for sampling and elicitation requests in the inspector UI.
  *
  * Creates a LocalStorageProvider for saved connections when not running in embedded mode (determined via the `embedded=true` URL parameter), initializes the MCP client with RPC logging and lifecycle callbacks, and renders the inspector routes (including the OAuth callback and main dashboard) inside theme and inspector contexts. Sampling and elicitation requests are surfaced as persistent toasts that allow viewing details, approving/denying, or opening supplied URLs.
@@ -206,26 +226,26 @@ function App() {
             );
           }}
         >
-          <ChatSessionsProvider>
-            <InspectorProvider>
+          <InspectorProvider>
               <InspectorTabSync activeTabRef={activeTabRef} />
-              <Router basename="/inspector">
-                <Routes>
-                  <Route path="/oauth/callback" element={<OAuthCallback />} />
-                  <Route path="/preview/:view" element={<ViewPreview />} />
-                  <Route
-                    path="/"
-                    element={
-                      <Layout>
-                        <InspectorDashboard />
-                      </Layout>
-                    }
-                  />
-                </Routes>
-              </Router>
-              <Toaster position="top-center" />
+              <ChatSessionsBridge>
+                <Router basename="/inspector">
+                  <Routes>
+                    <Route path="/oauth/callback" element={<OAuthCallback />} />
+                    <Route path="/preview/:view" element={<ViewPreview />} />
+                    <Route
+                      path="/"
+                      element={
+                        <Layout>
+                          <InspectorDashboard />
+                        </Layout>
+                      }
+                    />
+                  </Routes>
+                </Router>
+                <Toaster position="top-center" />
+              </ChatSessionsBridge>
             </InspectorProvider>
-          </ChatSessionsProvider>
         </McpClientProvider>
       </WidgetDebugProvider>
     </ThemeProvider>
