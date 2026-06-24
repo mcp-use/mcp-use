@@ -138,7 +138,7 @@
                     ]
                   },
                   {
-                    "group": "Security",
+                    "group": "Authorization",
                     "icon": "shield",
                     "pages": [
                       "typescript/server/authentication/index",

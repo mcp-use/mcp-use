@@ -1,47 +1,68 @@
 ---
 title: "Custom Provider"
-description: "Use any OAuth provider that supports Dynamic Client Registration with your MCP server"
+description: "Use a Dynamic Client Registration OAuth provider with a TypeScript MCP server."
 icon: "code"
 ---
 
-Use `oauthCustomProvider` when your identity provider supports Dynamic Client Registration (DCR) and advertises a `registration_endpoint` in its OAuth metadata. Clients will discover the endpoints and register themselves directly with the upstream; your server only verifies the resulting tokens.
+Use `oauthCustomProvider` when your identity provider supports Dynamic Client Registration but mcp-use does not have a built-in provider for it. The MCP client registers with the upstream provider, and your MCP server verifies the resulting access token.
 
-<Note>
-  If your provider **doesn't** support DCR (Google, GitHub, Okta, Azure AD, or any provider where you register an app in a dashboard and receive a fixed `clientId`/`clientSecret`), use [`oauthProxy`](/typescript/server/authentication/providers/oauth-proxy) instead.
-</Note>
+If your provider only supports a pre-registered application with a fixed `clientId` and `clientSecret`, use [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) instead.
 
-## Quick start
+This guide shows the shape of a custom provider. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthcustomprovider) for exact required fields, optional fields, defaults, and return contracts.
+
+## Confirm the provider supports DCR
+
+Before using `oauthCustomProvider`, confirm the provider's OAuth metadata advertises the full flow that MCP clients will use. Server-side `authEndpoint` and `tokenEndpoint` config does not repair incomplete upstream metadata.
+
+```text
+GET https://auth.example.com/.well-known/oauth-authorization-server
+```
+
+At minimum, look for authorization, token, and registration endpoints:
+
+```json
+{
+  "authorization_endpoint": "https://auth.example.com/oauth/authorize",
+  "token_endpoint": "https://auth.example.com/oauth/token",
+  "registration_endpoint": "https://auth.example.com/oauth/register"
+}
+```
+
+Without a registration endpoint, MCP clients cannot register themselves upstream.
+
+## Configure token verification
+
+Your custom provider must verify access tokens and return the verified payload.
 
 ```typescript
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { MCPServer, oauthCustomProvider } from "mcp-use/server";
-import { jwtVerify, createRemoteJWKSet } from "jose";
 
-const JWKS = createRemoteJWKSet(
-  new URL("https://auth.example.com/.well-known/jwks.json"),
-);
+const issuer = "https://auth.example.com";
+const jwks = createRemoteJWKSet(new URL(`${issuer}/.well-known/jwks.json`));
 
 const server = new MCPServer({
-  name: "my-server",
+  name: "custom-auth-server",
   version: "1.0.0",
   oauth: oauthCustomProvider({
-    issuer: "https://auth.example.com",
-    authEndpoint: "https://auth.example.com/oauth/authorize",
-    tokenEndpoint: "https://auth.example.com/oauth/token",
-
-    async verifyToken(token: string) {
-      const result = await jwtVerify(token, JWKS, {
-        issuer: "https://auth.example.com",
-        audience: "your-audience",
+    issuer,
+    authEndpoint: `${issuer}/oauth/authorize`,
+    tokenEndpoint: `${issuer}/oauth/token`,
+    jwksUrl: `${issuer}/.well-known/jwks.json`,
+    async verifyToken(token) {
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer,
+        audience: "https://your-api.example.com",
       });
-      return { payload: result.payload as Record<string, unknown> };
-    },
 
+      return { payload: payload as Record<string, unknown> };
+    },
     getUserInfo(payload) {
       return {
         userId: payload.sub as string,
         email: payload.email as string | undefined,
         name: payload.name as string | undefined,
-        roles: (payload.roles as string[]) || [],
+        roles: (payload.roles as string[]) ?? [],
       };
     },
   }),
@@ -50,78 +71,53 @@ const server = new MCPServer({
 await server.listen(3000);
 ```
 
-## All configuration options
+The provider metadata at the issuer must advertise the registration endpoint. Do not skip signature, issuer, or audience checks for deployed servers.
+
+## Normalize user claims
+
+Use `getUserInfo` to map provider-specific claims into fields your tools can read consistently.
 
 ```typescript
-oauthCustomProvider({
-  // Required: OAuth endpoints
-  issuer: "https://auth.example.com",
-  authEndpoint: "https://auth.example.com/oauth/authorize",
-  tokenEndpoint: "https://auth.example.com/oauth/token",
-
-  // Required: Token verification, must return { payload: Record<string, unknown> }
-  async verifyToken(token: string) {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: "https://auth.example.com",
-      audience: "your-audience",
-    });
-    return { payload: payload as Record<string, unknown> };
-  },
-
-  // Optional: JWKS endpoint advertised in discovery metadata
-  jwksUrl: "https://auth.example.com/.well-known/jwks.json",
-
-  // Optional: User info endpoint URL
-  userInfoEndpoint: "https://auth.example.com/userinfo",
-
-  // Optional: Override advertised scopes
-  scopesSupported: ["openid", "profile", "email"],
-
-  // Optional: Override advertised grant types
-  // Default: ['authorization_code', 'refresh_token']
-  grantTypesSupported: ["authorization_code", "refresh_token"],
-
-  // Optional: Audience for JWT verification
-  audience: "your-api-identifier",
-
-  // Optional: Custom user info extraction
-  getUserInfo(payload) {
-    return {
-      userId: payload.sub as string,
-      email: payload.email as string | undefined,
-      name: payload.name as string | undefined,
-    };
-  },
-});
+getUserInfo(payload) {
+  return {
+    userId: payload.sub as string,
+    email: payload.email as string | undefined,
+    organizationId: payload["https://example.com/org_id"],
+    permissions: (payload.permissions as string[]) ?? [],
+  };
+}
 ```
 
-## Accessing user info in tools
+After this mapping, tools can use `ctx.auth.user.organizationId` without parsing raw claims. Top-level `ctx.auth.permissions` is populated from the raw verified payload's `permissions` claim; if you only return permissions from `getUserInfo`, read them from `ctx.auth.user.permissions`.
 
-```typescript
-import { object } from "mcp-use/server";
+## Verify the setup
 
-server.tool(
-  {
-    name: "get-user-info",
-    description: "Get authenticated user info",
-  },
-  async (_args, ctx) =>
-    object({
-      userId: ctx.auth.user.userId,
-      email: ctx.auth.user.email,
-      name: ctx.auth.user.name,
-      scopes: ctx.auth.scopes,
-    }),
-);
+Run the server and connect with an OAuth-capable MCP client.
+
+```bash
+npm run dev
 ```
 
-## Resources
+Confirm these cases:
 
-- [jose library](https://github.com/panva/jose): JWT verification
-- [OAuth 2.1 Specification](https://oauth.net/2.1/)
-- [OIDC Specification](https://openid.net/specs/openid-connect-core-1_0.html)
+- The client discovers OAuth metadata with a registration endpoint.
+- The client registers with the upstream provider.
+- Invalid tokens are rejected.
+- Authenticated tool calls include normalized fields in `ctx.auth`.
 
-## Next Steps
+## Next steps
 
-- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy): For providers without DCR support
-- [User Context](/typescript/server/authentication/user-context): Access user information in tools
+<CardGroup cols={2}>
+  <Card title="OAuth Proxy" icon="shuffle" href="/typescript/server/authentication/providers/oauth-proxy">
+    Use a provider that does not support Dynamic Client Registration.
+  </Card>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Use normalized user claims inside tools.
+  </Card>
+  <Card title="Custom provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthcustomprovider">
+    Look up exact custom provider options and contracts.
+  </Card>
+  <Card title="jose" icon="key" href="https://github.com/panva/jose">
+    Verify JWTs against a remote JWKS.
+  </Card>
+</CardGroup>

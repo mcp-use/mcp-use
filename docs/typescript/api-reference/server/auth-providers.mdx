@@ -14,7 +14,7 @@ These factory functions build the `oauth` value you pass to [`new MCPServer({ ..
 There are two integration modes:
 
 - **DCR-direct providers** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`). The MCP server proxies metadata discovery to the upstream authorization server and verifies tokens. Clients communicate directly with the upstream for authorize, token, and register.
-- **Proxy mode** (`oauthProxy`) for providers without Dynamic Client Registration support (Google, GitHub, pre-registered Auth0 web apps, enterprise IdPs). The server mediates the flow: it exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream tokens through without minting its own.
+- **Proxy mode** (`oauthProxy`) for providers without Dynamic Client Registration support (Google, GitHub, Okta, Microsoft Entra ID, and enterprise IdPs). The server mediates the flow: it exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream tokens through without minting its own.
 
 All factories import from `mcp-use/server`.
 
@@ -324,7 +324,7 @@ Create an OAuth proxy for providers without Dynamic Client Registration.
 import { oauthProxy, jwksVerifier } from "mcp-use/server"
 ```
 
-Builds an `OAuthProxy` for providers that lack DCR support (Google OAuth, GitHub OAuth, pre-registered Auth0 web apps, enterprise IdPs). The proxy exposes a `/register` endpoint that returns the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, verifies tokens via the supplied `verifyToken` function, and passes upstream tokens through without minting its own. `scopes` defaults to `["openid", "email", "profile"]` and `grantTypes` defaults to `["authorization_code", "refresh_token"]`. When `getUserInfo` is omitted, a default extractor reads the standard OIDC claims (`sub`, `email`, `name`, `picture`) and splits the `scope` claim into `scopes`.
+Builds an `OAuthProxy` for providers that lack DCR support (Google OAuth, GitHub OAuth, Okta, Microsoft Entra ID, and enterprise IdPs). The proxy exposes a `/register` endpoint that returns the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, verifies tokens via the supplied `verifyToken` function, and passes upstream tokens through without minting its own. `scopes` defaults to `["openid", "email", "profile"]` and `grantTypes` defaults to `["authorization_code", "refresh_token"]`. When `getUserInfo` is omitted, a default extractor reads the standard OIDC claims (`sub`, `email`, `name`, `picture`) and splits the `scope` claim into `scopes`.
 
 Throws `Error` if any of `authEndpoint`, `tokenEndpoint`, `issuer`, `clientId`, or `verifyToken` is missing. The verifyToken error message points you to `jwksVerifier()` for JWT/JWKS providers.
 
@@ -346,27 +346,25 @@ function oauthProxy(config: OAuthProxyConfig): OAuthProxy
 ```ts wrap
 import { MCPServer, oauthProxy, jwksVerifier, object, error } from "mcp-use/server"
 
-const domain = process.env.AUTH0_DOMAIN
-const clientId = process.env.AUTH0_CLIENT_ID
-const clientSecret = process.env.AUTH0_CLIENT_SECRET
-const audience = process.env.AUTH0_AUDIENCE ?? ""
+const issuer = process.env.OKTA_ISSUER!
+const clientId = process.env.OKTA_CLIENT_ID!
+const clientSecret = process.env.OKTA_CLIENT_SECRET
 
 const server = new MCPServer({
-  name: "auth0-proxy-example",
+  name: "okta-proxy-example",
   version: "1.0.0",
-  description: "MCP server with Auth0 OAuth proxy authentication",
+  description: "MCP server with Okta OAuth proxy authentication",
   oauth: oauthProxy({
-    authEndpoint: `https://${domain}/authorize`,
-    tokenEndpoint: `https://${domain}/oauth/token`,
-    issuer: `https://${domain}/`,
+    authEndpoint: `${issuer}/v1/authorize`,
+    tokenEndpoint: `${issuer}/v1/token`,
+    issuer,
     clientId,
     clientSecret,
     scopes: ["openid", "email", "profile"],
-    extraAuthorizeParams: { audience },
     verifyToken: jwksVerifier({
-      jwksUrl: `https://${domain}/.well-known/jwks.json`,
-      issuer: `https://${domain}/`,
-      audience,
+      jwksUrl: `${issuer}/v1/keys`,
+      issuer,
+      audience: clientId,
     }),
   }),
 })

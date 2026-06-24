@@ -1,224 +1,138 @@
 ---
 title: "Auth0 Provider"
-description: "Configure Auth0 OAuth 2.1 authentication for your MCP server"
+description: "Configure Auth0 Dynamic Client Registration authentication for a TypeScript MCP server."
 icon: "/images/icons/auth0.svg"
 ---
 
-Auth0 supports two integration modes depending on whether you have access to Auth0's Dynamic Client Registration (DCR) feature.
+Use the Auth0 provider when Auth0 is your OAuth authorization server. MCP clients register directly with Auth0 through Dynamic Client Registration, and your MCP server verifies Auth0 access tokens on incoming MCP requests.
 
-<Tabs>
-  <Tab title="DCR (Built-in)">
-    Auth0's built-in DCR feature is currently in **Early Access**. MCP clients register and authenticate directly with Auth0
-    
-    <Note>
-      To use the built-in Auth0 provider, you need to join Auth0's Early Access program. See the [Auth0 MCP Authorization Guide](https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server) for details on how to get access.
-    </Note>
+This guide covers the Auth0 setup path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthauth0provider) for exact `oauthAuth0Provider()` options, environment variable fallbacks, defaults, and errors.
 
-    ## Auth0 Setup
+## Configure Auth0
 
-    ### 1. Configure your tenant
+In the [Auth0 Dashboard](https://manage.auth0.com), configure the tenant for MCP clients.
 
-    In the [Auth0 Dashboard](https://manage.auth0.com):
+1. Go to **Settings > Advanced** and enable **Resource Parameter Compatibility Profile**.
+2. Promote the login connections that MCP clients may use to domain-level connections.
+3. Create an API for your MCP server.
 
-    1. Go to **Settings → Advanced** and enable **Resource Parameter Compatibility Profile**
-    2. Promote connections to domain-level so third-party clients (like MCP Inspector) can use them:
-       ```bash
-       # List connections to get their IDs
-       auth0 api get connections
+Use the Auth0 CLI to promote a connection when needed:
 
-       # Promote a connection (e.g. username-password database)
-       auth0 api patch connections/YOUR_CONNECTION_ID --data '{"is_domain_connection": true}'
-       ```
-
-    ### 2. Create an API
-
-    ```bash
-    auth0 api post resource-servers --data '{
-      "identifier": "https://your-api.example.com",
-      "name": "MCP Tools API",
-      "signing_alg": "RS256",
-      "token_dialect": "rfc9068_profile_authz",
-      "enforce_policies": true,
-      "scopes": [
-        {"value": "read:data", "description": "Read data"}
-      ]
-    }'
-    ```
-
-    The `rfc9068_profile_authz` token dialect includes the `permissions` claim in access tokens, enabling scope-based access control.
-
-    ### 3. Environment variables
-
-    ```bash
-    MCP_USE_OAUTH_AUTH0_DOMAIN=your-tenant.auth0.com
-    MCP_USE_OAUTH_AUTH0_AUDIENCE=https://your-api.example.com
-    ```
-
-    ## Configuration
-
-    ```typescript
-    import { MCPServer, oauthAuth0Provider } from 'mcp-use/server'
-
-    // Zero-config: reads MCP_USE_OAUTH_AUTH0_DOMAIN and MCP_USE_OAUTH_AUTH0_AUDIENCE
-    const server = new MCPServer({
-      name: 'my-server',
-      version: '1.0.0',
-      oauth: oauthAuth0Provider()
-    })
-
-    await server.listen(3000)
-    ```
-
-    Or pass config explicitly:
-
-    ```typescript
-    oauth: oauthAuth0Provider({
-      domain: 'your-tenant.auth0.com',
-      audience: 'https://your-api.example.com',
-
-      // JWT signature verification is on by default. Leave it enabled.
-      // Do NOT disable it: an unverified token can be forged.
-
-      // Override advertised scopes
-      scopesSupported: ['openid', 'profile', 'email', 'offline_access'],
-    })
-    ```
-
-  </Tab>
-  <Tab title="OAuth Proxy">
-    Use `oauthProxy` with a standard Auth0 **Regular Web Application** (no Early Access required). Your server mediates the token exchange using pre-registered credentials.
-
-    ## Auth0 Setup
-
-    ### 1. Create a Regular Web Application
-
-    In the [Auth0 Dashboard](https://manage.auth0.com):
-
-    1. Go to **Applications → Create Application**
-    2. Choose **Regular Web Application**
-    3. Under **Allowed Callback URLs**, add your **MCP server's** callback URL:
-       ```text
-       http://localhost:3000/oauth/callback
-       ```
-       The server brokers the OAuth callback for every MCP client (Claude, ChatGPT, the inspector, ...), so this is the only URL you register. Individual clients never need their own redirect URIs added here. In production, use your deployed server's domain, e.g. `https://my-server.example.com/oauth/callback`.
-    4. Copy the **Client ID** and **Client Secret**
-
-    ### 2. Create an API
-
-    This gives you JWT access tokens (required, opaque tokens can't be verified locally):
-
-    1. Go to **APIs → Create API**
-    2. Set an identifier, e.g. `https://my-mcp-api/`
-    3. Leave signing algorithm as RS256
-
-    ### 3. Environment variables
-
-    ```bash
-    AUTH0_DOMAIN=your-tenant.us.auth0.com
-    AUTH0_CLIENT_ID=<from Regular Web App>
-    AUTH0_CLIENT_SECRET=<from Regular Web App>
-    AUTH0_AUDIENCE=https://my-mcp-api/
-    ```
-
-    ## Configuration
-
-    ```typescript
-    import { MCPServer, oauthProxy, jwksVerifier } from 'mcp-use/server'
-
-    const domain = process.env.AUTH0_DOMAIN!
-    const audience = process.env.AUTH0_AUDIENCE ?? ''
-
-    const server = new MCPServer({
-      name: 'my-server',
-      version: '1.0.0',
-      oauth: oauthProxy({
-        authEndpoint: `https://${domain}/authorize`,
-        tokenEndpoint: `https://${domain}/oauth/token`,
-        issuer: `https://${domain}/`,
-        clientId: process.env.AUTH0_CLIENT_ID!,
-        clientSecret: process.env.AUTH0_CLIENT_SECRET,
-        scopes: ['openid', 'email', 'profile'],
-        extraAuthorizeParams: { audience },
-        verifyToken: jwksVerifier({
-          jwksUrl: `https://${domain}/.well-known/jwks.json`,
-          issuer: `https://${domain}/`,
-          audience,
-        }),
-      }),
-    })
-
-    await server.listen(3000)
-    ```
-
-    The OAuth flow in proxy mode:
-    ```text
-    Client → /register         → receives pre-registered client_id
-    Client → /authorize        → MCP server redirects to Auth0 /authorize
-    Auth0  → /oauth/callback   → MCP server receives the authorization code
-    Server → client redirect   → forwards the code to the client's own callback
-    Client → /token            → MCP server injects credentials, forwards to Auth0
-    Auth0  → access_token (JWT)→ returned to client
-    Client → /mcp/...          → MCP server verifies JWT via Auth0 JWKS
-    ```
-
-  </Tab>
-</Tabs>
-
-## Accessing user info in tools
-
-```typescript
-import { object } from 'mcp-use/server'
-
-server.tool(
-  {
-    name: 'get-user-info',
-    description: 'Get authenticated user info',
-  },
-  async (_args, ctx) =>
-    object({
-      userId: ctx.auth.user.userId,
-      email: ctx.auth.user.email,
-      name: ctx.auth.user.name,
-      nickname: ctx.auth.user.nickname,
-      picture: ctx.auth.user.picture,
-      permissions: ctx.auth.permissions,
-      scopes: ctx.auth.scopes,
-    })
-)
+```bash
+auth0 api get connections
+auth0 api patch connections/YOUR_CONNECTION_ID --data '{"is_domain_connection": true}'
 ```
 
-## Permissions
+Create an API with an identifier that you will use as the provider audience:
 
-Auth0 includes permissions directly in the access token when you use the `rfc9068_profile_authz` token dialect. Check them in tool callbacks:
+```bash
+auth0 api post resource-servers --data '{
+  "identifier": "https://your-api.example.com",
+  "name": "MCP Tools API",
+  "signing_alg": "RS256",
+  "token_dialect": "rfc9068_profile_authz",
+  "enforce_policies": true,
+  "scopes": [
+    { "value": "read:data", "description": "Read data" }
+  ]
+}'
+```
+
+Use the `rfc9068_profile_authz` token dialect when your tools need Auth0 permissions in access tokens.
+
+## Set environment variables
+
+```bash
+MCP_USE_OAUTH_AUTH0_DOMAIN=your-tenant.auth0.com
+MCP_USE_OAUTH_AUTH0_AUDIENCE=https://your-api.example.com
+```
+
+The domain is your Auth0 tenant domain. The audience must match the API identifier you created.
+
+## Configure the MCP server
 
 ```typescript
-import { z } from 'zod'
-import { text, error } from 'mcp-use/server'
+import { MCPServer, oauthAuth0Provider } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "auth0-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider(),
+});
+
+await server.listen(3000);
+```
+
+You can pass `domain` and `audience` directly instead of using environment variables:
+
+```typescript
+oauth: oauthAuth0Provider({
+  domain: "your-tenant.auth0.com",
+  audience: "https://your-api.example.com",
+});
+```
+
+## Use Auth0 permissions in tools
+
+Auth0 permissions are available on `ctx.auth.permissions` when they are present in the access token.
+
+```typescript
+import { error, text } from "mcp-use/server";
+import { z } from "zod";
 
 server.tool(
   {
-    name: 'delete-document',
-    description: 'Delete a document (requires delete:documents)',
-    schema: { documentId: z.string() },
+    name: "delete_document",
+    description: "Delete a document when the caller has Auth0 permission.",
+    schema: z.object({
+      documentId: z.string(),
+    }),
   },
   async ({ documentId }, ctx) => {
-    if (!ctx.auth.permissions?.includes('delete:documents')) {
-      return error('Forbidden: delete:documents permission required')
+    if (!ctx.auth) {
+      return error("Unauthorized");
     }
 
-    await db.documents.delete({ id: documentId })
-    return text('Document deleted')
-  }
-)
+    if (!ctx.auth.permissions.includes("delete:documents")) {
+      return error("Forbidden: delete:documents permission required");
+    }
+
+    await db.documents.delete({ id: documentId });
+    return text("Document deleted.");
+  },
+);
 ```
 
-## Resources
+Use [User Context](/typescript/server/authentication/user-context) for broader access-control patterns.
 
-- [Runnable mcp-use + Auth0 DCR example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0)
-- [Runnable mcp-use + Auth0 proxy example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0-proxy)
-- [Auth0 MCP Authorization Guide](https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server)
-- [Auth0 Documentation](https://auth0.com/docs)
+## Verify the setup
 
-## Next Steps
+Run the server and connect with an OAuth-capable MCP client.
 
-- [User Context](/typescript/server/authentication/user-context): Access user information in tools
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers your server's OAuth metadata.
+- The client registers with Auth0 and completes login.
+- Authenticated tool calls include `ctx.auth`.
+- Tool calls without a valid bearer token are rejected.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runnable Auth0 example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0">
+    Compare your setup with a working mcp-use Auth0 server.
+  </Card>
+  <Card title="Auth0 MCP Authorization Guide" icon="book-open" href="https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server">
+    Review Auth0's MCP authorization setup.
+  </Card>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Read Auth0 user and permission data inside tools.
+  </Card>
+  <Card title="Auth0 provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthauth0provider">
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>
