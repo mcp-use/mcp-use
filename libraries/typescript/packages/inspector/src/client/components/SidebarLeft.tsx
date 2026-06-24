@@ -1,5 +1,5 @@
 import { Button } from "@/client/components/ui/button";
-import { Plus, Trash2, MessageSquare, Check, X, Database } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Check, X } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useChatSessions, type ChatSession } from "../context/ChatSessionsContext";
 import { useState } from "react";
@@ -11,24 +11,8 @@ export function SidebarLeft() {
     setActiveSessionId,
     createSession,
     deleteSession,
-    clearAllSessions,
-    storageEstimate
+    clearAllSessions
   } = useChatSessions();
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  const usagePercentage = storageEstimate && storageEstimate.quota > 0
-    ? (storageEstimate.usage / storageEstimate.quota) * 100
-    : 0;
-
-  // Warn if > 80% quota or > 500MB (since 500MB of JSON text is huge for this app)
-  const isWarning = usagePercentage > 80 || (storageEstimate?.usage || 0) > 500 * 1024 * 1024;
 
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
 
@@ -66,7 +50,7 @@ export function SidebarLeft() {
   return (
     <aside className="w-64 h-full flex flex-col bg-white dark:bg-[#000000] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm shrink-0 overflow-hidden">
       {/* New Sessions Button */}
-      <div className="p-4 pb-2">
+      <div className="p-4 pb-2.5 border-b border-zinc-200 dark:border-zinc-800">
         <Button
           variant="outline"
           className="w-full justify-between bg-transparent border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-800"
@@ -94,65 +78,39 @@ export function SidebarLeft() {
       </div>
 
       {/* Footer / Clear All */}
-      {(sessions.length > 0 || (storageEstimate && storageEstimate.usage > 0)) && (
+      {sessions.length > 0 && (
         <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 flex flex-col gap-2">
-          {storageEstimate && storageEstimate.usage > 0 && (
-            <div className="px-3 pb-1 pt-1">
-              <div className="flex justify-between items-center text-[10px] text-muted-foreground mb-1.5">
-                <span className="flex items-center gap-1">
-                  <Database className="size-3" /> Storage
-                </span>
-                <span className={cn(isWarning && "text-amber-500 font-medium")}>
-                  {formatBytes(storageEstimate.usage)}
-                </span>
+          {isConfirmingClear ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground px-1">Delete all chat history?</p>
+              <div className="flex gap-1.5">
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-xs text-red-500 px-2"
+                  onClick={() => { clearAllSessions(); setIsConfirmingClear(false); }}
+                >
+                  <Check className="size-3 mr-1" />
+                  Yes, clear
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="flex-1 text-xs text-muted-foreground px-2"
+                  onClick={() => setIsConfirmingClear(false)}
+                >
+                  <X className="size-3 mr-1" />
+                  Cancel
+                </Button>
               </div>
-              <div className="h-1 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className={cn("h-full bg-zinc-300 dark:bg-zinc-600 transition-all duration-500", isWarning && "bg-amber-500")}
-                  style={{ width: `${Math.min(usagePercentage, 100)}%` }}
-                />
-              </div>
-              {isWarning && (
-                <p className="text-[10px] text-amber-500 mt-1.5 leading-tight text-center">
-                  Storage is large. Consider clearing old chats.
-                </p>
-              )}
             </div>
-          )}
-
-          {sessions.length > 0 && (
-            isConfirmingClear ? (
-              <div className="space-y-1.5">
-                <p className="text-xs text-muted-foreground px-1">Delete all chat history?</p>
-                <div className="flex gap-1.5">
-                  <Button
-                    variant="ghost"
-                    className="flex-1 text-xs text-red-500 px-2"
-                    onClick={() => { clearAllSessions(); setIsConfirmingClear(false); }}
-                  >
-                    <Check className="size-3 mr-1" />
-                    Yes, clear
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="flex-1 text-xs text-muted-foreground px-2"
-                    onClick={() => setIsConfirmingClear(false)}
-                  >
-                    <X className="size-3 mr-1" />
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                variant="ghost"
-                className="w-full text-muted-foreground text-xs justify-start px-3"
-                onClick={() => setIsConfirmingClear(true)}
-              >
-                <Trash2 className="size-3.5 mr-2" />
-                Clear All Chats
-              </Button>
-            )
+          ) : (
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground text-xs justify-start px-3"
+              onClick={() => setIsConfirmingClear(true)}
+            >
+              <Trash2 className="size-3.5 mr-2" />
+              Clear All Chats
+            </Button>
           )}
         </div>
       )}

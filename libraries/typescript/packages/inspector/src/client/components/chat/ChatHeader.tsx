@@ -90,9 +90,9 @@ export function ChatHeader({
   onExportChat,
 }: ChatHeaderProps) {
   return (
-    <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
-      <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4">
-        {!hideTitle && <h3 className="text-xl sm:text-3xl font-base">Chat</h3>}
+    <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 gap-2 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center gap-2 rounded-full p-1.5 px-2 sm:px-3">
+        {!hideTitle && <h3 className="text-lg sm:text-xl font-medium">Chat</h3>}
         {llmConfig && (!hideConfigButton || freeTierInfo) && (
           <Tooltip>
             <TooltipTrigger asChild>
