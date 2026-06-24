@@ -1,0 +1,75 @@
+---
+title: "Inspector chat components"
+description: "Client-side React components exported by the Inspector package."
+icon: "messages-square"
+---
+
+The Inspector exports chat UI components from `@mcp-use/inspector/client` for applications that want to embed the Inspector chat experience in their own React UI.
+
+Use `ChatTab` when you want the full chat surface. Use lower-level components such as `MessageList` only when you need to own the surrounding layout.
+
+## `ChatTab`
+
+`ChatTab` renders the Inspector chat UI for one connected MCP server.
+
+```tsx
+import { ChatTab } from "@mcp-use/inspector/client";
+
+<ChatTab
+  connection={connection}
+  isConnected={isConnected}
+  prompts={prompts}
+  serverId={serverId}
+  callPrompt={callPrompt}
+  readResource={readResource}
+  hideTitle
+  hideModelBadge
+  hideServerUrl
+  clearButtonLabel="Start over"
+  clearButtonHideShortcut
+  clearButtonVariant="ghost"
+/>;
+```
+
+### Props
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `connection` | `unknown` | Active MCP connection object used by the chat UI. |
+| `isConnected` | `boolean` | Whether the MCP server is connected. |
+| `prompts` | `unknown[]` | Prompts available to the chat UI. |
+| `serverId` | `string` | Stable server identifier for chat state and widget rendering. |
+| `callPrompt` | `function` | Function used to execute an MCP prompt. |
+| `readResource` | `function` | Function used to read an MCP resource. |
+| `hideTitle` | `boolean` | Hides the chat header title. |
+| `hideModelBadge` | `boolean` | Hides the selected model badge in the landing state. |
+| `hideServerUrl` | `boolean` | Hides the MCP server URL shown in the landing state. |
+| `clearButtonLabel` | `string` | Custom label for the clear or new-chat button. |
+| `clearButtonHideIcon` | `boolean` | Hides the clear or new-chat button icon. |
+| `clearButtonHideShortcut` | `boolean` | Hides the keyboard shortcut hint on the clear or new-chat button. |
+| `clearButtonVariant` | `"default" \| "secondary" \| "ghost" \| "outline"` | Visual variant for the clear or new-chat button. |
+| `hideToolSelector` | `boolean` | Hides the tool selector in the chat input. |
+| `streamProtocol` | `"sse" \| "data-stream"` | Streaming response protocol. Defaults to Inspector SSE behavior. |
+| `credentials` | `RequestCredentials` | Fetch credentials used by chat streaming requests. |
+| `extraHeaders` | `Record<string, string>` | Additional headers sent on every streaming `POST`. |
+| `body` | `(messages) => unknown` | Custom streaming request body builder. |
+
+## Lower-level components
+
+Use lower-level exports when `ChatTab` owns too much UI for your application.
+
+```tsx
+import { MessageList } from "@mcp-use/inspector/client";
+
+<MessageList
+  messages={messages}
+  isLoading={isLoading}
+  serverId={connection.url}
+  serverBaseUrl={connection.url}
+  tools={connection.tools}
+  readResource={readResource}
+  sendMessage={(text) => sendMessage(text, [])}
+/>;
+```
+
+When rendering widgets inside messages, pass `serverBaseUrl` from the MCP connection URL so widget resources resolve against the correct server origin.
