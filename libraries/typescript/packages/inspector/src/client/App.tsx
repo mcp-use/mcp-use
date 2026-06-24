@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+import { ChatSessionsProvider } from "./context/ChatSessionsContext";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -31,6 +32,26 @@ function InspectorTabSync({
     activeTabRef.current = activeTab;
   }, [activeTab, activeTabRef]);
   return null;
+}
+
+/**
+ * Bridge component that lives inside InspectorProvider so it can read
+ * selectedServerId and pass it to ChatSessionsProvider.
+ *
+ * IMPORTANT: The `key` prop on ChatSessionsProvider is intentional and critical.
+ * When `selectedServerId` changes, React completely unmounts the old provider
+ * and mounts a fresh one — all useState values reset to their initial values
+ * instantly. This prevents any stale messages from a previous server leaking
+ * into the new server's view, even for the brief render cycle before useEffect
+ * cleanup runs.
+ */
+function ChatSessionsBridge({ children }: { children: React.ReactNode }) {
+  const { selectedServerId } = useInspector();
+  return (
+    <ChatSessionsProvider key={selectedServerId ?? 'no-server'} serverId={selectedServerId}>
+      {children}
+    </ChatSessionsProvider>
+  );
 }
 
 /**
@@ -206,23 +227,25 @@ function App() {
           }}
         >
           <InspectorProvider>
-            <InspectorTabSync activeTabRef={activeTabRef} />
-            <Router basename="/inspector">
-              <Routes>
-                <Route path="/oauth/callback" element={<OAuthCallback />} />
-                <Route path="/preview/:view" element={<ViewPreview />} />
-                <Route
-                  path="/"
-                  element={
-                    <Layout>
-                      <InspectorDashboard />
-                    </Layout>
-                  }
-                />
-              </Routes>
-            </Router>
-            <Toaster position="top-center" />
-          </InspectorProvider>
+              <InspectorTabSync activeTabRef={activeTabRef} />
+              <ChatSessionsBridge>
+                <Router basename="/inspector">
+                  <Routes>
+                    <Route path="/oauth/callback" element={<OAuthCallback />} />
+                    <Route path="/preview/:view" element={<ViewPreview />} />
+                    <Route
+                      path="/"
+                      element={
+                        <Layout>
+                          <InspectorDashboard />
+                        </Layout>
+                      }
+                    />
+                  </Routes>
+                </Router>
+                <Toaster position="top-center" />
+              </ChatSessionsBridge>
+            </InspectorProvider>
         </McpClientProvider>
       </WidgetDebugProvider>
     </ThemeProvider>

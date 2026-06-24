@@ -26,6 +26,7 @@ interface UseChatMessagesClientSideProps {
   readResource?: (uri: string) => Promise<any>;
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   disabledTools?: Set<string>;
+  initialMessages?: Message[];
 }
 
 const SYSTEM_PROMPT =
@@ -38,8 +39,9 @@ export function useChatMessagesClientSide({
   readResource,
   widgetModelContexts,
   disabledTools,
+  initialMessages,
 }: UseChatMessagesClientSideProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);

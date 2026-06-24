@@ -440,7 +440,7 @@ function TunnelBadge({
               : undefined
         }
         className={cn(
-          "flex items-center gap-2 h-9 px-3 border rounded-full transition-colors",
+          "flex items-center gap-2 h-9 px-4 border rounded-full transition-colors",
           canStart && !loadingDev
             ? "bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-800 hover:bg-violet-100 dark:hover:bg-violet-900/50 cursor-pointer"
             : "bg-violet-50/60 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800 cursor-not-allowed opacity-70"
@@ -619,7 +619,7 @@ export function LayoutHeader({
   };
 
   return (
-    <header className="w-full mx-auto">
+    <header className="w-full mx-auto px-2 sm:px-4 pt-4 pb-3 flex-shrink-0">
       {/* Mobile Layout */}
       <div className="flex lg:hidden flex-col gap-3">
         <div className="flex items-center justify-between w-full">
