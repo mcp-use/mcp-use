@@ -20,7 +20,7 @@ We will use **mcp-use TypeScript** to create a **zoo MCP server** that has two t
 - Deploy the MCP server to Cloud Run
 - Secure your server's endpoint by requiring authentication for all requests, ensuring only authorized clients and agents can communicate with it
 - Connect to your secure MCP server endpoint from Gemini CLI
-- Build ChatGPT Apps with interactive widgets
+- Build MCP Apps widgets for interactive results
 
 ## 2. Project Setup
 
@@ -278,13 +278,13 @@ await server.listen(port);
 
    The `create-mcp-use-app` template already includes the necessary imports and server setup. We've replaced the example code with our zoo server implementation.
 
-## 6. (Optional) Building ChatGPT Apps with Your MCP Server
+## 6. (Optional) Add an MCP Apps widget
 
-One of the powerful features of mcp-use is its built-in support for building **ChatGPT Apps** with interactive widgets. This allows you to create rich, interactive user interfaces that go beyond simple text responses.
+You can add an MCP Apps widget when the deployed server should return an interactive UI instead of only text or JSON.
 
-### What are ChatGPT Apps?
+### What are MCP Apps?
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces using the **OpenAI Apps SDK**. Widgets can:
+MCP Apps are interactive widgets returned by MCP tools. Widgets can:
 - Display data in tables, carousels, or custom layouts
 - Allow users to filter, sort, or manipulate results
 - Persist state across conversations
@@ -411,7 +411,7 @@ With mcp-use widgets, you get:
 - **Tool Calls**: Widgets can call other MCP tools directly
 - **Hot Reload**: Changes reflect immediately during development
 
-For more information on building ChatGPT Apps, see the [Building ChatGPT Apps Guide](/guides/chatgpt-apps-flow).
+For the main widget workflow, see [Build widgets](/typescript/server/build-widgets). For ChatGPT compatibility behavior, see [Apps SDK compatibility](/typescript/server/apps-sdk-compatibility).
 
 Your code is complete! It is time to deploy the MCP server to Cloud Run.
 
@@ -733,7 +733,7 @@ Congratulations! You have successfully deployed and connected to a secure remote
 - ✅ Created a production-ready MCP server with TypeScript
 - ✅ Deployed it securely to Google Cloud Run with authentication
 - ✅ Connected to it from Gemini CLI
-- ✅ Added interactive ChatGPT Apps widgets
+- ✅ Added interactive MCP Apps widgets
 - ✅ Learned how to use MCP prompts for faster workflows
 
 ### Continue Learning
@@ -742,7 +742,7 @@ This lab demonstrates the fundamentals of deploying MCP servers. You can extend 
 
 - Adding more tools and resources
 - Integrating with databases or external APIs
-- Building more complex ChatGPT Apps widgets
+- Building more complex MCP Apps widgets
 - Adding authentication and authorization
 - Scaling your server for high traffic
 

@@ -1,12 +1,12 @@
 ---
 title: "Content Security Policy"
-description: "Configure CSP for MCP Apps and ChatGPT Apps SDK widgets"
+description: "Configure the domains that MCP Apps widgets can load, call, and embed."
 icon: "shield"
 ---
 
 Content Security Policy (CSP) controls which domains your widgets can fetch from, load scripts/styles from, and embed. Widgets run in sandboxed iframes, so CSP must explicitly allow any external resources.
 
-## Automatic Configuration
+## Configure the server origin
 
 When `baseUrl` is set (via `MCPServer` constructor or `MCP_URL` environment variable), mcp-use automatically configures CSP:
 
@@ -26,11 +26,9 @@ This ensures:
 
 The server origin is auto-injected into each widget's `connectDomains`, `resourceDomains`, and `baseUriDomains`, so you don't need to add it manually.
 
-## Per-Widget Configuration
+## Add domains for one widget
 
 For widgets that need additional domains (APIs, CDNs, etc.), configure CSP in your widget metadata.
-
-### MCP Apps (all compatible clients, ChatGPT, Claude etc..)
 
 For file-based widgets, declare CSP with camelCase keys in `metadata.csp` on your exported `widgetMetadata`:
 
@@ -50,46 +48,19 @@ export const widgetMetadata: WidgetMetadata = {
     csp: {
       connectDomains: ["https://api.weather.com"],
       resourceDomains: ["https://cdn.weather.com"],
-      baseUriDomains: ["https://myserver.com"],
       frameDomains: ["https://trusted-embed.com"],
-      redirectDomains: ["https://oauth.provider.com"],
     },
   },
 };
 ```
 
-### Apps SDK Format (ChatGPT only, DEPRECATED)
-
-For legacy ChatGPT-only widgets, declare CSP with snake_case keys under `appsSdkMetadata["openai/widgetCSP"]`:
-
-```typescript
-export const appsSdkMetadata = {
-  "openai/widgetCSP": {
-    connect_domains: ["https://api.weather.com"],
-    resource_domains: ["https://cdn.weather.com"],
-    frame_domains: ["https://trusted-embed.com"],
-    redirect_domains: ["https://oauth.provider.com"],
-  },
-};
-```
-
-### Field Reference
-
-| MCP Apps (camelCase) | Apps SDK (snake_case) | Description |
-| -------------------- | --------------------- | ----------- |
-| `connectDomains` | `connect_domains` | Domains for fetch, XHR, WebSocket |
-| `resourceDomains` | `resource_domains` | Domains for scripts, styles, images |
-| `baseUriDomains` | `base_uri_domains` | Domains for base URI (MCP Apps) |
-| `frameDomains` | `frame_domains` | Domains for iframe embeds |
-| `redirectDomains` | `redirect_domains` | Domains for redirects (ChatGPT-specific) |
-| `scriptDirectives` | `script_directives` | Custom script CSP directives, not all clients support this (e.g. ChatGPT) |
-| `styleDirectives` | `style_directives` | Custom style CSP directives |
-
 <Note>
-Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains (`*.oaistatic.com`, etc.) are also added. For MCP Apps clients, only the domains you declare are used.
+Your CSP domains are merged with your server's base URL automatically. For ChatGPT, OpenAI's required domains are also added. Use [Apps SDK compatibility](./apps-sdk-compatibility) for ChatGPT-specific host extensions.
 </Note>
 
-## Environment Variables
+## Add domains for every widget
+
+Use `CSP_URLS` when every widget needs the same extra domains.
 
 ```env
 # Base URL: auto-included in widget CSP
@@ -102,13 +73,13 @@ CSP_URLS=https://api.example.com,https://cdn.example.com
 - **MCP_URL**: Base URL for widget assets and public files. Also used by the server to configure CSP.
 - **CSP_URLS**: (Optional) Additional domains to whitelist. Supports comma-separated list. Required for static deployments where widget assets are served from different domains.
 
-## Static Deployments
+## Static deployments
 
-When widgets are served from static storage (e.g., Supabase Storage) while the MCP server runs elsewhere, set:
+When widgets are served from static storage while the MCP server runs elsewhere, configure both origins:
 
 - **MCP_URL**: Where widget assets are stored
 - **MCP_SERVER_URL**: Where the MCP server runs (for API calls)
-- **CSP_URLS**: Domains for storage and API access (e.g., `https://YOUR_PROJECT.supabase.co`)
+- **CSP_URLS**: Domains for storage and API access
 
 See [Supabase deployment](./deployment/supabase) for a complete setup.
 
@@ -116,7 +87,7 @@ See [Supabase deployment](./deployment/supabase) for a complete setup.
 **Alternative**: Instead of the global `CSP_URLS` environment variable, configure CSP per-widget in `metadata.csp`
 </Tip>
 
-## Inspector Debugging
+## Verify CSP
 
 The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 
@@ -127,12 +98,8 @@ The mcp-use Inspector provides a **CSP Mode Toggle** for testing:
 CSP violations are logged in the console. Use Widget-Declared mode to catch CSP issues before production deployment.
 </Warning>
 
-See [Debugging ChatGPT Apps](/inspector/debugging-chatgpt-apps) for details.
-
-
 ## Next Steps
 
-- [MCP Apps](./mcp-apps): Unified metadata format for both protocols
-- [ChatGPT Apps SDK](./mcp-apps): Widget metadata and registration
+- [MCP Apps](./mcp-apps): Widget overview and routing
+- [Apps SDK compatibility](./apps-sdk-compatibility): ChatGPT compatibility and host extensions
 - [Supabase Deployment](./deployment/supabase): Static deployment with CSP
-- [Debugging Widgets](/inspector/debugging-chatgpt-apps): Test CSP in the Inspector

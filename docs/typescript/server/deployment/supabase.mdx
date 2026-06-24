@@ -337,7 +337,7 @@ supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-r
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
 
-**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/mcp-apps#protocol-specific-metadata) for examples.
+**Alternative**: You can also configure CSP per widget with `widgetMetadata.metadata.csp` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) for examples.
 </Note>
 
 ### 9. Deploy the Function

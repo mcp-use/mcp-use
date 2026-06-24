@@ -190,8 +190,11 @@
                 "pages": [
                   "typescript/server/mcp-apps",
                   "typescript/server/creating-mcp-apps-server",
-                  "typescript/server/content-security-policy",
-                  "guides/chatgpt-apps-flow"
+                  "typescript/server/build-widgets",
+                  "typescript/server/model-context",
+                  "typescript/server/interactivity",
+                  "typescript/server/apps-sdk-compatibility",
+                  "typescript/server/content-security-policy"
                 ]
               },
               {
@@ -761,6 +764,10 @@
     {
       "source": "/typescript/server/mcp-ui-resources",
       "destination": "/typescript/server/mcp-apps"
+    },
+    {
+      "source": "/guides/chatgpt-apps-flow",
+      "destination": "/typescript/server/apps-sdk-compatibility"
     },
     {
       "source": "/typescript/server/comparison-with-other-implementations",
