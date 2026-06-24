@@ -1,0 +1,400 @@
+---
+title: "Authentication helpers"
+description: "Authentication helpers for guarding MCP server tools and routes API Documentation"
+icon: "shield"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/oauth/index.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/oauth/index.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/oauth/index.ts</a>
+</Callout>
+
+These helpers read the authentication context that the OAuth bearer middleware attaches to each request, and gate tools or custom routes by OAuth scope or permission. They are standalone functions plus the related types they accept and return. They all import from `mcp-use/server`.
+
+When an OAuth provider or proxy is configured on the server (the `oauth` option of [MCPServer](/typescript/api-reference/server/mcp-server)), the bearer middleware verifies the token, builds an `AuthInfo` object, and attaches it to the request. Inside a tool callback the same object is also exposed directly as `ctx.auth`. The functions below operate on the Hono `Context`, so they work both in middleware and in tool callbacks that receive the request context.
+
+```ts
+import {
+  getAuth,
+  hasScope,
+  hasAnyScope,
+  requireScope,
+  requireAnyScope,
+  jwksVerifier,
+} from "mcp-use/server";
+import type {
+  AuthInfo,
+  UserInfo,
+  VerifyToken,
+  JwksVerifierConfig,
+  OAuthProvider,
+} from "mcp-use/server";
+```
+
+## Functions
+
+### getAuth
+
+Reads the authentication info the bearer middleware stored on the request and returns it as an `AuthInfo`.
+
+```ts
+import { getAuth } from "mcp-use/server";
+```
+
+Reads the authentication info that the bearer middleware stored on the request and returns it as an `AuthInfo` object. Works in both middleware and tool callbacks (the tool `requestContext` is a Hono `Context`).
+
+The value is read from the context variable `auth` (set by the middleware after a token is verified). Inside a tool callback you can read the same object directly as `ctx.auth`, so `getAuth` is mainly kept for compatibility with code that passes the raw context around. If no token was verified for the request (no provider configured, or the route is unauthenticated), the `auth` variable is unset and the return value is `undefined` at runtime even though the static type is `AuthInfo`.
+
+```ts
+import { getAuth } from "mcp-use/server";
+```
+
+**Parameters**
+><ParamField body="context" type="Context" required="true" >   Hono context, from middleware or from a tool's `requestContext` parameter. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="AuthInfo" />
+
+**Signature**
+```ts wrap
+function getAuth(context: Context): AuthInfo
+```
+
+### hasScope
+
+Returns `true` only if the authenticated user has every scope (or permission) in `needed` (logical AND).
+
+```ts
+import { hasScope } from "mcp-use/server";
+```
+
+Returns `true` only if the authenticated user has every scope (or permission) in `needed`. Both the OAuth `scopes` array and the Auth0 style `permissions` array are checked, so a value present in either one counts as granted.
+
+A single string is treated as a one element list. When `needed` is an array, ALL entries must be present (logical AND). Use this inside a tool callback to check access and return your own error result. It calls `getAuth` internally, so a request with no verified auth will throw when it tries to destructure the missing `AuthInfo`.
+
+```ts
+import { hasScope } from "mcp-use/server";
+```
+
+**Parameters**
+><ParamField body="context" type="Context" required="true" >   Hono context, typically the tool's `requestContext` parameter. </ParamField>
+><ParamField body="needed" type="string | string[]" required="true" >   A single scope/permission, or an array of scopes/permissions that must ALL be present. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="boolean" />
+
+**Signature**
+```ts wrap
+function hasScope(context: Context, needed: string | string[]): boolean
+```
+
+### hasAnyScope
+
+Returns `true` if the authenticated user has at least ONE of the scopes (or permissions) in `needed` (logical OR).
+
+```ts
+import { hasAnyScope } from "mcp-use/server";
+```
+
+Returns `true` if the authenticated user has at least ONE of the scopes (or permissions) in `needed` (logical OR). Like `hasScope`, it checks both the `scopes` and `permissions` arrays, and reads auth via `getAuth`, so it throws on a request with no verified auth.
+
+Unlike `hasScope`, this takes an array only.
+
+```ts
+import { hasAnyScope } from "mcp-use/server";
+```
+
+**Parameters**
+><ParamField body="context" type="Context" required="true" >   Hono context, typically the tool's `requestContext` parameter. </ParamField>
+><ParamField body="needed" type="string[]" required="true" >   Array of scopes/permissions; the user needs at least one of them. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="boolean" />
+
+**Signature**
+```ts wrap
+function hasAnyScope(context: Context, needed: string[]): boolean
+```
+
+### requireScope
+
+Builds a Hono middleware that enforces every scope (or permission) in `needed`, returning `403` when the check fails.
+
+```ts
+import { requireScope } from "mcp-use/server";
+```
+
+Builds a Hono middleware that enforces that the user has every scope (or permission) in `needed` before the route runs. If the check fails it short-circuits with HTTP `403` and does not call `next`. If it passes it calls `next`.
+
+A single string is treated as a one element list; an array requires ALL entries (logical AND), matching `hasScope`. The `403` JSON body is `{ error: "insufficient_scope", required, granted_scopes, granted_permissions, message }`, where `granted_scopes` and `granted_permissions` come from the current `AuthInfo`. For per-tool checks, prefer calling `hasScope` inside the tool callback instead of this route middleware.
+
+```ts
+import { requireScope } from "mcp-use/server";
+```
+
+**Parameters**
+><ParamField body="needed" type="string | string[]" required="true" >   A single scope/permission, or an array of scopes/permissions that must ALL be present. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="(c: Context, next: Next) => Promise<Response | void>" >   A Hono middleware function. Returns a `403` JSON response when the scope check fails, otherwise resolves after calling `next`. </ResponseField>
+
+**Signature**
+```ts wrap
+function requireScope(needed: string | string[]): (c: Context, next: Next) => Promise<Response | void>
+```
+
+### requireAnyScope
+
+Builds a Hono middleware that enforces at least ONE of the scopes (or permissions) in `needed` (logical OR), returning `403` when the check fails.
+
+```ts
+import { requireAnyScope } from "mcp-use/server";
+```
+
+Builds a Hono middleware that enforces that the user has at least ONE of the scopes (or permissions) in `needed` (logical OR) before the route runs. If the check fails it short-circuits with HTTP `403`; otherwise it calls `next`.
+
+Takes an array only. The `403` JSON body is `{ error: "insufficient_scope", required_any, granted_scopes, granted_permissions, message }`. For per-tool checks, prefer calling `hasAnyScope` inside the tool callback instead.
+
+```ts
+import { requireAnyScope } from "mcp-use/server";
+```
+
+**Parameters**
+><ParamField body="needed" type="string[]" required="true" >   Array of scopes/permissions; the user needs at least one of them. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="(c: Context, next: Next) => Promise<Response | void>" >   A Hono middleware function. Returns a `403` JSON response when the scope check fails, otherwise resolves after calling `next`. </ResponseField>
+
+**Signature**
+```ts wrap
+function requireAnyScope(needed: string[]): (c: Context, next: Next) => Promise<Response | void>
+```
+
+### jwksVerifier
+
+Builds a `VerifyToken` function that validates JWTs against a remote JWKS using `jose`.
+
+```ts
+import { jwksVerifier } from "mcp-use/server";
+```
+
+Builds a [VerifyToken](/typescript/api-reference/server/auth) function that validates JWTs against a remote JWKS (JSON Web Key Set) using `jose`. The returned function performs signature verification, issuer checking, and, if an `audience` is configured, audience checking. Pass the result as the `verifyToken` field of `oauthProxy(...)` for standard JWT/JWKS providers such as Auth0, Okta, or Google.
+
+`createRemoteJWKSet` is created eagerly but does not fetch keys until the first verify call, so constructing the verifier is cheap. The factory throws if `jwksUrl` is missing (`"jwksVerifier: jwksUrl is required"`) or if `issuer` is missing (`"jwksVerifier: issuer is required"`). At verify time, a token that is not a signed JWT (it lacks exactly three dot-separated segments, as with the opaque tokens some providers issue when no valid `audience` is requested) is rejected early with a descriptive error pointing at the `audience` configuration. Any other verification failure is wrapped and rethrown as `JWKS verification failed: <error>`.
+
+```ts
+import { jwksVerifier } from "mcp-use/server";
+```
+
+**Parameters**
+><ParamField body="config" type="JwksVerifierConfig" required="true" >   JWKS endpoint, expected issuer, and optional audience. See [JwksVerifierConfig](/typescript/api-reference/server/auth). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="VerifyToken" >   An async function that verifies a bearer token and resolves to its decoded payload, or throws if the token is invalid. </ResponseField>
+
+**Signature**
+```ts wrap
+function jwksVerifier(config: JwksVerifierConfig): VerifyToken
+```
+
+## Types
+
+### AuthInfo
+
+The authentication information the bearer middleware attaches to each verified request.
+
+```ts
+import type { AuthInfo } from "mcp-use/server";
+```
+
+The authentication information the bearer middleware attaches to each verified request. `getAuth` returns this shape, and it is also exposed directly as `ctx.auth` inside tool callbacks.
+
+`user` is the extracted [UserInfo](/typescript/api-reference/server/auth). `payload` is the raw verified token payload. `scopes` is parsed from the token's space-delimited `scope` claim (empty array when absent). `permissions` comes from the token's `permissions` claim (Auth0 style; empty array when absent).
+
+```ts
+import type { AuthInfo } from "mcp-use/server";
+```
+
+**Properties**
+><ResponseField name="user" type="UserInfo" required>   The authenticated user, extracted from the token payload. </ResponseField>
+><ResponseField name="payload" type="Record<string, unknown>" required>   The raw verified JWT payload. </ResponseField>
+><ResponseField name="accessToken" type="string" required>   The bearer access token from the `Authorization` header. </ResponseField>
+><ResponseField name="scopes" type="string[]" required>   OAuth scopes parsed from the `scope` claim. Empty array if the claim is absent. </ResponseField>
+><ResponseField name="permissions" type="string[]" required>   Permissions from the `permissions` claim (Auth0 style). Empty array if the claim is absent. </ResponseField>
+
+**Definition**
+```ts wrap
+interface AuthInfo {
+  user: UserInfo
+  payload: Record<string, unknown>
+  accessToken: string
+  scopes: string[]
+  permissions: string[]
+}
+```
+
+### UserInfo
+
+User information extracted from a verified OAuth token.
+
+```ts
+import type { UserInfo } from "mcp-use/server";
+```
+
+User information extracted from a verified OAuth token. `userId` is the only required field (mapped from the `sub` claim by the default extractor); all other fields are optional and depend on the provider and on the token's claims. The interface has an index signature, so additional custom claims are allowed and preserved (for example WorkOS surfaces `organization_id` this way).
+
+```ts
+import type { UserInfo } from "mcp-use/server";
+```
+
+**Properties**
+><ResponseField name="userId" type="string" required>   Stable user identifier, typically the `sub` claim. </ResponseField>
+><ResponseField name="email" type="string">   User email, if present in the token. </ResponseField>
+><ResponseField name="name" type="string">   Display name, if present. </ResponseField>
+><ResponseField name="username" type="string">   Username, if present. </ResponseField>
+><ResponseField name="nickname" type="string">   Nickname, if present. </ResponseField>
+><ResponseField name="picture" type="string">   Avatar/picture URL, if present. </ResponseField>
+><ResponseField name="roles" type="string[]">   Roles, if present. </ResponseField>
+><ResponseField name="permissions" type="string[]">   Permissions, if present. </ResponseField>
+><ResponseField name="[key: string]" type="unknown">   Index signature for any additional custom claims. </ResponseField>
+
+**Definition**
+```ts wrap
+interface UserInfo {
+  userId: string
+  email?: string
+  name?: string
+  username?: string
+  nickname?: string
+  picture?: string
+  roles?: string[]
+  permissions?: string[]
+  [key: string]: unknown
+}
+```
+
+### VerifyToken
+
+A token verification function that resolves to the decoded payload, or throws if the token is invalid.
+
+```ts
+import type { VerifyToken } from "mcp-use/server";
+```
+
+A token verification function: it takes a bearer token string and resolves to an object containing the decoded payload, or throws if the token is invalid. This is the type returned by `jwksVerifier` and accepted by `oauthProxy` as its `verifyToken` field. Provide a custom implementation for non-JWT providers (for example, GitHub opaque tokens validated by an API call).
+
+```ts
+import type { VerifyToken } from "mcp-use/server";
+```
+
+**Definition**
+```ts wrap
+type VerifyToken = (token: string) => Promise<{ payload: Record<string, unknown> }>
+```
+
+### JwksVerifierConfig
+
+Configuration for the built-in JWKS verifier created by `jwksVerifier`.
+
+```ts
+import type { JwksVerifierConfig } from "mcp-use/server";
+```
+
+Configuration for the built-in JWKS verifier created by `jwksVerifier`. `jwksUrl` and `issuer` are required (the factory throws if either is missing); `audience` is optional and, when set, rejects tokens without a matching `aud` claim.
+
+```ts
+import type { JwksVerifierConfig } from "mcp-use/server";
+```
+
+**Properties**
+><ResponseField name="jwksUrl" type="string" required>   JWKS endpoint URL (the provider's public key set), for example `https://your-domain.okta.com/oauth2/default/v1/keys`. </ResponseField>
+><ResponseField name="issuer" type="string" required>   Expected `iss` claim. Tokens whose issuer does not match are rejected. </ResponseField>
+><ResponseField name="audience" type="string">   Expected `aud` claim. When set, tokens without a matching audience are rejected. </ResponseField>
+
+**Definition**
+```ts wrap
+interface JwksVerifierConfig {
+  jwksUrl: string
+  issuer: string
+  audience?: string
+}
+```
+
+### OAuthProvider
+
+The contract every OAuth provider implements: token verification, user info extraction, and OAuth metadata getters.
+
+```ts
+import type { OAuthProvider } from "mcp-use/server";
+```
+
+The contract every OAuth provider implements: token verification, user info extraction, and OAuth metadata getters. The provider factory functions (such as `oauthAuth0Provider` and `oauthWorkOSProvider`) return values of this type, and you pass one as the `oauth` option of [MCPServer](/typescript/api-reference/server/mcp-server). `getUserInfoEndpoint` and `getAudience` are optional. `OAuthProxy` extends this interface with proxy-specific fields for providers without Dynamic Client Registration.
+
+```ts
+import type { OAuthProvider } from "mcp-use/server";
+```
+
+**Methods**
+><ResponseField name="verifyToken" type="(token: string) => Promise<{ payload: Record<string, unknown> }>" required>   Verify and decode a token. Throws if the token is invalid. </ResponseField>
+><ResponseField name="getUserInfo" type="(payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>" required>   Extract user information from a verified token payload. </ResponseField>
+><ResponseField name="getIssuer" type="() => string" required>   Return the OAuth issuer URL. </ResponseField>
+><ResponseField name="getAuthEndpoint" type="() => string" required>   Return the authorization endpoint URL. </ResponseField>
+><ResponseField name="getTokenEndpoint" type="() => string" required>   Return the token endpoint URL. </ResponseField>
+><ResponseField name="getScopesSupported" type="() => string[]" required>   Return the supported OAuth scopes. </ResponseField>
+><ResponseField name="getGrantTypesSupported" type="() => string[]" required>   Return the supported grant types. </ResponseField>
+><ResponseField name="getUserInfoEndpoint" type="() => string | undefined">   Optional. Return the user info endpoint URL, or `undefined` if not configured. </ResponseField>
+><ResponseField name="getAudience" type="() => string | undefined">   Optional. Return the audience for JWT verification, or `undefined` if not configured. </ResponseField>
+
+**Definition**
+```ts wrap
+interface OAuthProvider {
+  verifyToken(token: string): Promise<{ payload: Record<string, unknown> }>
+  getUserInfo(payload: Record<string, unknown>): UserInfo | Promise<UserInfo>
+  getIssuer(): string
+  getAuthEndpoint(): string
+  getTokenEndpoint(): string
+  getScopesSupported(): string[]
+  getGrantTypesSupported(): string[]
+  getUserInfoEndpoint?(): string | undefined
+  getAudience?(): string | undefined
+}
+```
+
+## Usage
+
+Configure a provider on the server, then read the authenticated user inside a tool via `ctx.auth` (an `AuthInfo`). This example uses the Auth0 provider, configured entirely from `MCP_USE_OAUTH_*` environment variables.
+
+```ts wrap
+import { MCPServer, oauthAuth0Provider, object } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "auth0-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with Auth0 OAuth authentication",
+  // Zero-config: OAuth is configured via MCP_USE_OAUTH_* environment variables
+  oauth: oauthAuth0Provider(),
+});
+
+server.tool(
+  {
+    name: "get-user-info",
+    description: "Get information about the authenticated user",
+  },
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+      nickname: ctx.auth.user.nickname,
+      picture: ctx.auth.user.picture,
+      permissions: ctx.auth.permissions,
+      scopes: ctx.auth.scopes,
+    })
+);
+
+server.listen().then(() => {
+  console.log("Auth0 OAuth MCP Server Running");
+});
+```
+
+To gate a tool by scope, call `hasScope` (or `hasAnyScope`) inside the callback and return your own error result when the check fails. To gate a custom route, mount `requireScope` (or `requireAnyScope`) as middleware.

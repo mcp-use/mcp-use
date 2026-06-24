@@ -1,0 +1,697 @@
+---
+title: "MCP Apps"
+description: "MCP Apps API Documentation"
+icon: "layout-dashboard"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/widgets/mcp-ui-adapter.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/widgets/mcp-ui-adapter.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/widgets/mcp-ui-adapter.ts</a>
+</Callout>
+
+Low-level utilities for building MCP UI resources, dual-protocol widget metadata, and SEO landing pages. Most servers register widgets declaratively with `server.uiResource(...)` (see [UIResource](/typescript/api-reference/server/resources)), which calls these helpers internally. The functions and types here are the building blocks for that pipeline and are also exported for advanced use.
+
+A widget is shipped as a `ui://` resource plus tool metadata. mcp-use supports two protocols from a single definition:
+
+- **[MCP Apps Extension (SEP-1865)](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx)**: mime type `text/html;profile=mcp-app`, metadata under `_meta.ui.*`, camelCase CSP keys. Used by Claude, Goose, and other MCP Apps clients.
+- **ChatGPT Apps SDK**: mime type `text/html+skybridge`, metadata under `openai/*` keys, snake_case CSP keys.
+
+The adapters on this page transform one [UnifiedWidgetMetadata](#unifiedwidgetmetadata) definition into either format, so you write the configuration once.
+
+```ts wrap
+import { MCPServer } from "mcp-use/server"
+
+const server = new MCPServer({
+  name: "mcp-apps-gallery",
+  version: "1.0.0",
+  description: "MCP Apps widget gallery",
+})
+
+// Declarative path - registers a tool + ui:// resource and emits
+// dual-protocol metadata under the hood.
+server.uiResource({
+  type: "mcpApps",
+  name: "welcome-card",
+  title: "Welcome",
+  description: "A welcome card with server information",
+  htmlTemplate: "<div class=\"card\"><h1>Welcome to MCP Apps</h1></div>",
+  metadata: {
+    prefersBorder: true,
+    widgetDescription: "Server welcome card",
+  },
+  exposeAsTool: true,
+})
+
+await server.listen()
+```
+
+---
+
+## Resource builders
+
+These functions produce `UIResourceContent` objects (`{ type: "resource", resource }`) that you can return from a tool or resource handler. They are the lower-level primitives behind [createUIResourceFromDefinition](#createuiresourcefromdefinition).
+
+### createUIResourceFromDefinition
+
+Create a `UIResourceContent` from a high-level [UIResourceDefinition](/typescript/api-reference/server/resources). This is the main router: it inspects the discriminated `type` field and delegates to the appropriate builder.
+
+```ts
+import { createUIResourceFromDefinition } from "mcp-use/server"
+```
+
+Routes a definition to the correct resource creator based on its `type` (`"externalUrl"`, `"rawHtml"`, `"remoteDom"`, `"appsSdk"`, or `"mcpApps"`).
+
+The resource URI is derived from `definition.name`. For `appsSdk` and `mcpApps` types it is `ui://widget/<name>.html`; for the others it is `ui://widget/<name>`. When `config.buildId` is set, it is appended to the name (`ui://widget/<name>-<buildId>...`) for cache busting. The encoding defaults to `"text"` when `definition.encoding` is not set. For the `externalUrl` type, `params` are passed through [buildWidgetUrl](#buildwidgeturl) to build the iframe URL. Throws `Error("Unknown UI resource type: ...")` if the definition `type` is not one of the supported values (enforced by an exhaustiveness check).
+
+**Parameters**
+><ParamField body="definition" type="UIResourceDefinition" required="true" >   UIResource definition (discriminated union on `type`) </ParamField>
+><ParamField body="params" type="Record<string, any>" required="true" >   Runtime parameters for the widget (used for the `externalUrl` type) </ParamField>
+><ParamField body="config" type="UrlConfig" required="true" >   URL configuration used when building widget URLs </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<UIResourceContent>" />
+
+**Signature**
+```ts wrap
+function createUIResourceFromDefinition(definition: UIResourceDefinition, params: Record<string, any>, config: UrlConfig): Promise<UIResourceContent>
+```
+
+### createMcpAppsResource
+
+Create a `UIResourceContent` for the MCP Apps Extension (SEP-1865) using the `text/html;profile=mcp-app` mime type.
+
+```ts
+import { createMcpAppsResource } from "mcp-use/server"
+```
+
+Builds a synchronous MCP Apps resource. The HTML template should contain the component code with embedded JS and CSS. The widget receives the tool output via the MCP protocol.
+
+Metadata is written under `resource._meta.ui` per SEP-1865. Only the fields you set are emitted: `csp` is included when it has at least one key, `prefersBorder` when it is not `undefined`, and `domain` when truthy. If no metadata fields apply, `_meta` is omitted entirely.
+
+**Parameters**
+><ParamField body="uri" type="string" required="true" >   Resource URI (must start with `ui://`) </ParamField>
+><ParamField body="htmlTemplate" type="string" required="true" >   HTML template with embedded component code </ParamField>
+><ParamField body="metadata" type="{ description?: string; csp?: { connectDomains?: string[]; resourceDomains?: string[]; frameDomains?: string[]; baseUriDomains?: string[] }; prefersBorder?: boolean; domain?: string }" >   MCP Apps metadata (CSP, border preference, domain) </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="UIResourceContent" />
+
+**Signature**
+```ts wrap
+function createMcpAppsResource(uri: string, htmlTemplate: string, metadata?: { description?: string; csp?: { connectDomains?: string[]; resourceDomains?: string[]; frameDomains?: string[]; baseUriDomains?: string[] }; prefersBorder?: boolean; domain?: string }): UIResourceContent
+```
+
+### createExternalUrlResource
+
+Create a `UIResourceContent` that loads an external URL in an iframe.
+
+```ts
+import { createExternalUrlResource } from "mcp-use/server"
+```
+
+Wraps `@mcp-ui/server`'s `createUIResource` with `content: { type: "externalUrl", iframeUrl }`. Use this for widgets served from a separate origin (for example a Vite dev server or a deployed static site).
+
+**Parameters**
+><ParamField body="uri" type="string" required="true" >   Resource URI (must start with `ui://`) </ParamField>
+><ParamField body="iframeUrl" type="string" required="true" >   URL to load in the iframe </ParamField>
+><ParamField body="encoding" type='UIEncoding' default='"text"' >   Encoding type (`"text"` or `"blob"`) </ParamField>
+><ParamField body="adapters" type="AdaptersConfig" >   Adapter configuration (for example Apps SDK) passed through to `@mcp-ui/server` </ParamField>
+><ParamField body="metadata" type="AppsSdkMetadata" >   Additional metadata for the resource </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<UIResourceContent>" />
+
+**Signature**
+```ts wrap
+function createExternalUrlResource(uri: string, iframeUrl: string, encoding?: UIEncoding, adapters?: AdaptersConfig, metadata?: AppsSdkMetadata): Promise<UIResourceContent>
+```
+
+### createRawHtmlResource
+
+Create a `UIResourceContent` that renders raw HTML inline.
+
+```ts
+import { createRawHtmlResource } from "mcp-use/server"
+```
+
+Wraps `@mcp-ui/server`'s `createUIResource` with `content: { type: "rawHtml", htmlString }`. The HTML is delivered inline rather than loaded from a URL.
+
+**Parameters**
+><ParamField body="uri" type="string" required="true" >   Resource URI (must start with `ui://`) </ParamField>
+><ParamField body="htmlString" type="string" required="true" >   HTML content to render </ParamField>
+><ParamField body="encoding" type='UIEncoding' default='"text"' >   Encoding type (`"text"` or `"blob"`) </ParamField>
+><ParamField body="adapters" type="AdaptersConfig" >   Adapter configuration (for example Apps SDK) </ParamField>
+><ParamField body="metadata" type="AppsSdkMetadata" >   Additional metadata for the resource </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<UIResourceContent>" />
+
+**Signature**
+```ts wrap
+function createRawHtmlResource(uri: string, htmlString: string, encoding?: UIEncoding, adapters?: AdaptersConfig, metadata?: AppsSdkMetadata): Promise<UIResourceContent>
+```
+
+### createRemoteDomResource
+
+Create a `UIResourceContent` for Remote DOM scripting.
+
+```ts
+import { createRemoteDomResource } from "mcp-use/server"
+```
+
+Builds a Remote DOM resource with mime type `application/vnd.mcp-ui.remote-dom+<framework>`. Because `remoteDom` was removed from `createUIResource` in `@mcp-ui/server` v6, this constructs the resource object manually. When `encoding` is `"blob"`, the script is base64-encoded into `resource.blob`; otherwise it is placed in `resource.text`.
+
+<Note>
+The `adapters` and `metadata` parameters are accepted for signature parity but are not applied (they are prefixed with an underscore in the implementation). The MIME type is still rendered by `@mcp-ui/client`.
+</Note>
+
+**Parameters**
+><ParamField body="uri" type="string" required="true" >   Resource URI (must start with `ui://`) </ParamField>
+><ParamField body="script" type="string" required="true" >   JavaScript code for remote DOM manipulation </ParamField>
+><ParamField body="framework" type='"react" | "webcomponents"' default='"react"' >   Framework for remote DOM </ParamField>
+><ParamField body="encoding" type='UIEncoding' default='"text"' >   Encoding type (`"text"` or `"blob"`) </ParamField>
+><ParamField body="_adapters" type="AdaptersConfig" >   Accepted for parity; not applied </ParamField>
+><ParamField body="_metadata" type="AppsSdkMetadata" >   Accepted for parity; not applied </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<UIResourceContent>" />
+
+**Signature**
+```ts wrap
+function createRemoteDomResource(uri: string, script: string, framework?: "react" | "webcomponents", encoding?: UIEncoding, _adapters?: AdaptersConfig, _metadata?: AppsSdkMetadata): Promise<UIResourceContent>
+```
+
+### buildWidgetUrl
+
+Build the full URL for a locally served widget, including encoded props.
+
+```ts
+import { buildWidgetUrl } from "mcp-use/server"
+```
+
+Constructs a URL of the form `<baseUrl>:<port>/mcp-use/widgets/<slug>`. The widget name is slugified for URL safety. When `props` is provided and non-empty, all props are serialized into a single `props` query parameter as JSON. When `props` is `undefined` or an empty object, no query parameter is added.
+
+**Parameters**
+><ParamField body="widget" type="string" required="true" >   Widget identifier (slugified for the URL path) </ParamField>
+><ParamField body="props" type="Record<string, any> | undefined" required="true" >   Parameters passed as a single JSON-encoded `props` query param </ParamField>
+><ParamField body="config" type="UrlConfig" required="true" >   URL configuration (`baseUrl`, `port`, optional `buildId`) </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="string" />
+
+**Signature**
+```ts wrap
+function buildWidgetUrl(widget: string, props: Record<string, any> | undefined, config: UrlConfig): string
+```
+
+### UrlConfig
+
+Configuration for building widget URLs, consumed by [buildWidgetUrl](#buildwidgeturl) and [createUIResourceFromDefinition](#createuiresourcefromdefinition).
+
+```ts
+import type { UrlConfig } from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="baseUrl" type="string" required="true" >   Base URL of the server (for example `http://localhost`) </ParamField>
+><ParamField body="port" type="number | string" required="true" >   Server port appended to the base URL </ParamField>
+><ParamField body="buildId" type="string" >   Optional build ID appended to widget URIs for cache busting </ParamField>
+
+**Signature**
+```ts wrap
+interface UrlConfig {
+  baseUrl: string
+  port: number | string
+  buildId?: string
+}
+```
+
+---
+
+## Protocol adapters
+
+Adapters transform a single [UnifiedWidgetMetadata](#unifiedwidgetmetadata) definition into protocol-specific tool and resource metadata. Both implement [ProtocolAdapter](#protocoladapter).
+
+### AppsSdkAdapter
+
+Protocol adapter that emits ChatGPT Apps SDK metadata.
+
+```ts
+import { AppsSdkAdapter } from "mcp-use/server"
+```
+
+Transforms unified widget definitions into Apps SDK format: mime type `text/html+skybridge`, flat `_meta` keys prefixed with `openai/`, and snake_case CSP fields (`connect_domains`, `resource_domains`, and so on).
+
+`buildToolMetadata` always sets `openai/outputTemplate` to the resource URI and copies `openai/toolInvocation/invoking`, `openai/toolInvocation/invoked`, `openai/widgetAccessible`, and `openai/resultCanProduceWidget` from `appsSdkMetadata` when present. It falls back to `metadata.invoking` and `metadata.invoked` for the invocation status keys. `buildResourceMetadata` extends the base implementation by copying additional `openai/*` fields from `appsSdkMetadata` when they are not already set.
+
+**Members**
+><ParamField body="mimeType" type='string' >   Readonly. Always `"text/html+skybridge"`. </ParamField>
+><ParamField body="protocol" type='"apps-sdk"' >   Readonly protocol identifier. </ParamField>
+><ParamField body="buildToolMetadata(definition, uri)" type="Record<string, unknown>" >   Builds Apps SDK tool metadata for a definition and resource URI. </ParamField>
+><ParamField body="buildResourceMetadata(definition)" type="{ mimeType: string; _meta?: Record<string, unknown> }" >   Builds Apps SDK resource metadata (mime type plus `_meta`). </ParamField>
+
+**Signature**
+```ts wrap
+class AppsSdkAdapter extends BaseProtocolAdapter {
+  readonly mimeType: string // "text/html+skybridge"
+  readonly protocol: "apps-sdk"
+  buildToolMetadata(definition: UIResourceDefinition, uri: string): Record<string, unknown>
+  buildResourceMetadata(definition: UIResourceDefinition): { mimeType: string; _meta?: Record<string, unknown> }
+}
+```
+
+### McpAppsAdapter
+
+Protocol adapter that emits MCP Apps Extension (SEP-1865) metadata.
+
+```ts
+import { McpAppsAdapter } from "mcp-use/server"
+```
+
+Transforms unified widget definitions into MCP Apps format: mime type `text/html;profile=mcp-app` (the value of [RESOURCE_MIME_TYPE](#resource-mime-type)), metadata under the `_meta.ui.*` namespace, and camelCase CSP fields kept as-is.
+
+`buildToolMetadata` returns the new nested form `{ ui: { resourceUri } }` and also includes the legacy flat key [RESOURCE_URI_META_KEY](#resource-uri-meta-key) pointing at the same URI for backward compatibility with older clients. Resource metadata is wrapped under `_meta.ui`.
+
+**Members**
+><ParamField body="mimeType" type='string' >   Readonly. Equals `RESOURCE_MIME_TYPE` (`"text/html;profile=mcp-app"`). </ParamField>
+><ParamField body="protocol" type='"mcp-apps"' >   Readonly protocol identifier. </ParamField>
+><ParamField body="buildToolMetadata(definition, uri)" type="Record<string, unknown>" >   Builds MCP Apps tool metadata (`ui.resourceUri` plus the legacy flat key). </ParamField>
+><ParamField body="buildResourceMetadata(definition)" type="{ mimeType: string; _meta?: Record<string, unknown> }" >   Builds MCP Apps resource metadata wrapped under `_meta.ui`. </ParamField>
+
+**Signature**
+```ts wrap
+class McpAppsAdapter extends BaseProtocolAdapter {
+  readonly mimeType: string // "text/html;profile=mcp-app"
+  readonly protocol: "mcp-apps"
+  buildToolMetadata(definition: UIResourceDefinition, uri: string): Record<string, unknown>
+  buildResourceMetadata(definition: UIResourceDefinition): { mimeType: string; _meta?: Record<string, unknown> }
+}
+```
+
+### ProtocolAdapter
+
+The interface implemented by every protocol adapter ([AppsSdkAdapter](#appssdkadapter) and [McpAppsAdapter](#mcpappsadapter)).
+
+```ts
+import type { ProtocolAdapter } from "mcp-use/server"
+```
+
+Defines how a unified widget definition is converted into protocol-specific tool and resource metadata.
+
+**Properties**
+><ParamField body="mimeType" type="string" required="true" >   Readonly mime type for this protocol (`text/html;profile=mcp-app` for MCP Apps, `text/html+skybridge` for Apps SDK) </ParamField>
+><ParamField body="protocol" type='"mcp-apps" | "apps-sdk"' required="true" >   Readonly protocol identifier </ParamField>
+
+**Methods**
+><ParamField body="buildToolMetadata(definition, uri)" type="Record<string, unknown>" required="true" >   Build protocol-specific tool metadata from a definition and resource URI </ParamField>
+><ParamField body="buildResourceMetadata(definition)" type="{ mimeType: string; _meta?: Record<string, unknown> }" required="true" >   Build protocol-specific resource metadata (includes `mimeType` and optional `_meta`) </ParamField>
+
+**Signature**
+```ts wrap
+interface ProtocolAdapter {
+  readonly mimeType: string
+  readonly protocol: "mcp-apps" | "apps-sdk"
+  buildToolMetadata(definition: UIResourceDefinition, uri: string): Record<string, unknown>
+  buildResourceMetadata(definition: UIResourceDefinition): { mimeType: string; _meta?: Record<string, unknown> }
+}
+```
+
+### CSPConfig
+
+Unified Content Security Policy configuration. Adapters map these camelCase fields to MCP Apps (camelCase) or Apps SDK (snake_case) format.
+
+```ts
+import type { CSPConfig } from "mcp-use/server"
+```
+
+Follows the SEP-1865 specification with support for arbitrary additional properties (the index signature allows fields not yet listed here, for future spec evolution).
+
+**Properties**
+><ParamField body="connectDomains" type="string[]" >   Domains allowed for fetch, XHR, and WebSocket connections </ParamField>
+><ParamField body="resourceDomains" type="string[]" >   Domains allowed for images, scripts, stylesheets, and fonts </ParamField>
+><ParamField body="frameDomains" type="string[]" >   Allowed iframe origins </ParamField>
+><ParamField body="baseUriDomains" type="string[]" >   Allowed base URIs for the document (SEP-1865) </ParamField>
+><ParamField body="redirectDomains" type="string[]" >   Domains for `openExternal` without a confirmation modal (ChatGPT only, not in SEP-1865) </ParamField>
+><ParamField body="scriptDirectives" type="string[]" >   CSP directive literals to include in `script-src` (for example `'unsafe-eval'`). Use with caution, these weaken security. </ParamField>
+><ParamField body="styleDirectives" type="string[]" >   CSP directive literals to include in `style-src` (for example `'unsafe-inline'`) </ParamField>
+
+**Signature**
+```ts wrap
+interface CSPConfig {
+  connectDomains?: string[]
+  resourceDomains?: string[]
+  frameDomains?: string[]
+  baseUriDomains?: string[]
+  redirectDomains?: string[]
+  scriptDirectives?: string[]
+  styleDirectives?: string[]
+  [key: string]: any
+}
+```
+
+### UnifiedWidgetMetadata
+
+Protocol-agnostic widget metadata. Write it once, and adapters transform it into both MCP Apps and Apps SDK formats.
+
+```ts
+import type { UnifiedWidgetMetadata } from "mcp-use/server"
+```
+
+Follows SEP-1865 with support for arbitrary additional properties via an index signature. Some fields target a single protocol (noted below); the other protocol ignores them.
+
+**Properties**
+><ParamField body="description" type="string" >   Description of the widget </ParamField>
+><ParamField body="csp" type="CSPConfig" >   Content Security Policy </ParamField>
+><ParamField body="prefersBorder" type="boolean" >   Request a visible border around the widget </ParamField>
+><ParamField body="domain" type="string" >   Dedicated domain for widget isolation </ParamField>
+><ParamField body="widgetDescription" type="string" >   Human-readable summary for the AI model (ChatGPT only) </ParamField>
+><ParamField body="permissions" type="{ camera?; microphone?; geolocation?; clipboardWrite?; [key: string]: any }" >   Sandbox permissions requested by the UI (SEP-1865). Hosts MAY honor these via iframe `allow` attributes. </ParamField>
+><ParamField body="autoResize" type="boolean" >   Enable automatic size change notifications (legacy MCP-UI, still supported) </ParamField>
+><ParamField body="invoking" type="string" >   Status text shown while the tool is running. Maps to `openai/toolInvocation/invoking`. Defaults to `"Loading {name}..."`. </ParamField>
+><ParamField body="invoked" type="string" >   Status text shown after the tool completes. Maps to `openai/toolInvocation/invoked`. Defaults to `"{name} ready"`. </ParamField>
+
+**Signature**
+```ts wrap
+interface UnifiedWidgetMetadata {
+  description?: string
+  csp?: CSPConfig
+  prefersBorder?: boolean
+  domain?: string
+  widgetDescription?: string
+  permissions?: {
+    camera?: Record<string, never>
+    microphone?: Record<string, never>
+    geolocation?: Record<string, never>
+    clipboardWrite?: Record<string, never>
+    [key: string]: any
+  }
+  autoResize?: boolean
+  invoking?: string
+  invoked?: string
+  [key: string]: any
+}
+```
+
+### RESOURCE_MIME_TYPE
+
+The MCP Apps Extension mime type, re-exported from `@modelcontextprotocol/ext-apps`.
+
+```ts
+import { RESOURCE_MIME_TYPE } from "mcp-use/server"
+```
+
+The mime type used for MCP Apps resources: `"text/html;profile=mcp-app"`. It is the value returned by [McpAppsAdapter](#mcpappsadapter)'s `mimeType` property. Re-exported from `@modelcontextprotocol/ext-apps/server` for convenience.
+
+**Signature**
+```ts wrap
+const RESOURCE_MIME_TYPE: string // "text/html;profile=mcp-app"
+```
+
+### RESOURCE_URI_META_KEY
+
+The legacy flat `_meta` key for an MCP Apps resource URI, re-exported from `@modelcontextprotocol/ext-apps`.
+
+```ts
+import { RESOURCE_URI_META_KEY } from "mcp-use/server"
+```
+
+The flat `_meta` key under which the resource URI is duplicated for backward compatibility with older MCP Apps clients ([McpAppsAdapter](#mcpappsadapter) also emits the newer nested `ui.resourceUri` form). Re-exported from `@modelcontextprotocol/ext-apps/server`.
+
+**Signature**
+```ts wrap
+const RESOURCE_URI_META_KEY: string
+```
+
+---
+
+## Widget definition types
+
+These types describe widgets at the discovery and manifest level.
+
+### WidgetManifest
+
+Manifest describing a built widget on disk.
+
+```ts
+import type { WidgetManifest } from "mcp-use/server"
+```
+
+Describes a widget's identity, props, preferred frame size, and built asset paths. The `name` must match the widget directory or file name.
+
+**Properties**
+><ParamField body="name" type="string" required="true" >   Unique widget identifier (must match directory or file name), for example `"weather-display"` </ParamField>
+><ParamField body="title" type="string" >   Human-readable title </ParamField>
+><ParamField body="description" type="string" >   Description of what the widget displays </ParamField>
+><ParamField body="version" type="string" >   Semantic version of the widget </ParamField>
+><ParamField body="props" type="WidgetProps" >   Widget props schema (type, required, default per prop) </ParamField>
+><ParamField body="size" type="[string, string]" >   Preferred frame size `[width, height]`, for example `["800px", "600px"]` </ParamField>
+><ParamField body="assets" type="{ main?: string; scripts?: string[]; styles?: string[] }" >   Asset paths for the main entry, scripts, and styles </ParamField>
+
+**Signature**
+```ts wrap
+interface WidgetManifest {
+  name: string
+  title?: string
+  description?: string
+  version?: string
+  props?: WidgetProps
+  size?: [string, string]
+  assets?: { main?: string; scripts?: string[]; styles?: string[] }
+}
+```
+
+### WidgetMetadata
+
+Metadata exported from a React widget module (a `resources/*.tsx` file) for auto-discovery and auto-registration.
+
+```ts
+import type { WidgetMetadata } from "mcp-use/react"
+```
+
+Declares a widget's title, props schema, tool output, and dual-protocol metadata. Exported by widget developers as `widgetMetadata`. The auto-discovery pipeline reads it to register the widget and (when `exposeAsTool` is not `false`) an MCP tool.
+
+<Note>
+This type is exported from `mcp-use/react`, not `mcp-use/server`. It is documented here because it configures the same dual-protocol widget pipeline.
+</Note>
+
+**Properties**
+><ParamField body="title" type="string" >   Human-readable title for the widget </ParamField>
+><ParamField body="description" type="string" >   Description shown to the model and used for auto-registered tool descriptions </ParamField>
+><ParamField body="props" type="z.ZodTypeAny | InputDefinition[]" >   Zod schema (preferred) or `InputDefinition` array for widget props validation </ParamField>
+><ParamField body="inputs" type="z.ZodTypeAny | InputDefinition[]" >   Deprecated. Use `props` instead. </ParamField>
+><ParamField body="schema" type="z.ZodTypeAny | InputDefinition[]" >   Deprecated. Use `props` instead. </ParamField>
+><ParamField body="toolOutput" type="((params: Record<string, any>) => CallToolResult | TypedCallToolResult<any>) | CallToolResult | TypedCallToolResult<any>" >   Function or static value producing the tool output (what the model sees). Defaults to a summary message. </ParamField>
+><ParamField body="exposeAsTool" type="boolean" default="true" >   Whether to auto-register this widget as an MCP tool. Set to `false` when paired with a custom `server.tool()`. </ParamField>
+><ParamField body="annotations" type="ResourceAnnotations & Partial<ToolAnnotations>" >   Annotations applied to both the resource and the tool </ParamField>
+><ParamField body="_meta" type="Record<string, unknown>" >   Optional raw metadata for the widget </ParamField>
+><ParamField body="appsSdkMetadata" type="AppsSdkMetadata" >   Deprecated. Legacy ChatGPT-only metadata. Prefer `metadata` for dual-protocol support. </ParamField>
+><ParamField body="metadata" type="{ description?; csp?: CSPConfig; prefersBorder?; domain?; widgetDescription?; autoResize?; invoking?; invoked? }" >   Unified dual-protocol metadata. Write once; the server generates both Apps SDK and MCP Apps formats. </ParamField>
+
+**Signature**
+```ts wrap
+interface WidgetMetadata {
+  title?: string
+  description?: string
+  props?: z.ZodTypeAny | InputDefinition[]
+  inputs?: z.ZodTypeAny | InputDefinition[] // deprecated
+  schema?: z.ZodTypeAny | InputDefinition[] // deprecated
+  toolOutput?:
+    | ((params: Record<string, any>) => CallToolResult | TypedCallToolResult<any>)
+    | CallToolResult
+    | TypedCallToolResult<any>
+  exposeAsTool?: boolean
+  annotations?: ResourceAnnotations & Partial<ToolAnnotations>
+  _meta?: Record<string, unknown>
+  appsSdkMetadata?: AppsSdkMetadata // deprecated
+  metadata?: {
+    description?: string
+    csp?: CSPConfig
+    prefersBorder?: boolean
+    domain?: string
+    widgetDescription?: string
+    autoResize?: boolean
+    invoking?: string
+    invoked?: string
+  }
+}
+```
+
+### DiscoverWidgetsOptions
+
+Options for discovering and registering widgets from a directory.
+
+```ts
+import type { DiscoverWidgetsOptions } from "mcp-use/server"
+```
+
+Controls where widgets are discovered, whether widgets without manifests are auto-registered, and an optional name filter.
+
+**Properties**
+><ParamField body="path" type="string" >   Path to the widgets directory. Defaults to `dist/resources/mcp-use/widgets`. </ParamField>
+><ParamField body="autoRegister" type="boolean" default="false" >   Automatically register widgets that do not have manifests </ParamField>
+><ParamField body="filter" type="string | RegExp" >   Filter widgets by name pattern, for example `"weather-*"` </ParamField>
+
+**Signature**
+```ts wrap
+interface DiscoverWidgetsOptions {
+  path?: string
+  autoRegister?: boolean
+  filter?: string | RegExp
+}
+```
+
+---
+
+## Landing page
+
+`generateLandingPage` builds the SEO-friendly HTML page shown when a browser hits the MCP endpoint. Most servers do not call it directly: set `publicLandingPage: true` on `new MCPServer({ ... })` and the server renders this page automatically for browser GET requests.
+
+```ts wrap
+import { MCPServer, oauthProxy } from "mcp-use/server"
+
+const server = new MCPServer({
+  name: "public-landing-page-example",
+  version: "1.0.0",
+  description: "An OAuth-protected MCP server whose browser landing page remains public.",
+  baseUrl: "http://localhost:3000",
+  publicLandingPage: true,
+  oauth: oauthProxy({
+    issuer: "https://example.com/demo-oauth",
+    authEndpoint: "https://example.com/demo-oauth/authorize",
+    tokenEndpoint: "https://example.com/demo-oauth/token",
+    clientId: "public-landing-page-example",
+    scopes: ["openid", "profile", "read:demo"],
+    verifyToken: async (token: string) => {
+      if (token !== "demo-token") {
+        throw new Error("Invalid demo token")
+      }
+      return { payload: { sub: "demo-user" } }
+    },
+  }),
+})
+
+await server.listen(3000)
+```
+
+### generateLandingPage
+
+Generate an SEO-friendly HTML landing page with connection instructions for Claude Code, Cursor, VS Code, VS Code Insiders, ChatGPT, and the hosted Manufact Inspector.
+
+```ts
+import { generateLandingPage } from "mcp-use/server"
+```
+
+Returns a complete HTML document string (including inline CSS and JS) that lists install commands and deep links for each supported client, plus an optional Primitives section listing tools, prompts, and resources. All user-provided values are HTML-escaped. Tool entries may be plain strings or [LandingPageTool](#landingpagetool) objects.
+
+**Parameters**
+><ParamField body="name" type="string" required="true" >   Server name </ParamField>
+><ParamField body="version" type="string" required="true" >   Server version </ParamField>
+><ParamField body="url" type="string" required="true" >   Full server URL (protocol, host, port, and path) </ParamField>
+><ParamField body="description" type="string" >   Optional server description </ParamField>
+><ParamField body="tools" type="(LandingPageTool | string)[]" >   Optional list of tools (names or `{ name, description }`) </ParamField>
+><ParamField body="prompts" type="LandingPagePrompt[]" >   Optional list of prompts </ParamField>
+><ParamField body="resources" type="LandingPageResource[]" >   Optional list of resources </ParamField>
+><ParamField body="iconUrl" type="string" >   Optional full URL to the server icon image </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="string" />
+
+**Signature**
+```ts wrap
+function generateLandingPage(name: string, version: string, url: string, description?: string, tools?: (LandingPageTool | string)[], prompts?: LandingPagePrompt[], resources?: LandingPageResource[], iconUrl?: string): string
+```
+
+### LandingPageTool
+
+A tool entry rendered in the landing page Primitives section.
+
+```ts
+import type { LandingPageTool } from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="name" type="string" required="true" >   Tool name </ParamField>
+><ParamField body="description" type="string" >   Optional tool description </ParamField>
+
+**Signature**
+```ts wrap
+interface LandingPageTool {
+  name: string
+  description?: string
+}
+```
+
+### LandingPagePrompt
+
+A prompt entry rendered in the landing page Primitives section.
+
+```ts
+import type { LandingPagePrompt } from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="name" type="string" required="true" >   Prompt name </ParamField>
+><ParamField body="description" type="string" >   Optional prompt description </ParamField>
+
+**Signature**
+```ts wrap
+interface LandingPagePrompt {
+  name: string
+  description?: string
+}
+```
+
+### LandingPageResource
+
+A resource entry rendered in the landing page Primitives section.
+
+```ts
+import type { LandingPageResource } from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="uri" type="string" required="true" >   Resource URI </ParamField>
+><ParamField body="name" type="string" >   Optional resource name </ParamField>
+><ParamField body="description" type="string" >   Optional resource description </ParamField>
+
+**Signature**
+```ts wrap
+interface LandingPageResource {
+  uri: string
+  name?: string
+  description?: string
+}
+```
+
+---
+
+## Type generation
+
+### generateToolRegistryTypes
+
+Generate TypeScript type definitions for the `ToolRegistry` from registered tools and write them to `.mcp-use/tool-registry.d.ts`.
+
+```ts
+import { generateToolRegistryTypes } from "mcp-use/server"
+```
+
+Reads each registered tool's Zod input and output schemas, converts them to TypeScript types, and emits a `declare module "mcp-use/react"` augmentation of the `ToolRegistry` interface. This powers type-safe tool calls in the `useCallTool` React hook. It is invoked automatically during development (on startup and on tool or widget changes) and by the `mcp-use generate-types` CLI command.
+
+Behavior and edge cases:
+
+- **Production-safe**: returns `true` immediately and writes nothing when `process.env.NODE_ENV === "production"`.
+- **Deterministic**: tools are sorted alphabetically by name before generation.
+- **Idempotent writes**: the new content is compared against the existing file (ignoring the timestamp line); if unchanged, the file is not rewritten.
+- **Defaults**: a tool with no input `schema` is typed as `null`; a tool with no `outputSchema` is typed as `Record<string, unknown>`.
+
+**Parameters**
+><ParamField body="registrations" type="Map<string, { config: ToolDefinition; handler: ToolCallback }>" required="true" >   The server's `registrations.tools` map </ParamField>
+><ParamField body="projectRoot" type="string" default="process.cwd()" >   Project root directory where `.mcp-use/` is written </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />
+
+**Signature**
+```ts wrap
+function generateToolRegistryTypes(registrations: Map<string, { config: ToolDefinition; handler: ToolCallback }>, projectRoot?: string): Promise<boolean>
+```

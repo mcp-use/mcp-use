@@ -1,0 +1,363 @@
+---
+title: "MCPServer"
+description: "Build MCP servers with tools, resources, and prompts API Documentation"
+icon: "server"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts</a>
+</Callout>
+
+Full MCP (Model Context Protocol) server built on the Hono web framework. It combines MCP protocol handling with an HTTP server so you can declare tools, resources, and prompts, then serve them to any MCP client. Run it standalone with `listen()`, or get a handler for serverless platforms (Cloudflare Workers, Vercel Edge, Deno).
+
+```ts
+import { MCPServer } from "mcp-use/server";
+```
+
+A minimal server (from the `basic/simple` example):
+
+```ts wrap
+import { MCPServer, text } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "simple-example-server",
+  version: "1.0.0",
+  description: "A simple MCP server example",
+});
+
+server.tool(
+  {
+    name: "hello-world",
+    description: "A simple tool that returns hello world",
+  },
+  async () => text("Hello World!")
+);
+
+// Start the server (MCP endpoints auto-mounted at /mcp)
+await server.listen();
+```
+
+<Callout type="info" title="Constructor return type">
+`new MCPServer(config)` returns an `McpServerInstance`, a value that is simultaneously the `MCPServer` class, the [Hono](https://hono.dev) app, and an `mcp-use` helper surface. That means `server.tool(...)` (MCP) and `server.get('/health', ...)` (Hono) both work on the same object. The exact return type is `McpServerInstance<true>` when `oauth` is configured and `McpServerInstance<false>` otherwise.
+</Callout>
+
+## Constructor
+
+Creates a new server instance. Initializes the native MCP server from the official SDK, creates the Hono application, sets up OAuth if configured, configures session management (stateful or stateless), and wraps the registration methods for multi-session support. Stateless mode is auto-detected (Deno defaults to stateless, Node.js to stateful) when `stateless` is not set.
+
+**Parameters**
+><ParamField body="config" type="ServerConfig" required="true" >   Server configuration object (see fields below). </ParamField>
+
+The most common `ServerConfig` fields:
+
+><ParamField body="config.name" type="string" required="true" >   Unique server name displayed to clients. </ParamField>
+><ParamField body="config.version" type="string" required="true" >   Semantic version of the server (e.g. "1.0.0"). </ParamField>
+><ParamField body="config.description" type="string | undefined" default="undefined" >   Human-readable description shown to clients during discovery. </ParamField>
+><ParamField body="config.instructions" type="string | undefined" default="undefined" >   Server-wide guidance for AI models, returned during MCP initialization. </ParamField>
+><ParamField body="config.host" type="string | undefined" default='"localhost"' >   Hostname used for widget URLs and server endpoints. </ParamField>
+><ParamField body="config.baseUrl" type="string | undefined" default="undefined" >   Full public base URL (overrides `host:port` for widget and OAuth URLs). Use when behind a reverse proxy. </ParamField>
+><ParamField body="config.oauth" type="OAuthProvider | undefined" default="undefined" >   OAuth provider configuration. When present, the instance is typed as `McpServerInstance<true>`. </ParamField>
+><ParamField body="config.cors" type="Partial<Parameters<typeof cors>[0]> | undefined" default="undefined" >   CORS overrides, matching the options accepted by Hono's `cors` middleware. Defaults to permissive CORS (`origin: "*"`) for development ergonomics. </ParamField>
+><ParamField body="config.allowedOrigins" type="string[] | undefined" default="undefined" >   Allowed origins for DNS rebinding protection. If unset or empty, host validation is disabled; if set, validation is enabled globally. </ParamField>
+><ParamField body="config.stateless" type="boolean | undefined" default="undefined" >   Force stateless (no session tracking) or stateful mode. Auto-detected when omitted: stateless for Deno, stateful for Node.js. </ParamField>
+><ParamField body="config.sessionIdleTimeoutMs" type="number | undefined" default="86400000" >   Idle timeout for sessions in milliseconds (default: 86400000, one day). </ParamField>
+
+**Signature**
+```ts wrap
+constructor(config: ServerConfig)
+```
+
+## Methods
+
+### tool
+
+Registers a tool that MCP clients can call. The definition supplies `name` and `description`; pass a Zod `schema` (or `inputs`) to validate arguments, and an optional callback that returns the tool result. Returns the server instance so calls can be chained. Argument types are inferred from the definition, so the callback parameters are fully typed.
+
+**Parameters**
+><ParamField body="toolDefinition" type="ToolDefinition" required="true" >   Tool configuration (name, description, schema/inputs, annotations, etc.). </ParamField>
+><ParamField body="callback" type="ToolCallback | undefined" default="undefined" >   Async handler that receives the validated input (and a context object) and returns a tool result. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" />
+
+**Example**
+```ts wrap
+import { z } from "zod";
+import { text } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "add",
+    description: "Add two numbers",
+    schema: z.object({ a: z.number(), b: z.number() }),
+  },
+  async ({ a, b }) => text(String(a + b))
+);
+```
+
+**Signature**
+```ts wrap
+tool: <T extends ToolDefinition>(toolDefinition: T, callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>) => this
+```
+
+### resource
+
+Registers a static resource that clients can read by its URI. A resource represents data or content (a file, a config blob, an API response). Returns the server instance for chaining. The `mimeType` defaults to `"text/plain"` when omitted.
+
+**Parameters**
+><ParamField body="resourceDefinition" type="ResourceDefinition" required="true" >   Resource configuration (name, uri, description, mimeType). </ParamField>
+><ParamField body="callback" type="ReadResourceCallback | undefined" default="undefined" >   Async handler returning the resource content. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" />
+
+**Example**
+```ts wrap
+import { markdown } from "mcp-use/server";
+
+server.resource(
+  {
+    name: "greeting",
+    uri: "app://greeting",
+    title: "Greeting Message",
+  },
+  async () => markdown("# Hello from mcp-use!")
+);
+```
+
+**Signature**
+```ts wrap
+resource: (resourceDefinition: ResourceDefinition | ResourceDefinitionWithoutCallback, callback?: ReadResourceCallback<HasOAuth>) => this
+```
+
+### resourceTemplate
+
+Registers a resource template for parameterized resources. Clients read URIs that match a `uriTemplate` (for example `docs://{topic}`); the template parameters are extracted and passed to the callback. Optional `callbacks.complete` provides autocomplete suggestions per parameter. Returns the server instance for chaining.
+
+**Parameters**
+><ParamField body="templateDefinition" type="ResourceTemplateDefinition" required="true" >   Template configuration (name, uriTemplate, description, mimeType, callbacks). </ParamField>
+><ParamField body="callback" type="ReadResourceTemplateCallback | undefined" default="undefined" >   Async handler receiving the resolved `URL` and the extracted params. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" />
+
+**Example**
+```ts wrap
+import { markdown, error } from "mcp-use/server";
+
+server.resourceTemplate(
+  {
+    name: "documentation",
+    uriTemplate: "docs://{topic}",
+    title: "Documentation",
+    description: "Get documentation by topic",
+    mimeType: "text/markdown",
+    callbacks: {
+      complete: {
+        topic: ["api", "auth", "getting-started", "troubleshooting"],
+      },
+    },
+  },
+  async (uri: URL, params: Record<string, string>) => {
+    const docs: Record<string, string> = {
+      api: "# API Docs",
+      auth: "# Auth Guide",
+    };
+    const content = docs[params.topic];
+    if (!content) {
+      return error(`Topic not found: ${params.topic}`);
+    }
+    return markdown(content);
+  }
+);
+```
+
+**Signature**
+```ts wrap
+resourceTemplate: <T extends ResourceTemplateDefinition>(templateDefinition: T, callback?: ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>) => this
+```
+
+### prompt
+
+Registers a reusable prompt template that clients can request. Prompts can accept arguments (validated by a Zod `schema`) and return formatted messages ready to send to an LLM. Returns the server instance for chaining.
+
+**Parameters**
+><ParamField body="promptDefinition" type="PromptDefinition" required="true" >   Prompt configuration (name, description, schema). </ParamField>
+><ParamField body="callback" type="PromptCallback | undefined" default="undefined" >   Async handler that returns the prompt messages. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" />
+
+**Example**
+```ts wrap
+import { z } from "zod";
+import { text } from "mcp-use/server";
+
+server.prompt(
+  {
+    name: "greeting",
+    description: "A simple prompt that returns a greeting",
+    schema: z.object({ name: z.string() }),
+  },
+  async ({ name }) => text(`Hello, ${name}!`)
+);
+```
+
+**Signature**
+```ts wrap
+prompt: <T extends PromptDefinition>(promptDefinition: T, callback?: PromptCallback<InferPromptInput<T>, HasOAuth>) => this
+```
+
+### uiResource
+
+Registers a UI resource for interactive widgets (MCP Apps). UI resources serve interactive components that compatible clients (such as ChatGPT with the Apps SDK, or Claude) can render. Returns the server instance for chaining. This is a declarative wrapper over the lower-level builders in the [Widgets and MCP Apps reference](/typescript/api-reference/server/widgets).
+
+**Parameters**
+><ParamField body="definition" type="UIResourceDefinition" required="true" >   UI resource configuration (name, uri, and the widget source such as `html`, a component, or an external URL). See [UIResourceDefinition](/typescript/api-reference/server/resources). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" />
+
+**Example**
+```ts wrap
+server.uiResource({
+  name: "chart-viewer",
+  uri: "ui://chart",
+  html: "<div>Chart goes here</div>",
+});
+```
+
+**Signature**
+```ts wrap
+uiResource(definition: UIResourceDefinition): this
+```
+
+### notifyResourceUpdated
+
+Notifies subscribed clients that a resource has changed. Sends a `notifications/resources/updated` message to every session that called `resources/subscribe` for the given URI. Can be called from a tool handler or any async context. Resolves once all notifications have been sent.
+
+**Parameters**
+><ParamField body="uri" type="string" required="true" >   The URI of the resource that was updated. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Example**
+```ts wrap
+// After updating a resource, notify subscribers
+await server.notifyResourceUpdated("file:///path/to/resource.txt");
+```
+
+**Signature**
+```ts wrap
+notifyResourceUpdated(uri: string): Promise<void>
+```
+
+### listen
+
+Starts the HTTP server. Mounts MCP protocol endpoints (at `/mcp` and `/sse`), the inspector UI (at `/inspector`), widget routes, and OAuth routes (if configured), then begins listening. Resolves once the server is listening. During HMR reload (when the CLI manages the lifecycle) this is a no-op.
+
+Port resolution, in order of priority: the `port` argument, then the `--port` CLI argument, then the `PORT` environment variable, then the default `3000`. The host comes from `config.host` or the `HOST` environment variable (default `"localhost"`), and the base URL comes from `config.baseUrl` or `MCP_URL`, falling back to `http://${host}:${port}`.
+
+**Parameters**
+><ParamField body="port" type="number | undefined" default="3000" >   Port to listen on. When omitted, falls back to the `--port` CLI arg, then `PORT`, then 3000. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Example**
+```ts wrap
+await server.listen(3000);
+// Server running at: http://localhost:3000
+// MCP endpoint:      http://localhost:3000/mcp
+// Inspector UI:      http://localhost:3000/inspector
+```
+
+**Signature**
+```ts wrap
+listen(port?: number): Promise<void>
+```
+
+### proxy
+
+Mounts one or more remote MCP servers onto this server. It introspects each remote server's tools, resources, and prompts and registers them natively, so this server acts as a gateway. Pass a map of namespace to connection config, or pass a single `MCPSession` plus a `namespace` option. Sampling and elicitation requests from proxied tools are forwarded to the active client session when request context is available. Resolves once mounting is complete.
+
+**Parameters**
+><ParamField body="config" type="Record<string, any> | MCPSession" required="true" >   A map of namespace to server connection config, or a single `MCPSession`. </ParamField>
+><ParamField body="options" type="{ namespace?: string } | undefined" default="undefined" >   Additional options. Provide `namespace` when passing a single `MCPSession`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Example**
+```ts wrap
+// Using a config map of namespaces
+await server.proxy({
+  db: { command: "node", args: ["db.js"] },
+});
+
+// Using an explicit session
+await server.proxy(mySession, { namespace: "db" });
+```
+
+**Signature**
+```ts wrap
+proxy(config: Record<string, any> | MCPSession, options?: { namespace?: string }): Promise<void>
+```
+
+## Static methods
+
+### fromOpenAPI
+
+Creates an MCP server from a parsed, bundled OpenAPI document. Each included OpenAPI operation is registered as an MCP tool. The server `name` defaults to `spec.info.title` and the `version` defaults to `options.version`, then `spec.info.version`, then `"1.0.0"`. Returns an `McpServerInstance<false>` (OAuth is not configured by this factory).
+
+**Parameters**
+><ParamField body="options" type="FromOpenAPIOptions" required="true" >   OpenAPI options (see fields below). </ParamField>
+><ParamField body="options.spec" type="OpenAPIDocument" required="true" >   The parsed OpenAPI document. </ParamField>
+><ParamField body="options.baseUrl" type="string | undefined" default="undefined" >   Base URL for the generated HTTP requests. </ParamField>
+><ParamField body="options.name" type="string | undefined" default="spec.info.title" >   Server name override. </ParamField>
+><ParamField body="options.version" type="string | undefined" default="spec.info.version" >   Server version override (falls back to "1.0.0"). </ParamField>
+><ParamField body="options.auth" type="OpenAPIAuth | undefined" default="undefined" >   Bearer or header auth applied to generated requests. </ParamField>
+><ParamField body="options.headers" type="Record<string, string> | undefined" default="undefined" >   Extra headers sent with every request. </ParamField>
+><ParamField body="options.tags" type="string[] | undefined" default="undefined" >   Only include operations matching these tags. </ParamField>
+><ParamField body="options.exclude" type="OpenAPIExcludeRule[] | undefined" default="undefined" >   Rules to exclude operations by operationId, path, method, or tags. </ParamField>
+><ParamField body="options.fetch" type="typeof fetch | undefined" default="undefined" >   Custom fetch implementation. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="McpServerInstance<false>" />
+
+**Signature**
+```ts wrap
+static fromOpenAPI(options: FromOpenAPIOptions): McpServerInstance<false>
+```
+
+### getPackageVersion
+
+Returns the installed `mcp-use` package version string (for example `"1.13.2"`).
+
+**Returns**
+><ResponseField name="returns" type="string" />
+
+**Example**
+```ts wrap
+console.log(`mcp-use version: ${MCPServer.getPackageVersion()}`);
+```
+
+**Signature**
+```ts wrap
+static getPackageVersion(): string
+```
+
+## Types
+
+### McpServerInstance
+
+The runtime type of a value returned by `new MCPServer(config)`. It is an intersection of three surfaces, so a single instance exposes MCP methods, the full Hono app, and the `mcp-use` helper surface at once.
+
+The `HasOAuth` type parameter is `true` when `oauth` is configured in `ServerConfig` and `false` otherwise; it flows into the typing of tool, resource, and prompt callbacks (for example, the presence of `ctx.auth`).
+
+**Definition**
+```ts wrap
+type McpServerInstance<HasOAuth extends boolean = false> = WithMcpUse & MCPServerClass<HasOAuth> & HonoType
+```

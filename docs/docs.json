@@ -194,22 +194,7 @@
                   "typescript/server/mcp-apps",
                   "typescript/server/creating-mcp-apps-server",
                   "typescript/server/content-security-policy",
-                  "guides/chatgpt-apps-flow",
-                  {
-                    "group": "React",
-                    "icon": "atom",
-                    "pages": [
-                      "typescript/react/usewidget",
-                      "typescript/react/usecalltool",
-                      "typescript/react/usefiles",
-                      "typescript/react/mcpuseprovider",
-                      "typescript/react/widgetcontrols",
-                      "typescript/react/modelcontext",
-                      "typescript/react/themeprovider",
-                      "typescript/react/image",
-                      "typescript/react/errorboundary"
-                    ]
-                  }
+                  "guides/chatgpt-apps-flow"
                 ]
               },
               {
@@ -279,6 +264,64 @@
                 "pages": [
                   "/inspector/index",
                   "tunneling/index"
+                ]
+              }
+            ]
+          },
+          {
+            "tab": "API Reference",
+            "icon": "terminal",
+            "groups": [
+              {
+                "group": "Overview",
+                "pages": [
+                  "typescript/api-reference/overview"
+                ]
+              },
+              {
+                "group": "Server",
+                "icon": "server",
+                "pages": [
+                  "typescript/api-reference/server/mcp-server",
+                  "typescript/api-reference/server/server-config",
+                  {
+                    "group": "Tools, resources & prompts",
+                    "icon": "box",
+                    "pages": [
+                      "typescript/api-reference/server/tools",
+                      "typescript/api-reference/server/resources",
+                      "typescript/api-reference/server/prompts"
+                    ]
+                  },
+                  "typescript/api-reference/server/tool-context",
+                  "typescript/api-reference/server/response-helpers",
+                  "typescript/api-reference/server/elicitation-schemas",
+                  {
+                    "group": "Authentication",
+                    "icon": "shield",
+                    "pages": [
+                      "typescript/api-reference/server/auth",
+                      "typescript/api-reference/server/auth-providers"
+                    ]
+                  },
+                  "typescript/api-reference/server/sessions",
+                  "typescript/api-reference/server/middleware",
+                  "typescript/api-reference/server/widgets"
+                ]
+              },
+              {
+                "group": "React",
+                "icon": "atom",
+                "pages": [
+                  "typescript/api-reference/react/usewidget",
+                  "typescript/api-reference/react/usecalltool",
+                  "typescript/api-reference/react/usefiles",
+                  "typescript/api-reference/react/mcpuseprovider",
+                  "typescript/api-reference/react/widgetcontrols",
+                  "typescript/api-reference/react/themeprovider",
+                  "typescript/api-reference/react/errorboundary",
+                  "typescript/api-reference/react/image",
+                  "typescript/api-reference/react/modelcontext"
                 ]
               }
             ]
@@ -728,43 +771,79 @@
     },
     {
       "source": "/typescript/server/api-reference",
-      "destination": "/typescript/server/index#mcpserver-api-reference"
+      "destination": "/typescript/api-reference/overview"
     },
     {
       "source": "/typescript/server/widget-components/usewidget",
-      "destination": "/typescript/react/usewidget"
+      "destination": "/typescript/api-reference/react/usewidget"
     },
     {
       "source": "/typescript/server/widget-components/usecalltool",
-      "destination": "/typescript/react/usecalltool"
+      "destination": "/typescript/api-reference/react/usecalltool"
     },
     {
       "source": "/typescript/server/widget-components/usefiles",
-      "destination": "/typescript/react/usefiles"
+      "destination": "/typescript/api-reference/react/usefiles"
     },
     {
       "source": "/typescript/server/widget-components/mcpuseprovider",
-      "destination": "/typescript/react/mcpuseprovider"
+      "destination": "/typescript/api-reference/react/mcpuseprovider"
     },
     {
       "source": "/typescript/server/widget-components/widgetcontrols",
-      "destination": "/typescript/react/widgetcontrols"
+      "destination": "/typescript/api-reference/react/widgetcontrols"
     },
     {
       "source": "/typescript/server/widget-components/modelcontext",
-      "destination": "/typescript/react/modelcontext"
+      "destination": "/typescript/api-reference/react/modelcontext"
     },
     {
       "source": "/typescript/server/widget-components/themeprovider",
-      "destination": "/typescript/react/themeprovider"
+      "destination": "/typescript/api-reference/react/themeprovider"
     },
     {
       "source": "/typescript/server/widget-components/image",
-      "destination": "/typescript/react/image"
+      "destination": "/typescript/api-reference/react/image"
     },
     {
       "source": "/typescript/server/widget-components/errorboundary",
-      "destination": "/typescript/react/errorboundary"
+      "destination": "/typescript/api-reference/react/errorboundary"
+    },
+    {
+      "source": "/typescript/react/usewidget",
+      "destination": "/typescript/api-reference/react/usewidget"
+    },
+    {
+      "source": "/typescript/react/usecalltool",
+      "destination": "/typescript/api-reference/react/usecalltool"
+    },
+    {
+      "source": "/typescript/react/usefiles",
+      "destination": "/typescript/api-reference/react/usefiles"
+    },
+    {
+      "source": "/typescript/react/mcpuseprovider",
+      "destination": "/typescript/api-reference/react/mcpuseprovider"
+    },
+    {
+      "source": "/typescript/react/widgetcontrols",
+      "destination": "/typescript/api-reference/react/widgetcontrols"
+    },
+    {
+      "source": "/typescript/react/modelcontext",
+      "destination": "/typescript/api-reference/react/modelcontext"
+    },
+    {
+      "source": "/typescript/react/themeprovider",
+      "destination": "/typescript/api-reference/react/themeprovider"
+    },
+    {
+      "source": "/typescript/react/image",
+      "destination": "/typescript/api-reference/react/image"
+    },
+    {
+      "source": "/typescript/react/errorboundary",
+      "destination": "/typescript/api-reference/react/errorboundary"
     },
     {
       "source": "/typescript/development/security",

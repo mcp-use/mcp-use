@@ -298,51 +298,7 @@ await server.listen();
 
 ## API Reference
 
-### ctx.sample(prompt: string, options?)
-
-Simplified API 
-
-**Parameters:**
-- `prompt` (string): The text prompt to send to the LLM
-- `options` (optional):
-  - `maxTokens` (number): Maximum tokens in response (default: 1000)
-  - `temperature` (number): Sampling temperature 0.0-1.0
-  - `timeout` (number): Timeout in milliseconds (default: Infinity)
-  - `progressIntervalMs` (number): Progress interval (default: 5000)
-  - `onProgress` (function): Custom progress handler
-
-**Returns:** Promise\<CreateMessageResult\>
-
-### ctx.sample(CreateMessageRequestParams, options?)
-
-Extended API 
-
-**Parameters:**
-- `params` (object):
-  - `messages` (array): Array of message objects
-  - `modelPreferences` (optional): Model selection preferences
-  - `systemPrompt` (optional): System prompt for the LLM
-  - `maxTokens` (optional): Maximum response tokens
-- `options` (optional): Same as simplified API
-
-**Returns:** Promise\<CreateMessageResult\>
-
-### CreateMessageResult
-
-```typescript
-interface CreateMessageResult {
-  role: 'assistant';
-  content: {
-    type: 'text' | 'image';
-    text?: string;
-    data?: string;
-    mimeType?: string;
-  };
-  model: string;
-  stopReason?: 'endTurn' | 'maxTokens' | 'stopSequence' | string;
-}
-```
-
+`ctx.sample()` and its options are documented in the [Tool context reference](/typescript/api-reference/server/tool-context). See `SampleOptions` for every option and `CreateMessageResult` for the return shape.
 
 ## Testing with MCP Inspector
 
@@ -380,4 +336,3 @@ Server runs on http://localhost:3000 with MCP Inspector available.
 - [Elicitation](./elicitation) - Request user input during execution
 - [Notifications](./notifications) - Send status updates to clients
 - [Client Sampling](/typescript/client/sampling) - Configure sampling on the client side
-

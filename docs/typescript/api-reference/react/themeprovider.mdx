@@ -1,0 +1,97 @@
+---
+title: "ThemeProvider"
+description: "Theme provider component that manages dark mode and host style variables for widgets API Documentation"
+icon: "palette"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/ThemeProvider.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/ThemeProvider.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/ThemeProvider.tsx</a>
+</Callout>
+
+`ThemeProvider` manages dark mode by setting the `dark` class and `data-theme` attribute on the document root element (`document.documentElement`). It resolves the active theme from the MCP Apps host context, falling back to the operating system preference when the host does not supply a theme. It also applies host style variables so CSS that uses `light-dark()` resolves against the active host theme.
+
+## ThemeProvider
+
+Component that manages the dark mode class on the document root and synchronizes host style variables.
+
+```tsx
+import { ThemeProvider } from 'mcp-use/react'
+```
+
+Wraps widget content and applies the active theme to `document.documentElement`. On render and whenever the effective theme changes, it removes the `light` and `dark` classes from the root element, then adds the active one, sets the `data-theme` attribute to `"light"` or `"dark"`, and (when enabled) sets `document.documentElement.style.colorScheme`. It also calls `applyHostStyleVariables` with the host context style variables so host design tokens are available as CSS variables.
+
+The effective theme is computed with the following priority:
+
+1. **Explicit host context theme.** When the MCP Apps host context reports a theme of `"dark"` or `"light"`, that value is used. The component reads the raw host context (not the value normalized by `useWidget`, which defaults a missing theme to `"light"`), so an omitted host theme is not treated as an explicit light-mode preference.
+2. **System preference.** When the host does not provide `"dark"` or `"light"`, the component falls back to the `prefers-color-scheme: dark` media query. During server-side rendering (when `window` is `undefined`) the initial system preference is `"light"`.
+
+The component subscribes to the `prefers-color-scheme: dark` media query and re-renders when the system theme changes, removing the listener on unmount. Theme application runs inside `useLayoutEffect`, so it executes synchronously before browser paint to prevent a flash of the wrong theme.
+
+The component renders its `children` directly inside a React fragment and adds no wrapper element to the DOM.
+
+<Tip>
+`McpUseProvider` includes `ThemeProvider` automatically, so most widgets do not need to render `ThemeProvider` themselves.
+</Tip>
+
+**Props**
+><ParamField body="children" type="React.ReactNode" required="true" >   The widget content to wrap. Rendered as-is inside a fragment. </ParamField>
+><ParamField body="colorScheme" type="boolean" default="true" >   When `true` (the default), sets `document.documentElement.style.colorScheme` to the active theme (`"light"` or `"dark"`). When `false`, clears the inline `colorScheme` style by setting it to an empty string. </ParamField>
+
+**Signature**
+```tsx wrap
+const ThemeProvider: React.FC<{ children: React.ReactNode; colorScheme?: boolean }>
+```
+
+## Side effects
+
+`ThemeProvider` mutates the document root and registers a media query listener. The following table documents every observable effect.
+
+<ResponseField name="document.documentElement classList" type="light | dark">
+The `light` and `dark` classes are both removed, then the class matching the effective theme is added. This drives Tailwind dark mode.
+</ResponseField>
+
+<ResponseField name="document.documentElement data-theme" type="light | dark">
+Set to the effective theme. This drives UI design tokens that key off `data-theme`.
+</ResponseField>
+
+<ResponseField name="document.documentElement.style.colorScheme" type="light | dark | empty string">
+Set to the effective theme when `colorScheme` is `true`, otherwise cleared to an empty string. Setting `color-scheme` lets host variables that use CSS `light-dark()` resolve against the active host theme.
+</ResponseField>
+
+<ResponseField name="host style variables" type="CSS custom properties">
+`applyHostStyleVariables` is called with the host context style variables (`hostContext.styles.variables`) whenever the host context changes, applying host design tokens as CSS variables.
+</ResponseField>
+
+## Basic Usage
+
+```tsx
+import { ThemeProvider } from 'mcp-use/react'
+
+function MyWidget() {
+  return (
+    <ThemeProvider>
+      <div>My widget content</div>
+    </ThemeProvider>
+  )
+}
+```
+
+Disable the inline `color-scheme` style by passing `colorScheme={false}`:
+
+```tsx
+import { ThemeProvider } from 'mcp-use/react'
+
+function MyWidget() {
+  return (
+    <ThemeProvider colorScheme={false}>
+      <div>My widget content</div>
+    </ThemeProvider>
+  )
+}
+```
+
+## Related
+
+- [`McpUseProvider`](/typescript/api-reference/react/mcpuseprovider) includes `ThemeProvider` automatically.
+- [`useWidget`](/typescript/api-reference/react/usewidget) exposes the host context theme and other widget data.

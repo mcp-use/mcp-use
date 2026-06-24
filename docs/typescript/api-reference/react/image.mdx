@@ -1,0 +1,114 @@
+---
+title: "Image"
+description: "Image component for MCP widgets that resolves public file paths against the MCP public URL API Documentation"
+icon: "image"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/Image.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/Image.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/Image.tsx</a>
+</Callout>
+
+The `Image` component is a drop-in replacement for the native `img` element inside MCP widgets. It automatically resolves relative `src` paths against the MCP public URL injected by the server, while leaving absolute URLs and data URIs untouched. This lets you reference files in your `public/` folder with simple root-relative paths (for example `/fruits/apple.png`) and have them work in both local development and deployed widgets.
+
+## Image
+
+Image component that automatically handles absolute paths using the MCP public URL.
+
+```tsx
+import { Image } from "mcp-use/react";
+```
+
+Renders an `img` element after resolving its `src`. The component is typed as
+`React.FC<React.ImgHTMLAttributes<globalThis.HTMLImageElement>>`, so it accepts every standard `img` HTML attribute (for example `alt`, `className`, `width`, `height`, `loading`, `onClick`). The `src` prop is destructured out, resolved, and reapplied; all other props are spread onto the rendered `img` unchanged.
+
+Source resolution rules applied to `src`:
+
+1. If `src` is falsy (`undefined` or an empty string), it is returned unchanged and rendered as-is.
+2. If `src` starts with `http://`, `https://`, or `data:`, it is treated as already absolute and used as-is.
+3. Otherwise `src` is treated as a public path. The resolver strips a single leading slash from `src` and joins it to the public URL base as `` `${publicUrl}/${cleanSrc}` ``.
+4. If no public URL base is available (the resolver falls back to an empty string), the original `src` is returned unchanged.
+
+The public URL base is read once from the `window` globals injected by the MCP server. It prefers `window.__mcpPublicAssetsUrl` (used by static deployments such as a Supabase storage bucket) and falls back to `window.__mcpPublicUrl` (used for dynamic serving, for example `http://localhost:3000/mcp-use/public`). When `window` is undefined (server-side rendering), the base resolves to an empty string and paths are returned unchanged. The base is expected to have no trailing slash, matching the MCPServer implementation, so exactly one slash separates the base from the resolved path.
+
+**Props**
+><ParamField body="src" type="string | undefined" >   Image source URL or path. A root-relative path such as `/fruits/apple.png` is prefixed with the MCP public URL; an `http://`, `https://`, or `data:` value is used as-is. Inherited from `React.ImgHTMLAttributes`, so it is optional at the type level, but in practice you should always provide it. </ParamField>
+><ParamField body="...props" type="React.ImgHTMLAttributes<globalThis.HTMLImageElement>" >   Any other standard `img` attribute (for example `alt`, `className`, `style`, `width`, `height`, `loading`, `srcSet`, `onClick`). These are forwarded to the underlying `img` element without modification. </ParamField>
+
+**Signature**
+```tsx wrap
+export const Image: React.FC<React.ImgHTMLAttributes<globalThis.HTMLImageElement>>;
+```
+
+## Source Resolution
+
+The component handles three source formats. Each row shows an input `src` and how it is rendered when the public URL base is, for example, `http://localhost:3000/mcp-use/public`.
+
+| Input `src` | Resolved output | Rule |
+|-------------|-----------------|------|
+| `https://example.com/image.jpg` | `https://example.com/image.jpg` | Absolute URL, used as-is |
+| `http://example.com/image.jpg` | `http://example.com/image.jpg` | Absolute URL, used as-is |
+| `data:image/png;base64,...` | `data:image/png;base64,...` | Data URI, used as-is |
+| `/fruits/apple.png` | `http://localhost:3000/mcp-use/public/fruits/apple.png` | Public path, leading slash stripped, joined to base |
+| `fruits/apple.png` | `http://localhost:3000/mcp-use/public/fruits/apple.png` | Public path with no leading slash, joined to base |
+| `/fruits/apple.png` (no base available) | `/fruits/apple.png` | Falls back to the original `src` |
+| `""` or `undefined` | unchanged | Falsy source returned as-is |
+
+## Basic Usage
+
+```tsx
+import { Image } from "mcp-use/react";
+
+function MyWidget() {
+  return (
+    <div>
+      {/* Public folder image, resolved against the MCP public URL */}
+      <Image src="/fruits/apple.png" alt="Apple" />
+
+      {/* Absolute URL, used as-is */}
+      <Image src="https://example.com/image.jpg" alt="Example" />
+
+      {/* Data URL, used as-is */}
+      <Image src="data:image/png;base64,..." alt="Inline" />
+    </div>
+  );
+}
+```
+
+## Public Folder Images
+
+When referencing images from your `public/` folder, use paths relative to the public root. The component resolves them to the correct URL using the injected `window` globals.
+
+```tsx
+import { Image } from "mcp-use/react";
+
+// public/fruits/apple.png
+<Image src="/fruits/apple.png" alt="Apple" />
+
+// public/logo.svg
+<Image src="/logo.svg" alt="Logo" />
+```
+
+<Note>
+The `Image` component prefers `window.__mcpPublicAssetsUrl` when it is available (static deployments such as a Supabase storage bucket), falling back to `window.__mcpPublicUrl` for dynamic serving.
+</Note>
+
+## Window Globals
+
+The component reads these `window` globals, which are injected by the MCP server or set at build time:
+
+- `window.__mcpPublicAssetsUrl`: Base URL for public assets in static deployments (for example a Supabase storage bucket). Preferred when present.
+- `window.__mcpPublicUrl`: Base URL for public assets (for example `http://localhost:3000/mcp-use/public`). Used as the fallback.
+
+If neither global is set, or the code runs without a `window` (server-side rendering), the resolver uses an empty base and returns each `src` unchanged.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="McpUseProvider" icon="plug" href="/typescript/api-reference/react/mcpuseprovider">
+    Unified provider that supplies widget context to components like `Image`.
+  </Card>
+  <Card title="useFiles" icon="folder-open" href="/typescript/api-reference/react/usefiles">
+    Hook for working with widget files and resolving file URLs.
+  </Card>
+</CardGroup>

@@ -1,0 +1,540 @@
+---
+title: "Tool context (ctx)"
+description: "The context object passed to every tool, resource, and prompt callback API Documentation"
+icon: "box"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/tool-context.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/tool-context.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/tool-context.ts</a>
+</Callout>
+
+`ToolContext` is the second argument (`ctx`) passed to every tool callback registered with `server.tool(...)`. It gives the callback access to sampling, elicitation, progress and log notifications, the connecting client's identity and capabilities, the current session, and notification helpers. Each member is wired up per invocation by `createEnhancedContext`, so members that depend on client capabilities or a progress token (for example `reportProgress`) may be `undefined` when the client did not request them.
+
+```ts wrap
+import { MCPServer, text } from "mcp-use/server";
+import z from "zod";
+
+const server = new MCPServer({
+  name: "sampling-example-server",
+  version: "1.0.0",
+  description: "An MCP server example demonstrating sampling capabilities",
+});
+
+server.tool(
+  {
+    name: "analyze-sentiment-simple",
+    description: "Analyze sentiment using the simplified string API.",
+    schema: z.object({ text: z.string() }),
+  },
+  async (params, ctx) => {
+    const res = await ctx.sample(
+      `Analyze the sentiment of the following text as positive, negative, or neutral. The text to analyze is: ${params.text}`
+    );
+    const content = Array.isArray(res.content) ? res.content[0] : res.content;
+    const sentimentText = content?.type === "text" ? content.text : "Unknown";
+    return text(`Sentiment: ${sentimentText}`);
+  }
+);
+
+await server.listen();
+```
+
+<Note>
+Members that require a feature the client did not negotiate are optional at the type level. `reportProgress` is only present when the client supplied a `progressToken` for the call. `sendNotification` and `sendNotificationToSession` are only present when the call is associated with a session. Guard with `ctx.client.can(...)` before calling `ctx.sample` or `ctx.elicit`, and null-check `ctx.reportProgress` before invoking it.
+</Note>
+
+## ToolContext
+
+Context object passed to tool callbacks. Provides access to sampling, elicitation, progress reporting, logging, client identity, session info, and notification helpers.
+
+```ts
+import type { ToolContext } from "mcp-use/server";
+```
+
+### sample
+
+Requests sampling from the client's LLM, with automatic progress notifications sent every `progressIntervalMs` (default 5000 ms) while waiting. This keeps clients that set `resetTimeoutOnProgress: true` from timing out. There is no timeout by default (the call waits indefinitely); set `options.timeout` to bound the wait. Has two overloads: a simplified string-prompt form and a full-control form that takes complete `CreateMessageRequest["params"]`.
+
+When called with a string prompt, the prompt is wrapped into a single user message and `maxTokens` defaults to `1000`. Only available if the client advertised the `sampling` capability, check with `ctx.client.can("sampling")` first.
+
+**Signature**
+```ts wrap
+sample: {
+  // Overload 1: Simplified string API
+  (prompt: string, options?: SampleOptions): Promise<CreateMessageResult>;
+  // Overload 2: Full control API
+  (params: CreateMessageRequest["params"], options?: SampleOptions): Promise<CreateMessageResult>;
+};
+```
+
+**Parameters**
+><ParamField body="prompt | params" type="string | CreateMessageRequest['params']" required="true" >   Either a prompt string (simplified API) or a complete sampling params object (full control API). </ParamField>
+><ParamField body="options" type="SampleOptions" default="undefined" >   Optional timeout, progress interval, max tokens, model preferences, and other sampling options. See `SampleOptions`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<CreateMessageResult>" />
+
+### elicit
+
+Requests user input via the client through elicitation. Supports three overloads with automatic mode detection: a Zod schema for form mode (type-safe, returns `result.data` typed via `z.infer<T>`), a URL string for URL mode (use for sensitive interactions such as OAuth), and the verbose params form for backward compatibility. There is no timeout by default; set `options.timeout` to bound the wait.
+
+In form mode, accepted responses are validated against the Zod schema. If validation fails, an `ElicitationValidationError` is thrown. The returned object always carries the SDK `action` (`"accept"`, `"decline"`, or `"cancel"`), and for accepted responses the input is exposed on `result.data` (validated against the Zod schema in form mode). Only available if the client advertised the `elicitation` capability.
+
+**Signature**
+```ts wrap
+elicit: {
+  // Overload 1: Form mode with a Zod schema (type-safe)
+  <T extends z.ZodObject<any>>(message: string, schema: T, options?: ElicitOptions): Promise<ElicitResult & { data: z.infer<T> }>;
+  // Overload 2: URL mode with a URL string
+  (message: string, url: string, options?: ElicitOptions): Promise<ElicitResult>;
+  // Overload 3: Verbose params form (backward compatible)
+  (params: ElicitFormParams | ElicitUrlParams, options?: ElicitOptions): Promise<ElicitResult>;
+};
+```
+
+**Parameters**
+><ParamField body="message" type="string" required="true" >   Human-readable message explaining why the input is needed (overloads 1 and 2). </ParamField>
+><ParamField body="schema" type="z.ZodObject<any>" required="true" >   Zod object schema describing the requested fields (form mode, overload 1). </ParamField>
+><ParamField body="url" type="string" required="true" >   URL the user should navigate to (URL mode, overload 2). </ParamField>
+><ParamField body="params" type="ElicitFormParams | ElicitUrlParams" required="true" >   Verbose params object (overload 3). See `ElicitFormParams` and `ElicitUrlParams`. </ParamField>
+><ParamField body="options" type="ElicitOptions" default="undefined" >   Optional timeout. See `ElicitOptions`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ElicitResult & { data: z.infer<T> }> | Promise<ElicitResult>" />
+
+### reportProgress
+
+Sends a progress notification to the client. Optional (`undefined`) unless the client requested progress updates for this tool call by supplying a `progressToken`. Null-check before calling: ``await ctx.reportProgress?.(50, 100, "Halfway")``.
+
+**Signature**
+```ts wrap
+reportProgress?: (progress: number, total?: number, message?: string) => Promise<void>;
+```
+
+**Parameters**
+><ParamField body="progress" type="number" required="true" >   Current progress value. Should increase with each call. </ParamField>
+><ParamField body="total" type="number" default="undefined" >   Total progress value, if known. </ParamField>
+><ParamField body="message" type="string" default="undefined" >   Optional message describing current progress. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+### log
+
+Sends a log notification to the client. Always present on `ctx`, and sends notifications when the client supports them. Levels follow RFC 5424; if the client set a minimum log level, messages below that threshold are dropped silently.
+
+**Signature**
+```ts wrap
+log: (
+  level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+  message: string,
+  logger?: string
+) => Promise<void>;
+```
+
+**Parameters**
+><ParamField body="level" type='"debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency"' required="true" >   RFC 5424 log level. </ParamField>
+><ParamField body="message" type="string" required="true" >   Log message content. </ParamField>
+><ParamField body="logger" type="string" default='"tool"' >   Optional logger name. Defaults to `"tool"`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+### client
+
+The client capability interface, providing access to the capabilities and identity the client advertised during the initialize handshake, plus per-invocation caller context. Always present on `ctx`. See the [client object](#client-object) section for each method.
+
+**Signature**
+```ts wrap
+client: {
+  can(capability: string): boolean;
+  capabilities(): Record<string, any>;
+  info(): { name?: string; version?: string };
+  extension(id: string): Record<string, any> | undefined;
+  supportsApps(): boolean;
+  user(): UserContext | undefined;
+};
+```
+
+### session
+
+Session information for the current tool execution. Exposes the unique session ID, which can be passed to `ctx.sendNotificationToSession()` to target this session from another tool.
+
+**Signature**
+```ts wrap
+session: {
+  sessionId: string;
+};
+```
+
+**Properties**
+><ParamField body="sessionId" type="string" required="true" >   Unique identifier for the current session. </ParamField>
+
+### sendNotification
+
+Sends a notification to the current session (the client that called this tool). A convenience over `server.sendNotification()`, which broadcasts to all sessions. If the session has no `sendNotification` function, a warning is logged and the call resolves without sending.
+
+**Signature**
+```ts wrap
+sendNotification: (method: string, params?: Record<string, unknown>) => Promise<void>;
+```
+
+**Parameters**
+><ParamField body="method" type="string" required="true" >   The notification method name (e.g. `"custom/my-notification"`). </ParamField>
+><ParamField body="params" type="Record<string, unknown>" default="undefined" >   Optional parameters to include in the notification. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+### sendNotificationToSession
+
+Sends a notification to a specific session by ID. Unlike `sendNotification`, this can target any connected session, useful for cross-session coordination. Resolves to `false` if the target session is not found or has no notification channel, otherwise `true`.
+
+**Signature**
+```ts wrap
+sendNotificationToSession: (sessionId: string, method: string, params?: Record<string, unknown>) => Promise<boolean>;
+```
+
+**Parameters**
+><ParamField body="sessionId" type="string" required="true" >   The target session ID (from `ctx.session.sessionId` or `server.getActiveSessions()`). </ParamField>
+><ParamField body="method" type="string" required="true" >   The notification method name. </ParamField>
+><ParamField body="params" type="Record<string, unknown>" default="undefined" >   Optional parameters to include in the notification. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<boolean>" />   `true` if the notification was sent, `false` if the session was not found.
+
+## client object
+
+The `ctx.client` object reflects the connecting client. The `can`, `capabilities`, `info`, `extension`, and `supportsApps` methods describe the session-level initialize handshake and are stable for the lifetime of the connection. `user()` is per-invocation and may return a different value on every tool call.
+
+```ts wrap
+server.tool(
+  {
+    name: "who-is-connected",
+    description: "Summarize the connected client and current caller.",
+    schema: z.object({}),
+  },
+  async (_params, ctx) => {
+    const { name, version } = ctx.client.info();
+    const caps = ctx.client.capabilities();
+    const caller = ctx.client.user();
+    console.log(name, version, Object.keys(caps), caller?.subject);
+    return text("ok");
+  }
+);
+```
+
+### client.can
+
+Checks whether the client advertised a specific top-level capability. Backed by `capability in capabilities`, so it reports presence, not a truthy value.
+
+**Signature**
+```ts wrap
+can(capability: string): boolean;
+```
+
+**Parameters**
+><ParamField body="capability" type="string" required="true" >   Capability name (e.g. `"sampling"`, `"elicitation"`, `"roots"`). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="boolean" />   `true` if the client advertised this capability.
+
+### client.capabilities
+
+Returns a shallow copy of all capabilities advertised by the client, or an empty object if none. The copy prevents callers from mutating internal state.
+
+**Signature**
+```ts wrap
+capabilities(): Record<string, any>;
+```
+
+**Returns**
+><ResponseField name="returns" type="Record<string, any>" />
+
+### client.info
+
+Returns the connecting client's name and version from the MCP initialize handshake. Either field may be `undefined` if the client did not provide it.
+
+**Signature**
+```ts wrap
+info(): { name?: string; version?: string };
+```
+
+**Returns**
+><ResponseField name="returns" type="{ name?: string; version?: string }" />
+
+### client.extension
+
+Returns the settings object for a specific MCP extension (SEP-1724), or `undefined` if the client did not advertise that extension. Reads from `capabilities.extensions[id]`.
+
+**Signature**
+```ts wrap
+extension(id: string): Record<string, any> | undefined;
+```
+
+**Parameters**
+><ParamField body="id" type="string" required="true" >   Extension identifier (e.g. `"io.modelcontextprotocol/ui"`). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Record<string, any> | undefined" />
+
+### client.supportsApps
+
+Returns `true` if the client advertises MCP Apps support (SEP-1865): the `io.modelcontextprotocol/ui` extension whose `mimeTypes` includes `text/html;profile=mcp-app`. Use it to conditionally return widget-aware responses. See the standalone [supportsApps()](#supportsapps) helper for the same check against a raw capabilities object.
+
+**Signature**
+```ts wrap
+supportsApps(): boolean;
+```
+
+**Returns**
+><ResponseField name="returns" type="boolean" />
+
+### client.user
+
+Returns normalized end-user context from `params._meta` sent by the client on this specific tool invocation, or `undefined` when the client does not include user metadata (Inspector, Claude Desktop, CLI, most non-ChatGPT clients). See `UserContext` for the shape.
+
+This value is per-invocation and can differ on every tool call, unlike the other `ctx.client` methods which reflect the session-level handshake. The data is self-reported and unverified, so do not use it for access control. For verified identity use `ctx.auth` (requires OAuth). Under the ChatGPT multi-tenant model a single MCP session is shared across all users: use `subject` to identify the user and `conversationId` to identify the chat thread.
+
+**Signature**
+```ts wrap
+user(): UserContext | undefined;
+```
+
+**Returns**
+><ResponseField name="returns" type="UserContext | undefined" />
+
+## Functions
+
+### supportsApps()
+
+Standalone helper that checks whether a raw client capabilities object advertises MCP Apps support (SEP-1865, the `io.modelcontextprotocol/ui` extension with MIME type `text/html;profile=mcp-app`). Returns `false` when the argument is `undefined` or the extension or MIME type is missing. Use it at server setup time (for example inside `server.onClientConnected`) when you want to register widget-enabled tool variants before any callback runs. Inside a callback, prefer `ctx.client.supportsApps()`.
+
+```ts
+import { supportsApps } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+function supportsApps(clientCapabilities: Record<string, any> | undefined): boolean;
+```
+
+**Parameters**
+><ParamField body="clientCapabilities" type="Record<string, any> | undefined" required="true" >   The raw capabilities object advertised by the client. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="boolean" />   `true` if the capabilities advertise MCP Apps support.
+
+### getRequestContext()
+
+Returns the current Hono `Context` from `AsyncLocalStorage`, or `undefined` when called outside a request context. Lets deeply nested code (tool callbacks, dynamically imported resource or prompt handlers) read request headers, middleware-set variables such as `auth`, and env without explicit parameter passing.
+
+```ts
+import { getRequestContext } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+function getRequestContext(): Context | undefined;
+```
+
+**Returns**
+><ResponseField name="returns" type="Context | undefined" />   The Hono `Context` for the current async operation, or `undefined` if not in a request context.
+
+### hasRequestContext()
+
+Returns `true` when the current async operation is executing within a request context (an `AsyncLocalStorage` store is set). Use it to branch before calling `getRequestContext()` when a `Context` may or may not be present.
+
+```ts
+import { hasRequestContext } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+function hasRequestContext(): boolean;
+```
+
+**Returns**
+><ResponseField name="returns" type="boolean" />   `true` if a request context is available.
+
+### runWithContext()
+
+Runs an async function with a Hono `Context` (and optional session ID) stored in `AsyncLocalStorage`, so that any async operation inside `fn` can retrieve it via `getRequestContext()`. The framework wraps MCP request handling in this for you; you typically only call it directly when integrating custom request handling.
+
+```ts
+import { runWithContext } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+function runWithContext<T>(context: Context, fn: () => Promise<T>, sessionId?: string): Promise<T>;
+```
+
+**Parameters**
+><ParamField body="context" type="Context" required="true" >   Hono `Context` object to store for the duration of `fn`. </ParamField>
+><ParamField body="fn" type="() => Promise<T>" required="true" >   Function to execute within the context. </ParamField>
+><ParamField body="sessionId" type="string" default="undefined" >   Optional session ID to store alongside the context. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<T>" />   Resolves to the return value of `fn`.
+
+## Types
+
+### SampleOptions
+
+Options for the `sample()` method on `ToolContext`. All fields are optional.
+
+```ts
+import type { SampleOptions } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+interface SampleOptions {
+  timeout?: number;
+  progressIntervalMs?: number;
+  onProgress?: (progress: { progress: number; total?: number; message: string }) => void;
+  maxTokens?: number;
+  modelPreferences?: {
+    hints?: Array<{ name?: string }>;
+    costPriority?: number;
+    speedPriority?: number;
+    intelligencePriority?: number;
+  };
+  systemPrompt?: string;
+  temperature?: number;
+  stopSequences?: string[];
+  metadata?: Record<string, unknown>;
+}
+```
+
+**Properties**
+><ParamField body="timeout" type="number" default="Infinity (no timeout)" >   Timeout in milliseconds for the sampling request. Defaults to no timeout (waits indefinitely). </ParamField>
+><ParamField body="progressIntervalMs" type="number" default="5000" >   Interval in milliseconds between progress notifications, sent to prevent client timeout when `resetTimeoutOnProgress` is enabled. </ParamField>
+><ParamField body="onProgress" type="(progress: { progress: number; total?: number; message: string }) => void" default="undefined" >   Callback invoked each time a progress notification is sent. Useful for logging. </ParamField>
+><ParamField body="maxTokens" type="number" default="1000" >   Maximum number of tokens to generate. Only used with the string-prompt shorthand. </ParamField>
+><ParamField body="modelPreferences" type="{ hints?: Array<{ name?: string }>; costPriority?: number; speedPriority?: number; intelligencePriority?: number }" default="undefined" >   Model preferences, including hints by name and cost / speed / intelligence priorities. </ParamField>
+><ParamField body="systemPrompt" type="string" default="undefined" >   System prompt to prepend to the conversation. </ParamField>
+><ParamField body="temperature" type="number" default="undefined" >   Temperature for sampling (0.0 to 1.0). Controls randomness. </ParamField>
+><ParamField body="stopSequences" type="string[]" default="undefined" >   Stop sequences that end generation. </ParamField>
+><ParamField body="metadata" type="Record<string, unknown>" default="undefined" >   Additional metadata to pass with the request. </ParamField>
+
+### ElicitOptions
+
+Options for the `elicit()` method on `ToolContext`.
+
+```ts
+import type { ElicitOptions } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+interface ElicitOptions {
+  timeout?: number;
+}
+```
+
+**Properties**
+><ParamField body="timeout" type="number" default="Infinity (no timeout)" >   Timeout in milliseconds for the elicitation request. Defaults to no timeout (waits indefinitely for the user response). </ParamField>
+
+### ElicitFormParams
+
+Parameters for form mode elicitation, used with the verbose `elicit()` overload to request structured data with optional JSON Schema validation.
+
+```ts
+import type { ElicitFormParams } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+interface ElicitFormParams {
+  message: string;
+  requestedSchema: Record<string, any>;
+  mode?: "form";
+}
+```
+
+**Properties**
+><ParamField body="message" type="string" required="true" >   Human-readable message explaining why the information is needed. </ParamField>
+><ParamField body="requestedSchema" type="Record<string, any>" required="true" >   JSON Schema defining the structure of the expected response. </ParamField>
+><ParamField body="mode" type='"form"' default='"form"' >   Mode specifier. Optional for backward compatibility, defaults to form mode. </ParamField>
+
+### ElicitUrlParams
+
+Parameters for URL mode elicitation, used with the verbose `elicit()` overload to direct users to an external URL. Must be used for interactions involving sensitive information such as credentials.
+
+```ts
+import type { ElicitUrlParams } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+interface ElicitUrlParams {
+  message: string;
+  url: string;
+  mode: "url";
+}
+```
+
+**Properties**
+><ParamField body="message" type="string" required="true" >   Human-readable message explaining why the interaction is needed. </ParamField>
+><ParamField body="url" type="string" required="true" >   URL for the user to navigate to. </ParamField>
+><ParamField body="mode" type='"url"' required="true" >   Mode specifier. Required for URL mode. </ParamField>
+
+### UserContext
+
+Normalized end-user context returned by `ctx.client.user()`, extracted from per-request `params._meta` (the ChatGPT `openai/*` key convention). All fields are optional, and the whole object is `undefined` on clients that do not send request-level metadata. This data is client-reported and unverified, do not treat it as a trusted identity.
+
+```ts
+import type { UserContext } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+interface UserContext {
+  userAgent?: string;
+  locale?: string;
+  location?: {
+    city?: string;
+    region?: string;
+    country?: string;
+    timezone?: string;
+    latitude?: string;
+    longitude?: string;
+  };
+  timezoneOffsetMinutes?: number;
+  subject?: string;
+  conversationId?: string;
+}
+```
+
+**Properties**
+><ParamField body="userAgent" type="string" default="undefined" >   Browser or host user-agent string (from `openai/userAgent`). </ParamField>
+><ParamField body="locale" type="string" default="undefined" >   BCP-47 locale tag, e.g. `"it-IT"` (from `openai/locale`). </ParamField>
+><ParamField body="location" type="{ city?: string; region?: string; country?: string; timezone?: string; latitude?: string; longitude?: string }" default="undefined" >   Approximate geographic location of the end user (from `openai/userLocation`). </ParamField>
+><ParamField body="timezoneOffsetMinutes" type="number" default="undefined" >   UTC offset in minutes (from `timezone_offset_minutes`). </ParamField>
+><ParamField body="subject" type="string" default="undefined" >   Stable, opaque identifier for the end user (from `openai/subject`). Remains constant across chat conversations for the same user. </ParamField>
+><ParamField body="conversationId" type="string" default="undefined" >   Identifier for the current chat or conversation thread (from `openai/session`). Distinct from the MCP session ID (`ctx.session.sessionId`); changes each time the user starts a new conversation. </ParamField>
+
+### McpContext
+
+Conditional Hono context type used as the base for MCP callbacks. The `HasOAuth` type parameter selects whether `auth` is guaranteed present. With `HasOAuth = true` (`McpContextWithAuth`), `auth: AuthInfo` is non-optional because tools are protected by default when OAuth is configured. With the default `HasOAuth = false` (`McpContextBase`), `auth?: AuthInfo` is optional so you can null-check, for example `if (!ctx.auth) return error("Not authenticated")`.
+
+```ts
+import type { McpContext } from "mcp-use/server";
+```
+
+**Signature**
+```ts wrap
+type McpContext<HasOAuth extends boolean = false> = HasOAuth extends true
+  ? McpContextWithAuth
+  : McpContextBase;
+```
+
+**Type Parameters**
+><ParamField body="HasOAuth" type="boolean" default="false" >   When `true`, `auth: AuthInfo` is guaranteed present. When `false`, `auth?: AuthInfo` is optional. </ParamField>
+
+**Resolved shapes**
+><ResponseField name="McpContextBase" type="HonoContext & { auth?: AuthInfo }" >   Base context without OAuth. `auth` is optional. </ResponseField>
+><ResponseField name="McpContextWithAuth" type="HonoContext & { auth: AuthInfo; readonly __hasOAuth?: true }" >   Context with OAuth configured. `auth` is guaranteed present. </ResponseField>
