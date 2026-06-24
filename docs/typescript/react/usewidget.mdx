@@ -108,7 +108,7 @@ useWidget<
 
 | Property            | Type                 | Description                                                                                                                                 |
 | ------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `isAvailable`       | `boolean`            | Whether the `window.openai` API is available                                                                                                |
+| `isAvailable`       | `boolean`            | Whether a widget host bridge is available. This is `true` when connected through MCP Apps, ChatGPT Apps SDK, or the Inspector bridge, and `false` during SSR or plain browser rendering without a host. |
 | `isPending`         | `boolean`            | Whether the tool is currently executing. When `true`, props will be empty `{}`                                                             |
 | `partialToolInput`  | `Partial<TProps> \| null` | Partial/streaming tool arguments, updated in real time as the LLM generates them. `null` when not streaming. Only set when the host sends `tool-input-partial` (e.g. MCP Inspector / MCP Apps); in ChatGPT Apps SDK or URL params this remains `null`. |
 | `isStreaming`       | `boolean`            | Whether tool arguments are currently being streamed (partial input received but complete input not yet available). `false` in ChatGPT Apps SDK or when the host does not stream. |

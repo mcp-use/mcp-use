@@ -243,7 +243,7 @@ As you can see, the official approach requires boilerplate and manual configurat
 
 ## The mcp-use Simplified Approach
 
-mcp-use eliminates all the manual setup and provides a zero-config development experience for building ChatGPT widgets.
+mcp-use handles the local server, widget bundling, Inspector integration, and metadata generation for ChatGPT widgets.
 
 ### Zero-Config Features
 
@@ -254,7 +254,7 @@ With mcp-use, you get:
 3. **Built-in Bundling**: Hot reload and production builds work out of the box
 4. **Pre-built React Hooks**: Use `useWidget()` for props, state, tool calls, and display modes; [streaming tool input](/typescript/react/usewidget#streaming-tool-arguments) for live previews when the host supports it (MCP Apps / Inspector)
 5. **Automatic CSP Configuration**: Content Security Policy is configured automatically
-6. **Automatic Tool Registration**: Widgets become tools automatically based on metadata
+6. **Custom Tool Pattern**: Pair widgets with explicit tools using `widget: { name }` and `widget({ props, output })`
 7. **Automatic Asset Handling**: `public/` folder serves static assets automatically
 
 ### Simplified Development Flow

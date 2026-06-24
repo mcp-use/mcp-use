@@ -1,8 +1,21 @@
 ---
-title: "Creating your first MCP App"
-description: "Complete guide to building an MCP server with interactive widget support for both ChatGPT and Claude"
+title: "MCP Apps quickstart"
+description: "Create, run, and verify a TypeScript MCP App with a widget-returning tool."
 icon: "rocket"
 ---
+
+Create a TypeScript MCP App with a tool that returns a React widget, run it locally, and verify the widget in the Inspector.
+
+If you want a plain MCP server without widgets, use the [TypeScript quickstart](/typescript/getting-started/quickstart) instead.
+
+## What you'll build
+
+By the end of this guide, you'll have:
+
+- A running MCP server at `http://localhost:3000/mcp`
+- A widget-returning tool that uses the `widget()` helper
+- A React widget that receives props from the tool result
+- A verified local result in the Inspector at `http://localhost:3000/inspector`
 
 <iframe
   className="w-full aspect-video rounded-xl"
@@ -12,17 +25,6 @@ icon: "rocket"
   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
   allowFullScreen
 ></iframe>
-
-This guide walks you through creating a complete MCP server with interactive widget support.
-
-## What You'll Build
-
-By the end of this guide, you'll have:
-
-- A fully functional MCP server
-- Tools that return widgets (using the `widget()` helper)
-- React widget components that receive props from tool handlers
-- Production-ready configuration
 
 ## Prerequisites
 
@@ -278,8 +280,8 @@ const MyWidget: React.FC = () => {
   // Generic order is <TProps, TState, TOutput, ...>, so skip past TState to type the output.
   const { props, output } = useWidget<MyProps, {}, MyOutput>();
 
-  // props = tool input parameters
-  // output = additional data returned by the tool
+  // props = structuredContent from widget({ props }) in the tool result
+  // output = structuredContent from your output helper, when you return one
   return <div>{/* Use both props and output */}</div>;
 };
 ```
