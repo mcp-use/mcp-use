@@ -1,326 +1,148 @@
 ---
 title: "Sampling"
-description: "Request LLM completions from the client during tool execution"
+description: "Request client-side LLM completions from TypeScript MCP tools."
 icon: "pipette"
 ---
 
-<Info>
-Sampling allows MCP server tools to request LLM completions from the client during execution. This enables tools to leverage the client's LLM capabilities for tasks like analysis, decision-making, or text generation.
-</Info>
+Sampling lets a tool ask the connected client's LLM for a completion during tool execution. Use it when the server needs model judgment but should not own an LLM provider integration.
 
-## Overview
+This guide focuses on when to use sampling and how to keep tools resilient. Use the [Tool context API reference](/typescript/api-reference/server/tool-context#sample) for exact overloads, options, progress behavior, defaults, and return shapes.
 
-When a tool needs an LLM response, it can use `ctx.sample()` to send a request to the client. The client's configured LLM processes the request and returns the result to the tool. This creates powerful workflows where tools can "think" using the client's AI capabilities.
+## Use sampling when the client should provide the model
 
-**Key Benefits:**
+Sampling is useful when the connected client already has the right model, credentials, policy, or user context.
 
-- **Leverage client's LLM**: Use whatever model the client has configured
-- **No server-side LLM**: No need to integrate an LLM provider in your server
+Good fits:
 
-## How It Works
+| Need | Why sampling fits |
+| --- | --- |
+| Summarize text returned by a tool | The client model can transform the result before the tool responds. |
+| Classify or rank user-provided content | The server avoids a separate LLM provider dependency. |
+| Generate a draft that depends on client policy | The client's model and policy stay in control. |
 
-```mermaid
-sequenceDiagram
-    Client->>Server: tools/call (with progressToken)
-    Server->>Client: sampling/createMessage
-    Note over Client: Process with LLM
-    Client->>Server: Progress notifications (every 5s)
-    Client->>Server: LLM response
-    Server->>Client: Tool result
-```
+Do not use sampling for deterministic server logic, authorization decisions, or work that must succeed in clients without sampling support.
 
-## Basic Usage
+## Check client support
 
-Use the `sample()` method on the context object within tool callbacks:
+Only call `ctx.sample()` when the client advertises the `sampling` capability. Provide a deterministic fallback.
 
 ```typescript
-import { MCPServer, text } from 'mcp-use/server';
-import { z } from 'zod';
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
+  name: "analysis-server",
+  version: "1.0.0",
 });
 
-server.tool({
-  name: 'analyze-sentiment',
-  description: 'Analyze sentiment of text using the client\'s LLM',
-  schema: z.object({
-    text: z.string(),
-  })
-}, async (params, ctx) => {
-  // Simple string API - just pass a prompt!
-  const response = await ctx.sample(
-    `Analyze the sentiment of the following text as positive, negative, or neutral. 
-     Just output a single word. Text: ${params.text}`
-  );
-
-  return text(`Sentiment: ${response.content.text}`);
-});
-
-await server.listen();
-```
-
-## API Styles
-
-The `ctx.sample()` method supports two API styles to suit different needs:
-
-### 1. Simplified
-
-Perfect for simple cases where you just need a completion:
-
-```typescript
-server.tool({
-  name: 'simple-analysis',
-  description: 'Analyze text using simplified API',
-  schema: z.object({
-    text: z.string(),
-  })
-}, async (params, ctx) => {
-  // Just pass a string - that's it!
-  const response = await ctx.sample(
-    `Summarize this text in one sentence: ${params.text}`
-  );
-  
-  return text(response.content.text);
-});
-```
-
-**With options:**
-
-```typescript
-// Add custom options while keeping the simple string API
-const response = await ctx.sample(
-  `Analyze this: ${params.text}`,
+server.tool(
   {
-    maxTokens: 50,
-    temperature: 0.3,
-    timeout: 30000  // 30 seconds
-  }
+    name: "analyze_sentiment",
+    description: "Analyze sentiment, using client sampling when available.",
+    schema: z.object({
+      text: z.string(),
+    }),
+  },
+  async ({ text: input }, ctx) => {
+    if (!ctx.client.can("sampling")) {
+      return text(`Received ${input.length} characters. Sampling is not available.`);
+    }
+
+    const response = await ctx.sample(
+      `Classify this text as positive, negative, or neutral. Return one word.\n\n${input}`,
+    );
+    const content = Array.isArray(response.content) ? response.content[0] : response.content;
+    const sentiment = content?.type === "text" ? content.text.trim() : "unknown";
+
+    return text(`Sentiment: ${sentiment}`);
+  },
 );
 ```
 
-### 2. Extended
+The fallback should still give the user a useful result, even if it is less capable than the sampled path.
 
-Use when you need fine-grained control over model preferences, system prompts, etc.:
+## Keep prompts narrow
+
+Sampling works best when the prompt asks for one clear output. Put server-side data into the prompt and ask for a bounded result.
 
 ```typescript
-server.tool({
-  name: 'advanced-analysis',
-  description: 'Analyze text with full control',
-  schema: z.object({
-    text: z.string(),
-  })
-}, async (params, ctx) => {
-  // Full control with complete params object
-  const response = await ctx.sample({
-    messages: [
-      {
-        role: 'user',
-        content: { 
-          type: 'text', 
-          text: `Analyze: ${params.text}` 
-        },
-      },
-    ],
-    modelPreferences: {
-      intelligencePriority: 0.8,  // Prefer smarter models
-      speedPriority: 0.5,          // Balance speed
-    },
-    systemPrompt: 'You are an expert analyst.',
-    maxTokens: 100,
-  });
-
-  return text(response.content.text);
-});
+const response = await ctx.sample(
+  `Summarize these release notes in three bullets for a support team.\n\n${notes}`,
+);
 ```
 
+Avoid asking the sampled model to make hidden business decisions. If the tool changes state, keep the state-changing logic on the server and use sampling only for language or analysis.
 
-### Progress reporting
+## Use full control when needed
 
-The client will report progress for the generation that can be handled with the `onProgress` callback.
+Use the full request form when the tool needs a system prompt, multiple messages, or model preferences.
 
 ```typescript
-server.tool({
-  name: 'custom-progress',
-  description: 'Custom progress configuration',
-  schema: z.object({
-    prompt: z.string(),
-  })
-}, async (params, ctx) => {
-  const response = await ctx.sample(
-    params.prompt,
+const response = await ctx.sample({
+  systemPrompt: "You write concise operational summaries.",
+  messages: [
     {
-      // Limit wait time (default: Infinity)
-      timeout: 120000,  // 2 minutes
-      
-      // Change progress interval (default: 5000ms)
-      progressIntervalMs: 2000,
-      
-      // Custom progress handling
-      onProgress: ({ message }) => {
-        console.log(`[Progress] ${message}`);
-      }
-    }
-  );
-  
-  return text(response.content.text);
+      role: "user",
+      content: {
+        type: "text",
+        text: `Summarize this incident timeline:\n\n${timeline}`,
+      },
+    },
+  ],
+  maxTokens: 200,
 });
 ```
 
-<Note>
-**Default Behavior**: Like `ctx.elicit()`, sampling has no timeout by default and waits indefinitely for the LLM response. This prevents premature failures for complex prompts that may take time to process.
-</Note>
+Keep exact option tuning in the API reference. The guide-level choice is simple: use a string prompt for ordinary completions, and use the full request object when the message structure matters.
 
+## Report long-running progress
 
+Sampling can take time. If the client supplied a progress token, mcp-use can report progress while waiting. For custom progress handling or intervals, see the [Tool context API reference](/typescript/api-reference/server/tool-context#sample).
 
-
-## Checking for Sampling Support
-
-You can check if the client supports sampling before attempting to use it:
+For long non-sampling work, use `ctx.reportProgress` directly:
 
 ```typescript
-server.tool({
-  name: 'conditional-sampling',
-  description: 'Use sampling if available',
-  schema: z.object({
-    text: z.string(),
-  })
-}, async (params, ctx) => {
-  if (!ctx) {
-    return text('Context not available - running in stateless mode');
-  }
-
-  // Check if client supports sampling
-  if (!ctx.client.can('sampling')) {
-    return text(`Simple Analysis: ${params.text.length} characters`);
-  }
-
-  const response = await ctx.sample(`Analyze: ${params.text}`);
-  return text(`LLM Analysis: ${response.content.text}`);
-});
+server.tool(
+  {
+    name: "process_records",
+    description: "Process records and report progress.",
+    schema: z.object({ batchId: z.string() }),
+  },
+  async ({ batchId }, ctx) => {
+    await ctx.reportProgress?.(0, 100, "Starting");
+    await processBatch(batchId);
+    await ctx.reportProgress?.(100, 100, "Complete");
+    return text("Batch processed.");
+  },
+);
 ```
 
-You can also inspect all client capabilities:
+Use [Notifications](/typescript/server/notifications) for broader server-to-client notification workflows.
+
+## Handle sampling failures
+
+Sampling can fail when the client rejects the request, disconnects, times out, or returns content your tool does not expect.
 
 ```typescript
-server.tool({
-  name: 'advanced-feature',
-  description: 'Uses different features based on client capabilities',
-  schema: z.object({ input: z.string() })
-}, async (params, ctx) => {
-  const caps = ctx.client.capabilities();
-  console.log('Client capabilities:', caps);
-  // { sampling: {}, roots: { listChanged: true }, elicitation: { form: {}, url: {} } }
-  
-  if (ctx.client.can('sampling') && ctx.client.can('elicitation')) {
-    // Use both sampling and elicitation
-    const analysis = await ctx.sample(`Analyze: ${params.input}`);
-    return text(`Advanced analysis: ${analysis.content.text}`);
-  } else if (ctx.client.can('sampling')) {
-    // Use only sampling
-    const result = await ctx.sample(`Process: ${params.input}`);
-    return text(`Result: ${result.content.text}`);
-  } else {
-    // Basic functionality only
-    return text(`Basic processing: ${params.input.length} characters`);
-  }
-});
-```
+try {
+  const response = await ctx.sample("Summarize this text in one sentence:\n\n" + input);
+  const content = Array.isArray(response.content) ? response.content[0] : response.content;
 
-### Identifying the client and checking for MCP Apps support
-
-Use `ctx.client.info()` to get the client's name and version from the MCP initialize handshake. Use `ctx.client.extension(id)` to access any MCP extension (SEP-1724), and `ctx.client.supportsApps()` as a convenience check for MCP Apps support (SEP-1865, `io.modelcontextprotocol/ui` extension):
-
-```typescript
-import { widget, text } from 'mcp-use/server';
-
-server.tool({
-  name: 'conditional-widget',
-  description: 'Returns a widget for MCP Apps clients, plain text otherwise',
-  schema: z.object({ query: z.string() })
-}, async (params, ctx) => {
-  // Who is connecting?
-  const { name, version } = ctx.client.info();
-  // e.g. { name: "claude-desktop", version: "1.2.0" }
-
-  // Access any MCP extension (SEP-1724)
-  const uiExt = ctx.client.extension('io.modelcontextprotocol/ui');
-  // { mimeTypes: ['text/html;profile=mcp-app'] } | undefined
-
-  // Convenience check for MCP Apps support (SEP-1865)
-  if (ctx.client.supportsApps()) {
-    // fetchData is a placeholder for your own data-loading logic
-    const result = await fetchData(params.query);
-    return widget({ props: result, output: text(`Found ${result.length} items`) });
+  if (content?.type !== "text") {
+    return text("The client returned a non-text sampling result.");
   }
 
-  return text(`Results for: ${params.query}`);
-});
+  return text(content.text);
+} catch (err) {
+  return text(`Sampling was unavailable: ${err instanceof Error ? err.message : String(err)}`);
+}
 ```
 
-<Note>
-`ctx.client.supportsApps()` checks whether the current client supports the MCP Apps standard. This check is **per-connection**  -  different clients connecting to the same server may return different values. There is no server-wide "all clients support apps" flag.
-</Note>
+Return a fallback result when the tool can still complete. Return an error only when sampling is required for correctness.
 
-## Example
+## Test sampling locally
 
-```typescript
-import { MCPServer, text } from 'mcp-use/server';
-import { z } from 'zod';
-
-const server = new MCPServer({
-  name: 'sentiment-analyzer',
-  version: '1.0.0',
-});
-
-server.tool({
-  name: 'analyze-sentiment',
-  description: 'Analyze sentiment using client\'s LLM',
-  schema: z.object({
-    text: z.string(),
-  })
-}, async (params, ctx) => {
-  const prompt = `Analyze the sentiment of the following text as positive, negative, or neutral.
-Just output a single word - 'positive', 'negative', or 'neutral'.
-
-Text to analyze: ${params.text}`;
-
-  const response = await ctx.sample(prompt);
-  const sentiment = response.content.text.trim().toLowerCase();
-  
-  return text(`Sentiment: ${sentiment}`);
-});
-
-await server.listen();
-```
-
-
-## API Reference
-
-`ctx.sample()` and its options are documented in the [Tool context reference](/typescript/api-reference/server/tool-context). See `SampleOptions` for every option and `CreateMessageResult` for the return shape.
-
-## Testing with MCP Inspector
-
-1. Start your server with inspector enabled
-2. Navigate to Tools tab
-3. Call a tool that uses sampling
-4. Approve in the sampling tab
-5. Verify the LLM response is processed correctly
-
-## GitHub code
-
-Check out the complete working example with all sampling patterns:
-
-📁 [examples/server/features/sampling/](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/sampling)
-
-This example includes:
-- Simple string API usage
-- Full control API with model preferences
-- Custom progress configuration
-- All three example tools from this guide
-
-To run the example:
+Run a server with a sampling tool and call it from a client that supports sampling, such as the Inspector.
 
 ```bash
 cd libraries/typescript/packages/mcp-use/examples/server/features/sampling
@@ -328,11 +150,21 @@ pnpm install
 pnpm dev
 ```
 
-Server runs on http://localhost:3000 with MCP Inspector available.
+In the Inspector, call the sampling tool, approve the sampling request, and verify both the sampled path and the fallback path.
 
-## Next Steps
+## Next steps
 
-- [Tools Guide](./tools) - Building executable tools
-- [Elicitation](./elicitation) - Request user input during execution
-- [Notifications](./notifications) - Send status updates to clients
-- [Client Sampling](/typescript/client/sampling) - Configure sampling on the client side
+<CardGroup cols={2}>
+  <Card title="Tool context API reference" icon="terminal" href="/typescript/api-reference/server/tool-context#sample">
+    Look up `ctx.sample()` overloads, options, progress behavior, and return shapes.
+  </Card>
+  <Card title="Elicitation" icon="check" href="/typescript/server/elicitation">
+    Ask the user for input during tool execution.
+  </Card>
+  <Card title="Notifications" icon="bell" href="/typescript/server/notifications">
+    Send status, progress, and custom notifications to connected clients.
+  </Card>
+  <Card title="Client sampling" icon="monitor" href="/typescript/client/sampling">
+    Configure sampling support in a TypeScript MCP client.
+  </Card>
+</CardGroup>

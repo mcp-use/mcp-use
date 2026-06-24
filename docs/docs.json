@@ -138,17 +138,6 @@
                     ]
                   },
                   {
-                    "group": "Server Behavior",
-                    "icon": "workflow",
-                    "pages": [
-                      "typescript/server/middleware",
-                      "typescript/server/elicitation",
-                      "typescript/server/sampling",
-                      "typescript/server/subscriptions",
-                      "typescript/server/notifications"
-                    ]
-                  },
-                  {
                     "group": "Security",
                     "icon": "shield",
                     "pages": [
@@ -181,7 +170,18 @@
                   },
                   "typescript/server/proxy",
                   "typescript/server/openapi",
-                  "typescript/server/nextjs-drop-in"
+                  "typescript/server/nextjs-drop-in",
+                  {
+                    "group": "Advanced Features",
+                    "icon": "sparkle",
+                    "pages": [
+                      "typescript/server/middleware",
+                      "typescript/server/elicitation",
+                      "typescript/server/sampling",
+                      "typescript/server/subscriptions",
+                      "typescript/server/notifications"
+                    ]
+                  }
                 ]
               },
               {

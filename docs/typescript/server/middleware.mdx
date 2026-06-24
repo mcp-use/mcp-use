@@ -1,12 +1,30 @@
 ---
 title: Middleware
-description: Intercept and process MCP requests with middleware
+description: Add cross-cutting behavior to TypeScript MCP operations with operation-level and HTTP middleware.
 icon: "layers"
 ---
 
-Middleware lets you intercept MCP operations to add logging, authentication, rate limiting, or any cross-cutting logic, without touching individual tool handlers.
+Middleware lets you run shared logic around MCP operations without putting that logic in every tool, resource, or prompt callback. Use it for logging, scope checks, request shaping, rate limiting, and other cross-cutting behavior.
 
-## Quick Start
+This guide focuses on where middleware fits and how to apply common patterns. Use the [Middleware and proxy API reference](/typescript/api-reference/server/middleware) for exact context fields, pattern matching rules, adapter behavior, and proxy options.
+
+## Choose MCP middleware or HTTP middleware
+
+Use MCP middleware when the logic depends on the parsed MCP operation. Use HTTP middleware when the logic belongs at the request layer before MCP parsing.
+
+| Need | Use |
+| --- | --- |
+| Check which tool is being called | MCP middleware |
+| Filter tool, resource, or prompt lists | MCP middleware |
+| Require OAuth scopes per MCP operation | MCP middleware |
+| Add CORS, request logging, or HTTP headers | HTTP middleware |
+| Mount Express or Hono middleware | HTTP middleware |
+
+MCP middleware patterns use the `mcp:` prefix. HTTP middleware uses normal Hono-style `server.use(...)` calls.
+
+## Wrap MCP tool calls
+
+Register MCP middleware with `server.use("mcp:<pattern>", handler)`. The handler receives a context object and a `next()` function.
 
 ```typescript
 import { MCPServer, text } from "mcp-use/server";
@@ -14,213 +32,160 @@ import { z } from "zod";
 
 const server = new MCPServer({ name: "my-server", version: "1.0.0" });
 
-// Log every tool call
 server.use("mcp:tools/call", async (ctx, next) => {
-  console.log(`→ ${ctx.params.name}`);
+  const startedAt = Date.now();
   const result = await next();
-  console.log(`← ${ctx.params.name}`);
+  console.log(`${ctx.params.name} finished in ${Date.now() - startedAt}ms`);
   return result;
 });
 
 server.tool(
-  { name: "greet", description: "Say hello", schema: z.object({ name: z.string() }) },
-  async ({ name }) => text(`Hello, ${name}!`)
+  {
+    name: "greet",
+    description: "Say hello.",
+    schema: z.object({ name: z.string() }),
+  },
+  async ({ name }) => text(`Hello, ${name}!`),
 );
 
 await server.listen();
 ```
 
-## How It Works
+Call `next()` to continue to the next middleware or the final operation handler. Return the result from `next()` unless you intentionally want to replace the response.
 
-MCP middleware uses an **onion model**: each middleware wraps the next, with the handler at the center.
+## Match the right operation
 
-```text
-Request
-  → Middleware A (before)
-    → Middleware B (before)
-      → Handler
-    ← Middleware B (after)
-  ← Middleware A (after)
-Response
-```
+The pattern after `mcp:` controls which MCP operations run through the middleware.
 
-Middleware is registered with `server.use('mcp:pattern', handler)` where the `mcp:` prefix distinguishes MCP middleware from HTTP middleware. Multiple middleware functions are composed in registration order (first registered = outermost).
-
-Each middleware can:
-- Inspect or modify the request before calling `next()`
-- Inspect or modify the response after `next()` returns
-- **Short-circuit** by returning early without calling `next()`
-- **Reject** by throwing an error
-
-## Patterns
-
-The pattern string (after `mcp:`) determines which operations trigger the middleware:
-
-| Pattern | Matches |
-|---------|---------|
-| `mcp:tools/call` | Tool executions only |
-| `mcp:tools/list` | Requests to list available tools |
-| `mcp:tools/*` | All tool operations |
+| Pattern | Use it for |
+| --- | --- |
+| `mcp:tools/call` | Tool execution |
+| `mcp:tools/list` | Tool discovery |
 | `mcp:resources/read` | Resource reads |
-| `mcp:resources/list` | Requests to list resources |
-| `mcp:resources/*` | All resource operations |
-| `mcp:prompts/get` | Prompt fetches |
-| `mcp:prompts/list` | Requests to list prompts |
-| `mcp:prompts/*` | All prompt operations |
-| `mcp:*` | Every MCP operation |
+| `mcp:resources/list` | Resource discovery |
+| `mcp:prompts/get` | Prompt requests |
+| `mcp:prompts/list` | Prompt discovery |
+| `mcp:tools/*`, `mcp:resources/*`, `mcp:prompts/*` | The wrapped operations in one MCP area |
+| `mcp:*` | Every operation currently wrapped by MCP middleware |
 
-## Context
+Use the narrowest pattern that covers the behavior. A narrow pattern keeps middleware easier to reason about and avoids accidental changes to unrelated operations.
 
-Every middleware receives a `MiddlewareContext`:
+MCP middleware currently wraps tool calls, prompt gets, resource reads, and tool/resource/prompt list operations. It does not wrap protocol setup, completion, logging level changes, resource subscribe/unsubscribe requests, or every MCP method.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `method` | `string` | MCP method name (e.g. `"tools/call"`) |
-| `params` | `Record<string, unknown>` | Request params (mutable, mutations flow downstream) |
-| `session` | `{ sessionId: string } \| undefined` | Session ID (HTTP transports) |
-| `auth` | `AuthInfo \| undefined` | OAuth info when authentication is configured |
-| `state` | `Map<string, unknown>` | Shared state for passing data across middleware |
+## Add an OAuth scope guard
 
-<Tip>
-`ctx.params` is mutable. Middleware can modify it before calling `next()` and the handler will receive the modified values.
-</Tip>
-
-### `ctx.auth` and OAuth
-
-When OAuth is configured (via `server.use(oauthAuth0Provider(...))` etc.), `ctx.auth` is automatically populated from the verified JWT:
+When OAuth is configured, MCP middleware can read verified auth information from `ctx.auth`. Use this for operation-level authorization.
 
 ```typescript
 server.use("mcp:tools/call", async (ctx, next) => {
-  if (ctx.auth) {
-    console.log(`User: ${ctx.auth.user.email}`);
-    console.log(`Scopes: ${ctx.auth.scopes.join(", ")}`);
+  const toolName = String(ctx.params.name ?? "");
+  const requiredScope = `tools:call:${toolName}`;
+
+  if (
+    !ctx.auth?.scopes.includes(requiredScope) &&
+    !ctx.auth?.scopes.includes("tools:*")
+  ) {
+    throw new Error(`Insufficient scope. Required: ${requiredScope}`);
   }
+
   return next();
 });
 ```
 
-## Examples
+Use [server authentication](/typescript/server/authentication/index) to verify the bearer token before relying on `ctx.auth`.
 
-<Tabs>
-  <Tab title="Logging">
-    Log all MCP operations with timing:
+## Rate-limit expensive operations
 
-    ```typescript
-    server.use("mcp:*", async (ctx, next) => {
-      const start = Date.now();
-      const result = await next();
-      console.log(`${ctx.method}  -  ${Date.now() - start}ms`);
-      return result;
-    });
-    ```
-  </Tab>
-
-  <Tab title="Scope Guard">
-    Require an OAuth scope before any tool call:
-
-    ```typescript
-    server.use("mcp:tools/call", async (ctx, next) => {
-      const toolName = ctx.params.name; // typed as string on mcp:tools/call
-      const required = `tools:call:${toolName}`;
-
-      if (!ctx.auth?.scopes.includes(required) &&
-          !ctx.auth?.scopes.includes("tools:*")) {
-        throw new Error(`Insufficient scope. Required: ${required}`);
-      }
-
-      return next();
-    });
-    ```
-  </Tab>
-
-  <Tab title="Rate Limiting">
-    Limit tool calls per session per minute:
-
-    ```typescript
-    const rateLimits = new Map<string, number[]>();
-
-    server.use("mcp:tools/call", async (ctx, next) => {
-      const key = ctx.session?.sessionId ?? "anonymous";
-      const now = Date.now();
-      const calls = (rateLimits.get(key) ?? [])
-        .filter(t => t > now - 60_000);
-
-      if (calls.length >= 30) {
-        throw new Error("Rate limit exceeded (30 calls/min)");
-      }
-
-      calls.push(now);
-      rateLimits.set(key, calls);
-      return next();
-    });
-    ```
-  </Tab>
-
-  <Tab title="Tool Filtering">
-    Hide internal tools from the list:
-
-    ```typescript
-    server.use("mcp:tools/list", async (ctx, next) => {
-      const result = (await next()) as any;
-      const tools = Array.isArray(result) ? result : result?.tools ?? [];
-      const visible = tools.filter((t: any) => !t.name.startsWith("_"));
-      return Array.isArray(result) ? visible : { ...result, tools: visible };
-    });
-    ```
-  </Tab>
-</Tabs>
-
-## Middleware Order
-
-Middleware executes in registration order. Earlier middleware wraps later ones.
+Use middleware when the limit applies to a class of operations rather than one tool.
 
 ```typescript
-server.use("mcp:*",         loggingMiddleware);  // 1. Outermost, sees everything
-server.use("mcp:tools/call", authMiddleware);    // 2. Rejects unauthorized early
-server.use("mcp:tools/call", rateLimitMiddleware); // 3. Limits request rate
-```
+const callsBySession = new Map<string, number[]>();
 
-<Tip>
-**Recommended order**: Logging → Authentication → Rate limiting → Validation. This ensures logging sees all requests (including rejected ones) and auth rejects early before expensive operations.
-</Tip>
-
-## HTTP vs MCP Middleware
-
-`server.use()` handles both HTTP and MCP middleware. The `mcp:` prefix distinguishes them:
-
-```typescript
-// MCP middleware: intercepts MCP operations
-server.use("mcp:tools/call", async (ctx, next) => { ... });
-
-// HTTP middleware: intercepts HTTP requests (existing Hono behavior)
-server.use("/api/*", someHttpMiddleware);
-server.use(someHonoMiddleware);
-```
-
-<Note>
-HTTP middleware runs at the HTTP layer (before the MCP protocol). MCP middleware runs at the MCP layer (after the protocol parses the request). Use HTTP middleware for things like CORS; use MCP middleware for things like scope-checking tool access.
-</Note>
-
-## Best Practices
-
-- **Single responsibility**: each middleware does one thing
-- **Fail fast**: reject invalid requests before expensive operations
-- **Always call `next()`**: unless intentionally short-circuiting
-- **Re-raise exceptions**: if you catch errors to log them, always re-throw
-
-```typescript
 server.use("mcp:tools/call", async (ctx, next) => {
-  try {
-    return await next();
-  } catch (err) {
-    console.error(`Tool failed: ${err}`);
-    throw err; // always re-raise
+  const key = ctx.session?.sessionId ?? "anonymous";
+  const now = Date.now();
+  const recentCalls = (callsBySession.get(key) ?? []).filter(
+    (timestamp) => timestamp > now - 60_000,
+  );
+
+  if (recentCalls.length >= 30) {
+    throw new Error("Rate limit exceeded.");
   }
+
+  recentCalls.push(now);
+  callsBySession.set(key, recentCalls);
+  return next();
 });
 ```
 
-## Full Example
+For distributed rate limiting, store counters in Redis or another shared backend instead of an in-memory `Map`.
 
-<Card title="middleware example" icon="github" href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/server/features/middleware/src/server.ts">
-  Complete server with logging, scope guard, rate limiter, and tool filter middleware.
-</Card>
+## Filter discovery results
+
+Middleware can also wrap list operations. Use this when different clients or users should see different capabilities.
+
+```typescript
+server.use("mcp:tools/list", async (_ctx, next) => {
+  const result = (await next()) as Array<{ name: string }> | { tools?: Array<{ name: string }> };
+  const tools = Array.isArray(result) ? result : result.tools ?? [];
+  const visible = tools.filter((tool) => !tool.name.startsWith("_"));
+
+  return Array.isArray(result) ? visible : { ...result, tools: visible };
+});
+```
+
+Keep filtering rules predictable. Hidden tools should not be required for normal user workflows.
+
+## Order middleware deliberately
+
+Middleware runs in registration order. The first middleware you register is the outermost wrapper.
+
+```typescript
+server.use("mcp:*", loggingMiddleware);
+server.use("mcp:tools/call", authMiddleware);
+server.use("mcp:tools/call", rateLimitMiddleware);
+```
+
+A practical order is logging, then authentication, then rate limiting, then operation-specific validation. That order lets logging observe rejected requests while still rejecting expensive work early.
+
+## Use HTTP middleware for request-level behavior
+
+Use normal `server.use(...)` calls for Hono middleware that should run at the HTTP layer.
+
+```typescript
+server.use("/api/*", async (c, next) => {
+  const startedAt = Date.now();
+  c.header("x-server", "mcp-use");
+  await next();
+  console.log(`${c.req.method} ${c.req.path} finished in ${Date.now() - startedAt}ms`);
+});
+```
+
+HTTP middleware runs before MCP parses the request. Use it for CORS, headers, raw request logging, and non-MCP routes. Use MCP middleware when you need `ctx.method`, `ctx.params`, `ctx.auth`, or MCP session information.
+
+## Test middleware locally
+
+Run the server and verify both the allowed and rejected paths.
+
+```bash
+npm run dev
+```
+
+Use the Inspector at `http://localhost:3000/inspector` to call tools, list resources, and request prompts. Check server logs for middleware output and verify that rejected operations return the expected error.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Middleware API reference" icon="terminal" href="/typescript/api-reference/server/middleware">
+    Look up middleware context fields, pattern matching, adapter behavior, and proxy options.
+  </Card>
+  <Card title="Authentication" icon="shield-check" href="/typescript/server/authentication/index">
+    Configure OAuth before relying on `ctx.auth`.
+  </Card>
+  <Card title="Tools" icon="wrench" href="/typescript/server/tools">
+    Design the tool callbacks that middleware wraps.
+  </Card>
+  <Card title="Middleware example" icon="github" href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/server/features/middleware/src/server.ts">
+    See a runnable server with logging, scope guard, rate limiting, and filtering.
+  </Card>
+</CardGroup>

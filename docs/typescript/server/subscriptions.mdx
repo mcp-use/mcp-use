@@ -1,153 +1,158 @@
 ---
 title: "Resource Subscriptions"
-description: "Enable clients to subscribe to resource updates and receive automatic notifications"
+description: "Notify subscribed TypeScript MCP clients when resource content changes."
 icon: "rss"
 ---
 
-<Info>
-Resource subscriptions allow clients to receive automatic notifications when specific resources change. This enables real-time data synchronization without polling.
-</Info>
+Resource subscriptions let clients opt in to updates for specific resource URIs. Use them when a client should refresh a known resource after the server changes its content.
 
-## Overview
+This guide focuses on the server workflow. Use the [MCPServer API reference](/typescript/api-reference/server/mcp-server) for the exact `notifyResourceUpdated()` signature and related session behavior.
 
-Resource subscriptions implement the MCP protocol's `resources/subscribe` and `resources/unsubscribe` methods. When a client subscribes to a resource, your server can notify them whenever that resource is updated.
+## Use subscriptions for resource-specific updates
 
-**Key Features:**
+Subscriptions are for resource content changes, not general status events.
 
-- **Automatic notifications**: Push updates to clients when resources change
-- **Session tracking**: Per-session subscription management
-- **Automatic cleanup**: Subscriptions are cleaned up when sessions close
-- **Efficient**: No polling required, so clients receive updates only when resources change
+| Need | Use |
+| --- | --- |
+| Tell clients a known resource URI changed | Resource subscription |
+| Broadcast a job status event | [Notifications](/typescript/server/notifications) |
+| Tell clients the resource list changed | `server.sendResourcesListChanged()` |
+| Return fresh data immediately | A tool or resource read |
 
-## How It Works
+Clients subscribe to a resource URI. Your server notifies subscribers after that resource changes. Clients then read the resource again.
 
-```mermaid
-sequenceDiagram
-    Client->>Server: resources/subscribe (uri)
-    Server->>Client: Subscription confirmed
-    Note over Server: Resource changes
-    Server->>Client: notifications/resources/updated
-    Client->>Server: resources/read (fetch latest)
-```
+## Define the resource
 
-The subscription flow:
-
-1. Client subscribes to a resource URI
-2. Server tracks the subscription
-3. When the resource changes, server notifies all subscribers
-4. Clients can then fetch the updated resource
-
-## Subscribing to Resources
-
-Clients can subscribe to resources to receive automatic notifications when they change. The client API provides subscription methods through the session connector:
+Start with a resource that returns the current content for a stable URI.
 
 ```typescript
-// Client-side API
-import { MCPClient } from 'mcp-use';
-
-const client = new MCPClient(config);
-const session = await client.createSession('my-server');
-
-// Subscribe to a resource
-await session.connector.subscribeToResource('config://app-settings');
-
-// Listen for update notifications
-session.on('notification', async (notification) => {
-  if (notification.method === 'notifications/resources/updated') {
-    console.log('Resource updated:', notification.params.uri);
-    // Fetch the updated resource
-    const updated = await session.connector.readResource(notification.params.uri);
-  }
-});
-
-// Later, unsubscribe when no longer needed
-await session.connector.unsubscribeFromResource('config://app-settings');
-```
-
-The server automatically handles subscription requests and tracks which sessions are subscribed to which resources.
-
-## Notifying Subscribers
-
-When a resource changes, use `server.notifyResourceUpdated()` to notify all subscribed clients:
-
-```typescript
-import { MCPServer, object, text } from 'mcp-use/server';
-import { z } from 'zod';
+import { MCPServer, object, text } from "mcp-use/server";
+import { z } from "zod";
 
 const server = new MCPServer({
-  name: 'config-server',
-  version: '1.0.0',
+  name: "settings-server",
+  version: "1.0.0",
 });
 
-// Store configuration state
-let appConfig = {
-  theme: 'light',
-  language: 'en',
-  features: ['auth', 'api']
+let appSettings = {
+  theme: "light",
+  language: "en",
 };
 
-// Define the resource
 server.resource(
   {
-    name: 'app_config',
-    uri: 'config://app-settings',
-    title: 'Application Configuration',
-    description: 'Current application settings'
+    name: "app_settings",
+    uri: "settings://app",
+    title: "App Settings",
+    description: "Current application settings.",
   },
-  async () => object(appConfig)
+  async () => object(appSettings),
 );
-
-// Update configuration and notify subscribers
-server.tool({
-  name: 'update-config',
-  description: 'Update application configuration',
-  schema: z.object({
-    theme: z.enum(['light', 'dark']).optional(),
-    language: z.string().optional(),
-  })
-}, async (params) => {
-  // Update the configuration
-  if (params.theme) appConfig.theme = params.theme;
-  if (params.language) appConfig.language = params.language;
-
-  // Notify all subscribed clients
-  await server.notifyResourceUpdated('config://app-settings');
-
-  return text('Configuration updated and subscribers notified');
-});
-
-await server.listen();
 ```
 
-## Subscription vs Notifications
+Use a stable URI. Subscribers are attached to the URI, so changing the URI changes what clients must subscribe to.
 
-Understanding the difference between subscriptions and notifications:
+## Notify subscribers after updates
 
-| Feature | Resource Subscriptions | Server Notifications |
-|---------|----------------------|----------------------|
-| **Purpose** | Track resource changes | Broadcast events |
-| **Direction** | Resource-specific | Any custom message |
-| **Protocol** | `resources/subscribe`<br/>`resources/updated` | `notifications/*` |
-| **Use Case** | Data synchronization | Status updates, events |
-| **Client Action** | Must subscribe first | Receives without subscribing |
+When server state changes, call `server.notifyResourceUpdated(uri)`.
 
-**Use subscriptions when:**
-- Clients need to track specific resource changes
-- You want resource-level granularity
-- Clients should opt-in to updates
+```typescript
+server.tool(
+  {
+    name: "update_settings",
+    description: "Update application settings.",
+    schema: z.object({
+      theme: z.enum(["light", "dark"]).optional(),
+      language: z.string().optional(),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  async ({ theme, language }) => {
+    if (theme) appSettings.theme = theme;
+    if (language) appSettings.language = language;
 
-**Use notifications when:**
-- Broadcasting general events to all clients
-- Sending progress updates or status changes
-- One-way messages that don't relate to specific resources
+    await server.notifyResourceUpdated("settings://app");
+    return text("Settings updated.");
+  },
+);
+```
 
-See [Notifications](./notifications) for more details on server notifications.
+The notification tells subscribed clients that the content changed. It does not include the new resource body. Clients should call `resources/read` for the URI again.
 
+## Notify list changes separately
 
-## Next Steps
+Use `sendResourcesListChanged()` only when the available resource set changes.
 
-- [Resources](./resources) - Learn about creating resources
-- [Notifications](./notifications) - Understand server notifications
-- [Tools Guide](./tools) - Create tools that update resources
-- [MCP Resources Specification](https://modelcontextprotocol.io/specification/2025-06-18/server/resources#subscriptions) - Official protocol details
+```typescript
+server.resource(
+  {
+    name: "new_report",
+    uri: "reports://new",
+    title: "New Report",
+  },
+  async () => text("Report content"),
+);
 
+await server.sendResourcesListChanged();
+```
+
+If only the content at an existing URI changed, use `notifyResourceUpdated(uri)` instead.
+
+## Design for stateful sessions
+
+Resource subscriptions depend on connected sessions. They are not a durable queue.
+
+Use subscriptions when:
+
+- Clients are connected through stateful MCP sessions.
+- Missing an update is acceptable because the client can read the resource again.
+- The resource URI is stable.
+
+Do not use subscriptions as the only persistence mechanism for background jobs, audit trails, or critical delivery.
+
+## Test resource updates locally
+
+Use a stateful client that can send `resources/subscribe`, such as the TypeScript client CLI.
+
+```bash
+npm run dev
+```
+
+In another terminal, subscribe to the resource URI. Replace `my-server` with the server name from your client config.
+
+```bash
+npx mcp-use client my-server resources subscribe "settings://app"
+```
+
+Keep that command running. In a third terminal, call the update tool:
+
+```bash
+npx mcp-use client my-server tools call update_settings theme=dark
+```
+
+Verify these cases:
+
+- The resource can be read before any updates.
+- The update tool calls `notifyResourceUpdated()` after changing state.
+- The client receives the update notification and can read the new content.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Resources" icon="folder-open" href="/typescript/server/resources">
+    Create static resources and resource templates.
+  </Card>
+  <Card title="Notifications" icon="bell" href="/typescript/server/notifications">
+    Send custom status, progress, and list-changed notifications.
+  </Card>
+  <Card title="MCPServer API reference" icon="server" href="/typescript/api-reference/server/mcp-server">
+    Look up `notifyResourceUpdated()` and resource notification methods.
+  </Card>
+  <Card title="MCP resources specification" icon="book-open" href="https://modelcontextprotocol.io/specification/2025-11-25/server/resources#subscriptions">
+    Read the protocol-level subscription behavior.
+  </Card>
+</CardGroup>
