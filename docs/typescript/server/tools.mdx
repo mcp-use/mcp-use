@@ -7,7 +7,7 @@ icon: "wrench"
 Tools are the primary way MCP clients interact with your server. They represent functions that can be invoked with parameters and return results. This guide covers everything you need to know about creating powerful and reliable tools.
 
 <Tip>
-**Response Helpers**: Throughout this guide, you'll see code examples using response helpers like `text()`, `object()`, and `mix()`. These utilities simplify creating tool responses with proper typing and metadata. See [Response Helpers](./response-helpers) for a complete reference.
+**Response helpers**: Throughout this guide, you'll see examples using helpers like `text()`, `object()`, and `mix()`. These utilities create MCP-compatible tool results with proper typing and metadata. See the [Response helpers API reference](/typescript/api-reference/server/response-helpers) for exact signatures and return shapes.
 </Tip>
 
 ## Understanding Tools
@@ -425,7 +425,7 @@ server.tool({
 })
 ```
 
-The `ctx.log()` function accepts a log level (`'debug'`, `'info'`, `'notice'`, `'warning'`, `'error'`, `'critical'`, `'alert'`, `'emergency'`), a message string, and an optional logger name. See [Server Logging](./logging#tool-logging-with-ctxlog) for complete documentation on log levels and best practices.
+The `ctx.log()` function accepts a log level (`'debug'`, `'info'`, `'notice'`, `'warning'`, `'error'`, `'critical'`, `'alert'`, `'emergency'`), a message string, and an optional logger name. See the [Tool context API reference](/typescript/api-reference/server/tool-context#log) for exact parameters and behavior.
 
 
 ## Notifying Clients of Tool Changes
@@ -460,7 +460,7 @@ Use the built-in inspector for interactive testing:
 
 ## Next Steps
 
-- [Response Helpers](./response-helpers) - Utility functions for creating responses
+- [Response helpers API reference](/typescript/api-reference/server/response-helpers) - Helper signatures, parameters, MIME types, and return shapes
 - [Resources Guide](./resources) - Managing static and dynamic content
 - [UI Widgets](./mcp-apps) - Creating interactive UI components
 - [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) - Real-world tool implementations

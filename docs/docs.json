@@ -117,7 +117,6 @@
                 "icon": "server",
                 "pages": [
                   "typescript/server/index",
-                  "typescript/server/configuration",
                   "typescript/server/examples",
                   {
                     "group": "Core Components",
@@ -133,28 +132,24 @@
                     "group": "Session Management",
                     "icon": "key-round",
                     "pages": [
-                      "typescript/server/session-management",
                       "typescript/server/session-management/memory-storage",
                       "typescript/server/session-management/filesystem-storage",
                       "typescript/server/session-management/redis-storage"
                     ]
                   },
                   {
-                    "group": "Advanced Features",
-                    "icon": "sparkle",
+                    "group": "Server Behavior",
+                    "icon": "workflow",
                     "pages": [
                       "typescript/server/middleware",
-                      "typescript/server/proxy",
                       "typescript/server/elicitation",
                       "typescript/server/sampling",
                       "typescript/server/subscriptions",
-                      "typescript/server/notifications",
-                      "typescript/server/logging",
-                      "typescript/server/openapi"
+                      "typescript/server/notifications"
                     ]
                   },
                   {
-                    "group": "Authentication",
+                    "group": "Security",
                     "icon": "shield",
                     "pages": [
                       "typescript/server/authentication/index",
@@ -181,10 +176,12 @@
                     "pages": [
                       "typescript/server/deployment/mcp-use",
                       "typescript/server/deployment/google",
-                      "typescript/server/deployment/supabase",
-                      "typescript/server/nextjs-drop-in"
+                      "typescript/server/deployment/supabase"
                     ]
-                  }
+                  },
+                  "typescript/server/proxy",
+                  "typescript/server/openapi",
+                  "typescript/server/nextjs-drop-in"
                 ]
               },
               {
