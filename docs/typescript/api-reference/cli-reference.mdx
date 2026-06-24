@@ -1,28 +1,42 @@
 ---
 title: "CLI Reference"
-description: "Complete reference for the @mcp-use/cli build and deployment tool"
+description: "Command reference for the @mcp-use/cli package and mcp-use executable."
 icon: "terminal"
 ---
 
-The `@mcp-use/cli` is a build and development tool for creating MCP servers with integrated UI widgets. It provides commands for development, building, deployment, and authentication.
+The `@mcp-use/cli` package installs the `mcp-use` executable. Use it to run and build TypeScript MCP servers, bundle MCP Apps widgets, deploy to Manufact Cloud, manage cloud resources, install agent skills, generate widget types, and drive MCP servers from the terminal.
 
-## What's New
+## Package and binary
+
+| Item | Value |
+| --- | --- |
+| Package | `@mcp-use/cli` |
+| Binary | `mcp-use` |
+| Node.js | `^20.19.0` or `>=22.12.0` |
+| Config file | `~/.mcp-use/config.json` |
+| Project link file | `.mcp-use/project.json` |
+| Build manifest | `dist/mcp-use.json` |
+
+## Command map
 
 <CardGroup cols={2}>
-  <Card title="Hot Module Reload" icon="flame" href="#hot-module-reloading-hmr">
-    `mcp-use dev` hot-reloads tools, prompts, and resources without dropping connected clients.
+  <Card title="Run locally" icon="flame" href="#dev---development-server">
+    `mcp-use dev` starts a hot-reloading server with the Inspector mounted at `/inspector`.
   </Card>
-  <Card title="--tunnel flag" icon="train-front-tunnel" href="/tunneling/index">
-    `mcp-use start --tunnel` exposes your local server through a public URL for ChatGPT, Claude, and other remote clients.
+  <Card title="Build and start" icon="box" href="#build---production-build">
+    `mcp-use build` bundles server code and widgets. `mcp-use start` runs the built server.
   </Card>
-  <Card title="skills add" icon="wand" href="#skills-add-install-ai-agent-skills">
-    Install mcp-use agent skills into Cursor, Claude Code, and Codex presets with one command.
+  <Card title="Deploy" icon="cloud-upload" href="#deploy---cloud-deployment">
+    `mcp-use deploy`, `mcp-use deployments`, and `mcp-use servers` manage Manufact Cloud deployments.
   </Card>
-  <Card title="generate-types" icon="type" href="#generate-types-type-generation">
-    Auto-derive TypeScript types from your Zod tool schemas for fully-typed widget code.
+  <Card title="Client CLI" icon="terminal" href="/typescript/tooling/client-cli">
+    `mcp-use client` calls tools, reads resources, gets prompts, handles OAuth, and captures widget screenshots.
   </Card>
-  <Card title="client" icon="terminal" href="/typescript/client/cli">
-    `mcp-use client` drives MCP servers from the terminal with full OAuth support, plus `client screenshot` for headless widget capture in agent visual feedback loops.
+  <Card title="Tunnels" icon="train-front-tunnel" href="/tunneling/index">
+    `mcp-use dev --tunnel` and `mcp-use start --tunnel` expose a local server through a public URL.
+  </Card>
+  <Card title="Skills and types" icon="wand" href="#skills-add---install-ai-agent-skills">
+    `mcp-use skills add` installs agent skills. `mcp-use generate-types` derives widget types from tool schemas.
   </Card>
 </CardGroup>
 
@@ -43,9 +57,6 @@ npx @mcp-use/cli dev
 # Install as project dependency
 npm install --save-dev @mcp-use/cli
 ```
-
-
----
 
 ## Commands
 
@@ -444,6 +455,13 @@ mcp-use servers update <id-or-slug> [options]
 mcp-use servers delete <server-id> [-y] [--org <slug-or-id>]   # alias: `rm`
 ```
 
+| Subcommand | Description |
+| ---------- | ----------- |
+| `list` / `ls` | List servers for the active org or `--org` override |
+| `get` | Show server details and recent deployments |
+| `update` | Change server config after creation |
+| `delete` / `rm` | Delete a server and its deployments; prompts unless `-y` is passed |
+
 `servers update` changes server config after creation:
 
 | Option | Description |
@@ -457,6 +475,7 @@ mcp-use servers delete <server-id> [-y] [--org <slug-or-id>]   # alias: `rm`
 | `--watch-paths <glob...>` | Only auto-deploy when matching files change (empty `""` clears the filter) |
 | `--deploy-branches <glob...>` | Branch globs (besides production) allowed to auto-deploy (empty `""` allows all) |
 | `--wait-for-ci` / `--no-wait-for-ci` | Hold auto-deploys until other check runs pass |
+| `--org <slug-or-id>` | Target organization |
 
 ```bash
 # Monorepo: scope an existing server to its own subtree + shared code
@@ -524,7 +543,7 @@ mcp-use client remove <name>
 | `auth` | `status`, `refresh`, `logout` (OAuth servers only) |
 | `screenshot` | Render the tool's UI resource headlessly and write a PNG |
 
-<Card title="Full Client CLI reference" icon="terminal" href="/typescript/client/cli">
+<Card title="Full Client CLI reference" icon="terminal" href="/typescript/tooling/client-cli">
   Connect/list/remove, every scope, the arg-parsing rules, OAuth flows, ad-hoc vs. saved-server screenshot forms, `--cdp-url` for remote browsers, and storage layout. Read this if you're using `mcp-use client` from your terminal or from an agent harness.
 </Card>
 
@@ -855,5 +874,5 @@ mcp-use deploy
 
 - [ServerConfig API reference](/typescript/api-reference/server/server-config) - Server configuration options
 - [Deployment Guide](/typescript/server/deployment/mcp-use) - Deploy to Manufact Cloud
-- [UI Widgets](/typescript/server/mcp-apps) - Build interactive widgets
+- [UI Widgets](/typescript/mcp-apps) - Build interactive widgets
 - [Sessions API reference](/typescript/api-reference/server/sessions) - Session storage and stream manager APIs

@@ -40,7 +40,8 @@
           {
             "group": "Welcome",
             "pages": [
-              "home/index"
+              "home/index",
+              "home/mcp101"
             ]
           },
           {
@@ -48,48 +49,6 @@
             "icon": "layout-template",
             "pages": [
               "home/templates"
-            ]
-          },
-          {
-            "group": "Dev Tools",
-            "icon": "wrench",
-            "expanded": false,
-            "pages": [
-              {
-                "group": "Inspector",
-                "icon": "bug-play",
-                "pages": [
-                  "inspector/index",
-                  "inspector/cli",
-                  "inspector/connection-settings",
-                  "inspector/url-parameters",
-                  "inspector/keyboard-shortcuts",
-                  "inspector/command-palette",
-                  "inspector/rpc-logging",
-                  "inspector/integration",
-                  "inspector/debugging-chatgpt-apps",
-                  "inspector/self-hosting",
-                  "inspector/development",
-                  "inspector/changelog"
-                ]
-              },
-              "typescript/server/cli-reference",
-              "tunneling/index"
-            ]
-          },
-          {
-            "group": "Concepts",
-            "icon": "brain",
-            "pages": [
-              "home/mcp101"
-            ]
-          },
-          {
-            "group": "Libraries",
-            "icon": "library",
-            "pages": [
-              "home/redirects/typescript",
-              "home/redirects/python"
             ]
           }
         ]
@@ -255,14 +214,25 @@
                 "group": "Tooling",
                 "icon": "wrench",
                 "pages": [
-                  "typescript/server/cli-reference"
-                ]
-              },
-              {
-                "group": "Development",
-                "icon": "folder-code",
-                "pages": [
-                  "/inspector/index",
+                  "typescript/tooling/client-cli",
+                  {
+                    "group": "Inspector",
+                    "icon": "bug-play",
+                    "pages": [
+                      "inspector/index",
+                      "inspector/cli",
+                      "inspector/connection-settings",
+                      "inspector/url-parameters",
+                      "inspector/keyboard-shortcuts",
+                      "inspector/command-palette",
+                      "inspector/rpc-logging",
+                      "inspector/integration",
+                      "inspector/debugging-chatgpt-apps",
+                      "inspector/self-hosting",
+                      "inspector/development",
+                      "inspector/changelog"
+                    ]
+                  },
                   "tunneling/index"
                 ]
               }
@@ -275,7 +245,8 @@
               {
                 "group": "Overview",
                 "pages": [
-                  "typescript/api-reference/overview"
+                  "typescript/api-reference/overview",
+                  "typescript/api-reference/cli-reference"
                 ]
               },
               {
@@ -791,6 +762,10 @@
     {
       "source": "/typescript/server/api-reference",
       "destination": "/typescript/api-reference/overview"
+    },
+    {
+      "source": "/typescript/server/cli-reference",
+      "destination": "/typescript/api-reference/cli-reference"
     },
     {
       "source": "/typescript/server/widget-components/usewidget",

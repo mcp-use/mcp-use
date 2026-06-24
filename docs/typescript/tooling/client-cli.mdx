@@ -1,0 +1,318 @@
+---
+title: CLI Client
+description: Use MCP servers directly from the terminal with the mcp-use CLI client
+icon: "terminal"
+---
+
+The mcp-use CLI client lets you interact with MCP servers directly from your terminal — no code required. Connect to a server, save it under a **short name**, and run tool/resource/prompt commands against that name.
+
+## Installation
+
+```bash
+npm install -g mcp-use
+# or
+npx mcp-use client --help
+```
+
+## Quick Start
+
+```bash
+# Connect once and save the server under a name of your choice
+npx mcp-use client connect manufact https://mcp.manufact.com/mcp
+
+# Every subsequent command names the server it operates on
+npx mcp-use client manufact tools list
+npx mcp-use client manufact tools call read_file path=/tmp/test.txt
+npx mcp-use client manufact interactive
+```
+
+## Command Structure
+
+The CLI has these top-level shapes under `mcp-use client`:
+
+| Shape | Purpose |
+|-------|---------|
+| `mcp-use client connect <name> <url>` | Save an MCP server under a short name |
+| `mcp-use client list` | List saved servers |
+| `mcp-use client remove <name>` | Remove a saved server |
+| `mcp-use client screenshot --mcp <url> --tool <name>` | Ad-hoc widget screenshot — no saved server needed |
+| `mcp-use client <name> <scope> <action>` | Run a command against a saved server |
+
+The per-server scopes are:
+
+| Scope | Actions |
+|-------|---------|
+| `tools` | `list`, `call <tool> [args...]`, `describe <tool>` |
+| `resources` | `list`, `read <uri>`, `subscribe <uri>`, `unsubscribe <uri>` |
+| `prompts` | `list`, `get <prompt> [args...]` |
+| `auth` | `status`, `refresh`, `logout` |
+| `screenshot` | `--tool <name> [args...]` — render a widget headlessly with the saved server's auth |
+| (top-level) | `interactive`, `disconnect` |
+
+## Connecting
+
+### HTTP Server
+
+```bash
+npx mcp-use client connect manufact https://mcp.manufact.com/mcp
+```
+
+Has a full OAuth 2.1 flow built in — the CLI handles the authentication flow for you.
+
+**Options:**
+- `--auth <token>`: Static Bearer token (skips OAuth).
+- `--no-oauth`: Don't auto-trigger OAuth on a 401; fail with the 401 instead.
+- `--auth-timeout <ms>`: OAuth loopback wait timeout (default 300000).
+
+### Stdio Server
+
+```bash
+npx mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
+```
+
+The string after the name is parsed as `command args...`.
+
+## Listing Saved Servers
+
+```bash
+npx mcp-use client list
+```
+
+```
+Saved Servers:
+
+NAME      TYPE   TARGET                         SERVER
+manufact  http   https://mcp.manufact.com/mcp   manufact-cloud
+fs        stdio  npx -y @mc...filesystem        fs-server
+```
+
+## Tools
+
+```bash
+# List
+npx mcp-use client manufact tools list
+npx mcp-use client manufact tools list --json
+
+# Describe (shows the input schema)
+npx mcp-use client manufact tools describe read_file
+
+# Call
+npx mcp-use client manufact tools call read_file path=/tmp/test.txt
+npx mcp-use client manufact tools call read_file '{"path":"/tmp/test.txt"}'
+npx mcp-use client manufact tools call read_file path=/tmp/test.txt --json
+npx mcp-use client manufact tools call slow_op --timeout 60000
+```
+
+**Arg syntax:**
+- `key=value` for simple strings/numbers/booleans (inferred from the tool schema).
+- `key:=<json>` to pass a JSON value (objects, arrays, etc.).
+- A single bare JSON object as the only arg works too: `'{"key":"value"}'`.
+
+## Resources
+
+```bash
+npx mcp-use client manufact resources list
+npx mcp-use client manufact resources read "file:///tmp/data.json"
+npx mcp-use client manufact resources subscribe "file:///tmp/data.json"
+npx mcp-use client manufact resources unsubscribe "file:///tmp/data.json"
+```
+
+`subscribe` keeps the process running and streams updates until Ctrl+C.
+
+## Prompts
+
+```bash
+npx mcp-use client manufact prompts list
+npx mcp-use client manufact prompts get greeting name=Alice
+npx mcp-use client manufact prompts get greeting '{"name":"Alice"}' --json
+```
+
+## Auth (OAuth)
+
+For HTTP servers that authenticated via OAuth:
+
+```bash
+npx mcp-use client manufact auth status   # show token state + expiry
+npx mcp-use client manufact auth refresh  # force-refresh access token
+npx mcp-use client manufact auth logout   # remove stored tokens
+```
+
+## Screenshot
+
+Render an MCP Apps widget headlessly and save a PNG. There are two forms.
+
+**Saved-server form** — reuses the auth from `mcp-use client connect`:
+
+```bash
+npx mcp-use client manufact screenshot --tool show-board
+npx mcp-use client manufact screenshot --tool show-board boardId=demo
+npx mcp-use client manufact screenshot --tool show-board --output ./out.png
+```
+
+**Ad-hoc form** — connects to an MCP server inline. Useful for one-off captures or programmatic/CI use that doesn't want to first save a server:
+
+```bash
+# Public server
+npx mcp-use client screenshot --mcp https://mcp.example.com --tool show-board
+
+# Authenticated server (curl-style -H, repeatable)
+npx mcp-use client screenshot \
+  --mcp https://mcp.example.com \
+  -H "Authorization: Bearer $TOKEN" \
+  --tool show-board boardId=demo
+```
+
+Common flags (both forms): `--width`, `--height`, `--device-scale-factor <n>` (e.g. `2` for Retina; defaults to `1`), `--theme light|dark`, `--output <path>`, `--wait-for <selector>`, `--delay <ms>`, `--timeout <ms>`, `--inspector <url>`, `--cdp-url <ws-url>`, `--quiet`. Run `mcp-use client screenshot --help` for the full list.
+
+<Note>
+`-H/--header` only applies to the ad-hoc form. The saved-server form carries the server's auth (OAuth or `--auth <token>` from `connect`) automatically.
+</Note>
+
+## Interactive Mode
+
+A REPL for one specific server:
+
+```bash
+npx mcp-use client manufact interactive
+```
+
+```
+mcp> tools list
+Available tools: read_file, write_file, list_directory
+
+mcp> tools call read_file
+Arguments (JSON, or press Enter for none): {"path":"/tmp/test.txt"}
+...
+
+mcp> exit
+```
+
+## Disconnecting
+
+```bash
+npx mcp-use client manufact disconnect
+```
+
+## Global Flags
+
+Per-server commands accept these flags where they make sense:
+
+- `--json`: Output results as JSON (on `list`/`call`/`read`/`get`).
+- `--timeout <ms>`: Request timeout (on `tools call`).
+- `--screenshot`: Capture a PNG screenshot of the rendered widget (on `tools call`, when the tool declares a UI resource). Opt-in — when omitted, the CLI prints a hint suggesting this flag.
+- `--screenshot-output <path>`: Override the screenshot output path. Implies `--screenshot`.
+- `--screenshot-device-scale-factor <n>`: Device pixel ratio for the widget screenshot (e.g. `2` for Retina). Defaults to `1`. Implies `--screenshot`. The dedicated `mcp-use client screenshot` command exposes the same knob as `--device-scale-factor <n>`.
+
+## Storage
+
+Saved servers are persisted in `~/.mcp-use/cli-sessions.json`:
+
+```json
+{
+  "sessions": {
+    "manufact": {
+      "type": "http",
+      "url": "https://mcp.manufact.com/mcp",
+      "authMode": "oauth",
+      "lastUsed": "2026-05-12T10:30:00Z",
+      "serverInfo": { "name": "manufact-cloud", "version": "1.0.0" }
+    },
+    "fs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+      "lastUsed": "2026-05-12T11:00:00Z"
+    }
+  }
+}
+```
+
+OAuth tokens live in `~/.mcp-use/oauth/<urlHash>/`, managed by the OAuth provider. Editing the JSON manually is fine — it just gets re-read on the next command.
+
+## Common Patterns
+
+### Debugging a Dev Server
+
+```bash
+npx mcp-use client connect dev http://localhost:3000/mcp
+npx mcp-use client dev tools list
+npx mcp-use client dev tools describe my_tool
+npx mcp-use client dev tools call my_tool param=value
+```
+
+### Multiple Servers
+
+```bash
+npx mcp-use client connect server1 http://localhost:3000/mcp
+npx mcp-use client connect server2 http://localhost:4000/mcp
+
+npx mcp-use client list
+npx mcp-use client server1 tools list
+npx mcp-use client server2 tools list
+```
+
+### Scripting
+
+```bash
+#!/bin/bash
+npx mcp-use client connect script http://localhost:3000/mcp
+
+DATA=$(npx mcp-use client script tools call get_data --json)
+echo "$DATA" | jq '.content[0].text'
+
+npx mcp-use client script disconnect
+```
+
+## Error Handling
+
+### Client Not Found
+
+```
+✗ Error: Client 'manufact' not found
+ℹ Connect with: npx mcp-use client connect manufact <url>
+```
+
+### Tool Not Found
+
+```
+✗ Error: Tool 'invalid_tool' not found
+
+Available tools:
+  • read_file
+  • write_file
+  • list_directory
+```
+
+### Missing Required Arguments
+
+```
+✗ Error: This tool requires arguments.
+
+Provide arguments as key=value pairs:
+  npx mcp-use client manufact tools call read_file key=value [key2=value2 ...]
+
+Tool schema:
+path (string) *required
+  The path to the file to read
+```
+
+## Migration from the old `--session` model
+
+Earlier versions of the CLI tracked an "active session" and let you omit the name in most commands (`mcp-use client tools list` would use whichever session you last connected to or switched to). That implicit state was confusing — what client am I currently aimed at? — so it was removed in favor of the explicit `<name>` positional.
+
+| Before | After |
+|--------|-------|
+| `mcp-use client connect <url> --name foo` | `mcp-use client connect foo <url>` |
+| `mcp-use client tools list` | `mcp-use client foo tools list` |
+| `mcp-use client tools call foo_tool ... --session foo` | `mcp-use client foo tools call foo_tool ...` |
+| `mcp-use client sessions list` | `mcp-use client list` |
+| `mcp-use client sessions switch foo` | *(removed — every command takes a name)* |
+| `mcp-use client disconnect` (implicit active) | `mcp-use client foo disconnect` |
+| `mcp-use client disconnect --all` | *(removed — disconnect one at a time)* |
+
+Existing `~/.mcp-use/cli-sessions.json` files keep working; the obsolete `activeSession` field is silently ignored on load.
+
+## Next Steps
+
+- Learn about [MCP Agents](/typescript/agent) for programmatic access
+- Explore [Server Development](/typescript/server) to create your own MCP servers
