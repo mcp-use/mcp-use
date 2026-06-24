@@ -325,6 +325,13 @@
                 ]
               },
               {
+                "group": "Agent",
+                "icon": "brain",
+                "pages": [
+                  "typescript/api-reference/agent/mcp-agent"
+                ]
+              },
+              {
                 "group": "Client",
                 "icon": "router",
                 "pages": [
