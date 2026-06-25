@@ -2312,10 +2312,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       isMountedRef.current = false;
       addLog("debug", "useMcp unmounting, disconnecting.");
 
-      // No global fetch teardown is needed: OAuth proxying is scoped to the
-      // provider's getProxyFetch() and the SDK transport/auth calls it is
-      // passed to, so unmounting never leaves a stale global fetch behind.
-
       // NOTE: We intentionally do NOT clear OAuth storage on unmount, even
       // mid-flow. Wrapper remounts (provider `_updateVersion` bumps, route
       // churn, StrictMode double-mounting) would otherwise destroy the
