@@ -68,7 +68,8 @@
                   "typescript/getting-started/welcome",
                   "typescript/getting-started/quickstart",
                   "typescript/getting-started/installation",
-                  "typescript/changelog/changelog"
+                  "typescript/changelog/changelog",
+                  "inspector/changelog"
                 ]
               },
               {
@@ -296,19 +297,6 @@
                 "icon": "brain",
                 "pages": [
                   "typescript/api-reference/agent/mcp-agent"
-                ]
-              }
-            ]
-          },
-          {
-            "tab": "Changelog",
-            "icon": "history",
-            "groups": [
-              {
-                "group": "Changelog",
-                "pages": [
-                  "typescript/changelog/changelog",
-                  "inspector/changelog"
                 ]
               }
             ]
