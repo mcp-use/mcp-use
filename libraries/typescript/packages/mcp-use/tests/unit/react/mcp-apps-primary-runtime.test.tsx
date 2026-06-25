@@ -197,6 +197,41 @@ describe("MCP Apps primary widget runtime", () => {
     expect(window.openai?.setWidgetState).not.toHaveBeenCalled();
   });
 
+  it("falls back to window.openai when the MCP Apps bridge never connects", async () => {
+    // Simulate an Apps SDK-only host: window.openai is present but the parent
+    // does not speak MCP Apps, so the bridge connect never resolves.
+    bridge.connect.mockReturnValue(new Promise<void>(() => {}));
+    bridge.isConnected.mockReturnValue(false);
+
+    let latest: ReturnType<typeof useWidget> | undefined;
+
+    function TestComponent() {
+      latest = useWidget();
+      return null;
+    }
+
+    await act(async () => {
+      create(<TestComponent />);
+      await flushMicrotasks();
+    });
+
+    // Data comes from window.openai, not the (never-connected) bridge.
+    expect(latest?.isPending).toBe(false);
+    expect(latest?.props).toEqual({ source: "openai-output" });
+    expect(latest?.toolInput).toEqual({ source: "openai-input" });
+    expect(latest?.metadata).toEqual({ source: "openai-meta" });
+    expect(latest?.theme).toBe("light");
+    expect(latest?.maxHeight).toBe(111);
+    expect(latest?.isAvailable).toBe(true);
+
+    // Actions route to window.openai while the bridge is unavailable.
+    await act(async () => {
+      await latest!.callTool("lookup", { id: 9 });
+    });
+    expect(window.openai?.callTool).toHaveBeenCalledWith("lookup", { id: 9 });
+    expect(bridge.callTool).not.toHaveBeenCalled();
+  });
+
   it("preserves ModelContext annotations when widget state is overwritten", async () => {
     let latest: ReturnType<typeof useWidget> | undefined;
 

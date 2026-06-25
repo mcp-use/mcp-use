@@ -135,6 +135,17 @@ export interface OpenAiGlobals<
   widgetState: WidgetState | null;
 }
 
+/**
+ * Custom event name dispatched by Apps SDK hosts (`window.openai`) when globals
+ * change. Used by the `window.openai` compatibility fallback in `useWidget`,
+ * which only activates when the MCP Apps bridge is not connected.
+ */
+export const SET_GLOBALS_EVENT_TYPE = "openai:set_globals";
+
+export type SetGlobalsEvent = CustomEvent<{
+  globals: Partial<OpenAiGlobals>;
+}>;
+
 export interface API<WidgetState extends UnknownObject = UnknownObject> {
   /** Calls a tool on your MCP. Returns the full response. */
   callTool: (
@@ -184,6 +195,10 @@ declare global {
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
+  }
+
+  interface WindowEventMap {
+    "openai:set_globals": SetGlobalsEvent;
   }
 }
 
