@@ -1,14 +1,24 @@
 ---
-title: Manufact Cloud
-description: Deploy your MCP server to Manufact Cloud with one command
+title: Deploy to Manufact Cloud
+description: Deploy a TypeScript MCP server built with mcp-use to Manufact Cloud.
 icon: "/images/logo-mcp-use.svg"
 ---
 
-Deploy your MCP server to **Manufact Cloud**, the recommended deployment platform for mcp-use servers. With a single command, you can deploy your server and get a production-ready URL.
+Deploy your TypeScript MCP server to [Manufact Cloud](https://docs.manufact.com/dashboard) when you want a hosted MCP URL, managed deployments, logs, metrics, preview environments, and client connection snippets.
+
+The `mcp-use` TypeScript SDK is the framework you use to build the server. Manufact Cloud is the hosted platform that deploys, monitors, and distributes it.
 
 ## Prerequisites
 
-**Manufact Cloud account**: Sign up at [mcp-use.com](https://mcp-use.com) or log in via CLI:
+- A TypeScript MCP server built with `mcp-use`.
+- A Manufact Cloud account. Open [Manufact login](https://manufact.com/login) or log in from the CLI.
+- The `mcp-use` executable. Projects created with `create-mcp-use-app` include it. For other projects, install the CLI:
+
+```bash
+npm install -g @mcp-use/cli
+```
+
+Log in before your first deploy:
 
 ```bash
 mcp-use login
@@ -22,24 +32,19 @@ mcp-use login --device-code <CODE>
 
 See the [CLI reference](/typescript/api-reference/cli-reference#login---authenticate-with-manufact-cloud) for `--api-key` and `--org` options.
 
-## Quick Deployment
+## Deploy from your project
 
-Deploy your MCP server in one command:
+Run `mcp-use deploy` from the project directory:
 
 ```bash
-# Install the CLI (if you are using create-mcp-use-app this step is not needed)
-npm install -g @mcp-use/cli
-
-# Login to Manufact Cloud
-mcp-use login
-
-# Deploy your server
 mcp-use deploy
 ```
 
-That's it! Your server will be built and deployed automatically.
+By default, the CLI deploys from GitHub. It can help you connect the Manufact GitHub App, create a repository when needed, and stream build logs. After the first successful deploy, the CLI writes `.mcp-use/project.json` so later `mcp-use deploy` runs update the same cloud server.
 
-## Deploy Without GitHub
+Use the [Manufact CLI deploy reference](https://docs.manufact.com/cli/deploy) for the complete flag list, including `--branch`, `--root-dir`, `--region`, `--env`, `--env-file`, `--build-command`, `--start-command`, and `--dockerfile`.
+
+## Deploy without GitHub
 
 You do not need a GitHub repository to deploy. Use `--no-github` to upload your local project source directly. The platform creates a managed repo and runs the normal build pipeline:
 
@@ -49,20 +54,26 @@ mcp-use deploy --no-github
 
 This path:
 
-- ✅ Works without a git remote or GitHub App installation
-- ✅ Uploads your local files (not GitHub)
-- ✅ Creates the server in the platform-managed org
-- ✅ Supports redeploys (linked projects auto-detect the upload path, so `--no-github` is only needed on the first deploy)
+- Works without a git remote or GitHub App installation.
+- Uploads your local source instead of deploying from your GitHub account.
+- Creates the server in a platform-managed repository.
+- Supports redeploys. Linked projects auto-detect the upload path, so `--no-github` is only required on the first deploy.
 
-You can later connect your own GitHub repository from the server dashboard ("Connect your GitHub") if you want push-to-deploy.
+You can later connect your own GitHub repository from the server dashboard if you want push-to-deploy.
 
 <Tip>
-  Web onboarding uses `mcp-use login --device-code` followed by `mcp-use deploy --no-github -y` for a fully non-interactive first deploy.
+  Web onboarding uses this sequence for a fully non-interactive first deploy:
+
+```bash
+mcp-use login --device-code <CODE>
+mcp-use deploy --no-github -y
+```
+
 </Tip>
 
-## GitHub Repository Deployment
+## Deploy from GitHub
 
-If your project is a GitHub repository, `mcp-use deploy` (without `--no-github`) automatically detects it and offers to deploy from GitHub:
+If your project is a GitHub repository, `mcp-use deploy` detects the repository, branch, and commit:
 
 ```bash
 mcp-use deploy
@@ -81,10 +92,10 @@ Deploy from GitHub repository your-org/your-repo? (y/n):
 
 This approach:
 
-- ✅ Deploys directly from your GitHub repository
-- ✅ Automatically detects build and start commands
-- ✅ Uses the latest commit from your branch
-- ✅ Requires the mcp-use GitHub App on the repo and changes pushed to GitHub
+- Deploys directly from your GitHub repository.
+- Automatically detects build and start commands for common MCP frameworks, including mcp-use TypeScript.
+- Uses the latest pushed commit from your branch.
+- Requires the mcp-use GitHub App to have access to the repository.
 
 ## Monorepos & multiple apps
 
@@ -119,50 +130,134 @@ Watch paths and branch patterns are also editable from the dashboard — see [De
 
 `mcp-use servers update --branch <name>` changes which branch is the production branch after creation.
 
-## After Deployment
+For cloud-side setup, see the Manufact docs for [creating servers](https://docs.manufact.com/dashboard/servers), [deployments](https://docs.manufact.com/dashboard/deployments), and [build runtimes](https://docs.manufact.com/dashboard/build-runtimes).
 
-Once deployment completes, you'll receive:
+## After deployment
 
-### Deployment URLs
+After deployment, the CLI prints the hosted MCP URL. Use that URL with any remote MCP-compatible client:
 
 ```text
-✓ Deployment successful!
-
-🌐 MCP Server URL:
-   https://your-server-id.run.mcp-use.com/mcp
-
-🔍 Inspector URL:
-   https://inspector.mcp-use.com/inspector?autoConnect=https://your-server-id.run.mcp-use.com/mcp
+https://<your-slug>.run.mcp-use.com/mcp
 ```
 
-The `autoConnect` parameter and other Inspector URL options are documented in [Inspector URL parameters](/inspector/url-parameters).
+The Manufact dashboard also shows your deployment status, build logs, runtime logs, environment variables, analytics, observability traces, and client connection snippets.
 
-#### Claude Desktop Configuration
+### Client configuration
+
+Use the hosted MCP URL in clients that support remote MCP servers:
 
 ```json
 {
   "mcpServers": {
     "my-server": {
-      "url": "https://your-server-id.run.mcp-use.com/mcp"
+      "url": "https://<your-slug>.run.mcp-use.com/mcp"
     }
   }
 }
 ```
 
-### Test Locally First
+You can also connect from the mcp-use TypeScript SDK:
 
-Before deploying, test your server locally:
+```ts
+import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    myServer: { url: "https://<your-slug>.run.mcp-use.com/mcp" },
+  },
+});
+```
+
+See [Connecting clients](https://docs.manufact.com/dashboard/connect-clients) for one-click setup and generated configuration for Cursor, VS Code, Claude, Gemini CLI, Codex CLI, and the TypeScript and Python SDKs.
+
+## Test locally first
+
+Before deploying, build and run your server locally:
 
 ```bash
-# Build and test locally
 mcp-use build
 mcp-use start
 ```
 
-## Next Steps
+For interactive local testing, use the Inspector with the dev server:
 
-- [Deploying to Supabase](./supabase) - Alternative deployment option
-- [ServerConfig API reference](/typescript/api-reference/server/server-config) - Advanced server configuration options
-- [UI Widgets](/typescript/mcp-apps) - Building interactive widgets
-- [CLI Reference](/typescript/api-reference/cli-reference#deploy---cloud-deployment) - All deploy and login flags
-- [API Reference](/typescript/api-reference/overview) - Complete API documentation
+```bash
+mcp-use dev
+```
+
+## Cloud operations
+
+Manufact Cloud owns the hosted deployment lifecycle. Use these pages for current cloud behavior:
+
+<CardGroup cols={2}>
+  <Card
+    title="Creating servers"
+    icon="server"
+    href="https://docs.manufact.com/dashboard/servers"
+  >
+    Import from GitHub, start from a template, build with an agent, or connect
+    an existing MCP server.
+  </Card>
+  <Card
+    title="Deployments"
+    icon="rocket"
+    href="https://docs.manufact.com/dashboard/deployments"
+  >
+    Manage automatic deploys, preview environments, manual redeploys, build
+    logs, and deployment history.
+  </Card>
+  <Card
+    title="Build and runtimes"
+    icon="package"
+    href="https://docs.manufact.com/dashboard/build-runtimes"
+  >
+    See how Manufact detects Node.js, Python, package managers, pnpm versions,
+    and Dockerfile builds.
+  </Card>
+  <Card
+    title="Environment variables"
+    icon="variable"
+    href="https://docs.manufact.com/dashboard/environment-variables"
+  >
+    Configure production and preview secrets, import `.env` files, and redeploy
+    after changes.
+  </Card>
+  <Card
+    title="Domains"
+    icon="globe"
+    href="https://docs.manufact.com/dashboard/domains"
+  >
+    Use a generated gateway URL or attach a custom domain.
+  </Card>
+  <Card
+    title="Runtime logs"
+    icon="terminal"
+    href="https://docs.manufact.com/dashboard/logs"
+  >
+    Stream stdout and stderr from the active deployment.
+  </Card>
+  <Card
+    title="Observability"
+    icon="activity"
+    href="https://docs.manufact.com/dashboard/observability"
+  >
+    Inspect live requests, traces, sessions, payload capture, and performance
+    metrics.
+  </Card>
+  <Card
+    title="Connecting clients"
+    icon="plug"
+    href="https://docs.manufact.com/dashboard/connect-clients"
+  >
+    Generate client configuration and connect your hosted MCP server to editors,
+    CLIs, Claude, and SDK clients.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+- [Manufact CLI deploy reference](https://docs.manufact.com/cli/deploy) - Current cloud deploy flags and examples.
+- [CLI reference](/typescript/api-reference/cli-reference#deploy---cloud-deployment) - mcp-use CLI behavior in this SDK.
+- [ServerConfig API reference](/typescript/api-reference/server/server-config) - Advanced server configuration options.
+- [MCP Apps](/typescript/mcp-apps) - Build interactive widgets for MCP clients.
+- [Deploying to Google Cloud Run](./google) and [Deploying to Supabase](./supabase) - Alternative deployment targets.
