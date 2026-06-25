@@ -6,6 +6,22 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v11.0.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=11.0.0&title=MCP%20Apps%20primary%20widget%20runtime&date=2026-06&lang=inspector" alt="Release 11.0.0" />
+  </Frame>
+  ## MCP Apps primary widget runtime & host context styles
+  Major release paired with `mcp-use` v1.33.0 — widgets now render with MCP Apps as the primary runtime and apply host context style variables, while the Apps SDK preview tab remains for `window.openai`-only widgets.
+
+- **New**: widgets render with the MCP Apps bridge as the primary runtime and apply host context style variables; the Apps SDK ("Component (Apps SDK)") preview tab remains for widgets that only speak `window.openai` (`#1739`)
+- **Fix**: stale saved auto-connect entries are replaced when the advertised transport changes, so embedded Inspector instances stop retrying deprecated SSE connections after switching to streamable HTTP (`#1792`)
+- **Fix**: signed-in users on the hosted free tier are no longer shown the "sign in to increase your limits" prompt — the free-tier upgrade chrome only renders for anonymous visitors (`#1767`)
+- **Fix**: the inspector CLI handles `--version` and unknown options and reads its version from `package.json`, so canary builds and CLI version output stay in sync (`#1722`)
+- **Update**: Bumped `vite` to 8.0.16 (`#1742`)
+- **Update**: Peer dependency on `mcp-use` moves to `>=1.33.0-canary.0`
+- **Update**: Updated mcp-use to v1.33.0
+</Update>
+
 <Update label="v10.0.1" description="June 2026">
   ## Hosted localhost chat & chat scroll helper
   Patch release paired with `mcp-use` v1.32.1 — hosted inspector chat falls back to browser-side streaming for loopback MCP servers and adds a scroll-to-bottom affordance in long chats.

@@ -6,6 +6,29 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v1.33.0" description="June 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.33.0&title=MCP%20Apps%20primary%20widget%20runtime&date=2026-06&lang=typescript" alt="Release 1.33.0" />
+  </Frame>
+  ## MCP Apps primary widget runtime & monorepo deploy triggers
+  Minor release making MCP Apps the primary widget runtime (with an Apps SDK compatibility fallback), enforcing `outputSchema` at the tool return position, and adding monorepo auto-deploy controls to the CLI. Inspector ships major v11.0.0 (see inspector changelog).
+
+- **New** (react): MCP Apps is now the primary widget runtime — `useWidget` connects the MCP Apps bridge in any hosted iframe (including ChatGPT) and applies host context style variables, while `window.openai` is kept for extension APIs such as file upload/download (`#1739`)
+- **Fix** (react): widgets on Apps SDK-only hosts no longer hang on the loading spinner — `useWidget` falls back to `window.openai` data and actions when the MCP Apps bridge does not connect, and a connected bridge still takes priority (`#1794`)
+- **New** (server): a tool's `outputSchema` is now type-checked at the return position — returning a shape that does not match is a compile-time error, while content-only helpers (`text()`, `markdown()`, `image()`, …) stay allowed; the Apps SDK adapter auto-derives `openai/widgetDescription` from the widget description (`#1772`)
+- **Enhancement** (connectors): the `stdio` connector exposes a `cwd` argument for the spawned server process (`#1785`)
+- **New** (@mcp-use/cli): monorepo auto-deploy trigger config — `mcp-use deploy` gains `--watch-paths` and `--wait-for-ci`, and `servers update` gains `--watch-paths`, `--deploy-branches`, `--wait-for-ci` / `--no-wait-for-ci`, and `--root-dir`; `servers get` / `update` print the effective trigger config (`#1793`)
+- **Enhancement** (@mcp-use/cli): `deploy` surfaces the GitHub App installation URL up front when the app is not connected or lacks repo access, and exits cleanly in non-interactive contexts instead of hanging on a prompt (`#1761`)
+- **Fix** (@mcp-use/cli): `deployments list` preserves the API's ordering instead of re-sorting by creation date client-side (`#1752`)
+- **Fix** (@mcp-use/cli): Codex skills install to `.agents/skills` instead of the unsupported `.agent/skills` path (`#1756`)
+- **New** (create-mcp-use-app): the `starter` and `mcp-apps` templates score 100% on the publishing checklist — tools declare a `title` and `outputSchema` and return matching `structuredContent` (`#1772`)
+- **Documentation** (@mcp-use/cli): the new monorepo deploy flags are documented in the CLI reference, deployment guide, and package README (`#1793`)
+- **Update**: Bumped `hono` to 4.12.25 (`#1755`) and `vite` to 8.0.16 (`#1742`)
+- **Update**: Updated @mcp-use/cli to v3.6.0
+- **Update**: Updated create-mcp-use-app to v0.14.17
+- **Update**: Updated @mcp-use/inspector to v11.0.0
+</Update>
+
 <Update label="v1.32.1" description="June 2026">
   ## OAuth proxy callbacks, deploy fixes & hosted localhost chat
   Patch release for OAuth proxy callback routing, server notification logs, dev-widget noise reduction, and CLI deploy/env fixes. Inspector ships v10.0.1 with hosted-localhost chat fallback and a chat scroll helper (see inspector changelog).
