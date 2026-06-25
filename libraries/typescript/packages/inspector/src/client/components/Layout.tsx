@@ -17,6 +17,7 @@ import {
 import {
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
+  type ConnectionMode,
   type EditableConnectionConfig,
   type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
@@ -63,15 +64,26 @@ export function Layout({ children }: LayoutProps) {
       name?: string,
       proxyConfig?: any,
       transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig
+      oauth?: OAuthStaticConfig,
+      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
+        ? "proxy"
+        : "auto",
+      autoProxyFallback:
+        | boolean
+        | {
+            enabled?: boolean;
+            proxyAddress?: string;
+          } = proxyConfig?.proxyAddress ? false : false
     ) => {
       addServer(url, {
         url,
         name,
+        connectionMode,
         proxyConfig,
         transportType,
         preventAutoAuth: true,
         useRedirectFlow: true,
+        autoProxyFallback,
         clientOptions: {
           capabilities: {
             extensions: {
@@ -400,7 +412,17 @@ export function Layout({ children }: LayoutProps) {
           config.name,
           config.proxyConfig,
           config.transportType,
-          config.oauth
+          config.oauth,
+          config.connectionMode,
+          config.connectionMode === "auto"
+            ? (config.autoProxyFallback ??
+                (config.proxyConfig?.proxyAddress
+                  ? {
+                      enabled: true,
+                      proxyAddress: config.proxyConfig.proxyAddress,
+                    }
+                  : false))
+            : false
         );
       } else if (
         currentConnection &&
@@ -413,9 +435,20 @@ export function Layout({ children }: LayoutProps) {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
           name: config.name,
+          connectionMode: config.connectionMode,
           proxyConfig: config.proxyConfig,
           transportType: config.transportType,
           oauth: config.oauth,
+          autoProxyFallback:
+            config.connectionMode === "auto"
+              ? (config.autoProxyFallback ??
+                (config.proxyConfig?.proxyAddress
+                  ? {
+                      enabled: true,
+                      proxyAddress: config.proxyConfig.proxyAddress,
+                    }
+                  : false))
+              : false,
         });
       }
 

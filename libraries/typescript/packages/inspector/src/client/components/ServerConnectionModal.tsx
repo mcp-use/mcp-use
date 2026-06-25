@@ -1,6 +1,9 @@
 import type { McpServer } from "mcp-use/react";
 import {
   buildOAuthStaticConfig,
+  getDefaultInspectorProxyAddress,
+  normalizeConnectionMode,
+  type ConnectionMode,
   type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 
@@ -15,6 +18,12 @@ type MCPConnectionWithConfig = MCPConnection & {
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
   oauth?: OAuthStaticConfig;
+  autoProxyFallback?:
+    | boolean
+    | {
+        enabled?: boolean;
+        proxyAddress?: string;
+      };
 };
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { useEffect, useState } from "react";
@@ -40,6 +49,13 @@ interface ServerConnectionModalProps {
       proxyAddress?: string;
       headers?: Record<string, string>;
     };
+    connectionMode?: ConnectionMode;
+    autoProxyFallback?:
+      | boolean
+      | {
+          enabled?: boolean;
+          proxyAddress?: string;
+        };
     oauth?: OAuthStaticConfig;
   }) => void;
 }
@@ -62,13 +78,13 @@ export function ServerConnectionModal({
   // Form state
   const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
-  const [connectionType, setConnectionType] = useState("Direct");
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>("auto");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
   const [requestTimeout, setRequestTimeout] = useState("10000");
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
   const [maxTotalTimeout, setMaxTotalTimeout] = useState("60000");
   const [proxyAddress, setProxyAddress] = useState(
-    `${window.location.origin}/inspector/api/proxy`
+    getDefaultInspectorProxyAddress()
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
@@ -103,16 +119,29 @@ export function ServerConnectionModal({
       // Transport type is always HTTP now (SSE is deprecated)
       // No need to set transportType from connection
 
-      // Determine connection type based on proxyConfig
+      // Determine connection mode based on modern config, legacy connectionType, or proxyConfig
+      const fallbackProxyAddress =
+        typeof storedConfig?.autoProxyFallback === "object"
+          ? storedConfig.autoProxyFallback.proxyAddress
+          : typeof connectionWithConfig.autoProxyFallback === "object"
+            ? connectionWithConfig.autoProxyFallback.proxyAddress
+            : undefined;
       const proxyAddress =
         storedConfig?.proxyConfig?.proxyAddress ||
-        connectionWithConfig.proxyConfig?.proxyAddress;
+        connectionWithConfig.proxyConfig?.proxyAddress ||
+        fallbackProxyAddress;
+      const mode = normalizeConnectionMode(
+        storedConfig?.connectionMode ||
+          (connectionWithConfig as any).connectionMode,
+        storedConfig?.connectionType ||
+          (connectionWithConfig as any).connectionType,
+        !!proxyAddress
+      );
+      setConnectionMode(mode);
       if (proxyAddress) {
-        setConnectionType("Via Proxy");
         setProxyAddress(proxyAddress);
       } else {
-        setConnectionType("Direct");
-        setProxyAddress(`${window.location.origin}/inspector/api/proxy`);
+        setProxyAddress(getDefaultInspectorProxyAddress());
       }
 
       // Convert headers from Record<string, string> to CustomHeader[]
@@ -178,32 +207,32 @@ export function ServerConnectionModal({
       }
     }
 
-    // Prepare proxy configuration if "Via Proxy" is selected
+    const headers = customHeaders.reduce(
+      (acc, header) => {
+        if (header.name && header.value) {
+          acc[header.name] = header.value;
+        }
+        return acc;
+      },
+      {} as Record<string, string>
+    );
+
     const proxyConfig =
-      connectionType === "Via Proxy" && proxyAddress.trim()
+      connectionMode === "proxy" && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
-            headers: customHeaders.reduce(
-              (acc, header) => {
-                if (header.name && header.value) {
-                  acc[header.name] = header.value;
-                }
-                return acc;
-              },
-              {} as Record<string, string>
-            ),
+            headers,
           }
-        : {
-            headers: customHeaders.reduce(
-              (acc, header) => {
-                if (header.name && header.value) {
-                  acc[header.name] = header.value;
-                }
-                return acc;
-              },
-              {} as Record<string, string>
-            ),
-          };
+        : Object.keys(headers).length > 0
+          ? { headers }
+          : undefined;
+
+    const autoProxyFallback =
+      connectionMode === "auto"
+        ? proxyAddress.trim()
+          ? { enabled: true, proxyAddress: proxyAddress.trim() }
+          : false
+        : false;
 
     // Always use HTTP transport (SSE is deprecated)
     const actualTransportType = "http";
@@ -214,7 +243,9 @@ export function ServerConnectionModal({
       url: normalizedUrl,
       name: alias.trim() || normalizedUrl,
       transportType: actualTransportType,
+      connectionMode,
       proxyConfig,
+      autoProxyFallback,
       ...(oauth ? { oauth } : {}),
     });
 
@@ -232,8 +263,8 @@ export function ServerConnectionModal({
           setAlias={setAlias}
           url={url}
           setUrl={setUrl}
-          connectionType={connectionType}
-          setConnectionType={setConnectionType}
+          connectionMode={connectionMode}
+          setConnectionMode={setConnectionMode}
           customHeaders={customHeaders}
           setCustomHeaders={setCustomHeaders}
           requestTimeout={requestTimeout}
