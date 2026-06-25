@@ -15,8 +15,10 @@ import {
   Telemetry,
 } from "@/client/telemetry";
 import {
+  getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
+  normalizeConnectionMode,
   type ConnectionMode,
   type EditableConnectionConfig,
   type OAuthStaticConfig,
@@ -664,20 +666,53 @@ export function Layout({ children }: LayoutProps) {
           customHeaders.Authorization = `${formatted} ${srv.auth.access_token}`;
         }
 
-        const proxyConfig: {
-          proxyAddress: string;
-          headers?: Record<string, string>;
-        } = {
-          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-          ...(Object.keys(customHeaders).length > 0 && {
-            headers: customHeaders,
-          }),
-        };
+        const explicitProxyAddress =
+          typeof srv.proxyConfig?.proxyAddress === "string"
+            ? srv.proxyConfig.proxyAddress.trim()
+            : "";
+        let defaultProxyAddress = "";
+        try {
+          if (new URL(url).origin !== window.location.origin) {
+            defaultProxyAddress = getDefaultInspectorProxyAddress();
+          }
+        } catch {
+          defaultProxyAddress = getDefaultInspectorProxyAddress();
+        }
+
+        const proxyAddress = explicitProxyAddress || defaultProxyAddress;
+        const connectionMode = normalizeConnectionMode(
+          srv.connectionMode,
+          srv.connectionType,
+          !!explicitProxyAddress
+        );
+        const proxyConfig =
+          connectionMode === "proxy" && proxyAddress
+            ? {
+                proxyAddress,
+                ...(Object.keys(customHeaders).length > 0 && {
+                  headers: customHeaders,
+                }),
+              }
+            : Object.keys(customHeaders).length > 0
+              ? { headers: customHeaders }
+              : undefined;
+        const autoProxyFallback =
+          connectionMode === "auto" && proxyAddress
+            ? { enabled: true, proxyAddress }
+            : false;
 
         // Avoid duplicates
         const existing = connections.find((c) => c.url === url);
         if (!existing) {
-          addConnection(url, name, proxyConfig, transportType);
+          addConnection(
+            url,
+            name,
+            proxyConfig,
+            transportType,
+            undefined,
+            connectionMode,
+            autoProxyFallback
+          );
         }
 
         if (!firstServerId) {
