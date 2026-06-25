@@ -52,8 +52,13 @@ type UseMcpAuthProvider = OAuthClientProvider & {
     client_id: string;
     client_secret?: string;
   } | null>;
-  installFetchInterceptor?: () => void;
-  restoreFetch?: () => void;
+  /**
+   * Returns a `fetch` scoped to this provider that routes OAuth requests
+   * through the configured OAuth proxy (bypassing CORS) while leaving the
+   * global `fetch` untouched. Passed to the SDK transport / `auth()` so proxy
+   * behavior is confined to this server's connection.
+   */
+  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
   serverUrl?: string;
   /** localStorage key for a given suffix (e.g. "tokens"). */
   getKey?: (keySuffix: string) => string;
@@ -662,7 +667,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         useRedirectFlow,
         gatewayUrl,
         onPopupWindow,
-        installFetchInterceptor: true,
+        proxyOAuthRequests: true,
         staticClientInfo,
         scope: oauthScope,
       });
@@ -718,8 +723,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
-          // Pass custom fetch if provided (e.g., OAuth retry fetch for scope-step-up)
-          ...(customFetch && { fetch: customFetch }),
+          // Pass a fetch that scopes OAuth-proxy routing to this server's
+          // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
+          // OAuth retry fetch for scope step-up) when proxying, or returns it
+          // unchanged otherwise. Never mutates the global fetch.
+          ...(() => {
+            const scopedFetch =
+              authProviderRef.current?.getProxyFetch?.(customFetch) ??
+              customFetch;
+            return scopedFetch ? { fetch: scopedFetch } : {};
+          })(),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
           // Pass user-configurable reconnection options, or when autoReconnect
@@ -1205,6 +1218,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                   serverUrl: url,
                   ...(resourceMetadataUrl && { resourceMetadataUrl }),
                   ...(scope && { scope }),
+                  fetchFn: authProviderRef.current.getProxyFetch?.(),
                 });
 
                 if (authResult === "REDIRECT") {
@@ -1224,6 +1238,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                     ...(resourceMetadataUrl && { resourceMetadataUrl }),
                     ...(scope && { scope }),
                     authorizationCode: authCode,
+                    fetchFn: authProviderRef.current.getProxyFetch?.(),
                   });
                 }
 
@@ -1493,6 +1508,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
           await auth(authProviderRef.current, {
             serverUrl: baseUrl,
+            fetchFn: authProviderRef.current.getProxyFetch?.(),
           });
           connectRef.current?.();
           return;
@@ -1540,17 +1556,17 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             useRedirectFlow,
             gatewayUrl,
             onPopupWindow: captureOnPopupWindow,
-            installFetchInterceptor: !gatewayUrl,
+            proxyOAuthRequests: !gatewayUrl,
             staticClientInfo,
             scope: oauthScope,
           });
 
         if (oauthProxyUrl && !gatewayUrl) {
-          addLog("info", "Installed OAuth fetch interceptor for manual auth");
+          addLog("info", "Scoped OAuth proxy fetch enabled for manual auth");
         } else if (oauthProxyUrl && gatewayUrl) {
           addLog(
             "info",
-            "Using MCP gateway proxy for OAuth (no fetch interceptor needed)"
+            "Using MCP gateway proxy for OAuth (no scoped OAuth fetch needed)"
           );
         }
 
@@ -1567,6 +1583,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         try {
           await auth(freshAuthProvider, {
             serverUrl: baseUrl,
+            fetchFn: freshAuthProvider.getProxyFetch?.(),
           });
           addLog("info", "OAuth flow completed (tokens obtained)");
         } catch (err: unknown) {
@@ -2274,7 +2291,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         useRedirectFlow,
         gatewayUrl,
         onPopupWindow,
-        installFetchInterceptor: true,
+        proxyOAuthRequests: true,
         staticClientInfo,
         scope: oauthScope,
       });
@@ -2294,10 +2311,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return () => {
       isMountedRef.current = false;
       addLog("debug", "useMcp unmounting, disconnecting.");
-
-      // Restore window.fetch if a proxy interceptor was installed.
-      // restoreFetch() is a no-op when no interceptor is active.
-      authProviderRef.current?.restoreFetch?.();
 
       // NOTE: We intentionally do NOT clear OAuth storage on unmount, even
       // mid-flow. Wrapper remounts (provider `_updateVersion` bumps, route

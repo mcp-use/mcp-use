@@ -1,12 +1,16 @@
 // @vitest-environment jsdom
 
 /**
- * Tests that useMcp calls restoreFetch() on unmount to tear down any
- * window.fetch interceptor installed by a proxy-mode OAuth provider.
+ * Tests that useMcp scopes OAuth proxy behavior to the connection instead of
+ * mutating the global fetch.
  *
- * Related issue: MCP-1713 — Inspector: switching from "Via Proxy" → "Direct"
- * fails with "Protected resource does not match" error because the stale
- * interceptor from the proxy connection is never removed.
+ * Originally tracked the MCP-1713 symptom (switching "Via Proxy" → "Direct"
+ * failed because a stale global fetch interceptor was never torn down). That
+ * class of bug — and the related #1766 (one "Via Proxy" server affecting every
+ * fetch globally) — is now structurally impossible: the provider exposes a
+ * scoped `getProxyFetch()` that is passed only to the SDK transport/auth, so
+ * the global `fetch` is never reassigned and there is nothing to "restore" on
+ * unmount.
  */
 
 import React from "react";
@@ -43,21 +47,28 @@ vi.mock("../../../src/telemetry/index.js", () => ({
 
 describe("useMcp proxy connection cleanup", () => {
   let useMcp: any;
+  let originalFetch: typeof globalThis.fetch;
 
   beforeEach(async () => {
     vi.resetModules();
+    originalFetch = globalThis.fetch;
     const module = await import("../../../src/react/useMcp.js");
     useMcp = module.useMcp;
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     vi.clearAllMocks();
   });
 
-  it("calls restoreFetch() on the auth provider when the hook unmounts", async () => {
-    const restoreFetch = vi.fn();
+  it("never reassigns the global fetch across a proxy connection's mount/unmount", async () => {
+    const fetchBefore = globalThis.fetch;
+
+    // A proxy-mode auth provider exposes a scoped getProxyFetch(); the hook must
+    // not install or tear down any global fetch interceptor.
+    const getProxyFetch = vi.fn((base?: typeof fetch) => base);
     const mockAuthProvider = {
-      restoreFetch,
+      getProxyFetch,
       clearStorage: vi.fn().mockReturnValue(0),
       serverUrl: "http://localhost:3001/mcp",
     };
@@ -77,13 +88,14 @@ describe("useMcp proxy connection cleanup", () => {
       renderer = create(<TestComponent />);
     });
 
-    expect(restoreFetch).not.toHaveBeenCalled();
+    expect(globalThis.fetch).toBe(fetchBefore);
 
     await act(async () => {
       renderer!.unmount();
     });
 
-    expect(restoreFetch).toHaveBeenCalledOnce();
+    // Global fetch identity is preserved — no global interceptor was installed.
+    expect(globalThis.fetch).toBe(fetchBefore);
   });
 
   it("does not throw on unmount when no auth provider is set", async () => {

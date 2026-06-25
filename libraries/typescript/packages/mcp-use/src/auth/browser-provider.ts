@@ -34,6 +34,15 @@ interface BrowserOAuthOptions {
   /** MCP proxy URL that client connected to (for resource field rewriting) */
   connectionUrl?: string;
   /**
+   * When true (default), OAuth requests (.well-known metadata, token,
+   * register, authorize) are routed through `oauthProxyUrl` to bypass CORS.
+   * The routing is applied only to the scoped fetch returned by
+   * {@link BrowserOAuthClientProvider.getProxyFetch}; it never mutates the
+   * global `fetch`. Set to false to connect directly even when an OAuth proxy
+   * URL is available (e.g. when the MCP gateway already proxies OAuth).
+   */
+  proxyOAuthRequests?: boolean;
+  /**
    * Pre-registered OAuth client information. When set, the SDK skips
    * Dynamic Client Registration and uses this client_id directly.
    * Required for proxy-mode auth servers (e.g. Slack, WorkOS proxy)
@@ -62,7 +71,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private useRedirectFlow?: boolean;
   private oauthProxyUrl?: string;
   private connectionUrl?: string;
-  private originalFetch?: typeof fetch;
+  private proxyOAuthRequests: boolean;
   private _lastOriginalResource: string | null = null;
   readonly onPopupWindow:
     | ((
@@ -83,6 +92,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     this.useRedirectFlow = options.useRedirectFlow;
     this.oauthProxyUrl = options.oauthProxyUrl;
     this.connectionUrl = options.connectionUrl;
+    this.proxyOAuthRequests = options.proxyOAuthRequests ?? true;
     this.staticClientInfo = options.staticClientInfo;
     this.onPopupWindow = options.onPopupWindow;
   }
@@ -122,36 +132,38 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
-   * Install fetch interceptor to proxy OAuth requests through the backend
+   * Returns a `fetch` function, scoped to this provider, that routes OAuth
+   * requests (`.well-known` metadata, token, register, authorize) through the
+   * configured `oauthProxyUrl` to bypass CORS. All other requests are passed
+   * through to `baseFetch` unchanged.
+   *
+   * Unlike patching the global `fetch`, the returned function only affects the
+   * transport/auth calls it is explicitly handed to (via the SDK transport's
+   * `fetch` option or `auth({ fetchFn })`). Connecting one server "Via Proxy"
+   * therefore never alters fetch behavior for other servers, other
+   * connections, or the rest of the page.
+   *
+   * When this provider is not configured to proxy OAuth requests (no
+   * `oauthProxyUrl`, or `proxyOAuthRequests` disabled), the provided
+   * `baseFetch` is returned as-is (or `undefined` when none is given, letting
+   * the SDK fall back to its default `fetch`).
+   *
+   * @param baseFetch - The fetch used for non-OAuth requests and for the
+   *   underlying proxy calls. Defaults to the global `fetch`.
    */
-  installFetchInterceptor(): void {
-    if (!this.oauthProxyUrl) {
-      console.warn(
-        "[BrowserOAuthProvider] No OAuth proxy URL configured, skipping fetch interceptor installation"
-      );
-      return; // No proxy configured
+  getProxyFetch(baseFetch?: typeof fetch): typeof fetch | undefined {
+    if (!this.proxyOAuthRequests || !this.oauthProxyUrl) {
+      // Nothing to scope — return the caller's base fetch (possibly undefined).
+      return baseFetch;
     }
 
-    // Store original fetch if not already stored
-    if (!this.originalFetch) {
-      this.originalFetch = window.fetch;
-    } else {
-      console.warn(
-        "[BrowserOAuthProvider] Fetch interceptor already installed"
-      );
-      return; // Already installed
-    }
-
+    const base: typeof fetch = baseFetch ?? globalThis.fetch.bind(globalThis);
     const oauthProxyUrl = this.oauthProxyUrl;
     const connectionUrl = this.connectionUrl; // Capture connectionUrl in closure
     const serverUrl = this.serverUrl; // Capture serverUrl for WWW-Authenticate discovery
-    const originalFetch = this.originalFetch;
-    console.log(
-      `[BrowserOAuthProvider] Installing fetch interceptor with proxy: ${oauthProxyUrl}`
-    );
 
-    // Create interceptor
-    window.fetch = async (
+    // Create scoped fetch
+    return async (
       input: RequestInfo | URL,
       init?: RequestInit
     ): Promise<Response> => {
@@ -168,7 +180,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
         url.match(/\/(register|token|authorize)$/);
 
       if (!isOAuthRequest) {
-        return await originalFetch(input, init);
+        return await base(input, init);
       }
 
       // Don't intercept requests already going to our OAuth proxy (avoid circular proxying)
@@ -182,7 +194,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           (urlObj.pathname.startsWith(proxyUrlObj.pathname) ||
             url.includes("/inspector/api/oauth"))
         ) {
-          return await originalFetch(input, init);
+          return await base(input, init);
         }
       } catch {
         // If URL parsing fails, continue with interception (better safe than sorry)
@@ -221,7 +233,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
             proxyUrl.searchParams.set("mcp_url", serverUrl);
           }
 
-          const metadataResponse = await originalFetch(proxyUrl.toString(), {
+          const metadataResponse = await base(proxyUrl.toString(), {
             ...init,
             method: "GET",
             headers,
@@ -249,7 +261,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
 
         // OAuth endpoint requests: serialize and proxy the full request unchanged.
         const body = init?.body ? await serializeBody(init.body) : undefined;
-        const response = await originalFetch(proxyEndpoint, {
+        const response = await base(proxyEndpoint, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -273,20 +285,9 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           "[OAuth Proxy] Request failed, falling back to direct fetch:",
           error
         );
-        return await originalFetch(input, init);
+        return await base(input, init);
       }
     };
-  }
-
-  /**
-   * Restore original fetch after OAuth flow completes
-   */
-  restoreFetch(): void {
-    if (this.originalFetch) {
-      console.log("[BrowserOAuthProvider] Restoring original fetch");
-      window.fetch = this.originalFetch;
-      this.originalFetch = undefined;
-    }
   }
 
   // --- SDK Interface Methods (delegated) ---
