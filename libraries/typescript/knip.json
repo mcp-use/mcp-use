@@ -5,7 +5,8 @@
   },
   "ignoreWorkspaces": [
     "packages/mcp-use/examples/**",
-    "packages/create-mcp-use-app/src/templates/**"
+    "packages/create-mcp-use-app/src/templates/**",
+    "test_app"
   ],
   "workspaces": {
     ".": {
@@ -16,7 +17,8 @@
         "scripts/**/*.{js,mjs,ts}",
         "tests/helpers/**/*.ts",
         "tests/servers/**/*.ts",
-        "tests/docs/**/*.ts"
+        "tests/docs/**/*.ts",
+        "tests/types/**/*.ts"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
       "ignoreBinaries": ["lsof", "sleep", "dev"]
@@ -31,7 +33,6 @@
       "entry": [
         "src/server/*.ts",
         "start-auth-servers.ts",
-        "scripts/**/*.{js,mjs,ts}",
         "tests/e2e/**/*.{ts,tsx,mjs}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
@@ -42,7 +43,7 @@
       ]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["src/index.tsx", "scripts/**/*.{js,mjs,ts}"],
+      "entry": ["scripts/**/*.{js,mjs,ts}"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

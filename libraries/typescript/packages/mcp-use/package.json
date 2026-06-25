@@ -114,6 +114,7 @@
     "build": "npm run generate:version && rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:types": "tsc -p tsconfig.test-types.json",
     "test:unit": "vitest run --exclude 'tests/integration/**'",
     "test:deno": "bash test-deno.sh",
     "test:simple": "vitest run tests/stream_events_simple.test.ts",
