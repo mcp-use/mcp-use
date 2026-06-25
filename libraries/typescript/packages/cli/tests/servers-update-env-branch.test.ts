@@ -129,6 +129,89 @@ describe("servers update field mapping", () => {
     });
   });
 
+  it("maps watch paths / deploy branches / wait-for-ci / root-dir", async () => {
+    const { createServersCommand } = await import("../src/commands/servers.js");
+    mockApiInstance.updateServer.mockResolvedValue({
+      id: SERVER_ID,
+      name: "my-server",
+      slug: "my-server",
+    });
+
+    const cmd = createServersCommand();
+    await cmd.parseAsync(
+      [
+        "update",
+        SERVER_ID,
+        "--watch-paths",
+        "apps/foo/**",
+        "packages/shared/**",
+        "--deploy-branches",
+        "release/*",
+        "--wait-for-ci",
+        "--root-dir",
+        "apps/foo",
+      ],
+      { from: "user" }
+    );
+
+    expect(mockApiInstance.updateServer).toHaveBeenCalledWith(SERVER_ID, {
+      watchPaths: ["apps/foo/**", "packages/shared/**"],
+      deployBranchPatterns: ["release/*"],
+      waitForCi: true,
+      config: { rootDir: "apps/foo" },
+    });
+  });
+
+  it("clears watch paths / deploy branches and resets root dir with empty values", async () => {
+    const { createServersCommand } = await import("../src/commands/servers.js");
+    mockApiInstance.updateServer.mockResolvedValue({
+      id: SERVER_ID,
+      name: "my-server",
+      slug: "my-server",
+    });
+
+    const cmd = createServersCommand();
+    await cmd.parseAsync(
+      [
+        "update",
+        SERVER_ID,
+        "--watch-paths",
+        "",
+        "--deploy-branches",
+        "",
+        "--no-wait-for-ci",
+        "--root-dir",
+        "",
+      ],
+      { from: "user" }
+    );
+
+    expect(mockApiInstance.updateServer).toHaveBeenCalledWith(SERVER_ID, {
+      watchPaths: [],
+      deployBranchPatterns: [],
+      waitForCi: false,
+      config: { rootDir: null },
+    });
+  });
+
+  it("omits waitForCi when neither --wait-for-ci flag is passed", async () => {
+    const { createServersCommand } = await import("../src/commands/servers.js");
+    mockApiInstance.updateServer.mockResolvedValue({
+      id: SERVER_ID,
+      name: "my-server",
+      slug: "my-server",
+    });
+
+    const cmd = createServersCommand();
+    await cmd.parseAsync(["update", SERVER_ID, "--name", "renamed"], {
+      from: "user",
+    });
+
+    expect(mockApiInstance.updateServer).toHaveBeenCalledWith(SERVER_ID, {
+      name: "renamed",
+    });
+  });
+
   it("does not call the API when no fields are provided", async () => {
     const { createServersCommand } = await import("../src/commands/servers.js");
     const exitSpy = vi.spyOn(process, "exit").mockImplementation(((
