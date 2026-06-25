@@ -213,6 +213,16 @@ interface DeployOptions {
   /** Path to a non-default Dockerfile (relative to rootDir / repo root). */
   dockerfile?: string;
   /**
+   * Glob patterns limiting which repo changes trigger auto-deploy (monorepos).
+   * Applied only when creating a new GitHub server.
+   */
+  watchPaths?: string[];
+  /**
+   * Hold GitHub auto-deploys until other check runs pass. Applied only when
+   * creating a new GitHub server.
+   */
+  waitForCi?: boolean;
+  /**
    * Deploy branch. Defaults to the current git branch (managed flow: "main").
    * Also scopes env-var sync to that branch's preview env.
    */
@@ -1664,6 +1674,8 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         buildCommand: options.buildCommand,
         startCommand: options.startCommand,
         dockerfilePath: options.dockerfile,
+        watchPaths: options.watchPaths,
+        waitForCi: options.waitForCi,
       });
 
       deploymentId = serverResult.deploymentId ?? "";
