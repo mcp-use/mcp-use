@@ -3,7 +3,6 @@ title: "Notifications"
 description: "MCP servers can send various notifications to the client to signal events or provide updates on long-running tasks. This is distinct from logging, which is handled separately."
 icon: "bell-ring"
 ---
-import { Callout } from "nextra/components";
 
 
 `mcp-use` allows you to handle these notifications by providing a `message_handler` to the `MCPClient`.
@@ -108,6 +107,6 @@ async def test_notifications(primitive_server):
 ```
 </CodeGroup>
 
-<Callout>
+<Note>
   The `message_handler` is a powerful catch-all for any message from the server. By inspecting the message type, you can build rich, responsive applications that react to server-side events in real time.
-</Callout>
+</Note>

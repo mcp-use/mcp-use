@@ -854,7 +854,7 @@ Provide a client that satisfies this shape. node-redis (via `createClient`) and 
 ><ParamField body="publish" type="(channel: string, message: string) => Promise<number>" >   Publish a message to a Pub/Sub channel. </ParamField>
 ><ParamField body="subscribe" type="(channel: string, callback: (message: string) => void) => Promise<number | void>" >   Subscribe to a Pub/Sub channel. </ParamField>
 ><ParamField body="unsubscribe" type="(channel: string) => Promise<number | void>" >   Unsubscribe from a Pub/Sub channel. </ParamField>
-><ParamField body="quit" type="() => Promise<string | \"OK\">" required="true" >   Close the connection. </ParamField>
+><ParamField body="quit" type='() => Promise<string | "OK">' required="true" >   Close the connection. </ParamField>
 
 **Signature**
 ```ts wrap
