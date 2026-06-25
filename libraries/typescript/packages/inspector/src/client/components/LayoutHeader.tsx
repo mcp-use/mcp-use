@@ -307,7 +307,7 @@ function TunnelBadge({
                 url: mcpEndpoint,
                 name: "Local MCP Server",
                 transportType: "http",
-                connectionType: "Direct",
+                connectionMode: "auto",
               })
             );
             toast.success(

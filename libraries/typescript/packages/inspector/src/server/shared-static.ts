@@ -41,7 +41,7 @@ interface RuntimeConfig {
   devMode?: boolean;
   /** Override sandbox origin for MCP Apps widgets behind reverse proxies */
   sandboxOrigin?: string | null;
-  /** Relative path to the MCP proxy (e.g. "/inspector/api/proxy"). When set, the client uses it for autoProxyFallback. Omit when the proxy is not available (e.g. Python server serving inspector). */
+  /** Relative path to the MCP proxy (e.g. "/inspector/api/proxy"). Set null when the proxy is not available (e.g. Python server serving inspector). */
   proxyUrl?: string | null;
   /** How the inspector is being served (standalone CLI, embedded in mcp-use, or cloud-hosted). Consumed by telemetry. */
   inspectorMode?: InspectorMode;

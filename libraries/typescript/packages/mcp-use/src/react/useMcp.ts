@@ -22,7 +22,7 @@ import { Logger, type LogLevel, logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
-import { applyProxyConfig } from "../utils/proxy-config.js";
+import { applyProxyConfig, type ProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { getPackageVersion } from "../version.js";
 import {
@@ -283,25 +283,44 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     };
   }, [autoReconnect]);
 
-  // Track whether we've already tried proxy fallback
-  const hasTriedProxyFallbackRef = useRef(false);
-  const [effectiveProxyConfig, setEffectiveProxyConfig] = useState(proxyConfig);
+  // Runtime proxy config is set only after automatic direct -> proxy fallback.
+  const [effectiveProxyConfig, setEffectiveProxyConfig] = useState<
+    ProxyConfig | undefined
+  >(undefined);
 
-  // Sync effectiveProxyConfig with proxyConfig prop changes
+  // Reset runtime fallback when the requested connection changes.
   useEffect(() => {
-    setEffectiveProxyConfig(proxyConfig);
-  }, [proxyConfig]);
+    setEffectiveProxyConfig(undefined);
+  }, [url, proxyConfig]);
+
+  const activeProxyConfig = useMemo(() => {
+    if (!effectiveProxyConfig?.proxyAddress) {
+      return proxyConfig;
+    }
+
+    const latestHeaders =
+      proxyConfig?.headers ?? proxyConfig?.customHeaders ?? {};
+    return {
+      ...effectiveProxyConfig,
+      headers: {
+        ...latestHeaders,
+        ...(effectiveProxyConfig.headers ??
+          effectiveProxyConfig.customHeaders ??
+          {}),
+      },
+    };
+  }, [effectiveProxyConfig, proxyConfig]);
 
   // Extract gateway URL and headers from proxy configuration
-  // Use proxyConfig directly (not effectiveProxyConfig) to ensure we always
-  // have the latest headers, even before the sync useEffect runs
+  // Use the runtime proxy after automatic fallback, while still merging in
+  // the latest requested headers from proxyConfig.
   const { gatewayUrl, proxyHeaders } = useMemo(() => {
-    const result = applyProxyConfig(url || "", proxyConfig);
+    const result = applyProxyConfig(url || "", activeProxyConfig);
     return {
-      gatewayUrl: proxyConfig?.proxyAddress,
+      gatewayUrl: activeProxyConfig?.proxyAddress,
       proxyHeaders: result.headers,
     };
-  }, [url, proxyConfig]);
+  }, [url, activeProxyConfig]);
 
   // OAuth provider should ALWAYS use the original target URL for OAuth discovery,
   // not the proxy URL. The proxy is only used for making the actual HTTP requests.
@@ -498,7 +517,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // Don't use a ref to track this - it causes issues with React strict mode
       // where multiple instances share the same ref but have different state
       const shouldTryProxyFallback =
-        autoProxyFallbackConfig.enabled && !effectiveProxyConfig?.proxyAddress; // Only fallback if not already using proxy
+        autoProxyFallbackConfig.enabled && !activeProxyConfig?.proxyAddress; // Only fallback if not already using proxy
 
       // Detect CORS errors (these can't have status codes, so check message)
       const isCorsError =
@@ -604,7 +623,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       onSampling,
       onElicitation,
       autoProxyFallbackConfig,
-      effectiveProxyConfig,
+      activeProxyConfig,
       providedAuthProvider,
     ]
   );
@@ -2238,15 +2257,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current);
     };
   }, [addLog]);
-
-  /**
-   * Effect: Reset proxy fallback tracking when URL changes
-   * This allows the fallback to try again for a different server
-   */
-  useEffect(() => {
-    hasTriedProxyFallbackRef.current = false;
-    setEffectiveProxyConfig(proxyConfig);
-  }, [url, proxyConfig]);
 
   /**
    * Effect: Main connection lifecycle
