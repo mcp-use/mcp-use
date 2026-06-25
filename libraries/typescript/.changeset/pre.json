@@ -19,6 +19,7 @@
     "mcp-apps-primary-widget-runtime",
     "monorepo-deploy-triggers",
     "slow-buckets-film",
-    "slow-lobsters-juggle"
+    "slow-lobsters-juggle",
+    "usewidget-apps-sdk-fallback"
   ]
 }
