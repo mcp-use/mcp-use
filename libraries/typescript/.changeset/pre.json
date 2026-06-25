@@ -16,6 +16,7 @@
     "hono-4-12-25",
     "mcp-2142-inspector-signed-in-prompt",
     "mcp-apps-primary-widget-runtime",
-    "slow-buckets-film"
+    "slow-buckets-film",
+    "slow-lobsters-juggle"
   ]
 }
