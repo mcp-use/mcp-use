@@ -48,6 +48,21 @@ interface ConnectionConfig {
   };
 }
 
+export function shouldReplaceAutoConnectConnection(
+  existing: {
+    url?: string;
+    state?: string;
+    transportType?: "http" | "sse";
+  },
+  config: Pick<ConnectionConfig, "url" | "transportType">
+): boolean {
+  return (
+    existing.url === config.url &&
+    existing.state !== "ready" &&
+    (existing.transportType ?? "http") !== config.transportType
+  );
+}
+
 /**
  * Parse an "autoConnect" parameter that may be a plain URL or a JSON-encoded connection configuration.
  *
@@ -227,7 +242,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
 export function useAutoConnect({
   connections,
   addConnection,
-  removeConnection: _removeConnection,
+  removeConnection,
   configLoaded: contextConfigLoaded,
   embedded = false,
 }: UseAutoConnectOptions): AutoConnectState {
@@ -334,6 +349,17 @@ export function useAutoConnect({
       const existing = connections.find((c) => c.url === config.url);
 
       if (existing) {
+        if (shouldReplaceAutoConnectConnection(existing, config)) {
+          console.warn(
+            "[useAutoConnect] Existing connection transport differs from auto-connect config; replacing it"
+          );
+          removeConnection(existing.id);
+          setAutoConnectConfig(config);
+          setIsAutoConnecting(true);
+          attemptConnection(config);
+          return;
+        }
+
         // Connection already exists
         if (existing.state === "ready") {
           // Already connected - navigate immediately
@@ -366,7 +392,7 @@ export function useAutoConnect({
         attemptConnection(config);
       }
     },
-    [connections, navigate, attemptConnection]
+    [connections, navigate, removeConnection, attemptConnection]
   );
 
   // Load config and initiate auto-connect
