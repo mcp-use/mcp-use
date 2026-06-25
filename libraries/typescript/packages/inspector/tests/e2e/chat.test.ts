@@ -305,12 +305,16 @@ test.describe("Inspector Chat Tests", () => {
         .getByTestId("chat-input")
         .fill(`Write a short list of 10 items. Iteration ${i + 1}.`);
       await page.getByTestId("chat-send-button").click();
-      await expect(page.getByTestId("chat-message-user")).toBeVisible({
+      // Each iteration adds one user + one assistant message. Assert on the
+      // count (not visibility) so the locator stays unambiguous after the
+      // first turn, which would otherwise trip Playwright strict mode.
+      await expect(page.getByTestId("chat-message-user")).toHaveCount(i + 1, {
         timeout: 3000,
       });
-      await expect(page.getByTestId("chat-message-assistant")).toBeVisible({
-        timeout: 45000,
-      });
+      await expect(page.getByTestId("chat-message-assistant")).toHaveCount(
+        i + 1,
+        { timeout: 45000 }
+      );
     }
 
     const container = page.getByTestId("chat-messages-scroll-container");
@@ -325,18 +329,19 @@ test.describe("Inspector Chat Tests", () => {
     const scrollButton = page.getByTestId("chat-scroll-to-bottom");
     await expect(scrollButton).toBeVisible({ timeout: 3000 });
 
-    // Click button and ensure we end up at the bottom.
+    // Click button and ensure we end up at the bottom. The scroll is animated,
+    // so poll until it settles instead of measuring synchronously.
     await scrollButton.click();
 
-    await container.evaluate((el) => {
-      const distanceFromBottom =
-        el.scrollHeight - (el.scrollTop + el.clientHeight);
-      if (distanceFromBottom > 80) {
-        throw new Error(
-          `Expected to be near bottom, distance=${distanceFromBottom}`
-        );
-      }
-    });
+    await expect
+      .poll(
+        () =>
+          container.evaluate(
+            (el) => el.scrollHeight - (el.scrollTop + el.clientHeight)
+          ),
+        { timeout: 5000 }
+      )
+      .toBeLessThanOrEqual(80);
 
     await expect(scrollButton).not.toBeVisible({ timeout: 3000 });
   });
