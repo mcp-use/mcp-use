@@ -17,6 +17,7 @@
     "mcp-2142-inspector-signed-in-prompt",
     "mcp-2260-templates-publishing-checklist",
     "mcp-apps-primary-widget-runtime",
+    "monorepo-deploy-triggers",
     "slow-buckets-film",
     "slow-lobsters-juggle"
   ]
