@@ -6,7 +6,7 @@ icon: "mouse-pointer-click"
 
 Interactive widgets can call tools, save UI state, send follow-up messages, and request a larger display mode. Use these APIs for user actions that should happen inside the widget instead of requiring another prompt.
 
-This guide assumes your widget already renders with `useWidget()`. See [Build widgets](/typescript/server/build-widgets) first if you still need the server and widget setup.
+This guide assumes your widget already renders with `useWidget()`. See [Build widgets](/typescript/mcp-apps/widgets) first if you still need the server and widget setup.
 
 ## Call tools from a widget
 
@@ -125,6 +125,6 @@ If one action must do multiple things, update local widget state first so the UI
 
 ## Next steps
 
-- Use [Model context](/typescript/server/model-context) to decide what the model should know about these interactions.
+- Use [Model context](/typescript/mcp-apps/model-context) to decide what the model should know about these interactions.
 - Use [`useCallTool()`](/typescript/api-reference/react/usecalltool) for full call state and typing details.
 - Use [`useWidget()`](/typescript/api-reference/react/usewidget) for all host actions and display-mode behavior.

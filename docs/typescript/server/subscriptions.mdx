@@ -116,23 +116,13 @@ Do not use subscriptions as the only persistence mechanism for background jobs, 
 
 ## Test resource updates locally
 
-Use a stateful client that can send `resources/subscribe`, such as the TypeScript client CLI.
+Use a stateful MCP client that can send `resources/subscribe`.
 
 ```bash
 npm run dev
 ```
 
-In another terminal, subscribe to the resource URI. Replace `my-server` with the server name from your client config.
-
-```bash
-npx mcp-use client my-server resources subscribe "settings://app"
-```
-
-Keep that command running. In a third terminal, call the update tool:
-
-```bash
-npx mcp-use client my-server tools call update_settings theme=dark
-```
+In another terminal, subscribe to the `settings://app` resource URI and keep the connection open. In a third terminal, call the `update_settings` tool with `theme=dark`.
 
 Verify these cases:
 

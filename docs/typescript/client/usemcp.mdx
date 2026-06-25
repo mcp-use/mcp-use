@@ -1,8 +1,7 @@
 ---
-title: "React Integration (useMcp & Provider)"
+title: "React Integration"
 description: "React hooks and providers for MCP client connections"
 icon: "react"
-tag: "New"
 ---
 
 mcp-use provides comprehensive React integration through `McpClientProvider` and the `useMcp` hook. The provider-based approach is recommended for managing multiple MCP server connections in your application.
@@ -170,112 +169,6 @@ function ServerStatus({ serverId }) {
         </div>
       );
   }
-}
-```
-
-## Provider Configuration
-
-### McpClientProvider Props
-
-```typescript
-interface McpClientProviderProps {
-  // Default OAuth callback URL for all servers (can be overridden per-server via callbackUrl)
-  // Useful when your app is mounted at a sub-path  -  e.g. set to "/myapp/oauth/callback"
-  // so the OAuth redirect lands on the correct route.
-  // Defaults to /oauth/callback on the current origin.
-  defaultCallbackUrl?: string;
-
-  // Default proxy configuration for all servers (can be overridden per-server)
-  defaultProxyConfig?: {
-    proxyAddress?: string;
-    headers?: Record<string, string>;
-  };
-
-  // Enable automatic proxy fallback (default: true)
-  // When a server fails with FastMCP or CORS errors, automatically retries with proxy
-  defaultAutoProxyFallback?:
-    | boolean
-    | {
-        enabled?: boolean;
-        proxyAddress?: string; // Default: https://inspector.mcp-use.com/inspector/api/proxy
-      };
-
-  // Initial servers (auto-connected on mount)
-  mcpServers?: Record<string, McpServerOptions>;
-
-  // Persistence
-  storageProvider?: StorageProvider;
-
-  // Debugging
-  enableRpcLogging?: boolean;
-
-  // Callbacks
-  onServerAdded?: (id: string, server: McpServer) => void;
-  onServerRemoved?: (id: string) => void;
-  onServerStateChange?: (id: string, state: string) => void;
-  onSamplingRequest?: (request, serverId, serverName, approve, reject) => void;
-  onElicitationRequest?: (
-    request,
-    serverId,
-    serverName,
-    approve,
-    reject
-  ) => void;
-}
-```
-
-### Server Options
-
-```typescript
-interface McpServerOptions {
-  // Connection
-  url?: string; // MCP server URL
-  name?: string; // Display name for the server
-  enabled?: boolean; // Enable/disable connection (default: true)
-  headers?: Record<string, string>; // Auth headers
-  transportType?: "auto" | "http" | "sse"; // Transport preference (default: 'auto')
-  timeout?: number; // Connection timeout (ms, default: 30000)
-
-  // Proxy (overrides provider defaults)
-  proxyConfig?: {
-    proxyAddress?: string;
-    headers?: Record<string, string>;
-  };
-  autoProxyFallback?: boolean | { enabled?: boolean; proxyAddress?: string };
-
-  // OAuth
-  preventAutoAuth?: boolean; // Prevent automatic OAuth popup (default: true)
-  useRedirectFlow?: boolean; // Use redirect instead of popup (default: false)
-  callbackUrl?: string; // OAuth callback URL
-  authProvider?: OAuthClientProvider; // Optional external OAuth provider (headless/custom runtimes)
-  oauth?: {
-    clientId?: string;     // Pre-registered OAuth client ID (skips Dynamic Client Registration)
-    clientSecret?: string; // Pre-registered client secret for confidential clients without PKCE
-    scope?: string;        // OAuth scopes string included in the authorize request
-  };
-  clientInfo?: {
-    name: string;
-    version: string;
-    description?: string;
-    icons?: Array<{ src: string }>;
-    websiteUrl?: string;
-  };
-
-  // Reconnection & Health Checks
-  autoRetry?: boolean | number; // Auto-retry on initial failure
-  autoReconnect?: boolean | number | {  // Auto-reconnect on drop (default: 3000ms)
-    enabled?: boolean;                  // Enable/disable (default: true)
-    initialDelay?: number;              // Delay before reconnect in ms (default: 3000)
-    healthCheckInterval?: number | false; // Health check polling in ms, or false to disable (default: 10000)
-    healthCheckTimeout?: number;        // Time before connection considered dead in ms (default: 30000)
-  };
-  reconnectionOptions?: ReconnectionOptions; // SDK-level transport reconnection
-
-  // Advanced
-  wrapTransport?: (transport: any, serverId: string) => any;
-  onNotification?: (notification: Notification) => void;
-  onSampling?: (params) => Promise<CreateMessageResult>;
-  onElicitation?: (params) => Promise<ElicitResult>;
 }
 ```
 
@@ -769,141 +662,6 @@ useMcp({
   Both can be used together for robust connection handling.
 </Note>
 
-## API Reference
-
-### Provider Hooks
-
-#### `useMcpClient()`
-
-Access the multi-server client context:
-
-```typescript
-const {
-  servers,
-  addServer,
-  removeServer,
-  updateServer,
-  updateServerMetadata,
-  getServer,
-  storageLoaded,
-} = useMcpClient();
-
-// Add a server
-addServer("my-server", {
-  url: "http://localhost:3000/mcp",
-  name: "My Server",
-  headers: { Authorization: "Bearer key" },
-});
-
-// Update a server's display name without reconnecting
-await updateServerMetadata("my-server", { name: "Production API" });
-
-// Update connection-affecting configuration (disconnects and reconnects)
-await updateServer("my-server", {
-  headers: { Authorization: "Bearer new-key" },
-});
-
-// Remove a server
-removeServer("my-server");
-
-// Get a specific server
-const server = getServer("my-server");
-```
-
-#### `useMcpServer(id)`
-
-Access a specific server's state and methods:
-
-```typescript
-const server = useMcpServer("my-server");
-
-// Server properties
-server.id; // "my-server"
-server.name; // "My Server"
-server.state; // "ready" | "discovering" | "failed" | ...
-server.tools; // Tool[]
-server.resources; // Resource[]
-server.prompts; // Prompt[]
-server.serverInfo; // { name, version, ... }
-server.error; // Error message if failed
-server.notifications; // McpNotification[]
-server.unreadNotificationCount; // number
-
-// Server methods
-await server.callTool("tool-name", { args });
-await server.readResource("uri");
-await server.listResources();
-await server.listPrompts();
-await server.getPrompt("prompt-name", { args });
-server.retry();
-server.disconnect();
-server.authenticate();
-server.clearStorage();
-server.markNotificationRead(notificationId);
-server.markAllNotificationsRead();
-server.clearNotifications();
-```
-
-### Server Methods
-
-#### `callTool(name, args, options?)`
-
-```typescript
-const result = await server.callTool("send-email", {
-  to: "user@example.com",
-  subject: "Hello",
-  body: "Test",
-});
-
-// With timeout
-const result = await server.callTool(
-  "long-task",
-  { data: "..." },
-  {
-    timeout: 300000, // 5 minutes
-    resetTimeoutOnProgress: true,
-  }
-);
-```
-
-#### `readResource(uri)`, `listResources()`, `listPrompts()`, `getPrompt()`
-
-Same API as standalone `useMcp`, but accessed per-server.
-
-#### `complete(params)`
-
-Request autocomplete suggestions for prompt arguments or resource template URIs:
-
-```typescript
-// Complete a prompt argument
-const result = await server.complete({
-  ref: { type: 'ref/prompt', name: 'code-review' },
-  argument: { name: 'language', value: 'py' }
-});
-
-console.log('Suggestions:', result.completion.values);
-// Output: ['python', 'pytorch', ...]
-
-// Complete a resource template URI variable
-const result = await server.complete({
-  ref: { type: 'ref/resource', uri: 'file:///{path}' },
-  argument: { name: 'path', value: '/home' }
-});
-```
-
-See [Completions](/typescript/client/completion) for detailed usage and examples.
-
-#### `refreshResourceTemplates()`
-
-Manually refresh the resource templates list from the server:
-
-```typescript
-await server.refreshResourceTemplates();
-console.log('Updated templates:', server.resourceTemplates);
-```
-
-The `resourceTemplates` state is automatically populated on connection and updated when notifications are received. Use this method to force a refresh when needed.
-
 ## Standalone useMcp Hook
 
 For simple single-server applications, you can use `useMcp` directly without the provider:
@@ -949,9 +707,9 @@ const mcp = useMcp({
   fallback, and notification management.
 </Note>
 
-## Next Steps
+## Further reading
 
-- [Authentication](/typescript/client/authentication) - OAuth and custom auth setup
-- [MCPClient](/typescript/client/client-configuration) - Multi-server class-based client
-- [Building Agents](/typescript/agent) - AI agents with MCP tools
-- [Client Configuration](/typescript/client/client-configuration) - HTTP, SSE, stdio connection types
+- [React client API reference](/typescript/api-reference/client/react-client) - Provider props, hook return values, server options, and storage types
+- [Authentication](/typescript/client/authentication) - OAuth, bearer tokens, and pre-registered client credentials
+- [Building agents](/typescript/agent) - AI agents that call tools from connected MCP servers
+- [Environments](/typescript/client/environments) - Node.js, browser, and React client entry points

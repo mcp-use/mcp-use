@@ -4,212 +4,100 @@ description: "Use MCP client in Node.js, browser, and React applications"
 icon: "container"
 ---
 
-The mcp-use client works across different JavaScript environments, each with its own entry point and capabilities. This guide shows you how to use the client in Node.js, browser, and React applications.
+The mcp-use client works across JavaScript environments, each with its own library entry point and capabilities. This guide shows you how to use the client in Node.js, browser, and React applications.
 
 ## Overview
 
-The library provides four main entry points:
+The library provides three main entry points:
 
 | Env         | Import               | Connection  | Use Cases                                        |
 | ----------- | -------------------- | ----------- | ------------------------------------------------ |
-| **Node.js** | `mcp-use`            | STDIO, HTTP | Servers, automation scripts, programmatic access |
+| **Node.js** | `mcp-use`            | HTTP, Standard I/O | Servers, automation scripts, programmatic access |
 | **Browser** | `mcp-use/browser`    | HTTP        | Web apps, browser extensions                     |
 | **React**   | `mcp-use/react`      | HTTP        | React applications with hooks                    |
-| **CLI**     | `npx mcp-use client` | STDIO, HTTP | Terminal usage, testing, debugging, scripting    |
 
 ## Node.js
 
-The Node.js environment provides the full feature set, including STDIO connections for local servers, file system operations, and code execution mode.
+The Node.js environment provides the full feature set, including HTTP connections to remote servers, Standard I/O connections to local servers, file system operations, and code execution mode.
 
 <Note>
-  **Node.js 20.19 or higher, or 22.12 or higher required**. The library supports both ESM
-  (`import`) and CommonJS (`require`) syntax.
+  **Node.js 20.19 or higher, or 22.12 or higher required**.
 </Note>
 
-<CodeGroup>
-```typescript TypeScript / ESM
-import { MCPClient } from 'mcp-use'
+```typescript
+import { MCPClient } from "mcp-use";
 
-// Create client with STDIO server
 const client = new MCPClient({
-mcpServers: {
-filesystem: {
-command: 'npx',
-args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/dir']
-}
-}
-})
+  mcpServers: {
+    remoteApi: {
+      url: "https://api.example.com/mcp",
+      headers: {
+        Authorization: "Bearer YOUR_TOKEN",
+      },
+    },
+    filesystem: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"],
+    },
+  },
+});
 
-// Connect to all servers
-await client.createAllSessions()
+const sessions = await client.createAllSessions();
 
-// Get a session and use it
-const session = client.getSession('filesystem')
-const tools = await session.listTools()
-console.log('Available tools:', tools)
+const remoteTools = await sessions.remoteApi.listTools();
+const filesystemTools = await sessions.filesystem.listTools();
 
-// Cleanup
-await client.closeAllSessions()
+console.log("Remote tools:", remoteTools.map((tool) => tool.name));
+console.log("Filesystem tools:", filesystemTools.map((tool) => tool.name));
 
-````
-
-```javascript CommonJS
-const { MCPClient } = require('mcp-use')
-
-async function main() {
-  // Create client with STDIO server
-  const client = new MCPClient({
-    mcpServers: {
-      filesystem: {
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/dir']
-      }
-    }
-  })
-
-  // Connect to all servers
-  await client.createAllSessions()
-
-  // Get a session and use it
-  const session = client.getSession('filesystem')
-  const tools = await session.listTools()
-  console.log('Available tools:', tools)
-
-  // Cleanup
-  await client.closeAllSessions()
-}
-
-main().catch(console.error)
-````
-
-</CodeGroup>
+await client.closeAllSessions();
+```
 
 ### Loading from Config File
 
 Node.js supports loading configuration from JSON files:
 
-<CodeGroup>
-```typescript TypeScript / ESM
-import { MCPClient, loadConfigFile } from 'mcp-use'
+```typescript
+import { MCPClient, loadConfigFile } from "mcp-use";
 
-// Load configuration from file
-const config = await loadConfigFile('mcp-config.json')
-const client = new MCPClient(config)
-await client.createAllSessions()
+const config = await loadConfigFile("mcp-config.json");
+const client = new MCPClient(config);
 
-````
-
-```javascript CommonJS
-const { MCPClient, loadConfigFile } = require('mcp-use')
-
-async function main() {
-  // Load configuration from file
-  const config = await loadConfigFile('mcp-config.json')
-  const client = new MCPClient(config)
-  await client.createAllSessions()
-}
-
-main().catch(console.error)
-````
-
-</CodeGroup>
+await client.createAllSessions();
+```
 
 #### Config File Structure
 
 The configuration file should be a JSON file with an `mcpServers` object containing your server definitions:
 
-<CodeGroup>
-```json Multiple Server Types
+```json
 {
   "mcpServers": {
-    "python-server": {
-      "command": "python",
-      "args": ["-m", "my_mcp_server"],
-      "env": {
-        "DEBUG": "1"
-      }
-    },
-    "uvx-server": {
-      "command": "uvx",
-      "args": ["blender-mcp"]
-    },
-    "npx-server": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"],
-      "env": {
-        "DISPLAY": ":1"
-      }
-    },
-    "remote-server": {
+    "remoteApi": {
       "url": "https://api.example.com/mcp",
       "headers": {
         "Authorization": "Bearer YOUR_TOKEN"
       }
-    }
-  }
-}
-```
-
-```json Simple Example
-{
-  "mcpServers": {
+    },
     "filesystem": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/path/to/directory"
-      ]
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
     }
   }
 }
 ```
 
-</CodeGroup>
-
 <Tip>
-  For more configuration options and examples, see the [Client
-  Configuration](/typescript/client/client-configuration) documentation.
+  For every configuration field and constructor option, see the
+  [`MCPClient` API reference](/typescript/api-reference/client/mcp-client).
 </Tip>
 
 ### Supported Connection Types
 
-Node.js supports all connection types:
+Node.js supports HTTP and Standard I/O connections:
 
 <CodeGroup>
-```typescript STDIO (ESM)
-// Local process via stdin/stdout
-import { MCPClient } from 'mcp-use'
-
-const client = new MCPClient({
-mcpServers: {
-myServer: {
-command: 'npx',
-args: ['-y', '@my-mcp/server'],
-env: { PORT: '3000' }
-}
-}
-})
-
-````
-
-```javascript STDIO (CommonJS)
-// Local process via stdin/stdout
-const { MCPClient } = require('mcp-use')
-
-const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      command: 'npx',
-      args: ['-y', '@my-mcp/server'],
-      env: { PORT: '3000' }
-    }
-  }
-})
-````
-
-```typescript HTTP (ESM)
-// Remote HTTP server with SSE
+```typescript HTTP
 import { MCPClient } from "mcp-use";
 
 const client = new MCPClient({
@@ -224,17 +112,14 @@ const client = new MCPClient({
 });
 ```
 
-```javascript HTTP (CommonJS)
-// Remote HTTP server with SSE
-const { MCPClient } = require("mcp-use");
+```typescript Standard I/O
+import { MCPClient } from "mcp-use";
 
 const client = new MCPClient({
   mcpServers: {
     myServer: {
-      url: "https://api.example.com/mcp",
-      headers: {
-        Authorization: "Bearer YOUR_TOKEN",
-      },
+      command: "npx",
+      args: ["-y", "@my-mcp/server"],
     },
   },
 });
@@ -246,10 +131,10 @@ const client = new MCPClient({
 
 Node.js environment includes additional capabilities:
 
+- **HTTP Support**: Full support for HTTP and Server-Sent Events
+- **Standard I/O connections**: Connect to local MCP servers via child processes
 - **File System Operations**: Load config files, save configurations
 - **Code Mode**: Execute code in sandboxed environments (VM or E2B)
-- **STDIO Connections**: Connect to local MCP servers via child processes
-- **HTTP Support**: Full support for HTTP and Server-Sent Events
 
 ## Browser
 
@@ -285,8 +170,8 @@ await client.closeAllSessions();
 ### Supported Connection Types
 
 <Warning>
-  **No STDIO Support**: Browser environments cannot spawn child processes, so
-  STDIO connections are not available. Use HTTP connections instead.
+  **HTTP only**: Browser environments connect to MCP servers over HTTP.
+  Standard I/O connections require child processes, which browsers cannot spawn.
 </Warning>
 
 ```typescript
@@ -305,11 +190,11 @@ const client = new MCPClient({
 
 The browser client has some limitations compared to Node.js:
 
-- ❌ **No STDIO**: Cannot spawn child processes
-- ❌ **No File System**: Cannot read/write config files
-- ❌ **No Code Mode**: Sandboxed code execution not available
 - ✅ **HTTP**: Full support for remote connections
 - ✅ **OAuth**: Complete OAuth flow support
+- ❌ **No Standard I/O**: Cannot spawn child processes
+- ❌ **No File System**: Cannot read/write config files
+- ❌ **No Code Mode**: Sandboxed code execution not available
 
 ### OAuth in Browser
 
@@ -478,204 +363,20 @@ The `useMcp` hook provides:
 - ✅ **Type Safety**: Full TypeScript support with type inference
 - ✅ **Resource Access**: Read resources and prompts from servers
 
-## CLI Client
-
-The CLI client provides a command-line interface for interacting with MCP servers directly from your terminal, without writing any code. It's perfect for testing, debugging, and quick server interactions.
-
-<Note>
-  **No installation required**: Use `npx mcp-use client` to run commands
-  directly. Or install globally with `npm install -g mcp-use`.
-</Note>
-
-### Quick Start
-
-```bash
-# Connect to an HTTP server, saved under the name "my-server"
-npx mcp-use client connect my-server http://localhost:3000/mcp
-
-# Connect to a stdio server
-npx mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
-
-# Every subsequent command names the client it operates on
-npx mcp-use client my-server tools list
-npx mcp-use client my-server tools call read_file path=/tmp/test.txt
-npx mcp-use client my-server interactive
-```
-
-### Command Structure
-
-Top-level shapes:
-
-```bash
-# Save an MCP server under a short name
-npx mcp-use client connect <name> <url>
-
-# List saved servers
-npx mcp-use client list
-
-# Run any command against a saved server
-npx mcp-use client <name> <scope> <action> [args...]
-```
-
-The per-server scopes are `tools`, `resources`, `prompts`, `auth`, and `screenshot`, plus the top-level `interactive` and `disconnect`:
-
-```bash
-# Tools
-npx mcp-use client my-server tools list
-npx mcp-use client my-server tools call <tool> [args]
-npx mcp-use client my-server tools call <tool> [args] --screenshot   # widget PNG when the tool renders a UI resource
-npx mcp-use client my-server tools describe <tool>
-
-# Resources
-npx mcp-use client my-server resources list
-npx mcp-use client my-server resources read <uri>
-
-# Prompts
-npx mcp-use client my-server prompts list
-npx mcp-use client my-server prompts get <prompt> [args]
-
-# Auth (OAuth servers only)
-npx mcp-use client my-server auth status
-npx mcp-use client my-server auth refresh
-npx mcp-use client my-server auth logout
-
-# Widget screenshot (saved-server form — reuses OAuth/bearer auth)
-npx mcp-use client my-server screenshot --tool <tool> [args]
-
-# Interactive mode for one server
-npx mcp-use client my-server interactive
-```
-
-For ad-hoc screenshots against a server you haven't saved, use the top-level form with `--mcp <url>` and optional `-H` headers — see the [CLI Client guide](/typescript/client/cli#screenshot).
-
-### Managing Multiple Servers
-
-Saved servers are persisted to `~/.mcp-use/cli-sessions.json`:
-
-```bash
-# Connect to multiple servers
-npx mcp-use client connect server1 http://localhost:3000/mcp
-npx mcp-use client connect server2 http://localhost:4000/mcp
-
-# List them
-npx mcp-use client list
-
-# Run against either, by name
-npx mcp-use client server1 tools list
-npx mcp-use client server2 tools list
-```
-
-There is no "active" server — every command names its target explicitly.
-
-### Interactive Mode
-
-For exploration and testing, drop into a REPL against a specific server:
-
-```bash
-npx mcp-use client my-server interactive
-
-mcp> tools list
-mcp> tools call read_file
-Arguments (JSON): {"path": "/tmp/test.txt"}
-✓ Success
-...
-mcp> exit
-```
-
-### Scripting with the CLI
-
-Use the CLI in automation scripts with the `--json` flag for machine-readable output:
-
-```bash
-#!/bin/bash
-
-# Connect to server (saves it under the name "automation")
-npx mcp-use client connect automation http://localhost:3000/mcp
-
-# Get data as JSON and process with jq
-RESULT=$(npx mcp-use client automation tools call get_data --json 2>/dev/null)
-VALUE=$(echo "$RESULT" | jq -r '.content[0].text')
-
-echo "Retrieved value: $VALUE"
-
-# Cleanup
-npx mcp-use client automation disconnect
-```
-
-### CLI Features
-
-- ✅ **No Code Required**: Interact with MCP servers from the terminal
-- ✅ **Both Transports**: Supports HTTP and STDIO connections
-- ✅ **Session Persistence**: Sessions saved and restored automatically
-- ✅ **Interactive Mode**: REPL-style interface for exploration
-- ✅ **Scripting Support**: JSON output for automation
-- ✅ **Multi-Session**: Manage multiple server connections
-- ✅ **Testing & Debugging**: Perfect for server development
-
-<Tip>
-  For complete CLI documentation, examples, and advanced usage, see the [CLI
-  Client Guide](/typescript/client/cli).
-</Tip>
-
 ## Environment Comparison
 
 ### Feature Support Matrix
 
-| Feature                    | Node.js | Browser | React | CLI |
-| -------------------------- | ------- | ------- | ----- | --- |
-| STDIO Connections          | ✅      | ❌      | ❌    | ✅  |
-| HTTP Connections           | ✅      | ✅      | ✅    | ✅  |
-| OAuth Authentication       | ✅      | ✅      | ✅    | ✅  |
-| File System Operations     | ✅      | ❌      | ❌    | ✅  |
-| Code Mode                  | ✅      | ❌      | ❌    | ❌  |
-| Config File Loading        | ✅      | ❌      | ❌    | ✅  |
-| Automatic State Management | ❌      | ❌      | ✅    | ❌  |
-| React Hooks                | ❌      | ❌      | ✅    | ❌  |
-| Interactive REPL           | ❌      | ❌      | ❌    | ✅  |
-| Session Persistence        | ❌      | ❌      | ❌    | ✅  |
-
-### Import Reference
-
-<CodeGroup>
-```typescript ESM (TypeScript / Modern JS)
-// Node.js - Full feature set
-import { MCPClient } from 'mcp-use'
-
-// Browser - No STDIO, no file system
-import { MCPClient } from 'mcp-use/browser'
-
-// React - Hook-based API
-import { useMcp } from 'mcp-use/react'
-
-// OAuth helpers (available in all environments)
-import { BrowserOAuthClientProvider, onMcpAuthorization } from 'mcp-use/browser'
-import { onMcpAuthorization } from 'mcp-use/react'
-
-````
-
-```javascript CommonJS (Node.js)
-// Node.js - Full feature set
-const { MCPClient } = require('mcp-use')
-
-// Server utilities
-const { MCPServer } = require('mcp-use/server')
-
-// Agent utilities
-const { MCPAgent } = require('mcp-use/agent')
-
-// OAuth helpers
-const { BrowserOAuthClientProvider } = require('mcp-use/auth')
-
-// Browser and React exports are not available in CommonJS
-// as they require ESM module resolution
-````
-
-</CodeGroup>
-
-<Info>
-  **CommonJS Support**: All Node.js features of `mcp-use` work with CommonJS
-  (`require`). Browser and React modules should use ESM (`import`) instead.
-</Info>
+| Feature                    | Node.js | Browser | React |
+| -------------------------- | ------- | ------- | ----- |
+| HTTP Connections           | ✅      | ✅      | ✅    |
+| Standard I/O Connections   | ✅      | ❌      | ❌    |
+| OAuth Authentication       | ✅      | ✅      | ✅    |
+| File System Operations     | ✅      | ❌      | ❌    |
+| Code Mode                  | ✅      | ❌      | ❌    |
+| Config File Loading        | ✅      | ❌      | ❌    |
+| Automatic State Management | ❌      | ❌      | ✅    |
+| React Hooks                | ❌      | ❌      | ✅    |
 
 ### Security Considerations
 
@@ -708,50 +409,15 @@ const client = new MCPClient({
 });
 ```
 
-## Examples
-
-Client examples live in the package under `examples/client/`. Run them from the **package root** (e.g. `libraries/typescript/packages/mcp-use`):
-
-- **Node**: `examples/client/node/`  -  full-features (tool calls, sampling, elicitation, notifications) and communication examples (sampling, notification).
-- **Browser**: `examples/client/browser/`  -  full-features and CommonJS (`browser/commonjs/`).
-
-```bash
-# From package root (libraries/typescript/packages/mcp-use)
-pnpm run example:node:full      # Node client with onSampling, onElicitation, onNotification
-pnpm run example:browser:full   # Browser client (same features)
-pnpm run example:client:notification   # Notification client (start notification server first)
-pnpm run example:client:sampling       # Sampling client (start sampling server first)
-pnpm run example:commonjs             # Browser CommonJS build
-pnpm run example:with-conformance      # Starts conformance server, then node + browser full-features
-```
-
-Minimal client setup with root-level callbacks (as in [full-features-example.ts](https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/examples/client/node/full-features-example.ts)):
-
-```typescript
-import { acceptWithDefaults, MCPClient } from "mcp-use";
-
-const client = new MCPClient(
-  { mcpServers: { myServer: { url: "http://localhost:3000/mcp" } } },
-  {
-    onElicitation: async (params) => acceptWithDefaults(params),
-    onNotification: (n) => console.log(n.method),
-    // onSampling: see Sampling docs
-  }
-);
-```
-
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="CLI Client" icon="terminal" href="/typescript/client/cli">
-    Complete CLI client guide with examples
-  </Card>
   <Card
-    title="Configuration"
-    icon="cog"
-    href="/typescript/client/client-configuration"
+    title="MCPClient reference"
+    icon="router"
+    href="/typescript/api-reference/client/mcp-client"
   >
-    Learn about client configuration options
+    Look up client configuration fields and lifecycle methods
   </Card>
   <Card title="Tools" icon="wrench" href="/typescript/client/tools">
     Call tools and handle results

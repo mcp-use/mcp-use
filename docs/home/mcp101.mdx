@@ -173,13 +173,13 @@ server.tool({
 Widgets live in a `resources/` folder and are auto-discovered - no manual registration needed. They communicate with the server over JSON-RPC and have full access to MCP tools and resources from the client side.
 
 <CardGroup cols={2}>
-  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/server/mcp-apps">
+  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/mcp-apps">
     Widgets, auto-discovery, props, and client-side hooks.
   </Card>
-  <Card title="Creating an MCP Apps Server" icon="circle-play" href="/typescript/server/creating-mcp-apps-server">
+  <Card title="Creating an MCP Apps Server" icon="circle-play" href="/typescript/mcp-apps/quickstart">
     Step-by-step: scaffold and ship your first widget.
   </Card>
-  <Card title="Apps SDK compatibility" icon="message-square" href="/typescript/server/apps-sdk-compatibility">
+  <Card title="Apps SDK compatibility" icon="message-square" href="/typescript/mcp-apps/apps-sdk-compatibility">
     Understand how MCP Apps run in ChatGPT.
   </Card>
   <Card title="Debugging Widgets" icon="bug-play" href="/inspector/debugging-chatgpt-apps">
@@ -237,7 +237,7 @@ await client.close_all_sessions()
 ```
 </CodeGroup>
 
-See [TypeScript Client](/typescript/client/client-configuration) and [Python Client](/python/client/client-configuration).
+See [TypeScript Client](/typescript/client/index) and [Python Client](/python/client/client-configuration).
 
 ### Client Primitives
 
@@ -301,16 +301,16 @@ For a deep dive into the protocol itself, see the [official MCP documentation](h
   <Card title="Build an MCP Server" icon="server" href="/typescript/server/index">
     Expose tools, resources, and prompts to any AI client.
   </Card>
-  <Card title="MCP Apps" icon="app-window-mac" href="/typescript/server/mcp-apps">
+  <Card title="MCP Apps" icon="app-window-mac" href="/typescript/mcp-apps">
     Interactive widgets that run in Claude and ChatGPT.
   </Card>
   <Card title="MCP Inspector" icon="bug-play" href="/inspector/index">
     Test and debug your MCP server in the browser.
   </Card>
-  <Card title="MCP Client" icon="router" href="/typescript/client/client-configuration">
+  <Card title="MCP Client" icon="router" href="/typescript/client/index">
     Connect to any MCP server programmatically.
   </Card>
-  <Card title="MCP Agent" icon="brain" href="/python/agent/agent-configuration">
+  <Card title="MCP Agent" icon="brain" href="/typescript/agent/index">
     AI agents that use MCP servers to complete tasks.
   </Card>
   <Card title="Examples" icon="code" href="https://github.com/mcp-use/mcp-use/tree/main/examples">

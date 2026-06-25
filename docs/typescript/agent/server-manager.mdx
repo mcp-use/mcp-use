@@ -1,28 +1,14 @@
 ---
 title: 'Server Manager'
-description: 'Dynamic multi-server orchestration for agents'
+description: 'Let MCPAgent connect to MCP servers on demand instead of loading every tool up front.'
 icon: 'server'
 ---
 
-The Server Manager enables intelligent orchestration of multiple MCP servers, allowing agents to dynamically discover, connect to, and utilize tools from different servers without loading everything upfront.
+Server Manager is an agent mode for multi-server setups. Instead of exposing every tool from every server at initialization, the agent starts with management tools and connects to individual servers when the task needs them.
 
-## Why Use Server Manager?
+Use Server Manager when you connect to several servers or when the combined tool list is too large for the model context. For one or two small servers, the normal agent mode is usually simpler.
 
-When working with multiple MCP servers, you face a challenge: each server can expose dozens of tools, and loading all tools from all servers into your agent's context can be overwhelming and inefficient.
-
-The Server Manager solves this by:
-
-- **Dynamic loading**: Load tools only when needed, not everything upfront
-- **Intelligent routing**: Automatically select the right server for each task
-- **Context optimization**: Keep agent context focused and efficient
-- **Automatic discovery**: Find and connect to the right tools automatically
-- **Lifecycle management**: Handle connections and cleanup automatically
-
-<Tip>
-**Best for multi-server setups**: If you're connecting to 3+ servers or dealing with 20+ total tools, the Server Manager significantly improves agent performance and context efficiency.
-</Tip>
-
-## Architecture Overview
+## How it changes initialization
 
 ```mermaid
 graph TB
@@ -34,7 +20,7 @@ graph TB
     SM --> Tools[Dynamic Tools]
 ```
 
-## Dynamic Tool Loading Process
+With `useServerManager: true`, the agent receives management tools first. When the agent connects to a server, the available tool set changes and the agent executor is recreated with the newly loaded tools.
 
 ```mermaid
 sequenceDiagram
@@ -45,110 +31,98 @@ sequenceDiagram
     Agent->>Server: Use tools directly
 ```
 
-## Getting Started
+## Enable Server Manager
 
-Enable the Server Manager in your agent:
+Pass `useServerManager: true` when constructing the agent. Explicit mode requires a client because Server Manager coordinates configured client servers.
 
 <CodeGroup>
 ```typescript TypeScript
 import { MCPClient, MCPAgent } from 'mcp-use'
 import { ChatOpenAI } from '@langchain/openai'
 
-// Create client with multiple servers
 const client = new MCPClient({
-    mcpServers: {
-        playwright: {
-            command: 'npx',
-            args: ['@playwright/mcp@latest']
-        },
-        filesystem: {
-            command: 'uvx',
-            args: ['mcp-server-filesystem', '/tmp']
-        }
+  mcpServers: {
+    playwright: {
+      command: 'npx',
+      args: ['@playwright/mcp@latest']
+    },
+    filesystem: {
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp']
     }
+  }
 })
 
-// Enable Server Manager
 const agent = new MCPAgent({
-    llm: new ChatOpenAI({ model: "gpt-5.5" }),
-    client,
-    useServerManager: true  // This is the magic switch!
+  llm: new ChatOpenAI({ model: 'gpt-4o' }),
+  client,
+  useServerManager: true
 })
-```
 
+const result = await agent.run({
+  prompt: 'Use the right server to inspect /tmp and summarize what you find.',
+  maxSteps: 12
+})
+
+console.log(result)
+await agent.close()
+```
 </CodeGroup>
 
-## Tool Discovery Flow
+## Management tools
 
-The agent uses the management tools to discover and connect to servers:
+The agent uses these management tools before it can call tools from a configured MCP server.
 
-1. **List available servers**: Use `list_mcp_servers` to see what servers are configured
-2. **Connect to a server**: Use `connect_to_mcp_server` to activate a server and load its tools
-3. **Use server tools**: Once connected, the server's tools become available to the agent
-4. **Switch servers**: Connect to a different server to access its tools
-5. **Disconnect**: Use `disconnect_from_mcp_server` to deactivate the current server
+| Tool | What it does |
+| --- | --- |
+| `list_mcp_servers` | Lists configured servers and their known capabilities. |
+| `connect_to_mcp_server` | Connects to one server and loads its tools. |
+| `get_active_mcp_server` | Reports the currently active server. |
+| `disconnect_from_mcp_server` | Disconnects the active server and removes its tools. |
+| `add_mcp_server_from_config` | Adds a server from configuration during the run. |
 
-## Management Tools Deep Dive
+## Prompt for server discovery
 
-### Core Server Management
+Ask the agent to inspect available servers before choosing one. This helps when server names are not obvious from the user request.
 
-| Tool | Purpose | Example |
-|------|---------|---------|
-| `list_mcp_servers` | Discovery of available servers and their tools | "What servers do I have access to?" |
-| `connect_to_mcp_server` | Activate a server and load its tools | "Connect to the filesystem server" |
-| `get_active_mcp_server` | Check current connection status | "Which server am I currently using?" |
-| `disconnect_from_mcp_server` | Deactivate server and remove its tools | "Disconnect from current server" |
-| `add_mcp_server_from_config` | Add a new server dynamically from configuration | "Add a new server with this configuration" |
-
-
-## Complete Example
-
-```typescript 
+```typescript
 import { MCPClient, MCPAgent } from 'mcp-use'
 import { ChatOpenAI } from '@langchain/openai'
 
 async function demoServerManager() {
-    // Multi-server configuration
-    const client = new MCPClient({
-        mcpServers: {
-            web: { command: 'npx', args: ['@playwright/mcp@latest'] },
-            files: { command: 'uvx', args: ['mcp-server-filesystem', '/tmp'] },
-            database: { command: 'uvx', args: ['mcp-server-sqlite'] }
-        }
-    })
+  const client = new MCPClient({
+    mcpServers: {
+      web: { command: 'npx', args: ['@playwright/mcp@latest'] },
+      files: {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '/tmp']
+      }
+    }
+  })
 
-    // Agent with Server Manager
-    const agent = new MCPAgent({
-        llm: new ChatOpenAI({ model: "gpt-5.5" }),
-        client,
-        useServerManager: true,
-        verbose: true  // See the magic happen!
-    })
+  const agent = new MCPAgent({
+    llm: new ChatOpenAI({ model: 'gpt-4o' }),
+    client,
+    useServerManager: true,
+    verbose: true
+  })
 
-    // Complex multi-server task
-    const result = await agent.run(`
-    I need to build a complete data collection system:
+  const result = await agent.run({
+    prompt: `
+      First list the available MCP servers.
+      Then choose the right server to inspect /tmp.
+      Summarize what you found and mention which server you connected to.
+    `,
+    maxSteps: 12
+  })
 
-    1. First, show me what servers and tools are available
-    2. Scrape product information from https://example-store.com
-    3. Clean and structure the data
-    4. Save it as both JSON and CSV files
-    5. Load the data into a SQLite database
-    6. Generate a summary report
-
-    Guide me through each step and show me how you discover and use the right tools.
-    `)
-
-    console.log('Task completed!')
-    console.log(result)
-
-    await client.closeAllSessions()
+  console.log(result)
+  await agent.close()
 }
 
 demoServerManager().catch(console.error)
 ```
 
+## When not to use it
 
-The Server Manager transforms your MCP agent from a static tool user into an intelligent, adaptive assistant that can dynamically discover and utilize the perfect tools for any task!
-
-
+Do not enable Server Manager just to connect to a single server. It adds an extra discovery step and makes the model choose a server before it can use tools. For small setups, expose all tools directly and rely on `disallowedTools`, `exposeResourcesAsTools`, and `exposePromptsAsTools` to control scope.

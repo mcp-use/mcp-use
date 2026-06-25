@@ -1,10 +1,10 @@
 ---
 title: "API Reference"
-description: "Complete API reference for the mcp-use TypeScript MCP Server SDK (mcp-use/server) and the widget UI runtime (mcp-use/react)."
+description: "Complete API reference for the mcp-use TypeScript SDK, including server, client, agent, and React APIs."
 icon: "terminal"
 ---
 
-This is the reference for building MCP servers in TypeScript with `mcp-use`. It documents every public export, with exact signatures, parameters, return values, defaults, and a minimal example for each.
+This is the reference for building MCP servers, clients, agents, and React integrations in TypeScript with `mcp-use`. It documents public exports with exact signatures, parameters, return values, defaults, and minimal examples.
 
 For task-based walkthroughs and concepts, use the [Docs](/typescript/server/index) tab. This section is the precise reference you cite when you already know what you are building.
 
@@ -19,7 +19,7 @@ npm install mcp-use
 The `@mcp-use/cli` package installs the `mcp-use` executable for local development, production builds, deployment, tunneling, type generation, and terminal-based MCP client workflows.
 
 <CardGroup cols={2}>
-  <Card title="CLI Reference" icon="terminal" href="/typescript/api-reference/cli-reference">
+  <Card title="mcp-use CLI" icon="terminal" href="/typescript/api-reference/cli-reference">
     Command reference for `mcp-use dev`, `build`, `start`, `deploy`, `client`, `servers`, `deployments`, `skills`, and `generate-types`.
   </Card>
   <Card title="CLI client" icon="terminal" href="/typescript/tooling/client-cli">
@@ -29,12 +29,14 @@ The `@mcp-use/cli` package installs the `mcp-use` executable for local developme
 
 ## Import paths
 
-The server SDK ships from two entry points. Import server-side APIs from `mcp-use/server` and widget UI APIs from `mcp-use/react`.
+The TypeScript SDK ships from several entry points. Use the entry point that matches where your code runs.
 
 | Import path | Use it to |
 |---|---|
+| `mcp-use` | Create Node.js MCP clients, enable Code Mode, and use shared client helpers. |
+| `mcp-use/browser` | Create browser MCP clients for HTTP servers. |
 | `mcp-use/server` | Create the server, register tools, resources, and prompts, handle auth, sessions, middleware, and MCP Apps resources. |
-| `mcp-use/react` | Build the React widget UI that renders inside MCP Apps and ChatGPT (the views your tools return). |
+| `mcp-use/react` | Manage React client connections and build React widget UIs that render inside MCP Apps and ChatGPT. |
 
 <Note>
 Create a server with `new MCPServer({ ... })`. See the [MCPServer](/typescript/api-reference/server/mcp-server) reference for the constructor and all of its methods.
@@ -81,6 +83,23 @@ Create a server with `new MCPServer({ ... })`. See the [MCPServer](/typescript/a
   </Card>
   <Card title="MCP Apps" icon="layout-dashboard" href="/typescript/api-reference/server/widgets">
     UI resource builders, protocol adapters, and landing pages.
+  </Card>
+</CardGroup>
+
+## Client (`mcp-use`, `mcp-use/browser`, `mcp-use/react`)
+
+<CardGroup cols={3}>
+  <Card title="MCPClient" icon="router" href="/typescript/api-reference/client/mcp-client">
+    The Node.js client class: configure servers, create sessions, and manage lifecycle.
+  </Card>
+  <Card title="MCPSession" icon="cable" href="/typescript/api-reference/client/mcp-session">
+    Live protocol calls for tools, resources, prompts, completion, roots, and notifications.
+  </Card>
+  <Card title="Code Mode" icon="code" href="/typescript/api-reference/client/code-mode">
+    Code execution options, methods, executor classes, and result types.
+  </Card>
+  <Card title="React client" icon="react" href="/typescript/api-reference/client/react-client">
+    `McpClientProvider`, `useMcpClient()`, `useMcpServer()`, `useMcp()`, and storage providers.
   </Card>
 </CardGroup>
 

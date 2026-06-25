@@ -147,13 +147,13 @@
                 "group": "MCP Apps",
                 "icon": "app-window-mac",
                 "pages": [
-                  "typescript/server/mcp-apps",
-                  "typescript/server/creating-mcp-apps-server",
-                  "typescript/server/build-widgets",
-                  "typescript/server/model-context",
-                  "typescript/server/interactivity",
-                  "typescript/server/apps-sdk-compatibility",
-                  "typescript/server/content-security-policy"
+                  "typescript/mcp-apps",
+                  "typescript/mcp-apps/quickstart",
+                  "typescript/mcp-apps/widgets",
+                  "typescript/mcp-apps/model-context",
+                  "typescript/mcp-apps/interactivity",
+                  "typescript/mcp-apps/apps-sdk-compatibility",
+                  "typescript/mcp-apps/content-security-policy"
                 ]
               },
               {
@@ -161,7 +161,6 @@
                 "icon": "router",
                 "pages": [
                   "typescript/client/index",
-                  "typescript/client/client-configuration",
                   "typescript/client/environments",
                   {
                     "group": "Core Components",
@@ -176,13 +175,10 @@
                     "group": "Advanced Features",
                     "icon": "sparkle",
                     "pages": [
-                      "typescript/client/cli",
-                      "typescript/client/server-manager",
                       "typescript/client/sampling",
                       "typescript/client/elicitation",
                       "typescript/client/completion",
-                      "typescript/client/notifications",
-                      "typescript/client/logging"
+                      "typescript/client/notifications"
                     ]
                   },
                   "typescript/client/authentication",
@@ -195,18 +191,11 @@
                 "icon": "brain",
                 "pages": [
                   "typescript/agent/index",
-                  "typescript/agent/agent-configuration",
-                  {
-                    "group": "Core Concepts",
-                    "icon": "box",
-                    "pages": [
-                      "typescript/agent/llm-integration",
-                      "typescript/agent/memory-management",
-                      "typescript/agent/server-manager",
-                      "typescript/agent/structured-output",
-                      "typescript/agent/streaming"
-                    ]
-                  },
+                  "typescript/agent/llm-integration",
+                  "typescript/agent/memory-management",
+                  "typescript/agent/server-manager",
+                  "typescript/agent/structured-output",
+                  "typescript/agent/streaming",
                   "typescript/agent/observability"
                 ]
               },
@@ -297,6 +286,8 @@
                 "pages": [
                   "typescript/api-reference/client/mcp-client",
                   "typescript/api-reference/client/mcp-session",
+                  "typescript/api-reference/client/code-mode",
+                  "typescript/api-reference/client/react-client",
                   "typescript/api-reference/client/inspector-chat-components"
                 ]
               },
@@ -740,15 +731,43 @@
     },
     {
       "source": "/typescript/server/ui-widgets",
-      "destination": "/typescript/server/mcp-apps"
+      "destination": "/typescript/mcp-apps"
     },
     {
       "source": "/typescript/server/mcp-ui-resources",
-      "destination": "/typescript/server/mcp-apps"
+      "destination": "/typescript/mcp-apps"
+    },
+    {
+      "source": "/typescript/server/mcp-apps",
+      "destination": "/typescript/mcp-apps"
+    },
+    {
+      "source": "/typescript/server/creating-mcp-apps-server",
+      "destination": "/typescript/mcp-apps/quickstart"
+    },
+    {
+      "source": "/typescript/server/build-widgets",
+      "destination": "/typescript/mcp-apps/widgets"
+    },
+    {
+      "source": "/typescript/server/model-context",
+      "destination": "/typescript/mcp-apps/model-context"
+    },
+    {
+      "source": "/typescript/server/interactivity",
+      "destination": "/typescript/mcp-apps/interactivity"
+    },
+    {
+      "source": "/typescript/server/apps-sdk-compatibility",
+      "destination": "/typescript/mcp-apps/apps-sdk-compatibility"
+    },
+    {
+      "source": "/typescript/server/content-security-policy",
+      "destination": "/typescript/mcp-apps/content-security-policy"
     },
     {
       "source": "/guides/chatgpt-apps-flow",
-      "destination": "/typescript/server/apps-sdk-compatibility"
+      "destination": "/typescript/mcp-apps/apps-sdk-compatibility"
     },
     {
       "source": "/typescript/server/comparison-with-other-implementations",

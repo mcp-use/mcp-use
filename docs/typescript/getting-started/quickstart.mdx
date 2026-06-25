@@ -70,7 +70,7 @@ npx mcp-use client connect local http://localhost:3000/mcp
 npx mcp-use client local tools list
 ```
 
-The first command saves the server under the name `local`; later commands address it by that name. See the [CLI client](/typescript/client/cli) reference for the full command set.
+The first command saves the server under the name `local`; later commands address it by that name. See the [CLI client](/typescript/tooling/client-cli) reference for the full command set.
 
 ## Explore the project
 
@@ -145,7 +145,7 @@ export default function GreetingCard() {
 Save the file. The dev server discovers the new widget and hot-reloads, so reload the **Tools** tab in the Inspector and call `greeting-card` with `{ name: "Ada", message: "Welcome aboard!" }`. The card renders inline.
 
 <Tip>
-See [Tools](/typescript/server/tools), [Resources](/typescript/server/resources), and [Prompts](/typescript/server/prompts) for the full API, and [MCP Apps](/typescript/server/mcp-apps) to build widgets.
+See [Tools](/typescript/server/tools), [Resources](/typescript/server/resources), and [Prompts](/typescript/server/prompts) for the full API, and [MCP Apps](/typescript/mcp-apps) to build widgets.
 </Tip>
 
 ## Deploy to Manufact Cloud
@@ -168,7 +168,7 @@ This runs `mcp-use deploy`, which builds your server and deploys it to [Manufact
   <Card title="MCP Server" icon="server" href="/typescript/server/index">
     Tools, resources, prompts, and server configuration.
   </Card>
-  <Card title="MCP Apps" icon="app-window-mac" href="/typescript/server/mcp-apps">
+  <Card title="MCP Apps" icon="app-window-mac" href="/typescript/mcp-apps">
     Build interactive widgets for ChatGPT and Claude.
   </Card>
   <Card title="Inspector" icon="bug-play" href="/inspector/index">

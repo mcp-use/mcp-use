@@ -422,12 +422,9 @@ interface MCPClientConfigShape {
 
 ### ServerConfig
 
-Transport configuration for one MCP server. Node.js clients support stdio and HTTP configs. Browser clients support HTTP configs only.
+Transport configuration for one MCP server. Node.js clients support HTTP and Standard I/O configs. Browser clients support HTTP configs only.
 
 **Fields**
-><ResponseField name="command" type="string">Stdio command for Node.js clients.</ResponseField>
-><ResponseField name="args" type="string[]">Stdio arguments for Node.js clients.</ResponseField>
-><ResponseField name="env" type="Record<string, string>">Optional environment variables for stdio servers.</ResponseField>
 ><ResponseField name="url" type="string">HTTP or SSE MCP endpoint URL.</ResponseField>
 ><ResponseField name="headers" type="Record<string, string>">Optional request headers for HTTP servers.</ResponseField>
 ><ResponseField name="authToken" type="string">Bearer token for HTTP servers.</ResponseField>
@@ -435,10 +432,13 @@ Transport configuration for one MCP server. Node.js clients support stdio and HT
 ><ResponseField name="transport" type='"http" | "sse"'>Optional transport preference. Defaults to streamable HTTP with SSE fallback.</ResponseField>
 ><ResponseField name="preferSse" type="boolean">Prefer SSE transport when connecting.</ResponseField>
 ><ResponseField name="disableSseFallback" type="boolean">Disable automatic SSE fallback for streamable HTTP.</ResponseField>
+><ResponseField name="command" type="string">Stdio command for Node.js clients.</ResponseField>
+><ResponseField name="args" type="string[]">Stdio arguments for Node.js clients.</ResponseField>
+><ResponseField name="env" type="Record<string, string>">Optional environment variables for Standard I/O servers.</ResponseField>
 
 **Signature**
 ```ts wrap
-type ServerConfig = StdioServerConfig | HttpServerConfig;
+type ServerConfig = HttpServerConfig | StdioServerConfig;
 ```
 
 ### MCPClientOptions
@@ -553,7 +553,7 @@ const result = await client.executeCode(`
 ## Related
 
 - [`MCPSession`](/typescript/api-reference/client/mcp-session): live MCP protocol calls for tools, resources, prompts, roots, and notifications.
-- [Client configuration](/typescript/client/client-configuration): guide to stdio and HTTP server configuration.
+- [MCP Client overview](/typescript/client/index): choose the right client entry point and make a first tool call.
 - [Code mode](/typescript/client/code-mode): guide to code execution mode and executors.
 - [Sampling](/typescript/client/sampling): guide to handling server sampling requests.
 - [Elicitation](/typescript/client/elicitation): guide to handling user input requests.

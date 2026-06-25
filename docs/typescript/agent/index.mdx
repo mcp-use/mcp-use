@@ -4,15 +4,18 @@ description: "Build AI agents that call MCP server tools, with LLM integration, 
 icon: "list-start"
 ---
 
-`MCPAgent` connects an LLM to one or more MCP servers. It discovers the servers' tools, lets the LLM call them to complete a task, and returns the result. You provide an LLM, and the agent handles tool selection, multi-step execution, and conversation memory.
+`MCPAgent` connects an LLM to one or more MCP servers. The agent discovers tools, resources, and prompts, exposes them to a LangChain-compatible chat model, runs a bounded multi-step loop, and returns the final answer.
+
+Use `MCPAgent` when you want the model to decide which MCP tools to call. Use [`MCPClient`](/typescript/client/index) directly when your application should choose exact tools, resources, or prompts itself.
 
 ## Key features
 
-- **LLM tool calling**: Connect a supported LLM to MCP server tools and run a multi-step loop until the task is done.
-- **Multiple providers**: OpenAI, Anthropic, Google, and Groq. See [LLM Integration](/typescript/agent/llm-integration).
-- **Streaming**: Stream each step or low-level events as the agent runs. See [Streaming](/typescript/agent/streaming).
-- **Conversation memory**: Remember earlier turns across `run` calls, on by default. See [Memory Management](/typescript/agent/memory-management).
-- **Multi-server**: Connect to several servers and let a [Server Manager](/typescript/agent/server-manager) pick the right tools.
+- **Tool-calling loop**: Give the agent a prompt and let the LLM call MCP tools until it can answer.
+- **Simplified or explicit setup**: Pass `"provider/model"` plus `mcpServers`, or provide your own LangChain model and `MCPClient`.
+- **Streaming**: Stream tool-call steps or low-level LangChain events as the agent runs.
+- **Structured output**: Pass a Zod schema to get validated TypeScript data instead of plain text.
+- **Conversation memory**: Keep previous turns across `run` calls by default.
+- **Multi-server routing**: Enable Server Manager when many servers expose more tools than you want in context at once.
 
 ## Installation
 
@@ -49,12 +52,10 @@ Set the matching API key in your environment: `OPENAI_API_KEY`, `ANTHROPIC_API_K
 
 ## Quick start
 
-This agent connects to the filesystem MCP server and answers a question about the current directory. It uses OpenAI, so set `OPENAI_API_KEY` before running.
-
-Pass a `"provider/model"` string and your server config. The agent builds the LLM and MCP client for you.
+This example connects to the filesystem MCP server and answers a question about the current directory. It uses simplified mode, so the agent creates the LangChain model and `MCPClient` during initialization.
 
 ```typescript
-import { MCPAgent } from "mcp-use"
+import { MCPAgent } from "mcp-use";
 
 const agent = new MCPAgent({
   llm: "openai/gpt-4o",
@@ -64,15 +65,26 @@ const agent = new MCPAgent({
       args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
     },
   },
-})
+});
 
-const result = await agent.run({ prompt: "What is in the current folder?" })
-console.log(result)
+const result = await agent.run({ prompt: "What is in the current folder?" });
+console.log(result);
 
-await agent.close()
+await agent.close();
 ```
 
-`agent.run()` returns the final answer as a string. `maxSteps` (default `5`) caps how many tool-calling steps the agent takes before it must answer; raise it for complex tasks with `new MCPAgent({ ..., maxSteps: 10 })` or per call with `agent.run({ prompt, maxSteps: 10 })`. Always call `agent.close()` to shut down the server connections.
+`agent.run()` returns the final answer as a string. `maxSteps` defaults to `5`; raise it for complex tasks with `new MCPAgent({ ..., maxSteps: 10 })` or per call with `agent.run({ prompt, maxSteps: 10 })`. Always call `agent.close()` when the agent owns its client, or when you want to shut down explicit client connections.
+
+## Choose a setup mode
+
+`MCPAgent` supports two construction patterns.
+
+| Mode            | Use it when                                                                                   | You provide                                            |
+| --------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Simplified mode | You want the shortest path to a working agent.                                                | `llm: "provider/model"` and `mcpServers`.              |
+| Explicit mode   | You need full control over the LLM, client lifecycle, callbacks, custom tools, or connectors. | A LangChain chat model plus `MCPClient` or connectors. |
+
+For constructor options, defaults, run options, memory methods, streaming signatures, and observability methods, see the [MCPAgent API Reference](/typescript/api-reference/agent/mcp-agent).
 
 ## Core capabilities
 
@@ -81,18 +93,18 @@ await agent.close()
 Pass a Zod `schema` to `run` to get a typed object back instead of a string.
 
 ```typescript
-import { z } from 'zod'
+import { z } from "zod";
 
 const result = await agent.run({
-  prompt: 'Analyze the file structure',
+  prompt: "Analyze the file structure",
   schema: z.object({
     totalFiles: z.number(),
     fileTypes: z.array(z.string()),
-    largestFile: z.string()
-  })
-})
+    largestFile: z.string(),
+  }),
+});
 
-console.log(result.totalFiles) // typed as number
+console.log(result.totalFiles);
 ```
 
 See [Structured Output](/typescript/agent/structured-output) for details.
@@ -102,8 +114,8 @@ See [Structured Output](/typescript/agent/structured-output) for details.
 Iterate over `agent.stream` to receive each step as the agent runs.
 
 ```typescript
-for await (const step of agent.stream({ prompt: 'Write a report' })) {
-  console.log(`Tool: ${step.action.tool}`)
+for await (const step of agent.stream({ prompt: "Write a report" })) {
+  console.log(`Tool: ${step.action.tool}`);
 }
 ```
 
@@ -114,87 +126,60 @@ for await (const step of agent.stream({ prompt: 'Write a report' })) {
 Conversation memory is on by default, so the agent remembers earlier turns across `run` calls.
 
 ```typescript
-await agent.run({ prompt: "Hello, my name is Alice" })
-await agent.run({ prompt: "What's my name?" }) // the agent remembers Alice
+await agent.run({ prompt: "Hello, my name is Alice" });
+await agent.run({ prompt: "What's my name?" });
 
-agent.clearConversationHistory() // reset the history
+agent.clearConversationHistory();
 ```
 
 Pass `memoryEnabled: false` to `new MCPAgent({ ... })` to disable it. See [Memory Management](/typescript/agent/memory-management).
 
-## API reference
-
-`MCPAgent` accepts options in one of two modes:
-
-```typescript
-// Explicit mode: you build the LLM and client
-interface ExplicitModeOptions {
-  llm: BaseChatModel                          // a LangChain chat model, e.g. new ChatOpenAI(...)
-  client?: MCPClient
-  connectors?: BaseConnector[]
-  maxSteps?: number                           // default 5
-  memoryEnabled?: boolean                     // default true
-  systemPrompt?: string
-  useServerManager?: boolean                  // let the agent manage multiple servers
-  verbose?: boolean
-}
-
-// Simplified mode: the agent builds the LLM and client from your config
-interface SimplifiedModeOptions {
-  llm: string                                 // "provider/model", e.g. "openai/gpt-4o"
-  mcpServers: Record<string, MCPServerConfig>
-  llmConfig?: LLMConfig                        // temperature, maxTokens, apiKey, ...
-  maxSteps?: number                           // default 5
-  memoryEnabled?: boolean                      // default true
-  systemPrompt?: string
-}
-```
-
-Methods and run options:
-
-```typescript
-class MCPAgent {
-  constructor(options: ExplicitModeOptions | SimplifiedModeOptions)
-
-  run(options: RunOptions): Promise<string>
-  run<T>(options: RunOptions<T>): Promise<T>             // with a schema
-  stream(options: RunOptions): AsyncGenerator<AgentStep, string>
-  streamEvents(options: RunOptions): AsyncGenerator      // low-level LangChain events
-  clearConversationHistory(): void
-  close(): Promise<void>
-}
-
-interface RunOptions<T = string> {
-  prompt: string
-  maxSteps?: number
-  schema?: ZodSchema<T>            // return a typed object instead of a string
-  signal?: AbortSignal             // cancel the run
-  externalHistory?: BaseMessage[]
-}
-```
-
 ## Next steps
 
 <CardGroup cols={3}>
-  <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
-    Configure your agent and LLM settings.
-  </Card>
-  <Card title="LLM Integration" icon="brain-circuit" href="/typescript/agent/llm-integration">
+  <Card
+    title="LLM Integration"
+    icon="brain-circuit"
+    href="/typescript/agent/llm-integration"
+  >
     Connect OpenAI, Anthropic, Google, or Groq.
   </Card>
-  <Card title="Structured Output" icon="braces" href="/typescript/agent/structured-output">
+  <Card
+    title="Structured Output"
+    icon="braces"
+    href="/typescript/agent/structured-output"
+  >
     Return typed responses with Zod schemas.
   </Card>
   <Card title="Streaming" icon="wifi" href="/typescript/agent/streaming">
     Stream steps and events as the agent runs.
   </Card>
-  <Card title="Memory Management" icon="database" href="/typescript/agent/memory-management">
+  <Card
+    title="Memory Management"
+    icon="database"
+    href="/typescript/agent/memory-management"
+  >
     Keep or reset conversation history across runs.
   </Card>
-  <Card title="Server Manager" icon="server" href="/typescript/agent/server-manager">
+  <Card
+    title="Server Manager"
+    icon="server"
+    href="/typescript/agent/server-manager"
+  >
     Manage tools across multiple MCP servers.
   </Card>
-  <Card title="Observability" icon="chart-line" href="/typescript/agent/observability">
+  <Card
+    title="Observability"
+    icon="chart-line"
+    href="/typescript/agent/observability"
+  >
     Trace and monitor agent runs.
+  </Card>
+  <Card
+    title="MCPAgent API Reference"
+    icon="terminal"
+    href="/typescript/api-reference/agent/mcp-agent"
+  >
+    Check constructor options, method signatures, and types.
   </Card>
 </CardGroup>

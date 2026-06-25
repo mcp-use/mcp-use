@@ -2,7 +2,6 @@
 title: "Authentication"
 description: "Secure your MCP connections with OAuth and bearer tokens"
 icon: "shield"
-tag: "New"
 ---
 
 The mcp-use client supports multiple authentication methods for secure connections to MCP servers, including OAuth 2.1 with automatic token management, bearer token authentication, and custom authentication providers.
@@ -204,33 +203,6 @@ const client = MCPClient.fromDict(config)
   **Best Practice**: Store sensitive tokens in environment variables and
   reference them in your configuration instead of hardcoding them in files.
 </Tip>
-
-## CLI Authentication
-
-The mcp-use CLI client supports bearer token authentication for connecting to secured MCP servers:
-
-```bash
-# Connect with bearer token, saved under the name "my-server"
-npx mcp-use client connect my-server https://api.example.com/mcp \
-  --auth sk-your-api-key
-
-# List tools on that saved server
-npx mcp-use client my-server tools list
-
-# Call a tool
-npx mcp-use client my-server tools call send_email to=user@example.com
-
-# Disconnect
-npx mcp-use client my-server disconnect
-```
-
-The CLI automatically saves authentication tokens in `~/.mcp-use/cli-sessions.json` for future sessions.
-
-<Note>
-  For complete CLI documentation including stdio connections, session
-  management, and interactive mode, see the [CLI Client
-  Guide](/typescript/client/cli).
-</Note>
 
 ## OAuth Flow Modes
 
