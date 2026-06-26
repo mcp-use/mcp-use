@@ -1,17 +1,18 @@
 {
-  "name": "security-schemes-example",
+  "name": "sign-in-aware-tools-example",
   "type": "module",
   "version": "1.0.0",
-  "description": "MCP server example demonstrating tool-level securitySchemes (SEP-1488) with Supabase OAuth + anonymous sign-in",
+  "description": "MCP server example demonstrating public, optional-auth, and auth-required tools",
   "author": "",
   "license": "MIT",
   "keywords": [
     "mcp",
     "server",
     "example",
-    "security-schemes",
+    "sign-in-aware-tools",
     "sep-1488",
-    "supabase",
+    "workos",
+    "authkit",
     "oauth"
   ],
   "main": "dist/server.js",
@@ -22,7 +23,6 @@
   },
   "dependencies": {
     "mcp-use": "workspace:*",
-    "@supabase/supabase-js": "^2.104.0",
     "zod": "4.3.5"
   },
   "devDependencies": {

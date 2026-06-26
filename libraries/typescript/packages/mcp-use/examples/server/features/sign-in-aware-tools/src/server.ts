@@ -1,5 +1,5 @@
 /**
- * securitySchemes example — SEP-1488 / OpenAI Apps SDK
+ * Sign-in aware tools example — SEP-1488 / OpenAI Apps SDK
  *
  * Each tool advertises its auth policy via `securitySchemes`, which lands as
  * a top-level field on the Tool object in `tools/list`. ChatGPT and other
@@ -15,67 +15,79 @@
  *   4. whoami          — `oauth2` required, returns the live token claims so
  *                        you can verify the anonymous sign-in worked.
  *
- * Auth is wired up with Supabase's OAuth 2.1 server. Supabase hosts
- * /authorize, /token, /register and .well-known discovery; this server hosts
- * the consent screen (and the anonymous sign-in that backs it). Configure the
- * consent URL in the Supabase Dashboard (Authentication → OAuth Server) to
- * point at http://localhost:3000/auth/consent and enable anonymous sign-ins
- * under Auth → Providers → Anonymous.
+ * Auth is wired up with WorkOS AuthKit. WorkOS handles Dynamic Client
+ * Registration, login, consent, and token issuance; this MCP server verifies
+ * WorkOS-issued bearer tokens and surfaces the decoded user info on `ctx.auth`.
  *
  * Setup:
  *   1. pnpm install
- *   2. cp .env.example .env  # then fill in your Supabase project id + publishable key
+ *   2. cp .env.example .env  # set MCP_USE_OAUTH_WORKOS_SUBDOMAIN
  *   3. pnpm dev
  *   4. open http://localhost:3000/inspector
  *
  * Environment variables (see .env.example):
- *   - MCP_USE_OAUTH_SUPABASE_PROJECT_ID
- *   - MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY
+ *   - MCP_USE_OAUTH_WORKOS_SUBDOMAIN or WORKOS_AUTH_KIT_URL
  */
 
 import {
   MCPServer,
-  oauthSupabaseProvider,
+  oauthWorkOSProvider,
   text,
   object,
   authenticationRequired,
 } from "mcp-use/server";
 import { z } from "zod";
-import { mountAuthRoutes } from "./auth-routes.js";
 
-declare const process: { env: Record<string, string | undefined> };
+const SIGN_IN_SCOPE = "openid";
+const OAUTH_SCOPES = ["email", "offline_access", SIGN_IN_SCOPE, "profile"];
 
-const SUPABASE_PROJECT_ID = process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID;
-const SUPABASE_PUBLISHABLE_KEY =
-  process.env.MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY;
-
-if (!SUPABASE_PROJECT_ID) {
-  throw new Error(
-    "Missing MCP_USE_OAUTH_SUPABASE_PROJECT_ID environment variable"
+function getResourceMetadataUrl(ctx: { req?: { url: string } }): string {
+  const baseUrl = normalizeLocalOrigin(
+    process.env.MCP_URL ?? getRequestOrigin(ctx)
   );
-}
-if (!SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error(
-    "Missing MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY environment variable"
-  );
+  return `${baseUrl.replace(/\/+$/, "")}/.well-known/oauth-protected-resource/mcp`;
 }
 
-const RESOURCE_METADATA_URL =
-  "http://localhost:3000/.well-known/oauth-protected-resource";
+function getRequestOrigin(ctx: { req?: { url: string } }): string {
+  if (!ctx.req) return "http://localhost:3000";
+  return new URL(ctx.req.url).origin;
+}
+
+function normalizeLocalOrigin(origin: string): string {
+  const url = new URL(origin);
+  if (url.hostname === "0.0.0.0" || url.hostname === "[::]") {
+    url.hostname = "localhost";
+  }
+  return url.origin;
+}
+
+function getWorkOSSubdomain(): string {
+  const configured =
+    process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN ??
+    process.env.WORKOS_AUTH_KIT_URL;
+
+  if (!configured) {
+    throw new Error(
+      "WorkOS AuthKit domain is required. Set MCP_USE_OAUTH_WORKOS_SUBDOMAIN or WORKOS_AUTH_KIT_URL."
+    );
+  }
+
+  try {
+    return new URL(configured).host;
+  } catch {
+    return configured;
+  }
+}
 
 const server = new MCPServer({
-  name: "security-schemes-example",
+  name: "sign-in-aware-tools-example",
   version: "1.0.0",
   description:
-    "Demonstrates tool-level securitySchemes (SEP-1488) with Supabase OAuth + anonymous sign-in",
-  oauth: oauthSupabaseProvider(),
-});
-
-// Mount the consent + anonymous sign-in pages that Supabase redirects to
-// after /authorize.
-mountAuthRoutes(server, {
-  projectId: SUPABASE_PROJECT_ID,
-  publishableKey: SUPABASE_PUBLISHABLE_KEY,
+    "Demonstrates public, optional-auth, and auth-required MCP tools",
+  oauth: oauthWorkOSProvider({
+    subdomain: getWorkOSSubdomain(),
+    scopesSupported: OAUTH_SCOPES,
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -93,7 +105,9 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// 2. Optional auth — works anonymously, richer when signed in
+// 2. Optional auth — works anonymously, richer when signed in.
+//    WorkOS AuthKit advertises OIDC scopes by default, so this demo uses
+//    `openid` as the sign-in scope instead of custom API scopes.
 //    securitySchemes: [{ type: "noauth" }, { type: "oauth2", scopes: [...] }]
 // ---------------------------------------------------------------------------
 server.tool(
@@ -104,7 +118,7 @@ server.tool(
     schema: z.object({ q: z.string().describe("Catalog filter") }),
     securitySchemes: [
       { type: "noauth" },
-      { type: "oauth2", scopes: ["catalog.read"] },
+      { type: "oauth2", scopes: [SIGN_IN_SCOPE] },
     ],
   },
   async ({ q }, ctx) => {
@@ -126,13 +140,13 @@ server.tool(
     name: "create_doc",
     description: "Create a document (sign-in required)",
     schema: z.object({ title: z.string().describe("Document title") }),
-    securitySchemes: [{ type: "oauth2", scopes: ["docs.write"] }],
+    securitySchemes: [{ type: "oauth2", scopes: [SIGN_IN_SCOPE] }],
   },
   async ({ title }, ctx) => {
     if (!ctx.auth) {
       return authenticationRequired({
-        scopes: ["docs.write"],
-        resourceMetadataUrl: RESOURCE_METADATA_URL,
+        scopes: [SIGN_IN_SCOPE],
+        resourceMetadataUrl: getResourceMetadataUrl(ctx),
         errorDescription: "Sign in to create documents",
       });
     }
@@ -150,13 +164,13 @@ server.tool(
     name: "whoami",
     description: "Return the authenticated user's token claims",
     schema: z.object({}),
-    securitySchemes: [{ type: "oauth2", scopes: ["openid"] }],
+    securitySchemes: [{ type: "oauth2", scopes: [SIGN_IN_SCOPE] }],
   },
   async (_args, ctx) => {
     if (!ctx.auth) {
       return authenticationRequired({
-        scopes: ["openid"],
-        resourceMetadataUrl: RESOURCE_METADATA_URL,
+        scopes: [SIGN_IN_SCOPE],
+        resourceMetadataUrl: getResourceMetadataUrl(ctx),
       });
     }
     return object({
@@ -172,6 +186,6 @@ server.tool(
 // Start
 // ---------------------------------------------------------------------------
 server.listen().then(() => {
-  console.log("securitySchemes example running on http://localhost:3000");
+  console.log("Sign-in aware tools example running on http://localhost:3000");
   console.log("MCP Inspector: http://localhost:3000/inspector");
 });

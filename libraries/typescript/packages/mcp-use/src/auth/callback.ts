@@ -208,6 +208,11 @@ async function doOnMcpAuthorization() {
   try {
     // --- Basic Error Handling ---
     if (!state) {
+      if (error) {
+        throw new Error(
+          `OAuth provider returned ${error}${errorDescription ? `: ${errorDescription}` : ""}.`
+        );
+      }
       throw new Error(
         "State parameter not found or invalid in callback query parameters."
       );
