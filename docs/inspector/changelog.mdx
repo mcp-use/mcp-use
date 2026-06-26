@@ -10,10 +10,12 @@ tag: "New"
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=11.0.0&title=MCP%20Apps%20primary%20widget%20runtime&date=2026-06&lang=inspector" alt="Release 11.0.0" />
   </Frame>
-  ## MCP Apps primary widget runtime & host context styles
-  Major release paired with `mcp-use` v1.33.0 — widgets now render with MCP Apps as the primary runtime and apply host context style variables, while the Apps SDK preview tab remains for `window.openai`-only widgets.
+  ## MCP Apps runtime, Auto connections & host context styles
+  Major release paired with `mcp-use` v1.33.0 — widgets now render with MCP Apps as the primary runtime, new connections default to Auto mode with proxy fallback, and host context style variables are applied while the Apps SDK preview tab remains for `window.openai`-only widgets.
 
 - **New**: widgets render with the MCP Apps bridge as the primary runtime and apply host context style variables; the Apps SDK ("Component (Apps SDK)") preview tab remains for widgets that only speak `window.openai` (`#1739`)
+- **Enhancement**: new connections default to Auto mode, trying a direct browser connection first and falling back to the configured Inspector proxy when CORS or other proxy-resolvable connection errors occur; Direct and Proxy remain available as advanced overrides (`#1795`)
+- **Fix**: OAuth proxy fetch is scoped per server configuration, so connecting one server Via Proxy no longer mutates global `fetch`, changes unrelated requests, or affects other servers configured for Direct mode (`#1770`)
 - **Fix**: stale saved auto-connect entries are replaced when the advertised transport changes, so embedded Inspector instances stop retrying deprecated SSE connections after switching to streamable HTTP (`#1792`)
 - **Fix**: signed-in users on the hosted free tier are no longer shown the "sign in to increase your limits" prompt — the free-tier upgrade chrome only renders for anonymous visitors (`#1767`)
 - **Fix**: the inspector CLI handles `--version` and unknown options and reads its version from `package.json`, so canary builds and CLI version output stay in sync (`#1722`)
