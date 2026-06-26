@@ -6,6 +6,7 @@ This module provides utilities to convert MCP tools to LangChain tools.
 
 import re
 from typing import Any, NoReturn
+import json
 
 from jsonschema_pydantic import jsonschema_to_pydantic
 from langchain_core.tools import BaseTool
@@ -35,7 +36,7 @@ LangChainContentBlock = dict[str, Any]
 LangChainToolResult = str | LangChainContentBlock | list[LangChainContentBlock]
 
 
-def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContentBlock]:
+def _mcp_content_to_langchain(tool_result: CallToolResult) ->LangChainToolResult:
     """Convert MCP tool result content to LangChain-compatible format.
 
     Maps MCP content types to LangChain content blocks:
@@ -46,15 +47,18 @@ def _mcp_content_to_langchain(content: list[Any]) -> str | list[LangChainContent
 
     If the result is a single TextContent, returns a plain string for simplicity.
     """
-    if not content:
-        return ""
+    if not tool_result.content:
+        if hasattr(tool_result, "structuredContent") and tool_result.structuredContent:
+            return json.dumps(tool_result.structuredContent)
+        return "(no content)"
+
 
     # Single TextContent → plain string (most common case)
-    if len(content) == 1 and isinstance(content[0], TextContent):
-        return content[0].text
+    if len(tool_result.content) == 1 and isinstance(tool_result.content[0], TextContent):
+        return tool_result.content[0].text
 
     blocks: list[LangChainContentBlock] = []
-    for item in content:
+    for item in tool_result.content:
         match item:
             case TextContent():
                 blocks.append({"type": "text", "text": item.text})
@@ -182,7 +186,7 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                     tool_result: CallToolResult = await self.tool_connector.call_tool(self.name, kwargs)
                     converted_content: LangChainToolResult | None = None
                     try:
-                        converted_content = _mcp_content_to_langchain(tool_result.content)
+                        converted_content = _mcp_content_to_langchain(tool_result)
                         if tool_result.isError:
                             error_message = (
                                 converted_content
