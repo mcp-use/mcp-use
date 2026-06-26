@@ -298,6 +298,48 @@ class TestHttpConnectorConnection(IsolatedAsyncioTestCase):
         self.assertIsNone(self.connector._connection_manager)
         self.assertFalse(self.connector._connected)
 
+    async def test_disconnect_called_twice_runs_cleanup_once(self, _):
+        """Calling disconnect twice in a row must clean up resources only once."""
+        self.connector._connected = True
+        self.connector._connection_manager = self.mock_cm
+        self.connector._cleanup_resources = AsyncMock()
+
+        await self.connector.disconnect()
+        await self.connector.disconnect()
+
+        self.connector._cleanup_resources.assert_called_once()
+        self.assertFalse(self.connector._connected)
+
+    async def test_disconnect_reentrant_call_skips_second_cleanup(self, _):
+        """A re-entrant disconnect during ``_cleanup_resources`` must not run cleanup twice.
+
+        Reproduces the scenario from issue #1220: while the first
+        ``disconnect`` is awaiting ``_cleanup_resources``, an
+        ``AsyncExitStack`` teardown (or another caller) invokes
+        ``disconnect`` again. The guard at the top of ``disconnect`` must
+        already see ``_connected == False`` so the second call returns
+        early instead of re-running cleanup against already-closed
+        resources.
+        """
+        self.connector._connected = True
+        self.connector._connection_manager = self.mock_cm
+
+        cleanup_call_count = 0
+
+        async def reentrant_cleanup():
+            nonlocal cleanup_call_count
+            cleanup_call_count += 1
+            # Simulate a concurrent/re-entrant disconnect firing while we
+            # are still inside the first call's cleanup await.
+            await self.connector.disconnect()
+
+        self.connector._cleanup_resources = reentrant_cleanup
+
+        await self.connector.disconnect()
+
+        self.assertEqual(cleanup_call_count, 1)
+        self.assertFalse(self.connector._connected)
+
 
 @patch("mcp_use.client.connectors.base.logger")
 class TestHttpConnectorOperations(IsolatedAsyncioTestCase):
