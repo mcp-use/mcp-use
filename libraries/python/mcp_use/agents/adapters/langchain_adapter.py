@@ -233,14 +233,20 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 logger.debug(f'Resource tool: "{self.name}" called')
                 try:
                     result = await self.tool_connector.read_resource(mcp_resource.uri)
+                    parts =[]
                     for content in result.contents:
                         # Attempt to decode bytes if necessary
                         if isinstance(content, bytes):
-                            content_decoded = content.decode()
-                        else:
-                            content_decoded = str(content)
 
-                    return content_decoded
+                            parts.append(content.decode())
+
+                        else:
+
+                            parts.append(str(content))
+
+
+
+                    return  "\n".join(parts)
                 except Exception as e:
                     if self.handle_tool_error:
                         return format_error(e, tool=self.name)  # Format the error to make LLM understand it

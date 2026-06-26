@@ -9,6 +9,8 @@ from mcp.types import (
     CallToolResult,
     EmbeddedResource,
     ImageContent,
+    ReadResourceResult,
+    Resource,
     TextContent,
     TextResourceContents,
     Tool,
@@ -79,6 +81,61 @@ class TestLangChainAdapterContentConversion:
         )
 
         assert result == "{'unexpected': 'value'}"
+
+
+class TestLangChainAdapterResourceTool:
+    """Tests for resource tool _arun — regression for partial content loss bug."""
+
+    def _make_resource_tool(self, read_resource_return):
+        adapter = LangChainAdapter()
+        connector = MagicMock()
+        connector.read_resource = AsyncMock(return_value=read_resource_return)
+        resource = Resource(name="test_resource", uri="config://app")
+        return adapter._convert_resource(resource, connector)
+
+    @pytest.mark.asyncio
+    async def test_single_content_block_returned(self):
+        """Single content block should be returned as a plain string."""
+        tool = self._make_resource_tool(
+            ReadResourceResult(
+                contents=[TextResourceContents(uri="config://app", text="hello world")]
+            )
+        )
+        result = await tool._arun()
+        assert result == "TextContent(type='text', text='hello world')" or "hello world" in result
+
+    @pytest.mark.asyncio
+    async def test_multiple_content_blocks_all_returned(self):
+        """All content blocks must be returned joined — regression for data loss bug.
+
+        Previously only the last block was returned; the rest were silently dropped.
+        """
+        tool = self._make_resource_tool(
+            ReadResourceResult(
+                contents=[
+                    TextResourceContents(uri="config://app", text="page 1"),
+                    TextResourceContents(uri="config://app", text="page 2"),
+                    TextResourceContents(uri="config://app", text="page 3"),
+                ]
+            )
+        )
+        result = await tool._arun()
+        assert "page 1" in result
+        assert "page 2" in result
+        assert "page 3" in result
+
+    @pytest.mark.asyncio
+    async def test_empty_contents_returns_empty_string(self):
+        """Empty contents must return empty string, not crash with UnboundLocalError.
+
+        Previously this raised: UnboundLocalError: cannot access local variable
+        'content_decoded' before assignment.
+        """
+        tool = self._make_resource_tool(
+            ReadResourceResult(contents=[])
+        )
+        result = await tool._arun()
+        assert result == ""
 
 
 class TestLangChainAdapterToolExecution:
