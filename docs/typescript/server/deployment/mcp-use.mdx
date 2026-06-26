@@ -119,6 +119,36 @@ Watch paths and branch patterns are also editable from the dashboard — see [De
 
 `mcp-use servers update --branch <name>` changes which branch is the production branch after creation.
 
+## Monorepo Push-Trigger Semantics
+
+When deploying from a monorepo that contains multiple apps, it's important to understand how pushes trigger deployments:
+
+### Push behavior
+
+- **Every push to any branch creates a deployment on every deployed app** sharing that repository — regardless of which files changed. The trigger is the push event itself; the diff content is not inspected.
+- **There is no path-based trigger filter** (e.g. `apps/<name>/**`). If you push to `apps/iching/...`, all apps in the repo will still rebuild.
+
+### Branch and URL semantics
+
+| Concept | Behavior |
+|---|---|
+| **Per-branch URL** | Each branch gets its own deployment at `<slug>--br-<branch>.deploy.mcp-use.com`. These are updated on every push to their respective branches. |
+| **Prod branch** | The canonical `<slug>.deploy.mcp-use.com` URL always points to the latest deployment from the designated prod branch. |
+| **Prod branch is NOT a push filter** | Setting a "Prod branch" does not limit which pushes trigger builds — it only selects which branch's deployment serves the canonical URL. |
+
+### Session termination
+
+When you push to the **prod branch**:
+- The canonical container is replaced with a new one
+- All live MCP sessions receive `mcp_session_terminated` and clients must reinitialize
+- Users connecting via per-branch URLs are unaffected
+
+### Recommendations
+
+- **If you need per-app isolation**: deploy each app from its own separate repository.
+- **To minimize disruption**: do active development on non-prod branches; merge to the prod branch only when ready to release.
+- **CI/CD strategy**: consider using short-lived feature branches for development to avoid triggering full rebuilds of all apps.
+
 ## After Deployment
 
 Once deployment completes, you'll receive:
