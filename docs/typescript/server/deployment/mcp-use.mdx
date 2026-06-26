@@ -86,6 +86,39 @@ This approach:
 - ✅ Uses the latest commit from your branch
 - ✅ Requires the mcp-use GitHub App on the repo and changes pushed to GitHub
 
+## Monorepos & multiple apps
+
+If you deploy several servers from the same repository, every push to that repo is evaluated against **each** connected server. By default a server redeploys on any push to its production branch, which in a monorepo means an unrelated change can rebuild an app you didn't touch. Two per-server filters scope that down:
+
+- **Watch paths** (`--watch-paths`): globs matched against the push's changed files. The server only auto-deploys when a changed file matches. Empty (the default) means any change triggers a deploy.
+- **Branch allow list** (`--deploy-branches`): globs of branches (besides the production branch) that are allowed to trigger auto-deploys. The production branch always deploys; an empty list allows all branches.
+
+```bash
+# Create a server that only redeploys when its own app or shared code changes
+mcp-use deploy \
+  --root-dir apps/iching \
+  --watch-paths "apps/iching/**" "packages/shared/**"
+
+# Tune an existing server's triggers (no redeploy of unrelated apps)
+mcp-use servers update <id-or-slug> \
+  --watch-paths "apps/iching/**" "packages/shared/**" \
+  --deploy-branches "release/*"
+
+# Clear the watch paths (back to "any change deploys")
+mcp-use servers update <id-or-slug> --watch-paths ""
+```
+
+<Note>
+Watch paths and branch patterns are also editable from the dashboard — see [Deployments](https://docs.manufact.com/dashboard/deployments) and [Server settings](https://docs.manufact.com/dashboard/settings).
+</Note>
+
+### Branch URLs and sessions
+
+- The **production branch** serves the canonical URL `https://<slug>.deploy.mcp-use.com/mcp`. Pushing to it swaps the running container, so live MCP sessions on the canonical URL receive `mcp_session_terminated` and clients reconnect.
+- Every other branch gets its own stable preview URL `https://<slug>--br-<branch>.deploy.mcp-use.com/mcp`, so you can test changes against real clients before merging. Preview deployments require the Hobby plan or higher.
+
+`mcp-use servers update --branch <name>` changes which branch is the production branch after creation.
+
 ## After Deployment
 
 Once deployment completes, you'll receive:

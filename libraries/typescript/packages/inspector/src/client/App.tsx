@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+import { getDefaultInspectorProxyAddress } from "./utils/connectionUpdates";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -63,13 +64,9 @@ function App() {
     [isEmbedded]
   );
 
-  // Read the proxy path injected by the inspector server (undefined when served
-  // from a Python/custom server that fetches static HTML and has no proxy).
-  const injectedProxyPath = (window as Window & { __MCP_PROXY_URL__?: string })
-    .__MCP_PROXY_URL__;
-  const proxyAddress = injectedProxyPath
-    ? `${window.location.origin}${injectedProxyPath}`
-    : undefined;
+  // Read the proxy path injected by the inspector server. Missing injection
+  // falls back to the standard Inspector route; explicit null disables proxy.
+  const proxyAddress = getDefaultInspectorProxyAddress();
 
   // App-level so it fires regardless of route, and after <Toaster /> mounts.
   useEffect(() => {

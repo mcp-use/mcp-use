@@ -31,7 +31,7 @@ type AgentPreset = "cursor" | "claude-code" | "codex";
 const AGENT_PRESET_FOLDERS: Record<AgentPreset, string> = {
   cursor: ".cursor",
   "claude-code": ".claude",
-  codex: ".agent",
+  codex: ".agents",
 };
 
 const ALL_PRESETS: AgentPreset[] = ["cursor", "claude-code", "codex"];
@@ -64,7 +64,7 @@ function sendInstallTelemetryEvent(agents: string, skills: string): void {
 /**
  * Download and extract skills from the mcp-use GitHub repository
  * and install them into the project's agent preset directories
- * (.cursor/skills, .claude/skills, .agent/skills).
+ * (.cursor/skills, .claude/skills, .agents/skills).
  */
 async function addSkillsToProject(projectPath: string): Promise<void> {
   const tarballUrl = `https://codeload.github.com/${REPO_OWNER}/${REPO_NAME}/tar.gz/${REPO_BRANCH}`;
@@ -124,7 +124,7 @@ export function createSkillsCommand(): Command {
     console.log(chalk.cyan("📚 Installing mcp-use skills..."));
     console.log(
       chalk.gray(
-        "   Downloading from github.com/mcp-use/mcp-use → .cursor/skills, .claude/skills, .agent/skills"
+        "   Downloading from github.com/mcp-use/mcp-use → .cursor/skills, .claude/skills, .agents/skills"
       )
     );
 

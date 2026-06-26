@@ -150,6 +150,9 @@ mcp-use logout
 - `--branch <name>` - Deploy branch (default: current git branch). Also scopes `--env` / `--env-file` sync to that branch's preview env.
 - `--env <key=value...>` - Set environment variable **values** (repeatable)
 - `--env-file <path>` - Load environment variable values from a `.env` file
+- `--root-dir <path>` - Subdirectory to deploy from (monorepos)
+- `--watch-paths <glob...>` - Only auto-deploy when matching files change (monorepos); set on new-server creation
+- `--wait-for-ci` - Hold GitHub auto-deploys until other check runs pass; set on new-server creation
 - `--open` - Open deployment in browser after success
 
 **Example:**
@@ -190,12 +193,20 @@ mcp-use servers update my-server --name "My Server" --description "…"
 
 # Clear a build/start override (pass an empty string)
 mcp-use servers update my-server --build-command "" --start-command ""
+
+# Monorepos: scope auto-deploys to an app's own files + shared code
+mcp-use servers update my-server \
+  --watch-paths "apps/my-server/**" "packages/shared/**" \
+  --deploy-branches "release/*"
 ```
 
 Flags: `--branch` (production branch), `--name`, `--description`,
-`--build-command`, `--start-command`, `--org`. At least one is required.
-Pass an empty string to `--build-command` or `--start-command` to remove the
-stored override.
+`--build-command`, `--start-command`, `--root-dir`, `--watch-paths`,
+`--deploy-branches`, `--wait-for-ci` / `--no-wait-for-ci`, `--org`. At least
+one is required. Pass an empty string to `--build-command`, `--start-command`,
+or `--root-dir` to clear it; pass an empty string to `--watch-paths` /
+`--deploy-branches` to clear the filter (deploy on any change / allow all
+branches).
 
 ### `servers env` — environment variables
 

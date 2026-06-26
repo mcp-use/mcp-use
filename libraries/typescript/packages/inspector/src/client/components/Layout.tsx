@@ -15,8 +15,11 @@ import {
   Telemetry,
 } from "@/client/telemetry";
 import {
+  getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
+  normalizeConnectionMode,
+  type ConnectionMode,
   type EditableConnectionConfig,
   type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
@@ -63,15 +66,26 @@ export function Layout({ children }: LayoutProps) {
       name?: string,
       proxyConfig?: any,
       transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig
+      oauth?: OAuthStaticConfig,
+      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
+        ? "proxy"
+        : "auto",
+      autoProxyFallback:
+        | boolean
+        | {
+            enabled?: boolean;
+            proxyAddress?: string;
+          } = proxyConfig?.proxyAddress ? false : false
     ) => {
       addServer(url, {
         url,
         name,
+        connectionMode,
         proxyConfig,
         transportType,
         preventAutoAuth: true,
         useRedirectFlow: true,
+        autoProxyFallback,
         clientOptions: {
           capabilities: {
             extensions: {
@@ -400,7 +414,17 @@ export function Layout({ children }: LayoutProps) {
           config.name,
           config.proxyConfig,
           config.transportType,
-          config.oauth
+          config.oauth,
+          config.connectionMode,
+          config.connectionMode === "auto"
+            ? (config.autoProxyFallback ??
+                (config.proxyConfig?.proxyAddress
+                  ? {
+                      enabled: true,
+                      proxyAddress: config.proxyConfig.proxyAddress,
+                    }
+                  : false))
+            : false
         );
       } else if (
         currentConnection &&
@@ -413,9 +437,20 @@ export function Layout({ children }: LayoutProps) {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
           name: config.name,
+          connectionMode: config.connectionMode,
           proxyConfig: config.proxyConfig,
           transportType: config.transportType,
           oauth: config.oauth,
+          autoProxyFallback:
+            config.connectionMode === "auto"
+              ? (config.autoProxyFallback ??
+                (config.proxyConfig?.proxyAddress
+                  ? {
+                      enabled: true,
+                      proxyAddress: config.proxyConfig.proxyAddress,
+                    }
+                  : false))
+              : false,
         });
       }
 
@@ -631,20 +666,53 @@ export function Layout({ children }: LayoutProps) {
           customHeaders.Authorization = `${formatted} ${srv.auth.access_token}`;
         }
 
-        const proxyConfig: {
-          proxyAddress: string;
-          headers?: Record<string, string>;
-        } = {
-          proxyAddress: `${window.location.origin}/inspector/api/proxy`,
-          ...(Object.keys(customHeaders).length > 0 && {
-            headers: customHeaders,
-          }),
-        };
+        const explicitProxyAddress =
+          typeof srv.proxyConfig?.proxyAddress === "string"
+            ? srv.proxyConfig.proxyAddress.trim()
+            : "";
+        let defaultProxyAddress = "";
+        try {
+          if (new URL(url).origin !== window.location.origin) {
+            defaultProxyAddress = getDefaultInspectorProxyAddress();
+          }
+        } catch {
+          defaultProxyAddress = getDefaultInspectorProxyAddress();
+        }
+
+        const proxyAddress = explicitProxyAddress || defaultProxyAddress;
+        const connectionMode = normalizeConnectionMode(
+          srv.connectionMode,
+          srv.connectionType,
+          !!explicitProxyAddress
+        );
+        const proxyConfig =
+          connectionMode === "proxy" && proxyAddress
+            ? {
+                proxyAddress,
+                ...(Object.keys(customHeaders).length > 0 && {
+                  headers: customHeaders,
+                }),
+              }
+            : Object.keys(customHeaders).length > 0
+              ? { headers: customHeaders }
+              : undefined;
+        const autoProxyFallback =
+          connectionMode === "auto" && proxyAddress
+            ? { enabled: true, proxyAddress }
+            : false;
 
         // Avoid duplicates
         const existing = connections.find((c) => c.url === url);
         if (!existing) {
-          addConnection(url, name, proxyConfig, transportType);
+          addConnection(
+            url,
+            name,
+            proxyConfig,
+            transportType,
+            undefined,
+            connectionMode,
+            autoProxyFallback
+          );
         }
 
         if (!firstServerId) {

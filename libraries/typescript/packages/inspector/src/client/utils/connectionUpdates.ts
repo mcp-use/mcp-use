@@ -4,10 +4,63 @@ export interface OAuthStaticConfig {
   scope?: string;
 }
 
+export type ConnectionMode = "auto" | "direct" | "proxy";
+
+type InspectorWindow = Window & { __MCP_PROXY_URL__?: string | null };
+
+export function getDefaultInspectorProxyAddress(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const injectedProxyPath = (window as InspectorWindow).__MCP_PROXY_URL__;
+  if (injectedProxyPath === null) {
+    return "";
+  }
+
+  return `${window.location.origin}${injectedProxyPath || "/inspector/api/proxy"}`;
+}
+
+export function normalizeConnectionMode(
+  mode?: string,
+  legacyConnectionType?: string,
+  hasProxyAddress = false
+): ConnectionMode {
+  if (mode === "auto" || mode === "direct" || mode === "proxy") {
+    return mode;
+  }
+  if (legacyConnectionType === "Via Proxy") {
+    return "proxy";
+  }
+  if (legacyConnectionType === "Direct") {
+    return "auto";
+  }
+  return hasProxyAddress ? "proxy" : "auto";
+}
+
+export type AutoProxyFallbackConfig =
+  | boolean
+  | {
+      enabled?: boolean;
+      proxyAddress?: string;
+    };
+
+function getAutoProxyFallbackAddress(
+  autoProxyFallback?: AutoProxyFallbackConfig
+): string {
+  if (!autoProxyFallback || typeof autoProxyFallback === "boolean") {
+    return "";
+  }
+
+  return autoProxyFallback.proxyAddress?.trim() || "";
+}
+
 interface ConnectionLike {
   url?: string;
   name?: string;
   transportType?: "http" | "sse";
+  connectionMode?: ConnectionMode;
+  connectionType?: "Direct" | "Via Proxy";
   proxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
@@ -16,12 +69,15 @@ interface ConnectionLike {
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
   oauth?: OAuthStaticConfig;
+  autoProxyFallback?: AutoProxyFallbackConfig;
 }
 
 export interface EditableConnectionConfig {
   url: string;
   name?: string;
   transportType: "http" | "sse";
+  connectionMode?: ConnectionMode;
+  connectionType?: "Direct" | "Via Proxy";
   proxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
@@ -30,6 +86,7 @@ export interface EditableConnectionConfig {
   headers?: Record<string, string>;
   customHeaders?: Record<string, string>;
   oauth?: OAuthStaticConfig;
+  autoProxyFallback?: AutoProxyFallbackConfig;
 }
 
 /**
@@ -95,18 +152,27 @@ function normalizeConnection(
   name: string;
   transportType: "http" | "sse";
   proxyAddress: string;
+  connectionMode: ConnectionMode;
   headers: Record<string, string>;
   oauthClientId: string;
   oauthClientSecret: string;
   oauthScope: string;
 } {
   const normalizedUrl = connection.url?.trim() || "";
+  const proxyAddress =
+    connection.proxyConfig?.proxyAddress?.trim() ||
+    getAutoProxyFallbackAddress(connection.autoProxyFallback);
 
   return {
     url: normalizedUrl,
     name: connection.name?.trim() || normalizedUrl,
     transportType: connection.transportType || "http",
-    proxyAddress: connection.proxyConfig?.proxyAddress?.trim() || "",
+    proxyAddress,
+    connectionMode: normalizeConnectionMode(
+      connection.connectionMode,
+      connection.connectionType,
+      !!proxyAddress
+    ),
     headers: getComparableHeaders(connection),
     oauthClientId: connection.oauth?.clientId?.trim() || "",
     oauthClientSecret: connection.oauth?.clientSecret?.trim() || "",
@@ -125,6 +191,7 @@ export function isAliasOnlyConnectionUpdate(
     currentConnection.url === nextConnection.url &&
     currentConnection.transportType === nextConnection.transportType &&
     currentConnection.proxyAddress === nextConnection.proxyAddress &&
+    currentConnection.connectionMode === nextConnection.connectionMode &&
     JSON.stringify(currentConnection.headers) ===
       JSON.stringify(nextConnection.headers) &&
     currentConnection.oauthClientId === nextConnection.oauthClientId &&

@@ -4,7 +4,7 @@
  *
  * The component registers content in a parent-child tree that is serialized
  * into an indented markdown-like string and pushed to the host via
- * ui/update-model-context (MCP Apps) or setWidgetState (ChatGPT Apps SDK).
+ * ui/update-model-context (MCP Apps).
  *
  * Two complementary APIs:
  *
@@ -173,7 +173,7 @@ interface ModelContextProps {
  *
  * Registers `content` in a hierarchical tree that is serialized into an
  * indented string and pushed to the host via `ui/update-model-context`
- * (MCP Apps) or `setWidgetState` (ChatGPT Apps SDK).
+ * (MCP Apps).
  *
  * - Supports empty children (self-closing `<ModelContext content="..." />`)
  * - Nested `<ModelContext>` components become child nodes in the tree

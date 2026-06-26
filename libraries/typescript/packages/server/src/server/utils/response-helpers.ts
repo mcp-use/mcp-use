@@ -22,6 +22,24 @@ export interface TypedCallToolResult<
 }
 
 /**
+ * A tool/resource result that carries only `content` and no structured payload.
+ *
+ * Returned by the content-only helpers (`text`, `markdown`, `html`, `image`,
+ * `resource`, ...). `structuredContent` is pinned to `never`, so these results
+ * are always valid no matter what a tool's `outputSchema` is. By contrast,
+ * `object()` and `widget()` return `TypedCallToolResult<T>` carrying
+ * `structuredContent`, so their shape is checked against `outputSchema` at the
+ * tool's return position.
+ */
+export interface ToolContentResult {
+  [x: string]: unknown;
+  content: CallToolResult["content"];
+  isError?: CallToolResult["isError"];
+  _meta?: CallToolResult["_meta"];
+  structuredContent?: never;
+}
+
+/**
  * Create a text content response for MCP tools and resources
  *
  * @param content - The text content to return
@@ -43,7 +61,7 @@ export interface TypedCallToolResult<
  * )
  * ```
  */
-export function text(content: string): CallToolResult {
+export function text(content: string): ToolContentResult {
   return {
     content: [
       {
@@ -82,7 +100,7 @@ export function text(content: string): CallToolResult {
 export function image(
   data: string,
   mimeType: string = "image/png"
-): CallToolResult {
+): ToolContentResult {
   return {
     content: [
       {
@@ -177,7 +195,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 export function audio(
   dataOrPath: string,
   mimeType?: string
-): CallToolResult | Promise<CallToolResult> {
+): ToolContentResult | Promise<ToolContentResult> {
   // Check if it's a file path (contains path separators or file extension)
   const isFilePath =
     dataOrPath.includes("/") ||
@@ -262,7 +280,7 @@ export function resource(
   uri: string,
   mimeTypeOrContent: string | CallToolResult | TypedCallToolResult<any>,
   text?: string
-): CallToolResult {
+): ToolContentResult {
   // Handle 2-arg pattern: resource(uri, CallToolResult)
   if (
     typeof mimeTypeOrContent === "object" &&
@@ -423,7 +441,7 @@ export function array<T extends any[]>(
  * )
  * ```
  */
-export function html(content: string): CallToolResult {
+export function html(content: string): ToolContentResult {
   return {
     content: [
       {
@@ -451,7 +469,7 @@ export function html(content: string): CallToolResult {
  * )
  * ```
  */
-export function markdown(content: string): CallToolResult {
+export function markdown(content: string): ToolContentResult {
   return {
     content: [
       {
@@ -479,7 +497,7 @@ export function markdown(content: string): CallToolResult {
  * )
  * ```
  */
-export function xml(content: string): CallToolResult {
+export function xml(content: string): ToolContentResult {
   return {
     content: [
       {
@@ -507,7 +525,7 @@ export function xml(content: string): CallToolResult {
  * )
  * ```
  */
-export function css(content: string): CallToolResult {
+export function css(content: string): ToolContentResult {
   return {
     content: [
       {
@@ -535,7 +553,7 @@ export function css(content: string): CallToolResult {
  * )
  * ```
  */
-export function javascript(content: string): CallToolResult {
+export function javascript(content: string): ToolContentResult {
   return {
     content: [
       {
@@ -564,7 +582,10 @@ export function javascript(content: string): CallToolResult {
  * )
  * ```
  */
-export function binary(base64Data: string, mimeType: string): CallToolResult {
+export function binary(
+  base64Data: string,
+  mimeType: string
+): ToolContentResult {
   return {
     content: [
       {
@@ -588,18 +609,23 @@ export function binary(base64Data: string, mimeType: string): CallToolResult {
  * - Tool result (content + structuredContent) is sent via `ui/notifications/tool-result`
  * There is no custom `mcp-use/props` sideband; props go into structuredContent.
  */
-export interface WidgetResponseConfig {
+export interface WidgetResponseConfig<
+  TProps extends Record<string, any> = Record<string, any>,
+> {
   /**
    * Widget-only data sent as structuredContent in the tool result.
    * The widget receives this via `ui/notifications/tool-result`.
    * Per spec, structuredContent is "not added to model context".
    *
+   * Because `props` become the result's `structuredContent`, they are
+   * type-checked against the tool's `outputSchema` at the tool's return position.
+   *
    * @example { temperature: 22, conditions: "Sunny", city: "Paris" }
    * @example { query: "mango", results: [{ fruit: "mango", color: "#FBF1E1" }] }
    */
-  props?: Record<string, any>;
+  props?: TProps;
   /** @deprecated Use `props` instead - Legacy alias for props */
-  data?: Record<string, any>;
+  data?: TProps;
   /**
    * Response helper result (text(), object(), etc.) that the model sees.
    * Summarizes the tool result for the conversation.
@@ -653,7 +679,9 @@ export interface WidgetResponseConfig {
  * })
  * ```
  */
-export function widget(config: WidgetResponseConfig): CallToolResult {
+export function widget<
+  TProps extends Record<string, any> = Record<string, any>,
+>(config: WidgetResponseConfig<TProps>): TypedCallToolResult<TProps> {
   const props = config.props || config.data || {};
   const { output, message, metadata } = config;
 
@@ -677,7 +705,9 @@ export function widget(config: WidgetResponseConfig): CallToolResult {
     result.structuredContent = props;
   }
 
-  return result;
+  // `props` (or output.structuredContent) become the result's structuredContent;
+  // surface that as TProps so the tool's return position is checked against outputSchema.
+  return result as unknown as TypedCallToolResult<TProps>;
 }
 
 export function mix(...results: CallToolResult[]): CallToolResult {

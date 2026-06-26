@@ -45,6 +45,12 @@ export type UseMcpOptions = {
     customHeaders?: Record<string, string>;
   };
   /**
+   * Connection policy used by higher-level clients such as the Inspector.
+   * Behavior is controlled by `proxyConfig` and `autoProxyFallback`; this field
+   * is persisted so editors can distinguish Auto, forced Direct, and forced Proxy.
+   */
+  connectionMode?: "auto" | "direct" | "proxy";
+  /**
    * Enable automatic proxy fallback when direct connection fails
    * When enabled, if a direct connection fails with FastMCP or CORS errors,
    * automatically retries using the proxy configuration

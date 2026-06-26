@@ -1,5 +1,155 @@
 # @mcp-use/cli
 
+## 3.6.0
+
+### Minor Changes
+
+- 430178c: Expose monorepo auto-deploy trigger config in the CLI. `mcp-use deploy` gains `--watch-paths` and `--wait-for-ci` for new GitHub servers, and `mcp-use servers update` gains `--watch-paths`, `--deploy-branches`, `--wait-for-ci`/`--no-wait-for-ci`, and `--root-dir`. `mcp-use servers get`/`update` now print the effective watch paths, deploy branch patterns, and wait-for-CI setting. This closes the gap where the Cloud API accepted these fields but the CLI could not set them, so monorepo apps can be scoped to only redeploy on relevant changes.
+
+### Patch Changes
+
+- 430178c: `mcp-use deployments list` now preserves the deployment ordering returned by the API instead of re-sorting by creation date on the client. This keeps the displayed order consistent with the server's pagination and sort.
+- 430178c: Fix Codex skills installation to use `.agents/skills` instead of the unsupported `.agent/skills` path.
+- 430178c: Updated dependency `vite` to `^8.0.16`.
+- 430178c: `mcp-use deploy` now surfaces the GitHub App installation URL up front when the app isn't connected or lacks repo access, before any prompt. In a non-interactive context (an agent or CI, without `--yes`) it prints the URL and clear next steps and exits cleanly instead of hanging on an unanswerable prompt.
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+  - @mcp-use/inspector@11.0.0
+  - mcp-use@1.33.0
+
+## 3.6.0-canary.14
+
+### Patch Changes
+
+- Updated dependencies [7455d7a]
+  - @mcp-use/inspector@11.0.0-canary.14
+  - mcp-use@1.33.0-canary.14
+
+## 3.6.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [1bd3f8d]
+  - mcp-use@1.33.0-canary.13
+  - @mcp-use/inspector@11.0.0-canary.13
+
+## 3.6.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [0027695]
+  - mcp-use@1.33.0-canary.12
+  - @mcp-use/inspector@11.0.0-canary.12
+
+## 3.6.0-canary.11
+
+### Minor Changes
+
+- 979e6b8: Expose monorepo auto-deploy trigger config in the CLI. `mcp-use deploy` gains `--watch-paths` and `--wait-for-ci` for new GitHub servers, and `mcp-use servers update` gains `--watch-paths`, `--deploy-branches`, `--wait-for-ci`/`--no-wait-for-ci`, and `--root-dir`. `mcp-use servers get`/`update` now print the effective watch paths, deploy branch patterns, and wait-for-CI setting. This closes the gap where the Cloud API accepted these fields but the CLI could not set them, so monorepo apps can be scoped to only redeploy on relevant changes.
+
+### Patch Changes
+
+- mcp-use@1.33.0-canary.11
+- @mcp-use/inspector@11.0.0-canary.11
+
+## 3.5.3-canary.10
+
+### Patch Changes
+
+- Updated dependencies [84e9c7d]
+  - mcp-use@1.33.0-canary.10
+  - @mcp-use/inspector@11.0.0-canary.10
+
+## 3.5.3-canary.9
+
+### Patch Changes
+
+- Updated dependencies [8dfac9c]
+  - @mcp-use/inspector@10.0.2-canary.9
+  - mcp-use@1.32.2-canary.9
+
+## 3.5.3-canary.8
+
+### Patch Changes
+
+- Updated dependencies [bf90128]
+  - mcp-use@1.32.2-canary.8
+  - @mcp-use/inspector@10.0.2-canary.8
+
+## 3.5.3-canary.7
+
+### Patch Changes
+
+- Updated dependencies [37337f3]
+  - @mcp-use/inspector@10.0.2-canary.7
+  - mcp-use@1.32.2-canary.7
+
+## 3.5.3-canary.6
+
+### Patch Changes
+
+- d639509: `mcp-use deployments list` now preserves the deployment ordering returned by the API instead of re-sorting by creation date on the client. This keeps the displayed order consistent with the server's pagination and sort.
+  - mcp-use@1.32.2-canary.6
+  - @mcp-use/inspector@10.0.2-canary.6
+
+## 3.5.3-canary.5
+
+### Patch Changes
+
+- dfa7562: `mcp-use deploy` now surfaces the GitHub App installation URL up front when the app isn't connected or lacks repo access, before any prompt. In a non-interactive context (an agent or CI, without `--yes`) it prints the URL and clear next steps and exits cleanly instead of hanging on an unanswerable prompt.
+  - mcp-use@1.32.2-canary.5
+  - @mcp-use/inspector@10.0.2-canary.5
+
+## 3.5.3-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b9324be]
+  - mcp-use@1.32.2-canary.4
+  - @mcp-use/inspector@10.0.2-canary.4
+
+## 3.5.3-canary.3
+
+### Patch Changes
+
+- Updated dependencies [e1bcc3f]
+  - @mcp-use/inspector@10.0.2-canary.3
+  - mcp-use@1.32.2-canary.3
+
+## 3.5.3-canary.2
+
+### Patch Changes
+
+- c62e103: Updated dependency `vite` to `^8.0.16`.
+- Updated dependencies [c62e103]
+  - @mcp-use/inspector@10.0.2-canary.2
+  - mcp-use@1.32.2-canary.2
+
+## 3.5.3-canary.1
+
+### Patch Changes
+
+- d962eab: Fix Codex skills installation to use `.agents/skills` instead of the unsupported `.agent/skills` path.
+  - mcp-use@1.32.2-canary.1
+  - @mcp-use/inspector@10.0.2-canary.1
+
+## 3.5.3-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c242a0c]
+  - mcp-use@1.32.2-canary.0
+  - @mcp-use/inspector@10.0.2-canary.0
+
 ## 3.5.2
 
 ### Patch Changes

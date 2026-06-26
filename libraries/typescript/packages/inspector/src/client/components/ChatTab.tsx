@@ -14,6 +14,8 @@ import React, {
 import { toast } from "sonner";
 import { copyToClipboard } from "../utils/clipboard";
 import { downloadJSON } from "../utils/jsonUtils";
+import { shouldShowFreeTierUpgrade } from "./chat/freeTier";
+import { useHostedSession } from "../hooks/useHostedSession";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
 import { ChatHeader } from "./chat/ChatHeader";
@@ -320,10 +322,22 @@ export function ChatTab({
     setShowLoginModal(true);
   }, [setConfigDialogOpen]);
 
-  const freeTierInfo =
-    isManaged && enableFreeTierUpgrade
-      ? { onLoginClick: handleOpenLogin }
-      : undefined;
+  // Whether the visitor is signed in to Manufact (hosted free-tier only). Used
+  // to suppress the "Sign in to increase your limits" prompt once authenticated
+  // — otherwise signed-in users keep getting asked to log in (MCP-2142). Only
+  // probed for the hosted free-tier UI; BYOK and host embeds skip the fetch.
+  const { user: hostedUser } = useHostedSession(
+    enableFreeTierUpgrade ? chatApiUrl : undefined
+  );
+  const isHostedAuthenticated = hostedUser != null;
+
+  const freeTierInfo = shouldShowFreeTierUpgrade({
+    isManaged,
+    enableFreeTierUpgrade,
+    isAuthenticated: isHostedAuthenticated,
+  })
+    ? { onLoginClick: handleOpenLogin }
+    : undefined;
 
   // Host embed (e.g. cloud dashboard) passes `managedLlmConfig` + `hideModelBadge`
   // because it renders its own model row (`ServerChatHeader`). Suppress inspector

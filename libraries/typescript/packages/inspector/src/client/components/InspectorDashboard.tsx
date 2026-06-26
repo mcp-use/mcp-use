@@ -40,8 +40,11 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import {
   buildOAuthStaticConfig,
+  getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
+  normalizeConnectionMode,
+  type ConnectionMode,
   type EditableConnectionConfig,
   type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
@@ -152,15 +155,26 @@ export function InspectorDashboard() {
       name?: string,
       proxyConfig?: any,
       transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig
+      oauth?: OAuthStaticConfig,
+      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
+        ? "proxy"
+        : "auto",
+      autoProxyFallback:
+        | boolean
+        | {
+            enabled?: boolean;
+            proxyAddress?: string;
+          } = proxyConfig?.proxyAddress ? false : false
     ) => {
       addServer(url, {
         url,
         name,
+        connectionMode,
         proxyConfig,
         transportType,
         preventAutoAuth: true,
         useRedirectFlow: true,
+        autoProxyFallback,
         ...(oauth ? { oauth } : {}),
       });
     },
@@ -176,8 +190,15 @@ export function InspectorDashboard() {
           proxyAddress?: string;
           headers?: Record<string, string>;
         };
+        connectionMode?: ConnectionMode;
         transportType?: "http" | "sse";
         oauth?: OAuthStaticConfig;
+        autoProxyFallback?:
+          | boolean
+          | {
+              enabled?: boolean;
+              proxyAddress?: string;
+            };
       }
     ) => {
       // Check if already updating this connection
@@ -295,13 +316,13 @@ export function InspectorDashboard() {
   // Form state
   const [alias, setAlias] = useState("");
   const [url, setUrl] = useState("");
-  const [connectionType, setConnectionType] = useState("Direct");
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>("auto");
   const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>([]);
   const [requestTimeout, setRequestTimeout] = useState("10000");
   const [resetTimeoutOnProgress, setResetTimeoutOnProgress] = useState("True");
   const [maxTotalTimeout, setMaxTotalTimeout] = useState("60000");
   const [proxyAddress, setProxyAddress] = useState(
-    `${window.location.origin}/inspector/api/proxy`
+    getDefaultInspectorProxyAddress()
   );
   // OAuth fields
   const [clientId, setClientId] = useState("");
@@ -409,14 +430,20 @@ export function InspectorDashboard() {
       {} as Record<string, string>
     );
 
-    // Prepare proxy configuration if "Via Proxy" is selected
+    // Prepare proxy configuration for forced proxy mode
     const proxyConfig =
-      connectionType === "Via Proxy" && proxyAddress.trim()
+      connectionMode === "proxy" && proxyAddress.trim()
         ? {
             proxyAddress: proxyAddress.trim(),
             headers: headersObject,
           }
         : undefined;
+    const autoProxyFallback =
+      connectionMode === "auto"
+        ? proxyAddress.trim()
+          ? { enabled: true, proxyAddress: proxyAddress.trim() }
+          : false
+        : false;
 
     const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
 
@@ -436,14 +463,9 @@ export function InspectorDashboard() {
           },
         },
       },
-      ...(proxyConfig
-        ? {
-            proxyConfig,
-            // Disable autoProxyFallback when proxy is explicitly configured
-            // User has chosen "Via Proxy" - use proxy from the start
-            autoProxyFallback: false,
-          }
-        : {}),
+      connectionMode,
+      autoProxyFallback,
+      ...(proxyConfig ? { proxyConfig } : {}),
       ...(Object.keys(headersObject).length > 0 && !proxyConfig
         ? { headers: headersObject }
         : {}),
@@ -472,6 +494,7 @@ export function InspectorDashboard() {
     setAlias("");
     setUrl("");
     setCustomHeaders([]);
+    setConnectionMode("auto");
     setClientId("");
     setClientSecret("");
     setScope("");
@@ -480,7 +503,7 @@ export function InspectorDashboard() {
   }, [
     url,
     alias,
-    connectionType,
+    connectionMode,
     proxyAddress,
     customHeaders,
     clientId,
@@ -537,11 +560,22 @@ export function InspectorDashboard() {
         connection.customHeaders ||
         {};
 
-      // Determine connection type and proxyConfig
+      // Determine connection mode and proxyConfig
+      const fallbackProxyAddress =
+        typeof storedConfig?.autoProxyFallback === "object"
+          ? storedConfig.autoProxyFallback.proxyAddress
+          : typeof connection.autoProxyFallback === "object"
+            ? connection.autoProxyFallback.proxyAddress
+            : undefined;
       const hasProxyAddress =
         storedConfig?.proxyConfig?.proxyAddress ||
-        connection.proxyConfig?.proxyAddress;
-      const connectionType = hasProxyAddress ? "Via Proxy" : "Direct";
+        connection.proxyConfig?.proxyAddress ||
+        fallbackProxyAddress;
+      const connectionMode = normalizeConnectionMode(
+        storedConfig?.connectionMode || (connection as any).connectionMode,
+        storedConfig?.connectionType || (connection as any).connectionType,
+        !!hasProxyAddress
+      );
       const proxyConfig = hasProxyAddress
         ? storedConfig?.proxyConfig || connection.proxyConfig
         : undefined;
@@ -552,8 +586,17 @@ export function InspectorDashboard() {
           ? { name: getConfiguredServerAlias(storedConfig || connection) }
           : {}),
         transportType: connection.transportType || "http",
-        connectionType,
+        connectionMode,
+        connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
         proxyConfig,
+        autoProxyFallback:
+          connectionMode === "auto"
+            ? (storedConfig?.autoProxyFallback ??
+              connection.autoProxyFallback ??
+              (fallbackProxyAddress
+                ? { enabled: true, proxyAddress: fallbackProxyAddress }
+                : undefined))
+            : undefined,
         customHeaders,
         requestTimeout: connection.requestTimeout || 10000,
         resetTimeoutOnProgress: connection.resetTimeoutOnProgress !== false,
@@ -593,7 +636,17 @@ export function InspectorDashboard() {
           config.name,
           config.proxyConfig,
           config.transportType,
-          config.oauth
+          config.oauth,
+          config.connectionMode,
+          config.connectionMode === "auto"
+            ? (config.autoProxyFallback ??
+                (config.proxyConfig?.proxyAddress
+                  ? {
+                      enabled: true,
+                      proxyAddress: config.proxyConfig.proxyAddress,
+                    }
+                  : false))
+            : false
         );
       } else if (
         currentConnection &&
@@ -606,9 +659,20 @@ export function InspectorDashboard() {
         // Otherwise just update the existing connection
         updateConnectionConfig(editingConnectionId, {
           name: config.name,
+          connectionMode: config.connectionMode,
           proxyConfig: config.proxyConfig,
           transportType: config.transportType,
           oauth: config.oauth,
+          autoProxyFallback:
+            config.connectionMode === "auto"
+              ? (config.autoProxyFallback ??
+                (config.proxyConfig?.proxyAddress
+                  ? {
+                      enabled: true,
+                      proxyAddress: config.proxyConfig.proxyAddress,
+                    }
+                  : false))
+              : false,
         });
       }
 
@@ -1092,7 +1156,7 @@ export function InspectorDashboard() {
                                     transportType:
                                       (connection as any).transportType ||
                                       "http",
-                                    connectionType: "Direct",
+                                    connectionMode: "auto",
                                   })
                                 );
                               } catch {
@@ -1183,8 +1247,8 @@ export function InspectorDashboard() {
             setAlias={setAlias}
             url={url}
             setUrl={setUrl}
-            connectionType={connectionType}
-            setConnectionType={setConnectionType}
+            connectionMode={connectionMode}
+            setConnectionMode={setConnectionMode}
             customHeaders={customHeaders}
             setCustomHeaders={setCustomHeaders}
             requestTimeout={requestTimeout}

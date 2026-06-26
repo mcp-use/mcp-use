@@ -271,6 +271,9 @@ mcp-use deploy [options]
 | `--region <region>`     | Deploy region: `US`, `EU`, or `APAC`                                                 | `US`           |
 | `--build-command <cmd>` | Custom build command (overrides auto-detection)                                      | Auto-detected  |
 | `--start-command <cmd>` | Custom start command (overrides auto-detection)                                      | Auto-detected  |
+| `--dockerfile <path>`   | Path to a non-default Dockerfile (relative to `--root-dir` / repo root)              | `Dockerfile`   |
+| `--watch-paths <glob...>` | Only auto-deploy when matching files change (monorepos). Set on new-server creation. | All changes    |
+| `--wait-for-ci`         | Hold GitHub auto-deploys until other check runs pass. Set on new-server creation.    | false          |
 
 **Examples:**
 
@@ -295,6 +298,9 @@ mcp-use deploy --runtime python
 
 # Monorepo: deploy a subdirectory
 mcp-use deploy --root-dir apps/mcp-server
+
+# Monorepo: only redeploy when this app or shared code changes
+mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" "packages/shared/**"
 
 # Force a brand-new deployment instead of reusing the linked one
 mcp-use deploy --new --name my-server-v2
@@ -433,7 +439,29 @@ mcp-use deployments delete <deployment-id> [-y|--yes]   # alias: `rm`
 ```bash
 mcp-use servers list [--org <slug-or-id>] [--limit <n>] [--skip <n>] [--sort <field:asc|desc>]
 mcp-use servers get <id-or-slug>
+mcp-use servers update <id-or-slug> [options]
 mcp-use servers delete <server-id> [-y] [--org <slug-or-id>]   # alias: `rm`
+```
+
+`servers update` changes server config after creation:
+
+| Option | Description |
+| ------ | ----------- |
+| `--branch <name>` | Production branch — controls which branch triggers production deploys |
+| `--name <name>` | Rename the server |
+| `--description <text>` | Update the server description |
+| `--build-command <cmd>` | Override the build command (empty string clears it) |
+| `--start-command <cmd>` | Override the start command (empty string clears it) |
+| `--root-dir <path>` | Repo subdirectory to build from (empty string resets to repo root) |
+| `--watch-paths <glob...>` | Only auto-deploy when matching files change (empty `""` clears the filter) |
+| `--deploy-branches <glob...>` | Branch globs (besides production) allowed to auto-deploy (empty `""` allows all) |
+| `--wait-for-ci` / `--no-wait-for-ci` | Hold auto-deploys until other check runs pass |
+
+```bash
+# Monorepo: scope an existing server to its own subtree + shared code
+mcp-use servers update my-app \
+  --watch-paths "apps/my-app/**" "packages/shared/**" \
+  --deploy-branches "release/*"
 ```
 
 Environment variables on a server are managed under `servers env`:
@@ -517,7 +545,7 @@ Downloads the latest mcp-use skills from [github.com/mcp-use/mcp-use](https://gi
 2. Installs them into all agent preset directories:
    - `.cursor/skills/` (Cursor)
    - `.claude/skills/` (Claude Code)
-   - `.agent/skills/` (Codex)
+   - `.agents/skills/` (Codex)
 
 **Options:**
 

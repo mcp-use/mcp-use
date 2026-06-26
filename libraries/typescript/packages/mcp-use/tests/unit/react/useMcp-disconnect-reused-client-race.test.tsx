@@ -37,7 +37,6 @@ const mockAuthProvider = {
   serverUrl: "http://localhost/a/mcp",
   tokens: vi.fn().mockResolvedValue(undefined),
   clearStorage: vi.fn().mockReturnValue(0),
-  restoreFetch: vi.fn(),
 };
 
 function makeSession() {

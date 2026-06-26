@@ -18,6 +18,7 @@ export class StdioConnector extends BaseConnector {
   private readonly command: string;
   private readonly args: string[];
   private readonly env?: Record<string, string>;
+  private readonly cwd?: string;
   private readonly errlog: Writable;
   private readonly clientInfo: ClientInfo;
 
@@ -32,6 +33,7 @@ export class StdioConnector extends BaseConnector {
     args?: string[];
     env?: Record<string, string>;
     errlog?: Writable;
+    cwd?: string;
   } & StdioConnectorOptions = {}) {
     super(rest);
 
@@ -43,6 +45,7 @@ export class StdioConnector extends BaseConnector {
       name: "stdio-connector",
       version: "1.0.0",
     };
+    this.cwd = rest.cwd;
   }
 
   /** Establish connection to the MCP implementation. */
@@ -74,6 +77,7 @@ export class StdioConnector extends BaseConnector {
         command: this.command,
         args: this.args,
         env: mergedEnv,
+        cwd: this.cwd,
       };
 
       // 2. Start the connection manager -> returns a live transport
