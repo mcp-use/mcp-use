@@ -1,5 +1,50 @@
 # @mcp-use/inspector
 
+## 11.0.0
+
+### Patch Changes
+
+- 430178c: fix(inspector): default connections to Auto mode with proxy fallback
+
+  The Inspector connection form no longer asks users to choose between Direct and
+  Via Proxy before connecting. New connections use Auto mode by default: the
+  Inspector tries a direct browser connection first, then falls back to the
+  configured Inspector proxy when direct connection fails because of CORS or other
+  proxy-resolvable connection errors.
+
+  Direct and Proxy are still available as advanced connection mode overrides in
+  the Configuration dialog, alongside the editable Proxy Endpoint. The Inspector
+  also preserves legacy `connectionType` configs while writing the new
+  `connectionMode` field.
+
+  `useMcp` now applies the runtime proxy config after automatic fallback when it
+  derives gateway URLs and headers, so fallback retries route through the proxy
+  instead of continuing to use the original direct transport config.
+
+- 430178c: Updated dependency `vite` to `^8.0.16`.
+- 430178c: fix(inspector): stop prompting signed-in users to log in on the hosted free tier
+
+  The hosted inspector (`inspector.manufact.com`) showed the "You're using
+  Manufact's free tier — Sign in to increase your limits" CTA to every visitor
+  using the managed LLM, even when they were already authenticated (MCP-2142).
+
+  `ChatTab` now resolves the shared Manufact session (via the new
+  `useHostedSession` hook, also used by `HostedUserMenu`) and only renders the
+  free-tier sign-in/upgrade chrome for anonymous visitors. The visibility rule is
+  extracted into a pure `shouldShowFreeTierUpgrade` helper and unit-tested.
+
+- 430178c: Read the inspector version from package.json so canary builds and CLI version output stay in sync.
+- 430178c: Replace stale saved auto-connect entries when the advertised transport changes, so embedded Inspector instances do not keep retrying deprecated SSE connections after switching to streamable HTTP.
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+  - mcp-use@1.33.0
+
 ## 11.0.0-canary.14
 
 ### Patch Changes

@@ -1,5 +1,31 @@
 # @mcp-use/cli
 
+## 3.6.0
+
+### Minor Changes
+
+- 430178c: Expose monorepo auto-deploy trigger config in the CLI. `mcp-use deploy` gains `--watch-paths` and `--wait-for-ci` for new GitHub servers, and `mcp-use servers update` gains `--watch-paths`, `--deploy-branches`, `--wait-for-ci`/`--no-wait-for-ci`, and `--root-dir`. `mcp-use servers get`/`update` now print the effective watch paths, deploy branch patterns, and wait-for-CI setting. This closes the gap where the Cloud API accepted these fields but the CLI could not set them, so monorepo apps can be scoped to only redeploy on relevant changes.
+
+### Patch Changes
+
+- 430178c: `mcp-use deployments list` now preserves the deployment ordering returned by the API instead of re-sorting by creation date on the client. This keeps the displayed order consistent with the server's pagination and sort.
+- 430178c: Fix Codex skills installation to use `.agents/skills` instead of the unsupported `.agent/skills` path.
+- 430178c: Updated dependency `vite` to `^8.0.16`.
+- 430178c: `mcp-use deploy` now surfaces the GitHub App installation URL up front when the app isn't connected or lacks repo access, before any prompt. In a non-interactive context (an agent or CI, without `--yes`) it prints the URL and clear next steps and exits cleanly instead of hanging on an unanswerable prompt.
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+  - @mcp-use/inspector@11.0.0
+  - mcp-use@1.33.0
+
 ## 3.6.0-canary.14
 
 ### Patch Changes

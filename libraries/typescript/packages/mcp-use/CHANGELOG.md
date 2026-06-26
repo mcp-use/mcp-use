@@ -1,5 +1,66 @@
 # mcp-use
 
+## 1.33.0
+
+### Minor Changes
+
+- 430178c: feat(server): enforce `outputSchema` at the tool return position, and make templates score 100% on the publishing checklist (MCP-2260)
+  - `mcp-use`: a tool's `outputSchema` is now type-checked at the return position with no new API. Returning `object({...})` (or `widget({ props })`, whose props become the result's `structuredContent`) with a shape that does not match `outputSchema` is a compile-time error, while content-only helpers (`text()`, `markdown()`, `image()`, ...) are always allowed. This is achieved by typing content helpers as a new `ToolContentResult` (no `structuredContent`) and making `widget()` generic over its props. Note: returning `mix()` carrying structured content, or a raw object literal whose `structuredContent` does not match, against a tool that declares `outputSchema` now errors (use `object()` or align the shape).
+  - `mcp-use`: the Apps SDK adapter auto-derives `openai/widgetDescription` from the widget's `description` when it isn't set explicitly, so hosts (and the publishing checklist) always see a widget description.
+  - `create-mcp-use-app` (`starter`): `fetch-weather` declares a `title` and an `outputSchema`, returning matching `structuredContent` via `object()`.
+  - `create-mcp-use-app` (`mcp-apps`): `search-tools` and `get-fruit-details` declare a `title`, and the `product-search-result` widget declares a `domain` (widget description is auto-derived from its `description`).
+
+### Patch Changes
+
+- 430178c: fix(inspector): default connections to Auto mode with proxy fallback
+
+  The Inspector connection form no longer asks users to choose between Direct and
+  Via Proxy before connecting. New connections use Auto mode by default: the
+  Inspector tries a direct browser connection first, then falls back to the
+  configured Inspector proxy when direct connection fails because of CORS or other
+  proxy-resolvable connection errors.
+
+  Direct and Proxy are still available as advanced connection mode overrides in
+  the Configuration dialog, alongside the editable Proxy Endpoint. The Inspector
+  also preserves legacy `connectionType` configs while writing the new
+  `connectionMode` field.
+
+  `useMcp` now applies the runtime proxy config after automatic fallback when it
+  derives gateway URLs and headers, so fallback retries route through the proxy
+  instead of continuing to use the original direct transport config.
+
+- 430178c: Updated dependency `vite` to `^8.0.16`.
+- 430178c: exposed the cwd argument for stdio
+- 430178c: Bump hono from 4.12.23 to 4.12.25.
+- 430178c: Use the MCP Apps bridge as the primary widget runtime even when `window.openai` is present, while keeping OpenAI extension APIs such as file upload and download available through `useFiles`.
+- 430178c: fix(inspector): scope OAuth proxy fetch per server configuration
+
+  The browser OAuth provider previously installed a global `window.fetch`
+  interceptor to route OAuth requests through the inspector proxy. With multiple
+  servers, connecting one server "Via Proxy" mutated `fetch` for the entire page,
+  so other servers (including ones set to "Direct") and unrelated requests were
+  affected, and switching a server from "Via Proxy" back to "Direct" could leave a
+  stale interceptor behind.
+
+  `BrowserOAuthClientProvider` now exposes a scoped `getProxyFetch()` that returns
+  a `fetch` confined to a single provider. It is passed only to that server's SDK
+  transport and `auth()` calls (via the SDK's `fetch` / `fetchFn` options), so
+  OAuth-proxy behavior is scoped to the selected server's connection and the
+  global `fetch` is never mutated.
+
+- 430178c: Fix `useWidget` breaking Apps SDK-only widgets. The MCP Apps bridge remains the primary runtime, but `window.openai` (Apps SDK) is now used as a compatibility fallback when the bridge does not connect, instead of being dropped entirely. Previously, any widget iframe whose host only spoke the Apps SDK (e.g. a ChatGPT widget without MCP Apps support) stayed stuck on the loading spinner because `useWidget` ignored `window.openai` data. A connected MCP Apps bridge still always wins, so ChatGPT continues to use MCP Apps as the source of truth.
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+- Updated dependencies [430178c]
+  - @mcp-use/inspector@11.0.0
+  - @mcp-use/cli@3.6.0
+
 ## 1.33.0-canary.14
 
 ### Patch Changes
