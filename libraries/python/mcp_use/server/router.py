@@ -229,7 +229,19 @@ class MCPRouter:
             )
 
         for resource in router._pending_resources:
-            self._pending_resources.append(resource)
+            resource_name = resource.name or getattr(resource.fn, "__name__", "unknown")
+            if combined_prefix:
+                resource_name = f"{combined_prefix}_{resource_name}"
+
+            self._pending_resources.append(
+                PendingResource(
+                    fn=resource.fn,
+                    uri=resource.uri,
+                    name=resource_name,
+                    description=resource.description,
+                    mime_type=resource.mime_type,
+                )
+            )
 
         for prompt in router._pending_prompts:
             prompt_name = prompt.name or getattr(prompt.fn, "__name__", "unknown")
