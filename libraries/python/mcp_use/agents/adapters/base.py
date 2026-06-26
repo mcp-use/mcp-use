@@ -7,7 +7,17 @@ This module provides the abstract base class that all MCP tool adapters should i
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
-from mcp.types import Prompt, Resource, Tool
+from mcp.types import (
+    AudioContent,
+    BlobResourceContents,
+    EmbeddedResource,
+    ImageContent,
+    Prompt,
+    Resource,
+    TextContent,
+    TextResourceContents,
+    Tool,
+)
 
 from mcp_use.client.client import MCPClient
 from mcp_use.client.connectors.base import BaseConnector
@@ -17,6 +27,63 @@ from mcp_use.telemetry.utils import track_adapter_usage
 
 # Generic type for the tools created by the adapter
 T = TypeVar("T")
+
+
+def _mcp_content_to_text(content: Any) -> str:
+    """Convert MCP tool result content into a readable string without flattening structure.
+
+    The MCP ``CallToolResult.content`` field is a list of typed content blocks. Calling
+    ``str()`` on that list produces a low-quality Python ``repr`` (and, for images/audio,
+    dumps large base64 payloads into the model context). This helper preserves the
+    meaningful information from each block instead:
+
+      - TextContent      → the text itself
+      - ImageContent     → ``[image: <mime_type>]`` placeholder (base64 data is omitted)
+      - AudioContent     → ``[audio: <mime_type>]`` placeholder (base64 data is omitted)
+      - EmbeddedResource → the resource text, or a ``[resource: ...]`` placeholder for blobs
+
+    Args:
+        content: The ``content`` attribute of a ``CallToolResult`` (typically a list of
+            content blocks), or any value that should be rendered as text.
+
+    Returns:
+        A readable string representation of the content. Multiple blocks are joined with
+        newlines; a single text block is returned as a plain string.
+    """
+    # Defensive: non-list payloads (or already-string content) fall back to str().
+    if not isinstance(content, list):
+        return str(content)
+
+    if not content:
+        return ""
+
+    # Single text block → plain string (the most common case).
+    if len(content) == 1 and isinstance(content[0], TextContent):
+        return content[0].text
+
+    parts: list[str] = []
+    for item in content:
+        match item:
+            case TextContent():
+                parts.append(item.text)
+            case ImageContent():
+                parts.append(f"[image: {item.mimeType}]")
+            case AudioContent():
+                parts.append(f"[audio: {item.mimeType}]")
+            case EmbeddedResource():
+                resource = item.resource
+                if isinstance(resource, TextResourceContents):
+                    parts.append(resource.text)
+                elif isinstance(resource, BlobResourceContents):
+                    mime_type = resource.mimeType or "application/octet-stream"
+                    parts.append(f"[resource: {mime_type} ({resource.uri})]")
+                else:
+                    parts.append(str(resource))
+            case _:
+                # Fallback for unknown content types.
+                parts.append(str(item))
+
+    return "\n".join(parts)
 
 
 class BaseAdapter(Generic[T], ABC):
@@ -58,14 +125,14 @@ class BaseAdapter(Generic[T], ABC):
         """
         if getattr(tool_result, "isError", False):
             # Handle errors first
-            error_content = tool_result.content or "Unknown error"
+            error_content = _mcp_content_to_text(tool_result.content) or "Unknown error"
             return f"Error: {error_content}"
         elif hasattr(tool_result, "contents"):  # For Resources (ReadResourceResult)
             return "\n".join(c.decode() if isinstance(c, bytes) else str(c) for c in tool_result.contents)
         elif hasattr(tool_result, "messages"):  # For Prompts (GetPromptResult)
             return "\n".join(str(s) for s in tool_result.messages)
         elif hasattr(tool_result, "content"):  # For Tools (CallToolResult)
-            return str(tool_result.content)
+            return _mcp_content_to_text(tool_result.content)
         else:
             # Fallback for unexpected types
             return str(tool_result)
