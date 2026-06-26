@@ -2,11 +2,35 @@
 Unit tests for the MCPSession class.
 """
 
+import asyncio
 import unittest
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
+from mcp_use.client.connectors.base import BaseConnector
 from mcp_use.session import MCPSession
+
+
+class DisconnectRaceConnector(BaseConnector):
+    """Connector that lets tests pause cleanup while another disconnect starts."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.cleanup_calls = 0
+        self.cleanup_started = asyncio.Event()
+        self.allow_cleanup = asyncio.Event()
+
+    @property
+    def public_identifier(self) -> str:
+        return "disconnect-race"
+
+    async def connect(self) -> None:
+        self._connected = True
+
+    async def _cleanup_resources(self) -> None:
+        self.cleanup_calls += 1
+        self.cleanup_started.set()
+        await self.allow_cleanup.wait()
 
 
 class TestMCPSessionInitialization(unittest.TestCase):
@@ -54,6 +78,25 @@ class TestMCPSessionConnection(IsolatedAsyncioTestCase):
         """Test disconnecting from the MCP implementation."""
         await self.session.disconnect()
         self.connector.disconnect.assert_called_once()
+
+    async def test_disconnect_is_idempotent_while_cleanup_is_in_progress(self):
+        """Concurrent disconnect calls should only clean up connector resources once."""
+        connector = DisconnectRaceConnector()
+        await connector.connect()
+        session = MCPSession(connector)
+
+        first_disconnect = asyncio.create_task(session.disconnect())
+        await connector.cleanup_started.wait()
+
+        second_disconnect = asyncio.create_task(session.disconnect())
+        await asyncio.sleep(0)
+
+        self.assertTrue(second_disconnect.done())
+        connector.allow_cleanup.set()
+        await asyncio.gather(first_disconnect, second_disconnect)
+
+        self.assertEqual(connector.cleanup_calls, 1)
+        self.assertFalse(connector.is_connected)
 
     async def test_async_context_manager(self):
         """Test using the session as an async context manager."""
