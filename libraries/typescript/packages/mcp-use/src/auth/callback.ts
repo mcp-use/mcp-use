@@ -464,13 +464,15 @@ async function doOnMcpAuthorization() {
       );
     }
 
-    // Install fetch interceptor if OAuth proxy was configured or inferred
-    // This is needed to bypass CORS for token exchange requests
+    // Build a fetch scoped to this provider that routes the token-exchange
+    // request through the OAuth proxy (to bypass CORS) when one is configured
+    // or inferred. This is passed only to auth() below — it never mutates the
+    // global fetch.
+    const scopedFetch = provider.getProxyFetch();
     if (oauthProxyUrl) {
       console.log(
-        `${logPrefix} Installing fetch interceptor for token exchange (proxy: ${oauthProxyUrl})`
+        `${logPrefix} Using scoped OAuth proxy fetch for token exchange (proxy: ${oauthProxyUrl})`
       );
-      provider.installFetchInterceptor();
     }
 
     // --- Call SDK Auth Function ---
@@ -493,6 +495,7 @@ async function doOnMcpAuthorization() {
     const authResult = await auth(provider, {
       serverUrl: sdkServerUrl,
       authorizationCode: code,
+      fetchFn: scopedFetch,
     });
 
     if (authResult === "AUTHORIZED") {

@@ -1,5 +1,133 @@
 # @mcp-use/inspector
 
+## 11.0.0-canary.14
+
+### Patch Changes
+
+- 7455d7a: fix(inspector): default connections to Auto mode with proxy fallback
+
+  The Inspector connection form no longer asks users to choose between Direct and
+  Via Proxy before connecting. New connections use Auto mode by default: the
+  Inspector tries a direct browser connection first, then falls back to the
+  configured Inspector proxy when direct connection fails because of CORS or other
+  proxy-resolvable connection errors.
+
+  Direct and Proxy are still available as advanced connection mode overrides in
+  the Configuration dialog, alongside the editable Proxy Endpoint. The Inspector
+  also preserves legacy `connectionType` configs while writing the new
+  `connectionMode` field.
+
+  `useMcp` now applies the runtime proxy config after automatic fallback when it
+  derives gateway URLs and headers, so fallback retries route through the proxy
+  instead of continuing to use the original direct transport config.
+
+- Updated dependencies [7455d7a]
+  - mcp-use@1.33.0-canary.14
+
+## 11.0.0-canary.13
+
+### Patch Changes
+
+- Updated dependencies [1bd3f8d]
+  - mcp-use@1.33.0-canary.13
+
+## 11.0.0-canary.12
+
+### Patch Changes
+
+- Updated dependencies [0027695]
+  - mcp-use@1.33.0-canary.12
+
+## 11.0.0-canary.11
+
+### Patch Changes
+
+- mcp-use@1.33.0-canary.11
+
+## 11.0.0-canary.10
+
+### Patch Changes
+
+- Updated dependencies [84e9c7d]
+  - mcp-use@1.33.0-canary.10
+
+## 10.0.2-canary.9
+
+### Patch Changes
+
+- 8dfac9c: Replace stale saved auto-connect entries when the advertised transport changes, so embedded Inspector instances do not keep retrying deprecated SSE connections after switching to streamable HTTP.
+  - mcp-use@1.32.2-canary.9
+
+## 10.0.2-canary.8
+
+### Patch Changes
+
+- Updated dependencies [bf90128]
+  - mcp-use@1.32.2-canary.8
+
+## 10.0.2-canary.7
+
+### Patch Changes
+
+- 37337f3: fix(inspector): stop prompting signed-in users to log in on the hosted free tier
+
+  The hosted inspector (`inspector.manufact.com`) showed the "You're using
+  Manufact's free tier — Sign in to increase your limits" CTA to every visitor
+  using the managed LLM, even when they were already authenticated (MCP-2142).
+
+  `ChatTab` now resolves the shared Manufact session (via the new
+  `useHostedSession` hook, also used by `HostedUserMenu`) and only renders the
+  free-tier sign-in/upgrade chrome for anonymous visitors. The visibility rule is
+  extracted into a pure `shouldShowFreeTierUpgrade` helper and unit-tested.
+  - mcp-use@1.32.2-canary.7
+
+## 10.0.2-canary.6
+
+### Patch Changes
+
+- mcp-use@1.32.2-canary.6
+
+## 10.0.2-canary.5
+
+### Patch Changes
+
+- mcp-use@1.32.2-canary.5
+
+## 10.0.2-canary.4
+
+### Patch Changes
+
+- Updated dependencies [b9324be]
+  - mcp-use@1.32.2-canary.4
+
+## 10.0.2-canary.3
+
+### Patch Changes
+
+- e1bcc3f: Read the inspector version from package.json so canary builds and CLI version output stay in sync.
+  - mcp-use@1.32.2-canary.3
+
+## 10.0.2-canary.2
+
+### Patch Changes
+
+- c62e103: Updated dependency `vite` to `^8.0.16`.
+- Updated dependencies [c62e103]
+  - mcp-use@1.32.2-canary.2
+
+## 10.0.2-canary.1
+
+### Patch Changes
+
+- mcp-use@1.32.2-canary.1
+
+## 10.0.2-canary.0
+
+### Patch Changes
+
+- Updated dependencies [c242a0c]
+  - mcp-use@1.32.2-canary.0
+
 ## 10.0.1
 
 ### Patch Changes

@@ -68,6 +68,10 @@ interface CreateServerBody {
   description?: string;
   tags?: string[];
   region?: string;
+  /** Glob patterns; only matching repo changes trigger auto-deploy. Empty = all changes. */
+  watchPaths?: string[];
+  /** When true, GitHub auto-deploy waits for other check runs to succeed. */
+  waitForCi?: boolean;
 }
 
 interface CreateServerResponse {
@@ -89,6 +93,12 @@ export interface UpdateServerBody {
   description?: string;
   productionBranch?: string;
   tags?: string[];
+  /** Glob patterns; only matching repo changes trigger auto-deploy. Empty array = all changes. */
+  watchPaths?: string[];
+  /** Branch globs for webhook auto-deploys; empty array allows all branches. */
+  deployBranchPatterns?: string[];
+  /** When true, GitHub auto-deploy waits for other check runs to succeed. */
+  waitForCi?: boolean;
   config?: Record<string, unknown>;
 }
 
@@ -98,6 +108,12 @@ interface CloudServerConnectedRepository {
   /** Null for platform-managed repos — the API never exposes the managed repo path. */
   repoFullName: string | null;
   productionBranch: string;
+  /** Glob patterns limiting which repo changes trigger auto-deploy. Empty = all changes. */
+  watchPaths?: string[];
+  /** Branch globs for webhook auto-deploys. Empty = all branches. */
+  deployBranchPatterns?: string[];
+  /** When true, GitHub auto-deploy waits for other check runs to succeed. */
+  waitForCi?: boolean;
   isActive: boolean;
   /** True when deployed via the platform-managed org (no user GitHub). */
   isManaged?: boolean;
@@ -244,7 +260,7 @@ function buildPaginationQuery(
 
 // ── GitHub ──────────────────────────────────────────────────────────
 
-export interface GitHubInstallation {
+interface GitHubInstallation {
   id: string;
   installation_id: string;
   account_login: string;

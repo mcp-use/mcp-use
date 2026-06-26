@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
-import { Switch } from "@/client/components/ui/switch";
 import { cn } from "@/client/lib/utils";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { Cog, Copy, FileText, Shield } from "lucide-react";
@@ -23,6 +22,10 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { CustomHeadersEditor } from "./CustomHeadersEditor";
+import {
+  normalizeConnectionMode,
+  type ConnectionMode,
+} from "@/client/utils/connectionUpdates";
 
 interface ConnectionSettingsFormProps {
   // Form state
@@ -30,8 +33,8 @@ interface ConnectionSettingsFormProps {
   setAlias: (value: string) => void;
   url: string;
   setUrl: (value: string) => void;
-  connectionType: string;
-  setConnectionType: (value: string) => void;
+  connectionMode: ConnectionMode;
+  setConnectionMode: (value: ConnectionMode) => void;
   customHeaders: CustomHeader[];
   setCustomHeaders: (headers: CustomHeader[]) => void;
   requestTimeout: string;
@@ -50,10 +53,6 @@ interface ConnectionSettingsFormProps {
   setClientSecret: (value: string) => void;
   scope: string;
   setScope: (value: string) => void;
-
-  // Auto-switch
-  autoSwitch?: boolean;
-  setAutoSwitch?: (value: boolean) => void;
 
   // Callbacks
   onConnect?: () => void;
@@ -89,8 +88,8 @@ export function ConnectionSettingsForm({
   setAlias,
   url,
   setUrl,
-  connectionType,
-  setConnectionType,
+  connectionMode,
+  setConnectionMode,
   customHeaders,
   setCustomHeaders,
   requestTimeout,
@@ -107,8 +106,6 @@ export function ConnectionSettingsForm({
   setClientSecret,
   scope,
   setScope,
-  autoSwitch,
-  setAutoSwitch,
   onConnect,
   onSave,
   onCancel,
@@ -137,9 +134,10 @@ export function ConnectionSettingsForm({
       url,
       ...(alias.trim() ? { name: alias.trim() } : {}),
       transportType: "http", // HTTP only - SSE is deprecated
-      connectionType,
+      connectionMode,
+      connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
       proxyConfig:
-        connectionType === "Via Proxy" && proxyAddress.trim()
+        connectionMode === "proxy" && proxyAddress.trim()
           ? {
               proxyAddress: proxyAddress.trim(),
               customHeaders: customHeaders.reduce(
@@ -151,6 +149,13 @@ export function ConnectionSettingsForm({
                 },
                 {} as Record<string, string>
               ),
+            }
+          : undefined,
+      autoProxyFallback:
+        connectionMode === "auto" && proxyAddress.trim()
+          ? {
+              enabled: true,
+              proxyAddress: proxyAddress.trim(),
             }
           : undefined,
       customHeaders: customHeaders.reduce(
@@ -188,9 +193,6 @@ export function ConnectionSettingsForm({
     ? "bg-white/10 border-white/20 text-white placeholder:text-white/50"
     : "";
   const labelClassName = isStyled ? "text-white/90" : "";
-  const selectTriggerClassName = isStyled
-    ? "bg-white/10 border-white/20 text-white"
-    : "";
   const buttonClassName = isStyled
     ? "bg-white/10 border-white/20 text-white hover:bg-white/20"
     : "";
@@ -218,12 +220,21 @@ export function ConnectionSettingsForm({
         // Transport type is always HTTP now (SSE is deprecated)
         // No need to set transportType from config
 
-        if (config.connectionType) {
-          setConnectionType(config.connectionType);
-        }
+        const pastedProxyAddress =
+          config.proxyConfig?.proxyAddress ||
+          (typeof config.autoProxyFallback === "object"
+            ? config.autoProxyFallback.proxyAddress
+            : undefined);
+        setConnectionMode(
+          normalizeConnectionMode(
+            config.connectionMode,
+            config.connectionType,
+            !!pastedProxyAddress
+          )
+        );
 
-        if (config.proxyConfig?.proxyAddress) {
-          setProxyAddress(config.proxyConfig.proxyAddress);
+        if (pastedProxyAddress) {
+          setProxyAddress(pastedProxyAddress);
         }
 
         // Extract headers from proxyConfig (preferred) or top-level customHeaders/headers
@@ -357,51 +368,6 @@ export function ConnectionSettingsForm({
         </p>
       </div>
 
-      {/* Connection Type */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label className={labelClassName}>Connection Type</Label>
-          {setAutoSwitch && (
-            <div className="flex items-center gap-2">
-              <Label
-                htmlFor="auto-switch"
-                className={cn(
-                  "text-xs cursor-pointer",
-                  isStyled ? "text-white/70" : "text-muted-foreground"
-                )}
-              >
-                Auto-switch
-              </Label>
-              <Switch
-                id="auto-switch"
-                data-testid="connection-form-auto-switch"
-                checked={autoSwitch}
-                onCheckedChange={(value) => {
-                  setAutoSwitch(value);
-                  localStorage.setItem(
-                    "mcp-inspector-auto-switch",
-                    String(value)
-                  );
-                }}
-                className="scale-75"
-              />
-            </div>
-          )}
-        </div>
-        <Select value={connectionType} onValueChange={setConnectionType}>
-          <SelectTrigger
-            className={cn("w-full", selectTriggerClassName)}
-            data-testid="connection-form-type-select"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Direct">Direct</SelectItem>
-            <SelectItem value="Via Proxy">Via Proxy</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {/* Configuration Buttons Row */}
       <div className="flex flex-row gap-3 @lg:flex-col">
         {/* Authentication Button */}
@@ -522,6 +488,32 @@ export function ConnectionSettingsForm({
               <DialogTitle>Configuration</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              {/* Connection Mode */}
+              <div className="space-y-2">
+                <Label className="text-sm flex items-center gap-1">
+                  Connection Mode
+                  <span className="text-muted-foreground text-xs">(?)</span>
+                </Label>
+                <Select
+                  value={connectionMode}
+                  onValueChange={(value) =>
+                    setConnectionMode(value as ConnectionMode)
+                  }
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    data-testid="config-dialog-connection-mode-select"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="direct">Direct</SelectItem>
+                    <SelectItem value="proxy">Proxy</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Request Timeout */}
               <div className="space-y-2">
                 <Label className="text-sm flex items-center gap-1">
@@ -573,10 +565,10 @@ export function ConnectionSettingsForm({
                 />
               </div>
 
-              {/* Inspector Proxy Address */}
+              {/* Proxy Endpoint */}
               <div className="space-y-2">
                 <Label className="text-sm flex items-center gap-1">
-                  Inspector Proxy Address
+                  Proxy Endpoint
                   <span className="text-muted-foreground text-xs">(?)</span>
                 </Label>
                 <Input

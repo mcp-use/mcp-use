@@ -4,23 +4,31 @@ description: "Advanced connection configuration and settings"
 icon: "settings"
 ---
 
-The MCP Inspector provides extensive configuration options for connecting to MCP servers, including connection types, transport protocols, timeouts, OAuth authentication, and custom headers.
+The MCP Inspector provides extensive configuration options for connecting to MCP servers, including connection mode, transport protocols, timeouts, OAuth authentication, and custom headers.
 
-## Connection Types
+## Connection Mode
 
-### Direct Connection
+By default, the Inspector uses **Auto** mode: it tries to connect directly to the MCP server first, then automatically falls back to the configured Inspector proxy if the direct connection fails for cases such as CORS or proxy-only routing.
 
-Connect directly to the MCP server without a proxy. This is the default and recommended option for most use cases.
+You normally do not need to change this setting. Open **Configuration** from the connection form if you need to force a specific mode.
+
+### Auto
+
+Try a direct connection first, then fall back to the Inspector proxy when direct connection fails. This is the default and recommended option for most use cases.
+
+### Direct
+
+Connect directly to the MCP server without proxy fallback.
 
 **When to use:**
 
-- Local development servers
-- Servers accessible from your network
-- Servers with public endpoints
+- Local development servers that are same-origin with the Inspector
+- Servers that require direct browser access
+- Debugging direct-only behavior
 
-### Via Proxy
+### Proxy
 
-Connect through a proxy server. Useful when you need to route traffic through an intermediary or when direct connections are blocked.
+Connect through the configured Inspector proxy immediately.
 
 **When to use:**
 
@@ -28,19 +36,6 @@ Connect through a proxy server. Useful when you need to route traffic through an
 - CORS restrictions
 - Testing proxy configurations
 - Development environments with proxy setup
-
-### Auto-Switch
-
-The inspector can automatically try both connection types if one fails. Enable this in the connection settings:
-
-1. Open the **Connection Type** dropdown
-2. Toggle **Auto-switch** on
-3. If Direct connection fails, the inspector will automatically try Via Proxy (and vice versa)
-
-<Note>
-  Auto-switch is skipped for authentication errors (401, Unauthorized) since
-  both connection types will fail the same way.
-</Note>
 
 ## Server display names
 
@@ -66,9 +61,9 @@ Maximum total time (in milliseconds) for the entire operation, including retries
 
 **Default:** `60000` (60 seconds)
 
-### Inspector Proxy Address
+### Proxy Endpoint
 
-The proxy endpoint URL when using "Via Proxy" connection type.
+The proxy endpoint URL used by **Auto** fallback and by forced **Proxy** mode.
 
 **Default:** `${window.location.origin}/inspector/api/proxy`
 
@@ -82,7 +77,6 @@ By default the inspector relies on Dynamic Client Registration (DCR), so no cred
 
 1. Click the **Authentication** button in the connection form
 2. Enter your OAuth credentials:
-
    - **Client ID**: Pre-registered OAuth client ID. Setting this skips DCR.
    - **Client Secret**: Pre-registered OAuth client secret (optional). Required for confidential clients without PKCE; when set alongside Client ID, the SDK switches token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post`.
    - **Scope**: Space-separated list of OAuth scopes
@@ -167,7 +161,7 @@ Export your connection configuration as JSON:
 {
   "url": "https://mcp.example.com/mcp",
   "transportType": "http",
-  "connectionType": "Direct",
+  "connectionMode": "auto",
   "headers": {
     "Authorization": "Bearer token123"
   },

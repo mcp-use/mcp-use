@@ -233,6 +233,32 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
       console.log(
         chalk.white("  Prod branch: ") + chalk.gray(cr.productionBranch)
       );
+      if (cr.watchPaths !== undefined) {
+        console.log(
+          chalk.white("  Watch paths: ") +
+            chalk.gray(
+              cr.watchPaths.length > 0
+                ? cr.watchPaths.join(", ")
+                : "(all changes)"
+            )
+        );
+      }
+      if (cr.deployBranchPatterns !== undefined) {
+        console.log(
+          chalk.white("  Deploy branches: ") +
+            chalk.gray(
+              cr.deployBranchPatterns.length > 0
+                ? cr.deployBranchPatterns.join(", ")
+                : "(all branches)"
+            )
+        );
+      }
+      if (cr.waitForCi !== undefined) {
+        console.log(
+          chalk.white("  Wait for CI: ") +
+            chalk.gray(cr.waitForCi ? "yes" : "no")
+        );
+      }
     }
 
     if (server.activeDeploymentId) {
@@ -305,6 +331,14 @@ async function getServerCommand(idOrSlug: string, options: { org?: string }) {
   }
 }
 
+/**
+ * Resolves a variadic glob option to the array sent to the API. A lone empty
+ * string (`--watch-paths ""`) clears the list; otherwise empties are dropped.
+ */
+function resolveGlobList(values: string[]): string[] {
+  return values.map((v) => v.trim()).filter((v) => v.length > 0);
+}
+
 async function updateServerCommand(
   idOrSlug: string,
   options: {
@@ -313,8 +347,13 @@ async function updateServerCommand(
     buildCommand?: string;
     startCommand?: string;
     description?: string;
+    watchPaths?: string[];
+    deployBranches?: string[];
+    waitForCi?: boolean;
+    rootDir?: string;
     org?: string;
-  }
+  },
+  command?: Command
 ): Promise<void> {
   try {
     if (!(await isLoggedIn())) {
@@ -336,6 +375,20 @@ async function updateServerCommand(
     if (options.description !== undefined)
       body.description = options.description;
     if (options.branch !== undefined) body.productionBranch = options.branch;
+    // Auto-deploy trigger config lives on the connected repository (top-level
+    // on the PATCH body, not under `config`). A lone `""` clears the list.
+    if (options.watchPaths !== undefined)
+      body.watchPaths = resolveGlobList(options.watchPaths);
+    if (options.deployBranches !== undefined)
+      body.deployBranchPatterns = resolveGlobList(options.deployBranches);
+    // `--no-wait-for-ci` makes commander default `waitForCi` to true, so only
+    // forward it when the user actually passed one of the flags.
+    if (
+      options.waitForCi !== undefined &&
+      command?.getOptionValueSource("waitForCi") === "cli"
+    ) {
+      body.waitForCi = options.waitForCi;
+    }
 
     const config: Record<string, unknown> = {};
     if (options.buildCommand !== undefined) {
@@ -347,12 +400,16 @@ async function updateServerCommand(
       config.startCommand =
         options.startCommand === "" ? null : options.startCommand;
     }
+    if (options.rootDir !== undefined) {
+      // Empty string resets to the repo root (merge-patch: null removes key).
+      config.rootDir = options.rootDir === "" ? null : options.rootDir;
+    }
     if (Object.keys(config).length > 0) body.config = config;
 
     if (Object.keys(body).length === 0) {
       console.error(
         chalk.red(
-          "✗ Nothing to update. Provide at least one of: --branch, --name, --build-command, --start-command, --description."
+          "✗ Nothing to update. Provide at least one of: --branch, --name, --build-command, --start-command, --description, --watch-paths, --deploy-branches, --wait-for-ci/--no-wait-for-ci, --root-dir."
         )
       );
       process.exit(1);
@@ -366,11 +423,37 @@ async function updateServerCommand(
 
     const label = server.name || server.slug || server.id;
     console.log(chalk.green.bold(`\n✓ Server updated: ${label}`));
-    if (server.connectedRepository) {
+    const repo = server.connectedRepository;
+    if (repo) {
       console.log(
-        chalk.gray("  Prod branch: ") +
-          chalk.cyan(server.connectedRepository.productionBranch)
+        chalk.gray("  Prod branch: ") + chalk.cyan(repo.productionBranch)
       );
+      if (repo.watchPaths !== undefined) {
+        console.log(
+          chalk.gray("  Watch paths: ") +
+            chalk.cyan(
+              repo.watchPaths.length > 0
+                ? repo.watchPaths.join(", ")
+                : "(all changes)"
+            )
+        );
+      }
+      if (repo.deployBranchPatterns !== undefined) {
+        console.log(
+          chalk.gray("  Deploy branches: ") +
+            chalk.cyan(
+              repo.deployBranchPatterns.length > 0
+                ? repo.deployBranchPatterns.join(", ")
+                : "(all branches)"
+            )
+        );
+      }
+      if (repo.waitForCi !== undefined) {
+        console.log(
+          chalk.gray("  Wait for CI: ") +
+            chalk.cyan(repo.waitForCi ? "yes" : "no")
+        );
+      }
     }
     console.log();
   } catch (error) {
@@ -479,6 +562,23 @@ export function createServersCommand(): Command {
       "Override the start command (pass an empty string to clear)"
     )
     .option("--description <text>", "Update the server description")
+    .option(
+      "--watch-paths <glob...>",
+      'Only auto-deploy when files matching these globs change (monorepos). Pass "" to clear.'
+    )
+    .option(
+      "--deploy-branches <glob...>",
+      'Branch globs allowed to trigger auto-deploys (besides the production branch). Pass "" to allow all.'
+    )
+    .option(
+      "--wait-for-ci",
+      "Hold GitHub auto-deploys until other check runs pass"
+    )
+    .option("--no-wait-for-ci", "Do not wait for other check runs")
+    .option(
+      "--root-dir <path>",
+      'Repo subdirectory to build from (monorepos). Pass "" to reset to the repo root.'
+    )
     .option("--org <slug-or-id>", "Target organization")
     .action(updateServerCommand);
 
