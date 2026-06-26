@@ -297,7 +297,9 @@ class LangChainAdapter(BaseAdapter[BaseTool]):
                 logger.debug(f'Prompt tool: "{self.name}" called with args: {kwargs}')
                 try:
                     result = await self.tool_connector.get_prompt(self.name, kwargs)
-                    return result.messages
+                    if not result.messages:
+                        return "(no prompt content)"
+                    return "\n".join(str(m.content) for m in result.messages)
                 except Exception as e:
                     if self.handle_tool_error:
                         return format_error(e, tool=self.name)  # Format the error to make LLM understand it
