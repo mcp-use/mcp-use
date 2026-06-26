@@ -20,7 +20,7 @@ import {
   type EditableConnectionConfig,
   type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
-import { useMcpClient, type McpServer } from "mcp-use/react";
+import { useMcpClient, type McpServer } from "@mcp-use/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";

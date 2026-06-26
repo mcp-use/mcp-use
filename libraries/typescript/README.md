@@ -57,6 +57,9 @@ mcp-use for TypeScript provides the complete MCP stack:
 | **[@mcp-use/inspector](#mcp-use-inspector)**  | Web-based debugger for MCP servers            | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) | [![npm](https://img.shields.io/npm/dw/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
 | **[create-mcp-use-app](#create-mcp-use-app)** | Project scaffolding tool                      | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) | [![npm](https://img.shields.io/npm/dw/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
+> [!NOTE]
+> **React Imports:** The `mcp-use` root package does not re-export React hooks directly at the root. React users should import from `mcp-use/react` or the scoped `@mcp-use/react` package directly.
+
 ---
 
 ## 🚀 Quick Start

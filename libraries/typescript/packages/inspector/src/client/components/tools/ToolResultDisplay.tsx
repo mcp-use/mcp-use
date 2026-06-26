@@ -23,7 +23,7 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
-import type { MessageContentBlock } from "mcp-use/react";
+import type { MessageContentBlock } from "@mcp-use/react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,

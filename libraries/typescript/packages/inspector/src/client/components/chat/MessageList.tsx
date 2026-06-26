@@ -10,7 +10,7 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { MessageContentBlock } from "mcp-use/react";
+import type { MessageContentBlock } from "@mcp-use/react";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";

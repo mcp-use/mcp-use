@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MessageContentBlock } from "mcp-use/react";
+import type { MessageContentBlock } from "@mcp-use/react";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
 import {
   detectWidgetProtocol,

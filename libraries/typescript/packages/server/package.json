@@ -55,7 +55,6 @@
     "@mcp-use/core": "workspace:*",
     "@mcp-use/client": "workspace:*",
     "@hono/node-server": "1.19.13",
-    "@mcp-ui/server": "6.1.0",
     "@mcp-use/cli": "workspace:*",
     "@modelcontextprotocol/ext-apps": "1.0.1",
     "express": "5.2.1",
@@ -64,6 +63,7 @@
     "posthog-node": "5.24.17"
   },
   "optionalDependencies": {
+    "@mcp-ui/server": "6.1.0",
     "cli-highlight": "2.1.11",
     "redis": "5.10.0"
   },

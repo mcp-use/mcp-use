@@ -3,7 +3,7 @@ import type {
   ContentBlock,
   Prompt,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/react";
 import React, {
   useCallback,
   useEffect,

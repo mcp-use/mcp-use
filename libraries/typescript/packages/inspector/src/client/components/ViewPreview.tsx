@@ -19,7 +19,7 @@
  * signals readiness + fonts have loaded + two animation frames have elapsed.
  */
 
-import { useMcpClient } from "mcp-use/react";
+import { useMcpClient } from "@mcp-use/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { MCPAppsRenderer } from "./MCPAppsRenderer";

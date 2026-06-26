@@ -4,7 +4,7 @@ import {
   OAuthFlowError,
   UnauthorizedError,
   type NodeOAuthOptions,
-} from "mcp-use/auth/node";
+} from "@mcp-use/client/auth/node";
 import { createInterface } from "node:readline";
 
 /**

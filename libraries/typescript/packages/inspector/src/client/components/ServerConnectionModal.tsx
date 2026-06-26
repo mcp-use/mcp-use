@@ -1,4 +1,4 @@
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/react";
 import {
   buildOAuthStaticConfig,
   type OAuthStaticConfig,
