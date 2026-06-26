@@ -56,7 +56,7 @@ export type UseMcpOptions = {
    * automatically retries using the proxy configuration
    *
    * Can be:
-   * - `true`: Enable with default proxy (https://inspector.mcp-use.com/inspector/api/proxy)
+   * - `true`: Enable with default proxy (https://inspector.manufact.com/inspector/api/proxy)
    * - `false`: Disable automatic fallback (default)
    * - `{ enabled: boolean, proxyAddress?: string }`: Custom configuration
    *

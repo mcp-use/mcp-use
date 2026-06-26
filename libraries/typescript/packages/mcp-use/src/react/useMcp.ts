@@ -37,6 +37,11 @@ import type { UseMcpOptions, UseMcpResult } from "./types.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
+// Live hosted inspector proxy. The former inspector.mcp-use.com host now
+// 301-redirects here, which breaks browser CORS preflights (redirects on a
+// preflight are a hard failure), so the default must point at the live host.
+const DEFAULT_PROXY_FALLBACK_ADDRESS =
+  "https://inspector.manufact.com/inspector/api/proxy";
 
 // Define Transport types literal for clarity
 type TransportType = "http" | "sse";
@@ -238,14 +243,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     if (typeof autoProxyFallback === "boolean") {
       return {
         enabled: autoProxyFallback,
-        proxyAddress: "https://inspector.mcp-use.com/inspector/api/proxy",
+        proxyAddress: DEFAULT_PROXY_FALLBACK_ADDRESS,
       };
     }
     return {
       enabled: autoProxyFallback.enabled !== false,
       proxyAddress:
-        autoProxyFallback.proxyAddress ||
-        "https://inspector.mcp-use.com/inspector/api/proxy",
+        autoProxyFallback.proxyAddress || DEFAULT_PROXY_FALLBACK_ADDRESS,
     };
   }, [autoProxyFallback]);
 
