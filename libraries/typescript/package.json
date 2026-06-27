@@ -87,7 +87,7 @@
       "vite": ">=8.0.5",
       "prismjs": ">=1.30.0",
       "glob": ">=10.5.0",
-      "js-yaml": ">=4.2.0",
+      "js-yaml": ">=4.2.0 <5",
       "flatted": ">=3.4.2",
       "tar": ">=7.5.11",
       "hono": ">=4.12.25",
@@ -122,7 +122,7 @@
       "shell-quote": ">=1.8.4",
       "joi": ">=18.2.1",
       "@opentelemetry/core": ">=2.8.0",
-      "@babel/core": ">=7.29.6"
+      "@babel/core": ">=7.29.6 <8"
     }
   },
   "dependencies": {
