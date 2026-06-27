@@ -11,6 +11,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Create mock tracking function
 const mockTrackConnectorInit = vi.fn().mockResolvedValue(undefined);
+const mockCapture = vi.fn();
+const mockFlush = vi.fn();
+const mockShutdown = vi.fn();
 
 // Mock the telemetry module
 vi.mock("../../../src/telemetry/telemetry-node.js", () => ({
@@ -20,6 +23,27 @@ vi.mock("../../../src/telemetry/telemetry-node.js", () => ({
       isEnabled: true,
     })),
   },
+}));
+
+vi.mock("posthog-node", () => {
+  return {
+    PostHog: class MockPostHog {
+      capture = mockCapture;
+      flush = mockFlush;
+      shutdown = mockShutdown;
+    },
+  };
+});
+
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn().mockReturnValue(false),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  readFileSync: vi.fn().mockReturnValue("test-user-id"),
+}));
+
+vi.mock("node:os", () => ({
+  homedir: vi.fn().mockReturnValue("/mock/home"),
 }));
 
 describe("Connector Telemetry Integration", () => {
@@ -229,32 +253,6 @@ describe("Connector Telemetry Integration", () => {
   });
 
   describe("Integration tests - actual connector connection", () => {
-    // Mock PostHog for integration tests
-    const mockCapture = vi.fn();
-    const mockFlush = vi.fn();
-    const mockShutdown = vi.fn();
-
-    beforeEach(() => {
-      vi.mock("posthog-node", () => {
-        return {
-          PostHog: class MockPostHog {
-            capture = mockCapture;
-            flush = mockFlush;
-            shutdown = mockShutdown;
-          },
-        };
-      });
-      vi.mock("node:fs", () => ({
-        existsSync: vi.fn().mockReturnValue(false),
-        mkdirSync: vi.fn(),
-        writeFileSync: vi.fn(),
-        readFileSync: vi.fn().mockReturnValue("test-user-id"),
-      }));
-      vi.mock("node:os", () => ({
-        homedir: vi.fn().mockReturnValue("/mock/home"),
-      }));
-    });
-
     it("should track HttpConnector init when connect() is called", async () => {
       // Note: This test would require mocking the HTTP transport
       // For now, we verify the BaseConnector method works correctly
