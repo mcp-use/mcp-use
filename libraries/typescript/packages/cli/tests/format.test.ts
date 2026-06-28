@@ -427,6 +427,44 @@ describe("Format Utilities", () => {
       expect(formatted).toContain("Items:");
     });
 
+    it("should format nullable anyOf and oneOf property types", () => {
+      const schema = {
+        type: "object",
+        properties: {
+          limit: {
+            anyOf: [{ type: "integer" }, { type: "null" }],
+            description: "Maximum result count",
+          },
+          includeHidden: {
+            oneOf: [{ type: "boolean" }, { type: "null" }],
+          },
+        },
+      };
+
+      const formatted = formatSchema(schema);
+
+      expect(formatted).toContain("limit");
+      expect(formatted).toContain("(integer | null)");
+      expect(formatted).toContain("Maximum result count");
+      expect(formatted).toContain("includeHidden");
+      expect(formatted).toContain("(boolean | null)");
+      expect(formatted).not.toContain("(any)");
+    });
+
+    it("should format array type unions", () => {
+      const schema = {
+        type: "object",
+        properties: {
+          nickname: { type: ["string", "null"] },
+        },
+      };
+
+      const formatted = formatSchema(schema);
+
+      expect(formatted).toContain("nickname");
+      expect(formatted).toContain("(string | null)");
+    });
+
     it("should handle null schema", () => {
       const formatted = formatSchema(null);
       expect(formatted).toContain("No schema");

@@ -312,7 +312,7 @@ export function formatSchema(schema: any, indent = 0): string {
   if (schema.type === "object" && schema.properties) {
     Object.entries(schema.properties).forEach(([key, value]: [string, any]) => {
       const required = schema.required?.includes(key);
-      const type = value.type || "any";
+      const type = formatSchemaType(value);
       const desc = value.description || "";
 
       const keyStr = required ? chalk.bold(key) : key;
@@ -343,13 +343,30 @@ export function formatSchema(schema: any, indent = 0): string {
       }
     });
   } else {
-    lines.push(`${pad}${chalk.cyan(`Type: ${schema.type || "any"}`)}`);
+    lines.push(`${pad}${chalk.cyan(`Type: ${formatSchemaType(schema)}`)}`);
     if (schema.description) {
       lines.push(`${pad}${chalk.gray(schema.description)}`);
     }
   }
 
   return lines.join("\n");
+}
+
+function formatSchemaType(schema: any): string {
+  if (Array.isArray(schema?.type)) {
+    return schema.type.join(" | ");
+  }
+
+  if (schema?.type) {
+    return schema.type;
+  }
+
+  const union = schema?.anyOf ?? schema?.oneOf;
+  if (Array.isArray(union) && union.length > 0) {
+    return union.map((variant) => formatSchemaType(variant)).join(" | ");
+  }
+
+  return "any";
 }
 
 /**
