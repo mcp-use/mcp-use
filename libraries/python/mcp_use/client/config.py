@@ -137,6 +137,13 @@ def create_connector_from_config(
             url=server_config["ws_url"],
             headers=server_config.get("headers", None),
             auth=server_config.get("auth", {}),
+            sampling_callback=sampling_callback,
+            elicitation_callback=elicitation_callback,
+            message_handler=message_handler,
+            logging_callback=logging_callback,
+            middleware=middleware,
+            roots=roots,
+            list_roots_callback=list_roots_callback,
         )
 
     raise ValueError("Cannot determine connector type from config")
