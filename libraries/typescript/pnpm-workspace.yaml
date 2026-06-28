@@ -17,3 +17,4 @@ minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
   - create-mcp-use-app
+  - js-yaml
