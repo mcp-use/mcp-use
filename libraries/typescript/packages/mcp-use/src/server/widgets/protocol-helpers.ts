@@ -169,18 +169,18 @@ export function applyClaudeResourceDomain(
  * @param displayName - Display name for the widget
  * @returns Tool output with content array
  */
-export function generateToolOutput(
+export async function generateToolOutput(
   definition: UIResourceDefinition,
   params: Record<string, unknown>,
   displayName: string
-): {
+): Promise<{
   content: Array<{
     type: string;
     text?: string;
     resource?: { uri: string; mimeType?: string };
   }>;
   structuredContent?: unknown;
-} {
+}> {
   const result: {
     content: Array<{
       type: string;
@@ -195,7 +195,7 @@ export function generateToolOutput(
   // Add structured content if available
   if ("structuredContent" in definition && definition.structuredContent) {
     if (typeof definition.structuredContent === "function") {
-      result.structuredContent = definition.structuredContent(params);
+      result.structuredContent = await definition.structuredContent(params);
     } else {
       result.structuredContent = definition.structuredContent;
     }
