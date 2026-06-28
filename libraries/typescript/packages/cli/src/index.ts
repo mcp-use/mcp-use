@@ -3069,6 +3069,14 @@ program
     "Path to a non-default Dockerfile (relative to rootDir / repo root)"
   )
   .option(
+    "--watch-paths <glob...>",
+    "Only auto-deploy when files matching these globs change (monorepos). Set on new-server creation."
+  )
+  .option(
+    "--wait-for-ci",
+    "Hold GitHub auto-deploys until other check runs pass. Set on new-server creation."
+  )
+  .option(
     "--no-github",
     "Upload local source without connecting GitHub (repo hosted in the platform-managed org)"
   )
@@ -3089,6 +3097,8 @@ program
       buildCommand: options.buildCommand,
       startCommand: options.startCommand,
       dockerfile: options.dockerfile,
+      watchPaths: options.watchPaths,
+      waitForCi: options.waitForCi,
       noGithub: options.github === false,
     });
   });

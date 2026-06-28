@@ -1,6 +1,7 @@
 /**
- * React hook for OpenAI Apps SDK and MCP Apps widget development
- * Wraps window.openai API (Apps SDK) and MCP Apps postMessage protocol
+ * React hook for MCP Apps widget development.
+ * Uses MCP Apps postMessage as the primary protocol, with a window.openai
+ * (Apps SDK) compatibility fallback for hosts that only speak the Apps SDK.
  */
 
 import {
@@ -21,6 +22,7 @@ import {
 import type {
   CallToolResponse,
   DisplayMode,
+  HostContext,
   MessageContentBlock,
   OpenAiGlobals,
   SafeArea,
@@ -36,6 +38,10 @@ import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
  * Hook to subscribe to a single value from window.openai globals.
  * Only triggers onChange when the value actually changes, to avoid redundant
  * re-renders from duplicate events (e.g. theme sync that re-sends same toolOutput).
+ *
+ * This powers the Apps SDK compatibility fallback. MCP Apps remains the primary
+ * runtime; these values are only consumed when the MCP Apps bridge is not
+ * connected (see `provider`).
  */
 function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
   key: K
@@ -47,9 +53,8 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
         typeof window !== "undefined" && window.openai
           ? (window.openai as OpenAiGlobals)[key]
           : undefined;
-      const handleSetGlobal = (event: any) => {
-        const customEvent = event as SetGlobalsEvent;
-        const value = customEvent.detail.globals[key];
+      const handleSetGlobal = (event: SetGlobalsEvent) => {
+        const value = event.detail.globals[key];
         if (value === undefined) {
           return;
         }
@@ -76,20 +81,22 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
 }
 
 /**
- * React hook for building MCP Apps and ChatGPT Apps SDK widgets.
+ * React hook for building MCP Apps widgets.
  *
- * Abstracts over three runtime providers, selected automatically:
+ * Abstracts over three data providers, selected automatically:
  *
- * 1. **ChatGPT Apps SDK** (`window.openai`) — active when the widget is loaded
- *    inside ChatGPT. Data arrives via `window.openai.toolInput`,
- *    `window.openai.toolOutput`, etc. and through the `openai:set_globals`
- *    custom event.
- *
- * 2. **MCP Apps bridge** (SEP-1865 `postMessage`) — active when the widget is
- *    loaded in any SEP-1865-compliant host (e.g. Claude, Cursor) that is not
- *    ChatGPT. The hook connects via `ui/initialize` and listens for
+ * 1. **MCP Apps bridge** (SEP-1865 `postMessage`) — primary runtime for
+ *    hosted widget iframes, including ChatGPT. The hook connects via
+ *    `ui/initialize` and listens for
  *    `ui/notifications/tool-input`, `ui/notifications/tool-input-partial`,
  *    `ui/notifications/tool-result`, and `ui/notifications/host-context-changed`.
+ *
+ * 2. **Apps SDK fallback** (`window.openai`) — used only when the MCP Apps
+ *    bridge does not connect (e.g. a host that exposes `window.openai` but does
+ *    not speak the MCP Apps protocol). Data arrives via `window.openai.toolInput`
+ *    / `window.openai.toolOutput` and the `openai:set_globals` custom event. MCP
+ *    Apps always wins once its bridge connects, even when `window.openai` is also
+ *    present (ChatGPT).
  *
  * 3. **URL params fallback** (`mcpUseParams`) — used during local development
  *    (`mcp-use dev` inspector) where `toolInput` and `toolOutput` are injected
@@ -152,7 +159,13 @@ export function useWidget<
 >(
   defaultProps?: TProps
 ): UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput> {
-  // Check if window.openai is available - use state to allow re-checking after async injection
+  const isWidgetIframe = useMemo(
+    () => typeof window !== "undefined" && window !== window.parent,
+    []
+  );
+
+  // Apps SDK availability (compatibility fallback). State so we can re-check
+  // after async window.openai injection.
   const [isOpenAiAvailable, setIsOpenAiAvailable] = useState(
     () => typeof window !== "undefined" && !!window.openai
   );
@@ -175,7 +188,8 @@ export function useWidget<
     string,
     unknown
   > | null>(null);
-  const [mcpAppsHostContext, setMcpAppsHostContext] = useState<any>(null);
+  const [mcpAppsHostContext, setMcpAppsHostContext] =
+    useState<HostContext | null>(null);
   const [mcpAppsHostInfo, setMcpAppsHostInfo] = useState<{
     name: string;
     version: string;
@@ -185,17 +199,58 @@ export function useWidget<
     unknown
   > | null>(null);
 
-  // Re-check for window.openai availability after mount (in case it's injected asynchronously)
+  const latestModelContextDescriptionRef = useRef<string | null>(null);
+  const latestWidgetStateRef = useRef<TState | null>(null);
+
+  const pushModelContextToMcpApps = useCallback((): void => {
+    const bridge = getMcpAppsBridge();
+    if (!bridge.isConnected()) return;
+
+    const currentState =
+      (latestWidgetStateRef.current as Record<string, unknown> | null) ?? {};
+    const description = latestModelContextDescriptionRef.current;
+    const hasDescription =
+      description !== null && description.trim().length > 0;
+    const structuredContent = hasDescription
+      ? { ...currentState, [MODEL_CONTEXT_KEY]: description }
+      : currentState;
+    const visibleState = Object.fromEntries(
+      Object.entries(currentState).filter(([key]) => key !== MODEL_CONTEXT_KEY)
+    );
+    const hasVisibleState = Object.keys(visibleState).length > 0;
+    const text =
+      hasDescription && hasVisibleState
+        ? `${description}\n\nState: ${JSON.stringify(visibleState)}`
+        : hasDescription
+          ? description
+          : hasVisibleState
+            ? JSON.stringify(visibleState)
+            : "";
+
+    bridge
+      .updateModelContext({
+        structuredContent,
+        content: [{ type: "text", text }],
+      })
+      .catch((err: unknown) => {
+        console.warn("[ModelContext] Failed to update model context:", err);
+      });
+  }, []);
+
+  // Re-check for window.openai availability after mount (in case it's injected
+  // asynchronously). Powers the Apps SDK compatibility fallback.
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     // Initial check
-    if (typeof window !== "undefined" && window.openai) {
+    if (window.openai) {
       setIsOpenAiAvailable(true);
       return;
     }
 
-    // Poll for window.openai if not immediately available (for async script injection)
+    // Poll for window.openai if not immediately available (async script injection)
     const checkInterval = setInterval(() => {
-      if (typeof window !== "undefined" && window.openai) {
+      if (window.openai) {
         setIsOpenAiAvailable(true);
         clearInterval(checkInterval);
       }
@@ -203,41 +258,31 @@ export function useWidget<
 
     // Also listen for the openai:set_globals event which fires when the API is ready
     const handleSetGlobals = () => {
-      if (typeof window !== "undefined" && window.openai) {
+      if (window.openai) {
         setIsOpenAiAvailable(true);
         clearInterval(checkInterval);
       }
     };
+    window.addEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
 
-    if (typeof window !== "undefined") {
-      window.addEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
-    }
-
-    // Cleanup after 5 seconds max (should be injected by then)
+    // Stop polling after 5 seconds (should be injected by then)
     const timeout = setTimeout(() => {
       clearInterval(checkInterval);
-      if (typeof window !== "undefined") {
-        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
-      }
+      window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
     }, 5000);
 
     return () => {
       clearInterval(checkInterval);
       clearTimeout(timeout);
-      if (typeof window !== "undefined") {
-        window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
-      }
+      window.removeEventListener(SET_GLOBALS_EVENT_TYPE, handleSetGlobals);
     };
   }, []);
 
-  // Initialize MCP Apps bridge if not in Apps SDK mode
+  // Initialize MCP Apps bridge for hosted widget iframes. ChatGPT may also
+  // expose window.openai, but MCP Apps remains the primary protocol — when the
+  // bridge connects it wins over the Apps SDK fallback.
   useEffect(() => {
-    // Only try MCP Apps if window.openai is not available and we're in an iframe
-    if (
-      typeof window === "undefined" ||
-      window.openai ||
-      window === window.parent
-    ) {
+    if (!isWidgetIframe || typeof window === "undefined") {
       return;
     }
 
@@ -266,6 +311,13 @@ export function useWidget<
         const hostCapabilities = bridge.getHostCapabilities();
         if (hostInfo) setMcpAppsHostInfo(hostInfo);
         if (hostCapabilities) setMcpAppsHostCapabilities(hostCapabilities);
+
+        if (
+          latestModelContextDescriptionRef.current !== null ||
+          latestWidgetStateRef.current !== null
+        ) {
+          pushModelContextToMcpApps();
+        }
       })
       .catch((error) => {
         console.warn("[useWidget] Failed to connect to MCP Apps host:", error);
@@ -297,13 +349,7 @@ export function useWidget<
       unsubToolResult();
       unsubHostContext();
     };
-  }, []);
-
-  const provider = useMemo(() => {
-    if (isOpenAiAvailable) return "openai";
-    if (isMcpAppsConnected) return "mcp-apps";
-    return "mcp-ui";
-  }, [isOpenAiAvailable, isMcpAppsConnected]);
+  }, [pushModelContextToMcpApps, isWidgetIframe]);
 
   // Extract search string to avoid dependency issues
   const searchString =
@@ -326,7 +372,18 @@ export function useWidget<
     };
   }, [searchString]);
 
-  // Always subscribe to openai globals (hooks must be called unconditionally)
+  // Provider selection: MCP Apps is primary. The Apps SDK (`window.openai`)
+  // path is a compatibility fallback used only while/if the MCP Apps bridge is
+  // not connected. A connected bridge always wins (preserves the "MCP Apps
+  // primary even when window.openai is present" behavior for ChatGPT).
+  const provider = useMemo(() => {
+    if (!isWidgetIframe) return "mcp-ui";
+    if (isMcpAppsConnected) return "mcp-apps";
+    if (isOpenAiAvailable) return "openai";
+    return "mcp-apps";
+  }, [isWidgetIframe, isMcpAppsConnected, isOpenAiAvailable]);
+
+  // Apps SDK globals (consumed only when provider === "openai").
   const openaiToolInput = useOpenAiGlobal("toolInput") as
     | TToolInput
     | undefined;
@@ -334,11 +391,11 @@ export function useWidget<
     | TOutput
     | null
     | undefined;
-  const toolResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as
+  const openaiResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as
     | TMetadata
     | null
     | undefined;
-  const widgetState = useOpenAiGlobal("widgetState") as
+  const openaiWidgetState = useOpenAiGlobal("widgetState") as
     | TState
     | null
     | undefined;
@@ -517,66 +574,58 @@ export function useWidget<
     return "";
   }, []);
 
-  // Use local state for widget state with sync to window.openai
+  // Use local state for widget state. MCP Apps state is local + model context
+  // updates via ui/update-model-context.
   const [localWidgetState, setLocalWidgetState] = useState<TState | null>(null);
-
-  // Sync widget state from window.openai
-  useEffect(() => {
-    if (widgetState !== undefined) {
-      setLocalWidgetState(widgetState);
-    }
-  }, [widgetState]);
+  latestWidgetStateRef.current = localWidgetState;
 
   // Keep a ref to the current provider so the flush handler always uses the
   // latest value without needing to re-register on every provider change.
   const providerRef = useRef(provider);
   providerRef.current = provider;
 
-  // Keep a ref to localWidgetState for the same reason
-  const localWidgetStateRef = useRef(localWidgetState);
-  localWidgetStateRef.current = localWidgetState;
+  // Sync widget state from window.openai when the Apps SDK fallback is active.
+  // Gated on provider so it never clobbers MCP Apps-managed state.
+  useEffect(() => {
+    if (provider === "openai" && openaiWidgetState !== undefined) {
+      setLocalWidgetState(openaiWidgetState);
+    }
+  }, [provider, openaiWidgetState]);
 
   // Register the model-context flush handler for the lifetime of this widget.
   // When the node tree changes, this handler is called with the serialized
   // description and pushes it to the host under MODEL_CONTEXT_KEY.
   useEffect(() => {
     const deregister = registerModelContextFlush((description) => {
+      latestModelContextDescriptionRef.current = description;
       const currentProvider = providerRef.current;
 
       if (currentProvider === "mcp-apps") {
-        const bridge = getMcpAppsBridge();
-        if (bridge.isConnected()) {
-          bridge
-            .updateModelContext({
-              structuredContent: { [MODEL_CONTEXT_KEY]: description },
-              content: [{ type: "text", text: description }],
-            })
-            .catch((err: unknown) => {
-              console.warn(
-                "[ModelContext] Failed to update model context:",
-                err
-              );
-            });
-        }
+        pushModelContextToMcpApps();
         return;
       }
 
       if (currentProvider === "openai" && window.openai?.setWidgetState) {
+        // Skip empty descriptions: avoids a spurious write during the brief
+        // window before the MCP Apps bridge connects (ChatGPT exposes both).
+        if (description === null || description.trim().length === 0) {
+          return;
+        }
         const prev = (window.openai.widgetState ??
-          localWidgetStateRef.current ??
+          latestWidgetStateRef.current ??
           {}) as Record<string, unknown>;
         window.openai
           .setWidgetState({
             ...prev,
             [MODEL_CONTEXT_KEY]: description,
-          } as TState)
+          } as UnknownObject)
           .catch((err: unknown) => {
             console.warn("[ModelContext] Failed to set widget state:", err);
           });
       }
     });
     return deregister;
-  }, []);
+  }, [pushModelContextToMcpApps]);
 
   // Stable API methods
   const callTool = useCallback(
@@ -584,16 +633,16 @@ export function useWidget<
       name: string,
       args: Record<string, unknown>
     ): Promise<CallToolResponse> => {
-      if (provider === "mcp-apps") {
-        const bridge = getMcpAppsBridge();
-        const raw = await bridge.callTool(name, args);
+      if (provider === "openai") {
+        if (!window.openai?.callTool) {
+          throw new Error("window.openai.callTool is not available");
+        }
+        const raw = await window.openai.callTool(name, args);
         return normalizeCallToolResponse(raw);
       }
 
-      if (!window.openai?.callTool) {
-        throw new Error("window.openai.callTool is not available");
-      }
-      const raw = await window.openai.callTool(name, args);
+      const bridge = getMcpAppsBridge();
+      const raw = await bridge.callTool(name, args);
       return normalizeCallToolResponse(raw);
     },
     [provider]
@@ -606,60 +655,59 @@ export function useWidget<
           ? [{ type: "text", text: content }]
           : content;
 
-      if (provider === "mcp-apps") {
-        const bridge = getMcpAppsBridge();
-        await bridge.sendMessage(contentArray);
-        return;
+      if (provider === "openai") {
+        if (!window.openai?.sendFollowUpMessage) {
+          throw new Error("window.openai.sendFollowUpMessage is not available");
+        }
+        // window.openai only supports plain text; extract and join text blocks
+        const prompt =
+          typeof content === "string"
+            ? content
+            : contentArray
+                .filter(
+                  (c): c is { type: "text"; text: string } =>
+                    c.type === "text" && "text" in c
+                )
+                .map((c) => c.text)
+                .join("\n");
+        return window.openai.sendFollowUpMessage({ prompt });
       }
 
-      if (!window.openai?.sendFollowUpMessage) {
-        throw new Error("window.openai.sendFollowUpMessage is not available");
-      }
-      // window.openai only supports plain text; extract and join text blocks
-      const prompt =
-        typeof content === "string"
-          ? content
-          : contentArray
-              .filter(
-                (c): c is { type: "text"; text: string } =>
-                  c.type === "text" && "text" in c
-              )
-              .map((c) => c.text)
-              .join("\n");
-      return window.openai.sendFollowUpMessage({ prompt });
+      const bridge = getMcpAppsBridge();
+      await bridge.sendMessage(contentArray);
     },
     [provider]
   );
 
   const openExternal = useCallback(
     (href: string): void => {
-      if (provider === "mcp-apps") {
-        const bridge = getMcpAppsBridge();
-        bridge.openLink(href).catch((error) => {
-          console.error("Failed to open link:", error);
-        });
+      if (provider === "openai") {
+        if (!window.openai?.openExternal) {
+          throw new Error("window.openai.openExternal is not available");
+        }
+        window.openai.openExternal({ href });
         return;
       }
 
-      if (!window.openai?.openExternal) {
-        throw new Error("window.openai.openExternal is not available");
-      }
-      window.openai.openExternal({ href });
+      const bridge = getMcpAppsBridge();
+      bridge.openLink(href).catch((error) => {
+        console.error("Failed to open link:", error);
+      });
     },
     [provider]
   );
 
   const requestDisplayMode = useCallback(
     async (mode: DisplayMode): Promise<{ mode: DisplayMode }> => {
-      if (provider === "mcp-apps") {
-        const bridge = getMcpAppsBridge();
-        return await bridge.requestDisplayMode(mode);
+      if (provider === "openai") {
+        if (!window.openai?.requestDisplayMode) {
+          throw new Error("window.openai.requestDisplayMode is not available");
+        }
+        return window.openai.requestDisplayMode({ mode });
       }
 
-      if (!window.openai?.requestDisplayMode) {
-        throw new Error("window.openai.requestDisplayMode is not available");
-      }
-      return window.openai.requestDisplayMode({ mode });
+      const bridge = getMcpAppsBridge();
+      return await bridge.requestDisplayMode(mode);
     },
     [provider]
   );
@@ -668,77 +716,46 @@ export function useWidget<
     async (
       state: TState | ((prevState: TState | null) => TState)
     ): Promise<void> => {
-      // MCP Apps: update local state + send ui/update-model-context to host
-      // so the model can reason about UI state on future turns (per SEP-1865)
-      if (provider === "mcp-apps") {
-        const currentState = localWidgetState;
-        const newState =
-          typeof state === "function"
-            ? (state as (prevState: TState | null) => TState)(currentState)
-            : state;
-        setLocalWidgetState(newState);
-
-        const bridge = getMcpAppsBridge();
-        // Preserve __model_context from any prior update-model-context calls
-        // so setState doesn't wipe out the model context annotations.
-        const structuredContent = newState as Record<string, unknown>;
-        bridge
-          .updateModelContext({
-            structuredContent,
-            content: [
-              {
-                type: "text",
-                text: JSON.stringify(
-                  Object.fromEntries(
-                    Object.entries(structuredContent).filter(
-                      ([k]) => k !== MODEL_CONTEXT_KEY
-                    )
-                  )
-                ),
-              },
-            ],
-          })
-          .catch((err) => {
-            console.warn("[useWidget] Failed to update model context:", err);
-          });
-        return;
-      }
-
-      if (!window.openai?.setWidgetState) {
-        throw new Error("window.openai.setWidgetState is not available");
-      }
-
-      // Use functional update to always get latest state
-      // Prefer widgetState (from window.openai) over localWidgetState for most up-to-date value
-      const currentState =
-        widgetState !== undefined ? widgetState : localWidgetState;
+      const currentState = latestWidgetStateRef.current;
       const newState =
         typeof state === "function"
           ? (state as (prevState: TState | null) => TState)(currentState)
           : state;
 
-      // Preserve __model_context so setState doesn't wipe annotations
-      const prevModelContext = (
-        (window.openai.widgetState ?? {}) as Record<string, unknown>
-      )[MODEL_CONTEXT_KEY];
-
+      latestWidgetStateRef.current = newState;
       setLocalWidgetState(newState);
-      return window.openai.setWidgetState(
-        prevModelContext !== undefined
-          ? ({ ...newState, [MODEL_CONTEXT_KEY]: prevModelContext } as TState)
-          : newState
-      );
+
+      // Apps SDK fallback: persist via window.openai.setWidgetState, preserving
+      // any prior __model_context annotation.
+      if (providerRef.current === "openai") {
+        if (!window.openai?.setWidgetState) {
+          throw new Error("window.openai.setWidgetState is not available");
+        }
+        const prevModelContext = (
+          (window.openai.widgetState ?? {}) as Record<string, unknown>
+        )[MODEL_CONTEXT_KEY];
+        return window.openai.setWidgetState(
+          prevModelContext !== undefined
+            ? ({
+                ...(newState as Record<string, unknown>),
+                [MODEL_CONTEXT_KEY]: prevModelContext,
+              } as UnknownObject)
+            : (newState as UnknownObject)
+        );
+      }
+
+      pushModelContextToMcpApps();
     },
-    [provider, widgetState, localWidgetState]
+    [pushModelContextToMcpApps]
   );
 
   // Determine if tool is still executing
   const isPending = useMemo(() => {
     if (provider === "openai") {
-      // Tool is pending until the host delivers either toolOutput (structuredContent)
-      // or toolResponseMetadata (_meta). Checking both mirrors how MCP Apps works and
-      // avoids staying stuck when the server omits _meta from the tool result.
-      return openaiToolOutput === null && toolResponseMetadata === null;
+      // Tool is pending until the host delivers either toolOutput
+      // (structuredContent) or toolResponseMetadata (_meta). Checking both
+      // mirrors MCP Apps and avoids staying stuck when the server omits _meta.
+      return openaiToolOutput === null && openaiResponseMetadata === null;
     }
     if (provider === "mcp-apps") {
       // In MCP Apps, widget is pending until we receive tool-result notification
@@ -763,7 +780,7 @@ export function useWidget<
   }, [
     provider,
     openaiToolOutput,
-    toolResponseMetadata,
+    openaiResponseMetadata,
     mcpAppsToolOutput,
     toolOutput,
     urlParams.toolId,
@@ -774,7 +791,7 @@ export function useWidget<
     if (provider === "mcp-apps" && mcpAppsPartialToolInput) {
       return mcpAppsPartialToolInput as Partial<TToolInput>;
     }
-    // OpenAI Apps SDK and URL params don't support streaming tool input
+    // Apps SDK and URL params don't support streaming tool input.
     return null;
   }, [provider, mcpAppsPartialToolInput]);
 
@@ -798,7 +815,9 @@ export function useWidget<
     output: (toolOutput ?? null) as TOutput | null,
     metadata: (provider === "mcp-apps"
       ? (mcpAppsResponseMetadata ?? null)
-      : (toolResponseMetadata ?? null)) as TMetadata | null,
+      : provider === "openai"
+        ? (openaiResponseMetadata ?? null)
+        : null) as TMetadata | null,
     state: localWidgetState
       ? (Object.fromEntries(
           Object.entries(localWidgetState as Record<string, unknown>).filter(
@@ -833,7 +852,12 @@ export function useWidget<
     requestDisplayMode,
 
     // Availability
-    isAvailable: isOpenAiAvailable || isMcpAppsConnected,
+    isAvailable:
+      provider === "mcp-apps"
+        ? isMcpAppsConnected
+        : provider === "openai"
+          ? isOpenAiAvailable
+          : false,
     isPending,
 
     // Streaming
@@ -843,6 +867,7 @@ export function useWidget<
     // Host identity (MCP Apps only)
     hostInfo: mcpAppsHostInfo ?? undefined,
     hostCapabilities: mcpAppsHostCapabilities ?? undefined,
+    hostContext: mcpAppsHostContext ?? undefined,
   } as UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>;
 }
 
@@ -885,18 +910,15 @@ export function useWidgetState<TState>(
   TState | null,
   (state: TState | ((prev: TState | null) => TState)) => Promise<void>,
 ] {
-  const { state, setState } = useWidget<UnknownObject, TState>();
+  const widget = useWidget<UnknownObject, TState>();
+  const { state, setState, isAvailable } = widget;
 
   // Initialize with default if provided and state is null
   useEffect(() => {
-    if (
-      state === null &&
-      defaultState !== undefined &&
-      window.openai?.setWidgetState
-    ) {
+    if (state === null && defaultState !== undefined && isAvailable) {
       setState(defaultState);
     }
-  }, []); // Only run once on mount
+  }, [defaultState, isAvailable, setState, state]);
 
   return [state, setState] as const;
 }

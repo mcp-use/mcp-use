@@ -1,12 +1,12 @@
 import type { InputDefinition } from "./common.js";
-import type {
-  CallToolResult,
-  ToolAnnotations,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./tool-context.js";
 import type { McpContext } from "./context.js";
 import type { z } from "zod";
-import type { TypedCallToolResult } from "../utils/response-helpers.js";
+import type {
+  ToolContentResult,
+  TypedCallToolResult,
+} from "../utils/response-helpers.js";
 
 // Re-export MCP SDK types for convenience
 export type { ToolAnnotations };
@@ -77,13 +77,15 @@ interface ToolCallbackBivariant<
   HasOAuth extends boolean,
 > {
   // Method signature enables bivariant checking for TInput parameter.
-  // The union with CallToolResult allows response helpers like text(), mix(),
-  // and markdown() to be used even when outputSchema is defined — the SDK
-  // validates structuredContent at runtime only when it is present.
+  // Return type: a structured result whose structuredContent must match the
+  // tool's outputSchema (TOutput), OR a content-only result (text(), markdown(),
+  // image(), ...). Content-only helpers carry no structuredContent, so they are
+  // always allowed; object()/widget() carry structuredContent and are therefore
+  // checked against outputSchema at compile time.
   bivarianceHack(
     params: TInput,
     ctx: EnhancedToolContext<HasOAuth>
-  ): Promise<TypedCallToolResult<TOutput> | CallToolResult>;
+  ): Promise<TypedCallToolResult<TOutput> | ToolContentResult>;
 }
 
 /**
@@ -142,7 +144,7 @@ export type ToolCallbackWithContext<
 > = (
   params: TInput,
   ctx: EnhancedToolContext<HasOAuth>
-) => Promise<TypedCallToolResult<TOutput> | CallToolResult>;
+) => Promise<TypedCallToolResult<TOutput> | ToolContentResult>;
 
 /**
  * Extract input type from a tool definition's schema.

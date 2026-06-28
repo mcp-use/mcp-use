@@ -18,9 +18,13 @@
  *  Session check is a simple GET — no WebSockets or polling. The only
  *  re-check triggers are: initial mount and `manufact:session-changed`.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import type React from "react";
 import { LayoutDashboard } from "lucide-react";
+import {
+  useHostedSession,
+  type HostedUser,
+} from "@/client/hooks/useHostedSession";
 import { Button } from "@/client/components/ui/button";
 import {
   DropdownMenu,
@@ -35,13 +39,6 @@ import {
   AvatarFallback,
   AvatarImage,
 } from "@/client/components/ui/avatar";
-
-interface HostedUser {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-}
 
 function getInitial(
   name: string | null | undefined,
@@ -75,48 +72,17 @@ export function HostedUserMenu({
   fallback = null,
   onUserResolved,
 }: HostedUserMenuProps) {
-  const [user, setUser] = useState<HostedUser | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const { user, loaded } = useHostedSession(chatApiUrl);
 
-  const fetchSession = useCallback(() => {
-    let cancelled = false;
-    const sessionUrl = `${new URL(chatApiUrl).origin}/api/auth/get-session`;
-
-    fetch(sessionUrl, { credentials: "include" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled) {
-          const resolved = data?.user ?? null;
-          setUser(resolved);
-          setLoaded(true);
-          onUserResolved?.(resolved);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLoaded(true);
-          onUserResolved?.(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [chatApiUrl]);
-
+  // Notify the parent (LayoutHeader) whenever the resolved session changes.
+  const lastReportedId = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const cleanup = fetchSession();
-    return cleanup;
-  }, [fetchSession]);
-
-  useEffect(() => {
-    const handler = () => {
-      fetchSession();
-    };
-    window.addEventListener("manufact:session-changed", handler);
-    return () =>
-      window.removeEventListener("manufact:session-changed", handler);
-  }, [fetchSession]);
+    if (!loaded) return;
+    const id = user?.id ?? null;
+    if (lastReportedId.current === id) return;
+    lastReportedId.current = id;
+    onUserResolved?.(user);
+  }, [loaded, user, onUserResolved]);
 
   // While the session check is still in-flight render nothing to avoid a flash.
   if (!loaded) return null;

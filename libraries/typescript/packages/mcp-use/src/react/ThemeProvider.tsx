@@ -1,23 +1,23 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
+import { applyHostStyleVariables } from "./host-styles.js";
 import { useWidget } from "./useWidget.js";
 
 /**
  * ThemeProvider that manages dark mode class on document root
  *
  * Priority:
- * 1. useWidget theme (from OpenAI Apps SDK)
+ * 1. Explicit host context theme
  * 2. System preference (prefers-color-scheme: dark)
  *
  * Sets the "dark" class and data-theme attribute on document.documentElement.
- * color-scheme is only set when the colorScheme prop is true — setting it to an
- * explicit value causes browsers to paint an opaque canvas behind iframes when
- * the widget and host documents use different schemes.
+ * color-scheme is set by default so host variables using CSS light-dark()
+ * resolve against the active host theme.
  */
 export const ThemeProvider: React.FC<{
   children: React.ReactNode;
   colorScheme?: boolean;
-}> = ({ children, colorScheme = false }) => {
-  const { theme, isAvailable } = useWidget();
+}> = ({ children, colorScheme = true }) => {
+  const { hostContext } = useWidget();
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
       if (typeof window === "undefined") return "light";
@@ -40,12 +40,18 @@ export const ThemeProvider: React.FC<{
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Calculate effective theme
-  const effectiveTheme = isAvailable ? theme : systemPreference;
+  // Calculate effective theme. useWidget() normalizes a missing host theme to
+  // "light" for consumers, so ThemeProvider reads the raw host context to avoid
+  // treating an omitted host value as an explicit light-mode preference.
+  const hostTheme =
+    hostContext?.theme === "dark" || hostContext?.theme === "light"
+      ? hostContext.theme
+      : undefined;
+  const effectiveTheme = hostTheme ?? systemPreference;
 
   // Apply theme synchronously before browser paint to prevent flash
   // Sets CSS class (for Tailwind dark mode) and data-theme attribute
-  // (for OpenAI Apps SDK UI design tokens).
+  // (for UI design tokens).
   useLayoutEffect(() => {
     if (typeof document === "undefined") return;
 
@@ -55,22 +61,22 @@ export const ThemeProvider: React.FC<{
     root.classList.remove("light", "dark");
     root.classList.add(effectiveTheme === "dark" ? "dark" : "light");
 
-    // Set data-theme attribute (OpenAI Apps SDK UI design tokens)
+    // Set data-theme attribute (UI design tokens)
     root.setAttribute(
       "data-theme",
       effectiveTheme === "dark" ? "dark" : "light"
     );
 
-    // Only set color-scheme when explicitly opted in via the colorScheme prop.
-    // Setting it to "dark"/"light" triggers browsers to paint an opaque canvas
-    // behind iframes when the widget scheme differs from the host scheme, which
-    // makes background-color: transparent ineffective.
     if (colorScheme) {
       root.style.colorScheme = effectiveTheme === "dark" ? "dark" : "light";
     } else {
       root.style.colorScheme = "";
     }
   }, [effectiveTheme, colorScheme]);
+
+  useLayoutEffect(() => {
+    applyHostStyleVariables(hostContext?.styles?.variables);
+  }, [hostContext]);
 
   return <>{children}</>;
 };

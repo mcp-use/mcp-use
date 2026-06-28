@@ -1710,6 +1710,11 @@ def update_docs_json(docs_json_path: str, api_reference_dir: str) -> None:
                 for tab in product["tabs"]:
                     if "API Reference" in tab.get("tab", ""):
                         tab["groups"] = api_groups
+                        # Keep the auto-generated API reference visible in the
+                        # sidebar but out of docs search, so generic queries
+                        # (e.g. "CLI") surface curated guides instead of the
+                        # generated reference. See MCP-2398.
+                        tab["searchable"] = False
                         break  # Found the tab, stop searching tabs
             break  # Found the product, stop searching products
 

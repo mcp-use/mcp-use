@@ -22,7 +22,7 @@ import { Logger, type LogLevel, logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
-import { applyProxyConfig } from "../utils/proxy-config.js";
+import { applyProxyConfig, type ProxyConfig } from "../utils/proxy-config.js";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { getPackageVersion } from "../version.js";
 import {
@@ -52,8 +52,13 @@ type UseMcpAuthProvider = OAuthClientProvider & {
     client_id: string;
     client_secret?: string;
   } | null>;
-  installFetchInterceptor?: () => void;
-  restoreFetch?: () => void;
+  /**
+   * Returns a `fetch` scoped to this provider that routes OAuth requests
+   * through the configured OAuth proxy (bypassing CORS) while leaving the
+   * global `fetch` untouched. Passed to the SDK transport / `auth()` so proxy
+   * behavior is confined to this server's connection.
+   */
+  getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
   serverUrl?: string;
   /** localStorage key for a given suffix (e.g. "tokens"). */
   getKey?: (keySuffix: string) => string;
@@ -278,25 +283,44 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     };
   }, [autoReconnect]);
 
-  // Track whether we've already tried proxy fallback
-  const hasTriedProxyFallbackRef = useRef(false);
-  const [effectiveProxyConfig, setEffectiveProxyConfig] = useState(proxyConfig);
+  // Runtime proxy config is set only after automatic direct -> proxy fallback.
+  const [effectiveProxyConfig, setEffectiveProxyConfig] = useState<
+    ProxyConfig | undefined
+  >(undefined);
 
-  // Sync effectiveProxyConfig with proxyConfig prop changes
+  // Reset runtime fallback when the requested connection changes.
   useEffect(() => {
-    setEffectiveProxyConfig(proxyConfig);
-  }, [proxyConfig]);
+    setEffectiveProxyConfig(undefined);
+  }, [url, proxyConfig]);
+
+  const activeProxyConfig = useMemo(() => {
+    if (!effectiveProxyConfig?.proxyAddress) {
+      return proxyConfig;
+    }
+
+    const latestHeaders =
+      proxyConfig?.headers ?? proxyConfig?.customHeaders ?? {};
+    return {
+      ...effectiveProxyConfig,
+      headers: {
+        ...latestHeaders,
+        ...(effectiveProxyConfig.headers ??
+          effectiveProxyConfig.customHeaders ??
+          {}),
+      },
+    };
+  }, [effectiveProxyConfig, proxyConfig]);
 
   // Extract gateway URL and headers from proxy configuration
-  // Use proxyConfig directly (not effectiveProxyConfig) to ensure we always
-  // have the latest headers, even before the sync useEffect runs
+  // Use the runtime proxy after automatic fallback, while still merging in
+  // the latest requested headers from proxyConfig.
   const { gatewayUrl, proxyHeaders } = useMemo(() => {
-    const result = applyProxyConfig(url || "", proxyConfig);
+    const result = applyProxyConfig(url || "", activeProxyConfig);
     return {
-      gatewayUrl: proxyConfig?.proxyAddress,
+      gatewayUrl: activeProxyConfig?.proxyAddress,
       proxyHeaders: result.headers,
     };
-  }, [url, proxyConfig]);
+  }, [url, activeProxyConfig]);
 
   // OAuth provider should ALWAYS use the original target URL for OAuth discovery,
   // not the proxy URL. The proxy is only used for making the actual HTTP requests.
@@ -493,7 +517,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // Don't use a ref to track this - it causes issues with React strict mode
       // where multiple instances share the same ref but have different state
       const shouldTryProxyFallback =
-        autoProxyFallbackConfig.enabled && !effectiveProxyConfig?.proxyAddress; // Only fallback if not already using proxy
+        autoProxyFallbackConfig.enabled && !activeProxyConfig?.proxyAddress; // Only fallback if not already using proxy
 
       // Detect CORS errors (these can't have status codes, so check message)
       const isCorsError =
@@ -599,7 +623,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       onSampling,
       onElicitation,
       autoProxyFallbackConfig,
-      effectiveProxyConfig,
+      activeProxyConfig,
       providedAuthProvider,
     ]
   );
@@ -662,7 +686,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         useRedirectFlow,
         gatewayUrl,
         onPopupWindow,
-        installFetchInterceptor: true,
+        proxyOAuthRequests: true,
         staticClientInfo,
         scope: oauthScope,
       });
@@ -718,8 +742,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           // Use SSE transport when explicitly requested
           preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
-          // Pass custom fetch if provided (e.g., OAuth retry fetch for scope-step-up)
-          ...(customFetch && { fetch: customFetch }),
+          // Pass a fetch that scopes OAuth-proxy routing to this server's
+          // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
+          // OAuth retry fetch for scope step-up) when proxying, or returns it
+          // unchanged otherwise. Never mutates the global fetch.
+          ...(() => {
+            const scopedFetch =
+              authProviderRef.current?.getProxyFetch?.(customFetch) ??
+              customFetch;
+            return scopedFetch ? { fetch: scopedFetch } : {};
+          })(),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
           // Pass user-configurable reconnection options, or when autoReconnect
@@ -1205,6 +1237,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                   serverUrl: url,
                   ...(resourceMetadataUrl && { resourceMetadataUrl }),
                   ...(scope && { scope }),
+                  fetchFn: authProviderRef.current.getProxyFetch?.(),
                 });
 
                 if (authResult === "REDIRECT") {
@@ -1224,6 +1257,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                     ...(resourceMetadataUrl && { resourceMetadataUrl }),
                     ...(scope && { scope }),
                     authorizationCode: authCode,
+                    fetchFn: authProviderRef.current.getProxyFetch?.(),
                   });
                 }
 
@@ -1493,6 +1527,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             parsedUrl.origin + parsedUrl.pathname.replace(/\/+$/, "");
           await auth(authProviderRef.current, {
             serverUrl: baseUrl,
+            fetchFn: authProviderRef.current.getProxyFetch?.(),
           });
           connectRef.current?.();
           return;
@@ -1540,17 +1575,17 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             useRedirectFlow,
             gatewayUrl,
             onPopupWindow: captureOnPopupWindow,
-            installFetchInterceptor: !gatewayUrl,
+            proxyOAuthRequests: !gatewayUrl,
             staticClientInfo,
             scope: oauthScope,
           });
 
         if (oauthProxyUrl && !gatewayUrl) {
-          addLog("info", "Installed OAuth fetch interceptor for manual auth");
+          addLog("info", "Scoped OAuth proxy fetch enabled for manual auth");
         } else if (oauthProxyUrl && gatewayUrl) {
           addLog(
             "info",
-            "Using MCP gateway proxy for OAuth (no fetch interceptor needed)"
+            "Using MCP gateway proxy for OAuth (no scoped OAuth fetch needed)"
           );
         }
 
@@ -1567,6 +1602,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         try {
           await auth(freshAuthProvider, {
             serverUrl: baseUrl,
+            fetchFn: freshAuthProvider.getProxyFetch?.(),
           });
           addLog("info", "OAuth flow completed (tokens obtained)");
         } catch (err: unknown) {
@@ -2223,15 +2259,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [addLog]);
 
   /**
-   * Effect: Reset proxy fallback tracking when URL changes
-   * This allows the fallback to try again for a different server
-   */
-  useEffect(() => {
-    hasTriedProxyFallbackRef.current = false;
-    setEffectiveProxyConfig(proxyConfig);
-  }, [url, proxyConfig]);
-
-  /**
    * Effect: Main connection lifecycle
    *
    * Runs on mount and when key connection parameters change.
@@ -2274,7 +2301,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         useRedirectFlow,
         gatewayUrl,
         onPopupWindow,
-        installFetchInterceptor: true,
+        proxyOAuthRequests: true,
         staticClientInfo,
         scope: oauthScope,
       });
@@ -2294,10 +2321,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return () => {
       isMountedRef.current = false;
       addLog("debug", "useMcp unmounting, disconnecting.");
-
-      // Restore window.fetch if a proxy interceptor was installed.
-      // restoreFetch() is a no-op when no interceptor is active.
-      authProviderRef.current?.restoreFetch?.();
 
       // NOTE: We intentionally do NOT clear OAuth storage on unmount, even
       // mid-flow. Wrapper remounts (provider `_updateVersion` bumps, route

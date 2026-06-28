@@ -14,8 +14,8 @@ import {
 import { MCP_APPS_BRIDGE_CONFIG } from "./constants.js";
 import type {
   DisplayMode,
+  HostContext,
   MessageContentBlock,
-  Theme,
 } from "./widget-types.js";
 
 // JSON-RPC message types (using imported types with compatible names)
@@ -23,38 +23,6 @@ type JSONRPCRequest = JsonRpcRequest;
 type JSONRPCResponse = JsonRpcResponse | JsonRpcError;
 type JSONRPCNotification = JsonRpcNotification;
 type JSONRPCMessage = JSONRPCRequest | JSONRPCResponse | JSONRPCNotification;
-
-// Host context from ui/initialize response
-interface HostContext {
-  theme?: Theme;
-  displayMode?: DisplayMode;
-  containerDimensions?: {
-    width?: number;
-    height?: number;
-    maxWidth?: number;
-    maxHeight?: number;
-  };
-  locale?: string;
-  timeZone?: string;
-  platform?: "web" | "desktop" | "mobile";
-  userAgent?: string;
-  deviceCapabilities?: {
-    touch?: boolean;
-    hover?: boolean;
-  };
-  safeAreaInsets?: {
-    top: number;
-    right: number;
-    bottom: number;
-    left: number;
-  };
-  styles?: {
-    variables?: Record<string, string>;
-    css?: {
-      fonts?: string;
-    };
-  };
-}
 
 interface McpUiInitializeResult {
   protocolVersion: string;
