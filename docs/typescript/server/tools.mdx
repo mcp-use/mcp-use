@@ -244,25 +244,6 @@ server.tool(
 
 Make error messages actionable. Tell the model or user what failed and which input caused the failure.
 
-## Notify clients after dynamic changes
-
-If your server adds or removes tools at runtime, notify connected clients so they can refresh their tool list.
-
-```typescript
-server.tool(
-  {
-    name: "new_tool",
-    description: "A dynamically added tool.",
-    schema: z.object({ input: z.string() }),
-  },
-  async ({ input }) => text(`Processed: ${input}`),
-);
-
-await server.sendToolsListChanged();
-```
-
-See [Notifications](/typescript/server/notifications) for server-to-client notification patterns.
-
 ## Test a tool locally
 
 Run the development server and call the tool from the Inspector.

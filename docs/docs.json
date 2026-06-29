@@ -714,10 +714,6 @@
       "destination": "/python/changelog/changelog"
     },
     {
-      "source": "/typescript/server",
-      "destination": "/typescript/server/index"
-    },
-    {
       "source": "/typescript/server/ui-widgets",
       "destination": "/typescript/mcp-apps"
     },
@@ -759,7 +755,7 @@
     },
     {
       "source": "/typescript/server/comparison-with-other-implementations",
-      "destination": "/typescript/server/index"
+      "destination": "/typescript/server"
     },
     {
       "source": "/typescript/server/api-reference",
@@ -924,7 +920,7 @@
         "items": [
           {
             "label": "TypeScript Docs",
-            "href": "https://mcp-use.com/docs/typescript/server/index"
+            "href": "https://mcp-use.com/docs/typescript/server"
           },
           {
             "label": "Python Docs",
