@@ -208,19 +208,19 @@ This creates a new function at `supabase/functions/mcp-server/`.
 
 ### 3. Adapt your MCP Server to use Deno (required for Supabase Edge Functions)
 
-Widgets in the resources folder are automatically registered. Additional widgets can be registered manually. (see [UI Widgets](/typescript/server/mcp-apps))
+Widgets in the resources folder are automatically registered. Additional widgets can be registered manually. (see [UI Widgets](/typescript/mcp-apps))
 
 <Note>
 **Complete Example**
 
-A full working example is available in the repository: [Supabase Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/supabase)
+A full working example is available in the repository: [Supabase Example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/deployment/supabase)
 
 </Note>
 
 ```typescript
 // supabase/functions/mcp-server/index.ts
 
-import { MCPServer } from "https://esm.sh/mcp-use@latest/server";
+import { MCPServer, text } from "npm:mcp-use/server";
 
 const PROJECT_REF = Deno.env.get("SUPABASE_PROJECT_REF") || "your-project-ref";
 const BASE_URL =
@@ -237,15 +237,16 @@ const server = new MCPServer({
 });
 
 // Define your tools
-import { text } from 'mcp-use/server';
-
-server.tool({
-  name: "get-my-city",
-  description: "Get my city",
-  cb: async () => {
-    return text(`My city is San Francisco`);
+server.tool(
+  {
+    name: "get-my-city",
+    description: "Get my city",
   },
-});
+  async () => {
+    return text(`My city is San Francisco`);
+  }
+);
+
 await server.listen();
 ```
 
@@ -270,7 +271,7 @@ export MCP_URL="https://YOUR_PROJECT_REF.supabase.co/storage/v1/object/public/wi
 # MCP_SERVER_URL: Where the MCP server runs (for API calls in widgets)
 export MCP_SERVER_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/YOUR_FUNCTION_NAME"
 
-# CSP_URLS: Supabase project URL (for Content Security Policy). See [Content Security Policy](../content-security-policy) for full CSP docs.
+# CSP_URLS: Supabase project URL (for Content Security Policy). See [Content Security Policy](/typescript/mcp-apps/content-security-policy) for full CSP docs.
 export CSP_URLS="https://YOUR_PROJECT_REF.supabase.co"
 ```
 
@@ -336,7 +337,7 @@ supabase secrets set CSP_URLS="https://YOUR_PROJECT_REF.supabase.co" --project-r
 
 **Important**: Set these before deploying the function. If you set them after deployment, you must redeploy for the changes to take effect.
 
-**Alternative**: You can also configure CSP per-widget in your widget's `appsSdkMetadata['openai/widgetCSP']` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](../content-security-policy) or [UI Widgets](/typescript/server/mcp-apps#apps-sdk-metadata) for examples.
+**Alternative**: You can also configure CSP per widget with `widgetMetadata.metadata.csp` instead of using the global `CSP_URLS` environment variable. See [Content Security Policy](/typescript/mcp-apps/content-security-policy) for examples.
 </Note>
 
 ### 9. Deploy the Function
@@ -361,7 +362,7 @@ const mcpUrl = `https://YOUR_PROJECT_ID.supabase.co/functions/v1/mcp-server/mcp`
 ### Browser/Client-Side Usage
 
 ```typescript
-import { BrowserMCPClient } from "mcp-use";
+import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
 
 const client = new BrowserMCPClient({
   mcpServers: {

@@ -1,0 +1,159 @@
+---
+title: "Build widgets"
+description: "Create a React widget and return it from a TypeScript MCP tool."
+icon: "panel-top"
+---
+
+Build a widget when a tool result needs an interactive UI. In `mcp-use`, a widget has two parts: a React file under `resources/` and a tool that returns `widget({ props, output })`.
+
+## Create the widget file
+
+Create a folder under `resources/`. The folder name becomes the widget name you use from the server.
+
+```text
+resources/
+└── product-results/
+    └── widget.tsx
+```
+
+Define the widget metadata and component in `widget.tsx`:
+
+```tsx
+import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { z } from "zod";
+
+const propSchema = z.object({
+  query: z.string(),
+  results: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      price: z.number(),
+    }),
+  ),
+});
+
+type ProductResultsProps = z.infer<typeof propSchema>;
+
+export const widgetMetadata: WidgetMetadata = {
+  description: "Display product search results",
+  props: propSchema,
+  exposeAsTool: false,
+};
+
+export default function ProductResults() {
+  const { props, isPending } = useWidget<ProductResultsProps>();
+
+  if (isPending) {
+    return <McpUseProvider>Loading products...</McpUseProvider>;
+  }
+
+  return (
+    <McpUseProvider>
+      <main>
+        <h2>Results for {props.query}</h2>
+        <ul>
+          {props.results.map((product) => (
+            <li key={product.id}>
+              {product.name} - ${product.price}
+            </li>
+          ))}
+        </ul>
+      </main>
+    </McpUseProvider>
+  );
+}
+```
+
+Always guard required `props` behind `isPending`. Widgets mount before the tool result is available.
+
+## Return the widget from a tool
+
+In `index.ts`, add a tool whose `widget.name` matches the folder under `resources/`.
+
+```typescript
+import { MCPServer, text, widget } from "mcp-use/server";
+import { z } from "zod";
+
+const productSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  price: z.number(),
+});
+
+const productResultsSchema = z.object({
+  query: z.string(),
+  results: z.array(productSchema),
+});
+
+const server = new MCPServer({
+  name: "product-search",
+  version: "1.0.0",
+});
+
+async function searchProducts(query: string) {
+  return [
+    { id: "sku_123", name: `${query} starter kit`, price: 29 },
+  ];
+}
+
+server.tool(
+  {
+    name: "search-products",
+    description: "Search products and show the results in a widget",
+    schema: z.object({
+      query: z.string().describe("Search query"),
+    }),
+    outputSchema: productResultsSchema,
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+    widget: {
+      name: "product-results",
+      invoking: "Searching products...",
+      invoked: "Products loaded",
+    },
+  },
+  async ({ query }) => {
+    const results = await searchProducts(query);
+
+    return widget({
+      props: { query, results },
+      output: text(`Found ${results.length} products matching "${query}".`),
+    });
+  },
+);
+```
+
+`props` becomes the widget's rendering data. `output` becomes the text result the model can read in the conversation.
+
+## Keep schemas aligned
+
+The server `outputSchema` should describe the same shape that the widget expects in `props`.
+
+Use a shared schema when the widget and server live in the same package. If you duplicate schemas, keep the field names and optional fields identical.
+
+## Verify the widget
+
+Run the dev server and call the tool in the Inspector:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000/inspector`, run `search-products`, and confirm the widget renders below the tool result.
+
+If the tool succeeds but no widget renders, check these two values first:
+
+- `widget.name` in `index.ts`
+- the folder name under `resources/`
+
+They must match exactly.
+
+## Next steps
+
+- Use [Model context](/typescript/mcp-apps/model-context) to decide what the model should know about widget state.
+- Use [Interactivity](/typescript/mcp-apps/interactivity) when the widget needs buttons, state, tool calls, or follow-up messages.
+- Use the [`useWidget()` API reference](/typescript/api-reference/react/usewidget) for all hook fields and defaults.

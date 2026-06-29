@@ -1,0 +1,136 @@
+---
+title: "API Reference"
+description: "Complete API reference for the mcp-use TypeScript SDK, including server, client, agent, and React APIs."
+icon: "terminal"
+---
+
+This is the reference for building MCP servers, clients, agents, and React integrations in TypeScript with `mcp-use`. It documents public exports with exact signatures, parameters, return values, defaults, and minimal examples.
+
+For task-based walkthroughs and concepts, use the [Docs](/typescript/server) tab. This section is the precise reference you cite when you already know what you are building.
+
+## Install
+
+```bash
+npm install mcp-use
+```
+
+## CLI
+
+The `@mcp-use/cli` package installs the `mcp-use` executable for local development, production builds, deployment, tunneling, type generation, and terminal-based MCP client workflows.
+
+<CardGroup cols={2}>
+  <Card title="mcp-use CLI" icon="terminal" href="/typescript/api-reference/cli-reference">
+    Command reference for `mcp-use dev`, `build`, `start`, `deploy`, `client`, `servers`, `deployments`, `skills`, and `generate-types`.
+  </Card>
+  <Card title="CLI client" icon="terminal" href="/typescript/tooling/client-cli">
+    Use `mcp-use client` to connect to MCP servers, call tools, read resources, get prompts, and capture widget screenshots.
+  </Card>
+</CardGroup>
+
+## Import paths
+
+The TypeScript SDK ships from several entry points. Use the entry point that matches where your code runs.
+
+| Import path | Use it to |
+|---|---|
+| `mcp-use` | Create Node.js MCP clients, enable Code Mode, and use shared client helpers. |
+| `mcp-use/browser` | Create browser MCP clients for HTTP servers. |
+| `mcp-use/server` | Create the server, register tools, resources, and prompts, handle auth, sessions, middleware, and MCP Apps resources. |
+| `mcp-use/react` | Manage React client connections and build React widget UIs that render inside MCP Apps and ChatGPT. |
+
+<Note>
+Create a server with `new MCPServer({ ... })`. See the [MCPServer](/typescript/api-reference/server/mcp-server) reference for the constructor and all of its methods.
+</Note>
+
+## Server (`mcp-use/server`)
+
+<CardGroup cols={3}>
+  <Card title="MCPServer" icon="server" href="/typescript/api-reference/server/mcp-server">
+    The server class: construct, register, and start a server.
+  </Card>
+  <Card title="ServerConfig" icon="settings" href="/typescript/api-reference/server/server-config">
+    Every configuration option for `new MCPServer`.
+  </Card>
+  <Card title="Tools" icon="wrench" href="/typescript/api-reference/server/tools">
+    `tool()` and the tool definition, callback, and annotation types.
+  </Card>
+  <Card title="Resources" icon="file-text" href="/typescript/api-reference/server/resources">
+    `resource()`, `resourceTemplate()`, and their callbacks.
+  </Card>
+  <Card title="Prompts" icon="message-square" href="/typescript/api-reference/server/prompts">
+    `prompt()`, prompt types, and argument completion.
+  </Card>
+  <Card title="Tool context (ctx)" icon="box" href="/typescript/api-reference/server/tool-context">
+    The `ctx` object: sample, elicit, log, progress, client, session.
+  </Card>
+  <Card title="Response helpers" icon="reply" href="/typescript/api-reference/server/response-helpers">
+    `text`, `object`, `image`, `widget`, `mix`, and the rest.
+  </Card>
+  <Card title="Elicitation schemas" icon="list-checks" href="/typescript/api-reference/server/elicitation-schemas">
+    Enum and form schema builders for elicitation.
+  </Card>
+  <Card title="Authentication" icon="shield" href="/typescript/api-reference/server/auth">
+    `getAuth`, scope checks, and the JWT verifier.
+  </Card>
+  <Card title="OAuth providers" icon="plug" href="/typescript/api-reference/server/auth-providers">
+    Provider factories and the OAuth proxy.
+  </Card>
+  <Card title="Sessions and streams" icon="database" href="/typescript/api-reference/server/sessions">
+    Pluggable session stores and stream managers.
+  </Card>
+  <Card title="Middleware and proxy" icon="layers" href="/typescript/api-reference/server/middleware">
+    Operation middleware, framework adapters, and the CORS proxy.
+  </Card>
+  <Card title="MCP Apps" icon="layout-dashboard" href="/typescript/api-reference/server/widgets">
+    UI resource builders, protocol adapters, and landing pages.
+  </Card>
+</CardGroup>
+
+## Client (`mcp-use`, `mcp-use/browser`, `mcp-use/react`)
+
+<CardGroup cols={3}>
+  <Card title="MCPClient" icon="router" href="/typescript/api-reference/client/mcp-client">
+    The Node.js client class: configure servers, create sessions, and manage lifecycle.
+  </Card>
+  <Card title="MCPSession" icon="cable" href="/typescript/api-reference/client/mcp-session">
+    Live protocol calls for tools, resources, prompts, completion, roots, and notifications.
+  </Card>
+  <Card title="Code Mode" icon="code" href="/typescript/api-reference/client/code-mode">
+    Code execution options, methods, executor classes, and result types.
+  </Card>
+  <Card title="React client" icon="react" href="/typescript/api-reference/client/react-client">
+    `McpClientProvider`, `useMcpClient()`, `useMcpServer()`, `useMcp()`, and storage providers.
+  </Card>
+</CardGroup>
+
+## React widget UI (`mcp-use/react`)
+
+<CardGroup cols={3}>
+  <Card title="useWidget()" icon="webhook" href="/typescript/api-reference/react/usewidget">
+    The universal hook for MCP Apps and Apps SDK widgets.
+  </Card>
+  <Card title="useCallTool()" icon="mouse-pointer-click" href="/typescript/api-reference/react/usecalltool">
+    Call MCP tools from a widget, with optional typed helpers.
+  </Card>
+  <Card title="useFiles()" icon="file-up" href="/typescript/api-reference/react/usefiles">
+    Upload and manage files from a widget.
+  </Card>
+  <Card title="McpUseProvider" icon="component" href="/typescript/api-reference/react/mcpuseprovider">
+    Provider that wires up the widget runtime and auto-sizing.
+  </Card>
+  <Card title="WidgetControls" icon="sliders-horizontal" href="/typescript/api-reference/react/widgetcontrols">
+    Built-in debug and view controls.
+  </Card>
+  <Card title="ThemeProvider" icon="palette" href="/typescript/api-reference/react/themeprovider">
+    Apply host theme variables to a widget.
+  </Card>
+  <Card title="ErrorBoundary" icon="shield-alert" href="/typescript/api-reference/react/errorboundary">
+    Catch and display widget render errors.
+  </Card>
+  <Card title="Image" icon="image" href="/typescript/api-reference/react/image">
+    Render images with correct host URLs.
+  </Card>
+  <Card title="ModelContext" icon="brain" href="/typescript/api-reference/react/modelcontext">
+    Expose widget context to the model.
+  </Card>
+</CardGroup>

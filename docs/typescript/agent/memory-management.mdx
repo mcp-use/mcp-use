@@ -1,16 +1,14 @@
 ---
-title: Memory Management
-description: Learn how to manage conversation memory in MCPAgent with different memory modes
+title: Memory management
+description: "Control MCPAgent conversation history, stateless runs, and history resets."
 icon: memory-stick
 ---
 
-MCPAgent provides flexible memory management options to control how conversation history is handled. You can choose between different memory strategies depending on your use case.
+`MCPAgent` keeps conversation history across runs by default. Disable memory for stateless requests, or clear history when a user starts a new task.
 
-## Memory Modes
+## Keep conversation memory
 
-### 1. Self-Managed Memory (`memoryEnabled: true`)
-
-When `memoryEnabled` is set to `true` (the default), the agent automatically manages conversation history internally. This is the simplest option for most use cases.
+When `memoryEnabled` is `true`, the agent stores human, assistant, and tool messages after each run. This is the default.
 
 ```typescript
 import { MCPAgent, MCPClient } from "mcp-use";
@@ -20,85 +18,83 @@ const client = new MCPClient({
   mcpServers: {
     filesystem: {
       command: "npx",
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"]
-    }
-  }
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
 });
 
-const llm = new ChatOpenAI({ model: "gpt-5.5" });
+const llm = new ChatOpenAI({ model: "gpt-4o" });
 
 const agent = new MCPAgent({
   llm,
   client,
-  memoryEnabled: true  // Agent manages memory internally (default)
+  memoryEnabled: true,
 });
 
-// The agent will automatically maintain conversation context
-const response1 = await agent.run("Hello, my name is Alice");
-const response2 = await agent.run("What's my name?");  // Agent remembers Alice
+await agent.run({ prompt: "Hello, my name is Alice" });
+const response = await agent.run({ prompt: "What's my name?" });
 
-await client.closeAllSessions();
+console.log(response);
+await agent.close();
 ```
 
-### 2. No Memory (`memoryEnabled: false`)
+## Run without memory
 
-When `memoryEnabled` is set to `false`, the agent has no internal memory and treats each interaction independently.
+When `memoryEnabled` is `false`, each run starts from the current system prompt and tool list only.
 
 ```typescript
 const agent = new MCPAgent({
   llm,
   client,
-  memoryEnabled: false  // No internal memory
+  memoryEnabled: false,
 });
 
-// Each interaction is independent
-const response1 = await agent.run("Hello, my name is Alice");
-const response2 = await agent.run("What's my name?");  // Agent doesn't remember Alice
+await agent.run({ prompt: "Hello, my name is Alice" });
+const response = await agent.run({ prompt: "What's my name?" });
 
-await client.closeAllSessions();
+console.log(response);
 ```
 
-## Memory Management Methods
+Use stateless agents for request/response APIs, background jobs, and tests where earlier runs must not affect later behavior.
 
-The MCPAgent provides methods to inspect and control conversation history:
+## Inspect history
 
-### `getConversationHistory()`
-
-Returns a copy of the current conversation history as an array of messages.
+`getConversationHistory()` returns a copy of the stored LangChain messages. Mutating the returned array does not mutate agent memory.
 
 ```typescript
 const history = agent.getConversationHistory();
 console.log(`Current history has ${history.length} messages`);
 
-// Inspect message types
 for (const message of history) {
   console.log(message.constructor.name, message.content);
 }
 ```
 
-### `clearConversationHistory()`
+## Clear history
 
-Clears the internal conversation history. If `memoryEnabled` is true and a system message exists, it will be preserved.
+`clearConversationHistory()` removes stored conversation messages. If memory is enabled and the agent has a system message, the system message is preserved.
 
 ```typescript
-// Clear conversation history
 agent.clearConversationHistory();
-console.log("Conversation history cleared");
 
-// Start fresh conversation
-const response = await agent.run("Start a new conversation");
+const response = await agent.run({
+  prompt: "Start a new conversation",
+});
 ```
 
-## Next Steps
+Use this after a user switches projects, changes accounts, or asks to start over.
+
+## Next steps
 
 <CardGroup cols={3}>
-  <Card title="Agent Configuration" icon="cog" href="/typescript/agent/agent-configuration">
-    Learn more about configuring agents
-  </Card>
-  <Card title="Structured Output" icon="brackets-curly" href="/typescript/agent/structured-output">
-    Generate type-safe responses with Zod schemas
+  <Card
+    title="Structured Output"
+    icon="brackets-curly"
+    href="/typescript/agent/structured-output"
+  >
+    Generate type-safe responses with Zod schemas.
   </Card>
   <Card title="Streaming" icon="wave-pulse" href="/typescript/agent/streaming">
-    Stream agent responses in real-time
+    Stream agent responses in real time.
   </Card>
 </CardGroup>

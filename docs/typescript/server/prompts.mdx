@@ -1,260 +1,220 @@
 ---
 title: "Prompts"
-description: "Building prompt templates for AI model interactions"
+description: "Create reusable TypeScript MCP prompt templates with typed arguments and model-ready output."
 icon: "message-square"
 ---
 
-Prompts in MCP provide a way to create reusable, parameterized templates for AI model interactions. They enable standardized prompt generation with dynamic content based on user-provided arguments.
+Prompts are reusable templates that MCP clients can request and send to a model. Use a prompt when you want to package a repeatable instruction, not when you want the server to perform an action.
 
-## Prompt Structure
+This guide focuses on prompt design and common patterns. Use the [Prompts API reference](/typescript/api-reference/server/prompts) for exact `server.prompt()` signatures, callback types, completion overloads, and return shapes.
 
-Every prompt has three main components:
+## Use prompts for reusable model instructions
+
+Use prompts when the client needs a structured instruction with optional arguments. Use tools when the server should run code, call an API, or change state.
+
+| Need | Use |
+| --- | --- |
+| Generate a repeatable model instruction | Prompt |
+| Run server-side logic or call an API | Tool |
+| Expose readable content by URI | Resource |
+| Display interactive UI | [Tool with an MCP App widget](/typescript/mcp-apps) |
+
+A good prompt has a task-shaped name, a clear description, typed arguments, and output that is ready for the model.
+
+## Register a prompt
+
+Define a prompt with `server.prompt()`. The schema describes arguments the client can collect before requesting the prompt.
 
 ```typescript
-server.prompt({
-  name: 'prompt_name',              // Unique identifier
-  description: 'What it generates',  // Clear description
-  schema: z.object({...}),                 // Argument definitions
-}, async (args) => {...}) // generator function
-```
-
-## Input Validation with Zod
-
-Prompts use [Zod](https://zod.dev/) schemas for input validation. The server automatically validates inputs before calling your handler, so you can trust that the parameters match your schema.
-
-```typescript
+import { MCPServer, text } from "mcp-use/server";
 import { z } from "zod";
+
+const server = new MCPServer({
+  name: "inventory-server",
+  version: "1.0.0",
+});
 
 server.prompt(
   {
-    name: "prompt_name",
-    description: "What it generates",
+    name: "summarize_inventory",
+    description: "Create an inventory summary for a specific audience.",
     schema: z.object({
-      topic: z.enum(["math", "science", "history"]),
-      language: z.string().default("english"),
-      ok: z.boolean(),
+      audience: z.enum(["operations", "finance", "support"]),
+      timeframe: z.string().describe("Reporting period, such as today or Q2"),
     }),
   },
-  async ({ topic }) => {
-    return {
-      messages: [
-        {
-          role: "system",
-          content: `You are a helpful assistant that can answer questions about ${topic}.`,
-        },
-      ],
-    };
-  }
+  async ({ audience, timeframe }) =>
+    text(
+      `Summarize inventory changes for ${audience} during ${timeframe}. Include risks, causes, and next actions.`,
+    ),
 );
 ```
 
-<Tip>
-  **Response Helpers**: Prompts support response helpers like `text()`,
-  `object()`, and `mix()` for cleaner implementations. The server automatically
-  converts them to the required `GetPromptResult` format. See [Response
-  Helpers](./response-helpers) for the complete reference.
-</Tip>
+The server validates prompt arguments before the callback runs. TypeScript infers the callback parameter type from the Zod schema.
 
-## Returning Prompt Content
+## Return prompt content
 
-Prompts can return content in two ways: manual message construction or using response helpers.
-
-### Option 1: Manual Message Construction
-
-The traditional approach uses the MCP message format directly:
+You can return MCP prompt messages directly or use response helpers. Prefer helpers for simple text or structured context; use direct messages when you need full control over message roles and content blocks.
 
 ```typescript
-import { z } from "zod";
-
 server.prompt(
   {
-    name: "code_review",
-    description: "Provides code review guidance",
+    name: "review_code",
+    description: "Create a code review prompt for a specific language.",
     schema: z.object({
       language: z.string(),
       code: z.string(),
     }),
   },
-  async ({ language, code }) => {
-    return {
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert ${language} developer. Review this code: ${code}`,
+  async ({ language, code }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text:
+            `You are an expert ${language} developer. Review this code for correctness, security, and maintainability.\n\n` +
+            code,
         },
-      ],
-    };
-  }
+      },
+    ],
+  }),
 );
 ```
 
-### Option 2: Using Response Helpers
-
-For cleaner code, use response helpers. The server automatically converts them to the proper message format:
+For simple prompts, response helpers keep the callback shorter:
 
 ```typescript
-import { text, object, mix } from "mcp-use/server";
-import { z } from "zod";
-
-// Simple text prompt
-server.prompt(
-  {
-    name: "greeting",
-    description: "Generate a friendly greeting",
-    schema: z.object({ name: z.string() }),
-  },
-  async ({ name }) => {
-    return text(`Hello, ${name}! How can I assist you today?`);
-  }
-);
-
-// Structured data prompt
-server.prompt(
-  {
-    name: "user_context",
-    description: "Provide user context information",
-    schema: z.object({ userId: z.string() }),
-  },
-  async ({ userId }) => {
-    const user = await fetchUser(userId);
-    return object({
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      preferences: user.preferences,
-    });
-  }
-);
-
-// Mixed content prompt
-server.prompt(
-  {
-    name: "documentation",
-    description: "Generate documentation with examples",
-    schema: z.object({ feature: z.string() }),
-  },
-  async ({ feature }) => {
-    const docs = await generateDocs(feature);
-    const examples = await getExamples(feature);
-
-    return mix(
-      text(`Documentation for ${feature}`),
-      object({ description: docs.description }),
-      text("Examples:"),
-      object({ examples })
-    );
-  }
-);
-```
-
-<Note>
-  Response helpers automatically handle the conversion to `GetPromptResult`
-  format. Use whichever approach fits your use case - both are fully supported.
-</Note>
-
-## Notifying Clients of Prompt Changes
-
-When dynamically adding or removing prompts, notify clients to refresh their prompts cache:
-
-```typescript
-// Register a new prompt dynamically
-server.prompt(
-  {
-    name: "new_prompt",
-    description: "A dynamically added prompt",
-    schema: z.object({ topic: z.string() }),
-  },
-  async ({ topic }) => ({
-    messages: [{ role: "system", content: `Expert in ${topic}` }],
-  })
-);
-
-// Notify all connected clients
-await server.sendPromptsListChanged();
-```
-
-See [Notifications](./notifications) for more details.
-
-## Prompt Arguments Autocomplete
-
-Enable completion suggestions for prompt arguments using the `completable()` helper. Clients can request suggestions via the MCP `completion/complete` protocol method.
-
-### List-Based Completion (Primitives)
-
-For simple cases with a fixed list of values, pass an array directly:
-
-```typescript Typescript highlight={8-11}
-import { completable } from "mcp-use/server";
-import { z } from "zod";
+import { mix, object, text } from "mcp-use/server";
 
 server.prompt(
   {
-    name: "code-review",
-    description: "Review code with language completion",
+    name: "prepare_release_notes",
+    description: "Draft release notes from a list of changes.",
     schema: z.object({
-      language: completable(z.string(), [
-        "python",
-        "javascript",
-        "typescript",
-        "java",
-        "cpp",
-      ]),
-      code: z.string().describe("The code to review"),
+      version: z.string(),
+      changes: z.array(z.string()),
     }),
   },
-  async ({ language, code }) => {
-    return {
-      messages: [
-        {
-          role: "system",
-          content: `Review this ${language} code: ${code}`,
-        },
-      ],
-    };
-  }
+  async ({ version, changes }) =>
+    mix(
+      text(`Draft release notes for version ${version}.`),
+      object({ changes }),
+    ),
 );
 ```
 
-The list-based approach automatically filters suggestions based on case-insensitive prefix matching.
+See [Response Helpers](/typescript/server/response-helpers) for a chooser and [Response helpers API reference](/typescript/api-reference/server/response-helpers) for exact conversion behavior.
 
-### Callback-Based Completion (Dynamic)
+## Design prompt arguments for clients
 
-For dynamic or contextual completion, use a callback function:
+Prompt arguments should be easy for a client or user to fill in. Use enums for constrained choices, descriptions for ambiguous fields, and defaults only when the default is safe.
 
-```typescript Typescript highlight={5-15}
+```typescript
+schema: z.object({
+  tone: z.enum(["concise", "technical", "executive"]).default("concise"),
+  audience: z.string().describe("Who will read the generated content"),
+  includeRisks: z.boolean().default(true),
+})
+```
+
+Avoid using prompt arguments as hidden configuration. If the value affects model behavior, make the field name and description visible.
+
+## Add autocomplete for prompt arguments
+
+Use `completable()` when clients can suggest valid values while the user fills in prompt arguments.
+
+```typescript
+import { completable } from "mcp-use/server";
+
 server.prompt(
   {
-    name: "analyze-project",
-    description: "Analyze a project with dynamic completion",
+    name: "summarize_project",
+    description: "Summarize a project for a selected team.",
     schema: z.object({
+      team: completable(z.string(), ["platform", "sales", "support"]),
       projectId: completable(z.string(), async (value, context) => {
-        // Access other argument values via context
-        const userId = context?.arguments?.userId;
-        const projects = await fetchUserProjects(userId);
-        return projects.filter((p) => p.id.startsWith(value)).map((p) => p.id);
+        const team = context?.arguments?.team as string | undefined;
+        const projects = await searchProjects({ team, query: value });
+        return projects.map((project) => project.id);
       }),
     }),
   },
-  async ({ projectId }) => {
-    return {
-      messages: [
-        {
-          role: "system",
-          content: `Analyzing project ${projectId}...`,
-        },
-      ],
-    };
-  }
+  async ({ team, projectId }) =>
+    text(`Summarize project ${projectId} for the ${team} team.`),
 );
 ```
 
-The callback receives the current input value and optional context containing other argument values.
+Use list-based completion for small fixed sets. Use callback-based completion when suggestions depend on live data or another argument.
 
-**Note**: List-based completion works best for primitive types (string, number, enum). For complex types or custom logic, use the callback-based approach.
+## Use authenticated context when needed
 
-## Next Steps
+When OAuth is configured, prompt callbacks can read verified user information from `ctx.auth`.
 
-- [Tools Guide](./tools) - Building executable tools
-- [Resources Guide](./resources) - Managing content
-- [API Reference](/typescript/server/index#mcpserver-api-reference) - Complete API documentation
-- [Examples](./examples) - Real-world implementations
+```typescript
+import { text } from "mcp-use/server";
+
+server.prompt(
+  {
+    name: "personal_weekly_summary",
+    description: "Create a weekly summary prompt for the authenticated user.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      throw new Error("Unauthorized");
+    }
+
+    return text(
+      `Create a weekly work summary for user ${ctx.auth.user.userId}. Include open decisions, risks, and follow-ups.`,
+    );
+  },
+);
+```
+
+Use `ctx.auth` only for verified identity from server authentication. Throw when the prompt request should fail instead of returning prompt content. See [User Context](/typescript/server/authentication/user-context) for guide-level patterns and [Tool context API reference](/typescript/api-reference/server/tool-context) for exact context fields.
+
+## Notify clients when prompts change
+
+If your server adds or removes prompts at runtime, notify connected clients so they can refresh their prompt list.
+
+```typescript
+server.prompt(
+  {
+    name: "incident_summary",
+    description: "Create an incident summary from notes.",
+    schema: z.object({ notes: z.string() }),
+  },
+  async ({ notes }) => text(`Summarize this incident:\n\n${notes}`),
+);
+
+await server.sendPromptsListChanged();
+```
+
+See [Notifications](/typescript/server/notifications) for server-to-client notification patterns.
+
+## Test prompts locally
+
+Run the development server and request the prompt from the Inspector.
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000/inspector`, select the Prompts tab, enter argument values, and verify the generated prompt content.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Prompts API reference" icon="terminal" href="/typescript/api-reference/server/prompts">
+    Look up prompt definitions, callback signatures, completion helpers, and return types.
+  </Card>
+  <Card title="Response Helpers" icon="drill" href="/typescript/server/response-helpers">
+    Choose helpers for text, JSON, Markdown, and mixed prompt content.
+  </Card>
+  <Card title="Tools" icon="wrench" href="/typescript/server/tools">
+    Use tools when the server should run code or call external systems.
+  </Card>
+  <Card title="Resources" icon="folder-open" href="/typescript/server/resources">
+    Expose readable content by URI.
+  </Card>
+</CardGroup>

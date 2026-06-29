@@ -1,134 +1,104 @@
 ---
-title: "Tunneling"
-description: "Test your local MCP server with ChatGPT and other clients before deploying"
+title: "MCP Server Tunneling"
+description: "Expose a local MCP server through a public /mcp URL for testing in ChatGPT, Claude, and other remote MCP clients."
 icon: "train-front-tunnel"
 ---
 
+Use a tunnel when ChatGPT, Claude, or another remote MCP client needs to reach a server running on your machine. The tunnel gives you a public HTTPS URL that forwards to your local MCP endpoint.
 
-The tunnel creates a secure connection between ChatGPT (or other MCP clients) and your local MCP server:
+With `mcp-use`, start the server with `--tunnel`, then copy the printed `Tunnel` URL. The URL you give to clients must include `/mcp`.
 
-```mermaid
-sequenceDiagram
-    participant ChatGPT as ChatGPT
-    participant TunnelServer as Manufact Cloud
-    participant LocalServer as Local MCP Server
-
-    ChatGPT->>TunnelServer: HTTPS request
-    TunnelServer->>LocalServer: Forward request
-    LocalServer->>TunnelServer: MCP response
-    TunnelServer->>ChatGPT: Forward response
+```text
+https://<subdomain>.local.mcp-use.run/mcp
 ```
 
-## Use Case
+Keep the terminal process running while you test. The public URL stops working when the process exits.
 
-Tunneling is perfect for:
+## Start a tunnel with mcp-use
 
-- **Testing before deployment**: Verify your MCP server works with real clients
-- **Development workflow**: Iterate quickly without deploying each change
-- **Client integration**: Test with ChatGPT, Claude, or other MCP clients
-- **Debugging**: Troubleshoot connection issues in a production-like environment
+Use `mcp-use dev --tunnel` while you are developing:
 
-
-## Quick Start
-
-<Tip>
-This guide references mcp-use server, but you can use tunneling with any MCP server as long as they are served on the `/mcp` path.
-</Tip>
-
-<Tip>
-If you're using `mcp-use start`, you can pass the `--tunnel` flag to automatically create a tunnel without running a separate command:
 ```bash
+mcp-use dev --tunnel
+```
+
+Use `mcp-use start --tunnel` when you want to test the built server:
+
+```bash
+mcp-use build
 mcp-use start --port 3000 --tunnel
 ```
-</Tip>
 
-<Steps>
-<Step title="Define Your Server">
-Create your MCP server with tools and resources:
+Successful output includes a tunnel endpoint:
 
-<CodeGroup>
-```bash via cli
-npx create-mcp-use-app my-mcp-server
+```text
+Starting tunnel for port 3000...
+✓ Tunnel established: https://happy-blue.local.mcp-use.run/mcp
+
+Local:    http://localhost:3000
+MCP:      http://localhost:3000/mcp
+Tunnel:   https://happy-blue.local.mcp-use.run/mcp
+Inspector: http://localhost:3000/inspector?autoConnect=...
 ```
 
-```typescript manual
-import { MCPServer, text } from 'mcp-use/server'
-import { z } from 'zod'
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  description: 'My MCP server'
-})
+Copy the value after `Tunnel:` into your remote MCP client. Do not copy only `https://happy-blue.local.mcp-use.run`; the client URL must end with `/mcp`.
 
-server.tool({
-  name: 'echo',
-  description: 'Echo back the provided message',
-  schema: z.object({
-    message: z.string().describe('The message to echo back'),
-  }),
-}, async ({ message }) => {
-  return text(`Echo: ${message}`);
-})
-```
-</CodeGroup>
-</Step>
-<Step title="Start Your Local MCP Server">
-Start your MCP server on a local port (e.g., port 3000):
+## Tunnel any server on /mcp
 
-```bash
-mcp-use start --port 3000
-```
+Use the standalone tunnel package when your local MCP server is not started by `mcp-use`. The server must already be running locally and serving MCP over HTTP at `/mcp`.
 
-</Step>
-
-<Step title="Create a Tunnel">
-Use the tunnel command to expose your local server:
+For a server on port `3000`, run:
 
 ```bash
 npx @mcp-use/tunnel 3000
 ```
 
-This will create a public URL that forwards to your local server. Learn more about the [@mcp-use/tunnel package](https://www.npmjs.com/package/@mcp-use/tunnel).
-</Step>
+Successful output prints a public URL:
 
-<Step title="Use the Public URL">
-The command will output a public URL like:
+```text
+╭────────────────────────────────────╮
+│  Tunnel Created Successfully!      │
+╰────────────────────────────────────╯
 
-```
-╭────────────────────────────╮
-│  🎉 Tunnel Created Successfully!           │
-╰────────────────────────────╯
+Public URL:
+  https://happy-blue.local.mcp-use.run/mcp
 
-  🌐 Public URL:
-     https://happy-blue-cat.local.mcp-use.run/mcp
-
-  📍 Subdomain: happy-blue-cat
-  🔌 Local Port: 3000
+Local Port: 3000
 ```
 
-Use this URL to connect your MCP client (ChatGPT, Claude, etc.) to your local server.
-</Step>
-</Steps>
+Copy the full public URL, including `/mcp`, into ChatGPT, Claude, or your other remote MCP client.
 
+## Verify the tunnel
 
+Verify the public URL with the `mcp-use client` CLI:
 
+```bash
+npx mcp-use client connect tunnel-test https://happy-blue.local.mcp-use.run/mcp
+npx mcp-use client tunnel-test tools list
+```
 
-<Info>
-**Time Limits:**
-- Tunnels automatically expire after **24 hours** of creation
-- Inactive tunnels are cleaned up after **1 hour** of no activity
+The `connect` command performs the MCP handshake and saves the tunnel under the name `tunnel-test`. The `tools list` command should print the tools exposed by your local server. If the server uses OAuth or bearer authentication, complete the client authentication flow or pass the required auth option before testing tools.
 
-**Rate Limiting:**
-- Maximum **10 tunnel creations per IP per hour**
-- Maximum **5 active tunnels per IP** at any time
-- These limits help ensure fair usage and prevent abuse
-</Info>
+## Stop the tunnel
 
-<Warning>
-The tunnel is active only while the command is running. Press `Ctrl+C` to close the tunnel when you're done testing.
-</Warning>
+Press `Ctrl+C` in the terminal running the tunnel.
 
-<Tip>
-Keep the terminal window open while testing. The tunnel closes when you stop the command.
-</Tip>
+When you started the tunnel with `mcp-use dev --tunnel` or `mcp-use start --tunnel`, stopping the command stops both the local server process and the tunnel. When you started the tunnel with `npx @mcp-use/tunnel 3000`, stopping that command closes only the tunnel; your local server keeps running until you stop it separately.
 
+## Lifetime and limits
+
+Tunnels are for local testing before deployment:
+
+- The tunnel is active only while the command is running.
+- Tunnels expire after 24 hours.
+- Inactive tunnels are cleaned up after 1 hour without activity.
+- Each IP address can create up to 10 tunnels per hour.
+- Each IP address can have up to 5 active tunnels at a time.
+
+For a stable public URL, deploy the server instead of relying on a local tunnel.
+
+## Next steps
+
+- Use the [TypeScript quickstart](/typescript/getting-started/quickstart) to create a local MCP server.
+- Use [Build your first MCP App](/typescript/mcp-apps/quickstart) to test widgets in a remote client.
+- Use [Deploy to Manufact Cloud](/typescript/server/deployment/mcp-use) when you are ready for a hosted MCP endpoint.

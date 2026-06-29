@@ -20,7 +20,7 @@ We will use **mcp-use TypeScript** to create a **zoo MCP server** that has two t
 - Deploy the MCP server to Cloud Run
 - Secure your server's endpoint by requiring authentication for all requests, ensuring only authorized clients and agents can communicate with it
 - Connect to your secure MCP server endpoint from Gemini CLI
-- Build ChatGPT Apps with interactive widgets
+- Build MCP Apps widgets for interactive results
 
 ## 2. Project Setup
 
@@ -55,7 +55,7 @@ We will use **mcp-use TypeScript** to create a **zoo MCP server** that has two t
        gcloud projects list | awk '/PROJECT_ID/{print $2}'
        ```
 5. You should see this message:
-   ```
+   ```text
    Updated property [core/project].
    ```
    If you see a `WARNING` and are asked `Do you want to continue (Y/n)?`, then you have likely entered the project ID incorrectly. Press `n`, press `Enter`, and try to run the `gcloud config set project` command again.
@@ -75,7 +75,7 @@ If prompted to authorize, click **Authorize** to continue.
 
 This command may take a few minutes to complete, but it should eventually produce a successful message similar to this one:
 
-```
+```text
 Operation "operations/acf.p2-73d90d00-47ee-447a-b600" finished successfully.
 ```
 
@@ -278,13 +278,13 @@ await server.listen(port);
 
    The `create-mcp-use-app` template already includes the necessary imports and server setup. We've replaced the example code with our zoo server implementation.
 
-## 6. Building ChatGPT Apps with Your MCP Server
+## 6. (Optional) Add an MCP Apps widget
 
-One of the powerful features of mcp-use is its built-in support for building **ChatGPT Apps** with interactive widgets. This allows you to create rich, interactive user interfaces that go beyond simple text responses.
+You can add an MCP Apps widget when the deployed server should return an interactive UI instead of only text or JSON.
 
-### What are ChatGPT Apps?
+### What are MCP Apps?
 
-ChatGPT Apps enable developers to build rich, interactive user interfaces using the **OpenAI Apps SDK**. Widgets can:
+MCP Apps are interactive widgets returned by MCP tools. Widgets can:
 - Display data in tables, carousels, or custom layouts
 - Allow users to filter, sort, or manipulate results
 - Persist state across conversations
@@ -294,7 +294,7 @@ ChatGPT Apps enable developers to build rich, interactive user interfaces using 
 
 Let's add an interactive widget to display animal information in a beautiful card format.
 
-1. The `resources` directory should already exist from `create-mcp-use-app`. Create a widget component `resources/animal-card.tsx`:
+1. Create a `resources` directory (widgets placed in `resources/` are auto-discovered) and add a widget component `resources/animal-card.tsx`:
    ```bash
    cloudshell edit ~/mcp-on-cloudrun/resources/animal-card.tsx
    ```
@@ -322,6 +322,7 @@ export const widgetMetadata: WidgetMetadata = {
 type AnimalCardProps = z.infer<typeof propsSchema>;
 
 const AnimalCard: React.FC = () => {
+  // Props are supplied at runtime via useWidget(), not as React props
   const { props } = useWidget<AnimalCardProps>();
 
   return (
@@ -354,11 +355,15 @@ const AnimalCard: React.FC = () => {
 export default AnimalCard;
 ```
 
-3. Update your `src/index.ts` to return widgets from tools. Add this new tool that returns a widget:
+3. Update your `index.ts` to return widgets from tools. First add `widget` to the existing import at the top of the file (`text` is already imported):
 
 ```typescript
-import { widget, text } from 'mcp-use/server';
+import { MCPServer, text, object, array, widget } from 'mcp-use/server';
+```
 
+Then add this new tool that returns a widget:
+
+```typescript
 // Tool: Get animal details with widget
 server.tool(
   {
@@ -406,7 +411,7 @@ With mcp-use widgets, you get:
 - **Tool Calls**: Widgets can call other MCP tools directly
 - **Hot Reload**: Changes reflect immediately during development
 
-For more information on building ChatGPT Apps, see the [Building ChatGPT Apps Guide](/guides/chatgpt-apps-flow).
+For the main widget workflow, see [Build widgets](/typescript/mcp-apps/widgets). For ChatGPT compatibility behavior, see [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility).
 
 Your code is complete! It is time to deploy the MCP server to Cloud Run.
 
@@ -491,7 +496,7 @@ gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
    Use the `--no-allow-unauthenticated` flag to require authentication. This is important for security reasons. If you don't require authentication, anyone can call your MCP server and potentially cause damage to your system.
 
 7. Confirm the creation of a new Artifact Registry repository. Since it is your first time deploying to Cloud Run from source code, you will see:
-   ```
+   ```text
    Deploying from source requires an Artifact Registry Docker repository to store built containers. A repository named
    [cloud-run-source-deploy] in region [europe-west1] will be created.
 
@@ -500,7 +505,7 @@ gcloud projects add-iam-policy-binding $GOOGLE_CLOUD_PROJECT \
    Type `Y` and press `Enter`, this will create an Artifact Registry repository for your deployment. This is required for storing the MCP server Docker container for the Cloud Run service.
 
 8. After a few minutes, you will see a message like:
-   ```
+   ```text
    Service [zoo-mcp-server] revision [zoo-mcp-server-12345-abc] has been deployed and is serving 100 percent of traffic.
    ```
 
@@ -562,18 +567,18 @@ Now that you've successfully deployed a remote MCP server, you can connect to it
    You may need to press `Enter` to accept some default settings.
 
 7. Have gemini list the MCP tools available to it within its context:
-   ```
+   ```text
    /mcp
    ```
 
 8. Ask gemini to find something in the zoo:
-   ```
+   ```text
    Where can I find penguins?
    ```
    The Gemini CLI should know to use the `zoo-remote` MCP Server and will ask if you would like to allow execution of MCP.
 
 9. Use the down arrow, then press `Enter` to select:
-   ```
+   ```text
    Yes, always allow all tools from server "zoo-remote"
    ```
 
@@ -587,7 +592,7 @@ When you are ready to end your session, type `/quit` and then press `Enter` to e
 
 If you see an error like this:
 
-```
+```text
 🔍 Attempting OAuth discovery for 'zoo-remote'...
 ❌ 'zoo-remote' requires authentication but no OAuth configuration found
 Error connecting to MCP server 'zoo-remote': MCP server 'zoo-remote' requires authentication. Please configure OAuth or check server settings.
@@ -612,7 +617,7 @@ gcloud run services logs read zoo-mcp-server --region europe-west1 --limit=5
 
 You should see an output log that confirms a tool call was made. 🛠️
 
-```
+```text
 2025-08-05 19:50:31 INFO:     169.254.169.126:39444 - "POST /mcp HTTP/1.1" 200 OK
 2025-08-05 19:50:31 [INFO]: Processing request of type CallToolRequest
 2025-08-05 19:50:31 >>> 🛠️ Tool: 'get_animals_by_species' called for 'penguin'
@@ -626,7 +631,7 @@ Gemini CLI automatically converts MCP prompts into [custom slash commands](https
 
 Create an MCP prompt so you can quickly find an animal in the zoo by typing `/find animal` into Gemini CLI.
 
-1. Add this code to your `src/index.ts` file above the server.listen() call:
+1. Add this code to your `index.ts` file above the `server.listen()` call:
 
 ```typescript
 // Prompt: Find animal location
@@ -667,11 +672,11 @@ server.prompt(
    ```
 
 5. In the prompt use the new custom command that you created:
-   ```
+   ```text
    /find --animal="lions"
    ```
    OR
-   ```
+   ```text
    /find lions
    ```
 
@@ -690,11 +695,11 @@ Since the requests related to finding the zoo animals don't require thinking or 
 
 1. After the new version of your application is deployed, start Gemini CLI:
    ```bash
-   gemini --model=gemini-3.1-flash-lite
+   gemini --model=gemini-2.5-flash-lite
    ```
 
 2. In the prompt use the new custom command that you created:
-   ```
+   ```text
    /find lions
    ```
 
@@ -704,7 +709,7 @@ You should still see that Gemini CLI calls the `get_animals_by_species` tool and
 
 If you see an error like this:
 
-```
+```text
 ✕ Unknown command: /find --animal="lions"
 ```
 
@@ -728,7 +733,7 @@ Congratulations! You have successfully deployed and connected to a secure remote
 - ✅ Created a production-ready MCP server with TypeScript
 - ✅ Deployed it securely to Google Cloud Run with authentication
 - ✅ Connected to it from Gemini CLI
-- ✅ Added interactive ChatGPT Apps widgets
+- ✅ Added interactive MCP Apps widgets
 - ✅ Learned how to use MCP prompts for faster workflows
 
 ### Continue Learning
@@ -737,7 +742,7 @@ This lab demonstrates the fundamentals of deploying MCP servers. You can extend 
 
 - Adding more tools and resources
 - Integrating with databases or external APIs
-- Building more complex ChatGPT Apps widgets
+- Building more complex MCP Apps widgets
 - Adding authentication and authorization
 - Scaling your server for high traffic
 

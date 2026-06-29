@@ -1,46 +1,51 @@
 ---
 title: "OAuth Proxy"
-description: "Bridge providers that don't support Dynamic Client Registration  -  Google, GitHub, Okta, Azure AD, and others  -  to your MCP server"
+description: "Bridge OAuth providers without Dynamic Client Registration to a TypeScript MCP server."
 icon: "shuffle"
 ---
 
-Use `oauthProxy` when your identity provider doesn't support Dynamic Client Registration (DCR). You register a single application in the provider's dashboard, hand the `clientId` / `clientSecret` to the MCP server, and the server mediates the OAuth flow so every MCP client can authenticate without registering itself upstream.
+Use `oauthProxy` when an identity provider cannot register MCP clients dynamically. You register one application in the provider dashboard, store its client credentials on the MCP server, and let the server mediate authorization and token exchange for MCP clients.
 
-<Note>
-  If your provider supports DCR (Auth0, Better Auth, Keycloak, WorkOS, Supabase, or any provider that advertises a `registration_endpoint`), prefer a [remote auth provider](/typescript/server/authentication/index#remote-auth-built-in) instead  -  clients register directly with the upstream and the server only verifies tokens.
-</Note>
+If your provider supports Dynamic Client Registration, use a built-in provider or [Custom Provider](/typescript/server/authentication/providers/custom). In DCR mode, clients register directly with the upstream provider and the MCP server only verifies tokens.
 
-## When to use OAuth Proxy
+This guide covers the proxy workflow. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthproxy) for exact `oauthProxy()` options, defaults, payload contracts, and verifier behavior.
 
-Reach for `oauthProxy` when all of the following are true:
+## Use OAuth Proxy only when DCR is unavailable
 
-- The provider requires you to register an app in a dashboard and returns a fixed `clientId` / `clientSecret`.
-- The provider does **not** expose a `registration_endpoint` in its OAuth metadata.
-- You're fine holding the client secret on the server and mediating token exchange.
+OAuth Proxy is the right fit when all of these are true:
 
-Common proxy targets: **Google, GitHub, Okta, Azure AD (Microsoft Entra ID), Auth0 Regular Web Apps** (non-DCR), and most enterprise SSO deployments.
+- The provider gives you a fixed `clientId` and `clientSecret`.
+- The provider does not expose a `registration_endpoint` in OAuth metadata.
+- You can safely store the client secret on the MCP server.
+- You are comfortable with the MCP server brokering the OAuth callback and token exchange.
 
-## How it works
+Common proxy targets include Google, GitHub, Okta, Microsoft Entra ID, and enterprise SSO deployments that require pre-registered applications.
 
-1. Your server exposes a `/register` endpoint that returns the configured `clientId`.
-2. The MCP client starts PKCE authorization at your server's `/authorize`, which redirects to the upstream with the server's own `/oauth/callback` as the redirect URI.
-3. The upstream redirects back to `<your-server>/oauth/callback`, and your server forwards the authorization code to the client's original redirect URI.
-4. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
-5. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
+## Register one upstream redirect URI
 
-Your server holds the client credentials and mediates every token exchange. Tokens are passed through  -  the proxy does not mint its own, and PKCE runs end-to-end between the MCP client and the upstream provider.
+In the provider dashboard, register the MCP server callback URL:
 
-<Note>
-  Register exactly one redirect URI in your provider's dashboard: `<your-server-domain>/oauth/callback` (e.g. `http://localhost:3000/oauth/callback` during development). MCP clients never need their own redirect URIs registered upstream  -  the server brokers the callback for all of them.
-</Note>
+```text
+http://localhost:3000/oauth/callback
+```
 
-## Quick start (Google)
+Use your deployed server domain in production:
+
+```text
+https://mcp.example.com/oauth/callback
+```
+
+Do not register every MCP client's redirect URI with the upstream provider. The MCP server brokers the callback for clients.
+
+## Configure the proxy
+
+This Google example validates opaque user access tokens with Google's tokeninfo and userinfo endpoints.
 
 ```typescript
-import { MCPServer, oauthProxy, jwksVerifier } from "mcp-use/server";
+import { MCPServer, oauthProxy } from "mcp-use/server";
 
 const server = new MCPServer({
-  name: "my-server",
+  name: "google-proxy-server",
   version: "1.0.0",
   oauth: oauthProxy({
     authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -50,166 +55,58 @@ const server = new MCPServer({
     clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     scopes: ["openid", "email", "profile"],
     extraAuthorizeParams: { access_type: "offline" },
-    verifyToken: jwksVerifier({
-      jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
-      issuer: "https://accounts.google.com",
-      audience: process.env.GOOGLE_CLIENT_ID!,
-    }),
+    async verifyToken(token) {
+      const tokenInfoResponse = await fetch(
+        `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(token)}`,
+      );
+
+      if (!tokenInfoResponse.ok) {
+        throw new Error("Invalid Google access token");
+      }
+
+      const tokenInfo = (await tokenInfoResponse.json()) as Record<string, unknown>;
+
+      if (tokenInfo.aud !== process.env.GOOGLE_CLIENT_ID) {
+        throw new Error("Google token audience did not match this client");
+      }
+
+      const userInfoResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!userInfoResponse.ok) {
+        throw new Error("Failed to fetch Google userinfo");
+      }
+
+      const userInfo = (await userInfoResponse.json()) as Record<string, unknown>;
+      return { payload: { ...tokenInfo, ...userInfo } };
+    },
   }),
 });
 
 await server.listen(3000);
 ```
 
-## Configuration options
+Use `jwksVerifier` only for providers that issue JWT access tokens and publish a JWKS. Write a custom `verifyToken` function for opaque-token providers.
 
-```typescript
-oauthProxy({
-  // Required: upstream OAuth endpoints
-  authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenEndpoint: "https://oauth2.googleapis.com/token",
-  issuer: "https://accounts.google.com",
+## Understand the proxy flow
 
-  // Required: pre-registered client credentials
-  clientId: process.env.CLIENT_ID!,
-  clientSecret: process.env.CLIENT_SECRET, // optional for public clients
+In proxy mode, the MCP server acts as the OAuth-facing server for MCP clients.
 
-  // Required: token verifier  -  resolves to { payload } or throws
-  verifyToken: jwksVerifier({
-    jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
-    issuer: "https://accounts.google.com",
-    audience: process.env.CLIENT_ID!,
-  }),
+1. The MCP client calls the MCP server's `/register` endpoint.
+2. The MCP server returns the pre-registered upstream `clientId`.
+3. The client starts PKCE authorization through the MCP server's `/authorize` endpoint.
+4. The upstream provider redirects to the MCP server's `/oauth/callback`.
+5. The MCP server forwards the authorization code to the client's original redirect URI.
+6. During token exchange, the MCP server injects the upstream `clientId` and `clientSecret`.
+7. The client calls `/mcp/*` with the upstream access token.
+8. The MCP server verifies the token with your `verifyToken` function.
 
-  // Optional: scopes to request (default: ["openid", "email", "profile"])
-  scopes: ["openid", "email", "profile"],
+The proxy passes upstream tokens through. It does not mint its own access tokens.
 
-  // Optional: grant types (default: ["authorization_code", "refresh_token"])
-  grantTypes: ["authorization_code", "refresh_token"],
+## Handle opaque tokens
 
-  // Optional: extra authorize-request params (e.g. audience, access_type, prompt)
-  extraAuthorizeParams: { access_type: "offline", prompt: "consent" },
-
-  // Optional: custom user info extractor
-  // Default pulls sub/email/name/picture and parses `scope` into scopes[].
-  getUserInfo(payload) {
-    return {
-      userId: payload.sub as string,
-      email: payload.email as string | undefined,
-      name: payload.name as string | undefined,
-    };
-  },
-});
-```
-
-### `jwksVerifier` helper
-
-For standard JWT + JWKS providers, `jwksVerifier` handles signature verification, issuer checking, and optional audience validation against a remote JWKS endpoint:
-
-```typescript
-verifyToken: jwksVerifier({
-  jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
-  issuer: "https://accounts.google.com",
-  audience: process.env.GOOGLE_CLIENT_ID!, // optional
-});
-```
-
-For non-JWT providers (e.g. GitHub opaque tokens), write a custom `verifyToken` function  -  see the [GitHub example](#github-opaque-tokens) below.
-
-<Note>
-  Any `verifyToken` function  -  including the one returned by `jwksVerifier`  -  **must resolve to `{ payload: Record<string, unknown> }`** or throw on an invalid token. The proxy surfaces `payload` to `getUserInfo` and to `ctx.auth`.
-</Note>
-
-## Provider examples
-
-### Google
-
-```typescript
-oauth: oauthProxy({
-  authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-  tokenEndpoint: "https://oauth2.googleapis.com/token",
-  issuer: "https://accounts.google.com",
-  clientId: process.env.GOOGLE_CLIENT_ID!,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  scopes: ["openid", "email", "profile"],
-  extraAuthorizeParams: { access_type: "offline" },
-  verifyToken: jwksVerifier({
-    jwksUrl: "https://www.googleapis.com/oauth2/v3/certs",
-    issuer: "https://accounts.google.com",
-    audience: process.env.GOOGLE_CLIENT_ID!,
-  }),
-});
-```
-
-### Okta
-
-```typescript
-const oktaDomain = process.env.OKTA_DOMAIN!;
-
-oauth: oauthProxy({
-  authEndpoint: `${oktaDomain}/oauth2/default/v1/authorize`,
-  tokenEndpoint: `${oktaDomain}/oauth2/default/v1/token`,
-  issuer: `${oktaDomain}/oauth2/default`,
-  clientId: process.env.OKTA_CLIENT_ID!,
-  clientSecret: process.env.OKTA_CLIENT_SECRET,
-  scopes: ["openid", "email", "profile"],
-  verifyToken: jwksVerifier({
-    jwksUrl: `${oktaDomain}/oauth2/default/v1/keys`,
-    issuer: `${oktaDomain}/oauth2/default`,
-  }),
-});
-```
-
-### Azure AD (Microsoft Entra ID)
-
-```typescript
-const tenantId = process.env.AZURE_TENANT_ID!;
-const base = `https://login.microsoftonline.com/${tenantId}/v2.0`;
-
-oauth: oauthProxy({
-  authEndpoint: `${base}/oauth2/v2.0/authorize`,
-  tokenEndpoint: `${base}/oauth2/v2.0/token`,
-  issuer: base,
-  clientId: process.env.AZURE_CLIENT_ID!,
-  clientSecret: process.env.AZURE_CLIENT_SECRET,
-  scopes: ["openid", "profile", "email"],
-  verifyToken: jwksVerifier({
-    jwksUrl: "https://login.microsoftonline.com/common/discovery/v2.0/keys",
-    issuer: base,
-    audience: process.env.AZURE_CLIENT_ID!,
-  }),
-});
-```
-
-### Auth0 Regular Web App (non-DCR)
-
-Use the proxy when your Auth0 tenant doesn't have the Early Access DCR feature enabled:
-
-```typescript
-const domain = process.env.AUTH0_DOMAIN!;
-const audience = process.env.AUTH0_AUDIENCE!;
-
-oauth: oauthProxy({
-  authEndpoint: `https://${domain}/authorize`,
-  tokenEndpoint: `https://${domain}/oauth/token`,
-  issuer: `https://${domain}/`,
-  clientId: process.env.AUTH0_CLIENT_ID!,
-  clientSecret: process.env.AUTH0_CLIENT_SECRET,
-  scopes: ["openid", "email", "profile"],
-  extraAuthorizeParams: { audience },
-  verifyToken: jwksVerifier({
-    jwksUrl: `https://${domain}/.well-known/jwks.json`,
-    issuer: `https://${domain}/`,
-    audience,
-  }),
-});
-```
-
-See the [runnable `auth0-proxy` example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0-proxy) for a full working setup.
-
-### GitHub (opaque tokens)
-
-GitHub issues non-JWT opaque tokens, so `jwksVerifier` doesn't apply. Write a custom `verifyToken` that validates by calling the GitHub API:
+GitHub issues opaque access tokens, so `jwksVerifier` does not apply. Validate the token by calling the provider API.
 
 ```typescript
 oauth: oauthProxy({
@@ -219,19 +116,21 @@ oauth: oauthProxy({
   clientId: process.env.GITHUB_CLIENT_ID!,
   clientSecret: process.env.GITHUB_CLIENT_SECRET!,
   scopes: ["read:user", "user:email"],
-
   async verifyToken(token) {
-    const res = await fetch("https://api.github.com/user", {
+    const response = await fetch("https://api.github.com/user", {
       headers: {
         Authorization: `Bearer ${token}`,
         "User-Agent": "my-mcp-server",
       },
     });
-    if (!res.ok) throw new Error("Invalid GitHub token");
-    const user = await res.json();
+
+    if (!response.ok) {
+      throw new Error("Invalid GitHub token");
+    }
+
+    const user = await response.json();
     return { payload: { sub: String(user.id), ...user } };
   },
-
   getUserInfo(payload) {
     return {
       userId: payload.sub as string,
@@ -244,48 +143,45 @@ oauth: oauthProxy({
 });
 ```
 
-## Accessing user info in tools
+## Use upstream tokens in tools
+
+The upstream access token is available as `ctx.auth.accessToken`. Use it only when a tool must call the provider API on behalf of the user.
 
 ```typescript
+import { error, object } from "mcp-use/server";
+
 server.tool(
   {
-    name: "get-user-info",
-    description: "Get authenticated user info",
-  },
-  async (_args, ctx) => ({
-    userId: ctx.auth.user.userId,
-    email: ctx.auth.user.email,
-    name: ctx.auth.user.name,
-    scopes: ctx.auth.scopes,
-  }),
-);
-```
-
-The upstream access token is available as `ctx.auth.accessToken`  -  use it to call provider APIs on behalf of the user:
-
-```typescript
-server.tool(
-  {
-    name: "get-google-profile",
-    description: "Fetch the full profile from Google's userinfo endpoint",
+    name: "get_google_profile",
+    description: "Fetch the caller's Google profile.",
   },
   async (_args, ctx) => {
-    const res = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    const response = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
       headers: { Authorization: `Bearer ${ctx.auth.accessToken}` },
     });
-    return { content: [{ type: "text", text: JSON.stringify(await res.json()) }] };
+
+    return object(await response.json());
   },
 );
 ```
 
-## Resources
+## Next steps
 
-- [Runnable `auth0-proxy` example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/auth0-proxy)
-- [jose library](https://github.com/panva/jose)  -  JWT / JWKS verification
-- [OAuth 2.1 Specification](https://oauth.net/2.1/)
-- [PKCE (RFC 7636)](https://datatracker.ietf.org/doc/html/rfc7636)
-
-## Next Steps
-
-- [Custom Provider (DCR)](/typescript/server/authentication/providers/custom)  -  Use a provider that supports Dynamic Client Registration
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+<CardGroup cols={2}>
+  <Card title="Custom Provider" icon="code" href="/typescript/server/authentication/providers/custom">
+    Use a provider that supports Dynamic Client Registration.
+  </Card>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Use proxied identity data inside tools.
+  </Card>
+  <Card title="OAuth Proxy API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthproxy">
+    Look up exact proxy options, defaults, and verifier contracts.
+  </Card>
+  <Card title="PKCE" icon="book-open" href="https://datatracker.ietf.org/doc/html/rfc7636">
+    Review the authorization-code security flow used by MCP clients.
+  </Card>
+</CardGroup>

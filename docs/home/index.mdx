@@ -44,7 +44,7 @@ For the complete documentation index, see [llms.txt](https://mcp-use.com/docs/ll
     imgLight="https://cdn.mcp-use.com/docs/server_white.png"
     title="Build an MCP Server"
     description="Expose tools, resources, and prompts to any AI agent."
-    leftHref="/typescript/server/index"
+    leftHref="/typescript/server"
     rightHref="/python/server/index"
     leftLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
     rightLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
@@ -54,7 +54,7 @@ For the complete documentation index, see [llms.txt](https://mcp-use.com/docs/ll
     imgLight="https://cdn.mcp-use.com/docs/agent_white.png"
     title="Build an MCP App"
     description="Interactive widgets that run in Claude, ChatGPT, and any MCP client."
-    leftHref="/typescript/server/mcp-apps"
+    leftHref="/typescript/mcp-apps"
     rightHref="/python/server/index"
     leftLogo="https://cdn.mcp-use.com/docs/typescriptlogo.svg"
     rightLogo="https://cdn.mcp-use.com/docs/pythonlogo.svg"
@@ -96,7 +96,7 @@ await server.listen(3000);
 // Inspector at http://localhost:3000/inspector
 ```
 
-<Card title="Full TypeScript Server Documentation" icon="arrow-right" href="/typescript/server/index" horizontal />
+<Card title="Full TypeScript Server Documentation" icon="arrow-right" href="/typescript/server" horizontal />
   </Tab>
   <Tab title="Python">
 ```bash
@@ -157,11 +157,11 @@ await server.listen(3000);
 Widgets in `resources/` are **auto-discovered**  -  no manual registration needed.
 
 <CardGroup cols={2}>
-  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/server/mcp-apps">
+  <Card title="MCP Apps Guide" icon="app-window-mac" href="/typescript/mcp-apps">
     Build widgets with React, auto-discovery, and client-side hooks.
   </Card>
-  <Card title="ChatGPT Apps Flow" icon="message-square" href="/guides/chatgpt-apps-flow">
-    Step-by-step: ship an MCP App to ChatGPT.
+  <Card title="Apps SDK compatibility" icon="message-square" href="/typescript/mcp-apps/apps-sdk-compatibility">
+    Understand how MCP Apps run in ChatGPT.
   </Card>
 </CardGroup>
 
@@ -271,3 +271,5 @@ mcp-use is fullstack. Alongside MCP Servers and MCP Apps, it ships a full **MCP 
 </CardGroup>
 
 </div>
+
+{/* preview rebuild trigger */}

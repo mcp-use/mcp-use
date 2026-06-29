@@ -1,0 +1,569 @@
+---
+title: "useCallTool()"
+description: "React hook for calling MCP tools from widgets with TanStack Query-like state management API Documentation"
+icon: "mouse-pointer-click"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useCallTool.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useCallTool.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useCallTool.ts</a>
+</Callout>
+
+`useCallTool` is a React hook for calling MCP tools from inside a widget. It manages the call with a discriminated union state machine (idle, pending, success, error) similar to TanStack Query, and exposes two ways to invoke the tool: `callTool` (fire-and-forget with optional side effect callbacks) and `callToolAsync` (returns a `Promise`).
+
+Types are inferred automatically from the tool name when running `mcp-use dev`, which generates `ToolRegistry` augmentations in `.mcp-use/tool-registry.d.ts`. For setups without the dev server, use [`generateHelpers()`](#generatehelpers) to bind the hook to an explicit tool map.
+
+<Info>
+`useCallTool` runs only in a browser environment. Calling it outside the browser (for example, during server-side rendering) throws `Error("useCallTool can only be used in browser environment")`.
+</Info>
+
+## useCallTool
+
+Call an MCP tool and track its lifecycle with idle, pending, success, and error states.
+
+```ts
+import { useCallTool } from "mcp-use/react";
+```
+
+Hook for calling MCP tools with TanStack Query-like state management.
+
+The hook is declared with two overloads. The first is type-safe and resolves input and output types from the augmented `ToolRegistry` based on the tool `name`. The second is a fallback that lets you supply explicit generics when a tool is not in the registry. The runtime detects the protocol automatically: in MCP Apps clients it uses JSON-RPC over `postMessage`, and in the ChatGPT Apps SDK it uses `window.openai.callTool()`. Your code is identical in both cases.
+
+When `name` is a key of `ToolRegistry`, input arguments and the response `structuredContent` are fully typed from your server's tool definition. The hook tracks the latest call with an internal counter, so if you fire a new call before a previous one resolves, only the most recent call updates state (responses from stale calls are ignored).
+
+```ts
+import { useCallTool } from "mcp-use/react";
+```
+
+**Type Parameters (overload 1)**
+><ParamField body="TName" type="keyof ToolRegistry" required="True" >   The tool name. Constrained to the keys of the augmented `ToolRegistry`, which gives autocomplete for available tool names. </ParamField>
+
+**Type Parameters (overload 2)**
+><ParamField body="TArgs" type="UnknownObject | null" default="null" >   The shape of the tool input arguments. Use `null` when the tool takes no arguments. </ParamField>
+><ParamField body="TResponse" type="Partial<CallToolResponse>" default="CallToolResponse" >   The shape of the tool response. </ParamField>
+
+**Parameters**
+><ParamField body="name" type="TName | string" required="True" >   The name of the tool to call. Auto-typed from `ToolRegistry` in the first overload, or a plain `string` in the fallback overload. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="UseCallToolReturn<TArgs, TResponse>" >   The current call state spread with the `callTool` and `callToolAsync` methods. See [`UseCallToolReturn`](#usecalltoolreturn). </ResponseField>
+
+**Signature**
+```ts wrap
+// Overload 1: type-safe with ToolRegistry
+export function useCallTool<TName extends keyof ToolRegistry>(name: TName): UseCallToolReturn<ResolveInput<TName>, ResolveOutput<TName>>;
+// Overload 2: fallback with explicit generics
+export function useCallTool<TArgs extends UnknownObject | null = null, TResponse extends Partial<CallToolResponse> = CallToolResponse>(name: string): UseCallToolReturn<TArgs, TResponse>;
+```
+
+### Returns
+
+The hook returns the current [`CallToolState`](#calltoolstate) spread together with two methods. Every field below is present on the returned object.
+
+### status
+
+The current lifecycle state of the tool call.
+
+**Returns**
+><ResponseField name="status" type='"idle" | "pending" | "success" | "error"' >   `"idle"` before any call, `"pending"` while a call is in flight, `"success"` after the latest call resolves, and `"error"` after the latest call rejects. </ResponseField>
+
+### isIdle
+
+Convenience boolean flag for the idle state.
+
+**Returns**
+><ResponseField name="isIdle" type="boolean" >   `true` when `status === "idle"` (no call has been made yet). </ResponseField>
+
+### isPending
+
+Convenience boolean flag for the pending state.
+
+**Returns**
+><ResponseField name="isPending" type="boolean" >   `true` when `status === "pending"` (a call is currently executing). </ResponseField>
+
+### isSuccess
+
+Convenience boolean flag for the success state.
+
+**Returns**
+><ResponseField name="isSuccess" type="boolean" >   `true` when `status === "success"`. When `true`, `data` is defined and `error` is `undefined`. </ResponseField>
+
+### isError
+
+Convenience boolean flag for the error state.
+
+**Returns**
+><ResponseField name="isError" type="boolean" >   `true` when `status === "error"`. When `true`, `error` is defined and `data` is `undefined`. </ResponseField>
+
+### data
+
+The tool result, available only after a successful call.
+
+**Returns**
+><ResponseField name="data" type="TResponse | undefined" >   The normalized response. `undefined` in every state except `success`. For registry-typed tools this is `CallToolResponse` with a typed `structuredContent`. See [`CallToolResponse`](#calltoolresponse). </ResponseField>
+
+### error
+
+The error thrown by the tool call, available only after a failed call.
+
+**Returns**
+><ResponseField name="error" type="unknown | undefined" >   The thrown error. `undefined` in every state except `error`. Typed as `unknown` because any value can be thrown. </ResponseField>
+
+### callTool
+
+Fire-and-forget invocation with optional side effect callbacks.
+
+`callTool` starts the tool call and returns `void` immediately. State (`isPending`, `data`, `error`, and so on) updates as the call progresses. You can pass a [`SideEffects`](#sideeffects) object to react to the result. When the tool input is optional (for example `null` input or all-optional fields), you may omit `args` entirely or pass only the side effects object as the first argument; the hook detects a side effects object by the presence of an `onSuccess`, `onError`, or `onSettled` key.
+
+**Type**
+```ts wrap
+callTool: CallToolFn<TArgs, TResponse>
+```
+
+See [`CallToolFn`](#calltoolfn) for the full set of call signatures.
+
+### callToolAsync
+
+Promise-based invocation for sequential or `try`/`catch` flows.
+
+`callToolAsync` starts the tool call and returns a `Promise` that resolves with the response or rejects with the thrown error. State flags update the same way as `callTool`. When the tool input is optional, you may call it with no arguments. Use this method to chain tool calls or to handle the result with `await` inside a `try`/`catch` block.
+
+**Type**
+```ts wrap
+callToolAsync: CallToolAsyncFn<TArgs, TResponse>
+```
+
+See [`CallToolAsyncFn`](#calltoolasyncfn) for the full set of call signatures.
+
+## generateHelpers
+
+Generate fully-typed hook helpers from an explicit tool map.
+
+This is an alternative to the automatic `ToolRegistry` approach. When using `mcp-use dev`, types are auto-generated in `.mcp-use/tool-registry.d.ts` and `useCallTool` is typed without this factory. Use `generateHelpers` for advanced cases: running without `mcp-use dev` (for example a custom build setup), scoping types to a subset of tools, or using different tool maps in different parts of your app. It returns an object containing a typed `useCallTool` and a typed `useToolInfo` hook, both bound to the supplied `TMap`.
+
+```ts
+import { generateHelpers } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TMap" type="ToolMap" required="True" >   The tool map defining all tools and their input/output types. See [`ToolMap`](#toolmap). </ParamField>
+
+**Returns**
+><ResponseField name="useCallTool" type="TypedUseCallTool<TMap>" >   A `useCallTool` hook whose `name` argument is constrained to the keys of `TMap`, with input and output inferred from the map. See [`TypedUseCallTool`](#typedusecalltool). </ResponseField>
+><ResponseField name="useToolInfo" type="TypedUseToolInfo<TMap>" >   A `useToolInfo` hook that returns the current widget state typed against `TMap`. See [`TypedUseToolInfo`](#typedusetoolinfo). </ResponseField>
+
+**Signature**
+```ts wrap
+export function generateHelpers<TMap extends ToolMap>(): { useCallTool: TypedUseCallTool<TMap>; useToolInfo: <TName extends keyof TMap & string>() => UseWidgetResult<WidgetInputType<ToolInput<TMap, TName>>, UnknownObject, ToolOutput<TMap, TName>, UnknownObject, WidgetInputType<ToolInput<TMap, TName>>> };
+```
+
+## Types
+
+### CallToolState
+
+The discriminated union that models the four lifecycle states of a tool call.
+
+Each variant fixes the boolean flags and the presence of `data` and `error`, so narrowing on `status` (or on any flag) gives type-safe access to `data` and `error`. The success variant is the only one where `data` is present, and the error variant is the only one where `error` is present.
+
+```ts
+import type { CallToolState } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TData" type="any" required="True" >   The type of `data` in the `success` variant. </ParamField>
+
+**Signature**
+```ts wrap
+export type CallToolState<TData> =
+  | { status: "idle"; isIdle: true; isPending: false; isSuccess: false; isError: false; data: undefined; error: undefined }
+  | { status: "pending"; isIdle: false; isPending: true; isSuccess: false; isError: false; data: undefined; error: undefined }
+  | { status: "success"; isIdle: false; isPending: false; isSuccess: true; isError: false; data: TData; error: undefined }
+  | { status: "error"; isIdle: false; isPending: false; isSuccess: false; isError: true; data: undefined; error: unknown };
+```
+
+### SideEffects
+
+Optional callbacks passed to [`callTool`](#calltool), modeled after TanStack Query mutation callbacks.
+
+All three callbacks are optional. `onSuccess` runs when the call resolves, `onError` runs when it rejects, and `onSettled` runs after either outcome. Each callback receives the original `args` that were passed to the call. In `onSettled`, exactly one of `data` or `error` is defined depending on the outcome.
+
+```ts
+import type { SideEffects } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TArgs" type="TArgs" required="True" >   The type of the tool input arguments passed back to each callback. </ParamField>
+><ParamField body="TResponse" type="TResponse" required="True" >   The type of the successful response. </ParamField>
+
+**Signature**
+```ts wrap
+export type SideEffects<TArgs, TResponse> = {
+  onSuccess?: (data: TResponse, args: TArgs) => void;
+  onError?: (error: unknown, args: TArgs) => void;
+  onSettled?: (data: TResponse | undefined, error: unknown | undefined, args: TArgs) => void;
+};
+```
+
+### CallToolFn
+
+The call signature of [`callTool`](#calltool), the fire-and-forget method. Returns `void`.
+
+The signature adapts to whether the tool input is optional. When the input type is optional (it is `null`, or all of its keys are optional), you can call with no arguments, with only a [`SideEffects`](#sideeffects) object, with only `args`, or with both. When the input is required, you must pass `args`, optionally followed by a `SideEffects` object.
+
+```ts
+import type { CallToolFn } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TArgs" type="TArgs" required="True" >   The tool input type. Whether it is optional determines which overloads are available. </ParamField>
+><ParamField body="TResponse" type="TResponse" required="True" >   The successful response type passed to the callbacks. </ParamField>
+
+**Signature**
+```ts wrap
+export type CallToolFn<TArgs, TResponse> = IsArgsOptional<TArgs> extends true
+  ? {
+      (): void;
+      (sideEffects: SideEffects<TArgs, TResponse>): void;
+      (args: TArgs): void;
+      (args: TArgs, sideEffects: SideEffects<TArgs, TResponse>): void;
+    }
+  : {
+      (args: TArgs): void;
+      (args: TArgs, sideEffects: SideEffects<TArgs, TResponse>): void;
+    };
+```
+
+### CallToolAsyncFn
+
+The call signature of [`callToolAsync`](#calltoolasync), the Promise-based method.
+
+Like `CallToolFn`, it adapts to whether the input is optional. When the input is optional, you can call with no arguments or with `args`; both return `Promise<TResponse>`. When the input is required, you must pass `args`.
+
+```ts
+import type { CallToolAsyncFn } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TArgs" type="TArgs" required="True" >   The tool input type. Whether it is optional determines which overloads are available. </ParamField>
+><ParamField body="TResponse" type="TResponse" required="True" >   The type the returned `Promise` resolves with. </ParamField>
+
+**Signature**
+```ts wrap
+export type CallToolAsyncFn<TArgs, TResponse> = IsArgsOptional<TArgs> extends true
+  ? {
+      (): Promise<TResponse>;
+      (args: TArgs): Promise<TResponse>;
+    }
+  : (args: TArgs) => Promise<TResponse>;
+```
+
+### UseCallToolReturn
+
+The full return type of [`useCallTool`](#usecalltool). Intersects the current [`CallToolState`](#calltoolstate) with the two call methods.
+
+```ts
+import type { UseCallToolReturn } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TArgs" type="TArgs" required="True" >   The tool input type. </ParamField>
+><ParamField body="TResponse" type="TResponse" required="True" >   The successful response type. </ParamField>
+
+**Signature**
+```ts wrap
+export type UseCallToolReturn<TArgs, TResponse> = CallToolState<TResponse> & {
+  callTool: CallToolFn<TArgs, TResponse>;
+  callToolAsync: CallToolAsyncFn<TArgs, TResponse>;
+};
+```
+
+### ToolMap
+
+The structure of a tool map passed to [`generateHelpers`](#generatehelpers). Maps each tool name to its input and optional output types.
+
+Each entry has a required `input` (an object type, or `null` when the tool takes no arguments) and an optional `output` object type. When `output` is omitted, the tool's response is the bare `CallToolResponse` without typed `structuredContent`.
+
+```ts
+import type { ToolMap } from "mcp-use/react";
+```
+
+**Signature**
+```ts wrap
+export type ToolMap = Record<string, {
+  input: UnknownObject | null;
+  output?: UnknownObject;
+}>;
+```
+
+### ToolInput
+
+Extracts the input type for a given tool name from a [`ToolMap`](#toolmap).
+
+```ts
+import type { ToolInput } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TMap" type="ToolMap" required="True" >   The tool map to read from. </ParamField>
+><ParamField body="TName" type="keyof TMap" required="True" >   The tool name whose input type to extract. </ParamField>
+
+**Signature**
+```ts wrap
+export type ToolInput<TMap extends ToolMap, TName extends keyof TMap> = TMap[TName]["input"];
+```
+
+### ToolOutput
+
+Extracts the output type for a given tool name from a [`ToolMap`](#toolmap), combined with [`CallToolResponse`](#calltoolresponse).
+
+When the map entry declares an `output` object, the result is `CallToolResponse` intersected with `{ structuredContent: <output> }`. When `output` is absent, it intersects with `Record<string, never>`, leaving `structuredContent` untyped.
+
+```ts
+import type { ToolOutput } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TMap" type="ToolMap" required="True" >   The tool map to read from. </ParamField>
+><ParamField body="TName" type="keyof TMap" required="True" >   The tool name whose output type to extract. </ParamField>
+
+**Signature**
+```ts wrap
+export type ToolOutput<TMap extends ToolMap, TName extends keyof TMap> =
+  CallToolResponse & (TMap[TName]["output"] extends UnknownObject
+    ? { structuredContent: TMap[TName]["output"] }
+    : Record<string, never>);
+```
+
+### TypedUseCallTool
+
+The type of the `useCallTool` hook returned by [`generateHelpers`](#generatehelpers). A `useCallTool` bound to a specific [`ToolMap`](#toolmap), so `name` is constrained to that map's keys and input/output are inferred from it.
+
+```ts
+import type { TypedUseCallTool } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TMap" type="ToolMap" required="True" >   The tool map the hook is bound to. </ParamField>
+
+**Signature**
+```ts wrap
+export type TypedUseCallTool<TMap extends ToolMap> = <TName extends keyof TMap & string>(name: TName) => UseCallToolReturn<ToolInput<TMap, TName>, ToolOutput<TMap, TName>>;
+```
+
+### TypedUseToolInfo
+
+The type of the `useToolInfo` hook returned by [`generateHelpers`](#generatehelpers). A `useToolInfo` bound to a specific [`ToolMap`](#toolmap) that returns the current widget state (a `UseWidgetResult`) typed against the map.
+
+`null` input types are widened to `UnknownObject` for compatibility with `useWidget`.
+
+```ts
+import type { TypedUseToolInfo } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="TMap" type="ToolMap" required="True" >   The tool map the hook is bound to. </ParamField>
+
+**Signature**
+```ts wrap
+export type TypedUseToolInfo<TMap extends ToolMap> = <TName extends keyof TMap & string>() => UseWidgetResult<
+  WidgetInputType<ToolInput<TMap, TName>>,
+  UnknownObject,
+  ToolOutput<TMap, TName>,
+  UnknownObject,
+  WidgetInputType<ToolInput<TMap, TName>>
+>;
+```
+
+### InferToolMapFromSchemas
+
+Helper type that builds a [`ToolMap`](#toolmap) from Zod schemas, so you do not have to hand-write input and output object types.
+
+Pass a record mapping tool names to objects with an optional `schema` and `outputSchema`. The helper reads the inferred input from the schema (`_input`, falling back to `_type`) and the inferred output from the output schema (`_output`, falling back to `_type`). When a schema is missing, `input` resolves to `null`; when an output schema is missing, `output` resolves to `undefined`.
+
+```ts
+import type { InferToolMapFromSchemas } from "mcp-use/react";
+```
+
+**Type Parameters**
+><ParamField body="T" type="Record<string, { schema?: any; outputSchema?: any }>" required="True" >   A record mapping tool names to their Zod input and output schemas. </ParamField>
+
+**Signature**
+```ts wrap
+export type InferToolMapFromSchemas<T extends Record<string, { schema?: any; outputSchema?: any }>> = {
+  [K in keyof T]: {
+    input: T[K]["schema"] extends { _input: infer I } ? I : T[K]["schema"] extends { _type: infer I } ? I : null;
+    output: T[K]["outputSchema"] extends { _output: infer O } ? O : T[K]["outputSchema"] extends { _type: infer O } ? O : undefined;
+  };
+};
+```
+
+## Response Structure
+
+Successful calls resolve with a normalized `CallToolResponse`. The hook's `data` field (and the `data` argument of the success callbacks) has this shape. For registry-typed or tool-map-typed tools, `structuredContent` is narrowed to your tool's output type.
+
+### CallToolResponse
+
+The normalized response returned by a tool call.
+
+`result` is a convenience field containing the text content blocks joined into a single string. `structuredContent` holds the tool's structured output when it returned any. `isError` is set by the protocol when the tool reported an error result.
+
+**Signature**
+```ts wrap
+export type CallToolResponse = {
+  content: Array<{ type: string; text?: string; [key: string]: any }>;
+  structuredContent?: Record<string, unknown>;
+  isError?: boolean;
+  result: string; // text content joined as a convenience
+  _meta?: Record<string, unknown>;
+};
+```
+
+## Examples
+
+### Basic usage
+
+The tool name is type-checked, and input and output are typed from the registry when running `mcp-use dev`.
+
+```tsx wrap
+import { useCallTool } from "mcp-use/react";
+
+const MyWidget = () => {
+  const { callTool, data, isPending, isSuccess, isError, error } =
+    useCallTool("search-flights");
+
+  return (
+    <div>
+      <button onClick={() => callTool({ destination: "NYC" })}>
+        Search Flights
+      </button>
+      {isPending && <p>Searching...</p>}
+      {isSuccess && (
+        <ul>
+          {data.structuredContent.flights.map((flight) => (
+            <li key={flight.id}>{flight.price}</li>
+          ))}
+        </ul>
+      )}
+      {isError && <p>Error: {String(error)}</p>}
+    </div>
+  );
+};
+```
+
+### Fire-and-forget with callbacks
+
+Use `callTool` for non-blocking calls. The callbacks receive the original `args`, so you can read them back in any of the three handlers.
+
+```ts wrap
+const { callTool } = useCallTool("create-booking");
+
+callTool(
+  { flightId: "123", passenger: "John Doe" },
+  {
+    onSuccess: (data, args) => {
+      console.log("Booking confirmed:", data.structuredContent, args);
+    },
+    onError: (error, args) => {
+      console.error("Booking failed:", error, args);
+    },
+    onSettled: (data, error, args) => {
+      console.log("Request complete", { data, error, args });
+    },
+  }
+);
+```
+
+### Async/await
+
+Use `callToolAsync` to chain calls or handle results in a `try`/`catch` block. The Promise resolves with the response or rejects with the thrown error.
+
+```ts wrap
+const { callToolAsync } = useCallTool("search-flights");
+
+const handleSearch = async () => {
+  try {
+    const result = await callToolAsync({
+      destination: "Tokyo",
+      date: "2024-12-01",
+    });
+    setFlights(result.structuredContent.flights);
+  } catch (error) {
+    console.error("Search failed:", error);
+  }
+};
+```
+
+### Explicit generics (escape hatch)
+
+When a tool is not in the registry, supply input and response types directly with the fallback overload.
+
+```ts wrap
+const { callTool } = useCallTool<{ query: string }, { results: string[] }>(
+  "custom-tool"
+);
+```
+
+### Manual typing with generateHelpers
+
+For setups without `mcp-use dev`, bind the hooks to an explicit tool map.
+
+```ts wrap
+import { generateHelpers } from "mcp-use/react";
+
+type MyToolMap = {
+  "search-flights": {
+    input: { destination: string; date?: string };
+    output: { flights: Array<{ id: string; price: number }> };
+  };
+  "book-flight": {
+    input: { flightId: string };
+    output: { confirmation: string };
+  };
+};
+
+const { useCallTool } = generateHelpers<MyToolMap>();
+
+// useCallTool is now typed against MyToolMap
+const { callTool, data } = useCallTool("search-flights");
+```
+
+### Server tool definition
+
+The tool names and schemas registered on the server drive the generated types. Define tools with `new MCPServer({ ... })` and a Zod `schema`.
+
+```ts wrap
+import { MCPServer, widget } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "mcp-apps-example",
+  version: "1.0.0",
+});
+
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({
+      city: z.string().describe("City name"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city }) =>
+    widget({
+      props: { city, temperature: 22, conditions: "Partly Cloudy" },
+      message: `Current weather in ${city}`,
+    })
+);
+
+await server.listen();
+```
+
+## See Also
+
+- [useWidget()](/typescript/api-reference/react/usewidget) - Accessing widget props, state, and host context
+- [Building UI Widgets](/typescript/mcp-apps) - Complete widget development guide

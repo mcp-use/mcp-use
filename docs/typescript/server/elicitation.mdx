@@ -1,478 +1,212 @@
 ---
 title: "Elicitation"
-description: "Request user input during tool execution"
+description: "Request user input from TypeScript MCP tools with safe form and URL flows."
 icon: "check"
 ---
 
-<Info>
-Elicitation enables your MCP server tools to request additional information from users during execution. This creates interactive workflows where tools can dynamically gather structured data or direct users to external URLs for sensitive operations.
-</Info>
+Elicitation lets a tool pause and ask the client for user input. Use it when a tool cannot continue safely without a user decision, missing field, or external authorization step.
 
-## Overview
+This guide focuses on when to use elicitation and how to handle the user response. Use the [Tool context API reference](/typescript/api-reference/server/tool-context#elicit) for exact overloads, result types, timeout options, validation errors, and return shapes. Use the [Elicitation schemas API reference](/typescript/api-reference/server/elicitation-schemas) for enum schema helpers.
 
-When a tool needs user input, it can use `ctx.elicit()` to send a request to the client. The client presents this request to the user and returns their response. This enables dynamic, interactive tool behavior that adapts based on user input.
+## Choose form mode or URL mode
 
-**Two Modes Available:**
+Use form mode for non-sensitive structured input. Use URL mode for sensitive or external flows.
 
-- **Form Mode**: Collect structured data with JSON schema validation (for non-sensitive information)
-- **URL Mode**: Direct users to external URLs (MUST be used for sensitive data like credentials, OAuth)
+| Need | Mode |
+| --- | --- |
+| Ask for preferences, labels, confirmation fields, or non-sensitive details | Form mode |
+| Send the user through OAuth, payment, credential entry, or another sensitive flow | URL mode |
 
-## Basic Usage
+Never collect credentials, API keys, payment details, or OAuth secrets through form mode. Form responses pass through the MCP client.
 
-Use the `elicit()` method on the context object within tool callbacks. The API automatically detects the mode from your parameters:
+Keep form schemas flat and simple. Use top-level primitive fields, enum fields, and string-array enum selections. For nested objects, files, credentials, or richer forms, send the user through URL mode or another external flow.
+
+## Check client support
+
+Only use elicitation when the connected client supports the mode you need. Provide a fallback for clients that do not advertise that support.
 
 ```typescript
-import { MCPServer, text } from 'mcp-use/server';
-import { z } from 'zod';
+import { error, text } from "mcp-use/server";
+import { z } from "zod";
 
-const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-});
+server.tool(
+  {
+    name: "collect_contact",
+    description: "Collect non-sensitive contact details before continuing.",
+  },
+  async (_params, ctx) => {
+    if (!ctx.client.capabilities().elicitation?.form) {
+      return error("This client does not support form elicitation.");
+    }
 
-server.tool({
-  name: 'collect-user-info',
-  description: 'Collect user information',
-}, async (params, ctx) => {
-    // Simplified API: ctx.elicit(message, zodSchema)
-    // Mode is automatically inferred from the Zod schema
     const result = await ctx.elicit(
-      'Please provide your contact details',
+      "Who should receive the follow-up?",
       z.object({
-        name: z.string().default('Anonymous'),
-        email: z.string().email(),
-      })
+        name: z.string().describe("Recipient name"),
+        email: z.string().email().describe("Recipient email"),
+      }),
     );
 
-    // result.data is automatically typed as { name: string, email: string }
-    if (result.action === 'accept')
-      return text(`Thank you, ${result.data.name}! We'll contact you at ${result.data.email}`);
-    else if (result.action === 'decline')
-      return text('No information provided');
-    else
-      return text('Operation cancelled');
-});
-```
-
-## Form Mode
-
-Form mode allows you to collect structured data from users with Zod schema validation. **Use this for non-sensitive information only.**
-
-```typescript
-const result = await ctx.elicit(message, zodSchema);
-// Mode is automatically inferred as "form" from the Zod schema parameter
-// result.data is automatically typed based on the Zod schema
-```
-
-Use Zod schemas to define the structure and validation rules for user input. Benefits:
-
-- **Type Safety**: Return type is automatically inferred from your schema
-- **Server-Side Validation**: Data is validated against the Zod schema before being returned (mcp-use feature)
-- **Validation**: Built-in Zod validators (`.min()`, `.max()`, `.email()`, etc.)
-- **Descriptions**: Use `.describe()` for field labels
-- **Defaults**: Use `.default()` for default values
-- **Optional fields**: Use `.optional()` for optional properties
-
-### Server-Side Validation
-
-<Note>
-**Automatic Validation with mcp-use**: When using the mcp-use server library's simplified API with Zod schemas (`ctx.elicit(message, zodSchema)`), the server automatically validates the returned data against your schema. This is a convenience feature provided by mcp-use. Invalid data is rejected with clear error messages before reaching your tool logic.
-</Note>
-
-The validation flow:
-
-1. **Schema Conversion**: Zod schema is converted to JSON Schema and sent to the client
-2. **User Input**: Client collects data from the user
-3. **Client Validation**: Client validates against JSON Schema (optional)
-4. **Data Return**: Client returns data to server
-5. **Server Validation**: Server validates data against the original Zod schema
-6. **Type Safety**: Validated data is returned with correct TypeScript types
-
-#### What Gets Validated
-
-The server validates:
-
-- **Data Types**: Strings, numbers, booleans must match schema
-- **Ranges**: Min/max values for numbers
-- **String Constraints**: MinLength, maxLength, patterns
-- **Formats**: Email, URL, date formats
-- **Required Fields**: Missing required fields are caught
-- **Enums**: Values must be from allowed options
-- **Custom Validators**: Any Zod refinements and transforms
-
-#### Validation Error Handling
-
-When validation fails, the error is caught and can be handled:
-
-```typescript
-server.tool({
-  name: 'create-account',
-  description: 'Create account with validation'
-}, async (params, ctx) => {
-    try {
-      const result = await ctx.elicit(
-        'Create your account',
-        z.object({
-          username: z.string().min(3).max(20),
-          email: z.string().email(),
-          age: z.number().min(18).max(120),
-        })
-      );
-
-      if (result.action === 'accept') {
-        // Data is guaranteed to be valid here
-        return text(`Account created for ${result.data.username}`);
-      }
-
-      return text('Account creation cancelled');
-    } catch (error) {
-      // Validation error or other failure
-      return error(`Validation failed: ${error.message}`);
+    if (result.action !== "accept") {
+      return text("No contact details were provided.");
     }
-});
+
+    return text(`Follow-up will go to ${result.data.name} at ${result.data.email}.`);
+  },
+);
 ```
 
-#### Validation Examples
+In form mode, mcp-use validates accepted responses against your Zod schema before returning `result.data`.
 
-**Valid Data**:
-```typescript
-// User provides: { username: "john_doe", email: "john@example.com", age: 25 }
-// ✅ Passes validation - all fields valid
-```
+## Handle every user decision
 
-**Invalid Age**:
-```typescript
-// User provides: { username: "john_doe", email: "john@example.com", age: 200 }
-// ❌ Fails: "Too big: expected number to be <=120"
-```
-
-**Invalid Email**:
-```typescript
-// User provides: { username: "john_doe", email: "not-an-email", age: 25 }
-// ❌ Fails: "Invalid email address"
-```
-
-**Missing Required Field**:
-```typescript
-// User provides: { username: "john_doe", age: 25 }
-// ❌ Fails: "Invalid input: expected string, received undefined" (email missing)
-```
-
-**Wrong Type**:
-```typescript
-// User provides: { username: "john_doe", email: "john@example.com", age: "twenty-five" }
-// ❌ Fails: "Invalid input: expected number, received string"
-```
-
-#### Default Values
-
-Fields with `.default()` are automatically filled if missing:
+An elicitation request can be accepted, declined, or cancelled. Treat each outcome deliberately.
 
 ```typescript
 const result = await ctx.elicit(
-  'Enter preferences',
+  "Confirm the export settings.",
   z.object({
-    theme: z.enum(['light', 'dark']).default('light'),
-    notifications: z.boolean().default(true),
-  })
+    includePrivateFields: z.boolean().default(false),
+  }),
 );
 
-// If user provides: {}
-// result.data will be: { theme: 'light', notifications: true }
-```
-
-<Note>
-Default values (SEP-1034) and enum schema improvements (SEP-1330) are complementary. Use `.default()` for straightforward Zod-based forms, and use the verbose JSON Schema API when you need titled enum variants or multi-select enum arrays.
-</Note>
-
-#### SEP-1330 Enum Schema Patterns
-
-When you need advanced enum shapes like titled enums (`oneOf`/`anyOf`) or legacy `enumNames`, use the verbose API:
-
-```typescript
-import {
-  enumSchema,
-  legacyEnum,
-  titledEnum,
-  titledMultiEnum,
-  untitledEnum,
-  untitledMultiEnum,
-} from 'mcp-use/server';
-
-const result = await ctx.elicit({
-  message: 'Choose your options',
-  requestedSchema: enumSchema({
-    untitledSingle: untitledEnum(['option1', 'option2', 'option3']),
-    titledSingle: titledEnum([
-      { value: 'value1', title: 'First Option' },
-      { value: 'value2', title: 'Second Option' },
-      { value: 'value3', title: 'Third Option' },
-    ]),
-    legacyEnum: legacyEnum([
-      { value: 'opt1', name: 'Option One' },
-      { value: 'opt2', name: 'Option Two' },
-      { value: 'opt3', name: 'Option Three' },
-    ]),
-    untitledMulti: untitledMultiEnum(['option1', 'option2', 'option3']),
-    titledMulti: titledMultiEnum([
-      { value: 'value1', title: 'First Choice' },
-      { value: 'value2', title: 'Second Choice' },
-      { value: 'value3', title: 'Third Choice' },
-    ]),
-  }),
-});
-
-if (result.action === 'accept') {
-  return text(`Selected: ${JSON.stringify(result.data)}`);
+switch (result.action) {
+  case "accept":
+    return text(
+      result.data.includePrivateFields
+        ? "Exporting with private fields."
+        : "Exporting without private fields.",
+    );
+  case "decline":
+    return text("The user declined to provide export settings.");
+  case "cancel":
+    return text("The export was cancelled.");
 }
 ```
 
-Supported SEP-1330 variants:
+Use `decline` for an explicit refusal and `cancel` for dismissal or interruption. Avoid continuing a risky operation after either outcome.
 
-- Untitled single-select: `type: "string" + enum`
-- Titled single-select: `type: "string" + oneOf[{ const, title }]`
-- Legacy titled enum: `type: "string" + enum + enumNames`
-- Untitled multi-select: `type: "array" + items.enum`
-- Titled multi-select: `type: "array" + items.anyOf[{ const, title }]`
+## Use form mode for non-sensitive data
 
-#### Example: Simple Contact Form
+Form mode works well when the user needs to choose or fill in ordinary application data.
 
 ```typescript
-import { z } from 'zod';
-import { text } from 'mcp-use/server';
+server.tool(
+  {
+    name: "create_ticket",
+    description: "Create a support ticket after asking for missing details.",
+  },
+  async (_params, ctx) => {
+    if (!ctx.client.capabilities().elicitation?.form) {
+      return error("This client does not support form elicitation.");
+    }
 
-server.tool({
-  name: 'register-user',
-  description: 'Register a new user',
-}, async (params, ctx) => {
-    // Simplified API with Zod schema
     const result = await ctx.elicit(
-      'Please complete your registration',
+      "Add ticket details.",
       z.object({
-        name: z.string().min(2).describe('Your full name'),
-        email: z.string().email().describe('Your email address'),
-        age: z.number().min(18).max(120).describe('Your age'),
-        newsletter: z.boolean().default(false).describe('Subscribe to newsletter'),
-      })
+        title: z.string().min(3),
+        priority: z.enum(["low", "normal", "high"]).default("normal"),
+        description: z.string().optional(),
+      }),
     );
 
-    // result.data is typed as:
-    // { name: string, email: string, age: number, newsletter: boolean }
-    if (result.action === 'accept') {
-      const user = result.data;
-      // TypeScript knows the exact shape of user data
-      return text(`Welcome, ${user.name}! Registration successful.`);
+    if (result.action !== "accept") {
+      return text("Ticket creation cancelled.");
     }
 
-    return text('Registration cancelled');
-  });
+    const ticket = await tickets.create(result.data);
+    return text(`Created ticket ${ticket.id}.`);
+  },
+);
 ```
 
-## URL Mode
+Use `.describe()` on fields when labels or expected values are not obvious. Use `.default()` only when the default is safe.
 
-URL mode directs users to external URLs for sensitive operations. **This mode MUST be used for:**
+## Use URL mode for sensitive flows
 
-- Authentication credentials
-- API keys and tokens
-- OAuth authorization flows
-- Payment information
-- Any sensitive personal data
-
-<Warning>
-**Security Requirement**: Never use form mode for sensitive data. URL mode ensures credentials and sensitive information do not pass through the MCP client, maintaining proper security boundaries per the MCP specification.
-</Warning>
+URL mode directs the user to an external page. Use it when secrets or authorization codes must stay outside the MCP client.
 
 ```typescript
-const result = await ctx.elicit(message, urlString);
-// Mode is automatically inferred as "url" from the URL string parameter
-// elicitationId is automatically generated
-```
-
-### Example: OAuth Authorization
-
-```typescript
-server.tool({
-  name: 'connect-github',
-  description: 'Authorize GitHub access',
-}, async (params, ctx) => {
-    // Generate OAuth URL (in a real app, this would come from your OAuth provider)
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&state=${generateState()}`;
-
-    // Simplified API: ctx.elicit(message, url)
-    // Mode and elicitationId are handled automatically
-    const result = await ctx.elicit(
-      'Please authorize GitHub access to continue',
-      authUrl
-    );
-
-    if (result.action === 'accept') {
-      // User completed authorization
-      // In a real implementation, you would:
-      // 1. Receive the callback with authorization code
-      // 2. Exchange code for access token
-      // 3. Store tokens securely on the server
-      return text('✅ GitHub authorization successful! You can now use GitHub tools.');
-    } else if (result.action === 'decline') {
-      return error('❌ GitHub authorization declined. Some features will be unavailable.');
-    } else {
-      return error('Authorization cancelled');
+server.tool(
+  {
+    name: "connect_github",
+    description: "Ask the user to authorize GitHub access.",
+  },
+  async (_params, ctx) => {
+    if (!ctx.client.capabilities().elicitation?.url) {
+      return error("This client does not support URL elicitation.");
     }
-  });
+
+    const authRequest = await githubAuth.createAuthorizationRequest();
+    const result = await ctx.elicit("Authorize GitHub access to continue.", authRequest.url);
+
+    if (result.action !== "accept") {
+      return error("GitHub authorization was not completed.");
+    }
+
+    const connection = await githubAuth.waitForCallback(authRequest.state);
+
+    if (!connection.ok) {
+      return error("GitHub authorization did not finish.");
+    }
+
+    return text("GitHub authorization completed.");
+  },
+);
 ```
 
+The `accept` action only means the user continued the URL flow. Your server must still verify the OAuth callback, exchange the code, and store tokens securely before reporting success.
 
-## Response Handling
+## Catch validation and client errors
 
-The `elicit()` method returns an `ElicitResult` object:
+Wrap elicitation when the tool can recover from validation errors, unsupported clients, timeouts, or transport failures.
 
 ```typescript
-interface ElicitResult {
-  action: 'accept' | 'decline' | 'cancel';
-  data?: any;  // Only present for 'accept' action in form mode
+try {
+  const result = await ctx.elicit(
+    "Choose a deployment environment.",
+    z.object({
+      environment: z.enum(["staging", "production"]),
+    }),
+  );
+
+  if (result.action !== "accept") {
+    return text("Deployment cancelled.");
+  }
+
+  return text(`Deploying to ${result.data.environment}.`);
+} catch (err) {
+  return error(`Could not collect deployment input: ${err instanceof Error ? err.message : String(err)}`);
 }
 ```
 
-### Response Actions
+For exact timeout behavior, validation error types, and verbose schema forms, see the [Tool context API reference](/typescript/api-reference/server/tool-context#elicit).
 
-| Action | Description | When to Use |
-|--------|-------------|-------------|
-| **accept** | User provided valid input or completed the action | Check `result.data` for form mode input |
-| **decline** | User explicitly declined the request | User chose not to provide information |
-| **cancel** | User cancelled without making a choice | User dismissed or closed the request |
+## Test elicitation locally
 
-Always handle all three response actions appropriately:
-
-```typescript
-server.tool({
-  name: 'example-tool',
-  description: 'Example showing response handling',
-}, async (params, ctx) => {
-    const result = await ctx.elicit('Do you want to proceed?', z.object({ confirm: z.boolean().default(false) }));
-
-    // Handle all three cases
-    switch (result.action) {
-      case 'accept':
-        // User provided data
-        if (result.data.confirm) {
-          return text('✅ Proceeding with action');
-        }
-        return text('❌ Action not confirmed');
-
-      case 'decline':
-        // User explicitly declined
-        return text('🚫 User declined to provide confirmation');
-
-      case 'cancel':
-        // User cancelled
-        return text('⚠️ Operation cancelled by user');
-
-      default:
-        // Should never happen, but good practice
-        return error('❓ Unknown response');
-    }
-  });
-```
-
-## Timeout Configuration
-
-By default, `elicit()` waits indefinitely for user response (no timeout). You can optionally specify a timeout:
-
-```typescript
-import { z } from 'zod';
-
-server.tool({
-  name: 'time-sensitive-input',
-  description: 'Collect input with timeout',
-}, async (params, ctx) => {
-  try {
-    // Wait indefinitely (default)
-    const result1 = await ctx.elicit(
-      'Please provide information',
-      z.object({ data: z.string() })
-    );
-
-    // With 60-second timeout
-    const result2 = await ctx.elicit(
-      'Quick! Provide information',
-      z.object({ data: z.string() }),
-      { timeout: 60000 } // 1 minute timeout
-    );
-
-    // URL mode with timeout
-    const result3 = await ctx.elicit(
-      'Authorize (2 minute limit)',
-      'https://example.com/oauth',
-      { timeout: 120000 } // 2 minute timeout
-    );
-
-    if (result2.action === 'accept') {
-      return text(`Received: ${result2.data.data}`);
-    }
-
-    return text('No response');
-  } catch (error) {
-    // Timeout or validation error
-    return error(`Request failed: ${error.message}`);
-  }
-});
-```
-
-<Note>
-**Default Behavior**: Like `ctx.sample()`, elicitation has no timeout by default and waits indefinitely for user response. This prevents premature failures for users who may take time to complete forms or authorizations.
-</Note>
-
-## Error Handling
-
-Wrap elicitation calls in try-catch blocks to handle errors gracefully:
-
-```typescript
-server.tool({
-  name: 'safe-elicitation',
-  description: 'Tool with error handling',
-}, async (params, ctx) => {
-    try {
-      const result = await ctx.elicit('Please provide information', z.object({ data: z.string() }));
-
-      if (result.action === 'accept') {
-        return text(`Received: ${result.data.data}`);
-      }
-
-      return text('No data provided');
-    } catch (error: unknown) {
-      // Client doesn't support elicitation or request failed
-      return error(`Error: ${error instanceof Error ? error.message : String(error)}. Please ensure your client supports elicitation.`);
-    }
-  });
-```
-
-## Working Example
-
-Check out the complete working example with form mode, URL mode, and conformance tests:
-
-📁 [examples/server/elicitation/](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/elicitation)
-
-This example includes:
-- Form mode with JSON schema validation
-- URL mode for OAuth-like flows
-- Conformance test tool
-- SEP-1330 conformance pattern via `test_elicitation_sep1330_enums` in the conformance feature server:
-  [examples/server/features/conformance/](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/conformance)
-- Working test client
-
-To run the example:
+Run the elicitation example or call an elicitation tool from the Inspector.
 
 ```bash
-cd libraries/typescript/packages/mcp-use/examples/server/elicitation
+cd libraries/typescript/packages/mcp-use/examples/server/features/elicitation
 pnpm install
 pnpm dev
 ```
 
-Server runs on http://localhost:3002 with MCP Inspector available.
+Then open the Inspector, call a tool that uses elicitation, and verify accept, decline, and cancel behavior.
 
-## Next Steps
+## Next steps
 
-- Learn how to [handle elicitation on the client side](/typescript/client/elicitation)
-- Explore [sampling](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/sampling) for LLM completions
-- Check out [notifications](/typescript/server/notifications) for server-to-client messages
-- Review [tools documentation](/typescript/server/tools) for more tool patterns
-
+<CardGroup cols={2}>
+  <Card title="Tool context API reference" icon="terminal" href="/typescript/api-reference/server/tool-context#elicit">
+    Look up `ctx.elicit()` overloads, result types, timeout options, and validation behavior.
+  </Card>
+  <Card title="Elicitation schemas API reference" icon="list-checks" href="/typescript/api-reference/server/elicitation-schemas">
+    Look up enum schema helpers for advanced form schemas.
+  </Card>
+  <Card title="Sampling" icon="pipette" href="/typescript/server/sampling">
+    Ask the client LLM for a completion during tool execution.
+  </Card>
+  <Card title="Client elicitation" icon="monitor" href="/typescript/client/elicitation">
+    Handle elicitation requests in a TypeScript MCP client.
+  </Card>
+</CardGroup>

@@ -1,0 +1,127 @@
+---
+title: "Overview"
+description: "Understand when to build MCP Apps with mcp-use and where to go next."
+icon: "blocks"
+---
+
+MCP Apps bring rich, interactive interfaces into AI conversations. With `mcp-use`, your MCP tools can render React widgets for search results, dashboards, forms, previews, workflows, and any experience where users should act directly on structured data.
+
+In `mcp-use`, an MCP App is a TypeScript MCP server plus React widget files in `resources/`. The `mcp-apps` template wires up the server, widget build, local development tooling, and compatibility metadata for hosts such as ChatGPT.
+
+<video
+  alt="MCP Apps Widget Example"
+  style={{
+    maxWidth: "600px",
+    borderRadius: "8px",
+    marginBottom: "1.5rem",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+  }}
+  muted
+  autoPlay
+  loop
+>
+  <source src="/images/widget.mp4" type="video/mp4" />
+</video>
+
+## What MCP Apps do
+
+An MCP App lets a tool return a widget alongside the model-visible answer. The model receives a concise text result, and the widget receives structured data for rendering.
+
+This separation keeps large UI data out of the model context while still giving the user an interactive view.
+
+```typescript
+return widget({
+  props: { query, results }, // widget rendering data
+  output: text(`Found ${results.length} products.`), // model-visible text
+});
+```
+
+The matching React widget lives at `resources/product-search-result/widget.tsx` and reads `props` with `useWidget()`.
+
+## How mcp-use structures an app
+
+The `mcp-apps` template keeps server code and widget code in one TypeScript project. These are the files you edit most often:
+
+```text
+my-widget-server/
+├── index.ts
+├── resources/
+│   ├── product-search-result/
+│   │   └── widget.tsx
+│   └── styles.css
+├── public/
+├── ...
+├── package.json
+└── tsconfig.json
+```
+
+The tool definition in `index.ts` chooses the widget with `widget: { name }`. The tool handler returns `widget({ props, output })`.
+
+The widget file uses `useWidget()` to read `props`, pending state, host context, widget state, and host actions.
+
+## What the model sees
+
+MCP tool results separate model-visible output from widget-only data.
+
+| Field | Model sees it? | Widget sees it? | Use it for |
+| --- | --- | --- | --- |
+| `content` | Yes | Yes | Short text summary for the conversation |
+| `structuredContent` | No | Yes, as `props` | Data the widget renders |
+| `_meta` | No | Yes, as `metadata` | Extra widget metadata |
+
+Use `output: text(...)` for the model-visible answer. Use `props` for widget rendering data.
+
+For a deeper explanation of widget state, model-visible context, and the `useWidget()` data model, see the [useWidget API reference](/typescript/api-reference/react/usewidget).
+
+## Compatibility
+
+`mcp-use` uses the normal widget APIs to emit the metadata and bridge behavior ChatGPT needs, so the same widget code can run in ChatGPT and MCP Apps hosts.
+
+Apps SDK APIs remain useful for ChatGPT-specific host extensions that are not part of the shared MCP Apps spec yet. Use [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) when you need to understand that boundary.
+
+## Start here
+
+<CardGroup cols={2}>
+  <Card
+    title="Build your first MCP App"
+    icon="rocket"
+    href="/typescript/mcp-apps/quickstart"
+  >
+    Create a TypeScript MCP App, run it locally, and render the template widget.
+  </Card>
+  <Card
+    title="Build widgets"
+    icon="panel-top"
+    href="/typescript/mcp-apps/widgets"
+  >
+    Create a React widget and return it from a TypeScript MCP tool.
+  </Card>
+  <Card
+    title="Model context"
+    icon="brain"
+    href="/typescript/mcp-apps/model-context"
+  >
+    Decide what the model sees, what the widget sees, and what state persists.
+  </Card>
+  <Card
+    title="Interactivity"
+    icon="mouse-pointer-click"
+    href="/typescript/mcp-apps/interactivity"
+  >
+    Add tool calls, state, follow-up messages, and display controls.
+  </Card>
+  <Card
+    title="Apps SDK compatibility"
+    icon="openai"
+    href="/typescript/mcp-apps/apps-sdk-compatibility"
+  >
+    Understand how MCP Apps run in ChatGPT and when Apps SDK extensions matter.
+  </Card>
+  <Card
+    title="Content Security Policy"
+    icon="shield"
+    href="/typescript/mcp-apps/content-security-policy"
+  >
+    Allow widget API calls, assets, embeds, and static deployments.
+  </Card>
+</CardGroup>

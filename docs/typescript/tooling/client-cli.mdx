@@ -1,0 +1,231 @@
+---
+title: CLI Client
+description: Connect to MCP servers from the terminal, call tools, read resources, get prompts, manage auth, and capture widget screenshots.
+icon: "terminal"
+---
+
+Use `mcp-use client` when you want to test or automate an MCP server from the terminal. The fastest useful loop is: connect to a server, list its tools, then call one tool.
+
+For the complete command and flag catalog, see the [CLI reference](/typescript/api-reference/cli-reference#client-commands).
+
+## Install the CLI
+
+Run the CLI with `npx`, or install it globally if you use it often.
+
+```bash
+npx mcp-use client --help
+```
+
+```bash
+npm install -g @mcp-use/cli
+mcp-use client --help
+```
+
+## Connect and call a tool
+
+Save the server under a short name, then use that name in every later command.
+
+```bash
+npx mcp-use client connect dev http://localhost:3000/mcp
+npx mcp-use client dev tools list
+npx mcp-use client dev tools call get-weather city=Tokyo
+```
+
+After `connect`, the CLI prints the server name, version, capabilities, and tool count. Use `tools list` as the quick verification step. If the command returns the tools you expect, the server is reachable and initialized.
+
+Use any short name that helps you remember the target, such as `dev`, `staging`, `prod`, or `filesystem`.
+
+## Connect to HTTP or stdio servers
+
+HTTP servers use a URL. The saved name comes before the URL.
+
+```bash
+npx mcp-use client connect dev http://localhost:3000/mcp
+```
+
+Stdio servers use `--stdio`. Quote the command so the CLI can split it into the executable and arguments.
+
+```bash
+npx mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
+```
+
+List saved servers when you need to confirm the names you have available.
+
+```bash
+npx mcp-use client list
+```
+
+Remove a saved server when you no longer need it.
+
+```bash
+npx mcp-use client remove dev
+```
+
+## Call tools
+
+Start with `tools list`, then inspect a tool schema before calling tools with required inputs.
+
+```bash
+npx mcp-use client dev tools list
+npx mcp-use client dev tools describe get-weather
+npx mcp-use client dev tools call get-weather city=Tokyo
+```
+
+Tool arguments can be passed as `key=value` pairs. Use `key:=<json>` for nested values, or pass one JSON object.
+
+```bash
+npx mcp-use client dev tools call search query=shoes limit=5
+npx mcp-use client dev tools call search filters:='{"color":"black","inStock":true}'
+npx mcp-use client dev tools call search '{"query":"shoes","limit":5}'
+```
+
+Use `--json` when another command or script needs to parse the result.
+
+```bash
+npx mcp-use client dev tools call get-weather city=Tokyo --json
+```
+
+Use `--timeout <ms>` for slow tools.
+
+```bash
+npx mcp-use client dev tools call generate-report topic=sales --timeout 60000
+```
+
+## Read resources
+
+Resources are server-provided content identified by URI. List resources first, then read the URI you need.
+
+```bash
+npx mcp-use client dev resources list
+npx mcp-use client dev resources read "file:///tmp/data.json"
+```
+
+If a resource supports updates, subscribe to stream changes until you stop the process.
+
+```bash
+npx mcp-use client dev resources subscribe "file:///tmp/data.json"
+```
+
+## Get prompts
+
+Prompts are reusable message templates exposed by the server. List prompts, then get one with its arguments.
+
+```bash
+npx mcp-use client dev prompts list
+npx mcp-use client dev prompts get greeting name=Alice
+npx mcp-use client dev prompts get greeting '{"name":"Alice"}' --json
+```
+
+Prompt arguments use the same simple forms as tool arguments.
+
+## Check OAuth status
+
+For HTTP servers that require OAuth, `connect` starts the browser-based OAuth flow when the server returns `401 Unauthorized`. After authentication, the saved server reuses those credentials for tools, resources, prompts, and screenshots.
+
+```bash
+npx mcp-use client connect prod https://mcp.example.com/mcp
+npx mcp-use client prod auth status
+```
+
+Use `auth refresh` when you want to force a token refresh, and `auth logout` when you want to clear stored OAuth tokens for that server URL.
+
+```bash
+npx mcp-use client prod auth refresh
+npx mcp-use client prod auth logout
+```
+
+Auth commands apply only to HTTP servers authenticated through OAuth. For a static bearer token, pass `--auth` when connecting.
+
+```bash
+npx mcp-use client connect prod https://mcp.example.com/mcp --auth "$TOKEN"
+```
+
+Pass `--no-oauth` when you want the CLI to fail on `401 Unauthorized` instead of starting OAuth.
+
+```bash
+npx mcp-use client connect prod https://mcp.example.com/mcp --no-oauth
+```
+
+## Capture widget screenshots
+
+Use screenshots to verify MCP Apps widgets from a terminal or an automated test. The saved-server form reuses the auth from `connect`.
+
+```bash
+npx mcp-use client dev screenshot --tool show-board boardId=demo --output ./board.png
+```
+
+You can also call a tool and save its widget screenshot in one command.
+
+```bash
+npx mcp-use client dev tools call show-board boardId=demo --screenshot
+```
+
+For one-off captures without saving a server first, use the ad-hoc form with `--mcp`.
+
+```bash
+npx mcp-use client screenshot --mcp http://localhost:3000/mcp --tool show-board boardId=demo
+```
+
+Authenticated ad-hoc screenshots can pass HTTP headers. Header flags apply only to the ad-hoc form.
+
+```bash
+npx mcp-use client screenshot \
+  --mcp https://mcp.example.com/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  --tool show-board boardId=demo
+```
+
+Common screenshot options include `--output`, `--width`, `--height`, `--device-scale-factor`, `--theme`, `--wait-for`, `--delay`, `--timeout`, and `--cdp-url`. See the [CLI reference](/typescript/api-reference/cli-reference#client-commands) for the full screenshot option list.
+
+## Use interactive mode
+
+Interactive mode opens a small REPL for one saved server. Use it when you want to explore tools, resources, and prompts without repeating the full command prefix.
+
+```bash
+npx mcp-use client dev interactive
+```
+
+```text
+mcp> tools list
+mcp> tools describe get-weather
+mcp> tools call get-weather
+Arguments (JSON, or press Enter for none): {"city":"Tokyo"}
+mcp> exit
+```
+
+## Script common checks
+
+Use `--json` and stable saved names when scripting. This keeps stdout parseable while status messages stay on stderr.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+npx mcp-use client connect dev http://localhost:3000/mcp
+npx mcp-use client dev tools list --json | jq -r '.[].name'
+npx mcp-use client dev tools call get-weather city=Tokyo --json | jq '.content'
+```
+
+For local development, a compact smoke test is enough: connect, list tools, describe the tool you changed, then call it once.
+
+```bash
+npx mcp-use client connect dev http://localhost:3000/mcp
+npx mcp-use client dev tools list
+npx mcp-use client dev tools describe my-tool
+npx mcp-use client dev tools call my-tool input=value
+```
+
+## When a command fails
+
+Most failures can be diagnosed from the command you just ran:
+
+- `Server '<name>' not found`: run `npx mcp-use client list`, or reconnect with `npx mcp-use client connect <name> <url>`.
+- `This tool requires arguments`: run `tools describe <tool>` and pass the required inputs.
+- `Tool '<name>' not found`: run `tools list` against the same saved server.
+- OAuth refresh fails: run `mcp-use client connect <name> <url>` again to re-authenticate.
+
+For exhaustive flags, command shapes, and storage details, use the [CLI reference](/typescript/api-reference/cli-reference#client-commands).
+
+## Next steps
+
+Use the [TypeScript server overview](/typescript/server) to build a server that exposes tools, resources, prompts, and widgets. Use the [MCP Apps guide](/typescript/mcp-apps) when your tools should return interactive React widgets.

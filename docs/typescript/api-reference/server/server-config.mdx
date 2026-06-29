@@ -1,0 +1,128 @@
+---
+title: "ServerConfig"
+description: "ServerConfig API Documentation"
+icon: "settings"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/common.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/common.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/types/common.ts</a>
+</Callout>
+
+`ServerConfig` is the configuration object passed to the `new MCPServer({ ... })` constructor. It controls server identity (name, version, title, icons), networking (host, base URL, CORS, DNS rebinding protection), session and stream persistence, OAuth authentication, and the public landing page. `name` and `version` are the only required fields; every other field is optional.
+
+```ts wrap
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "everything-server",
+  title: "Everything Server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+});
+```
+
+## ServerConfig
+
+Configuration for an MCP server. Pass this object to the `new MCPServer({ ... })` constructor.
+
+```ts
+import { MCPServer } from "mcp-use/server";
+```
+
+The complete set of options accepted by the `MCPServer` constructor. The constructor stores this object on `server.config` and applies the defaults described below. The `new MCPServer(config)` path takes a `ServerConfig` with `name` and `version` required; everything else is optional.
+
+**Properties**
+
+><ParamField body="name" type="string" required={true}>Unique identifier for the MCP server (for example `"my-mcp-server"` or `"product-search-api"`). Required.</ParamField>
+><ParamField body="version" type="string" required={true}>Semantic version of the server (for example `"1.0.0"`). Required.</ParamField>
+><ParamField body="description" type="string">Human-readable description of what the server does. Shown to clients during discovery. Optional, no default.</ParamField>
+><ParamField body="instructions" type="string">Instructions for AI models using this server. Use this for server-wide guidance such as cross-tool workflows, ordering constraints, or safety requirements. Do not repeat individual tool descriptions here. Optional, no default.</ParamField>
+><ParamField body="host" type="string" default="localhost">Hostname for widget URLs and server endpoints. When omitted, the constructor falls back to `"localhost"` (`config.host || "localhost"`).</ParamField>
+><ParamField body="baseUrl" type="string">Full base URL that overrides `host:port` for widget URLs (for example `"https://myserver.com"`). Use when deploying behind a reverse proxy or to a known public URL. Optional, no default.</ParamField>
+><ParamField body="cors" type="Partial<Parameters<typeof cors>[0]>">Custom CORS options for the server, typed against Hono's `cors` middleware options. By default mcp-use enables permissive CORS (`origin: "*"`) for development ergonomics. Set this to customize allowed origins, headers, methods, credentials, etc. Optional, no default.</ParamField>
+><ParamField body="allowedOrigins" type="string[]">Allowed origins for DNS rebinding protection. If not set, protection is disabled (all `Host` values accepted). If set to an empty array, protection is also disabled. If set with one or more origins, `Host` validation is enabled globally for the server. Optional, no default (disabled).</ParamField>
+><ParamField body="sessionIdleTimeoutMs" type="number" default="86400000">Idle timeout for sessions in milliseconds. Defaults to `86400000` (1 day).</ParamField>
+><ParamField body="autoCreateSessionOnInvalidId" type="boolean">Deprecated and slated for removal in a future version. Modern MCP clients send a new `InitializeRequest` after receiving a 404 for a stale session, and the server now follows the spec strictly by returning 404 for invalid session IDs. For session persistence across restarts, use `sessionStore` with a persistent backend instead. Optional, no default.</ParamField>
+><ParamField body="stateless" type="boolean">Enable stateless mode (no session tracking). When left `undefined`, the constructor auto-detects: `true` for Deno (edge runtimes) and `false` for Node.js. In Node.js, mode is further auto-detected per request from the client `Accept` header (`application/json, text/event-stream` selects stateful; `application/json` only selects stateless). Setting `stateless: true` forces stateless mode and ignores the `Accept` header. Stateless mode is required for edge functions where instances do not persist; stateful mode supports sessions, resumability, and notifications.</ParamField>
+><ParamField body="sessionStore" type="SessionStore">Custom session metadata storage backend. Stores serializable session metadata (client capabilities, log level, timestamps); for active SSE stream management use `streamManager` instead. Enables pluggable persistence for metadata survival across restarts, distributed deployments, and horizontal scaling. Defaults to `FileSystemSessionStore` when `NODE_ENV !== "production"` and `InMemorySessionStore` in production mode. Imported as `import("../sessions/stores/index.js").SessionStore`.</ParamField>
+><ParamField body="streamManager" type="StreamManager">Custom stream manager for active SSE connections, separate from `sessionStore` to enable distributed notifications via Redis Pub/Sub. Manages active SSE stream controllers for server-to-client push notifications. Defaults to an in-memory `InMemoryStreamManager` (streams on this server only). Use `RedisStreamManager` for distributed notifications and sampling across multiple instances. Imported as `import("../sessions/streams/index.js").StreamManager`.</ParamField>
+><ParamField body="oauth" type="OAuthProvider">OAuth authentication configuration. When provided, automatically sets up OAuth routes (`/authorize`, `/token`, `.well-known/*`), JWT verification middleware, bearer token authentication on all `/mcp` routes, and user information extraction with context attachment. Build with the provider factory functions `oauthSupabaseProvider()`, `oauthAuth0Provider()`, `oauthKeycloakProvider()`, or `oauthCustomProvider()`. Optional, no default.</ParamField>
+><ParamField body="publicLandingPage" type="boolean" default="false">Expose the HTML MCP landing page without bearer authentication. When OAuth is configured, `/mcp` routes require a token by default; set to `true` to allow unauthenticated browser visits to the landing page while keeping MCP protocol traffic protected. Defaults to `false`.</ParamField>
+><ParamField body="favicon" type="string">Path to a favicon file relative to the `public/` directory (for example `"favicon.ico"` or `"icons/app-icon.png"`). The favicon is automatically included in all widget pages. If omitted but `icons` is provided, the constructor auto-selects a favicon from `icons`. Optional, no default.</ParamField>
+><ParamField body="title" type="string">Display name for the server, shown in MCP clients and the inspector UI. If not provided, the `name` field is used as the display name. Optional, no default.</ParamField>
+><ParamField body="websiteUrl" type="string">Website URL for the server (for example `"https://myserver.com"`), included in the server info displayed to clients. Optional, no default.</ParamField>
+><ParamField body="icons" type="Array<{ src: string; mimeType?: string; sizes?: string[]; theme?: light | dark }>">Array of server icons in various sizes and formats, used by MCP clients and the inspector UI for server branding. Each entry requires `src` and may include `mimeType`, `sizes`, and `theme` (`"light"` or `"dark"`). Relative `src` values are rewritten to absolute URLs under `${baseUrl}/mcp-use/public/` when `baseUrl` is set. Optional, no default.</ParamField>
+
+**Type definition**
+```ts wrap
+interface ServerConfig {
+  name: string;
+  version: string;
+  description?: string;
+  instructions?: string;
+  host?: string;
+  baseUrl?: string;
+  cors?: Partial<Parameters<typeof cors>[0]>;
+  allowedOrigins?: string[];
+  sessionIdleTimeoutMs?: number;
+  /** @deprecated removed in a future version */
+  autoCreateSessionOnInvalidId?: boolean;
+  stateless?: boolean;
+  sessionStore?: SessionStore;
+  streamManager?: StreamManager;
+  oauth?: OAuthProvider;
+  publicLandingPage?: boolean;
+  favicon?: string;
+  title?: string;
+  websiteUrl?: string;
+  icons?: Array<{
+    src: string;
+    mimeType?: string;
+    sizes?: string[];
+    theme?: "light" | "dark";
+  }>;
+}
+```
+
+## Usage
+
+The `name` and `version` fields are required; everything else is optional. The following example sets a display `title` and a `baseUrl`.
+
+```ts wrap
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "everything-server",
+  title: "Everything Server",
+  version: "1.0.0",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+});
+```
+
+### DNS rebinding protection
+
+Set `allowedOrigins` to enable global `Host` header validation. Leaving it unset (or passing an empty array) disables protection and accepts all `Host` values.
+
+```ts wrap
+import { MCPServer } from "mcp-use/server";
+
+const resolvedAllowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+const server = new MCPServer({
+  name: "dns-rebinding-example",
+  version: "1.0.0",
+  description:
+    "Example server showing localhost auto-protection and explicit allowedOrigins in production.",
+  allowedOrigins:
+    resolvedAllowedOrigins && resolvedAllowedOrigins.length > 0
+      ? resolvedAllowedOrigins
+      : undefined,
+});
+```
+
+## See also
+
+- [MCPServer](/typescript/api-reference/server/mcp-server) for the constructor that consumes `ServerConfig`.

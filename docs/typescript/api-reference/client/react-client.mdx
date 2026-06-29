@@ -1,0 +1,264 @@
+---
+title: "React client"
+description: "React provider, hooks, storage providers, and types for browser MCP client connections."
+icon: "react"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/McpClientProvider.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the provider source on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/McpClientProvider.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/McpClientProvider.tsx</a>
+<br />
+View the standalone hook source: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useMcp.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useMcp.ts</a>
+<br />
+View the shared React client types: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/types.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/types.ts</a>
+</Callout>
+
+The React client APIs manage browser MCP connections from React apps. Use `McpClientProvider` for multi-server apps and `useMcp()` for a single HTTP MCP server.
+
+All exports come from `mcp-use/react`:
+
+```ts
+import {
+  LocalStorageProvider,
+  McpClientProvider,
+  MemoryStorageProvider,
+  useMcp,
+  useMcpClient,
+  useMcpServer,
+} from "mcp-use/react";
+import type {
+  McpClientContextType,
+  McpClientProviderProps,
+  McpServer,
+  McpServerOptions,
+  StorageProvider,
+  UseMcpOptions,
+  UseMcpResult,
+} from "mcp-use/react";
+```
+
+## McpClientProvider
+
+`McpClientProvider` creates a React context for multiple MCP server connections. It loads initial servers, applies provider defaults, persists configuration when a storage provider is set, and exposes server state through `useMcpClient()` and `useMcpServer()`.
+
+**Parameters**
+><ParamField body="children" type="ReactNode" required="true">React children rendered inside the provider.</ParamField>
+><ParamField body="mcpServers" type="Record<string, McpServerOptions>" default="undefined">Initial server map. Servers in this map connect when the provider mounts.</ParamField>
+><ParamField body="defaultCallbackUrl" type="string" default='"/oauth/callback" on the current origin'>Default OAuth callback URL for servers that do not set `callbackUrl`.</ParamField>
+><ParamField body="defaultProxyConfig" type="{ proxyAddress?: string; headers?: Record<string, string> }" default="undefined">Default proxy configuration for all servers. Per-server `proxyConfig` overrides these values.</ParamField>
+><ParamField body="defaultAutoProxyFallback" type='boolean | { enabled?: boolean; proxyAddress?: string }' default="true">Whether direct connection failures caused by FastMCP or CORS should retry through a proxy.</ParamField>
+><ParamField body="clientInfo" type="ClientInfo & { capabilities?: Record<string, unknown> }" default="mcp-use client info">Client metadata and default advertised MCP capabilities for every managed server.</ParamField>
+><ParamField body="storageProvider" type="StorageProvider" default="undefined">Storage adapter used to load, save, and remove server configurations.</ParamField>
+><ParamField body="enableRpcLogging" type="boolean" default="false">When `true`, logs MCP protocol messages in the browser for debugging.</ParamField>
+><ParamField body="onServerAdded" type="(id: string, server: McpServer) => void" default="undefined">Called after a server is added.</ParamField>
+><ParamField body="onServerRemoved" type="(id: string) => void" default="undefined">Called after a server is removed.</ParamField>
+><ParamField body="onServerStateChange" type='(id: string, state: McpServer["state"]) => void' default="undefined">Called when a managed server changes connection state.</ParamField>
+><ParamField body="onSamplingRequest" type="(request, serverId, serverName, approve, reject) => void" default="undefined">Called when any managed server requests sampling.</ParamField>
+><ParamField body="onElicitationRequest" type="(request, serverId, serverName, approve, reject) => void" default="undefined">Called when any managed server requests elicitation.</ParamField>
+
+**Signature**
+```tsx wrap
+function McpClientProvider(props: McpClientProviderProps): JSX.Element
+```
+
+## useMcpClient
+
+`useMcpClient()` returns the multi-server context. It must run under `McpClientProvider`.
+
+**Returns**
+><ResponseField name="servers" type="McpServer[]">All managed servers with connection state, methods, notifications, and pending request queues.</ResponseField>
+><ResponseField name="addServer" type="(id: string, options: McpServerOptions) => void">Adds a server. Calls with an existing id are ignored.</ResponseField>
+><ResponseField name="removeServer" type="(id: string, opts?: { clearCredentials?: boolean }) => void">Removes a server. Set `clearCredentials: true` to also clear persisted OAuth credentials.</ResponseField>
+><ResponseField name="updateServerMetadata" type="(id: string, metadata: { name: string }) => Promise<void>">Updates display metadata without reconnecting.</ResponseField>
+><ResponseField name="updateServer" type="(id: string, options: Partial<McpServerOptions>) => Promise<void>">Updates connection-affecting options and reconnects the server.</ResponseField>
+><ResponseField name="getServer" type="(id: string) => McpServer | undefined">Returns a managed server by id.</ResponseField>
+><ResponseField name="storageLoaded" type="boolean">Whether configured storage has finished loading.</ResponseField>
+
+**Throws**
+Throws `Error` when called outside `McpClientProvider`.
+
+**Signature**
+```ts wrap
+function useMcpClient(): McpClientContextType
+```
+
+## useMcpServer
+
+`useMcpServer(id)` returns one managed server by id. It must run under `McpClientProvider`.
+
+**Parameters**
+><ParamField body="id" type="string" required="true">Server id passed to `addServer()` or the `mcpServers` map.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="McpServer | undefined">The matching server, or `undefined` when no server with that id is registered.</ResponseField>
+
+**Throws**
+Throws `Error` when called outside `McpClientProvider`.
+
+**Signature**
+```ts wrap
+function useMcpServer(id: string): McpServer | undefined
+```
+
+## useMcp
+
+`useMcp(options)` connects to one HTTP MCP server from a React component. Use it directly for simple single-server apps or use `McpClientProvider` for multi-server apps.
+
+**Parameters**
+><ParamField body="options" type="UseMcpOptions" required="true">Connection, authentication, callback, reconnection, and transport options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="UseMcpResult">Connection state, discovered tools/resources/prompts, protocol methods, auth metadata, logs, and the underlying browser client.</ResponseField>
+
+**Signature**
+```ts wrap
+function useMcp(options: UseMcpOptions): UseMcpResult
+```
+
+## McpServerOptions
+
+`McpServerOptions` configures one server managed by `McpClientProvider`. It extends `UseMcpOptions` but replaces low-level callbacks with provider-managed request queues.
+
+**Fields**
+><ResponseField name="url" type="string">HTTP MCP endpoint URL.</ResponseField>
+><ResponseField name="name" type="string">Display name shown before server metadata loads.</ResponseField>
+><ResponseField name="enabled" type="boolean">When `false`, the provider does not connect to the server. Defaults to `true`.</ResponseField>
+><ResponseField name="headers" type="Record<string, string>">Headers sent with HTTP transport requests.</ResponseField>
+><ResponseField name="transportType" type='"auto" | "http" | "sse"'>Transport preference. Use `"auto"` for streamable HTTP with fallback.</ResponseField>
+><ResponseField name="timeout" type="number">Initial connection timeout in milliseconds. Defaults to `30000`.</ResponseField>
+><ResponseField name="proxyConfig" type="{ proxyAddress?: string; headers?: Record<string, string> }">Proxy settings for this server.</ResponseField>
+><ResponseField name="autoProxyFallback" type='boolean | { enabled?: boolean; proxyAddress?: string }'>Per-server automatic proxy fallback setting.</ResponseField>
+><ResponseField name="preventAutoAuth" type="boolean">When `true`, the server enters `pending_auth` until `authenticate()` is called.</ResponseField>
+><ResponseField name="useRedirectFlow" type="boolean">When `true`, OAuth uses full-page redirect instead of a popup.</ResponseField>
+><ResponseField name="callbackUrl" type="string">OAuth callback URL for this server.</ResponseField>
+><ResponseField name="authProvider" type="OAuthClientProvider">External OAuth provider for headless or custom runtimes.</ResponseField>
+><ResponseField name="oauth" type="{ clientId?: string; clientSecret?: string; scope?: string }">Pre-registered OAuth client credentials for servers without Dynamic Client Registration.</ResponseField>
+><ResponseField name="clientInfo" type="ClientInfo">Client metadata sent during MCP initialization and OAuth registration.</ResponseField>
+><ResponseField name="autoRetry" type="boolean | number">Retry initial connection failures. A number sets the retry delay in milliseconds.</ResponseField>
+><ResponseField name="autoReconnect" type='boolean | number | { enabled?: boolean; initialDelay?: number; healthCheckInterval?: number | false; healthCheckTimeout?: number }'>Application-level reconnection and health check behavior.</ResponseField>
+><ResponseField name="reconnectionOptions" type="ReconnectionOptions">SDK transport-level retry settings.</ResponseField>
+><ResponseField name="wrapTransport" type="(transport: any, serverId: string) => any">Transport wrapper for logging, monitoring, or custom behavior.</ResponseField>
+><ResponseField name="onSamplingRequest" type="(request: PendingSamplingRequest) => void">Per-server app callback for sampling requests.</ResponseField>
+><ResponseField name="onElicitationRequest" type="(request: PendingElicitationRequest) => void">Per-server app callback for elicitation requests.</ResponseField>
+><ResponseField name="onNotificationReceived" type="(notification: McpNotification) => void">Per-server app callback for notifications.</ResponseField>
+
+## McpServer
+
+`McpServer` is the server object returned by `useMcpServer()` and listed in `useMcpClient().servers`. It includes all `UseMcpResult` fields plus provider-managed metadata and queues.
+
+**Fields and methods**
+><ResponseField name="id" type="string">Provider server id.</ResponseField>
+><ResponseField name="url" type="string">Server URL.</ResponseField>
+><ResponseField name="name" type="string">Display name supplied by the app.</ResponseField>
+><ResponseField name="state" type='"discovering" | "pending_auth" | "authenticating" | "ready" | "failed"'>Current connection state.</ResponseField>
+><ResponseField name="tools" type="Tool[]">Discovered server tools.</ResponseField>
+><ResponseField name="resources" type="Resource[]">Discovered server resources.</ResponseField>
+><ResponseField name="resourceTemplates" type="ResourceTemplate[]">Discovered server resource templates.</ResponseField>
+><ResponseField name="prompts" type="Prompt[]">Discovered server prompts.</ResponseField>
+><ResponseField name="serverInfo" type="{ name: string; title?: string; version?: string; websiteUrl?: string; icons?: Array<{ src: string; mimeType?: string }>; icon?: string }">Server metadata from initialization.</ResponseField>
+><ResponseField name="error" type="string | undefined">Failure message when `state` is `"failed"`.</ResponseField>
+><ResponseField name="callTool" type="(name: string, args?: Record<string, unknown>, options?: RequestOptions) => Promise<any>">Calls a server tool.</ResponseField>
+><ResponseField name="readResource" type="(uri: string) => Promise<ReadResourceResult>">Reads a resource by URI.</ResponseField>
+><ResponseField name="listResources" type="() => Promise<void>">Refreshes the resource list.</ResponseField>
+><ResponseField name="listPrompts" type="() => Promise<void>">Refreshes the prompt list.</ResponseField>
+><ResponseField name="getPrompt" type="(name: string, args?: Record<string, string>) => Promise<GetPromptResult>">Gets a prompt by name.</ResponseField>
+><ResponseField name="complete" type="(params: CompleteRequestParams) => Promise<CompleteResult>">Requests prompt or resource template completions.</ResponseField>
+><ResponseField name="refreshTools" type="() => Promise<void>">Refreshes the tool list.</ResponseField>
+><ResponseField name="refreshResources" type="() => Promise<void>">Refreshes the resource list.</ResponseField>
+><ResponseField name="refreshResourceTemplates" type="() => Promise<void>">Refreshes the resource template list.</ResponseField>
+><ResponseField name="refreshPrompts" type="() => Promise<void>">Refreshes the prompt list.</ResponseField>
+><ResponseField name="refreshAll" type="() => Promise<void>">Refreshes tools, resources, resource templates, and prompts.</ResponseField>
+><ResponseField name="retry" type="() => void">Attempts to reconnect after failure.</ResponseField>
+><ResponseField name="disconnect" type="() => void">Disconnects from the server.</ResponseField>
+><ResponseField name="authenticate" type="() => void">Starts OAuth authentication.</ResponseField>
+><ResponseField name="clearStorage" type="() => void">Clears OAuth storage for this server URL.</ResponseField>
+><ResponseField name="notifications" type="McpNotification[]">Stored notifications from this server.</ResponseField>
+><ResponseField name="unreadNotificationCount" type="number">Unread notification count.</ResponseField>
+><ResponseField name="markNotificationRead" type="(id: string) => void">Marks one notification as read.</ResponseField>
+><ResponseField name="markAllNotificationsRead" type="() => void">Marks all notifications as read.</ResponseField>
+><ResponseField name="clearNotifications" type="() => void">Clears stored notifications.</ResponseField>
+><ResponseField name="pendingSamplingRequests" type="PendingSamplingRequest[]">Pending sampling requests from this server.</ResponseField>
+><ResponseField name="approveSampling" type="(requestId: string, result: CreateMessageResult) => void">Approves a sampling request.</ResponseField>
+><ResponseField name="rejectSampling" type="(requestId: string, error?: string) => void">Rejects a sampling request.</ResponseField>
+><ResponseField name="pendingElicitationRequests" type="PendingElicitationRequest[]">Pending elicitation requests from this server.</ResponseField>
+><ResponseField name="approveElicitation" type="(requestId: string, result: ElicitResult) => void">Approves an elicitation request.</ResponseField>
+><ResponseField name="rejectElicitation" type="(requestId: string, error?: string) => void">Rejects an elicitation request.</ResponseField>
+><ResponseField name="client" type="BrowserMCPClient | null">Underlying browser client.</ResponseField>
+
+## UseMcpOptions
+
+`UseMcpOptions` configures one standalone React MCP connection. `McpServerOptions` reuses most of these fields.
+
+**Fields**
+><ResponseField name="url" type="string">HTTP MCP endpoint URL.</ResponseField>
+><ResponseField name="enabled" type="boolean">When `false`, no connection is attempted. Defaults to `true`.</ResponseField>
+><ResponseField name="proxyConfig" type="{ proxyAddress?: string; headers?: Record<string, string> }">Proxy settings for this connection.</ResponseField>
+><ResponseField name="autoProxyFallback" type='boolean | { enabled?: boolean; proxyAddress?: string }'>Retries direct FastMCP or CORS failures through a proxy. Defaults to `true` for standalone `useMcp()`.</ResponseField>
+><ResponseField name="callbackUrl" type="string">OAuth callback URL. Defaults to `/oauth/callback` on the current origin.</ResponseField>
+><ResponseField name="storageKeyPrefix" type="string">OAuth localStorage key prefix. Defaults to `"mcp:auth"`.</ResponseField>
+><ResponseField name="headers" type="Record<string, string>">HTTP request headers.</ResponseField>
+><ResponseField name="logLevel" type='"silent" | "error" | "warn" | "info" | "http" | "verbose" | "debug" | "silly"'>Console log level.</ResponseField>
+><ResponseField name="autoRetry" type="boolean | number">Retry initial connection failures. A number sets the retry delay in milliseconds.</ResponseField>
+><ResponseField name="autoReconnect" type='boolean | number | { enabled?: boolean; initialDelay?: number; healthCheckInterval?: number | false; healthCheckTimeout?: number }'>Application-level reconnection and health check behavior. Defaults to `3000`.</ResponseField>
+><ResponseField name="reconnectionOptions" type="ReconnectionOptions">SDK transport-level retry settings.</ResponseField>
+><ResponseField name="popupFeatures" type="string">Popup feature string for OAuth popup mode.</ResponseField>
+><ResponseField name="transportType" type='"auto" | "http" | "sse"'>Transport preference. `"sse"` is deprecated but supported.</ResponseField>
+><ResponseField name="preventAutoAuth" type="boolean">When `true`, wait for `authenticate()` before opening OAuth.</ResponseField>
+><ResponseField name="useRedirectFlow" type="boolean">Use full-page OAuth redirect instead of a popup.</ResponseField>
+><ResponseField name="onPopupWindow" type="(url: string, features: string, window: Window | null) => void">Called just before the OAuth popup opens.</ResponseField>
+><ResponseField name="clientOptions" type="{ capabilities?: Record<string, unknown> }">Options passed to the underlying MCP SDK client.</ResponseField>
+><ResponseField name="timeout" type="number">Initial connection timeout in milliseconds. Defaults to `30000`.</ResponseField>
+><ResponseField name="sseReadTimeout" type="number">SSE read timeout in milliseconds. Defaults to `300000`.</ResponseField>
+><ResponseField name="wrapTransport" type="(transport: any, serverId: string) => any">Transport wrapper.</ResponseField>
+><ResponseField name="onNotification" type="(notification: Notification) => void">Called when the server sends a notification.</ResponseField>
+><ResponseField name="onSampling" type="(params: CreateMessageRequest['params']) => Promise<CreateMessageResult>">Handles `sampling/createMessage` requests.</ResponseField>
+><ResponseField name="onElicitation" type="(params: ElicitRequestFormParams | ElicitRequestURLParams) => Promise<ElicitResult>">Handles `elicitation/create` requests.</ResponseField>
+><ResponseField name="clientInfo" type="ClientInfo">Client metadata sent during MCP initialization and OAuth registration.</ResponseField>
+><ResponseField name="fetch" type="typeof globalThis.fetch">Custom fetch function for MCP HTTP requests.</ResponseField>
+><ResponseField name="authProvider" type="OAuthClientProvider">External OAuth provider.</ResponseField>
+><ResponseField name="oauth" type="{ clientId?: string; clientSecret?: string; scope?: string }">Pre-registered OAuth client settings.</ResponseField>
+
+## StorageProvider
+
+`StorageProvider` persists provider-managed server configuration. Implement this interface for localStorage, IndexedDB, AsyncStorage, or backend-backed storage.
+
+**Methods**
+><ResponseField name="getServers" type="() => Promise<Record<string, McpServerOptions>> | Record<string, McpServerOptions>">Returns all stored server configurations.</ResponseField>
+><ResponseField name="setServers" type="(servers: Record<string, McpServerOptions>) => Promise<void> | void">Replaces all stored server configurations.</ResponseField>
+><ResponseField name="setServer" type="(id: string, config: McpServerOptions) => Promise<void> | void">Adds or updates one server configuration.</ResponseField>
+><ResponseField name="removeServer" type="(id: string) => Promise<void> | void">Removes one server configuration.</ResponseField>
+><ResponseField name="clear" type="() => Promise<void> | void">Clears all server configurations.</ResponseField>
+><ResponseField name="getServerMetadata" type="(id: string) => Promise<CachedServerMetadata | undefined> | CachedServerMetadata | undefined">Optionally returns cached server metadata.</ResponseField>
+><ResponseField name="setServerMetadata" type="(id: string, metadata: CachedServerMetadata) => Promise<void> | void">Optionally stores cached server metadata.</ResponseField>
+><ResponseField name="removeServerMetadata" type="(id: string) => Promise<void> | void">Optionally removes cached server metadata.</ResponseField>
+
+### LocalStorageProvider
+
+`LocalStorageProvider` stores server configs and metadata in browser `localStorage`.
+
+**Parameters**
+><ParamField body="storageKey" type="string" default='"mcp-client-servers"'>localStorage key used for server configurations. Metadata uses `${storageKey}-metadata`.</ParamField>
+
+**Signature**
+```ts wrap
+class LocalStorageProvider implements StorageProvider {
+  constructor(storageKey?: string)
+}
+```
+
+### MemoryStorageProvider
+
+`MemoryStorageProvider` stores server configs and metadata in memory. Data is lost on reload or provider unmount.
+
+**Signature**
+```ts wrap
+class MemoryStorageProvider implements StorageProvider {
+  constructor()
+}
+```
+
+## Related
+
+- [React Integration](/typescript/client/usemcp): guide to using the provider and hooks in a React app.
+- [Authentication](/typescript/client/authentication): OAuth and bearer token setup.
+- [Completions](/typescript/client/completion): prompt and resource template completion examples.

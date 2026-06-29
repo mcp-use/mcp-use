@@ -1,144 +1,111 @@
 ---
-title: "Overview"
-description: "Add OAuth 2.0/2.1 authentication to your MCP server with support for Auth0, Better Auth, WorkOS, Supabase, Keycloak, and custom providers"
+title: "OAuth"
+description: "Choose and configure OAuth authentication for TypeScript MCP servers."
 icon: "shield-check"
 ---
 
-# Server Authentication
+Use OAuth when your MCP server needs to identify the caller, protect MCP transport endpoints, or scope data by user, organization, role, or permission. Configure one OAuth provider on `MCPServer`; mcp-use then attaches authenticated user data to tool context.
 
-Add enterprise-grade OAuth 2.0/2.1 authentication to your MCP server. Secure your tools with bearer token authentication, implement role-based access control (RBAC), and access authenticated user information in your tool callbacks.
+This guide helps you choose the right authentication path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers) for exact provider options, defaults, return shapes, and verification behavior.
 
-## Quick Start
+## Choose an authentication path
 
-<Tabs>
-  <Tab title="Remote Auth (WorkOS)">
-    Use a built-in provider when your identity provider supports remote authentication. Clients register and authenticate directly with the upstream provider  -  your server only verifies the resulting bearer token.
+Most MCP servers should use a Dynamic Client Registration provider. Use OAuth Proxy only when the upstream identity provider cannot register MCP clients dynamically.
 
-    ```typescript
-    import { MCPServer, oauthWorkOSProvider } from 'mcp-use/server'
+| Situation | Use |
+| --- | --- |
+| You use Auth0, Better Auth, Clerk, Keycloak, Supabase, or WorkOS | A built-in provider |
+| Your provider advertises a `registration_endpoint` | [Custom Provider](/typescript/server/authentication/providers/custom) |
+| Your provider only gives you one fixed `clientId` and `clientSecret` | [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy) |
+| You only need local development without identity | No OAuth provider |
 
-    const server = new MCPServer({
-      name: 'my-secure-server',
-      version: '1.0.0',
-      oauth: oauthWorkOSProvider({
-        subdomain: process.env.MCP_USE_OAUTH_WORKOS_SUBDOMAIN!, // 'your-company.authkit.app'
-      })
-    })
+With a Dynamic Client Registration provider, clients register directly with the upstream identity provider. Your MCP server exposes discovery metadata and verifies bearer tokens. It does not handle the authorization code or token exchange.
 
-    server.tool({
-      name: 'get-user-profile',
-      description: 'Get the authenticated user profile',
-      cb: async (params, context) => {
-        const user = context.auth.user
-        return { userId: user.userId, email: user.email, name: user.name }
-      }
-    })
+With OAuth Proxy, your MCP server mediates authorization and token exchange because the upstream provider cannot register each MCP client itself.
 
-    await server.listen(3000)
-    ```
-  </Tab>
-  <Tab title="OAuth Proxy (Google)">
-    Use `oauthProxy` when your provider doesn't support Dynamic Client Registration (Google, GitHub, Okta, Azure AD, etc.). Your server holds pre-registered client credentials and mediates the token exchange.
+## Start with a built-in provider
 
-    ```typescript
-    import { MCPServer, oauthProxy, jwksVerifier } from 'mcp-use/server'
+Choose the provider that matches your identity system:
 
-    const server = new MCPServer({
-      name: 'my-secure-server',
-      version: '1.0.0',
-      oauth: oauthProxy({
-        authEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenEndpoint: 'https://oauth2.googleapis.com/token',
-        issuer: 'https://accounts.google.com',
-        clientId: process.env.GOOGLE_CLIENT_ID!,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-        scopes: ['openid', 'email', 'profile'],
-        extraAuthorizeParams: { access_type: 'offline' },
-        verifyToken: jwksVerifier({
-          jwksUrl: 'https://www.googleapis.com/oauth2/v3/certs',
-          issuer: 'https://accounts.google.com',
-          audience: process.env.GOOGLE_CLIENT_ID!,
-        }),
-      })
-    })
+- [Auth0](/typescript/server/authentication/providers/auth0): Auth0 OAuth with Dynamic Client Registration.
+- [Better Auth](/typescript/server/authentication/providers/better-auth): Self-hosted OAuth with Better Auth's OAuth Provider plugin.
+- [Clerk](/typescript/server/authentication/providers/clerk): Clerk OAuth with user and organization claims.
+- [Keycloak](/typescript/server/authentication/providers/keycloak): Keycloak realm authentication with role mapping.
+- [Supabase](/typescript/server/authentication/providers/supabase): Supabase OAuth 2.1 server authentication.
+- [WorkOS](/typescript/server/authentication/providers/workos): WorkOS AuthKit authentication with organization context.
+- [Custom Provider](/typescript/server/authentication/providers/custom): Any DCR-capable OAuth provider with custom token verification.
 
-    server.tool({
-      name: 'get-user-profile',
-      description: 'Get the authenticated user profile',
-      cb: async (params, context) => {
-        const user = context.auth.user
-        return { userId: user.userId, email: user.email, name: user.name }
-      }
-    })
+## Configure the server
 
-    await server.listen(3000)
-    ```
-  </Tab>
-</Tabs>
+Pass the selected provider to `MCPServer`.
 
-## Providers
+```typescript
+import { MCPServer, oauthAuth0Provider } from "mcp-use/server";
 
-<Tip>
-Not sure which to use? Use a remote auth provider if your identity provider supports Dynamic Client Registration. If it doesn't, use `oauthProxy`.
-</Tip>
+const server = new MCPServer({
+  name: "secure-server",
+  version: "1.0.0",
+  oauth: oauthAuth0Provider(),
+});
 
-### Remote Auth (built-in)
-
-Clients register and authenticate directly with the provider. 
-
-- [Auth0](/typescript/server/authentication/providers/auth0)  -  Full OAuth 2.1 with PKCE and JWKS verification
-- [Better Auth](/typescript/server/authentication/providers/better-auth)  -  Self-hosted OAuth 2.1 via the Better Auth OAuth Provider plugin
-- [WorkOS](/typescript/server/authentication/providers/workos)  -  Enterprise SSO via WorkOS AuthKit
-- [Supabase](/typescript/server/authentication/providers/supabase)  -  Authentication for Supabase projects
-- [Keycloak](/typescript/server/authentication/providers/keycloak)  -  Enterprise SSO with realm roles
-- [Custom Provider](/typescript/server/authentication/providers/custom)  -  Any DCR-capable provider with a custom `verifyToken` function
-
-### OAuth Proxy
-
-For providers that don't support remote client registration  -  Google, GitHub, Okta, Azure AD, or any provider where you register an application in a dashboard and receive a fixed `clientId`/`clientSecret`  -  use `oauthProxy`:
-
-- [OAuth Proxy](/typescript/server/authentication/providers/oauth-proxy)  -  Bridge non-DCR providers with pre-registered client credentials, including ready-to-copy configs for Google, Okta, Azure AD, Auth0, and GitHub.
-
-## How it works
-
-### Remote auth flow
-
-1. Your server exposes `.well-known/*` endpoints that pass through the upstream provider's OAuth metadata  -  including its `registration_endpoint`.
-2. MCP clients fetch that metadata, register themselves directly with the upstream provider, then run the full authorization + token exchange against it.
-3. On each `/mcp/*` request, your server verifies the bearer token (JWKS signature check, issuer, audience).
-
-### OAuth proxy flow
-
-1. Your server exposes a `/register` endpoint that returns your pre-configured `clientId`. 
-2. MCP clients run PKCE authorization against the upstream using that `clientId`.
-3. At token exchange, your server injects the `clientId` and `clientSecret` before forwarding to the upstream.
-4. On each `/mcp/*` request, your server verifies the bearer token via the `verifyToken` function you provided.
-
-Your server holds the client credentials and mediates every token exchange.
-
-## OAuth Endpoints
-
-When OAuth is configured, your server exposes these discovery endpoints:
-
-```
-GET /.well-known/oauth-authorization-server
-GET /.well-known/openid-configuration
-GET /.well-known/oauth-protected-resource
-GET /.well-known/oauth-protected-resource/mcp
+await server.listen(3000);
 ```
 
-The authorization-server endpoints pass through the upstream provider's metadata so clients can discover the real authorize, token, and registration URLs.
+Provider pages show the required dashboard steps and environment variables. The API reference owns the full provider option catalog.
 
-## Bearer Token Authentication
+## Protect tools with user context
 
-All `/mcp/*` endpoints require a valid bearer token when OAuth is configured:
+When OAuth is configured and the request is authenticated, tools can read `ctx.auth`.
 
+```typescript
+import { error, object } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "get_profile",
+    description: "Return the authenticated caller.",
+  },
+  async (_args, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
+    return object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      scopes: ctx.auth.scopes,
+      permissions: ctx.auth.permissions,
+    });
+  },
+);
 ```
-Authorization: Bearer eyJhbGci...
-```
 
-## Next Steps
+Use [User Context](/typescript/server/authentication/user-context) for access-control patterns inside tools.
 
-- [Client Authentication](/typescript/client/authentication)  -  Connect to OAuth servers from clients
-- [useMcp Hook](/typescript/client/usemcp)  -  React hook with OAuth support
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+## What authentication changes
+
+When `oauth` is configured:
+
+- MCP discovery endpoints advertise OAuth metadata.
+- MCP transport endpoints, including `/mcp/*`, require `Authorization: Bearer <token>`.
+- Invalid, expired, or unverifiable tokens are rejected before tool code runs.
+- Tool callbacks receive authenticated user data on `ctx.auth`.
+
+Keep provider-specific setup in the provider page. Keep authorization decisions close to the tool or middleware that needs them.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Read identity, scopes, roles, and permissions inside tools.
+  </Card>
+  <Card title="Auth providers API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers">
+    Look up exact provider options, defaults, and verification behavior.
+  </Card>
+  <Card title="Client Authentication" icon="router" href="/typescript/client/authentication">
+    Connect a TypeScript MCP client to an OAuth-protected server.
+  </Card>
+  <Card title="OAuth Proxy" icon="shuffle" href="/typescript/server/authentication/providers/oauth-proxy">
+    Bridge providers that do not support Dynamic Client Registration.
+  </Card>
+</CardGroup>

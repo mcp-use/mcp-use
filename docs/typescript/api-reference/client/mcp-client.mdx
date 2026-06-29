@@ -1,0 +1,559 @@
+---
+title: "MCPClient"
+description: "Create and manage TypeScript MCP client connections"
+icon: "router"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for the Node.js client on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client.ts</a>
+<br />
+View the shared base client implementation: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/base.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/base.ts</a>
+<br />
+View the browser client implementation: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/browser.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/browser.ts</a>
+</Callout>
+
+`MCPClient` stores MCP server configuration and creates [`MCPSession`](/typescript/api-reference/client/mcp-session) instances for live connections. Use the client to add or remove servers, open sessions, manage lifecycle, handle client-side callbacks, and enable code mode.
+
+```ts
+import { MCPClient } from "mcp-use";
+// or import { MCPClient } from "mcp-use/client";
+```
+
+In browser bundles, import from `mcp-use/browser`. The browser entry exports `BrowserMCPClient` as `MCPClient`; it supports HTTP servers only and inherits the same session-management methods.
+
+```ts
+import { MCPClient } from "mcp-use/browser";
+```
+
+A minimal Node.js client:
+
+```ts wrap
+import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    filesystem: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+    },
+  },
+});
+
+const session = await client.createSession("filesystem");
+const tools = await session.listTools();
+
+await client.close();
+```
+
+## Constructor
+
+Creates a Node.js MCP client. The constructor accepts an inline config object, a path to a JSON config file, or no config. Servers can also be added later with `addServer()`.
+
+**Parameters**
+><ParamField body="config" type="string | MCPClientConfigShape | undefined" default="undefined">Inline client configuration, path to a JSON config file, or omitted for an empty client.</ParamField>
+><ParamField body="options" type="MCPClientOptions | undefined" default="undefined">Client behavior options such as code mode, sampling, elicitation, and notification callbacks.</ParamField>
+
+**Signature**
+```ts wrap
+constructor(
+  config?: string | Record<string, any>,
+  options?: MCPClientOptions
+)
+```
+
+## Static methods
+
+### fromDict
+
+Creates an `MCPClient` from an inline configuration object.
+
+**Parameters**
+><ParamField body="cfg" type="Record<string, any>" required="true">Client configuration with an optional `mcpServers` map.</ParamField>
+><ParamField body="options" type="MCPClientOptions | undefined" default="undefined">Client behavior options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="MCPClient" />
+
+**Example**
+```ts wrap
+const client = MCPClient.fromDict({
+  mcpServers: {
+    api: { url: "https://example.com/mcp" },
+  },
+});
+```
+
+**Signature**
+```ts wrap
+static fromDict(
+  cfg: Record<string, any>,
+  options?: MCPClientOptions
+): MCPClient
+```
+
+### fromConfigFile
+
+Loads a JSON config file and creates an `MCPClient`.
+
+**Parameters**
+><ParamField body="path" type="string" required="true">Path to the JSON configuration file.</ParamField>
+><ParamField body="options" type="MCPClientOptions | undefined" default="undefined">Client behavior options.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="MCPClient" />
+
+**Signature**
+```ts wrap
+static fromConfigFile(path: string, options?: MCPClientOptions): MCPClient
+```
+
+### getPackageVersion
+
+Returns the installed `mcp-use` package version.
+
+**Returns**
+><ResponseField name="returns" type="string" />
+
+**Signature**
+```ts wrap
+static getPackageVersion(): string
+```
+
+## Session methods
+
+### createSession
+
+Creates a new [`MCPSession`](/typescript/api-reference/client/mcp-session) for a configured server. If a session already exists for the same server name, the new session replaces it.
+
+**Parameters**
+><ParamField body="serverName" type="string" required="true">Name of the server in `config.mcpServers`.</ParamField>
+><ParamField body="autoInitialize" type="boolean" default="true">When `true`, connects and runs the MCP initialize handshake before resolving.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<MCPSession>" />
+
+**Throws**
+Throws `Error` when `serverName` is not found in the config.
+
+**Example**
+```ts wrap
+const session = await client.createSession("api");
+const result = await session.callTool("search", { query: "docs" });
+```
+
+**Signature**
+```ts wrap
+createSession(serverName: string, autoInitialize?: boolean): Promise<MCPSession>
+```
+
+### createAllSessions
+
+Creates sessions for every configured server. Sessions are opened sequentially.
+
+**Parameters**
+><ParamField body="autoInitialize" type="boolean" default="true">When `true`, connects and initializes each session before resolving.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<Record<string, MCPSession>>" />
+
+**Signature**
+```ts wrap
+createAllSessions(autoInitialize?: boolean): Promise<Record<string, MCPSession>>
+```
+
+### getSession
+
+Returns an existing session or `null` when the session has not been created.
+
+**Parameters**
+><ParamField body="serverName" type="string" required="true">Name of the server session to retrieve.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="MCPSession | null" />
+
+**Signature**
+```ts wrap
+getSession(serverName: string): MCPSession | null
+```
+
+### requireSession
+
+Returns an existing session and throws when the session is missing.
+
+**Parameters**
+><ParamField body="serverName" type="string" required="true">Name of the server session to retrieve.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="MCPSession" />
+
+**Throws**
+Throws `Error` with the available session names when no session exists for `serverName`.
+
+**Signature**
+```ts wrap
+requireSession(serverName: string): MCPSession
+```
+
+### getAllActiveSessions
+
+Returns the active sessions as a map keyed by server name.
+
+**Returns**
+><ResponseField name="returns" type="Record<string, MCPSession>" />
+
+**Signature**
+```ts wrap
+getAllActiveSessions(): Record<string, MCPSession>
+```
+
+### closeSession
+
+Disconnects one active session and removes it from the active session list. Calling this method for a missing session logs a warning and resolves.
+
+**Parameters**
+><ParamField body="serverName" type="string" required="true">Name of the session to close.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+closeSession(serverName: string): Promise<void>
+```
+
+### closeAllSessions
+
+Closes every active session. Errors are logged and remaining sessions continue closing.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+closeAllSessions(): Promise<void>
+```
+
+### close
+
+Closes the client. This cleans up any code executor first, then closes all active sessions. Prefer this for application shutdown.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Example**
+```ts wrap
+process.on("SIGINT", async () => {
+  await client.close();
+  process.exit(0);
+});
+```
+
+**Signature**
+```ts wrap
+close(): Promise<void>
+```
+
+## Configuration methods
+
+### addServer
+
+Adds or replaces a server configuration. The server can be used by `createSession()` after it is added.
+
+**Parameters**
+><ParamField body="name" type="string" required="true">Unique server name.</ParamField>
+><ParamField body="serverConfig" type="ServerConfig" required="true">Server transport configuration.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Example**
+```ts wrap
+client.addServer("weather", {
+  url: "https://weather.example.com/mcp",
+  headers: { Authorization: `Bearer ${process.env.WEATHER_TOKEN}` },
+});
+```
+
+**Signature**
+```ts wrap
+addServer(name: string, serverConfig: Record<string, any>): void
+```
+
+### removeServer
+
+Removes a server configuration and removes the server name from `activeSessions`. Close the session first when you need to disconnect the transport.
+
+**Parameters**
+><ParamField body="name" type="string" required="true">Server name to remove.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+removeServer(name: string): void
+```
+
+### getServerNames
+
+Returns configured server names. In Node.js code mode, the internal `code_mode` server is excluded.
+
+**Returns**
+><ResponseField name="returns" type="string[]" />
+
+**Signature**
+```ts wrap
+getServerNames(): string[]
+```
+
+### getServerConfig
+
+Returns the configuration for a single server.
+
+**Parameters**
+><ParamField body="name" type="string" required="true">Server name.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Record<string, any> | undefined" />
+
+**Signature**
+```ts wrap
+getServerConfig(name: string): Record<string, any>
+```
+
+### getConfig
+
+Returns the complete client configuration.
+
+**Returns**
+><ResponseField name="returns" type="Record<string, any>" />
+
+**Signature**
+```ts wrap
+getConfig(): Record<string, any>
+```
+
+### saveConfig
+
+Writes the current client configuration to a JSON file. This method is only available on the Node.js `MCPClient`.
+
+**Parameters**
+><ParamField body="filepath" type="string" required="true">Destination file path. Missing parent directories are created.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+saveConfig(filepath: string): void
+```
+
+## Code mode methods
+
+### executeCode
+
+Executes JavaScript or TypeScript code with access to connected MCP tools. This method is only available when `options.codeMode` is enabled.
+
+**Parameters**
+><ParamField body="code" type="string" required="true">Code to execute.</ParamField>
+><ParamField body="timeout" type="number | undefined" default="undefined">Execution timeout in milliseconds.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ExecutionResult>" />
+
+**Throws**
+Throws `Error` when code mode is not enabled.
+
+**Signature**
+```ts wrap
+executeCode(code: string, timeout?: number): Promise<ExecutionResult>
+```
+
+### searchTools
+
+Searches tools across active MCP sessions. This method is only available when `options.codeMode` is enabled.
+
+**Parameters**
+><ParamField body="query" type="string" default='""'>Search query. Empty string returns all tools.</ParamField>
+><ParamField body="detailLevel" type='"names" | "descriptions" | "full"' default='"full"'>Amount of tool detail to return.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ToolSearchResponse>" />
+
+**Throws**
+Throws `Error` when code mode is not enabled.
+
+**Signature**
+```ts wrap
+searchTools(
+  query?: string,
+  detailLevel?: "names" | "descriptions" | "full"
+): Promise<ToolSearchResponse>
+```
+
+## Types
+
+### MCPClientConfigShape
+
+Top-level client configuration. The `mcpServers` map holds named server configs. Root callback fields and `clientInfo` are used as defaults when a server config omits them.
+
+**Fields**
+><ResponseField name="mcpServers" type="Record<string, ServerConfig>">Optional map of server names to transport configs.</ResponseField>
+><ResponseField name="clientInfo" type="ClientInfo">Optional default client metadata sent during initialization.</ResponseField>
+><ResponseField name="onSampling" type="OnSamplingCallback">Optional default callback for server sampling requests.</ResponseField>
+><ResponseField name="onElicitation" type="OnElicitationCallback">Optional default callback for server elicitation requests.</ResponseField>
+><ResponseField name="onNotification" type="OnNotificationCallback">Optional default callback for server notifications.</ResponseField>
+
+**Signature**
+```ts wrap
+interface MCPClientConfigShape {
+  clientInfo?: ClientInfo;
+  mcpServers?: Record<string, ServerConfig>;
+  onSampling?: OnSamplingCallback;
+  onElicitation?: OnElicitationCallback;
+  onNotification?: OnNotificationCallback;
+  /** @deprecated Use onSampling. */
+  samplingCallback?: OnSamplingCallback;
+  /** @deprecated Use onElicitation. */
+  elicitationCallback?: OnElicitationCallback;
+}
+```
+
+### ServerConfig
+
+Transport configuration for one MCP server. Node.js clients support HTTP and Standard I/O configs. Browser clients support HTTP configs only.
+
+**Fields**
+><ResponseField name="url" type="string">HTTP or SSE MCP endpoint URL.</ResponseField>
+><ResponseField name="headers" type="Record<string, string>">Optional request headers for HTTP servers.</ResponseField>
+><ResponseField name="authToken" type="string">Bearer token for HTTP servers.</ResponseField>
+><ResponseField name="authProvider" type="unknown">Optional SDK-compatible auth provider.</ResponseField>
+><ResponseField name="transport" type='"http" | "sse"'>Optional transport preference. Defaults to streamable HTTP with SSE fallback.</ResponseField>
+><ResponseField name="preferSse" type="boolean">Prefer SSE transport when connecting.</ResponseField>
+><ResponseField name="disableSseFallback" type="boolean">Disable automatic SSE fallback for streamable HTTP.</ResponseField>
+><ResponseField name="command" type="string">Stdio command for Node.js clients.</ResponseField>
+><ResponseField name="args" type="string[]">Stdio arguments for Node.js clients.</ResponseField>
+><ResponseField name="env" type="Record<string, string>">Optional environment variables for Standard I/O servers.</ResponseField>
+
+**Signature**
+```ts wrap
+type ServerConfig = HttpServerConfig | StdioServerConfig;
+```
+
+### MCPClientOptions
+
+Options passed as the second constructor argument. These values are global defaults. Per-server callback fields override them.
+
+**Fields**
+><ResponseField name="codeMode" type="boolean | CodeModeConfig">Enable code execution mode.</ResponseField>
+><ResponseField name="onSampling" type="OnSamplingCallback">Handle `sampling/createMessage` requests from servers.</ResponseField>
+><ResponseField name="onElicitation" type="OnElicitationCallback">Handle `elicitation/create` requests from servers.</ResponseField>
+><ResponseField name="onNotification" type="OnNotificationCallback">Handle server notifications when a server config does not provide its own handler.</ResponseField>
+><ResponseField name="samplingCallback" type="OnSamplingCallback">Deprecated alias for `onSampling`.</ResponseField>
+><ResponseField name="elicitationCallback" type="OnElicitationCallback">Deprecated alias for `onElicitation`.</ResponseField>
+
+**Signature**
+```ts wrap
+interface MCPClientOptions {
+  codeMode?: boolean | CodeModeConfig;
+  onSampling?: OnSamplingCallback;
+  samplingCallback?: OnSamplingCallback;
+  onElicitation?: OnElicitationCallback;
+  elicitationCallback?: OnElicitationCallback;
+  onNotification?: OnNotificationCallback;
+}
+```
+
+### CodeModeConfig
+
+Advanced code execution configuration.
+
+**Fields**
+><ResponseField name="enabled" type="boolean">Enable or disable code mode.</ResponseField>
+><ResponseField name="executor" type='"vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor'>Executor implementation. Defaults to `"vm"`.</ResponseField>
+><ResponseField name="executorOptions" type="VMExecutorOptions | E2BExecutorOptions">Executor-specific options.</ResponseField>
+
+**Signature**
+```ts wrap
+interface CodeModeConfig {
+  enabled: boolean;
+  executor?: "vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor;
+  executorOptions?: VMExecutorOptions | E2BExecutorOptions;
+}
+```
+
+### ExecutionResult
+
+Result returned by `executeCode()`.
+
+**Fields**
+><ResponseField name="result" type="unknown">Return value from the executed code.</ResponseField>
+><ResponseField name="logs" type="string[]">Console output captured during execution.</ResponseField>
+><ResponseField name="error" type="string | null">Error message when execution failed, otherwise `null`.</ResponseField>
+><ResponseField name="execution_time" type="number">Execution duration in seconds.</ResponseField>
+
+## Usage
+
+Use an initialized session for MCP protocol calls:
+
+```ts wrap
+import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    demo: { url: "http://localhost:3000/mcp" },
+  },
+});
+
+try {
+  const session = await client.createSession("demo");
+  const tools = await session.listTools();
+  console.log(tools.map((tool) => tool.name));
+} finally {
+  await client.close();
+}
+```
+
+Handle sampling and elicitation with global defaults:
+
+```ts wrap
+import { acceptWithDefaults, MCPClient } from "mcp-use";
+
+const client = new MCPClient(
+  {
+    mcpServers: {
+      assistant: { url: "https://assistant.example.com/mcp" },
+    },
+  },
+  {
+    onSampling: async (params) => {
+      return callYourModel(params);
+    },
+    onElicitation: async (params) => {
+      return acceptWithDefaults(params);
+    },
+  }
+);
+```
+
+Enable code mode with the default VM executor:
+
+```ts wrap
+const client = new MCPClient("./mcp-config.json", {
+  codeMode: true,
+});
+
+const result = await client.executeCode(`
+  const tools = await searchTools("file", "descriptions");
+  return tools.meta.result_count;
+`);
+```
+
+## Related
+
+- [`MCPSession`](/typescript/api-reference/client/mcp-session): live MCP protocol calls for tools, resources, prompts, roots, and notifications.
+- [MCP Client overview](/typescript/client/index): choose the right client entry point and make a first tool call.
+- [Code mode](/typescript/client/code-mode): guide to code execution mode and executors.
+- [Sampling](/typescript/client/sampling): guide to handling server sampling requests.
+- [Elicitation](/typescript/client/elicitation): guide to handling user input requests.

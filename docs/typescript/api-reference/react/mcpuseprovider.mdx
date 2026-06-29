@@ -1,0 +1,171 @@
+---
+title: "McpUseProvider"
+description: "McpUseProvider API Documentation"
+icon: "component"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/McpUseProvider.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/McpUseProvider.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/McpUseProvider.tsx</a>
+</Callout>
+
+Universal provider component for mcp-use widgets. It works identically whether your widget runs in MCP Apps clients (Claude, Goose) or in ChatGPT via the Apps SDK, so no protocol-specific conditional logic is needed in your widget code.
+
+`McpUseProvider` composes the common React setup for a widget into a single wrapper. From outermost to innermost it renders `StrictMode`, then `ThemeProvider`, then (conditionally) `WidgetControls`, then `ErrorBoundary` around your `children`. When `autoSize` is enabled it also wraps the tree in a container `div` that a `ResizeObserver` measures to notify the host of height changes.
+
+## McpUseProvider
+
+Unified provider component that combines all common React setup for mcp-use widgets.
+
+```tsx
+import { McpUseProvider } from "mcp-use/react";
+```
+
+Wraps widget `children` with the standard mcp-use provider stack. Always includes `StrictMode` (outermost), `ThemeProvider`, and `ErrorBoundary` (innermost). Conditionally adds `WidgetControls` when `debugger` is `true` or `viewControls` is set, and an auto-sizing container `div` when `autoSize` is `true`.
+
+The auto-sizing container uses a `ResizeObserver` on the wrapping `div` to detect content height changes and notifies the host through the MCP Apps bridge (`ui/notifications/size-changed`). Notifications are debounced by 150ms to let animations settle, and a positive height change is only sent when it differs from the last reported height by at least 5px. A zero height is always reported, which lets the host collapse and hide an empty widget. When the widget renders inside the top-level window (not an iframe, where `window === window.parent`) the height notification is skipped. If `ResizeObserver` is unavailable or `window` is undefined (server-side rendering), auto-sizing is a no-op.
+
+**Props**
+><ParamField body="children" type="React.ReactNode" required="true" >   The widget content to wrap. </ParamField>
+><ParamField body="debugger" type="boolean" default="false" >   Enable the debug button in the `WidgetControls` component. When `true`, `WidgetControls` is rendered around the content. </ParamField>
+><ParamField body="viewControls" type='boolean | "pip" | "fullscreen"' default="false" >   Enable view controls in the `WidgetControls` component. `true` shows both the picture-in-picture and fullscreen buttons, `"pip"` shows only the picture-in-picture button, and `"fullscreen"` shows only the fullscreen button. Any truthy value also causes `WidgetControls` to be rendered. </ParamField>
+><ParamField body="autoSize" type="boolean" default="true" >   Automatically notify the host about container height changes for auto-sizing using a `ResizeObserver` on the children container, sent via the MCP Apps `ui/notifications/size-changed` notification. </ParamField>
+><ParamField body="colorScheme" type="boolean" default="true" >   Set `color-scheme` on the document root to match the active theme, enabling native dark scrollbars and the CSS `light-dark()` function. Disable only when you need the browser canvas to stay transparent in hosts that render widgets over a differently themed background. Forwarded to `ThemeProvider`. </ParamField>
+
+**Signature**
+```ts wrap
+function McpUseProvider({ children, debugger: enableDebugger = false, viewControls = false, autoSize = true, colorScheme = true }: McpUseProviderProps): React.ReactElement
+```
+
+<Note>
+The default for `autoSize` is `true` in the current source. Widgets are auto-sized out of the box. Pass `autoSize={false}` to opt out.
+</Note>
+
+## Types
+
+The props object accepted by `McpUseProvider`.
+
+### McpUseProviderProps
+
+Shape of the props object passed to `McpUseProvider`.
+
+**Fields**
+><ResponseField name="children" type="React.ReactNode" required="true">   The widget content to wrap. </ResponseField>
+><ResponseField name="debugger" type="boolean">   Optional. Enable the debug button in `WidgetControls`. Defaults to `false`. </ResponseField>
+><ResponseField name="viewControls" type='boolean | "pip" | "fullscreen"'>   Optional. Enable view controls in `WidgetControls`. Defaults to `false`. </ResponseField>
+><ResponseField name="autoSize" type="boolean">   Optional. Enable host height notifications via `ResizeObserver`. Defaults to `true`. </ResponseField>
+><ResponseField name="colorScheme" type="boolean">   Optional. Set `color-scheme` on the document root to match the active theme. Defaults to `true`. </ResponseField>
+
+**Signature**
+```ts wrap
+interface McpUseProviderProps {
+  children: React.ReactNode;
+  debugger?: boolean;
+  viewControls?: boolean | "pip" | "fullscreen";
+  autoSize?: boolean;
+  colorScheme?: boolean;
+}
+```
+
+## What is included
+
+`McpUseProvider` builds the component tree with conditional wrappers, from outermost to innermost:
+
+1. `StrictMode` (always, outermost): React development-mode checks.
+2. `ThemeProvider` (always): protocol-aware theme management, syncs with both MCP Apps and ChatGPT. Receives the `colorScheme` prop.
+3. `WidgetControls` (conditional): rendered when `debugger` is `true` or `viewControls` is set. Receives `debugger` and `viewControls`.
+4. Auto-sizing container `div` (conditional): rendered when `autoSize` is `true`. Styled with `width: "100%"` and `minHeight: 0`, and observed by a `ResizeObserver`.
+5. `ErrorBoundary` (always, innermost): catches render errors for graceful failures.
+
+## Usage
+
+Minimal usage wraps a single widget component. The widget itself is registered server-side and rendered inside the iframe; the example server below shows the matching server tool that drives a `weather-display` widget.
+
+```tsx wrap
+import { McpUseProvider } from "mcp-use/react";
+
+export default function App() {
+  return (
+    <McpUseProvider>
+      <div>My widget content</div>
+    </McpUseProvider>
+  );
+}
+```
+
+Enable the debug button, view controls, and auto-sizing together:
+
+```tsx wrap
+import { McpUseProvider } from "mcp-use/react";
+
+export default function App() {
+  return (
+    <McpUseProvider debugger viewControls autoSize>
+      <div>My widget content</div>
+    </McpUseProvider>
+  );
+}
+```
+
+The matching server registers a tool that returns the widget. Use `new MCPServer({ ... })` to construct the server:
+
+```ts wrap
+import { MCPServer, widget } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "mcp-apps-example",
+  version: "1.0.0",
+  description:
+    "Example MCP server demonstrating dual-protocol widget support (works with both ChatGPT and MCP Apps clients)",
+});
+
+server.tool(
+  {
+    name: "get-weather",
+    description:
+      "Get current weather for a city (works with ChatGPT and MCP Apps clients)",
+    schema: z.object({
+      city: z.string().describe("City name"),
+    }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city }) =>
+    widget({
+      props: { city },
+      message: `Current weather in ${city}`,
+    })
+);
+
+await server.listen();
+```
+
+<Tip>
+When `autoSize` is enabled (the default) and your widget returns `null`, for example when there are no results to display, the `ResizeObserver` reports a zero height. A zero height is always sent to the host (it bypasses the 5px change threshold), so the host can collapse the iframe and hide the empty widget.
+</Tip>
+
+<Warning>
+`McpUseProvider` does not include `BrowserRouter`. If your widget uses `react-router` for navigation, add it explicitly inside the provider:
+
+```tsx wrap
+import { BrowserRouter } from "react-router";
+import { McpUseProvider } from "mcp-use/react";
+
+<McpUseProvider>
+  <BrowserRouter>
+    <MyWidget />
+  </BrowserRouter>
+</McpUseProvider>;
+```
+</Warning>
+
+## Related
+
+- [`WidgetControls`](/typescript/api-reference/react/widgetcontrols): debug and view controls.
+- [`ThemeProvider`](/typescript/api-reference/react/themeprovider): theme management.
+- [`ErrorBoundary`](/typescript/api-reference/react/errorboundary): error handling.
+- [`useWidget`](/typescript/api-reference/react/usewidget): widget hook for accessing props and actions.

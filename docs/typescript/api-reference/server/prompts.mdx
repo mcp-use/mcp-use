@@ -1,0 +1,430 @@
+---
+title: "Prompts"
+description: "Register prompt templates and add argument autocompletion API Documentation"
+icon: "message-square"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts</a>
+</Callout>
+
+Prompts are reusable, parameterized templates that a server exposes to clients so they can generate structured messages for a language model. Register a prompt with `server.prompt()`, validate its arguments with a Zod schema, and return either a `GetPromptResult` directly or a response helper result (such as `text()`) that the server converts for you. To give clients IDE-style autocomplete on prompt arguments, wrap individual schema fields with `completable()`.
+
+```ts
+import { MCPServer, completable } from "mcp-use/server"
+import type {
+  PromptDefinition,
+  PromptCallback,
+  PromptResult,
+  GetPromptResult,
+  Completable,
+  CompletionContext,
+} from "mcp-use/server"
+```
+
+## Methods
+
+Registers a prompt template that clients can use to generate formatted messages for a language model.
+
+```ts
+import { MCPServer } from "mcp-use/server"
+```
+
+### prompt
+
+Registers a prompt template on the server and returns the server instance for method chaining. The prompt accepts arguments validated by its Zod schema and returns prompt messages. The callback may be supplied two ways: as a separate `callback` argument (recommended), or as a `cb` property on the definition object (legacy). At least one of them must be present, otherwise registration throws.
+
+The callback can return a `GetPromptResult` (an object with a `messages` array) directly, or any response helper result such as `text()`, `markdown()`, or `object()`. When the returned value has a `messages` array it is used as-is; any other value is treated as a `CallToolResult` and converted to a `GetPromptResult` before being sent. The prompt name is added to the server's registered prompt list. After registering at runtime, call `server.sendPromptsListChanged()` so connected clients refresh their list.
+
+```ts
+from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="promptDefinition" type="PromptDefinition | PromptDefinitionWithoutCallback" required="true" >   Prompt configuration object. See [PromptDefinition](#promptdefinition) for all fields. Use `PromptDefinitionWithoutCallback` (no `cb` field) when passing the callback as the second argument. </ParamField>
+><ParamField body="callback" type="PromptCallback<InferPromptInput<T>, HasOAuth>" >   Optional callback that receives the validated arguments and returns the prompt result. Required unless the definition includes a `cb` property. The argument type is inferred from `promptDefinition.schema`. See [PromptCallback](#promptcallback). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" >   The server instance, for method chaining. </ResponseField>
+
+**Throws**
+><ResponseField name="Error" type="Error" >   Thrown synchronously during registration when the prompt has neither a `cb` property nor a `callback` argument. The message is `Prompt '<name>' must have either a cb property or a callback parameter`. </ResponseField>
+
+**Signature**
+```ts wrap
+public prompt: <T extends PromptDefinition<any, HasOAuth> | PromptDefinitionWithoutCallback>(promptDefinition: T & (PromptDefinition<any, HasOAuth> | PromptDefinitionWithoutCallback), callback?: PromptCallback<InferPromptInput<T>, HasOAuth>) => this
+```
+
+**Example**
+```ts wrap
+import { MCPServer, text } from "mcp-use/server"
+import z from "zod"
+
+const server = new MCPServer({
+  name: "simple-example-server",
+  version: "1.0.0",
+  description: "A simple MCP server example",
+})
+
+server.prompt(
+  {
+    name: "greeting",
+    description: "A simple prompt that returns a greeting",
+    schema: z.object({
+      name: z.string(),
+    }),
+  },
+  async ({ name }) => text(`Hello, ${name}!`)
+)
+
+await server.listen()
+```
+
+## Functions
+
+### completable()
+
+Attaches autocompletion to a Zod schema so clients can request suggestions.
+
+```ts
+import { completable } from "mcp-use/server"
+```
+
+Wraps a Zod schema so MCP clients can request autocomplete suggestions for the field via the protocol's `completion/complete` request. Use it on individual fields inside a prompt's (or resource template's) schema. It returns the same schema with completion metadata attached, so the field still validates exactly as before.
+
+There are two ways to supply suggestions:
+
+- List-based (primitives only): pass an array of allowed values. The server filters them with a case-insensitive prefix match against what the user has typed. Only `z.string()`, `z.number()`, and `z.enum([...])` schemas are accepted in this form.
+- Callback-based (any schema): pass a function that receives the current input value and an optional [`CompletionContext`](#completioncontext) and returns the suggestions (or a promise of them). Use this for dynamic or contextual completion, including suggestions that depend on other already-provided arguments via `context.arguments`.
+
+```ts
+from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="schema" type="T extends z.ZodTypeAny" required="true" >   The Zod schema for the argument (for example `z.string()`, `z.number()`, `z.enum([...])`). For the list-based overload, `T` is constrained to `z.ZodString | z.ZodNumber | z.ZodEnum<any>`. </ParamField>
+><ParamField body="complete" type="z.infer<T>[] | ((value, context?) => Promise<...> | ...)" required="true" >   Either an array of allowed values (primitives), or a completion callback `(value: SchemaInput<T>, context?: CompletionContext) => Promise<SchemaInput<T>[]> | SchemaInput<T>[]`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CompletableSchema<T>" >   The same schema with completion metadata attached. See [`Completable`](#completable-1). </ResponseField>
+
+**Signature**
+```ts wrap
+// Overload 1: list of allowed values (primitives only)
+function completable<T extends z.ZodString | z.ZodNumber | z.ZodEnum<any>>(
+  schema: T,
+  complete: z.infer<T>[]
+): CompletableSchema<T>
+
+// Overload 2: completion callback (any schema)
+function completable<T extends z.ZodTypeAny>(
+  schema: T,
+  complete: (
+    value: SchemaInput<T>,
+    context?: CompletionContext
+  ) => Promise<SchemaInput<T>[]> | SchemaInput<T>[]
+): CompletableSchema<T>
+```
+
+**Example**
+```ts wrap
+import { MCPServer, completable } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({
+  name: "completion-example-server",
+  version: "1.0.0",
+  description:
+    "An MCP server example demonstrating completion capabilities for prompt and resource template arguments",
+})
+
+// Prompt with static list completion - languages for code review
+server.prompt(
+  {
+    name: "code-review",
+    schema: z.object({
+      language: completable(z.string(), [
+        "python",
+        "typescript",
+        "javascript",
+        "java",
+        "go",
+        "rust",
+      ]),
+      severity: z.string(),
+    }),
+  },
+  async ({ language, severity }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review code in ${language} with ${severity} severity`,
+        },
+      },
+    ],
+  })
+)
+
+// Prompt with dynamic callback completion - file extensions
+server.prompt(
+  {
+    name: "file-search",
+    schema: z.object({
+      extension: completable(z.string(), async (value: string) => {
+        const extensions = [".ts", ".tsx", ".js", ".jsx", ".py", ".go", ".md"]
+        return extensions.filter((ext) => ext.startsWith(value))
+      }),
+      directory: z.string(),
+    }),
+  },
+  async ({ extension, directory }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Find files with extension ${extension} in ${directory}`,
+        },
+      },
+    ],
+  })
+)
+
+await server.listen()
+```
+
+## Types
+
+### PromptDefinition
+
+Configuration object describing a prompt, including its callback (legacy single-object pattern).
+
+```ts
+import type { PromptDefinition } from "mcp-use/server"
+```
+
+Describes a prompt's metadata, input schema, and callback. This is the variant that carries the callback inline via the `cb` field. When passing the callback as a separate argument to `server.prompt()`, use `PromptDefinitionWithoutCallback` (the same shape minus the `cb` field). The interface is generic over `TInput` (the validated argument type) and `HasOAuth` (whether OAuth is configured, which affects `ctx.auth` availability).
+
+```ts
+from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="name" type="string" required="true" >   Unique identifier for the prompt (for example `"code-review-template"`). </ParamField>
+><ParamField body="title" type="string" >   Human-readable title displayed in prompt lists. </ParamField>
+><ParamField body="description" type="string" >   Description of what the prompt does; helps users choose the right prompt. Defaults to an empty string when omitted. </ParamField>
+><ParamField body="args" type="InputDefinition[]" >   Argument definitions. Deprecated, use `schema` instead. </ParamField>
+><ParamField body="schema" type="z.ZodObject<any>" >   Zod object schema for input validation. Call `.describe()` on each field for user guidance, and wrap fields with [`completable()`](#completable) to enable autocompletion. </ParamField>
+><ParamField body="cb" type="PromptCallback<TInput, HasOAuth>" required="true" >   Async callback that generates the prompt. Required on this interface; omit it (and pass the callback separately) by using `PromptDefinitionWithoutCallback`. </ParamField>
+
+**Signature**
+```ts wrap
+interface PromptDefinition<TInput = Record<string, any>, HasOAuth extends boolean = false> {
+  name: string
+  title?: string
+  description?: string
+  /** @deprecated Use schema instead */
+  args?: InputDefinition[]
+  schema?: z.ZodObject<any>
+  cb: PromptCallback<TInput, HasOAuth>
+}
+```
+
+### PromptCallback
+
+The function signature for a prompt's handler.
+
+```ts
+import type { PromptCallback } from "mcp-use/server"
+```
+
+The handler invoked when a client requests a prompt. It receives the validated arguments as its first parameter and an [`EnhancedPromptContext`](/typescript/api-reference/server/tool-context) as an optional second parameter, and returns a promise. The context exposes `auth` (when OAuth is configured), `req` (the Hono request), and `client` (a capability checker). Parameters are checked bivariantly so you can freely destructure the argument object.
+
+The return type is a union: a `CallToolResult`, a `GetPromptResult`, or a `TypedCallToolResult<any>`. In practice this means you can return a response helper such as `text()` or `markdown()`, or return a `GetPromptResult` object literal with a `messages` array. See [PromptResult](#promptresult) for the shape `server.prompt()` ultimately sends.
+
+```ts
+from "mcp-use/server"
+```
+
+**Type Parameters**
+><ParamField body="TInput" type="Record<string, any>" default="Record<string, any>" >   Type of the validated argument object. Inferred from the definition's `schema`. </ParamField>
+><ParamField body="HasOAuth" type="boolean" default="false" >   Whether OAuth is configured, which controls availability of `ctx.auth`. </ParamField>
+
+**Signature**
+```ts wrap
+type PromptCallback<TInput = Record<string, any>, HasOAuth extends boolean = false> = (
+  params: TInput,
+  ctx: EnhancedPromptContext<HasOAuth>
+) => Promise<CallToolResult | GetPromptResult | TypedCallToolResult<any>>
+```
+
+**Example**
+```ts wrap
+import { MCPServer } from "mcp-use/server"
+import z from "zod"
+
+const server = new MCPServer({ name: "prompts", version: "1.0.0" })
+
+// Returning a GetPromptResult directly from the callback
+server.prompt(
+  {
+    name: "greeting",
+    description: "A simple prompt that returns a greeting",
+    schema: z.object({ name: z.string() }),
+  },
+  async ({ name }) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `Hello, ${name}!` },
+      },
+    ],
+  })
+)
+```
+
+### PromptResult
+
+The value a prompt resolves to. An alias of `GetPromptResult`.
+
+```ts
+import type { PromptResult } from "mcp-use/server"
+```
+
+A naming alias for [`GetPromptResult`](#getpromptresult), re-exported from the MCP SDK for convenience. Use it wherever you want to refer to the result a prompt produces. It is the exact same type as `GetPromptResult`; the two are interchangeable.
+
+```ts
+from "mcp-use/server"
+```
+
+**Signature**
+```ts wrap
+type PromptResult = GetPromptResult
+```
+
+### GetPromptResult
+
+The structured result returned to a client for a `prompts/get` request.
+
+```ts
+import type { GetPromptResult } from "mcp-use/server"
+```
+
+The MCP protocol result for retrieving a prompt, re-exported from `@modelcontextprotocol/sdk`. It carries an array of `messages` plus an optional `description` and `_meta`. Each message has a `role` of `"user"` or `"assistant"` and a `content` object whose `type` is one of `"text"`, `"image"`, `"audio"`, or an embedded resource. When `server.prompt()` detects a returned value with a `messages` array it forwards it unchanged; otherwise it converts the value (a `CallToolResult` from a response helper) into this shape.
+
+```ts
+from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="messages" type="PromptMessage[]" required="true" >   Ordered list of messages that make up the prompt. Each is `{ role: "user" | "assistant"; content: ... }`. </ParamField>
+><ParamField body="description" type="string" >   Optional human-readable description of the prompt result. </ParamField>
+><ParamField body="_meta" type="object" >   Optional protocol metadata. </ParamField>
+
+**Signature**
+```ts wrap
+type GetPromptResult = {
+  messages: Array<{
+    role: "user" | "assistant"
+    content:
+      | { type: "text"; text: string }
+      | { type: "image"; data: string; mimeType: string }
+      | { type: "audio"; data: string; mimeType: string }
+      | { type: "resource"; resource: unknown }
+  }>
+  description?: string
+  _meta?: { [key: string]: unknown }
+}
+```
+
+### Completable
+
+A type alias for a schema that has completion metadata attached.
+
+```ts
+import type { Completable } from "mcp-use/server"
+```
+
+A utility type alias for the result of [`completable()`](#completable). Use it when you need to annotate or reference a completable schema's type. It is generic over the wrapped Zod schema type `T`.
+
+```ts
+from "mcp-use/server"
+```
+
+**Type Parameters**
+><ParamField body="T" type="z.ZodTypeAny" required="true" >   The wrapped Zod schema type. </ParamField>
+
+**Signature**
+```ts wrap
+type Completable<T extends z.ZodTypeAny> = CompletableSchema<T>
+```
+
+**Example**
+```ts wrap
+import type { Completable } from "mcp-use/server"
+import type { z } from "zod"
+
+type LanguageSchema = Completable<z.ZodString>
+```
+
+### CompletionContext
+
+Context passed to a completion callback, exposing the other argument values.
+
+```ts
+import type { CompletionContext } from "mcp-use/server"
+```
+
+Passed as the optional second argument to a callback-based [`completable()`](#completable). It carries the other argument values already supplied for the same prompt or resource template, which lets you produce contextual suggestions (for example, narrowing project suggestions by an earlier `userId`). The `arguments` property is optional, so guard for `undefined` before reading from it.
+
+```ts
+from "mcp-use/server"
+```
+
+**Properties**
+><ParamField body="arguments" type="Record<string, unknown>" >   Other argument values from the same prompt or resource template. Useful for contextual completion based on previously provided values. </ParamField>
+
+**Signature**
+```ts wrap
+interface CompletionContext {
+  arguments?: Record<string, unknown>
+}
+```
+
+**Example**
+```ts wrap
+import { MCPServer, completable } from "mcp-use/server"
+import { z } from "zod"
+import type { CompletionContext } from "mcp-use/server"
+
+const server = new MCPServer({ name: "prompts", version: "1.0.0" })
+
+server.prompt(
+  {
+    name: "analyze-project",
+    schema: z.object({
+      projectId: completable(
+        z.string(),
+        async (value: string, ctx?: CompletionContext) => {
+          const userId = ctx?.arguments?.userId
+          const projects = await fetchProjects(userId)
+          return projects
+            .map((p) => p.id)
+            .filter((id) => id.startsWith(value))
+        }
+      ),
+    }),
+  },
+  async ({ projectId }) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `Analyzing ${projectId}...` },
+      },
+    ],
+  })
+)
+```

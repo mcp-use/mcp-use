@@ -1,9 +1,10 @@
 ---
-title: "Server Proxying & Composition"
-description: "Learn how to compose multiple MCP servers together into a unified aggregator server."
+title: "Server Composition"
+description: "Compose multiple MCP servers into one unified aggregator server."
+icon: "git-merge"
 ---
 
-The `mcp-use` TypeScript SDK allows you to easily proxy and compose multiple MCP servers into a single unified "Aggregator" server.
+The `mcp-use` TypeScript SDK lets you proxy and compose multiple MCP servers into a single unified aggregator server.
 
 This is extremely useful when you have multiple microservices or specialized MCP servers (like a database server, a weather server, and an internal API server) and you want to expose all of their tools, resources, and prompts through a single unified endpoint.
 
@@ -12,7 +13,7 @@ This is extremely useful when you have multiple microservices or specialized MCP
 The most elegant way to proxy servers is to pass a configuration object directly to `server.proxy()`. The keys of the object act as the **namespaces** for the child servers, preventing any naming collisions.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use/server";
 import path from "node:path";
 
 const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
@@ -42,7 +43,7 @@ await server.proxy({
 server.tool({
   name: "aggregator_status",
   description: "Check aggregator status",
-}, async () => ({ content: [{ type: "text", text: "All systems operational" }] }));
+}, async () => text("All systems operational"));
 
 // Start the unified server
 await server.listen(3000);
@@ -52,7 +53,7 @@ In the example above, the `database` tools will be prefixed with `database_` (e.
 
 ## Low-Level API (Explicit Session)
 
-For advanced use cases - such as dynamically determining auth headers, managing complex connection lifecycles, or using custom connectors - you can inject an explicit `MCPSession` directly into the `proxy` method using the `mcp-use` Client SDK.
+For advanced use cases (such as dynamically determining auth headers, managing complex connection lifecycles, or using custom connectors), you can inject an explicit `MCPSession` directly into the `proxy` method using the `mcp-use` Client SDK.
 
 ```typescript
 import { MCPServer } from "mcp-use/server";
@@ -104,7 +105,7 @@ If a child server requests LLM Sampling (`sampling/createMessage`) or Elicitatio
 If a request context is somehow lost (e.g., executing a tool via a headless script), the Aggregator provides graceful fallbacks so the child server doesn't hang.
 
 ### Progress Tracking
-If a child tool emits `notifications/progress/report` events, the Aggregator catches those events and pipes them directly through the unified `ToolContext` back to the parent client.
+If a child tool emits `notifications/progress` events, the Aggregator catches those events and pipes them directly through the unified `ToolContext` back to the parent client.
 
 ### Resource URIs
 To prevent URI collisions across different servers, the proxy automatically prepends the namespace to the resource URI protocol.

@@ -1,0 +1,40 @@
+---
+title: "Apps SDK compatibility"
+description: "Understand how MCP Apps run in ChatGPT and how mcp-use handles Apps SDK compatibility."
+icon: "openai"
+---
+
+ChatGPT supports MCP Apps. That means a widget built with the MCP Apps bridge can run in ChatGPT and in other MCP Apps-compatible hosts.
+
+`mcp-use` handles the compatibility details for you. Build the widget with the standard `mcp-use` server and React APIs; `mcp-use` emits the metadata ChatGPT needs and maps host behavior through the same hooks you use everywhere else.
+
+## How ChatGPT fits in
+
+OpenAI's Apps SDK remains supported, and ChatGPT also implements the MCP Apps UI standard. `mcp-use` generates MCP Apps metadata and ChatGPT compatibility metadata from the same widget definitions.
+
+In practice:
+
+- Use `widget: { name }` and `widget({ props, output })` on the server.
+- Use `useWidget()` and `useCallTool()` in React widgets.
+- Let `mcp-use` translate compatibility metadata for ChatGPT.
+- Reach for Apps SDK extensions only when a ChatGPT-specific capability has no shared MCP Apps equivalent yet.
+
+## What mcp-use abstracts
+
+The same widget code should work across supported hosts:
+
+| Widget behavior | mcp-use API |
+| --- | --- |
+| Read tool input, result props, metadata, host context, and state | `useWidget()` |
+| Call MCP tools from the widget | `useCallTool()` |
+| Update model-visible widget state | `useWidget().setState` or `ModelContext` |
+| Send a follow-up user message | `useWidget().sendFollowUpMessage` |
+| Request inline, fullscreen, or picture-in-picture display | `useWidget().requestDisplayMode` |
+
+These APIs keep widget code focused on behavior instead of host-specific bridge details.
+
+## Next steps
+
+- Use [Build widgets](/typescript/mcp-apps/widgets) for the normal MCP Apps workflow.
+- Use [Model context](/typescript/mcp-apps/model-context) to decide what the model and widget should see.
+- Use [Interactivity](/typescript/mcp-apps/interactivity) for tool calls, state, follow-up messages, and display controls.

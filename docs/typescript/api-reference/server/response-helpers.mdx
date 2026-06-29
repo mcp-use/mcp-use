@@ -1,0 +1,739 @@
+---
+title: "Response helpers"
+description: "Utility functions for building standardized MCP tool and resource responses API Documentation"
+icon: "reply"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/response-helpers.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/response-helpers.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/response-helpers.ts</a>
+</Callout>
+
+Response helpers are standalone functions that build `CallToolResult` objects for MCP tools, resources, and prompts. Instead of constructing content arrays and `_meta` MIME types by hand, you call a helper that produces the correct shape and content type. Every helper is importable from `mcp-use/server`. The server automatically converts the returned `CallToolResult` to `GetPromptResult` for prompts and `ReadResourceResult` for resources, so the same helper works across all three primitives.
+
+```ts wrap
+import { text, markdown, html, xml, css, javascript, object, array, image, audio, binary, resource, mix, error, widget } from "mcp-use/server"
+import type { TypedCallToolResult, WidgetResponseConfig } from "mcp-use/server"
+```
+
+## Functions
+
+### text
+
+Creates a plain text content response, the most common response type for tools and resources.
+
+```ts
+import { text } from "mcp-use/server"
+```
+
+Creates a plain text content response. The most common response type for tools and resources. Sets the `_meta.mimeType` to `text/plain`.
+
+```ts wrap
+import { text } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="content" type="string" required="true" >   The text content to return </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with a single `text` content item and `text/plain` MIME type </ResponseField>
+
+**Signature**
+```ts wrap
+function text(content: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, text } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "greet-user",
+    description: "Greet a user by name",
+    schema: z.object({ name: z.string() }),
+  },
+  async ({ name }) => text(`Hey ${name}!`)
+)
+```
+
+### markdown
+Creates a Markdown content response. Identical shape to [`text`](/typescript/api-reference/server/response-helpers), but sets the `_meta.mimeType` to `text/markdown` so clients render it as Markdown.
+
+```ts wrap
+import { markdown } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="content" type="string" required="true" >   The Markdown content to return </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with `text/markdown` MIME type metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function markdown(content: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, markdown } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-report",
+    description: "Generate a markdown report",
+    schema: z.object({ title: z.string() }),
+  },
+  async ({ title }) => markdown(`# ${title}\n\n## Summary\n\n- Item 1\n- Item 2`)
+)
+```
+
+### html
+Creates an HTML content response for web display. Returns the HTML inside a `text` content item and sets `_meta.mimeType` to `text/html`.
+
+```ts wrap
+import { html } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="content" type="string" required="true" >   The HTML content to return </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with `text/html` MIME type metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function html(content: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, html } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-html-snippet",
+    description: "Return an HTML snippet",
+    schema: z.object({}),
+  },
+  async () => html("<h1>Hello</h1><p>This is an HTML response from an MCP tool.</p>")
+)
+```
+
+### xml
+Creates an XML content response. Returns the XML inside a `text` content item and sets `_meta.mimeType` to `text/xml`.
+
+```ts wrap
+import { xml } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="content" type="string" required="true" >   The XML content to return </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with `text/xml` MIME type metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function xml(content: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, xml } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-xml-data",
+    description: "Return XML data",
+    schema: z.object({}),
+  },
+  async () => xml('<?xml version="1.0"?><root><item id="1">Test</item></root>')
+)
+```
+
+### css
+Creates a CSS stylesheet content response. Returns the CSS inside a `text` content item and sets `_meta.mimeType` to `text/css`.
+
+```ts wrap
+import { css } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="content" type="string" required="true" >   The CSS content to return </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with `text/css` MIME type metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function css(content: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, css } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-theme-css",
+    description: "Return CSS theme styles",
+    schema: z.object({}),
+  },
+  async () => css("body { margin: 0; font-family: system-ui; }")
+)
+```
+
+### javascript
+Creates a JavaScript code content response. Returns the source inside a `text` content item and sets `_meta.mimeType` to `text/javascript`.
+
+```ts wrap
+import { javascript } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="content" type="string" required="true" >   The JavaScript content to return </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with `text/javascript` MIME type metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function javascript(content: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, javascript } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-script",
+    description: "Return a JavaScript snippet",
+    schema: z.object({}),
+  },
+  async () => javascript('console.log("Hello from MCP tool");')
+)
+```
+
+### object
+Creates a JSON object response that carries both a text representation and typed structured content. The text content is the pretty-printed JSON (`JSON.stringify(data, null, 2)`), `structuredContent` holds the typed data, and `_meta.mimeType` is set to `application/json`. The generic `T` flows through to the result type so callers get full type inference.
+
+If `data` is an array, `object` delegates to [`array`](/typescript/api-reference/server/response-helpers) internally and the result is wrapped in a `data` field. Note that the `_meta.mimeType` is only set on the non-array path.
+
+```ts wrap
+import { object } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="data" type="T extends Record<string, any>" required="true" >   The object to return as JSON. An array is forwarded to `array()` </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="TypedCallToolResult<T>" >   Result with pretty-printed JSON text, typed `structuredContent`, and `application/json` MIME type </ResponseField>
+
+**Signature**
+```ts wrap
+function object<T extends Record<string, any>>(data: T): TypedCallToolResult<T>
+```
+
+**Example**
+```ts wrap
+import { MCPServer, object } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "search-items",
+    description: "Search items",
+    schema: z.object({ query: z.string() }),
+  },
+  async ({ query }) => {
+    const result = await search(query)
+    return object({ count: result.length, items: result })
+  }
+)
+```
+
+<Tip>
+The `object()` helper includes both the stringified JSON (for backwards compatibility as specified by the protocol) and the new structured data property.
+</Tip>
+
+### array
+Creates a JSON response for an array. Because the MCP `structuredContent` field must be an object, the array is wrapped in a `data` field. The text content is the pretty-printed JSON of the original array. Unlike the other JSON helper, `array` does not set a `_meta.mimeType`.
+
+```ts wrap
+import { array } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="data" type="T extends any[]" required="true" >   The array to return as JSON </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="TypedCallToolResult<{ data: T }>" >   Result whose `structuredContent` is `{ data }` and whose text content is the pretty-printed array </ResponseField>
+
+**Signature**
+```ts wrap
+function array<T extends any[]>(data: T): TypedCallToolResult<{ data: T }>
+```
+
+**Example**
+```ts wrap
+import { MCPServer, array } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-number-list",
+    description: "Return an array of numbers",
+    schema: z.object({ count: z.number() }),
+  },
+  async ({ count }) => {
+    const nums = Array.from({ length: count }, (_, i) => i + 1)
+    return array(nums)
+  }
+)
+```
+
+<Note>
+Arrays are automatically wrapped in an object with a `data` field. If you pass an array to [`object`](/typescript/api-reference/server/response-helpers), it calls `array()` internally.
+</Note>
+
+### image
+Creates an image content response from base64 data or a data URL. Emits an `image` content item with `data` and `mimeType`, and sets `_meta` to `{ mimeType, isImage: true }`. The `mimeType` defaults to `image/png` when not provided.
+
+```ts wrap
+import { image } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="data" type="string" required="true" >   The image data (data URL or base64) </ParamField>
+><ParamField body="mimeType" type="string" default='image/png' >   MIME type of the image (default: "image/png") </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with an `image` content item and `isImage` metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function image(data: string, mimeType?: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, image } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-placeholder-image",
+    description: "Return a placeholder image",
+    schema: z.object({}),
+  },
+  async () => {
+    const { data, mimeType } = await getPlaceholderImage()
+    return image(data, mimeType)
+  }
+)
+```
+
+### audio
+Creates an audio content response from either base64 data or a file path. The argument is treated as a file path when it contains a path separator (`/` or `\`) or a `.` and is shorter than 1000 characters. In that case the file is read asynchronously and the function returns a `Promise<CallToolResult>`, so you must `await` it. Otherwise the base64 string is used directly and a synchronous `CallToolResult` is returned.
+
+When a file path is read, the MIME type is taken from `mimeType` if provided, otherwise inferred from the file extension. The extension map covers `wav` (audio/wav), `mp3` (audio/mpeg), `ogg` (audio/ogg), `m4a` (audio/mp4), `webm` (audio/webm), `flac` (audio/flac), and `aac` (audio/aac), falling back to `audio/wav` for anything else. On the synchronous base64 path the MIME type defaults to `audio/wav`. The result emits an `audio` content item and sets `_meta` to `{ mimeType, isAudio: true }`.
+
+```ts wrap
+import { audio } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="dataOrPath" type="string" required="true" >   Audio data as a base64 string, or a path to an audio file </ParamField>
+><ParamField body="mimeType" type="string" >   MIME type (e.g. "audio/wav"). Defaults to "audio/wav" for base64 data, or is inferred from the file extension for file paths </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult | Promise<CallToolResult>" >   Synchronous result for base64 data, or a Promise for file paths </ResponseField>
+
+**Signature**
+```ts wrap
+function audio(dataOrPath: string, mimeType?: string): CallToolResult | Promise<CallToolResult>
+```
+
+**Example**
+```ts wrap
+import { MCPServer, audio } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-audio-sample",
+    description: "Return an audio sample",
+    schema: z.object({}),
+  },
+  async () => {
+    const base64 = Buffer.from("fake-audio-data").toString("base64")
+    return audio(base64, "audio/wav")
+  }
+)
+```
+
+<Warning>
+When passing a file path, `await` the result. The file is read asynchronously and `audio()` returns a `Promise<CallToolResult>` in that case.
+</Warning>
+
+### binary
+Creates a binary content response from base64-encoded data. The base64 string is placed in a `text` content item, `_meta.mimeType` is set to the provided MIME type, and `_meta.isBinary` is set to `true`. Unlike [`image`](/typescript/api-reference/server/response-helpers) and [`audio`](/typescript/api-reference/server/response-helpers), `mimeType` is required.
+
+```ts wrap
+import { binary } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="base64Data" type="string" required="true" >   The base64-encoded binary data </ParamField>
+><ParamField body="mimeType" type="string" required="true" >   The MIME type of the binary content </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with the base64 payload and `isBinary` metadata </ResponseField>
+
+**Signature**
+```ts wrap
+function binary(base64Data: string, mimeType: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, binary } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-binary-data",
+    description: "Return binary data as base64",
+    schema: z.object({}),
+  },
+  async () => {
+    const base64 = Buffer.from("Hello binary world").toString("base64")
+    return binary(base64, "application/octet-stream")
+  }
+)
+```
+
+### resource
+Creates an embedded resource content item. It supports two call patterns selected at runtime:
+
+- **Three arguments** `resource(uri, mimeType, text)`: builds a resource from an explicit URI, MIME type, and text. `mimeType` and `text` are only added to the embedded resource when truthy.
+- **Two arguments** `resource(uri, content)`: when the second argument is an object with a `content` property (a result from another helper such as [`text`](/typescript/api-reference/server/response-helpers) or [`object`](/typescript/api-reference/server/response-helpers)), the text is read from its first `text` content item and the MIME type is read from its `_meta.mimeType`, then re-embedded under `uri`.
+
+The result is a single `resource` content item and does not set `_meta`.
+
+```ts wrap
+import { resource } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="uri" type="string" required="true" >   The resource URI </ParamField>
+><ParamField body="mimeTypeOrContent" type="string | CallToolResult | TypedCallToolResult<any>" required="true" >   MIME type (3-arg pattern) or a helper result (2-arg pattern) </ParamField>
+><ParamField body="text" type="string" >   Optional text content, only used in the 3-arg pattern </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with a single embedded `resource` content item </ResponseField>
+
+**Signature**
+```ts wrap
+function resource(uri: string, mimeTypeOrContent: string | CallToolResult | TypedCallToolResult<any>, text?: string): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, mix, text, resource } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-help",
+    description: "Return help docs with embedded resource reference",
+    schema: z.object({ topic: z.enum(["api", "auth"]) }),
+  },
+  async ({ topic }) =>
+    mix(text(`Help for: ${topic}`), resource(`docs://${topic}`, "text/markdown"))
+)
+```
+
+### mix
+Combines multiple helper results into a single response. The `content` arrays of all inputs are concatenated in order. The `structuredContent` objects from every input that has one are shallow-merged into a single object (added only if at least one input has `structuredContent`), and the `_meta` objects are shallow-merged the same way. Use it to return text alongside images, embedded resources, or several content items together.
+
+```ts wrap
+import { mix } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="...results" type="CallToolResult[]" required="true" >   The helper results to merge, in order </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with the flattened content array and merged `structuredContent` and `_meta` </ResponseField>
+
+**Signature**
+```ts wrap
+function mix(...results: CallToolResult[]): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, mix, text, image, object, resource } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "process-file",
+    description: "Process a file and summarize",
+    schema: z.object({ fileUrl: z.string() }),
+  },
+  async ({ fileUrl }) =>
+    mix(
+      text(`Processed ${fileUrl}`),
+      object({ status: "success", duration: "100ms" })
+    )
+)
+```
+
+<Note>
+`mix()` merges content arrays and combines the `structuredContent` and `_meta` objects from all inputs, allowing complex multi-part responses.
+</Note>
+
+### error
+Creates an error response. Sets `isError: true` and returns the message as a single `text` content item. The return type is `TypedCallToolResult<never>` so it composes with tools that declare an output schema. Does not set `_meta`.
+
+```ts wrap
+import { error } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="message" type="string" required="true" >   The error message </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="TypedCallToolResult<never>" >   Result with `isError: true` and the message as text content </ResponseField>
+
+**Signature**
+```ts wrap
+function error(message: string): TypedCallToolResult<never>
+```
+
+**Example**
+```ts wrap
+import { MCPServer, error, text } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "delete-item",
+    description: "Delete an item permanently",
+    schema: z.object({ itemId: z.string() }),
+  },
+  async ({ itemId }) => {
+    if (!items.has(itemId)) {
+      return error(`Item not found: ${itemId}`)
+    }
+    items.delete(itemId)
+    return text(`Deleted: ${itemId}`)
+  }
+)
+```
+
+<Tip>
+Using `error()` gives a standardized way to communicate failures to clients while keeping a consistent response structure.
+</Tip>
+
+### widget
+Creates a response for a tool that renders a widget. The widget configuration (name, invoking and invoked status, and so on) is set on the tool's `widget` property at registration time. `widget()` carries only the runtime data described by [`WidgetResponseConfig`](/typescript/api-reference/server/response-helpers).
+
+Per SEP-1865, widget data flows through standard MCP channels: tool arguments reach the widget via `ui/notifications/tool-input`, and the tool result (content plus structuredContent) reaches it via `ui/notifications/tool-result`. There is no custom `mcp-use/props` sideband. The fields have different visibility:
+
+| Field | LLM sees it? | Widget sees it? | Populated by |
+|---|---|---|---|
+| `content` | Yes | Yes | `output` or `message` |
+| `structuredContent` | No | Yes (as `props`) | `props` (or `data`) |
+| `_meta` | No | Yes (as `metadata`) | `metadata` |
+
+The exact build behavior:
+
+- **content**: if `message` is set, content is a single text item with that message. Otherwise, if `output` has a non-empty content array, that content is used. Otherwise content falls back to a single empty text item.
+- **_meta**: set to `metadata` only when `metadata` has at least one key.
+- **structuredContent**: set to `output.structuredContent` when present, otherwise to the resolved props (`props` or its deprecated alias `data`) when those have at least one key.
+
+```ts wrap
+import { widget } from "mcp-use/server"
+```
+
+**Parameters**
+><ParamField body="config" type="WidgetResponseConfig" required="true" >   Runtime data for the widget </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="CallToolResult" >   Result with `structuredContent` (props), `content` (the LLM-visible text), and `_meta` (metadata) </ResponseField>
+
+**Signature**
+```ts wrap
+function widget(config: WidgetResponseConfig): CallToolResult
+```
+
+**Example**
+```ts wrap
+import { MCPServer, widget } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({ city: z.string() }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city }) => {
+    const weather = await fetchWeather(city)
+    return widget({
+      props: { city, ...weather },
+      message: `Current weather in ${city}: ${weather.conditions}, ${weather.temperature}°C`,
+    })
+  }
+)
+```
+
+<Tip>
+The widget `name` must match a `.tsx` file or folder in your `resources/` directory. The widget reads `props` via `useWidget().props` and `metadata` via `useWidget().metadata`, while the model only sees the `output` (or `message`) text.
+</Tip>
+
+## Types
+
+### TypedCallToolResult
+A typed `CallToolResult` that constrains `structuredContent` to a specific type `T`. Used for output-schema validation and to give callers type inference on the structured data. `T` must be a record type (object) to satisfy the SDK's `CallToolResult` interface, and defaults to `Record<string, unknown>`.
+
+The properties are listed explicitly rather than via `extends Omit<CallToolResult, "structuredContent">` to avoid breaking type inference, a known interaction between Zod `.passthrough()` and TypeScript `Omit`.
+
+```ts wrap
+import type { TypedCallToolResult } from "mcp-use/server"
+```
+
+**Type parameters**
+><ParamField body="T" type="extends Record<string, unknown>" default="Record<string, unknown>" >   The shape of `structuredContent` </ParamField>
+
+**Properties**
+><ResponseField name="content" type="CallToolResult['content']" required="true" >   The content array, same shape as the SDK `CallToolResult` </ResponseField>
+><ResponseField name="structuredContent" type="T" >   Typed structured data </ResponseField>
+><ResponseField name="isError" type="CallToolResult['isError']" >   Error flag, same shape as the SDK `CallToolResult` </ResponseField>
+><ResponseField name="_meta" type="CallToolResult['_meta']" >   Response metadata, same shape as the SDK `CallToolResult` </ResponseField>
+><ResponseField name="[x: string]" type="unknown" >   Index signature permitting additional properties </ResponseField>
+
+**Signature**
+```ts wrap
+interface TypedCallToolResult<T extends Record<string, unknown> = Record<string, unknown>> {
+  [x: string]: unknown
+  content: CallToolResult["content"]
+  isError?: CallToolResult["isError"]
+  _meta?: CallToolResult["_meta"]
+  structuredContent?: T
+}
+```
+
+**Example**
+```ts wrap
+import { object } from "mcp-use/server"
+import type { TypedCallToolResult } from "mcp-use/server"
+
+interface UserData {
+  userId: string
+  email: string
+  role: "admin" | "user"
+}
+
+function getUserResponse(user: UserData): TypedCallToolResult<UserData> {
+  return object(user)
+}
+```
+
+### WidgetResponseConfig
+Runtime configuration passed to [`widget`](/typescript/api-reference/server/response-helpers). It carries only runtime data, not the widget's registration-time configuration. All fields are optional.
+
+```ts wrap
+import type { WidgetResponseConfig } from "mcp-use/server"
+```
+
+**Properties**
+><ResponseField name="props" type="Record<string, any>" >   Widget-only data sent as `structuredContent` in the tool result. The widget receives it via `ui/notifications/tool-result`. Per spec, `structuredContent` is not added to model context </ResponseField>
+><ResponseField name="data" type="Record<string, any>" >   Deprecated. Legacy alias for `props` </ResponseField>
+><ResponseField name="output" type="CallToolResult | TypedCallToolResult<any>" >   Response helper result (`text()`, `object()`, and so on) that the model sees. Summarizes the tool result for the conversation </ResponseField>
+><ResponseField name="metadata" type="Record<string, unknown>" >   Extra metadata sent in the tool result's `_meta`. The widget receives it via `useWidget().metadata`. Not added to model context. Use for pagination cursors, timestamps, and so on </ResponseField>
+><ResponseField name="message" type="string" >   Optional override for the text message in `content`. Used when you want to show different text than `output` provides </ResponseField>
+
+**Signature**
+```ts wrap
+interface WidgetResponseConfig {
+  props?: Record<string, any>
+  /** @deprecated Use `props` instead */
+  data?: Record<string, any>
+  output?: CallToolResult | TypedCallToolResult<any>
+  metadata?: Record<string, unknown>
+  message?: string
+}
+```
+
+**Example**
+```ts wrap
+import { MCPServer, widget, text } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({ name: "my-server", version: "1.0.0" })
+
+server.tool(
+  {
+    name: "list-results",
+    description: "List paginated results in a widget",
+    schema: z.object({ query: z.string() }),
+    widget: { name: "results-list" },
+  },
+  async ({ query }) => {
+    const items = await search(query)
+    return widget({
+      props: { items },
+      metadata: { totalCount: 1000, nextCursor: "abc123" },
+      output: text(`Showing ${items.length} of 1000 results`),
+    })
+  }
+)
+```

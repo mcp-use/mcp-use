@@ -1,0 +1,454 @@
+---
+title: "useWidget()"
+description: "React hooks and types for building MCP Apps widgets API Documentation"
+icon: "webhook"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useWidget.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useWidget.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/useWidget.ts</a>
+</Callout>
+
+React hook for building MCP Apps widgets. `useWidget` abstracts over two data providers, selected automatically:
+
+1. **MCP Apps bridge** (SEP-1865 `postMessage`), the primary runtime for hosted widget iframes including ChatGPT. The hook connects via `ui/initialize` and listens for `ui/notifications/tool-input`, `ui/notifications/tool-input-partial`, `ui/notifications/tool-result`, and `ui/notifications/host-context-changed`.
+2. **URL params fallback** (`mcpUseParams`), used during local development (the `mcp-use dev` inspector) where `toolInput` and `toolOutput` are injected via the query string. There is no live streaming in this mode.
+
+The server controls what the LLM sees (the `content` text array) separately from what the widget sees (`structuredContent` mapped to `props`). This lets a tool return rich structured data for rendering without polluting the model's context.
+
+All exports come from `mcp-use/react`:
+
+```ts
+import {
+  useWidget,
+  useWidgetProps,
+  useWidgetState,
+  useWidgetTheme,
+} from "mcp-use/react";
+import type {
+  UseWidgetResult,
+  API,
+  DisplayMode,
+  SafeArea,
+  SafeAreaInsets,
+  Theme,
+  DeviceType,
+  UserAgent,
+  OpenAiGlobals,
+} from "mcp-use/react";
+```
+
+## Hooks
+
+### useWidget
+
+The primary hook for building MCP Apps widgets. Returns props, persisted state, host context (theme, display mode, locale, layout), host actions (call a tool, send a message, open a link, request a display mode), and streaming and availability flags.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+```
+
+Build an MCP Apps widget. Components do not receive props through React props; props come from this hook. The hook automatically selects the MCP Apps bridge inside a hosted iframe and the URL params fallback during local development.
+
+The hook accepts five optional type parameters in this exact order: `TProps`, `TState`, `TOutput`, `TMetadata`, `TToolInput`. The single runtime argument, `defaultProps`, seeds `props` before any tool data arrives.
+
+`props` is merged from `toolInput` (base) and `structuredContent` (overlay). When the widget is exposed as a tool, `props` equals `toolInput` while pending and `structuredContent` once done. When the widget is returned by another tool, `props` equals `structuredContent` and `toolInput` holds the parent tool's arguments.
+
+**Type Parameters**
+><ParamField body="TProps" type="object" default="UnknownObject" >   Shape of `props`, mapped from `structuredContent` in the tool result (or from `toolInput` while pending). </ParamField>
+><ParamField body="TState" type="object" default="UnknownObject" >   Shape of the persisted widget `state` read and written via `setState`. </ParamField>
+><ParamField body="TOutput" type="object" default="UnknownObject" >   Shape of `output`, the raw `structuredContent` field from the tool result. </ParamField>
+><ParamField body="TMetadata" type="object" default="UnknownObject" >   Shape of `metadata`, the `_meta` object from the tool result. </ParamField>
+><ParamField body="TToolInput" type="object" default="UnknownObject" >   Shape of `toolInput`, the arguments the model passed to the tool. </ParamField>
+
+**Parameters**
+><ParamField body="defaultProps" type="TProps" default="undefined" >   Optional initial props used as the merge base before `toolInput` or `structuredContent` arrives. When omitted, the base is an empty object. </ParamField>
+
+**Returns**
+
+`UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>`, a discriminated union on `isPending`. While `isPending` is `true`, `props` is `Partial<TProps>`; once `isPending` is `false`, `props` is the full `TProps`.
+
+><ResponseField name="props" type="Partial<TProps> | TProps" >   Merged widget props. `Partial<TProps>` while `isPending` is `true`, then the full `TProps` once the tool result arrives. Defaults to `defaultProps` (or `{}`). </ResponseField>
+><ResponseField name="toolInput" type="TToolInput" >   The arguments the model passed when calling the tool, delivered via `ui/notifications/tool-input`. Defaults to `{}` when unavailable. </ResponseField>
+><ResponseField name="output" type="TOutput | null" >   The `structuredContent` field from the tool result. Widget-only data the LLM never sees. `null` while the tool is still executing. </ResponseField>
+><ResponseField name="metadata" type="TMetadata | null" >   The `_meta` object from the tool result (timestamps, cache headers, API version, etc.). Not in the model's context. `null` while pending, and always `null` on the URL params fallback. </ResponseField>
+><ResponseField name="state" type="TState | null" >   Persisted widget state the model can read on future turns. `null` until `setState` is first called. The internal model-context key is stripped from the returned value. </ResponseField>
+><ResponseField name="setState" type="(state: TState | ((prevState: TState | null) => TState)) => Promise<void>" >   Update the persisted widget state. Accepts a new value or a functional updater `(prev) => next`. Sends `ui/update-model-context` so the LLM sees the new state next turn. Rapid updates before the next user message are deduplicated by the host. </ResponseField>
+><ResponseField name="theme" type="Theme" >   The host's color-scheme preference, `"light"` or `"dark"`. Defaults to `"light"`. Changes arrive via `ui/notifications/host-context-changed`. </ResponseField>
+><ResponseField name="displayMode" type="DisplayMode" >   Current rendering context: `"inline"`, `"fullscreen"`, or `"pip"`. Defaults to `"inline"`. On mobile, `"pip"` is coerced to `"fullscreen"` by the host. </ResponseField>
+><ResponseField name="safeArea" type="SafeArea" >   Safe-area inset boundaries (in pixels) for OS chrome (notch, home indicator, system bars). Defaults to `{ insets: { top: 0, bottom: 0, left: 0, right: 0 } }`. From `HostContext.safeAreaInsets`. </ResponseField>
+><ResponseField name="maxHeight" type="number" >   Maximum height the widget container can grow to, in pixels. Defaults to `600`. From `HostContext.containerDimensions.maxHeight`. </ResponseField>
+><ResponseField name="maxWidth" type="number | undefined" >   Maximum width the widget container can grow to, in pixels. From `HostContext.containerDimensions.maxWidth`. `undefined` when unbounded or unavailable (no default is applied). </ResponseField>
+><ResponseField name="userAgent" type="UserAgent" >   Device type and input-capability flags. Defaults to ``{ device: { type: "desktop" }, capabilities: { hover: true, touch: false } }``. Derived from `HostContext.platform` and `HostContext.deviceCapabilities`. </ResponseField>
+><ResponseField name="locale" type="string" >   The user's BCP 47 language and region tag (for example `"en-US"`). Defaults to `WIDGET_DEFAULTS.LOCALE`. From `HostContext.locale`. </ResponseField>
+><ResponseField name="timeZone" type="string" >   The user's IANA timezone (for example `"America/New_York"`). From `HostContext.timeZone`. Falls back to the browser timezone (`Intl.DateTimeFormat().resolvedOptions().timeZone`), or `"UTC"` when no `window` is present. </ResponseField>
+><ResponseField name="mcp_url" type="string" >   Base URL of the MCP server running inside the sandbox, derived from `window.__mcpPublicUrl` with the `/mcp-use/public` suffix removed. `""` when unavailable. </ResponseField>
+><ResponseField name="callTool" type="(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>" >   Call any tool registered on the MCP server (including app-only tools). Sends `tools/call` via the host and returns a normalized `CallToolResponse`. </ResponseField>
+><ResponseField name="sendFollowUpMessage" type="(content: string | MessageContentBlock[]) => Promise<void>" >   Add a user-role message to the conversation and trigger a new model turn. A plain string is wrapped as a single `text` block; an array of `MessageContentBlock` is sent as-is. Sends `ui/message`. </ResponseField>
+><ResponseField name="openExternal" type="(href: string) => void" >   Ask the host to open a URL in the user's browser or a new tab via `ui/open-link`. The host may deny the request; errors are logged, not thrown. </ResponseField>
+><ResponseField name="requestDisplayMode" type="(mode: DisplayMode) => Promise<{ mode: DisplayMode }>" >   Request a display-mode change via `ui/request-display-mode`. The host returns the actual granted mode, which may differ from the requested one. </ResponseField>
+><ResponseField name="isAvailable" type="boolean" >   `true` when the MCP Apps `postMessage` bridge has connected. `false` while connecting or on the URL params fallback (where it is always `false`). </ResponseField>
+><ResponseField name="isPending" type="boolean" >   `true` while the tool is still executing; becomes `false` once `ui/notifications/tool-result` is received. While `true`, `props` is `Partial<TProps>`. On the URL params fallback it is `true` until `toolOutput` is present. </ResponseField>
+><ResponseField name="partialToolInput" type="Partial<TToolInput> | null" >   Partial tool arguments streamed in real time while the LLM is still generating them, via `ui/notifications/tool-input-partial`. A best-effort parse of incomplete JSON (auto-closed brackets), so fields may be missing or change. `null` on the URL params fallback. </ResponseField>
+><ResponseField name="isStreaming" type="boolean" >   `true` while `partialToolInput` is non-null and the complete `toolInput` has not yet arrived. Always `false` on the URL params fallback. </ResponseField>
+><ResponseField name="hostInfo" type="{ name: string; version: string } | undefined" >   Name and version of the MCP Apps host from the `ui/initialize` handshake. `undefined` outside a supported MCP Apps host. </ResponseField>
+><ResponseField name="hostCapabilities" type="Record<string, unknown> | undefined" >   Capabilities advertised by the host during `ui/initialize` (SEP-1865 `HostCapabilities`). `undefined` outside a supported host or when none were sent. </ResponseField>
+><ResponseField name="hostContext" type="HostContext | undefined" >   Raw host context from the MCP Apps bridge. Includes standardized host style variables at `hostContext.styles.variables` when provided. `undefined` outside a supported host. </ResponseField>
+
+**Signature**
+```ts wrap
+function useWidget<TProps = UnknownObject, TState = UnknownObject, TOutput = UnknownObject, TMetadata = UnknownObject, TToolInput = UnknownObject>(defaultProps?: TProps): UseWidgetResult<TProps, TState, TOutput, TMetadata, TToolInput>
+```
+
+**Example**
+
+```tsx wrap
+import { useWidget } from "mcp-use/react";
+
+interface WeatherProps {
+  city: string;
+  temperature: number;
+}
+
+const WeatherWidget: React.FC = () => {
+  const { props, isPending, toolInput, theme } = useWidget<WeatherProps>();
+
+  if (isPending) return <p>Loading...</p>;
+
+  return (
+    <div data-theme={theme}>
+      <h1>{props.city}</h1>
+      <p>{props.temperature}C</p>
+      <p>Requested: {toolInput.city}</p>
+    </div>
+  );
+};
+```
+
+The matching server tool, using `new MCPServer({ ... })`:
+
+```ts wrap
+import { MCPServer, widget } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "mcp-apps-example",
+  version: "1.0.0",
+  description: "Dual-protocol widget support (ChatGPT and MCP Apps clients)",
+});
+
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get current weather for a city",
+    schema: z.object({ city: z.string().describe("City name") }),
+    widget: {
+      name: "weather-display",
+      invoking: "Fetching weather data...",
+      invoked: "Weather data loaded",
+    },
+  },
+  async ({ city }) =>
+    widget({
+      props: { city, temperature: 22 },
+      message: `Current weather in ${city}: 22C`,
+    }),
+);
+
+await server.listen();
+```
+
+### useWidgetProps
+
+Convenience wrapper around `useWidget` that returns only the widget props. Equivalent to calling `useWidget(defaultProps)` and reading the `props` field.
+
+**Type Parameters**
+><ParamField body="TProps" type="object" default="UnknownObject" >   Shape of the returned props. </ParamField>
+
+**Parameters**
+><ParamField body="defaultProps" type="TProps" default="undefined" >   Optional initial props used as the merge base, forwarded to `useWidget`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Partial<TProps>" >   The merged widget props. Fields may be `undefined` while the tool is still executing. </ResponseField>
+
+**Signature**
+```ts wrap
+function useWidgetProps<TProps = UnknownObject>(defaultProps?: TProps): Partial<TProps>
+```
+
+**Example**
+
+```tsx wrap
+import { useWidgetProps } from "mcp-use/react";
+
+const props = useWidgetProps<{ city: string; temperature: number }>();
+// { city: "Paris", temperature: 22 }
+```
+
+### useWidgetState
+
+Convenience wrapper around `useWidget` that returns persisted state as a `[state, setState]` tuple, similar to `useState` but persisted and visible to the model. When `defaultState` is provided and the current state is `null`, the hook initializes it once the widget runtime is available (`isAvailable === true`).
+
+**Type Parameters**
+><ParamField body="TState" type="object" required="True" >   Shape of the persisted state. </ParamField>
+
+**Parameters**
+><ParamField body="defaultState" type="TState" default="undefined" >   Optional initial state. Applied via `setState` only when the current state is `null` and the runtime is available. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="readonly [TState | null, (state: TState | ((prev: TState | null) => TState)) => Promise<void>]" >   A readonly tuple of the current state (`null` until set) and the `setState` updater. The updater accepts a value or a functional updater and persists via `ui/update-model-context`. </ResponseField>
+
+**Signature**
+```ts wrap
+function useWidgetState<TState>(defaultState?: TState): readonly [TState | null, (state: TState | ((prev: TState | null) => TState)) => Promise<void>]
+```
+
+**Example**
+
+```tsx wrap
+import { useWidgetState } from "mcp-use/react";
+
+const [favorites, setFavorites] = useWidgetState<string[]>([]);
+
+await setFavorites(["item1", "item2"]);
+await setFavorites((prev) => [...(prev ?? []), "newItem"]);
+```
+
+### useWidgetTheme
+
+Convenience wrapper around `useWidget` that returns only the current `theme` value.
+
+**Returns**
+><ResponseField name="returns" type="Theme" >   The host's color-scheme preference, `"light"` or `"dark"`. Defaults to `"light"`. </ResponseField>
+
+**Signature**
+```ts wrap
+function useWidgetTheme(): Theme
+```
+
+**Example**
+
+```tsx wrap
+import { useWidgetTheme } from "mcp-use/react";
+
+const theme = useWidgetTheme(); // "light" | "dark"
+```
+
+## Types
+
+### UseWidgetResult
+
+The return type of `useWidget`. A discriminated union on `isPending` over a shared base of fields.
+
+When `isPending` is `true`, `props` is typed as `Partial<TProps>` (fields may be `undefined`). When `isPending` is `false`, `props` is typed as the full `TProps` (all required fields present). Guarding on `isPending` narrows the type, so after an `if (isPending) return ...` guard, `props` field access is safe without optional chaining.
+
+Every field is described in the `useWidget` Returns section above.
+
+**Type Parameters**
+><ParamField body="TProps" type="object" default="UnknownObject" >   Shape of `props`. </ParamField>
+><ParamField body="TState" type="object" default="UnknownObject" >   Shape of `state`. </ParamField>
+><ParamField body="TOutput" type="object" default="UnknownObject" >   Shape of `output`. </ParamField>
+><ParamField body="TMetadata" type="object" default="UnknownObject" >   Shape of `metadata`. </ParamField>
+><ParamField body="TToolInput" type="object" default="UnknownObject" >   Shape of `toolInput`. </ParamField>
+
+**Signature**
+```ts wrap
+type UseWidgetResult<TProps = UnknownObject, TState = UnknownObject, TOutput = UnknownObject, TMetadata = UnknownObject, TToolInput = UnknownObject> = UseWidgetResultBase<TState, TOutput, TMetadata, TToolInput> & ({ isPending: true; props: Partial<TProps> } | { isPending: false; props: TProps })
+```
+
+### API
+
+Type definition for the `window.openai` extension API exposed by the ChatGPT Apps SDK host. `useWidget` wraps these methods (for example `callTool`, `sendFollowUpMessage`, `openExternal`, `requestDisplayMode`, `setState`) so widget code does not call `window.openai` directly. The interface is parameterized by `WidgetState`.
+
+**Type Parameters**
+><ParamField body="WidgetState" type="UnknownObject" default="UnknownObject" >   Shape of the persisted widget state passed to `setWidgetState`. </ParamField>
+
+**Members**
+><ResponseField name="callTool" type="(name: string, args: Record<string, unknown>) => Promise<CallToolResponse>" >   Call a tool on your MCP server and return the full response. </ResponseField>
+><ResponseField name="sendFollowUpMessage" type="(args: { prompt: string }) => Promise<void>" >   Trigger a follow-up turn in the conversation. </ResponseField>
+><ResponseField name="openExternal" type="(payload: { href: string }) => void" >   Open an external link, redirect the web page, or open a mobile app. </ResponseField>
+><ResponseField name="requestDisplayMode" type="(args: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>" >   Transition the app between inline, fullscreen, and pip. The host may reject the request, and on mobile pip is always coerced to fullscreen. </ResponseField>
+><ResponseField name="setWidgetState" type="(state: WidgetState) => Promise<void>" >   Persist widget state that will be shown to the model. </ResponseField>
+><ResponseField name="notifyIntrinsicHeight" type="(height: number) => Promise<void>" >   Notify OpenAI about intrinsic height changes for auto-sizing. </ResponseField>
+><ResponseField name="uploadFile" type="((file: File) => Promise<FileMetadata>) | undefined" >   Upload a file to the host. Optional: only present when the OpenAI extension exposes file APIs. Detect availability with `useFiles().isSupported`. </ResponseField>
+><ResponseField name="getFileDownloadUrl" type="((file: FileMetadata) => Promise<{ downloadUrl: string }>) | undefined" >   Get a temporary download URL for a previously uploaded file. Optional: only present when the OpenAI extension exposes file APIs. </ResponseField>
+
+**Signature**
+```ts wrap
+interface API<WidgetState extends UnknownObject = UnknownObject> {
+  callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResponse>;
+  sendFollowUpMessage: (args: { prompt: string }) => Promise<void>;
+  openExternal(payload: { href: string }): void;
+  requestDisplayMode: (args: { mode: DisplayMode }) => Promise<{ mode: DisplayMode }>;
+  setWidgetState: (state: WidgetState) => Promise<void>;
+  notifyIntrinsicHeight: (height: number) => Promise<void>;
+  uploadFile?: (file: File) => Promise<FileMetadata>;
+  getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
+}
+```
+
+### DisplayMode
+
+The rendering context of a widget. `"inline"` embeds the widget in the host's content flow, `"fullscreen"` occupies the full screen or window, and `"pip"` is a floating picture-in-picture overlay. On mobile, `"pip"` requests are coerced to `"fullscreen"` by the host.
+
+**Signature**
+```ts wrap
+type DisplayMode = "pip" | "inline" | "fullscreen"
+```
+
+### SafeArea
+
+Host-provided safe-area boundaries for a widget. Wraps a `SafeAreaInsets` value under an `insets` key. Apply the insets as padding or margin so interactive elements are not hidden behind OS chrome.
+
+**Members**
+><ResponseField name="insets" type="SafeAreaInsets" >   The four-sided inset measurements, in pixels. </ResponseField>
+
+**Signature**
+```ts wrap
+type SafeArea = {
+  insets: SafeAreaInsets;
+}
+```
+
+### SafeAreaInsets
+
+Pixel inset measurements for each side of the viewport, describing the space consumed by OS chrome (notch, home indicator, rounded corners, system bars).
+
+**Members**
+><ResponseField name="top" type="number" >   Inset from the top edge, in pixels. </ResponseField>
+><ResponseField name="bottom" type="number" >   Inset from the bottom edge, in pixels. </ResponseField>
+><ResponseField name="left" type="number" >   Inset from the left edge, in pixels. </ResponseField>
+><ResponseField name="right" type="number" >   Inset from the right edge, in pixels. </ResponseField>
+
+**Signature**
+```ts wrap
+type SafeAreaInsets = {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+```
+
+### Theme
+
+The host's color-scheme preference. `useWidget` defaults this to `"light"` when no host context is available.
+
+**Signature**
+```ts wrap
+type Theme = "light" | "dark"
+```
+
+### DeviceType
+
+The device class reported by the host, used as `UserAgent.device.type`. The MCP Apps bridge maps host platforms to `"mobile"` or `"desktop"`; `"tablet"` and `"unknown"` are valid members of the type.
+
+**Signature**
+```ts wrap
+type DeviceType = "mobile" | "tablet" | "desktop" | "unknown"
+```
+
+### UserAgent
+
+Device type and input-capability flags reported by the host. Use `device.type` to adapt layout density and `capabilities.hover` / `capabilities.touch` to decide whether to show hover-only UI or touch-friendly hit targets.
+
+**Members**
+><ResponseField name="device" type="{ type: DeviceType }" >   The reported device class. </ResponseField>
+><ResponseField name="capabilities" type="{ hover: boolean; touch: boolean }" >   Input capabilities: whether the device supports hover and whether it supports touch. </ResponseField>
+
+**Signature**
+```ts wrap
+type UserAgent = {
+  device: { type: DeviceType };
+  capabilities: {
+    hover: boolean;
+    touch: boolean;
+  };
+}
+```
+
+### OpenAiGlobals
+
+Type definition for the global state values exposed on `window.openai` by the ChatGPT Apps SDK host (theme, layout, locale, and tool state). `useWidget` reads equivalent values from the MCP Apps host context, so widget code does not access these globals directly. The interface is parameterized by the tool input, output, response-metadata, and widget-state shapes.
+
+**Type Parameters**
+><ParamField body="ToolInput" type="UnknownObject" default="UnknownObject" >   Shape of the tool input arguments. </ParamField>
+><ParamField body="ToolOutput" type="UnknownObject" default="UnknownObject" >   Shape of the tool output. </ParamField>
+><ParamField body="ToolResponseMetadata" type="UnknownObject" default="UnknownObject" >   Shape of the tool response metadata. </ParamField>
+><ParamField body="WidgetState" type="UnknownObject" default="UnknownObject" >   Shape of the persisted widget state. </ParamField>
+
+**Members**
+><ResponseField name="theme" type="Theme" >   Current color-scheme preference. </ResponseField>
+><ResponseField name="userAgent" type="UserAgent" >   Device type and input-capability flags. </ResponseField>
+><ResponseField name="locale" type="string" >   The user's BCP 47 locale tag. </ResponseField>
+><ResponseField name="maxHeight" type="number" >   Maximum container height, in pixels. </ResponseField>
+><ResponseField name="displayMode" type="DisplayMode" >   Current display mode. </ResponseField>
+><ResponseField name="safeArea" type="SafeArea" >   Safe-area insets for the current layout. </ResponseField>
+><ResponseField name="toolInput" type="ToolInput" >   The arguments the model passed to the tool. </ResponseField>
+><ResponseField name="toolOutput" type="ToolOutput | null" >   The tool output, or `null` while pending. </ResponseField>
+><ResponseField name="toolResponseMetadata" type="ToolResponseMetadata | null" >   The tool response metadata, or `null` while pending. </ResponseField>
+><ResponseField name="widgetState" type="WidgetState | null" >   The persisted widget state, or `null` when unset. </ResponseField>
+
+**Signature**
+```ts wrap
+interface OpenAiGlobals<ToolInput extends UnknownObject = UnknownObject, ToolOutput extends UnknownObject = UnknownObject, ToolResponseMetadata extends UnknownObject = UnknownObject, WidgetState extends UnknownObject = UnknownObject> {
+  theme: Theme;
+  userAgent: UserAgent;
+  locale: string;
+  maxHeight: number;
+  displayMode: DisplayMode;
+  safeArea: SafeArea;
+  toolInput: ToolInput;
+  toolOutput: ToolOutput | null;
+  toolResponseMetadata: ToolResponseMetadata | null;
+  widgetState: WidgetState | null;
+}
+```
+
+## Widget lifecycle
+
+Widgets render before the tool finishes executing:
+
+1. **First render** (`isPending === true`): the widget mounts immediately, `props` is `Partial<TProps>`, and `output` and `metadata` are `null`. Render a loading state here.
+2. **After the tool completes** (`isPending === false`): `props` is the full `TProps`, and `output` and `metadata` are populated. The widget re-renders with full data.
+
+When the host streams tool arguments (the `mcp-use dev` inspector or MCP Apps clients that send `ui/notifications/tool-input-partial`), an optional phase occurs between (1) and (2): the widget receives `partialToolInput` in real time while `isStreaming` is `true`, then transitions to full `props`. On the URL params fallback, `partialToolInput` stays `null` and `isStreaming` stays `false`.
+
+```tsx wrap
+const MyWidget: React.FC = () => {
+  const { props, isPending } = useWidget<{ city: string; temperature: number }>();
+
+  if (isPending) return <LoadingSpinner />;
+
+  // props.city and props.temperature are non-optional here
+  return (
+    <div>
+      {props.city} - {props.temperature}C
+    </div>
+  );
+};
+```
+
+## Default values
+
+When host values are unavailable, `useWidget` returns these safe defaults:
+
+- `theme`: `"light"`
+- `displayMode`: `"inline"`
+- `safeArea`: `{ insets: { top: 0, bottom: 0, left: 0, right: 0 } }`
+- `maxHeight`: `600`
+- `userAgent`: `{ device: { type: "desktop" }, capabilities: { hover: true, touch: false } }`
+- `locale`: `WIDGET_DEFAULTS.LOCALE`
+- `timeZone`: browser timezone, or `"UTC"` when no `window`
+- `props`: `defaultProps` when provided, otherwise `{}`
+- `output`: `null`
+- `metadata`: `null`
+- `state`: `null`
+- `maxWidth`: no default (stays `undefined` when unavailable)
+
+## Related
+
+- [`McpUseProvider`](/typescript/api-reference/react/mcpuseprovider) for unified widget setup including auto-sizing.
+- [`WidgetControls`](/typescript/api-reference/react/widgetcontrols) for debug and view controls.
+- [`ThemeProvider`](/typescript/api-reference/react/themeprovider) for theme management.
+- [`ErrorBoundary`](/typescript/api-reference/react/errorboundary) for widget error handling.

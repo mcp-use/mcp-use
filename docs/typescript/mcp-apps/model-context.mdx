@@ -1,0 +1,139 @@
+---
+title: "Model context"
+description: "Understand what the model sees, what the widget sees, and how widget state reaches future model turns."
+icon: "brain"
+---
+
+Model context is the information available to the model after a tool returns a widget and while the user interacts with that widget. Use it deliberately: send the model concise text, send the widget structured data, and expose UI state only when it helps the next model turn.
+
+## Tool results have separate audiences
+
+An MCP tool result can carry model-visible text and widget-only data at the same time.
+
+| Field | Model sees it? | Widget sees it? | Use it for |
+| --- | --- | --- | --- |
+| `content` | Yes | Yes | A short answer or summary for the conversation |
+| `structuredContent` | No | Yes, as `props` | Data the widget renders |
+| `_meta` | No | Yes, as `metadata` | Extra widget data that should not be model-visible |
+
+In `mcp-use`, `widget({ props, output, metadata })` maps these fields for you:
+
+```typescript
+return widget({
+  props: { query, results },
+  metadata: { generatedAt: new Date().toISOString() },
+  output: text(`Showing ${results.length} results for "${query}".`),
+});
+```
+
+The model can read the `output` text. The widget reads `props` and `metadata` through `useWidget()`, so it can show details like when the result was generated without adding that detail to the model context.
+
+## Keep model text short
+
+Use `output` to tell the model what happened, not to duplicate the full widget payload.
+
+```typescript
+return widget({
+  props: { query, results },
+  output: text(`Found ${results.length} matching products.`),
+});
+```
+
+This keeps large lists, tables, and visualization data out of the model context while still rendering them for the user.
+
+## Use props for rendering data
+
+Use `props` for data the widget needs to render.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+type ResultsProps = {
+  query: string;
+  results: { id: string; name: string }[];
+};
+
+export function ResultsWidget() {
+  const { props, isPending } = useWidget<ResultsProps>();
+
+  if (isPending) return <div>Loading...</div>;
+
+  return <div>{props.results.length} results for {props.query}</div>;
+}
+```
+
+`props` is partial while `isPending` is `true`. Check `isPending` before reading required fields.
+
+## Use state for user choices
+
+Use `setState` for user choices that should survive widget re-renders and be available to future model turns.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+type FilterState = {
+  selectedCategory: string;
+};
+
+const { state, setState } = useWidget<{}, FilterState>();
+
+await setState({
+  selectedCategory: "audio",
+});
+```
+
+State should describe user-visible choices such as selected rows, filters, tabs, favorites, or form progress. Store durable business data in your backend instead.
+
+## Use ModelContext for what is visible
+
+Use `<ModelContext>` when the model should know what part of the widget the user is currently seeing.
+
+```tsx
+import { ModelContext } from "mcp-use/react";
+
+type Product = {
+  id: string;
+  name: string;
+};
+
+function ProductPanel({ product }: { product: Product }) {
+  return (
+    <ModelContext content={`Viewing product ${product.name} (${product.id})`}>
+      <ProductDetails product={product} />
+    </ModelContext>
+  );
+}
+```
+
+`<ModelContext>` is lifecycle-aware. When the component unmounts, that context is removed.
+
+Use `modelContext.set()` for imperative events that do not map cleanly to JSX:
+
+```tsx
+import { modelContext } from "mcp-use/react";
+
+function onSelectProduct(product: Product) {
+  modelContext.set("selected-product", `Selected ${product.name}`);
+}
+
+function onClosePanel() {
+  modelContext.remove("selected-product");
+}
+```
+
+## Choose the right channel
+
+| Need | Use |
+| --- | --- |
+| The model needs a concise result | `output: text(...)` |
+| The widget needs render data | `props` |
+| The widget needs hidden auxiliary data | `metadata` |
+| The model should know user selections on future turns | `setState` |
+| The model should know what UI is visible now | `<ModelContext>` |
+| Data must persist across conversations or users | Your backend |
+
+## Next steps
+
+- Use [Build widgets](/typescript/mcp-apps/widgets) for the server and React setup.
+- Use [Interactivity](/typescript/mcp-apps/interactivity) for buttons, tool calls, and follow-up messages.
+- Use the [`ModelContext` API reference](/typescript/api-reference/react/modelcontext) for full lifecycle behavior.

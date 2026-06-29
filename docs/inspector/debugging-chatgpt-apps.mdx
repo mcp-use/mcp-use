@@ -1,1007 +1,124 @@
 ---
-title: "Debugging Widgets"
-description: "Test and debug MCP Apps and ChatGPT Apps SDK widgets with dual-protocol support"
+title: "Debug widgets in the Inspector"
+description: "Test MCP Apps widgets, ChatGPT compatibility, layout, CSP, and widget data in the Inspector."
 icon: "bug"
 ---
 
-The mcp-use Inspector provides comprehensive support for debugging widgets built with **both** MCP Apps and ChatGPT Apps SDK protocols. Test your tools, render widgets, switch protocols, and verify interactions all within the inspector interface.
+{/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-<Info>
-**Dual-Protocol Support**: The inspector supports both widget protocols:
-- **MCP Apps** - Standard MCP protocol with JSON-RPC communication
-- **ChatGPT Apps SDK** - OpenAI's protocol with `window.openai` API emulation
+Use the Inspector to debug a widget before you try it in a production host. The fastest loop is: connect your server, run the tool that returns the widget, inspect the widget data, then test layout, display modes, and CSP.
 
-Use the **Protocol Toggle** to switch between protocols and test cross-compatibility.
+For building widgets, start with [Build widgets](/typescript/mcp-apps/widgets). For hook fields and host actions, use the [`useWidget()` API reference](/typescript/api-reference/react/usewidget).
 
-</Info>
+## Connect the widget server
 
-## Overview
+Run your mcp-use app locally:
 
-### What are Widget Protocols?
-
-MCP servers can provide interactive widgets using two protocols:
-
-| Protocol             | Standard                | Clients                    | Communication             |
-| -------------------- | ----------------------- | -------------------------- | ------------------------- |
-| **MCP Apps**         | MCP standard             | Claude, Goose, MCP clients | JSON-RPC over postMessage |
-| **ChatGPT Apps SDK** | OpenAI proprietary      | ChatGPT                    | window.openai API         |
-
-With mcp-use, you can build widgets that support **both protocols simultaneously** using `type: "mcpApps"`.
-
-### How the Inspector Helps
-
-The inspector provides:
-
-- **Dual-Protocol Testing**: Switch between MCP Apps and ChatGPT protocols
-- **Protocol Toggle**: Test cross-compatibility with one click
-- **Widget Rendering**: Preview widgets in both protocols
-- **Debug Controls**: Test different devices, locales, CSP modes
-- **Display Modes**: Test inline, picture-in-picture, fullscreen
-- **Interactive Debugging**: Test widget interactions and tool calls
-- **Dev Mode Support**: Hot reload for widget development
-
-## Protocol Toggle
-
-For widgets that support both protocols (using `type: "mcpApps"`), the inspector shows a **Protocol Toggle** that lets you switch between:
-
-- **MCP Apps** - Tests the MCP Apps protocol with JSON-RPC communication
-- **ChatGPT Apps** - Tests the Apps SDK protocol with window.openai emulation
-
-The toggle only appears for dual-protocol widgets. Single-protocol widgets (`type: "appsSdk"`) only render using ChatGPT protocol.
-
-## MCP Apps Debug Controls
-
-When testing MCP Apps protocol widgets, the inspector provides comprehensive debug controls:
-
-### Device Emulation
-
-Switch between device types to test responsive behavior:
-
-- **Desktop** - Large viewport, hover support
-- **Mobile** - Small viewport, touch support
-- **Tablet** - Medium viewport, both touch and hover
-
-### Locale & Timezone
-
-Test internationalization:
-
-- **Locale Selector** - Choose from 100+ locales (en-US, es-ES, ja-JP, etc.)
-- **Timezone Selector** - Test timezone-specific behavior (MCP Apps only)
-
-### CSP Mode Toggle
-
-Test Content Security Policy enforcement:
-
-- **Permissive** - Relaxed CSP for debugging
-- **Widget-Declared** - Enforces widget's declared CSP (production mode)
-
-<Warning>
-  CSP violations are logged in the console. Use Widget-Declared mode to catch
-  CSP issues before production deployment.
-</Warning>
-
-See [Content Security Policy](/typescript/server/content-security-policy) for widget CSP configuration.
-
-### Capabilities Testing
-
-Toggle device capabilities:
-
-- **Touch** - Enable/disable touch input simulation
-- **Hover** - Enable/disable hover state detection
-
-### Safe Area Insets
-
-Configure safe area insets for testing mobile layouts:
-
-- **Top** - Notch or status bar area
-- **Bottom** - Home indicator area
-- **Left/Right** - Display cutouts
-
-### Display Mode Controls
-
-Test different display modes:
-
-- **Inline** - Default embedded view
-- **Picture-in-Picture** - Floating window (click PiP button)
-- **Fullscreen** - Full browser window (click fullscreen button)
-
-### Props Management
-
-Test widgets with different inputs:
-
-- **Use Tool Input** - Use current tool call parameters
-- **Select Preset** - Choose from saved prop configurations
-- **Create Preset** - Save current props for reuse
-- **Edit Props** - Manually modify prop values
-
-## ChatGPT Apps SDK: window.openai API Emulation
-
-<Note>
-This section covers the **ChatGPT Apps SDK** protocol specifically. For MCP Apps protocol widgets, the inspector uses JSON-RPC over postMessage instead.
-
-Your widget code can work with both protocols by using the `useWidget()` hook from `mcp-use/react`, which abstracts protocol differences.
-
-</Note>
-
-When testing ChatGPT Apps SDK protocol widgets, the inspector provides complete emulation of the `window.openai` API. This API is automatically injected into widget iframes, allowing your components to work identically in the inspector and in ChatGPT.
-
-### API Overview
-
-The `window.openai` object provides:
-
-- **Global Properties**: Theme, display mode, tool data, widget state
-- **Methods**: Tool calls, follow-up messages, display mode requests
-- **Events**: Global change notifications via `openai:set_globals` events
-
-### Global Properties
-
-These properties are available on `window.openai` and update reactively:
-
-#### `toolInput`
-
-The input parameters passed to the tool that triggered this widget.
-
-```javascript
-const input = window.openai.toolInput;
-// { city: "San Francisco", category: "pizza" }
+```bash
+npm run dev
 ```
 
-#### `toolOutput`
+Open `http://localhost:3000/inspector` and connect to `http://localhost:3000/mcp`.
 
-The structured output from the tool execution. This is the primary data source for your widget.
+If the server is remote, connect to its MCP endpoint instead. Use **Direct** first, then try **Via Proxy** only when the browser cannot reach the server directly.
 
-```javascript
-const output = window.openai.toolOutput;
-// { places: [...], metadata: {...} }
-```
+## Run the widget-returning tool
 
-#### `toolResponseMetadata`
+Open the **Tools** tab, select the tool that returns the widget, and run it with a small input.
 
-Additional metadata from the tool response. Contains the `_meta` field from the tool result, which may include custom metadata passed via `widget({ metadata: ... })` on the server.
+The widget should render below the tool result. The raw result should include the widget metadata and the structured data passed to the widget.
 
-#### `widgetState`
+If the tool succeeds but no widget renders, check these values first:
 
-Persistent state for this widget instance. State is scoped to the specific widget and conversation message.
+- `widget.name` in the server tool definition
+- the matching folder under `resources/`
+- the tool result metadata that points to the widget resource
+- browser console errors from the widget iframe
 
-```javascript
-// Read current state
-const state = window.openai.widgetState;
+## Switch protocols when compatibility matters
 
-// Update state (persists across widget interactions)
-await window.openai.setWidgetState({ favorites: [...] });
-```
+The Inspector can test MCP Apps behavior and ChatGPT Apps SDK compatibility for widgets that support both runtimes.
 
-<Note>
-  Widget state persists in browser localStorage and is rehydrated when the
-  widget loads. State is scoped to the widget instance and doesn't travel across
-  different widgets or conversation turns.
-</Note>
+Use the protocol toggle when it appears:
 
-#### `displayMode`
+| Protocol | What it tests |
+| --- | --- |
+| **MCP Apps** | The standard MCP Apps bridge over `postMessage`. |
+| **ChatGPT Apps** | ChatGPT compatibility behavior, including Apps SDK-style host globals. |
 
-Current display mode: `"inline"`, `"pip"`, or `"fullscreen"`.
+Prefer `useWidget()` and other `mcp-use/react` hooks in widget code. They abstract over the runtime differences that the Inspector is testing.
 
-```javascript
-const mode = window.openai.displayMode;
-// "inline" | "pip" | "fullscreen"
-```
+See [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) when you need ChatGPT-specific behavior.
 
-#### `theme`
+## Inspect props, output, metadata, and state
 
-Current theme: `"light"` or `"dark"`. Automatically syncs with inspector theme.
+Use the widget debug panels to confirm what the widget receives.
 
-```javascript
-const theme = window.openai.theme;
-// "light" | "dark"
-```
+| Data | What to verify |
+| --- | --- |
+| `props` | The structured data the widget renders. |
+| `output` | The raw structured tool output, when exposed separately. |
+| `metadata` | Widget-only metadata such as timestamps, cache info, or host hints. |
+| `state` | Persisted widget state after user interactions. |
+| tool input | Arguments passed to the tool that produced the widget. |
 
-#### `maxHeight`
+When `props` are missing, compare the server's `outputSchema` with the widget's expected prop shape. They should describe the same fields.
 
-Maximum height available for the widget container (in pixels).
+## Test layout and display modes
 
-```javascript
-const height = window.openai.maxHeight;
-// 600 (default)
-```
+Use the debug controls to test the widget in the contexts a host may provide.
 
-#### `locale`
+Check:
 
-User's locale setting.
+- inline, picture-in-picture, and fullscreen display modes
+- desktop, tablet, and mobile sizing
+- touch and hover behavior
+- light and dark themes
+- locale and timezone-dependent formatting
+- safe-area insets for mobile layouts
 
-```javascript
-const locale = window.openai.locale;
-// "en-US" (default)
-```
+The host may grant a different display mode than the widget requests. Read `displayMode` from `useWidget()` when the current mode matters.
 
-#### `safeArea`
+## Test Content Security Policy
 
-Safe area insets for mobile devices.
+Use the widget-declared CSP mode before shipping a widget that loads external APIs, images, scripts, styles, or embeds.
 
-```javascript
-const safeArea = window.openai.safeArea;
-// { insets: { top: 0, bottom: 0, left: 0, right: 0 } }
-```
+If the widget works in permissive mode but fails with widget-declared CSP, update the widget CSP configuration. See [Content Security Policy](/typescript/mcp-apps/content-security-policy) for the server and widget settings.
 
-#### `userAgent`
+## Use console output
 
-User agent information including device type and capabilities.
+Open browser DevTools while the widget is rendered. Console messages from the widget iframe help identify runtime errors, blocked requests, CSP violations, missing props, and failed tool calls.
 
-```javascript
-const userAgent = window.openai.userAgent;
-// { device: { type: "desktop" }, capabilities: { hover: true, touch: false } }
-```
+Keep console output intentional. Log the minimum state needed to debug the widget, then remove noisy logs before release.
 
-### API Methods
+## Test the widget in chat
 
-#### `callTool(name, params)`
+After the tool works directly, open the **Chat** tab and ask the model to use the tool.
 
-Call an MCP tool directly from the widget. Returns a Promise with the tool result.
+Use chat to verify end-to-end behavior:
 
-```javascript
-const result = await window.openai.callTool("get_restaurants", {
-  city: "San Francisco",
-  category: "pizza",
-});
+- the model chooses the right tool
+- the tool receives valid arguments
+- the model-visible text output is useful
+- the widget renders with the same structured data
+- widget actions such as tool calls, state updates, follow-up messages, and display-mode requests behave as expected
 
-// Result format matches OpenAI's expected structure:
-// { content: [{ type: "text", text: "..." }] }
-```
+Use the Tools tab again when you need to isolate whether a failure is in the tool, widget, or model behavior.
 
-**Implementation:**
+## Troubleshoot missing widgets
 
-- Sends `postMessage` to parent (inspector)
-- Inspector executes tool via MCP connection
-- Result is formatted to match OpenAI's expected format
-- MCP `contents` array is converted to OpenAI `content` format
-- 30-second timeout for tool calls
+If no widget appears, start with the smallest failing case.
 
-<Warning>
-  Tools must be marked as callable by components in your MCP server. The
-  inspector forwards all tool calls to the connected MCP server.
-</Warning>
+| Symptom | Check |
+| --- | --- |
+| Tool result appears, but no widget appears. | Confirm `widget.name` matches a folder under `resources/`. |
+| Widget frame appears blank. | Check iframe console errors and missing required props. |
+| Widget loads in permissive CSP only. | Add the required domains to widget CSP. |
+| ChatGPT protocol fails, but MCP Apps works. | Check [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility). |
+| A widget action fails. | Verify the tool name, arguments, auth state, and iframe console logs. |
 
-#### `sendFollowUpMessage(args)`
+## Next steps
 
-Send a follow-up message to ChatGPT as if the user typed it.
-
-```javascript
-await window.openai.sendFollowUpMessage({
-  prompt: "Show me more details about the first restaurant",
-});
-```
-
-**Implementation:**
-
-- Dispatches custom event `mcp-inspector:widget-followup`
-- Message appears in Chat tab
-- Can be used to continue conversation from widget interactions
-
-#### `setWidgetState(state)`
-
-Persist widget state across interactions. State is visible to ChatGPT and can influence future tool calls.
-
-```javascript
-await window.openai.setWidgetState({
-  favorites: ["restaurant-1", "restaurant-2"],
-  filters: { price: "$$" },
-});
-```
-
-**Implementation:**
-
-- Stores state in browser localStorage
-- Keyed by widget instance ID
-- State is rehydrated on widget load
-- Sent to parent via `postMessage` for inspector awareness
-
-<Note>
-  Keep widget state under 4k tokens for performance. State is sent to ChatGPT
-  and can influence model behavior.
-</Note>
-
-#### `requestDisplayMode(options)`
-
-Request a different display mode for the widget.
-
-```javascript
-const result = await window.openai.requestDisplayMode({
-  mode: "fullscreen",
-});
-// Returns: { mode: "fullscreen" }
-```
-
-**Supported modes:**
-
-- `"inline"` - Default embedded view
-- `"pip"` - Picture-in-Picture floating window
-- `"fullscreen"` - Full browser window
-
-**Implementation:**
-
-- Uses native Fullscreen API when available
-- Falls back to CSS-based fullscreen
-- On mobile, PiP may be coerced to fullscreen
-- Updates `displayMode` property and dispatches events
-
-#### `openExternal(payload)`
-
-Open an external link in a new window/tab.
-
-```javascript
-window.openai.openExternal({
-  href: "https://example.com",
-});
-
-// Or with string
-window.openai.openExternal("https://example.com");
-```
-
-**Implementation:**
-
-- Uses `window.open()` with security flags
-- Opens in new tab with `noopener,noreferrer`
-
-#### `notifyIntrinsicHeight(height)`
-
-Notify OpenAI about intrinsic height changes for auto-sizing. This allows widgets to dynamically resize based on content.
-
-```javascript
-await window.openai.notifyIntrinsicHeight(800);
-```
-
-**Implementation:**
-
-- Sends `postMessage` with type `openai:notifyIntrinsicHeight`
-- Inspector updates iframe height accordingly
-- Height is capped based on display mode (fullscreen/pip respect viewport)
-- Used by `McpUseProvider` with `autoSize={true}` for automatic height updates
-
-**Usage Example:**
-
-```javascript
-// Manual height notification
-const container = document.getElementById("widget-content");
-const height = container.scrollHeight;
-await window.openai.notifyIntrinsicHeight(height);
-
-// Or use McpUseProvider with autoSize for automatic updates
-<McpUseProvider autoSize>
-  <MyWidget />
-</McpUseProvider>;
-```
-
-## Console Proxy Toggle
-
-The inspector provides a console proxy feature that allows you to forward iframe console logs to the page console for easier debugging.
-
-### Enabling Console Proxy
-
-1. Open the **Console** panel in the inspector (click the terminal icon)
-2. Toggle **"Proxy logs to page console"** switch
-3. Console logs from the widget iframe will now appear in your browser's developer console
-
-### Features
-
-- **Persistent Preference**: Your preference is saved in `localStorage` and persists across sessions
-- **Formatted Output**: Logs are prefixed with `[WIDGET CONSOLE]` for easy identification
-- **Log Level Preservation**: Error, warn, info, debug, and trace levels are preserved
-- **JSON Formatting**: Objects are automatically stringified for better readability
-
-### Use Cases
-
-- **Debugging Widget Issues**: See all console logs in one place
-- **Development Workflow**: Use browser DevTools features (filtering, searching)
-- **Error Tracking**: Easier to spot errors and warnings
-
-## Widget State Inspection
-
-The inspector provides built-in widget state inspection capabilities through the `WidgetInspectorControls` component.
-
-### Viewing Widget State
-
-When a widget is rendered in the inspector, you can inspect:
-
-- **Props**: Widget rendering data from `structuredContent` (what the server computed)
-- **Tool Input**: Original tool call arguments from the model
-- **Output**: Tool output data (`toolOutput` / `structuredContent`)
-- **Metadata**: Response metadata from `_meta` (`toolResponseMetadata`)
-- **State**: Persistent widget state (`widgetState`)
-- **Theme**: Current theme (light/dark)
-- **Display Mode**: Current display mode (inline/pip/fullscreen)
-- **Safe Area**: Safe area insets for mobile
-- **User Agent**: Device capabilities
-- **Locale**: User locale
-
-### Debug Information Display
-
-The inspector automatically displays debug information when widgets use `McpUseProvider` with `debugger={true}` or when using `WidgetControls` component. This provides:
-
-- Real-time state updates
-- Interactive tool testing
-- State modification capabilities
-- Full widget context visibility
-
-### State Inspection API
-
-Widgets can respond to state inspection requests:
-
-```javascript
-// Inspector sends: mcp-inspector:getWidgetState
-window.addEventListener("message", (event) => {
-  if (event.data?.type === "mcp-inspector:getWidgetState") {
-    window.parent.postMessage(
-      {
-        type: "mcp-inspector:widgetStateResponse",
-        toolId: event.data.toolId,
-        state: window.openai.widgetState,
-      },
-      "*",
-    );
-  }
-});
-```
-
-This allows the inspector to display current widget state even when the widget is in an iframe.
-
-### Events
-
-#### `openai:set_globals`
-
-Custom event dispatched when any global property changes. React components can listen to this for reactive updates.
-
-```javascript
-window.addEventListener("openai:set_globals", (event) => {
-  const { globals } = event.detail;
-  // globals contains all updated properties
-  console.log("Theme changed:", globals.theme);
-  console.log("Display mode:", globals.displayMode);
-});
-```
-
-**When dispatched:**
-
-- Initial widget load
-- Display mode changes
-- Theme changes
-- Any global property update from parent
-
-**Event detail structure:**
-
-```typescript
-{
-  globals: {
-    toolInput: {...},
-    toolOutput: {...},
-    toolResponseMetadata: null,
-    widgetState: {...},
-    displayMode: "inline",
-    maxHeight: 600,
-    theme: "dark",
-    locale: "en-US",
-    safeArea: {...},
-    userAgent: {...}
-  }
-}
-```
-
-### React Helper Hooks
-
-The inspector's API emulation is compatible with React hooks that use `useSyncExternalStore` to subscribe to global changes. Here's an example pattern:
-
-```javascript
-function useOpenAiGlobal(key) {
-  return useSyncExternalStore(
-    (onChange) => {
-      const handleSetGlobal = (event) => {
-        if (event.detail.globals[key] !== undefined) {
-          onChange();
-        }
-      };
-      window.addEventListener("openai:set_globals", handleSetGlobal);
-      return () => {
-        window.removeEventListener("openai:set_globals", handleSetGlobal);
-      };
-    },
-    () => window.openai[key],
-  );
-}
-
-// Usage
-function MyWidget() {
-  const theme = useOpenAiGlobal("theme");
-  const toolOutput = useOpenAiGlobal("toolOutput");
-
-  return (
-    <div className={theme === "dark" ? "dark" : "light"}>
-      {/* Widget content */}
-    </div>
-  );
-}
-```
-
-### Implementation Details
-
-#### API Injection
-
-The `window.openai` API is injected into widget iframes via server-side HTML generation:
-
-1. Widget HTML is fetched from MCP server
-2. Inspector injects API script before widget content
-3. API object is attached to `window.openai` and `window.webplus` (for compatibility)
-4. Initial globals event is dispatched
-5. Message listeners are set up for parent communication
-
-#### Communication Protocol
-
-Widget-to-inspector communication uses `postMessage`:
-
-**Widget → Inspector:**
-
-- `openai:callTool` - Tool execution requests
-- `openai:sendFollowup` - Follow-up messages
-- `openai:requestDisplayMode` - Display mode changes
-- `openai:setWidgetState` - State updates
-
-**Inspector → Widget:**
-
-- `openai:callTool:response` - Tool call results
-- `openai:globalsChanged` - Global property updates
-- `openai:displayModeChanged` - Display mode changes (legacy)
-
-#### State Persistence
-
-Widget state is persisted in browser localStorage:
-
-- **Key format**: `mcp-inspector-widget-state-${toolId}`
-- **Storage**: Browser localStorage (scoped to inspector domain)
-- **Lifetime**: Persists across page reloads
-- **Scope**: Per widget instance
-
-#### Tool Result Formatting
-
-MCP tool results are automatically converted to OpenAI's expected format:
-
-**MCP Format:**
-
-```json
-{
-  "contents": [{ "type": "text", "text": "Result" }]
-}
-```
-
-**OpenAI Format (returned to widget):**
-
-```json
-{
-  "content": [{ "type": "text", "text": "Result" }]
-}
-```
-
-#### Compatibility
-
-The inspector maintains compatibility with:
-
-- **OpenAI Apps SDK**: Full API compatibility
-- **Legacy APIs**: `sendFollowupTurn` (aliased to `sendFollowUpMessage`)
-- **React Router**: URL normalization for routing
-- **Multiple display modes**: Inline, PiP, Fullscreen
-
-### Differences from ChatGPT
-
-While the inspector provides full API compatibility, there are some differences:
-
-1. **User Agent**: Inspector provides mock user agent data
-2. **Safe Area**: Defaults to zero insets (not mobile-specific)
-3. **Locale**: Defaults to "en-US" (not user-specific)
-4. **Tool Results**: Converted from MCP format to OpenAI format
-5. **Follow-ups**: Appear in inspector Chat tab instead of ChatGPT
-
-### Testing Your Widget
-
-To test widget compatibility:
-
-1. **Develop locally** with inspector
-2. **Test all API methods** in your widget
-3. **Verify state persistence** across interactions
-4. **Test display mode transitions**
-5. **Verify tool calls** work correctly
-6. **Check theme adaptation**
-7. **Test in ChatGPT** for final verification
-
-### Official Documentation
-
-For the complete OpenAI Apps SDK API reference, see:
-
-- [OpenAI Apps SDK - Build a custom UX](https://developers.openai.com/apps-sdk/build/custom-ux) - Official API documentation
-- [OpenAI Apps SDK Reference](https://developers.openai.com/apps-sdk/reference) - Complete API reference
-
-## Connecting Your ChatGPT App
-
-### Setting Up Your MCP Server
-
-Your ChatGPT App needs an MCP server that exposes tools and optionally widgets:
-
-```typescript
-import { MCPServer } from "mcp-use/server";
-import { z } from "zod";
-
-const server = new MCPServer({
-  name: "my-chatgpt-app",
-  version: "1.0.0",
-});
-
-// Add a tool that returns a widget
-server.tool({
-  name: "create_dashboard",
-  description: "Create an interactive dashboard",
-  schema: z.object({
-    title: z.string(),
-    data: z.object({}).passthrough(),
-  }),
-}, async (args) => {
-    // Return widget URI in metadata
-    return {
-      contents: [
-        {
-          type: "text",
-          text: "Dashboard created",
-        },
-      ],
-      _meta: {
-        "openai/outputTemplate": "dashboard-widget-123",
-      },
-    };
-  },
-});
-```
-
-### Connecting via Inspector
-
-1. Start your MCP server
-2. Open the inspector (local or hosted)
-3. Connect to your server URL:
-   - Local: `http://localhost:3000/mcp`
-   - Remote: `https://your-server.com/mcp`
-4. Server appears in Connected Servers list
-
-### Authentication Setup
-
-If your ChatGPT App requires authentication:
-
-1. Configure OAuth in connection settings
-2. Or add custom headers with API keys
-3. Complete authentication flow
-4. Inspector stores credentials securely
-
-## Testing Tools
-
-### Executing Tools
-
-Test your ChatGPT App tools directly:
-
-1. Navigate to **Tools** tab
-2. Find your tool in the list
-3. Click to select it
-4. Enter test parameters
-5. Click **Execute**
-6. View results in real-time
-
-### Viewing Tool Results
-
-Tool results show:
-
-- **Text Output**: Plain text responses
-- **Structured Data**: JSON responses
-- **Widget References**: Links to OpenAI Apps SDK widgets
-- **Metadata**: Tool execution metadata
-
-### Testing with Different Parameters
-
-Test edge cases and variations:
-
-1. Execute tool with different parameters
-2. Save successful requests for replay
-3. Test error handling
-4. Verify parameter validation
-
-<Note>
-  Use saved requests to quickly test the same tool with different parameters.
-</Note>
-
-## Widget/Component Testing
-
-### OpenAI Apps SDK Widget Support
-
-The inspector fully supports OpenAI Apps SDK widgets:
-
-- **Widget Rendering**: Interactive widget display
-- **Dev Mode**: Hot reload during development
-- **Display Modes**: Inline, Picture-in-Picture, Fullscreen
-- **CSP Handling**: Content Security Policy support
-
-### Rendering Widgets
-
-When a tool returns a widget reference:
-
-1. Tool executes successfully
-2. Inspector detects widget URI in metadata
-3. Widget automatically loads and renders
-4. Interactive components become available
-
-**Widget detection:**
-
-- Looks for `openai/outputTemplate` in tool metadata
-- Fetches widget resource from MCP server
-- Renders in dedicated widget container
-
-### Widget Lifecycle Testing
-
-Widgets render **before** tool execution completes, allowing them to show loading states. The mcp-use Inspector properly emulates this lifecycle:
-
-1. **Tool Called** → Widget iframe created immediately
-2. **Widget Renders** → `isPending=true`, shows loading state
-3. **Tool Completes** → Widget receives result via `window.openai` updates
-4. **Widget Updates** → `isPending=false`, shows data
-
-**Testing isPending Transitions:**
-
-To verify your widget handles the pending state correctly:
-
-1. Use a tool that takes >2 seconds to complete
-2. Widget should show loading state immediately (not after tool completes)
-3. Open browser DevTools console
-4. Look for logs showing `isPending: true` then `isPending: false`
-5. Verify widget transitions from loading UI to data display
-
-**Example Console Output:**
-
-```
-[MyWidget] isPending: true, props: {}           // Immediate render
-[MyWidget] isPending: false, props: {city: ...} // After tool completes
-```
-
-<Tip>
-Use the **Tools tab** to test widget lifecycle - execute a slow tool and watch the widget render in pending state before the tool completes.
-</Tip>
-
-See [Widget Lifecycle](/typescript/server/widget-components/usewidget#widget-lifecycle) for complete details on `isPending` behavior and implementation patterns.
-
-### Dev Mode for Widgets
-
-Dev mode is enabled automatically when running `mcp-use dev`. The framework detects dev mode from the resource metadata and uses Vite's dev server for hot module replacement:
-
-1. Run `mcp-use dev` (or `npm run dev`)
-2. Inspector detects dev mode automatically
-3. Widget changes reload instantly via Vite HMR
-4. Console logs visible in inspector
-
-### Widget Display Modes
-
-Widgets support three display modes:
-
-**Inline:**
-
-- Default mode
-- Embedded in result panel
-- Scrollable content
-
-**Picture-in-Picture (PiP):**
-
-- Floating window
-- Stays visible while scrolling
-- Resizable and draggable
-
-**Fullscreen:**
-
-- Full browser window
-- Maximum visibility
-- Exit with ESC or close button
-
-**Switching modes:**
-
-- Widget can request mode changes
-- Inspector handles transitions
-- State persists during session
-
-### Widget CSP Handling
-
-Content Security Policy is automatically handled:
-
-- CSP metadata from tool results
-- Applied to widget iframe
-- Secure sandbox environment
-- Script execution allowed
-
-## Interactive Widget Features
-
-### Tool Calls from Widgets
-
-Widgets can call MCP tools:
-
-1. Widget uses `window.openai.callTool()`
-2. Inspector intercepts the call
-3. Executes tool via MCP connection
-4. Returns result to widget
-5. Widget updates with response
-
-**Example widget code:**
-
-```javascript
-// In your widget
-const result = await window.openai.callTool("get_data", {
-  userId: "123",
-});
-```
-
-### Follow-up Messages
-
-Widgets can send follow-up messages to ChatGPT:
-
-1. Widget calls `window.openai.sendFollowup()`
-2. Inspector captures the message
-3. Message appears in Chat tab
-4. ChatGPT processes the follow-up
-5. Conversation continues
-
-**Use cases:**
-
-- User interactions in widget
-- Dynamic conversation flow
-- Context-aware responses
-
-### Widget State Management
-
-Widget state is managed automatically:
-
-- **Tool Input**: Parameters passed to tool
-- **Tool Output**: Results from tool execution
-- **Widget Data**: Resource content for widget
-- **Display State**: Current display mode
-
-### Console Logging from Widgets
-
-View widget console output:
-
-1. Widget console logs appear in inspector
-2. Access via console panel in widget container
-3. Filter by log level
-4. Debug widget issues
-
-**Console features:**
-
-- Real-time log streaming
-- Log level filtering
-- Error highlighting
-- Stack trace display
-
-## Debugging Workflow
-
-### Step-by-Step Process
-
-1. **Connect to Server**
-   - Add your MCP server in inspector
-   - Verify connection status
-
-2. **Test Tools**
-   - Execute each tool independently
-   - Verify parameters and responses
-   - Check for errors
-
-3. **Test Widgets**
-   - Execute tools that return widgets
-   - Verify widget rendering
-   - Use Protocol Toggle to test both protocols (if dual-protocol)
-   - Test widget interactions and tool calls
-   - Test different display modes (inline, PiP, fullscreen)
-
-4. **Test Device Compatibility**
-   - Use Device Emulation (Desktop/Mobile/Tablet)
-   - Test different locales and timezones
-   - Verify CSP compliance (Widget-Declared mode)
-   - Test touch and hover capabilities
-
-5. **Test Integration**
-   - Use Chat tab with LLM
-   - Verify tool calls from AI
-   - Check widget rendering in context
-
-6. **Debug Issues**
-   - Check console logs
-   - Review tool results
-   - Verify widget metadata
-   - Test error scenarios
-
-### Common Issues and Solutions
-
-**Widget Not Rendering:**
-
-- **MCP Apps**: Check `_meta.ui.resourceUri` in tool metadata (the `ui/resourceUri` flat format is deprecated)
-- **ChatGPT**: Check `_meta["openai/outputTemplate"]` in tool metadata
-- Verify widget resource exists at the specified path
-- Check CSP settings match widget's network requirements
-- Use Protocol Toggle to test if it works in the other protocol
-- Review console for errors
-
-**Tool Calls Failing:**
-
-- Verify tool name matches
-- Check parameter schema
-- Review authentication
-- Check server logs
-
-**Widget Interactions Not Working:**
-
-- **ChatGPT**: Verify `window.openai` API availability in widget
-- **MCP Apps**: Check JSON-RPC postMessage communication
-- Check widget iframe sandbox permissions
-- Review console for errors
-- Test in different display modes
-- Try switching protocols with Protocol Toggle
-
-### Testing Widget Interactions
-
-1. **Render Widget**: Execute tool to load widget
-2. **Interact**: Click buttons, fill forms in widget
-3. **Monitor**: Watch console for tool calls
-4. **Verify**: Check tool results and widget updates
-5. **Iterate**: Fix issues and retest
-
-### Verifying Tool Outputs
-
-- **Preview Mode**: See formatted widget output
-- **JSON Mode**: View raw tool response
-- **Metadata**: Check widget references
-- **Structure**: Verify data format
-
-## Best Practices
-
-### Development vs Production Widgets
-
-**Development:**
-
-- Use dev mode for hot reload
-- Enable console logging and verbose debugging
-- Use Permissive CSP mode for easier debugging
-- Test in all display modes and device types
-- Test both protocols (MCP Apps and ChatGPT)
-- Verify error handling and fallbacks
-
-**Production:**
-
-- Disable dev mode
-- Use Widget-Declared CSP mode to catch violations
-- Minimize console output
-- Test with production CSP restrictions
-- Verify performance across device types
-- Test internationalization with different locales
-
-### Testing Widget Responsiveness
-
-- Test in different display modes (inline, PiP, fullscreen)
-- Use Device Emulation to test Desktop/Mobile/Tablet
-- Verify mobile layouts with safe area insets
-- Check resize behavior and auto-resize (MCP Apps)
-- Test PiP mode transitions
-- Test with different locales and timezones
-
-### Handling Widget Errors
-
-- Implement error boundaries
-- Show user-friendly messages
-- Log errors to console
-- Provide fallback UI
-
-### Performance Considerations
-
-- Optimize widget loading
-- Minimize initial bundle size
-- Lazy load components
-- Cache widget resources
-
-## Next Steps
-
-- [MCP Apps](/typescript/server/mcp-apps) - Build widgets with the standard MCP protocol
-- [ChatGPT Apps SDK](/typescript/server/mcp-apps) - Build ChatGPT-specific widgets
-- [Widget Components](/typescript/server/widget-components/usewidget) - React hooks and components
-- [Inspector Overview](/inspector/index) - Inspector features and usage
-- [Connection Settings](/inspector/connection-settings) - Advanced inspector configuration
+- Use [Build widgets](/typescript/mcp-apps/widgets) to review the server and widget structure.
+- Use [Interactivity](/typescript/mcp-apps/interactivity) to add tool calls, state, follow-up messages, and display controls.
+- Use [`useWidget()`](/typescript/api-reference/react/usewidget) for the full hook reference.

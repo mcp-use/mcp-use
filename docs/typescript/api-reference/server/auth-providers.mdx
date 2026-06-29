@@ -1,0 +1,700 @@
+---
+title: "OAuth providers"
+description: "OAuth provider factories and proxy helpers for MCP servers API Documentation"
+icon: "plug"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/oauth/index.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/oauth/index.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/oauth/index.ts</a>
+</Callout>
+
+These factory functions build the `oauth` value you pass to [`new MCPServer({ ... })`](/typescript/api-reference/server/mcp-server). Each one returns an `OAuthProvider` (or `OAuthProxy`) that the server uses to verify bearer tokens, proxy `.well-known` metadata discovery, and extract user info onto `ctx.auth`.
+
+There are two integration modes:
+
+- **DCR-direct providers** (`oauthAuth0Provider`, `oauthBetterAuthProvider`, `oauthClerkProvider`, `oauthKeycloakProvider`, `oauthSupabaseProvider`, `oauthWorkOSProvider`, `oauthCustomProvider`). The MCP server proxies metadata discovery to the upstream authorization server and verifies tokens. Clients communicate directly with the upstream for authorize, token, and register.
+- **Proxy mode** (`oauthProxy`) for providers without Dynamic Client Registration support (Google, GitHub, Okta, Microsoft Entra ID, and enterprise IdPs). The server mediates the flow: it exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream tokens through without minting its own.
+
+All factories import from `mcp-use/server`.
+
+```ts wrap
+import { oauthAuth0Provider, oauthProxy, jwksVerifier } from "mcp-use/server";
+```
+
+## Functions
+
+### oauthAuth0Provider
+
+Create an Auth0 OAuth provider for an MCP server.
+
+```ts
+import { oauthAuth0Provider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` backed by Auth0. Supports zero-config setup: when `config` is omitted, `domain` falls back to `MCP_USE_OAUTH_AUTH0_DOMAIN` and `audience` falls back to `MCP_USE_OAUTH_AUTH0_AUDIENCE`. Throws `Error` if `domain` is missing (`"Auth0 domain is required."`) and throws `Error` if `audience` is missing (`"Auth0 audience is required."`). The `config` argument is `Partial<Auth0ProviderConfig>` and defaults to an empty object.
+
+**Parameters**
+><ParamField body="config" type="Partial<Auth0ProviderConfig>" default="{}" >   Optional Auth0 configuration. Values passed here override the corresponding environment variables. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthAuth0Provider(config?: Partial<Auth0ProviderConfig>): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthAuth0Provider, error, object } from "mcp-use/server"
+
+// Zero-config: reads MCP_USE_OAUTH_AUTH0_DOMAIN and MCP_USE_OAUTH_AUTH0_AUDIENCE
+const server = new MCPServer({
+  name: "auth0-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with Auth0 OAuth authentication",
+  oauth: oauthAuth0Provider(),
+})
+
+server.tool(
+  { name: "get-user-info", description: "Get information about the authenticated user" },
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+      permissions: ctx.auth.permissions,
+      scopes: ctx.auth.scopes,
+    }),
+)
+
+server.listen()
+```
+
+### oauthBetterAuthProvider
+
+Create a Better Auth OAuth provider for an MCP server.
+
+```ts
+import { oauthBetterAuthProvider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` backed by Better Auth's OAuth Provider plugin. The MCP server only verifies tokens and serves metadata; clients discover Better Auth's endpoints via `.well-known` passthrough (`/oauth2/authorize`, `/oauth2/token`, `/oauth2/register`, `/jwks`) and talk to Better Auth directly. `authURL` falls back to `MCP_USE_OAUTH_BETTER_AUTH_URL`. Throws `Error` if `authURL` is missing (`"Better Auth authURL is required."`). The `config` argument is `Partial<BetterAuthProviderConfig>` and defaults to an empty object.
+
+**Parameters**
+><ParamField body="config" type="Partial<BetterAuthProviderConfig>" default="{}" >   Optional Better Auth configuration. Values passed here override the corresponding environment variables. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthBetterAuthProvider(config?: Partial<BetterAuthProviderConfig>): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthBetterAuthProvider, object } from "mcp-use/server"
+
+const server = new MCPServer({
+  name: "better-auth-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with Better Auth OAuth authentication",
+  oauth: oauthBetterAuthProvider({
+    authURL: "http://localhost:3000/api/auth",
+  }),
+})
+```
+
+### oauthClerkProvider
+
+Create a Clerk OAuth provider for an MCP server.
+
+```ts
+import { oauthClerkProvider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` backed by Clerk. Uses Dynamic Client Registration: clients register themselves with Clerk (enable DCR in the Clerk Dashboard under Configure, OAuth Applications, Dynamic Client Registration), and the MCP server only verifies Clerk-issued tokens. `frontendApiUrl` falls back to `MCP_USE_OAUTH_CLERK_FRONTEND_API_URL`. Throws `Error` if `frontendApiUrl` is missing (`"Clerk frontendApiUrl is required."`). The `config` argument is `Partial<ClerkProviderConfig>` and defaults to an empty object.
+
+**Parameters**
+><ParamField body="config" type="Partial<ClerkProviderConfig>" default="{}" >   Optional Clerk configuration. Values passed here override the corresponding environment variables. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthClerkProvider(config?: Partial<ClerkProviderConfig>): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthClerkProvider, object } from "mcp-use/server"
+
+// Zero-config: reads MCP_USE_OAUTH_CLERK_FRONTEND_API_URL
+const server = new MCPServer({
+  name: "clerk-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with Clerk OAuth authentication",
+  oauth: oauthClerkProvider(),
+})
+
+server.tool(
+  { name: "get-user-info", description: "Get information about the authenticated user" },
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+      name: ctx.auth.user.name,
+    }),
+)
+
+server.listen()
+```
+
+### oauthKeycloakProvider
+
+Create a Keycloak OAuth provider for an MCP server.
+
+```ts
+import { oauthKeycloakProvider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` backed by Keycloak using its native Dynamic Client Registration (RFC 7591). `serverUrl` falls back to `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL`, `realm` falls back to `MCP_USE_OAUTH_KEYCLOAK_REALM`, and `audience` falls back to `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE`. Throws `Error` if `serverUrl` is missing (`"Keycloak serverUrl is required."`) and throws `Error` if `realm` is missing (`"Keycloak realm is required."`). The `config` argument is `Partial<KeycloakProviderConfig>` and defaults to an empty object.
+
+**Parameters**
+><ParamField body="config" type="Partial<KeycloakProviderConfig>" default="{}" >   Optional Keycloak configuration. Values passed here override the corresponding environment variables. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthKeycloakProvider(config?: Partial<KeycloakProviderConfig>): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthKeycloakProvider, object } from "mcp-use/server"
+
+const server = new MCPServer({
+  name: "keycloak-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with Keycloak OAuth authentication (DCR)",
+  oauth: oauthKeycloakProvider({
+    serverUrl: "http://localhost:8080",
+    realm: "demo",
+  }),
+})
+
+server.tool(
+  { name: "get-user-info", description: "Return identity info extracted from the Keycloak access token" },
+  async (_args, ctx) =>
+    object({
+      userId: ctx.auth.user.userId,
+      username: ctx.auth.user.username,
+      email: ctx.auth.user.email,
+      roles: ctx.auth.user.roles,
+    }),
+)
+```
+
+### oauthSupabaseProvider
+
+Create a Supabase OAuth provider for an MCP server.
+
+```ts
+import { oauthSupabaseProvider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` backed by Supabase's OAuth 2.1 server. Supports zero-config setup: `projectId` falls back to `MCP_USE_OAUTH_SUPABASE_PROJECT_ID`, `supabaseUrl` falls back to `MCP_USE_OAUTH_SUPABASE_URL`, and `jwtSecret` falls back to `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`. The hosted URL is derived as `https://${projectId}.supabase.co` unless `supabaseUrl` is set (use `supabaseUrl` for local or self-hosted instances, e.g. `http://localhost:54321`). Throws `Error` if neither `projectId` nor `supabaseUrl` is resolved (`"Supabase projectId or supabaseUrl is required."`). The `config` argument is `Partial<SupabaseProviderConfig>` and defaults to an empty object.
+
+**Parameters**
+><ParamField body="config" type="Partial<SupabaseProviderConfig>" default="{}" >   Optional Supabase configuration. Values passed here override the corresponding environment variables. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthSupabaseProvider(config?: Partial<SupabaseProviderConfig>): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthSupabaseProvider } from "mcp-use/server"
+
+// Zero-config: reads MCP_USE_OAUTH_SUPABASE_PROJECT_ID
+const server = new MCPServer({
+  name: "supabase-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with Supabase OAuth authentication",
+  oauth: oauthSupabaseProvider(),
+})
+```
+
+### oauthWorkOSProvider
+
+Create a WorkOS AuthKit OAuth provider for an MCP server.
+
+```ts
+import { oauthWorkOSProvider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` backed by WorkOS AuthKit using Dynamic Client Registration. Clients register themselves with WorkOS (enable DCR in the WorkOS Dashboard under Connect, Configuration), and the MCP server only verifies WorkOS-issued tokens. `subdomain` falls back to `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`. Throws `Error` if `subdomain` is missing (`"WorkOS subdomain is required."`). The `config` argument is `Partial<WorkOSProviderConfig>` and defaults to an empty object.
+
+**Parameters**
+><ParamField body="config" type="Partial<WorkOSProviderConfig>" default="{}" >   Optional WorkOS configuration. Values passed here override the corresponding environment variables. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthWorkOSProvider(config?: Partial<WorkOSProviderConfig>): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthWorkOSProvider } from "mcp-use/server"
+
+// Zero-config: reads MCP_USE_OAUTH_WORKOS_SUBDOMAIN
+const server = new MCPServer({
+  name: "workos-oauth-example",
+  version: "1.0.0",
+  description: "MCP server with WorkOS AuthKit OAuth authentication",
+  oauth: oauthWorkOSProvider(),
+})
+```
+
+### oauthCustomProvider
+
+Create an OAuth provider for any standards-compliant authorization server.
+
+```ts
+import { oauthCustomProvider } from "mcp-use/server"
+```
+
+Builds an `OAuthProvider` from explicit endpoint URLs and a custom `verifyToken` function. Unlike the other factories, `config` is required (there are no environment-variable fallbacks). Use this for any OAuth provider that exposes standard `.well-known` discovery and an authorization plus token endpoint, where you supply your own token verification logic.
+
+**Parameters**
+><ParamField body="config" type="CustomProviderConfig" required="True" >   Custom provider configuration with explicit endpoints and a `verifyToken` function. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProvider" />
+
+**Signature**
+```ts wrap
+function oauthCustomProvider(config: CustomProviderConfig): OAuthProvider
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthCustomProvider } from "mcp-use/server"
+
+const server = new MCPServer({
+  name: "my-server",
+  version: "1.0.0",
+  oauth: oauthCustomProvider({
+    issuer: "https://oauth.example.com",
+    jwksUrl: "https://oauth.example.com/.well-known/jwks.json",
+    authEndpoint: "https://oauth.example.com/authorize",
+    tokenEndpoint: "https://oauth.example.com/token",
+    verifyToken: async (token) => {
+      // Custom verification logic; return { payload }
+      return { payload: {} }
+    },
+  }),
+})
+```
+
+### oauthProxy
+
+Create an OAuth proxy for providers without Dynamic Client Registration.
+
+```ts
+import { oauthProxy, jwksVerifier } from "mcp-use/server"
+```
+
+Builds an `OAuthProxy` for providers that lack DCR support (Google OAuth, GitHub OAuth, Okta, Microsoft Entra ID, and enterprise IdPs). The proxy exposes a `/register` endpoint that returns the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, verifies tokens via the supplied `verifyToken` function, and passes upstream tokens through without minting its own. `scopes` defaults to `["openid", "email", "profile"]` and `grantTypes` defaults to `["authorization_code", "refresh_token"]`. When `getUserInfo` is omitted, a default extractor reads the standard OIDC claims (`sub`, `email`, `name`, `picture`) and splits the `scope` claim into `scopes`.
+
+Throws `Error` if any of `authEndpoint`, `tokenEndpoint`, `issuer`, `clientId`, or `verifyToken` is missing. The verifyToken error message points you to `jwksVerifier()` for JWT/JWKS providers.
+
+Pair `oauthProxy` with `jwksVerifier()` (exported from `mcp-use/server`) to verify JWTs against a remote JWKS. `jwksVerifier` enforces the `iss` claim, optionally enforces `aud`, and throws early with a helpful message if the token is not a three-segment signed JWT (for example, when an authorize request omitted a valid `audience` and the provider issued an opaque token).
+
+**Parameters**
+><ParamField body="config" type="OAuthProxyConfig" required="True" >   OAuth proxy configuration including upstream endpoints, client credentials, and a `verifyToken` function. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="OAuthProxy" />
+
+**Signature**
+```ts wrap
+function oauthProxy(config: OAuthProxyConfig): OAuthProxy
+```
+
+**Example**
+
+```ts wrap
+import { MCPServer, oauthProxy, jwksVerifier, object, error } from "mcp-use/server"
+
+const issuer = process.env.OKTA_ISSUER!
+const clientId = process.env.OKTA_CLIENT_ID!
+const clientSecret = process.env.OKTA_CLIENT_SECRET
+
+const server = new MCPServer({
+  name: "okta-proxy-example",
+  version: "1.0.0",
+  description: "MCP server with Okta OAuth proxy authentication",
+  oauth: oauthProxy({
+    authEndpoint: `${issuer}/v1/authorize`,
+    tokenEndpoint: `${issuer}/v1/token`,
+    issuer,
+    clientId,
+    clientSecret,
+    scopes: ["openid", "email", "profile"],
+    verifyToken: jwksVerifier({
+      jwksUrl: `${issuer}/v1/keys`,
+      issuer,
+      audience: clientId,
+    }),
+  }),
+})
+
+server.listen()
+```
+
+### mountOAuthProxy
+
+Mount CORS-free OAuth proxy routes on a Hono app.
+
+```ts
+import { mountOAuthProxy } from "mcp-use/server"
+```
+
+Mounts OAuth proxy routes on a Hono app so browser clients can complete OAuth flows without CORS restrictions. This is a request-forwarding utility distinct from `oauthProxy` (which configures the MCP server's own auth). It registers two routes under `basePath` (default `/oauth`): `GET <basePath>/metadata` proxies `.well-known` metadata discovery (with WWW-Authenticate header discovery and standard-path fallbacks), and `POST <basePath>/proxy` forwards general OAuth requests such as token exchange and registration. The routes enable permissive CORS (`origin: "*"`, methods `GET`, `POST`, `OPTIONS`). Returns `void`. The `options` argument defaults to an empty object.
+
+**Parameters**
+><ParamField body="app" type="Hono" required="True" >   The Hono application instance to register routes on. </ParamField>
+><ParamField body="options" type="OAuthProxyOptions" default="{}" >   Configuration options for the proxy routes. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+function mountOAuthProxy(app: Hono, options?: OAuthProxyOptions): void
+```
+
+**Example**
+
+```ts wrap
+import { Hono } from "hono"
+import { mountOAuthProxy } from "mcp-use/server"
+
+const app = new Hono()
+
+// Basic usage at the default /oauth base path
+mountOAuthProxy(app)
+
+// With a custom base path
+mountOAuthProxy(app, {
+  basePath: "/inspector/api/oauth",
+})
+```
+
+## Types
+
+### Auth0ProviderConfig
+
+Configuration for `oauthAuth0Provider`.
+
+```ts
+import type { Auth0ProviderConfig } from "mcp-use/server"
+```
+
+Configuration for the Auth0 provider. `oauthAuth0Provider` accepts `Partial<Auth0ProviderConfig>` and fills any missing `domain`/`audience` from environment variables.
+
+**Properties**
+><ParamField body="domain" type="string" required="True" >   Auth0 tenant domain, e.g. `my-tenant.auth0.com`. </ParamField>
+><ParamField body="audience" type="string" required="True" >   API identifier used as the JWT `aud` claim. </ParamField>
+><ParamField body="verifyJwt" type="boolean" >   Whether to verify the JWT signature. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+
+**Signature**
+```ts wrap
+interface Auth0ProviderConfig {
+  domain: string
+  audience: string
+  verifyJwt?: boolean
+  scopesSupported?: string[]
+}
+```
+
+### BetterAuthProviderConfig
+
+Configuration for `oauthBetterAuthProvider`.
+
+```ts
+import type { BetterAuthProviderConfig } from "mcp-use/server"
+```
+
+Configuration for the Better Auth provider. `authURL` falls back to `MCP_USE_OAUTH_BETTER_AUTH_URL`. The optional `getUserInfo` callback maps the verified JWT payload to a `UserInfo` object (sync or async). Note the `getUserInfo` parameter is typed `Record<string, unknown>`, which contains a curly brace; see the signature fence below.
+
+**Properties**
+><ParamField body="authURL" type="string" required="True" >   Base URL of the Better Auth OAuth server, e.g. `http://localhost:3000/api/auth`. </ParamField>
+><ParamField body="verifyJwt" type="boolean" >   Whether to verify the JWT signature. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+><ParamField body="getUserInfo" type="(payload) => UserInfo | Promise<UserInfo>" >   Optional callback mapping a verified payload to user info. </ParamField>
+
+**Signature**
+```ts wrap
+interface BetterAuthProviderConfig {
+  authURL: string
+  verifyJwt?: boolean
+  scopesSupported?: string[]
+  getUserInfo?: (payload: Record<string, unknown>) => UserInfo | Promise<UserInfo>
+}
+```
+
+### ClerkProviderConfig
+
+Configuration for `oauthClerkProvider`.
+
+```ts
+import type { ClerkProviderConfig } from "mcp-use/server"
+```
+
+Configuration for the Clerk provider. `frontendApiUrl` falls back to `MCP_USE_OAUTH_CLERK_FRONTEND_API_URL`.
+
+**Properties**
+><ParamField body="frontendApiUrl" type="string" required="True" >   Clerk Frontend API URL, e.g. `https://verb-noun-42.clerk.accounts.dev` or `https://clerk.yourdomain.com`. </ParamField>
+><ParamField body="audience" type="string" >   Optional audience for JWT verification. </ParamField>
+><ParamField body="verifyJwt" type="boolean" >   Whether to verify the JWT signature. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+
+**Signature**
+```ts wrap
+interface ClerkProviderConfig {
+  frontendApiUrl: string
+  audience?: string
+  verifyJwt?: boolean
+  scopesSupported?: string[]
+}
+```
+
+### KeycloakProviderConfig
+
+Configuration for `oauthKeycloakProvider`.
+
+```ts
+import type { KeycloakProviderConfig } from "mcp-use/server"
+```
+
+Configuration for the Keycloak provider. `serverUrl` falls back to `MCP_USE_OAUTH_KEYCLOAK_SERVER_URL`, `realm` to `MCP_USE_OAUTH_KEYCLOAK_REALM`, and `audience` to `MCP_USE_OAUTH_KEYCLOAK_AUDIENCE`.
+
+**Properties**
+><ParamField body="serverUrl" type="string" required="True" >   Keycloak base URL, e.g. `https://keycloak.example.com`. </ParamField>
+><ParamField body="realm" type="string" required="True" >   Keycloak realm name. </ParamField>
+><ParamField body="audience" type="string" >   MCP server URL used to validate the JWT `aud` claim (set via a Keycloak audience mapper on client scopes). </ParamField>
+><ParamField body="verifyJwt" type="boolean" >   Whether to verify the JWT signature. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+
+**Signature**
+```ts wrap
+interface KeycloakProviderConfig {
+  serverUrl: string
+  realm: string
+  audience?: string
+  verifyJwt?: boolean
+  scopesSupported?: string[]
+}
+```
+
+### SupabaseProviderConfig
+
+Configuration for `oauthSupabaseProvider`.
+
+```ts
+import type { SupabaseProviderConfig } from "mcp-use/server"
+```
+
+Configuration for the Supabase provider. Either `projectId` or `supabaseUrl` must resolve (from config or environment). `projectId` derives the hosted URL `https://${projectId}.supabase.co`; `supabaseUrl` overrides it for self-hosted or local instances.
+
+**Properties**
+><ParamField body="projectId" type="string" >   Supabase project ID used to derive the hosted URL. </ParamField>
+><ParamField body="supabaseUrl" type="string" >   Explicit Supabase base URL. Overrides the projectId-derived URL, e.g. `http://localhost:54321`. </ParamField>
+><ParamField body="jwtSecret" type="string" >   Optional JWT secret for legacy HS256 token verification. </ParamField>
+><ParamField body="verifyJwt" type="boolean" >   Whether to verify the JWT signature. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+
+**Signature**
+```ts wrap
+interface SupabaseProviderConfig {
+  projectId?: string
+  supabaseUrl?: string
+  jwtSecret?: string
+  verifyJwt?: boolean
+  scopesSupported?: string[]
+}
+```
+
+### WorkOSProviderConfig
+
+Configuration for `oauthWorkOSProvider`.
+
+```ts
+import type { WorkOSProviderConfig } from "mcp-use/server"
+```
+
+Configuration for the WorkOS provider. `subdomain` falls back to `MCP_USE_OAUTH_WORKOS_SUBDOMAIN`.
+
+**Properties**
+><ParamField body="subdomain" type="string" required="True" >   WorkOS AuthKit subdomain, e.g. `my-company.authkit.app`. </ParamField>
+><ParamField body="verifyJwt" type="boolean" >   Whether to verify the JWT signature. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+
+**Signature**
+```ts wrap
+interface WorkOSProviderConfig {
+  subdomain: string
+  verifyJwt?: boolean
+  scopesSupported?: string[]
+}
+```
+
+### CustomProviderConfig
+
+Configuration for `oauthCustomProvider`.
+
+```ts
+import type { CustomProviderConfig } from "mcp-use/server"
+```
+
+Configuration for an arbitrary OAuth provider. `issuer`, `authEndpoint`, `tokenEndpoint`, and `verifyToken` are required; the rest are optional. `verifyToken` resolves to an object containing a `payload` (see the signature fence for the exact type, which contains a curly brace). The optional `getUserInfo` callback maps a payload to a `UserInfo`.
+
+**Properties**
+><ParamField body="issuer" type="string" required="True" >   OAuth issuer URL. </ParamField>
+><ParamField body="authEndpoint" type="string" required="True" >   Authorization endpoint URL. </ParamField>
+><ParamField body="tokenEndpoint" type="string" required="True" >   Token endpoint URL. </ParamField>
+><ParamField body="verifyToken" type="(token) => Promise<any>" required="True" >   Function that verifies a bearer token and resolves to its decoded payload. </ParamField>
+><ParamField body="jwksUrl" type="string" >   JWKS endpoint URL for signature verification. </ParamField>
+><ParamField body="userInfoEndpoint" type="string" >   User info endpoint URL. </ParamField>
+><ParamField body="scopesSupported" type="string[]" >   Scopes advertised in metadata. </ParamField>
+><ParamField body="audience" type="string" >   Audience for JWT verification. </ParamField>
+><ParamField body="grantTypesSupported" type="string[]" >   Grant types advertised in metadata. </ParamField>
+><ParamField body="getUserInfo" type="(payload) => UserInfo" >   Optional callback mapping a verified payload to user info. </ParamField>
+
+**Signature**
+```ts wrap
+interface CustomProviderConfig {
+  issuer: string
+  authEndpoint: string
+  tokenEndpoint: string
+  verifyToken: (token: string) => Promise<any>
+  jwksUrl?: string
+  userInfoEndpoint?: string
+  scopesSupported?: string[]
+  audience?: string
+  grantTypesSupported?: string[]
+  getUserInfo?: (payload: any) => UserInfo
+}
+```
+
+### OAuthProxy
+
+The proxy-mode provider returned by `oauthProxy`.
+
+```ts
+import type { OAuthProxy } from "mcp-use/server"
+```
+
+Extends `OAuthProvider` with proxy-specific fields for providers without DCR support. Implements the full provider interface (the getter methods plus `verifyToken`/`getUserInfo`) and adds a `type` discriminator, pre-registered client credentials, and optional extra authorize params. The proxy exposes a `/register` endpoint returning the configured `clientId`, injects `clientId`/`clientSecret` at token exchange, and passes upstream JWTs through without minting tokens.
+
+**Properties**
+><ParamField body="type" type='"proxy"' required="True" >   Discriminator used to detect proxy providers in the provider union. </ParamField>
+><ParamField body="clientId" type="string" required="True" >   Pre-registered OAuth client ID. </ParamField>
+><ParamField body="clientSecret" type="string" >   Pre-registered OAuth client secret (optional for public clients). </ParamField>
+><ParamField body="extraAuthorizeParams" type="Record<string, string>" >   Extra parameters appended to authorize requests. </ParamField>
+
+**Signature**
+```ts wrap
+interface OAuthProxy extends OAuthProvider {
+  type: "proxy"
+  clientId: string
+  clientSecret?: string
+  extraAuthorizeParams?: Record<string, string>
+}
+```
+
+### OAuthProxyConfig
+
+Configuration for `oauthProxy`.
+
+```ts
+import type { OAuthProxyConfig } from "mcp-use/server"
+```
+
+Configuration for creating an OAuth proxy. `authEndpoint`, `tokenEndpoint`, `issuer`, `clientId`, and `verifyToken` are required. `scopes` defaults to `["openid", "email", "profile"]` and `grantTypes` defaults to `["authorization_code", "refresh_token"]` inside `oauthProxy`. The `verifyToken` field is a `VerifyToken` function that resolves to an object with a `payload` (see the signature fence for the exact type, which contains a curly brace). When `getUserInfo` is omitted, standard OIDC claims are extracted.
+
+**Properties**
+><ParamField body="authEndpoint" type="string" required="True" >   Upstream authorization endpoint URL, e.g. `https://accounts.google.com/o/oauth2/v2/auth`. </ParamField>
+><ParamField body="tokenEndpoint" type="string" required="True" >   Upstream token endpoint URL, e.g. `https://oauth2.googleapis.com/token`. </ParamField>
+><ParamField body="issuer" type="string" required="True" >   Token issuer, used in metadata and (when paired with `jwksVerifier`) enforced as the `iss` claim. </ParamField>
+><ParamField body="verifyToken" type="VerifyToken" required="True" >   Token verification function. Use `jwksVerifier()` for JWT+JWKS providers, or write your own for opaque tokens. </ParamField>
+><ParamField body="clientId" type="string" required="True" >   Pre-registered OAuth client ID. </ParamField>
+><ParamField body="clientSecret" type="string" >   Pre-registered OAuth client secret (optional for public clients). </ParamField>
+><ParamField body="scopes" type="string[]" default='["openid", "email", "profile"]' >   OAuth scopes to request. </ParamField>
+><ParamField body="grantTypes" type="string[]" default='["authorization_code", "refresh_token"]' >   Supported grant types. </ParamField>
+><ParamField body="extraAuthorizeParams" type="Record<string, string>" >   Extra parameters added to authorize requests, e.g. `{ access_type: "offline", prompt: "consent" }`. </ParamField>
+><ParamField body="getUserInfo" type="(payload) => UserInfo" >   Custom extractor for user info from the verified payload. Defaults to standard OIDC claims. </ParamField>
+
+**Signature**
+```ts wrap
+interface OAuthProxyConfig {
+  authEndpoint: string
+  tokenEndpoint: string
+  issuer: string
+  verifyToken: VerifyToken
+  clientId: string
+  clientSecret?: string
+  scopes?: string[]
+  grantTypes?: string[]
+  extraAuthorizeParams?: Record<string, string>
+  getUserInfo?: (payload: Record<string, unknown>) => UserInfo
+}
+```
+
+### OAuthProxyOptions
+
+Options for `mountOAuthProxy`.
+
+```ts
+import type { OAuthProxyOptions } from "mcp-use/server"
+```
+
+Options for configuring the Hono OAuth proxy routes mounted by `mountOAuthProxy`. All fields are optional. The `authenticate` and `validateTarget` callbacks each take a Hono `Context` and may return a boolean or a promise of one; returning `false` rejects the request (401 for `authenticate`, 403 for `validateTarget`).
+
+**Properties**
+><ParamField body="basePath" type="string" default='/oauth' >   Base path for the proxy routes. </ParamField>
+><ParamField body="enableLogging" type="boolean" default="true" >   Enable request logging to the console. </ParamField>
+><ParamField body="authenticate" type="(c: Context) => Promise<boolean> | boolean" >   Optional request authentication. Return `false` to reject with 401. </ParamField>
+><ParamField body="validateTarget" type="(targetUrl: string, c: Context) => Promise<boolean> | boolean" >   Optional check that the target URL is allowed. Return `false` to reject with 403. </ParamField>
+
+**Signature**
+```ts wrap
+interface OAuthProxyOptions {
+  basePath?: string
+  enableLogging?: boolean
+  authenticate?: (c: Context) => Promise<boolean> | boolean
+  validateTarget?: (targetUrl: string, c: Context) => Promise<boolean> | boolean
+}
+```

@@ -1,0 +1,454 @@
+---
+title: "Middleware and proxy"
+description: "Operation-level MCP middleware, Express/Connect adapters, and the CORS proxy API Documentation"
+icon: "layers"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/middleware/mcp-middleware.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/middleware/mcp-middleware.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/middleware/mcp-middleware.ts</a>
+</Callout>
+
+The middleware module provides three layers of interception for an [`MCPServer`](/typescript/api-reference/server/mcp-server):
+
+1. **Operation-level MCP middleware**, a Hono-style chain registered with `server.use('mcp:...')` that wraps individual MCP operations (tool calls, resource reads, prompt gets, and list operations). Implemented by `composeMiddleware`, `matchesPattern`, and the `MiddlewareContext` types.
+2. **HTTP middleware adapters**, `adaptMiddleware`, `adaptConnectMiddleware`, and `isExpressMiddleware`, which let you register either Express/Connect middleware (such as `morgan` or `express-rate-limit`) or native Hono middleware on the underlying HTTP app.
+3. **A CORS proxy**, `mountMcpProxy`, that forwards browser-originated MCP requests to remote servers that do not support CORS.
+
+All symbols below are exported from `mcp-use/server`.
+
+```ts
+import {
+  composeMiddleware,
+  matchesPattern,
+  adaptMiddleware,
+  adaptConnectMiddleware,
+  isExpressMiddleware,
+  mountMcpProxy,
+  type McpMiddlewareEntry,
+  type McpMiddlewareFn,
+  type McpMiddlewareFnFor,
+  type McpMiddlewarePatternMap,
+  type MiddlewareContext,
+  type ToolsCallMiddlewareContext,
+  type ResourcesReadMiddlewareContext,
+  type PromptsGetMiddlewareContext,
+  type McpProxyOptions,
+} from "mcp-use/server";
+```
+
+## Operation-level MCP middleware
+
+Hono-style middleware for intercepting MCP operations. Register handlers with `server.use('mcp:...', handler)`. Each handler receives a `MiddlewareContext` and a `next` function, executes around `next()`, and may inspect or mutate `ctx.params`, short-circuit by returning a value, or reject by throwing.
+
+```ts
+import { composeMiddleware, matchesPattern } from "mcp-use/server";
+```
+
+The example below registers operation-level middleware directly on a server. Middleware runs in FIFO registration order (the first registered handler is the outermost).
+
+```ts
+import { MCPServer, text } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "middleware-example",
+  version: "1.0.0",
+});
+
+// Logging middleware, fires for every MCP operation ('mcp:*')
+server.use("mcp:*", async (ctx, next) => {
+  const start = Date.now();
+  console.log(`→ [${ctx.method}]`, JSON.stringify(ctx.params));
+  const result = await next();
+  console.log(`← [${ctx.method}] ${Date.now() - start}ms`);
+  return result;
+});
+
+// Auth guard, checks OAuth scopes before any tool call ('mcp:tools/call')
+server.use("mcp:tools/call", async (ctx, next) => {
+  if (ctx.auth) {
+    const toolName = (ctx.params as { name?: string }).name ?? "";
+    const required = `tools:call:${toolName}`;
+    if (
+      !ctx.auth.scopes.includes(required) &&
+      !ctx.auth.scopes.includes("tools:*")
+    ) {
+      throw new Error(`Insufficient scope. Required: ${required}`);
+    }
+  }
+  return next();
+});
+
+server.tool(
+  {
+    name: "greet",
+    description: "Return a greeting for a given name",
+    schema: z.object({ name: z.string() }),
+  },
+  async ({ name }) => text(`Hello, ${name}!`)
+);
+
+await server.listen();
+```
+
+### composeMiddleware
+
+Compose a middleware chain for a single MCP method invocation. It filters `entries` down to those whose pattern matches `method`, then builds a `next()` chain with `innerFn` at the center and returns the outermost callable.
+
+If no entries match `method`, it returns a function that ignores its context and simply calls `innerFn` directly (zero overhead). Otherwise the returned function dispatches through each matching handler in FIFO registration order, with the first registered handler running as the outermost wrapper.
+
+Each handler's `next` advances to the following handler (or to `innerFn` when the last handler is reached). Calling `next()` more than once within the same handler rejects with `Error("next() called multiple times")`.
+
+**Parameters**
+><ParamField body="entries" type="McpMiddlewareEntry[]" required="true" >   Registered middleware entries (pattern plus handler). Only entries matching `method` are included in the chain. </ParamField>
+><ParamField body="method" type="string" required="true" >   The MCP method being invoked, e.g. `"tools/call"` or `"resources/read"`. </ParamField>
+><ParamField body="innerFn" type="() => Promise<unknown>" required="true" >   The terminal function (the actual handler) called once the chain reaches its center. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="(ctx: MiddlewareContext) => Promise<unknown>" >   The outermost callable. Invoke it with a `MiddlewareContext` to run the chain. </ResponseField>
+
+**Signature**
+```ts wrap
+function composeMiddleware(entries: McpMiddlewareEntry[], method: string, innerFn: () => Promise<unknown>): (ctx: MiddlewareContext) => Promise<unknown>
+```
+
+### matchesPattern
+
+Test whether a registered middleware pattern matches a given MCP method. The pattern here is the value after the `mcp:` prefix has been stripped.
+
+Matching rules:
+- `"*"` matches any method.
+- A pattern ending in `"/*"` (such as `"tools/*"`) prefix-matches any method that starts with the part before the `*` (such as `"tools/"`). The match is computed by slicing off the trailing `*` and calling `method.startsWith(prefix)`.
+- Any other pattern (such as `"tools/call"`) is an exact match only.
+
+**Parameters**
+><ParamField body="pattern" type="string" required="true" >   The pattern to test, with the `mcp:` prefix already removed, e.g. `"*"`, `"tools/*"`, or `"tools/call"`. </ParamField>
+><ParamField body="method" type="string" required="true" >   The MCP method name to match against, e.g. `"tools/call"`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="boolean" >   `true` if the pattern matches the method. </ResponseField>
+
+**Signature**
+```ts wrap
+function matchesPattern(pattern: string, method: string): boolean
+```
+
+### MiddlewareContext
+
+The context passed to every MCP middleware handler. `params` is mutable: a middleware can modify it before calling `next()`, and those changes are visible to downstream middleware and to the handler. `state` is a shared `Map` for passing arbitrary data across middleware in the same request chain.
+
+**Properties**
+><ParamField body="method" type="string" required="true" >   MCP method name, e.g. `"tools/call"`, `"tools/list"`, `"resources/read"`. </ParamField>
+><ParamField body="params" type="Record<string, unknown>" required="true" >   JSON-RPC request params. Mutable: mutations are passed downstream. </ParamField>
+><ParamField body="session" type="{ sessionId: string }" >   Session info if available (HTTP transports only). </ParamField>
+><ParamField body="auth" type="AuthInfo" >   OAuth info extracted from the JWT. Present only when OAuth is configured; otherwise `undefined`. </ParamField>
+><ParamField body="state" type="Map<string, unknown>" required="true" >   Shared state map for passing data across middleware in the same request. </ParamField>
+
+**Signature**
+```ts wrap
+interface MiddlewareContext {
+  method: string;
+  params: Record<string, unknown>;
+  session?: { sessionId: string };
+  auth?: AuthInfo;
+  state: Map<string, unknown>;
+}
+```
+
+### McpMiddlewareFn
+
+A single MCP middleware function. Call `next()` to pass control to the next middleware (or the handler). Return its result, or return a different value to override the response, or throw an error to reject the request.
+
+**Parameters**
+><ParamField body="ctx" type="MiddlewareContext" required="true" >   The middleware context for the current operation. </ParamField>
+><ParamField body="next" type="() => Promise<unknown>" required="true" >   Advances the chain. Resolves with the result of the next middleware or the handler. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<unknown>" >   The (possibly overridden) result of the operation. </ResponseField>
+
+**Signature**
+```ts wrap
+type McpMiddlewareFn = (ctx: MiddlewareContext, next: () => Promise<unknown>) => Promise<unknown>
+```
+
+### McpMiddlewareFnFor
+
+A typed MCP middleware function whose `ctx` parameter is narrowed based on the pattern string `P`. When `P` is a key of [`McpMiddlewarePatternMap`](#mcpmiddlewarepatternmap) (`"tools/call"`, `"resources/read"`, or `"prompts/get"`), `ctx` is narrowed to the matching context type. For wildcard or unrecognized patterns it falls back to the base `McpMiddlewareFn` whose `ctx` is the base `MiddlewareContext`.
+
+**Type parameters**
+><ParamField body="P" type="extends string" required="true" >   The middleware pattern string used to select the narrowed context type. </ParamField>
+
+**Signature**
+```ts wrap
+type McpMiddlewareFnFor<P extends string> = P extends keyof McpMiddlewarePatternMap
+  ? (ctx: McpMiddlewarePatternMap[P], next: () => Promise<unknown>) => Promise<unknown>
+  : McpMiddlewareFn
+```
+
+### McpMiddlewarePatternMap
+
+Maps MCP middleware pattern strings to their narrowed context type. Used by [`McpMiddlewareFnFor`](#mcpmiddlewarefnfor) to infer the correct `ctx` parameter for a given pattern.
+
+**Properties**
+><ParamField body="tools/call" type="ToolsCallMiddlewareContext" required="true" >   Narrowed context for the `tools/call` method. </ParamField>
+><ParamField body="resources/read" type="ResourcesReadMiddlewareContext" required="true" >   Narrowed context for the `resources/read` method. </ParamField>
+><ParamField body="prompts/get" type="PromptsGetMiddlewareContext" required="true" >   Narrowed context for the `prompts/get` method. </ParamField>
+
+**Signature**
+```ts wrap
+interface McpMiddlewarePatternMap {
+  "tools/call": ToolsCallMiddlewareContext;
+  "resources/read": ResourcesReadMiddlewareContext;
+  "prompts/get": PromptsGetMiddlewareContext;
+}
+```
+
+### ToolsCallMiddlewareContext
+
+A [`MiddlewareContext`](#middlewarecontext) with `method` fixed to `"tools/call"` and `params` narrowed to the `tools/call` shape: `name` (the tool name), an optional `arguments` record, and an optional `_meta` record. The `params` type is intersected with `Record<string, unknown>` so arbitrary extra keys remain accessible.
+
+**Properties**
+><ParamField body="method" type='"tools/call"' required="true" >   Always the literal `"tools/call"`. </ParamField>
+><ParamField body="params" type="{ name: string; arguments?: Record<string, unknown>; _meta?: Record<string, unknown> } & Record<string, unknown>" required="true" >   The narrowed tool-call params. </ParamField>
+
+**Signature**
+```ts wrap
+interface ToolsCallMiddlewareContext extends MiddlewareContext {
+  method: "tools/call";
+  params: { name: string; arguments?: Record<string, unknown>; _meta?: Record<string, unknown> } & Record<string, unknown>;
+}
+```
+
+### ResourcesReadMiddlewareContext
+
+A [`MiddlewareContext`](#middlewarecontext) with `method` fixed to `"resources/read"` and `params` narrowed to the `resources/read` shape: `uri` (the resource URI) and an optional `_meta` record. The `params` type is intersected with `Record<string, unknown>` so extra keys remain accessible.
+
+**Properties**
+><ParamField body="method" type='"resources/read"' required="true" >   Always the literal `"resources/read"`. </ParamField>
+><ParamField body="params" type="{ uri: string; _meta?: Record<string, unknown> } & Record<string, unknown>" required="true" >   The narrowed resource-read params. </ParamField>
+
+**Signature**
+```ts wrap
+interface ResourcesReadMiddlewareContext extends MiddlewareContext {
+  method: "resources/read";
+  params: { uri: string; _meta?: Record<string, unknown> } & Record<string, unknown>;
+}
+```
+
+### PromptsGetMiddlewareContext
+
+A [`MiddlewareContext`](#middlewarecontext) with `method` fixed to `"prompts/get"` and `params` narrowed to the `prompts/get` shape: `name` (the prompt name), an optional `arguments` record of strings, and an optional `_meta` record. The `params` type is intersected with `Record<string, unknown>` so extra keys remain accessible.
+
+**Properties**
+><ParamField body="method" type='"prompts/get"' required="true" >   Always the literal `"prompts/get"`. </ParamField>
+><ParamField body="params" type="{ name: string; arguments?: Record<string, string>; _meta?: Record<string, unknown> } & Record<string, unknown>" required="true" >   The narrowed prompt-get params. </ParamField>
+
+**Signature**
+```ts wrap
+interface PromptsGetMiddlewareContext extends MiddlewareContext {
+  method: "prompts/get";
+  params: { name: string; arguments?: Record<string, string>; _meta?: Record<string, unknown> } & Record<string, unknown>;
+}
+```
+
+### McpMiddlewareEntry
+
+Internal storage entry for a registered MCP middleware. The pattern is stored with the `mcp:` prefix already stripped (e.g. `"tools/call"`, `"tools/*"`, or `"*"`). This is the element type consumed by [`composeMiddleware`](#composemiddleware).
+
+<Info>
+This interface is marked `@internal`. It is exported for advanced use and for typing custom middleware composition, but most servers register middleware through `server.use('mcp:...')` and never construct entries directly.
+</Info>
+
+**Properties**
+><ParamField body="pattern" type="string" required="true" >   Pattern after stripping `"mcp:"`, e.g. `"tools/call"`, `"tools/*"`, or `"*"`. </ParamField>
+><ParamField body="handler" type="McpMiddlewareFn" required="true" >   The middleware function to run for matching methods. </ParamField>
+
+**Signature**
+```ts wrap
+interface McpMiddlewareEntry {
+  pattern: string;
+  handler: McpMiddlewareFn;
+}
+```
+
+## HTTP middleware adapters
+
+Adapters that let you register either Express/Connect middleware or native Hono middleware on the server's underlying HTTP app. `server.use(...)` uses these internally to detect the middleware style and adapt accordingly, so the same `server.use(...)` call accepts both.
+
+```ts
+import {
+  adaptMiddleware,
+  adaptConnectMiddleware,
+  isExpressMiddleware,
+} from "mcp-use/server";
+```
+
+The example below registers both Express middleware from npm and native Hono middleware on the same server. `server.use(...)` detects each style and adapts it for you.
+
+```ts
+import { MCPServer, text } from "mcp-use/server";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
+
+const server = new MCPServer({
+  name: "express-middleware-example",
+  version: "1.0.0",
+});
+
+// Express middleware from npm
+server.use(morgan("combined"));
+server.use("/api", rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+
+// Hono middleware (c, next)
+server.use(async (c, next) => {
+  const start = Date.now();
+  await next();
+  console.log(`${c.req.method} ${c.req.path} - ${Date.now() - start}ms`);
+});
+
+await server.listen();
+```
+
+### isExpressMiddleware
+
+Detect whether a middleware function is Express/Connect style or Hono style. Express/Connect middleware has the signature `(req, res, next)` (or `(err, req, res, next)`); Hono middleware has the signature `(c, next)`.
+
+Detection combines function arity with body pattern matching against the stringified function:
+- A non-function (or falsy) value returns `false`.
+- Functions with 3 or 4 parameters are treated as Express/Connect and return `true` (the body is checked for Express patterns such as `res.send`, `res.json`, `req.body`, but it returns `true` for 3-4 parameter functions regardless).
+- Functions with exactly 2 parameters are treated as Hono and return `false`, unless the body contains Express-specific patterns (then `true`). Hono-specific patterns such as `c.req` or `c.json` confirm the Hono case (`false`).
+- Functions with any other parameter count (0, 1, or 5+) default to Hono and return `false`.
+
+**Parameters**
+><ParamField body="middleware" type="any" required="true" >   The middleware function to inspect. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="boolean" >   `true` if it is Express/Connect middleware, `false` if it is Hono middleware. </ResponseField>
+
+**Signature**
+```ts wrap
+function isExpressMiddleware(middleware: any): boolean
+```
+
+### adaptMiddleware
+
+Adapt a middleware function so it works with Hono. It calls [`isExpressMiddleware`](#isexpressmiddleware): if the input is Express/Connect style, it delegates to [`adaptConnectMiddleware`](#adaptconnectmiddleware) with the supplied path; otherwise it returns the middleware unchanged as a Hono `MiddlewareHandler`.
+
+**Parameters**
+><ParamField body="middleware" type="any" required="true" >   The middleware function (Express/Connect or Hono). </ParamField>
+><ParamField body="middlewarePath" type="string" default='"*"' >   The path pattern the middleware is mounted at. Only used when the middleware is Express/Connect. Defaults to `"*"`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<MiddlewareHandler>" >   A Hono middleware handler. </ResponseField>
+
+**Signature**
+```ts wrap
+function adaptMiddleware(middleware: any, middlewarePath?: string): Promise<MiddlewareHandler>
+```
+
+### adaptConnectMiddleware
+
+Adapt a Connect/Express middleware handler to a Hono `MiddlewareHandler`. It dynamically imports `node-mocks-http` to build a mock `IncomingMessage`/`ServerResponse` pair, runs the Connect middleware against them, and translates the result back into a Hono response.
+
+Behavior to note:
+- The `middlewarePath` is normalized by stripping a trailing `*` and a trailing `/`, then that prefix is removed from the request pathname so the Connect middleware sees the path without its mount prefix.
+- If the Connect middleware ends the response (calls `res.end`), the captured status, headers, and body become the Hono response. Status codes `204` and `304` are sent without a body.
+- If the Connect middleware calls `next()` without ending the response, control passes to Hono's `next()` so the request continues down the chain.
+
+**Parameters**
+><ParamField body="connectMiddleware" type="any" required="true" >   The Connect/Express middleware handler to adapt. </ParamField>
+><ParamField body="middlewarePath" type="string" required="true" >   The path pattern the middleware is mounted at, e.g. `"/mcp-use/widgets/*"`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<MiddlewareHandler>" >   A Hono middleware handler wrapping the Connect middleware. </ResponseField>
+
+**Signature**
+```ts wrap
+function adaptConnectMiddleware(connectMiddleware: any, middlewarePath: string): Promise<MiddlewareHandler>
+```
+
+## CORS proxy
+
+A CORS proxy for browser-based MCP clients that need to connect to remote MCP servers which do not support CORS or require server-side forwarding. Mount it onto a Hono app with `mountMcpProxy`.
+
+```ts
+import { mountMcpProxy } from "mcp-use/server";
+```
+
+### mountMcpProxy
+
+Mount the MCP proxy middleware on a Hono app. The proxy reads a target URL from the `X-Target-URL` header (or from an `__mcp_target` query parameter used for OAuth discovery, which takes precedence), forwards the request to that target with sanitized headers, and streams the response back to the client. It enables CORS (exposing all response headers, with `Authorization` allowed explicitly), handles SSE streaming, manages redirects manually to avoid `ArrayBuffer` detachment, and rewrites the `resource` field on OAuth discovery responses to match the proxy URL. Returns `void`.
+
+The proxy registers routes under `options.path` (default `"/mcp/proxy"`): a CORS handler and an optional logger on the `path/*` glob, plus a catch-all handler for every HTTP method on that same glob.
+
+Error and status behavior:
+- Missing target URL responds `400` with an `X-Target-URL header is required` error.
+- An invalid target URL format responds `400`.
+- When `authenticate` returns false, responds `401` (`Unauthorized`).
+- When `validateRequest` returns false, responds `403` (`Invalid target URL`).
+- Upstream failures respond `500`; connection-refused errors (`ECONNREFUSED` or `fetch failed`) are logged as a warning rather than an error.
+
+<Warning>
+This proxy does not implement authentication by default. For production use, provide an `authenticate` function or restrict access to localhost only.
+</Warning>
+
+**Parameters**
+><ParamField body="app" type="Hono" required="true" >   The Hono application instance to mount the proxy on. </ParamField>
+><ParamField body="options" type="McpProxyOptions" default="{}" >   Proxy configuration. Defaults to an empty object. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+function mountMcpProxy(app: Hono, options?: McpProxyOptions): void
+```
+
+```ts
+import { Hono } from "hono";
+import { mountMcpProxy } from "mcp-use/server";
+
+const app = new Hono();
+
+// With authentication and target validation
+mountMcpProxy(app, {
+  path: "/api/proxy",
+  authenticate: async (c) => {
+    const token = c.req.header("Authorization");
+    return token === `Bearer ${process.env.SECRET_TOKEN}`;
+  },
+  validateRequest: (targetUrl) => targetUrl.startsWith("https://mcp.example.com"),
+});
+```
+
+### McpProxyOptions
+
+Configuration for [`mountMcpProxy`](#mountmcpproxy). Every field is optional.
+
+**Properties**
+><ParamField body="path" type="string" default='"/mcp/proxy"' >   Route path for the proxy endpoint, e.g. `"/inspector/api/proxy"`. </ParamField>
+><ParamField body="authenticate" type="(c: Context) => Promise<boolean> | boolean" >   Optional authentication function. Return `true` to allow the request, `false` to reject with `401`. </ParamField>
+><ParamField body="validateRequest" type="(targetUrl: string, c: Context) => Promise<boolean> | boolean" >   Optional validator checking whether the target URL is allowed. Return `true` to allow, `false` to reject with `403`. </ParamField>
+><ParamField body="enableLogging" type="boolean" default="true" >   Enable request logging. Disabled only when explicitly set to `false`. </ParamField>
+
+**Signature**
+```ts wrap
+interface McpProxyOptions {
+  path?: string;
+  authenticate?: (c: Context) => Promise<boolean> | boolean;
+  validateRequest?: (targetUrl: string, c: Context) => Promise<boolean> | boolean;
+  enableLogging?: boolean;
+}
+```
+
+## See also
+
+<CardGroup cols={2}>
+  <Card title="MCPServer" icon="server" href="/typescript/api-reference/server/mcp-server">
+    The server class whose `use(...)` method registers the middleware documented here.
+  </Card>
+  <Card title="Source on GitHub" icon="github" href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/middleware/mcp-middleware.ts">
+    Full middleware and proxy implementation.
+  </Card>
+</CardGroup>

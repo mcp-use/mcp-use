@@ -1,0 +1,400 @@
+---
+title: "Elicitation schemas"
+description: "Helpers and types for building enum-style elicitation field schemas API Documentation"
+icon: "list-checks"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/elicitation-helpers.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/elicitation-helpers.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/utils/elicitation-helpers.ts</a>
+</Callout>
+
+Elicitation schema helpers (SEP-1330). These helpers generate JSON Schema fragments for enum-style elicitation fields. They are intended for use with the verbose ``ctx.elicit({ requestedSchema })`` API, where you pass a raw MCP elicitation schema instead of a Zod object.
+
+Each function is a pure builder: it takes plain arrays of values or options and returns a JSON Schema fragment object. None of them throw, none mutate their inputs (value arrays are copied), and there are no defaults or hidden limits. Compose field builders into a top-level object schema with `enumSchema`, then pass it as `requestedSchema`.
+
+All functions and types on this page are exported from `mcp-use/server`.
+
+```ts wrap
+import {
+  enumSchema,
+  untitledEnum,
+  titledEnum,
+  legacyEnum,
+  untitledMultiEnum,
+  titledMultiEnum,
+} from "mcp-use/server";
+```
+
+The example below sets up a server using `new MCPServer({ ... })` and uses these helpers to build a `requestedSchema` passed to the verbose `ctx.elicit` call.
+
+```ts wrap
+import { error, MCPServer, text, enumSchema, titledEnum, untitledMultiEnum } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "elicitation-example-server",
+  version: "1.0.0",
+  description: "An MCP server example demonstrating elicitation capabilities",
+});
+
+server.tool(
+  {
+    name: "pick-options",
+    description: "Collect a plan and feature selection via enum elicitation.",
+  },
+  async (params, ctx) => {
+    const requestedSchema = enumSchema({
+      plan: titledEnum([
+        { value: "free", title: "Free" },
+        { value: "pro", title: "Pro" },
+      ]),
+      features: untitledMultiEnum(["analytics", "exports", "sso"]),
+    });
+
+    const result = await ctx.elicit({
+      message: "Choose your plan and features",
+      requestedSchema,
+    });
+
+    if (result.action === "accept") {
+      return text(`Received: ${JSON.stringify(result.data)}`);
+    }
+    return error("User declined or cancelled");
+  }
+);
+
+await server.listen();
+```
+
+## Functions
+
+### enumSchema
+
+Build a top-level object schema for an elicitation `requestedSchema`.
+
+```ts
+import { enumSchema } from "mcp-use/server";
+```
+
+Wraps a map of field names to enum field schemas into a single object schema suitable for the `requestedSchema` argument of the verbose `ctx.elicit` call. The returned object always has `type: "object"` and its `properties` is exactly the `fields` map you pass in (it is assigned by reference, not copied). Pass an empty object to produce a schema with no properties. The values you supply should be built with the field helpers below (`untitledEnum`, `titledEnum`, `legacyEnum`, `untitledMultiEnum`, `titledMultiEnum`).
+
+**Parameters**
+><ParamField body="fields" type="Record<string, ElicitationEnumFieldSchema>" required="True" >   Map of field name to enum field schema. See [`ElicitationEnumFieldSchema`](/typescript/api-reference/server/elicitation-schemas#elicitationenumfieldschema). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="ElicitationEnumObjectSchema" >   Object schema with <code>type: "object"</code> and the given <code>properties</code>. See [`ElicitationEnumObjectSchema`](/typescript/api-reference/server/elicitation-schemas#elicitationenumobjectschema). </ResponseField>
+
+**Signature**
+```ts wrap
+function enumSchema(fields: Record<string, ElicitationEnumFieldSchema>): ElicitationEnumObjectSchema
+```
+
+### untitledEnum
+
+Build an untitled single-select enum field schema.
+
+```ts
+import { untitledEnum } from "mcp-use/server";
+```
+
+Produces a single-select string enum with no display titles, where the raw values are shown to the user. The returned schema has `type: "string"` and an `enum` array. The `values` array is shallow-copied into the result (via `[...values]`), so later mutation of the input does not affect the returned schema. An empty `values` array yields `{ type: "string", enum: [] }`. The result is an example of `{ type: "string", enum: ["a", "b"] }`.
+
+**Parameters**
+><ParamField body="values" type="string[]" required="True" >   The allowed string values for the single-select enum. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="UntitledEnumSchema" >   See [`UntitledEnumSchema`](/typescript/api-reference/server/elicitation-schemas#untitledenumschema). </ResponseField>
+
+**Signature**
+```ts wrap
+function untitledEnum(values: string[]): UntitledEnumSchema
+```
+
+### titledEnum
+
+Build a titled single-select enum field schema.
+
+```ts
+import { titledEnum } from "mcp-use/server";
+```
+
+Produces a single-select string enum with human-readable display titles. The returned schema has `type: "string"` and a `oneOf` array, where each entry is mapped from an option to `{ const: option.value, title: option.title }`. This is the recommended titled form under SEP-1330 (prefer it over `legacyEnum`). An empty `options` array yields an empty `oneOf`. The result is an example of `{ type: "string", oneOf: [{ const: "a", title: "Option A" }] }`.
+
+**Parameters**
+><ParamField body="options" type="EnumOption[]" required="True" >   Options with <code>value</code> and <code>title</code>. See [`EnumOption`](/typescript/api-reference/server/elicitation-schemas#enumoption). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="TitledEnumSchema" >   See [`TitledEnumSchema`](/typescript/api-reference/server/elicitation-schemas#titledenumschema). </ResponseField>
+
+**Signature**
+```ts wrap
+function titledEnum(options: EnumOption[]): TitledEnumSchema
+```
+
+### legacyEnum
+
+Build a legacy titled single-select enum field schema.
+
+```ts
+import { legacyEnum } from "mcp-use/server";
+```
+
+Produces a single-select string enum using the legacy `enum` plus `enumNames` form. This form is deprecated in SEP-1330 but still supported, prefer [`titledEnum`](/typescript/api-reference/server/elicitation-schemas#titledenum) for new code. The returned schema has `type: "string"`, an `enum` array mapped from `option.value`, and an `enumNames` array mapped from `option.name` (positionally aligned). An empty `options` array yields empty `enum` and `enumNames` arrays. The result is an example of `{ type: "string", enum: ["a"], enumNames: ["Option A"] }`.
+
+**Parameters**
+><ParamField body="options" type="LegacyEnumOption[]" required="True" >   Options with <code>value</code> and <code>name</code>. See [`LegacyEnumOption`](/typescript/api-reference/server/elicitation-schemas#legacyenumoption). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="LegacyEnumSchema" >   See [`LegacyEnumSchema`](/typescript/api-reference/server/elicitation-schemas#legacyenumschema). </ResponseField>
+
+**Signature**
+```ts wrap
+function legacyEnum(options: LegacyEnumOption[]): LegacyEnumSchema
+```
+
+### untitledMultiEnum
+
+Build an untitled multi-select enum field schema.
+
+```ts
+import { untitledMultiEnum } from "mcp-use/server";
+```
+
+Produces a multi-select (array) enum with no display titles. The returned schema has `type: "array"` and `items` set to `{ type: "string", enum: [...values] }`, so the `values` array is shallow-copied into `items.enum` and later mutation of the input does not affect the result. An empty `values` array yields `items` with an empty `enum`. The result is an example of `{ type: "array", items: { type: "string", enum: ["a", "b"] } }`.
+
+**Parameters**
+><ParamField body="values" type="string[]" required="True" >   The allowed string values for the multi-select enum. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="UntitledMultiEnumSchema" >   See [`UntitledMultiEnumSchema`](/typescript/api-reference/server/elicitation-schemas#untitledmultienumschema). </ResponseField>
+
+**Signature**
+```ts wrap
+function untitledMultiEnum(values: string[]): UntitledMultiEnumSchema
+```
+
+### titledMultiEnum
+
+Build a titled multi-select enum field schema.
+
+```ts
+import { titledMultiEnum } from "mcp-use/server";
+```
+
+Produces a multi-select (array) enum with human-readable display titles. The returned schema has `type: "array"` and `items` set to `{ anyOf: [...] }`, where each entry is mapped from an option to `{ const: option.value, title: option.title }`. An empty `options` array yields `items` with an empty `anyOf`. The result is an example of `{ type: "array", items: { anyOf: [{ const: "a", title: "Option A" }] } }`.
+
+**Parameters**
+><ParamField body="options" type="EnumOption[]" required="True" >   Options with <code>value</code> and <code>title</code>. See [`EnumOption`](/typescript/api-reference/server/elicitation-schemas#enumoption). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="TitledMultiEnumSchema" >   See [`TitledMultiEnumSchema`](/typescript/api-reference/server/elicitation-schemas#titledmultienumschema). </ResponseField>
+
+**Signature**
+```ts wrap
+function titledMultiEnum(options: EnumOption[]): TitledMultiEnumSchema
+```
+
+## Types
+
+### EnumOption
+
+A single titled enum option used by `titledEnum` and `titledMultiEnum`.
+
+```ts
+import type { EnumOption } from "mcp-use/server";
+```
+
+Describes one option of a titled enum: the underlying machine value and the human-readable display title. Used as the element type of the `options` argument to [`titledEnum`](/typescript/api-reference/server/elicitation-schemas#titledenum) and [`titledMultiEnum`](/typescript/api-reference/server/elicitation-schemas#titledmultienum).
+
+**Properties**
+><ParamField body="value" type="string" required="True" >   The underlying value sent back when this option is selected. </ParamField>
+><ParamField body="title" type="string" required="True" >   The human-readable display title for this option. </ParamField>
+
+**Definition**
+```ts wrap
+interface EnumOption {
+  value: string;
+  title: string;
+}
+```
+
+### LegacyEnumOption
+
+A single titled enum option used by `legacyEnum`.
+
+```ts
+import type { LegacyEnumOption } from "mcp-use/server";
+```
+
+Describes one option for the legacy `enum` plus `enumNames` form. It is identical to [`EnumOption`](/typescript/api-reference/server/elicitation-schemas#enumoption) except the display label field is named `name` instead of `title`. Used as the element type of the `options` argument to [`legacyEnum`](/typescript/api-reference/server/elicitation-schemas#legacyenum).
+
+**Properties**
+><ParamField body="value" type="string" required="True" >   The underlying value sent back when this option is selected. </ParamField>
+><ParamField body="name" type="string" required="True" >   The human-readable display label for this option. </ParamField>
+
+**Definition**
+```ts wrap
+interface LegacyEnumOption {
+  value: string;
+  name: string;
+}
+```
+
+### UntitledEnumSchema
+
+JSON Schema fragment for an untitled single-select enum.
+
+```ts
+import type { UntitledEnumSchema } from "mcp-use/server";
+```
+
+The return type of [`untitledEnum`](/typescript/api-reference/server/elicitation-schemas#untitledenum). Represents a single-select string field whose allowed values are listed directly in `enum`, with no separate display titles.
+
+**Properties**
+><ParamField body="type" type='"string"' required="True" >   Always the literal <code>"string"</code>. </ParamField>
+><ParamField body="enum" type="string[]" required="True" >   The allowed string values. </ParamField>
+
+**Definition**
+```ts wrap
+interface UntitledEnumSchema {
+  type: "string";
+  enum: string[];
+}
+```
+
+### TitledEnumSchema
+
+JSON Schema fragment for a titled single-select enum.
+
+```ts
+import type { TitledEnumSchema } from "mcp-use/server";
+```
+
+The return type of [`titledEnum`](/typescript/api-reference/server/elicitation-schemas#titledenum). Represents a single-select string field where each allowed value carries a display title, expressed as a `oneOf` array of `{ const, title }` entries.
+
+**Properties**
+><ParamField body="type" type='"string"' required="True" >   Always the literal <code>"string"</code>. </ParamField>
+><ParamField body="oneOf" type="Array<{ const: string; title: string }>" required="True" >   One entry per allowed value, each with a <code>const</code> value and a <code>title</code>. </ParamField>
+
+**Definition**
+```ts wrap
+interface TitledEnumSchema {
+  type: "string";
+  oneOf: Array<{ const: string; title: string }>;
+}
+```
+
+### LegacyEnumSchema
+
+JSON Schema fragment for a legacy titled single-select enum.
+
+```ts
+import type { LegacyEnumSchema } from "mcp-use/server";
+```
+
+The return type of [`legacyEnum`](/typescript/api-reference/server/elicitation-schemas#legacyenum). Represents a single-select string field using the deprecated `enum` plus `enumNames` form, where `enum[i]` is the value and `enumNames[i]` is its display label.
+
+**Properties**
+><ParamField body="type" type='"string"' required="True" >   Always the literal <code>"string"</code>. </ParamField>
+><ParamField body="enum" type="string[]" required="True" >   The allowed string values. </ParamField>
+><ParamField body="enumNames" type="string[]" required="True" >   Display labels, positionally aligned with <code>enum</code>. </ParamField>
+
+**Definition**
+```ts wrap
+interface LegacyEnumSchema {
+  type: "string";
+  enum: string[];
+  enumNames: string[];
+}
+```
+
+### UntitledMultiEnumSchema
+
+JSON Schema fragment for an untitled multi-select enum.
+
+```ts
+import type { UntitledMultiEnumSchema } from "mcp-use/server";
+```
+
+The return type of [`untitledMultiEnum`](/typescript/api-reference/server/elicitation-schemas#untitledmultienum). Represents a multi-select (array) field whose items are a single-select string enum with no display titles.
+
+**Properties**
+><ParamField body="type" type='"array"' required="True" >   Always the literal <code>"array"</code>. </ParamField>
+><ParamField body="items" type='{ type: "string"; enum: string[] }' required="True" >   The item schema: a string enum of allowed values. </ParamField>
+
+**Definition**
+```ts wrap
+interface UntitledMultiEnumSchema {
+  type: "array";
+  items: {
+    type: "string";
+    enum: string[];
+  };
+}
+```
+
+### TitledMultiEnumSchema
+
+JSON Schema fragment for a titled multi-select enum.
+
+```ts
+import type { TitledMultiEnumSchema } from "mcp-use/server";
+```
+
+The return type of [`titledMultiEnum`](/typescript/api-reference/server/elicitation-schemas#titledmultienum). Represents a multi-select (array) field whose items carry display titles, expressed as an `anyOf` array of `{ const, title }` entries.
+
+**Properties**
+><ParamField body="type" type='"array"' required="True" >   Always the literal <code>"array"</code>. </ParamField>
+><ParamField body="items" type="{ anyOf: Array<{ const: string; title: string }> }" required="True" >   The item schema: an <code>anyOf</code> of titled <code>const</code> entries. </ParamField>
+
+**Definition**
+```ts wrap
+interface TitledMultiEnumSchema {
+  type: "array";
+  items: {
+    anyOf: Array<{ const: string; title: string }>;
+  };
+}
+```
+
+### ElicitationEnumFieldSchema
+
+Union of every enum field schema produced by the field helpers.
+
+```ts
+import type { ElicitationEnumFieldSchema } from "mcp-use/server";
+```
+
+A discriminated union of all enum field schema shapes that can appear as a property in an elicitation object schema. It is the value type of the `fields` argument to [`enumSchema`](/typescript/api-reference/server/elicitation-schemas#enumschema) and of `properties` in [`ElicitationEnumObjectSchema`](/typescript/api-reference/server/elicitation-schemas#elicitationenumobjectschema). Each member is the return type of one field helper above.
+
+**Definition**
+```ts wrap
+type ElicitationEnumFieldSchema =
+  | UntitledEnumSchema
+  | TitledEnumSchema
+  | LegacyEnumSchema
+  | UntitledMultiEnumSchema
+  | TitledMultiEnumSchema;
+```
+
+### ElicitationEnumObjectSchema
+
+Top-level object schema returned by `enumSchema`.
+
+```ts
+import type { ElicitationEnumObjectSchema } from "mcp-use/server";
+```
+
+The return type of [`enumSchema`](/typescript/api-reference/server/elicitation-schemas#enumschema). Represents the top-level object schema you pass as `requestedSchema` to the verbose `ctx.elicit` call, mapping each field name to an [`ElicitationEnumFieldSchema`](/typescript/api-reference/server/elicitation-schemas#elicitationenumfieldschema).
+
+**Properties**
+><ParamField body="type" type='"object"' required="True" >   Always the literal <code>"object"</code>. </ParamField>
+><ParamField body="properties" type="Record<string, ElicitationEnumFieldSchema>" required="True" >   Map of field name to enum field schema. </ParamField>
+
+**Definition**
+```ts wrap
+interface ElicitationEnumObjectSchema {
+  type: "object";
+  properties: Record<string, ElicitationEnumFieldSchema>;
+}
+```

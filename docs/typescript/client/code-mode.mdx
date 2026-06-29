@@ -2,7 +2,6 @@
 title: "Code Mode"
 description: "Enable AI agents to write code for tool interactions"
 icon: "code"
-tag: "New"
 ---
 
 Code Mode enables AI agents to interact with MCP tools by writing and executing JavaScript/TypeScript code instead of making individual tool calls. This dramatically improves efficiency for complex tasks, data processing, and multi-step workflows.
@@ -394,133 +393,17 @@ try {
 }
 ```
 
-## API Reference
-
-### MCPClientOptions
-
-```typescript
-interface MCPClientOptions {
-  // Enable code mode with boolean (uses default VM executor)
-  // OR provide detailed configuration
-  codeMode?: boolean | CodeModeConfig;
-}
-
-interface CodeModeConfig {
-  // Enable code execution mode
-  enabled: boolean;
-
-  // Executor type: "vm" (default), "e2b", custom function, or BaseCodeExecutor instance
-  executor?: "vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor;
-
-  // Executor-specific options (type-safe based on executor choice)
-  executorOptions?: VMExecutorOptions | E2BExecutorOptions;
-}
-
-// VM executor options
-interface VMExecutorOptions {
-  timeoutMs?: number; // Default: 30000 (30 seconds)
-  memoryLimitMb?: number; // Optional memory limit
-}
-
-// E2B executor options
-interface E2BExecutorOptions {
-  apiKey: string; // Required
-  timeoutMs?: number; // Default: 300000 (5 minutes)
-}
-```
-
-### ExecutionResult
-
-```typescript
-interface ExecutionResult {
-  // The return value from the executed code
-  result: unknown;
-
-  // Console output (log, error, warn, etc.)
-  logs: string[];
-
-  // Error message if execution failed, null otherwise
-  error: string | null;
-
-  // Execution duration in seconds
-  execution_time: number;
-}
-```
-
-### MCPClient Methods
-
-```typescript
-class MCPClient {
-  // Execute code with MCP tool access
-  async executeCode(code: string, timeout?: number): Promise<ExecutionResult>;
-
-  // Search available tools (used internally by code execution)
-  async searchTools(
-    query?: string,
-    detailLevel?: "names" | "descriptions" | "full"
-  ): Promise<ToolSearchResponse>;
-
-  // Clean up resources (E2B sandboxes, MCP sessions)
-  async close(): Promise<void>;
-}
-```
-
-### ToolSearchResponse
-
-```typescript
-interface ToolSearchMeta {
-  total_tools: number;      // Total number of tools across all servers
-  namespaces: string[];     // List of server namespaces
-  result_count: number;    // Number of tools matching the query
-}
-
-interface ToolSearchResponse {
-  meta: ToolSearchMeta;
-  results: ToolSearchResult[];
-}
-
-interface ToolSearchResult {
-  name: string;             // Tool name
-  server: string;           // Server namespace
-  description?: string;     // Tool description (if detailLevel >= "descriptions")
-  input_schema?: object;   // JSON Schema for inputs (if detailLevel === "full")
-}
-```
-
-### BaseCodeExecutor (for custom executors)
-
-```typescript
-abstract class BaseCodeExecutor {
-  constructor(client: MCPClient);
-
-  // Execute code with access to MCP tools
-  abstract execute(code: string, timeout?: number): Promise<ExecutionResult>;
-
-  // Clean up resources
-  abstract cleanup(): Promise<void>;
-
-  // Get tool namespace information
-  protected getToolNamespaces(): ToolNamespaceInfo[];
-
-  // Ensure MCP servers are connected
-  protected async ensureServersConnected(): Promise<void>;
-
-  // Create search function for runtime tool discovery
-  public createSearchToolsFunction(): SearchToolsFunction;
-}
-```
-
 ## Complete Examples
 
 
-**VM Executor Example:** See [`examples/client/code_mode_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client/code_mode_example.ts) for a complete working example using the default VM executor with the filesystem MCP server.
+**VM Executor Example:** See [`examples/agent/code-mode/code_mode_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/agent/code-mode/code_mode_example.ts) for a complete working example using the default VM executor with the filesystem MCP server.
 
 
-**E2B Executor Example:** See [`examples/client/code_mode_e2b_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/client/code_mode_e2b_example.ts) for a complete working example using E2B cloud sandboxes.
-
+**E2B Executor Example:** See [`examples/agent/code-mode/code_mode_e2b_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/agent/code-mode/code_mode_e2b_example.ts) for a complete working example using E2B cloud sandboxes.
 
 ## Further Reading
 
+- [Code Mode API reference](/typescript/api-reference/client/code-mode) - `MCPClientOptions`, `CodeModeConfig`, executor options, `ExecutionResult`, `ToolSearchResponse`, and `BaseCodeExecutor` signatures
 - [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) - Research and motivation
 - [MCP Specification](https://modelcontextprotocol.io/specification) - MCP protocol details
 - [E2B Documentation](https://e2b.dev/docs) - E2B sandbox platform

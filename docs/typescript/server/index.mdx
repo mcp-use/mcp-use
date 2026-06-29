@@ -1,216 +1,251 @@
 ---
-title: "Introduction"
-description: "Build MCP servers with mcp-use server framework"
+title: "Overview"
+description: "Build TypeScript MCP servers with tools, resources, prompts, widgets, auth, sessions, and deployments."
 icon: "list-start"
 ---
 
-# MCP Server
+Use the mcp-use TypeScript server framework when you want to build an MCP server with tools, resources, prompts, or interactive MCP App widgets.
 
-**mcp-use** has a complete MCP server framework implementation for TypeScript. 
-It improves the official Model Context Protocol SDK with many developer friendly features. In addition, it supports all official MCP features and achieves a conformance score of 100% based on the official MCP Conformance Tests.
+If you are starting from scratch, use the [TypeScript quickstart](/typescript/getting-started/quickstart) to scaffold a server. Use [Build your first MCP App](/typescript/mcp-apps/quickstart) when the server should return React widgets.
 
-## Key Features
+## What mcp-use adds
 
-- **Full MCP compatibility**: MCP servers built with mcp-use are 100% compatible with the MCP specs.
-- **MCP Apps support**: UI widgets are compatible with MCP Apps for all compatible clients (ChatGPT, Claude, etc.). [UI Widgets](/typescript/server/mcp-apps).
-- **Edge runtime support**: Built-in Edge runtime support
-- **Built-in Inspector**: A built-in MCP inspector launches automatically so you can test your server immediately. See [MCP Inspector](/inspector) for more details.
-- **Hot Module Reloading**: Add, remove, or update tools, prompts, and resources without restarting the server or dropping connections.
-- **One command to get started**: Use `npx create-mcp-use-app` command to scaffold a complete MCP server.
+- **One-command scaffolding:** `npx create-mcp-use-app` creates a runnable server with scripts, TypeScript config, examples, and optional widgets.
+- **Inspector-first development:** `npm run dev` serves the MCP endpoint and Inspector so you can test tools, resources, prompts, and widgets locally.
+- **Hot reload:** tools, resources, prompts, and widgets update during development without restarting the server or dropping client sessions.
+- **Typed server primitives:** tools, prompts, and resource templates use Zod schemas for validation and TypeScript inference.
+- **MCP Apps support:** create interactive experiences in MCP Apps-compatible clients and ChatGPT.
 
-## Installation
+## Core server concepts
 
-### Using create-mcp-use-app (recommended)
+### Server instance
 
-The easiest way to get started is to use the `create-mcp-use-app` command, which scaffolds a complete MCP server project with all necessary configuration:
+Create one `MCPServer` instance in your entry file. It owns MCP registration, the Hono app, the HTTP transport, session handling, and local development routes.
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "inventory-server",
+  title: "Inventory Server",
+  version: "1.0.0",
+  description: "Look up products and prepare inventory summaries",
+  instructions:
+    "Call search-products before get-product-details. Confirm availability before preparing an order.",
+  baseUrl: process.env.MCP_URL || "http://localhost:3000",
+});
+```
+
+`instructions` are returned during MCP initialization. Use them for server-wide workflow guidance that does not belong in a single tool description.
+
+### Tools
+
+Tools are functions clients can invoke. Use tools for actions, lookups, and workflows.
+
+```typescript
+import { text } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool(
+  {
+    name: "get-time",
+    description: "Return the current server time as an ISO timestamp",
+    schema: z.object({}),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  async () => text(new Date().toISOString()),
+);
+```
+
+Learn more in [Tools](/typescript/server/tools).
+
+### Resources
+
+Resources expose readable content by URI. Use resources for configuration, documents, generated data, or files that clients should inspect.
+
+```typescript
+import { object } from "mcp-use/server";
+
+server.resource(
+  {
+    name: "inventory-summary",
+    uri: "inventory://summary",
+    title: "Inventory Summary",
+    description: "Current warehouse inventory totals",
+  },
+  async () =>
+    object({
+      warehouses: 3,
+      products: 1284,
+      lowStockItems: 17,
+    }),
+);
+```
+
+Learn more in [Resources](/typescript/server/resources).
+
+### Prompts
+
+Prompts are reusable templates for model interactions. Use prompts when you want clients to reuse a structured model instruction with typed arguments.
+
+```typescript
+import { text } from "mcp-use/server";
+import { z } from "zod";
+
+server.prompt(
+  {
+    name: "summarize-inventory",
+    description: "Create an inventory summary for a specific audience",
+    schema: z.object({
+      audience: z.enum(["operations", "finance", "support"]),
+      timeframe: z.string().describe("Reporting period, such as today or Q2"),
+    }),
+  },
+  async ({ audience, timeframe }) =>
+    text(
+      `Summarize inventory changes for ${audience} during ${timeframe}. Include risks, causes, and next actions.`,
+    ),
+);
+```
+
+Learn more in [Prompts](/typescript/server/prompts).
+
+### MCP Apps
+
+MCP Apps are React components rendered from MCP tool results. Put the component in `resources/<widget-name>/widget.tsx`, read data with `useWidget()`, and handle the initial loading state before reading props.
+
+```tsx
+// resources/product-search-result/widget.tsx
+import React from "react";
+import { useWidget } from "mcp-use/react";
+
+type ProductSearchResultProps = {
+  query: string;
+  results: { id: string; name: string }[];
+};
+
+const ProductSearchResult: React.FC = () => {
+  const { props, isPending } = useWidget<ProductSearchResultProps>();
+
+  if (isPending) {
+    return <div className="p-4">Loading...</div>;
+  }
+
+  const query = props.query ?? "";
+  const results = props.results ?? [];
+
+  return (
+    <div className="p-4">
+      <h3>Results for "{query}"</h3>
+      <ul>
+        {results.map((result) => (
+          <li key={result.id}>{result.name}</li>
+        ))}
+      </ul>
+    </div>
+  );
+};
+
+export default ProductSearchResult;
+```
+
+The recommended server pattern is to define a custom tool with a `widget: { name }` config and return `widget({ props, output })` from the handler.
+
+```typescript
+import { text, widget } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool(
+  {
+    name: "search-products",
+    description: "Search products and display the results in a widget",
+    schema: z.object({
+      query: z.string().describe("Search term"),
+    }),
+    outputSchema: z.object({
+      query: z.string(),
+      results: z.array(z.object({ id: z.string(), name: z.string() })),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+    widget: {
+      name: "product-search-result",
+      invoking: "Searching...",
+      invoked: "Results loaded",
+    },
+  },
+  async ({ query }) => {
+    const results = await searchProducts(query);
+
+    return widget({
+      props: { query, results },
+      output: text(`Found ${results.length} products for "${query}"`),
+    });
+  },
+);
+```
+
+Learn more in [MCP Apps](/typescript/mcp-apps) and [useWidget()](/typescript/api-reference/react/usewidget).
+
+## Local development loop
+
+Run the dev server from a scaffolded project:
 
 ```bash
-npx create-mcp-use-app my-mcp-server
-cd my-mcp-server
 npm run dev
 ```
 
-### Project Structure
+By default, local development gives you:
 
-After creation, your project will have this structure:
+| URL                               | Purpose                                                          |
+| --------------------------------- | ---------------------------------------------------------------- |
+| `http://localhost:3000/mcp`       | MCP endpoint for clients.                                        |
+| `http://localhost:3000/inspector` | Inspector UI for testing tools, resources, prompts, and widgets. |
 
-```
-my-mcp-server/
-├── resources/                    # React widgets for Apps SDK and MCP-UI
-│   ├── product-search-result/   # Example widget (folder name = widget name)
-│   │   ├── widget.tsx            # Main widget component
-│   │   ├── types.ts              # Props and types
-│   │   ├── components/           # Optional subcomponents
-│   │   └── hooks/                # Optional hooks
-│   └── styles.css               # Shared styles
-├── public/                       # Static assets (icons, favicon, etc.)
-│   ├── icon.svg                  # Server icon (mcp-use branding by default)
-│   └── favicon.ico               # Browser favicon
-├── index.ts                      # MCP server entry point
-├── package.json
-├── tsconfig.json
-└── README.md
-```
+Keep the Inspector open while editing `index.ts` and files under `resources/`. The dev server hot-reloads registrations and widget assets.
 
-### Running Your MCP Server
-
-Commands:
-
-```bash
-npm run dev   # start the development server
-npm run build # build the server
-npm run start # start the production server
-npm run deploy # deploy the server to Manufact Cloud
-```
-
-When you run your MCP server, it will be available at:
-- **MCP Endpoint**: `http://localhost:3000/mcp` - For MCP client connections
-- **MCP Inspector**: `http://localhost:3000/inspector` 
-
-### Hot Module Reloading (HMR)
-
-The development server supports Hot Module Reloading for tools, prompts, and resources. When you modify your server file, changes are applied instantly without restarting the server or dropping client connections.
-
-```bash
-# HMR is enabled by default
-npm run dev
-```
-
-**What HMR does:**
-- **Add tools/prompts/resources**: New registrations appear immediately
-- **Update existing ones**: Changes to descriptions, schemas, or handlers are applied in-place
-- **Remove registrations**: Deleted tools/prompts/resources are removed from the server
-- **Notify clients**: Connected clients (like the Inspector) receive `list_changed` notifications and auto-refresh
-
-This means you can keep the Inspector open, modify your server code, and see your changes reflected immediately without losing your session.
-
-### Deploy Your MCP Server
-You can deploy your MCP server on any platform. Build your MCP server with `npm run build` and start the production server with `npm run start`.
-Or you can deploy it on [Manufact Cloud](https://manufact.com).
-For detailed instructions, see the [Deploy Your Server](/typescript/server/deployment/mcp-use) guide.
-
-
-
-
-### Next Steps
-
-- [Core features](/typescript/server/tools): Learn how to create MCP tools, prompts and resources.
-- [UI Widgets](/typescript/server/mcp-apps): Expose UI components to chat clients compatible with ChatGPT Apps SDK and MCP-UI.
-- [Configuration](/typescript/server/configuration): Advanced configuration and deployment options.
-- [Deploy Your Server](/typescript/server/deployment/mcp-use) - Deploy to production with one command
-
-
-### Manual Installation
-
-If you prefer to set up manually or add mcp-use to an existing project, install the package via npm:
-
-
-```bash
-npm install mcp-use
-```
-
-
-## Architecture Overview
-
-The mcp-use server framework is designed around a modular architecture that seamlessly integrates MCP protocol features with Hono's flexibility. Understanding this architecture helps you build powerful, production-ready MCP servers.
-
-The framework is built on six fundamental components that work together:
-
-### **Server Instance**
-The main `MCPServer` class created via `new MCPServer()`. It orchestrates all MCP functionality, manages the Hono application, and handles client connections.
-
-**Learn more**: See [Configuration](/typescript/server/configuration) for server setup options.
-
-### **Tools**
-Executable functions that MCP clients can invoke with typed parameters. Tools perform actions, fetch data, or trigger operations and return structured results.
-
-**Learn more**: [Tools Guide →](/typescript/server/tools)
-
-### **Resources**
-Static or dynamic content accessible via URIs. Resources can be configuration files, documentation, data feeds, or any content that clients need to read.
-
-**Learn more**: [Resources Guide →](/typescript/server/resources)
-
-### **Prompts**
-Reusable, parameterized templates for AI model interactions. Prompts standardize how your server generates context for LLM conversations.
-
-**Learn more**: [Prompts Guide →](/typescript/server/prompts)
-
-### **UI Widgets (MCP Apps)**
-Rich, interactive React components that render in chat clients. Widgets are automatically registered from your `resources/` folder and work with all compatible clients (ChatGPT, Claude, etc.).
-
-<img src="./images/apps-sdk-widget.png" alt="Apps SDK UI Widget Example" style={{maxWidth: '600px', borderRadius: '8px', margin: '1rem 0', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} />
-
-**Key features:**
-- **Automatic Registration**: Drop `.tsx` files in `resources/` and they become MCP tools
-- **Zero Boilerplate**: No manual `server.tool()` or `server.uiResource()` calls needed
-- **Hot Module Replacement**: Changes reflect instantly during development
-- **Type-Safe Props**: Zod schemas provide full TypeScript type safety
-- **Interactive**: Widgets can call tools, manage state, and respond to user actions
-
-**Learn more**: [UI Widgets Guide →](/typescript/server/mcp-apps)
-
-### **Custom Endpoints Integration**
-Full Hono functionality for custom routes, middleware, authentication, static file serving, and more. The server instance is also a Hono app.
-
-```typescript
-// Add custom routes
-server.get('/api/mango', (c) => {
-  return c.json({ fruit: 'mango' })
-})
-```
-
-## McpServer API Reference
-
-The `McpServer` class provides a clean, chainable API:
-
-```typescript
-class McpServer {
-  // MCP Protocol Methods
-  tool(definition: ToolDefinition): this
-  resource(definition: ResourceDefinition): this
-  resourceTemplate(definition: ResourceTemplateDefinition): this
-  prompt(definition: PromptDefinition): this
-  uiResource(definition: UIResourceDefinition): this
-  
-  listen(port?: number): Promise<void>
-
-  // Hono proxy - all HTTP methods available
-  // Examples: get(), post(), use(), route()
-}
-```
-
-**Additional Features:**
-- **[OAuth Authentication](/typescript/server/authentication)**: Configure OAuth providers for secure authentication
-- **[Sampling](/typescript/client/sampling)**: Request LLM completions from the client during tool execution
-- **[Notifications](/typescript/server/notifications)**: Send real-time notifications to connected clients
-- **[Inspector UI](/inspector)**: Interactive debugging interface automatically served at `/inspector` endpoint
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={3}>
+  <Card
+    title="TypeScript quickstart"
+    icon="rocket"
+    href="/typescript/getting-started/quickstart"
+  >
+    Create and verify a TypeScript MCP server.
+  </Card>
   <Card title="Tools" icon="wrench" href="/typescript/server/tools">
-    Build executable functions with parameters and validation
+    Build executable functions with parameters and validation.
   </Card>
-  <Card title="OpenAPI" icon="file-code" href="/typescript/server/openapi">
-    Generate MCP tools from an existing OpenAPI document
-  </Card>
-  <Card title="Resources" icon="folder-open" href="/typescript/server/resources">
-    Expose static and dynamic content via URI-based resources
+  <Card
+    title="Resources"
+    icon="folder-open"
+    href="/typescript/server/resources"
+  >
+    Expose static and dynamic content by URI.
   </Card>
   <Card title="Prompts" icon="message-square" href="/typescript/server/prompts">
-    Create reusable prompt templates for AI interactions
+    Create reusable prompt templates.
   </Card>
-  <Card title="UI Widgets" icon="palette" href="/typescript/server/mcp-apps">
-    Build interactive React components with auto-registration
+  <Card
+    title="MCP Apps"
+    icon="app-window-mac"
+    href="/typescript/mcp-apps"
+  >
+    Return interactive React widgets from tools.
   </Card>
-  <Card title="Proxy Servers" icon="network-wired" href="/typescript/server/proxy">
-    Compose multiple MCP servers into a single unified aggregator
-  </Card>
-  <Card title="Configuration" icon="cog" href="/typescript/server/configuration">
-    Configure your server for production deployment
-  </Card>
-  <Card title="Deploy to Production" icon="rocket" href="/typescript/server/deployment/mcp-use">
-    Deploy your server to Manufact Cloud with one command
+  <Card
+    title="Configuration"
+    icon="cog"
+    href="/typescript/api-reference/server/server-config"
+  >
+    Configure transport, sessions, middleware, CORS, and production settings.
   </Card>
 </CardGroup>

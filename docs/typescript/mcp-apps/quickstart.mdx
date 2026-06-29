@@ -1,0 +1,167 @@
+---
+title: "Build your first MCP App"
+description: "Create, run, and verify a TypeScript MCP App with a widget-returning tool."
+icon: "rocket"
+---
+
+Create a TypeScript MCP App, run it locally, and verify that a tool returns a React widget in the Inspector.
+
+If you want a plain MCP server without widgets, use the [TypeScript quickstart](/typescript/getting-started/quickstart) instead.
+
+## What you'll build
+
+This guide creates a local server with:
+
+- an MCP endpoint at `http://localhost:3000/mcp`
+- an Inspector at `http://localhost:3000/inspector`
+- a `search-tools` tool that returns a widget
+- a React widget at `resources/product-search-result/widget.tsx`
+
+## Prerequisites
+
+- Node.js 20.19 or higher, or 22.12 or higher
+- Basic TypeScript and React knowledge
+
+## Create the project
+
+Run the MCP Apps template:
+
+```bash
+npx create-mcp-use-app my-widget-server --template mcp-apps
+cd my-widget-server
+npm install
+```
+
+The template creates more files for assets, generated widget entries, and local tooling. These are the files you edit most often:
+
+```text
+my-widget-server/
+├── index.ts
+├── resources/
+│   ├── product-search-result/
+│   │   └── widget.tsx
+│   └── styles.css
+├── public/
+├── ...
+├── package.json
+└── tsconfig.json
+```
+
+## Run the server
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+This starts the MCP server, widget development server, and Inspector. Keep the process running while you test the app.
+
+## Inspect the widget tool
+
+Open `index.ts` and find the `search-tools` tool. The template includes extra server metadata, fruit data, and a second `get-fruit-details` tool. This excerpt shows the widget-returning path you need to understand first.
+
+```typescript
+// index.ts excerpt; server, fruits, z, text, and widget are defined above.
+server.tool(
+  {
+    name: "search-tools",
+    description: "Search for fruits and display the results in a widget",
+    schema: z.object({
+      query: z.string().optional().describe("Search query to filter fruits"),
+    }),
+    outputSchema: z.object({
+      query: z.string(),
+      results: z.array(
+        z.object({
+          fruit: z.string(),
+          color: z.string(),
+        }),
+      ),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+    widget: {
+      name: "product-search-result",
+      invoking: "Searching...",
+      invoked: "Results loaded",
+    },
+  },
+  async ({ query }) => {
+    const results = fruits.filter(
+      (fruit) =>
+        !query || fruit.fruit.toLowerCase().includes(query.toLowerCase()),
+    );
+
+    return widget({
+      props: { query: query ?? "", results },
+      output: text(`Found ${results.length} fruits matching "${query ?? "all"}".`),
+    });
+  },
+);
+
+await server.listen();
+```
+
+`widget.name` must match the folder under `resources/`. In this template, `product-search-result` maps to `resources/product-search-result/widget.tsx`.
+
+The `props` object becomes widget rendering data. The `output` value is the short text result the model can read.
+
+## Inspect the React widget
+
+Open `resources/product-search-result/widget.tsx`. The widget reads the tool result with `useWidget()`.
+
+The generated widget includes metadata, layout components, display-mode controls, state, and tool calls. This excerpt shows the core data access pattern.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+type ProductSearchResultProps = {
+  query: string;
+  results: { fruit: string; color: string }[];
+};
+
+export default function ProductSearchResult() {
+  const { props, isPending } = useWidget<ProductSearchResultProps>();
+
+  if (isPending) {
+    return <div className="p-4">Loading...</div>;
+  }
+
+  return (
+    <div className="p-4">
+      <h2>
+        Results for "{props.query || "all"}" ({props.results.length})
+      </h2>
+      <ul>
+        {props.results.map((result) => (
+          <li key={result.fruit}>{result.fruit}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+Widgets can render before the tool finishes. Check `isPending` before reading required fields from `props`.
+
+## Verify in the Inspector
+
+Use the Inspector to confirm that the server and widget work.
+
+1. Open `http://localhost:3000/inspector`.
+2. Go to the **Tools** tab.
+3. Select `search-tools`.
+4. Run the tool with `{ "query": "a" }` or `{}`.
+5. Confirm that the widget renders below the tool result.
+
+If the tool runs but no widget appears, check that `widget.name` exactly matches the folder under `resources/` and that the handler returns `widget(...)`.
+
+## Next steps
+
+- Use [`useWidget()`](/typescript/api-reference/react/usewidget) to read props, state, host context, and display mode.
+- Use [`useCallTool()`](/typescript/api-reference/react/usecalltool) when a widget needs to call another MCP tool.
+- Configure [Content Security Policy](/typescript/mcp-apps/content-security-policy) before loading external APIs, images, scripts, embeds, or static assets.

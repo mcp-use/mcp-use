@@ -1,0 +1,326 @@
+---
+title: "ModelContext"
+description: "Keep the AI model aware of what the user is currently viewing in your widget API Documentation"
+icon: "brain"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/model-context.tsx"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/model-context.tsx' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/react/model-context.tsx</a>
+</Callout>
+
+`ModelContext` and `modelContext` let your widget push contextual descriptions to the AI model so it can reason about what the user is currently seeing, without requiring an explicit tool call or storing it in developer-managed state.
+
+Both APIs feed into a single hierarchical context string. On every change the tree is serialized into an indented markdown-like list and pushed to the host via `ui/update-model-context` (MCP Apps) or `setWidgetState` (ChatGPT Apps SDK). Updates are batched automatically with `queueMicrotask`, so rapid mount and unmount cycles within a single render produce a single host notification.
+
+```ts wrap
+import { ModelContext, modelContext } from "mcp-use/react";
+```
+
+## ModelContext
+
+Declarative React component that registers a context annotation for as long as it is mounted. Participates in a parent-child tree based on nesting in JSX.
+
+```ts wrap
+import { ModelContext } from "mcp-use/react";
+```
+
+Annotate a portion of the widget UI with a description the model can see. The component registers `content` in a hierarchical tree that is serialized into an indented string and pushed to the host via `ui/update-model-context` (MCP Apps).
+
+The component re-registers automatically when `content` changes, so it reflects interactive state. The registration runs inside a `useEffect` and is cleaned up on unmount, which removes the node from the tree. Only non-empty content is registered: if `content.trim()` is empty, no node is created.
+
+- Supports empty children: a self-closing `<ModelContext content="..." />` registers a leaf annotation and renders `null`.
+- Nested `<ModelContext>` components become child nodes in the tree. When children are provided, the component wraps them in a context provider so descendants attach to this node as their parent.
+- Multiple siblings at the same level produce a flat list at that depth. Siblings are sorted deterministically by their internal id.
+
+**Props**
+><ParamField body="content" type="string" required="True" >   The text describing what the user is currently seeing. Required. Whitespace-only values register no node. </ParamField>
+><ParamField body="children" type="ReactNode" default="undefined" >   Optional. When provided, this component acts as a scope boundary: nested `<ModelContext>` components become children in the serialized tree. When omitted or `null`, the component renders `null` (a leaf annotation). </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="ReactNode | null">   Renders `null` when no children are passed. When children are provided, renders the children wrapped in an internal parent-id context provider so descendants nest under this node. </ResponseField>
+
+**Signature**
+```ts wrap
+function ModelContext({ content, children }: { content: string; children?: ReactNode }): React.ReactElement | null
+```
+
+### Basic usage
+
+A self-closing tag registers a leaf annotation. No children are needed.
+
+```tsx wrap
+import { ModelContext } from "mcp-use/react";
+
+function WeatherCard({ city, temp }: Props) {
+  return (
+    <>
+      <ModelContext content={`Showing weather for ${city}: ${temp} degrees`} />
+      <div className="card">
+        {city}: {temp}
+      </div>
+    </>
+  );
+}
+```
+
+### Nesting
+
+`<ModelContext>` components nest hierarchically. A component wrapped in another's `children` becomes a child node in the serialized tree.
+
+```tsx wrap
+<ModelContext content="User is on the Dashboard">
+  <ModelContext content="Revenue chart is visible" />
+  <ModelContext content="5 notifications pending" />
+</ModelContext>
+```
+
+The model receives:
+
+```text wrap
+- User is on the Dashboard
+  - Revenue chart is visible
+  - 5 notifications pending
+```
+
+### Siblings
+
+Multiple `<ModelContext>` at the same level are siblings. They produce a flat list at that depth.
+
+```tsx wrap
+function Dashboard() {
+  return (
+    <>
+      <ModelContext content="Revenue section" />
+      <ModelContext content="Users section" />
+    </>
+  );
+}
+// - Revenue section
+// - Users section
+```
+
+### Dynamic content
+
+The component re-registers automatically when `content` changes. Use this to reflect interactive state.
+
+```tsx wrap
+const [tab, setTab] = useState("overview");
+
+<ModelContext content={`Active tab: ${tab}`}>
+  <TabPanel tab={tab} />
+</ModelContext>
+```
+
+## modelContext
+
+Module-level imperative API. Works anywhere: event handlers, plain functions, code outside React. Entries registered via this API are always root-level nodes (no parent in the tree).
+
+```ts wrap
+import { modelContext } from "mcp-use/react";
+```
+
+<Note>
+Unlike `<ModelContext>`, entries set via `modelContext.set()` are not automatically cleaned up when a component unmounts. Always call `modelContext.remove(key)` in cleanup logic, or use `<ModelContext>` when you need automatic lifecycle management.
+</Note>
+
+### modelContext.set
+
+Register or update a named context entry. The `key` acts as a stable identifier: calling `set` with the same key overwrites the previous content. The entry is registered as a root-level node (parent is `null`) and the host is notified on the next batched flush.
+
+**Parameters**
+><ParamField body="key" type="string" required="True" >   Stable identifier for the entry. Reusing a key overwrites the previous value. </ParamField>
+><ParamField body="content" type="string" required="True" >   The description the model should see for this entry. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+modelContext.set(key: string, content: string): void
+```
+
+### modelContext.remove
+
+Remove a previously registered context entry by key. Removing a key that is not present is a no-op. The host is notified on the next batched flush.
+
+**Parameters**
+><ParamField body="key" type="string" required="True" >   The key of the entry to remove. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+modelContext.remove(key: string): void
+```
+
+### modelContext.clear
+
+Remove all context entries, both component-based (`<ModelContext>`) and imperative (`modelContext.set`). Useful for cleanup on unmount of a top-level widget. The host is notified on the next batched flush.
+
+**Returns**
+><ResponseField name="returns" type="void" />
+
+**Signature**
+```ts wrap
+modelContext.clear(): void
+```
+
+### Usage
+
+```ts wrap
+import { modelContext } from "mcp-use/react";
+
+function onItemSelect(item: Item) {
+  // The model now knows which item the user selected
+  modelContext.set("selected-item", `User selected: ${item.name} ($${item.price})`);
+}
+
+function onDrawerClose() {
+  modelContext.remove("selected-item");
+}
+```
+
+Use `modelContext.set` from a `useEffect` when you want lifecycle-aware imperative updates.
+
+```tsx wrap
+useEffect(() => {
+  modelContext.set("scroll-position", `User scrolled to item ${visibleIndex}`);
+  return () => modelContext.remove("scroll-position");
+}, [visibleIndex]);
+```
+
+## How the tree is serialized
+
+All mounted `<ModelContext>` nodes and `modelContext.set()` entries are collected in a single global registry. On every change the tree is serialized into an indented markdown-like list. Empty (whitespace-only) content is skipped, and siblings at each depth are sorted deterministically.
+
+```text wrap
+- Root description
+  - Child description
+    - Grandchild description
+  - Another child
+- Standalone imperative entry
+```
+
+This string is sent to the host as:
+
+- **MCP Apps**: `ui/update-model-context` with `structuredContent.__model_context`.
+- **ChatGPT Apps SDK**: `setWidgetState` with `__model_context` merged into the state object.
+
+Updates are batched via `queueMicrotask`, so rapid mount and unmount cycles within a single render produce a single host notification. If no host handler is registered yet (for example, the widget has not mounted), updates are silently dropped and re-flow when the component tree registers a node on the next mount.
+
+## Integration with useWidget state
+
+`<ModelContext>` and `setState` from `useWidget` are independent. Use them for different purposes.
+
+| API | Purpose |
+|-----|---------|
+| `setState` | Explicit developer-managed state (cart items, form values, filters). The developer decides what to include. |
+| `<ModelContext>` / `modelContext.set()` | Declarative annotations about what the user is currently seeing. Set it and forget it: the framework handles the rest. |
+
+The reserved `__model_context` key is automatically filtered from the `state` value returned by `useWidget`, so it never appears in your code.
+
+<Tip>
+Use `<ModelContext>` for UI annotations that mirror your JSX structure (which tab is active, which section is visible). Use `modelContext.set()` for annotations triggered by user actions (item selected, modal opened) that do not map cleanly to a rendered component.
+</Tip>
+
+## Full example
+
+This widget pairs the declarative component with the imperative API. The server registers a tool whose widget keeps the model aware of UI state.
+
+```ts wrap
+import { MCPServer, widget } from "mcp-use/server";
+import { z } from "zod";
+
+const server = new MCPServer({
+  name: "model-context-example",
+  version: "1.0.0",
+  description:
+    "Demonstrates ModelContext and modelContext APIs for keeping the AI aware of widget UI state",
+});
+
+const products = [
+  { id: "1", name: "Wireless Headphones", price: 79.99, category: "Audio" },
+  { id: "2", name: "Mechanical Keyboard", price: 129.99, category: "Input" },
+  { id: "3", name: "USB-C Hub", price: 49.99, category: "Accessories" },
+];
+
+server.tool(
+  {
+    name: "browse-products",
+    description:
+      "Open an interactive product browser. The widget uses ModelContext to keep the AI aware of which tab the user is on and which product they have selected.",
+    schema: z.object({
+      category: z
+        .string()
+        .optional()
+        .describe("Pre-select a category tab (Audio, Input, Accessories)"),
+    }),
+    widget: {
+      name: "context-demo",
+      invoking: "Loading product browser...",
+      invoked: "Product browser ready",
+    },
+  },
+  async ({ category }) => {
+    return widget({
+      props: {
+        products,
+        initialCategory: category ?? null,
+      },
+      message: `Product browser opened${category ? ` on the ${category} tab` : ""}.`,
+    });
+  }
+);
+
+await server.listen();
+```
+
+The widget rendered for that tool combines both APIs.
+
+```tsx wrap
+import { McpUseProvider, ModelContext, modelContext, useWidget } from "mcp-use/react";
+import { useState } from "react";
+
+const TABS = ["Overview", "Reviews", "Specs"];
+
+export default function ProductWidget() {
+  const { props, isPending } = useWidget<{ name: string; price: number }>();
+  const [tab, setTab] = useState("Overview");
+
+  function onAddToCart() {
+    modelContext.set("cart-action", `User added ${props.name} to cart`);
+    // Clear after a short delay so it does not linger
+    setTimeout(() => modelContext.remove("cart-action"), 3000);
+  }
+
+  if (isPending) return <div>Loading...</div>;
+
+  return (
+    <McpUseProvider autoSize>
+      <ModelContext content={`Viewing product: ${props.name} ($${props.price})`}>
+        <ModelContext content={`Active tab: ${tab}`} />
+
+        <div>
+          <h1>{props.name}</h1>
+          <p>{props.price}</p>
+
+          <div>
+            {TABS.map((t) => (
+              <button key={t} onClick={() => setTab(t)}>{t}</button>
+            ))}
+          </div>
+
+          <button onClick={onAddToCart}>Add to cart</button>
+        </div>
+      </ModelContext>
+    </McpUseProvider>
+  );
+}
+```
+
+## Related
+
+- [`useWidget()`](/typescript/api-reference/react/usewidget) for accessing widget props and state.
+- [`<McpUseProvider />`](/typescript/api-reference/react/mcpuseprovider) for the widget root provider.

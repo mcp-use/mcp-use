@@ -1,287 +1,149 @@
 ---
 title: "Notifications"
-description: "Send notifications to clients and receive notifications from clients"
+description: "Send server-to-client notifications from TypeScript MCP servers."
 icon: "bell"
 ---
 
-MCP supports bidirectional notifications between servers and clients. Notifications are one-way JSON-RPC messages that don't expect a response.
+Notifications are one-way MCP messages. Use them to tell connected clients that something changed, report progress, or send custom status events.
 
-**Server → Client**: Send notifications to signal events, status changes, or broadcast messages.
+Broadcast notifications, session-targeted notifications, and resource-subscription updates require stateful sessions. Request-scoped progress and log notifications depend on the current tool call and the client-provided request context. In stateless edge environments, do not design workflows that depend on server-to-client session notifications.
 
-**Client → Server**: Receive notifications when clients update their roots or other state.
+This guide focuses on notification workflows. Use the [MCPServer API reference](/typescript/api-reference/server/mcp-server) and [Tool context API reference](/typescript/api-reference/server/tool-context) for exact method signatures, return values, and payload shapes.
 
-<Note>
-For information on handling notifications in your client application, see [Client Notifications](/typescript/client/notifications).
-</Note>
+## Choose the notification path
 
-<Tip>
-Check out the [complete notifications example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/notifications) for a working implementation with progress tracking, custom broadcasts, and resource updates.
-</Tip>
+Choose the narrowest target that matches the workflow.
 
+| Need | Use |
+| --- | --- |
+| Notify every connected client | `server.sendNotification(...)` |
+| Notify one known session | `server.sendNotificationToSession(...)` |
+| Notify the client running the current tool | `ctx.sendNotification(...)` |
+| Report progress for the current tool call | `ctx.reportProgress?.(...)` |
+| Tell clients to refresh tools, resources, or prompts | list-changed helpers |
+| Tell subscribed clients a resource changed | `server.notifyResourceUpdated(uri)` |
 
-<Warning>
-Notifications only work in **stateful mode** where clients maintain persistent sessions. In stateless edge environments, notifications are not supported.
-</Warning>
+Use resource subscriptions for resource-specific updates. Use custom notifications for status events that are not tied to one resource.
 
-## Sending Notifications
+## Send a custom notification
 
-### Broadcasting to All Clients
-
-Send a notification to all connected clients:
+Use a namespaced method for custom notifications so clients can route them cleanly.
 
 ```typescript
-import { MCPServer } from "mcp-use/server";
-
-const server = new MCPServer({
-  name: "my-server",
-  version: "1.0.0"
-});
-
-// Later, send to all connected clients
 await server.sendNotification("custom/status-update", {
   status: "ready",
-  timestamp: Date.now()
-});
-
-// you can also send to a speocific client by session ID
-await server.sendNotificationToSession(sessionId, "custom/status-update", {
-  status: "ready",
-  timestamp: Date.now()
-});
-
-```
-
-### Sending to the current client
-
-Send a notification to the current client:
-
-```typescript
-server.tool({
-  name: 'send-notification',
-  description: 'Send a notification to the current client',
-}, async (params, ctx) => {
-  await ctx.sendNotification("custom/welcome", { message: "Hello, client!" });
+  checkedAt: new Date().toISOString(),
 });
 ```
 
+Custom notifications are best for dashboards, background job status, and operational events. Keep payloads small and stable.
 
-### Sending to a Specific Client
+## Notify the current client from a tool
 
-Send a notification to a specific session:
+Inside a tool callback, use `ctx.sendNotification(...)` when only the calling client should receive the message.
 
 ```typescript
-// Get all active session IDs
+import { text } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "run_import",
+    description: "Run an import and notify the caller when it starts.",
+  },
+  async (_params, ctx) => {
+    await ctx.sendNotification("custom/import-started", {
+      startedAt: new Date().toISOString(),
+    });
+
+    await runImport();
+    return text("Import complete.");
+  },
+);
+```
+
+Use this for per-user status that should not be broadcast to other sessions.
+
+## Notify a specific session
+
+Use session IDs when another operation needs to target one connected client.
+
+```typescript
 const sessions = server.getActiveSessions();
-console.log(`${sessions.length} clients connected`);
+const [sessionId] = sessions;
 
-// Send to a specific session
-if (sessions.length > 0) {
-  const success = await server.sendNotificationToSession(
-    sessions[0],
-    "custom/welcome",
-    { message: "Hello, client!" }
-  );
-  
-  if (!success) {
-    console.log("Session not found or expired");
-  }
-}
-```
-
-### Built-in Notification Types
-
-MCP defines standard notification methods that clients may handle:
-
-#### Tools List Changed
-
-Notify clients when the available tools have changed:
-
-```typescript
-// Convenience method
-await server.sendToolsListChanged();
-
-// Or using the general notification method
-await server.sendNotification("notifications/tools/list_changed");
-```
-
-#### Resources List Changed
-
-Notify clients when resources have been updated:
-
-```typescript
-// Convenience method
-await server.sendResourcesListChanged();
-
-// Or using the general notification method
-await server.sendNotification("notifications/resources/list_changed");
-```
-
-#### Prompts List Changed
-
-Notify clients when prompts have changed:
-
-```typescript
-// Convenience method
-await server.sendPromptsListChanged();
-
-// Or using the general notification method
-await server.sendNotification("notifications/prompts/list_changed");
-```
-
-#### Progress Notifications
-
-Progress notifications (`notifications/progress`) are used to keep clients informed during long-running operations and prevent timeouts. When a client calls a tool with a `progressToken`, the server can send progress updates.
-
-**Automatic Progress in Sampling**
-
-When using `ctx.sample()` in tool callbacks, progress notifications are automatically sent every 5 seconds:
-
-```typescript
-import { text } from 'mcp-use/server';
-
-server.tool({
-  name: 'long_llm_task',
-  cb: async (params, ctx?: ToolContext) => {
-    if (!ctx) return text('No context')
-    
-    // Progress notifications are sent automatically every 5 seconds
-    const result = await ctx.sample({
-      messages: [{ role: 'user', content: { type: 'text', text: params.prompt } }]
-    })
-    
-    return text(result.content.text)
-  }
-})
-```
-
-**Manual Progress Reporting**
-
-You can also send progress notifications manually using `ctx.reportProgress()`:
-
-```typescript
-import { text } from 'mcp-use/server';
-
-server.tool({
-  name: 'process_data',
-  cb: async (params, ctx?: ToolContext) => {
-    if (ctx?.reportProgress) {
-      await ctx.reportProgress(0, 100, 'Starting...')
-      
-      // Process data in stages
-      await processStage1()
-      await ctx.reportProgress(33, 100, 'Stage 1 complete')
-      
-      await processStage2()
-      await ctx.reportProgress(66, 100, 'Stage 2 complete')
-      
-      await processStage3()
-      await ctx.reportProgress(100, 100, 'Complete')
-    }
-    
-    return text('Done')
-  }
-})
-```
-
-**How Progress Prevents Timeouts**
-
-According to the MCP specification, when a client has `resetTimeoutOnProgress: true` enabled:
-- Each progress notification resets the client's timeout counter
-- This allows operations to run indefinitely as long as progress is reported
-- The default timeout is 60 seconds, but with progress notifications, operations can take much longer
-
-**Progress Notification Format**
-
-Progress notifications follow this structure:
-
-```typescript
-{
-  method: "notifications/progress",
-  params: {
-    progressToken: number,  // Token from the original request
-    progress: number,       // Current progress value
-    total?: number,         // Total progress (if known)
-    message?: string        // Optional status message
-  }
-}
-```
-
-### Custom Notifications
-
-You can send custom notifications with any method name and parameters:
-
-```typescript
-// Use a namespace prefix for custom notifications
-await server.sendNotification("custom/user-joined", {
-  userId: "user-123",
-  username: "alice",
-  joinedAt: new Date().toISOString()
-});
-
-await server.sendNotification("custom/data-updated", {
-  resourceId: "res-456",
-  changes: ["field1", "field2"]
-});
-```
-
-
-## Receiving Notifications
-
-### Roots Changed
-
-Clients can notify the server when their available roots (directories/files) change. Register a handler to respond to these changes:
-
-```typescript
-import { MCPServer } from "mcp-use/server";
-
-const server = new MCPServer({
-  name: "my-server",
-  version: "1.0.0"
-});
-
-// Handle roots/list_changed from clients
-server.onRootsChanged(async (roots) => {
-  console.log(`Client updated roots: ${roots.length} root(s)`);
-  
-  roots.forEach(root => {
-    console.log(`  - ${root.name || "unnamed"}: ${root.uri}`);
+if (sessionId) {
+  const sent = await server.sendNotificationToSession(sessionId, "custom/welcome", {
+    message: "Connected.",
   });
-  
-  // You can use the new roots to adjust server behavior
-  // For example, update which files the server can access
-});
-```
 
-### Requesting Roots from a Client
-
-You can also request the current roots from a specific client session:
-
-```typescript
-const sessions = server.getActiveSessions();
-
-if (sessions.length > 0) {
-  const roots = await server.listRoots(sessions[0]);
-  
-  if (roots) {
-    console.log(`Client has ${roots.length} roots:`);
-    roots.forEach(r => console.log(`  - ${r.uri}`));
+  if (!sent) {
+    console.log("Session was no longer available.");
   }
 }
 ```
 
-### Root Type
+Session-targeted notifications are only useful while the session remains connected. Use persistent storage for durable tasks that must survive disconnects.
+
+## Refresh client lists after dynamic changes
+
+If your server adds or removes tools, resources, or prompts at runtime, notify clients to refresh their cached lists.
 
 ```typescript
-interface Root {
-  uri: string;      // Must start with "file://"
-  name?: string;    // Optional human-readable name
-}
+await server.sendToolsListChanged();
+await server.sendResourcesListChanged();
+await server.sendPromptsListChanged();
 ```
 
-## Next Steps
+Call these after the registration set changes. Do not call them for normal tool results or ordinary resource content updates.
 
-- [Client Notifications](/typescript/client/notifications) - Handle notifications in your client application
-- [Tools Guide](./tools) - Create tools that send notifications
-- [Configuration](./configuration) - Configure session management
-- [Examples](./examples) - More notification examples
+## Report progress from long-running tools
 
+Use `ctx.reportProgress` when the current tool call has stages the client should see.
+
+```typescript
+server.tool(
+  {
+    name: "process_data",
+    description: "Process data in stages.",
+  },
+  async (_params, ctx) => {
+    await ctx.reportProgress?.(0, 100, "Starting");
+    await processStageOne();
+    await ctx.reportProgress?.(50, 100, "Halfway");
+    await processStageTwo();
+    await ctx.reportProgress?.(100, 100, "Complete");
+    return text("Done.");
+  },
+);
+```
+
+`ctx.reportProgress` is optional because clients only provide progress tokens for some calls. Always use optional chaining or a guard.
+
+## Test notifications locally
+
+Use a stateful local connection and a client that displays notifications.
+
+```bash
+cd libraries/typescript/packages/mcp-use/examples/server/features/notifications
+pnpm install
+pnpm dev
+```
+
+In the Inspector, call tools that send custom notifications. If you use the example `toggle-mode` tool, confirm that the client receives a tools-list-changed notification.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="MCPServer API reference" icon="server" href="/typescript/api-reference/server/mcp-server">
+    Look up server notification methods and session helpers.
+  </Card>
+  <Card title="Tool context API reference" icon="box" href="/typescript/api-reference/server/tool-context">
+    Look up `ctx.sendNotification`, `ctx.sendNotificationToSession`, and `ctx.reportProgress`.
+  </Card>
+  <Card title="Resource Subscriptions" icon="rss" href="/typescript/server/subscriptions">
+    Notify clients that subscribed resource content changed.
+  </Card>
+  <Card title="Client notifications" icon="monitor" href="/typescript/client/notifications">
+    Handle notifications in a TypeScript MCP client.
+  </Card>
+</CardGroup>

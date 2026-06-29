@@ -1,0 +1,264 @@
+---
+title: "Code Mode"
+description: "Code execution configuration, methods, executor classes, and result types for the TypeScript MCP client."
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the client source on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client.ts</a>
+<br />
+View the executor base types: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/executors/base.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/executors/base.ts</a>
+<br />
+View the Code Mode connector: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/connectors/codeMode.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/client/connectors/codeMode.ts</a>
+</Callout>
+
+Code Mode adds code execution to `MCPClient`. When enabled, the client exposes `executeCode()` and `searchTools()`, and the internal Code Mode connector provides `execute_code` and `search_tools` tools for agents.
+
+Import the client and public executor types from `mcp-use`:
+
+```ts
+import { BaseCodeExecutor, MCPClient } from "mcp-use";
+import type {
+  CodeModeConfig,
+  E2BExecutorOptions,
+  ExecutionResult,
+  VMExecutorOptions,
+} from "mcp-use";
+```
+
+## Enable Code Mode
+
+Set `codeMode: true` to use the default VM executor. Pass `CodeModeConfig` when you need E2B, a custom executor function, a custom executor class, or executor options.
+
+**Signature**
+```ts wrap
+interface MCPClientOptions {
+  codeMode?: boolean | CodeModeConfig;
+}
+```
+
+## CodeModeConfig
+
+Advanced configuration for code execution mode.
+
+**Fields**
+><ResponseField name="enabled" type="boolean">Whether code execution mode is enabled.</ResponseField>
+><ResponseField name="executor" type='"vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor'>Executor implementation. Defaults to `"vm"`.</ResponseField>
+><ResponseField name="executorOptions" type="VMExecutorOptions | E2BExecutorOptions">Executor-specific options.</ResponseField>
+
+**Signature**
+```ts wrap
+interface CodeModeConfig {
+  enabled: boolean;
+  executor?: "vm" | "e2b" | CodeExecutorFunction | BaseCodeExecutor;
+  executorOptions?: VMExecutorOptions | E2BExecutorOptions;
+}
+```
+
+## Executor options
+
+### VMExecutorOptions
+
+Options for the Node.js VM executor.
+
+**Fields**
+><ResponseField name="timeoutMs" type="number">Maximum execution time in milliseconds. Defaults to `30000`.</ResponseField>
+><ResponseField name="memoryLimitMb" type="number">Optional memory limit in megabytes. When omitted, no memory limit is configured.</ResponseField>
+
+**Signature**
+```ts wrap
+interface VMExecutorOptions {
+  timeoutMs?: number;
+  memoryLimitMb?: number;
+}
+```
+
+### E2BExecutorOptions
+
+Options for the E2B cloud sandbox executor.
+
+**Fields**
+><ResponseField name="apiKey" type="string">E2B API key. Required.</ResponseField>
+><ResponseField name="timeoutMs" type="number">Maximum execution time in milliseconds. Defaults to `300000`.</ResponseField>
+
+**Signature**
+```ts wrap
+interface E2BExecutorOptions {
+  apiKey: string;
+  timeoutMs?: number;
+}
+```
+
+## MCPClient methods
+
+### executeCode
+
+Executes JavaScript or TypeScript code with access to connected MCP tools. Code Mode must be enabled.
+
+**Parameters**
+><ParamField body="code" type="string" required="true">Code to execute.</ParamField>
+><ParamField body="timeout" type="number | undefined" default="undefined">Per-execution timeout in milliseconds.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ExecutionResult>" />
+
+**Throws**
+Throws `Error` when Code Mode is not enabled.
+
+**Signature**
+```ts wrap
+executeCode(code: string, timeout?: number): Promise<ExecutionResult>
+```
+
+### searchTools
+
+Searches tools across active MCP sessions. Code Mode must be enabled.
+
+**Parameters**
+><ParamField body="query" type="string" default='""'>Search query. Empty string returns all tools.</ParamField>
+><ParamField body="detailLevel" type='"names" | "descriptions" | "full"' default='"full"'>Amount of detail to return for each matching tool.</ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<ToolSearchResponse>" />
+
+**Throws**
+Throws `Error` when Code Mode is not enabled.
+
+**Signature**
+```ts wrap
+searchTools(
+  query?: string,
+  detailLevel?: "names" | "descriptions" | "full"
+): Promise<ToolSearchResponse>
+```
+
+### close
+
+Closes the client. When Code Mode has created an executor, `close()` cleans up executor resources before closing sessions.
+
+**Returns**
+><ResponseField name="returns" type="Promise<void>" />
+
+**Signature**
+```ts wrap
+close(): Promise<void>
+```
+
+## ExecutionResult
+
+Result returned by `executeCode()`.
+
+**Fields**
+><ResponseField name="result" type="unknown">Return value from the executed code.</ResponseField>
+><ResponseField name="logs" type="string[]">Console output captured during execution.</ResponseField>
+><ResponseField name="error" type="string | null">Error message when execution failed, otherwise `null`.</ResponseField>
+><ResponseField name="execution_time" type="number">Execution duration in seconds.</ResponseField>
+
+**Signature**
+```ts wrap
+interface ExecutionResult {
+  result: unknown;
+  logs: string[];
+  error: string | null;
+  execution_time: number;
+}
+```
+
+## Tool search types
+
+### ToolSearchResponse
+
+Response returned by `searchTools()` and by the runtime `search_tools()` helper available inside executed code.
+
+**Fields**
+><ResponseField name="meta" type="ToolSearchMeta">Search metadata, including total tool count and namespaces.</ResponseField>
+><ResponseField name="results" type="ToolSearchResult[]">Matching tools.</ResponseField>
+
+**Signature**
+```ts wrap
+interface ToolSearchResponse {
+  meta: ToolSearchMeta;
+  results: ToolSearchResult[];
+}
+```
+
+### ToolSearchMeta
+
+**Fields**
+><ResponseField name="total_tools" type="number">Total number of tools across active sessions before filtering.</ResponseField>
+><ResponseField name="namespaces" type="string[]">Sorted server namespaces that have tools.</ResponseField>
+><ResponseField name="result_count" type="number">Number of matching tools returned in `results`.</ResponseField>
+
+**Signature**
+```ts wrap
+interface ToolSearchMeta {
+  total_tools: number;
+  namespaces: string[];
+  result_count: number;
+}
+```
+
+### ToolSearchResult
+
+**Fields**
+><ResponseField name="name" type="string">Tool name.</ResponseField>
+><ResponseField name="server" type="string">Server namespace.</ResponseField>
+><ResponseField name="description" type="string">Tool description. Included when `detailLevel` is `"descriptions"` or `"full"`.</ResponseField>
+><ResponseField name="input_schema" type="Tool['inputSchema']">Tool input schema. Included when `detailLevel` is `"full"`.</ResponseField>
+
+**Signature**
+```ts wrap
+interface ToolSearchResult {
+  name: string;
+  server: string;
+  description?: string;
+  input_schema?: Tool["inputSchema"];
+}
+```
+
+## Custom executors
+
+### CodeExecutorFunction
+
+Function form for a custom executor.
+
+**Signature**
+```ts wrap
+type CodeExecutorFunction = (
+  code: string,
+  timeout?: number
+) => Promise<ExecutionResult>
+```
+
+### BaseCodeExecutor
+
+Extend `BaseCodeExecutor` when a custom executor needs access to MCP sessions, namespaces, and the shared tool search function.
+
+**Constructor parameters**
+><ParamField body="client" type="MCPClient" required="true">Client whose configured servers should be exposed to executed code.</ParamField>
+
+**Methods**
+><ResponseField name="execute" type="(code: string, timeout?: number) => Promise<ExecutionResult>">Runs code. Subclasses must implement this method.</ResponseField>
+><ResponseField name="cleanup" type="() => Promise<void>">Releases executor resources. Subclasses must implement this method.</ResponseField>
+><ResponseField name="createSearchToolsFunction" type="() => SearchToolsFunction">Returns the runtime tool search helper.</ResponseField>
+><ResponseField name="ensureServersConnected" type="() => Promise<void>">Protected helper that connects missing configured servers before execution.</ResponseField>
+><ResponseField name="getToolNamespaces" type="() => ToolNamespaceInfo[]">Protected helper that returns active server namespaces and tools, excluding the internal `code_mode` server.</ResponseField>
+
+**Signature**
+```ts wrap
+abstract class BaseCodeExecutor {
+  constructor(client: MCPClient);
+  abstract execute(code: string, timeout?: number): Promise<ExecutionResult>;
+  abstract cleanup(): Promise<void>;
+  public createSearchToolsFunction(): SearchToolsFunction;
+  protected ensureServersConnected(): Promise<void>;
+  protected getToolNamespaces(): ToolNamespaceInfo[];
+}
+```
+
+## Related
+
+- [Code Mode](/typescript/client/code-mode): guide to enabling Code Mode and choosing an executor.
+- [`MCPClient`](/typescript/api-reference/client/mcp-client): complete client constructor, lifecycle, configuration, and session APIs.
+- [Building agents](/typescript/agent): agent setup with MCP tools.

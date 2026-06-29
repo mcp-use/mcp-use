@@ -5,8 +5,8 @@ icon: "layers"
 ---
 
 The Next.js drop-in lets you colocate an MCP server inside an existing Next.js
-app  -  same repo, same `@/*` aliases, same shared components, same `.env` files
- -  without spinning up a separate project. Your Next.js routes keep working, and
+app (same repo, same `@/*` aliases, same shared components, same `.env` files)
+without spinning up a separate project. Your Next.js routes keep working, and
 a single `mcp-use dev` (or `build` / `start`) runs the MCP server beside them.
 
 ## Quick Start
@@ -19,7 +19,6 @@ Inside an existing Next.js app (App Router, `src/` layout):
 
     ```typescript src/mcp/index.ts
     import { MCPServer, text } from "mcp-use/server";
-    import z from "zod";
     import { getCurrentUser } from "@/lib/auth";
 
     const server = new MCPServer({
@@ -65,6 +64,8 @@ Inside an existing Next.js app (App Router, `src/` layout):
 
     The MCP server comes up on `http://localhost:3000/mcp` with HMR, and
     imports like `@/lib/auth` resolve through your Next.js app's `tsconfig.json`.
+    Since `next dev` also defaults to port 3000, pass `--port 3001` when you run
+    both at once (see [Running alongside Next.js](#running-alongside-next-js)).
 
   </Step>
 </Steps>
@@ -73,7 +74,7 @@ Inside an existing Next.js app (App Router, `src/` layout):
 
 The convention for a drop-in:
 
-```
+```text
 my-next-app/
 ├── package.json
 ├── tsconfig.json            # "@/*": ["./src/*"]
@@ -93,7 +94,7 @@ my-next-app/
 can override the entry with `--entry src/mcp/server.ts`.
 
 Widgets in `src/mcp/resources/` are picked up by `mcp-use build` / `dev`
-automatically  -  they can `import "@/components/..."` and those aliases resolve
+automatically. They can `import "@/components/..."` and those aliases resolve
 through your app's `tsconfig.json`.
 
 ## How It Works
@@ -140,7 +141,7 @@ needed.
 The CLI mirrors Next.js's env-file cascade into `process.env` before your
 server boots:
 
-```
+```text
 .env → .env.development → .env.local → .env.development.local
 ```
 
@@ -150,11 +151,11 @@ up the same way Next.js sees it.
 ## Widgets inside a Next.js app
 
 Widgets run in a browser iframe and **cannot** use server APIs, even though
-they live inside the Next.js tree. The drop-in enforces this at build time  - 
-if a widget (or a module it transitively imports) pulls in `server-only`,
+they live inside the Next.js tree. The drop-in enforces this at build time. If
+a widget (or a module it transitively imports) pulls in `server-only`,
 `next/headers`, etc., the build fails with an actionable error:
 
-```
+```text
 Widget "user-card" imports "next/headers" (imported from src/components/navbar.tsx),
 which is a Next.js server-only module. Widgets run in a browser iframe and
 cannot use server APIs.
@@ -171,7 +172,12 @@ the widget via props:
 
 ```typescript src/mcp/index.ts
 import { MCPServer, widget } from "mcp-use/server";
-import { getCurrentUser } from "@/lib/auth"; // uses next/headers  -  fine here
+import { getCurrentUser } from "@/lib/auth"; // uses next/headers, fine here
+
+const server = new MCPServer({
+  name: "my-app-mcp",
+  version: "1.0.0",
+});
 
 server.tool(
   {
@@ -184,6 +190,8 @@ server.tool(
       message: "Profile rendered",
     })
 );
+
+await server.listen();
 ```
 
 Tailwind automatically scans `<project>/src/` when it exists, so widgets that
@@ -212,7 +220,7 @@ build:
   `tailwind.config.ts` and RSC-only files. The manifest records the `.ts`
   source path and `mcp-use start` runs it through `tsx` directly.
 - **No `tsc --noEmit` typecheck.** `next build` already does this for you.
-- Widget builds still run  -  they produce static assets in
+- Widget builds still run. They produce static assets in
   `dist/resources/widgets/<name>/`.
 
 ## Running alongside Next.js
@@ -241,12 +249,12 @@ Or run them together with [concurrently](https://www.npmjs.com/package/concurren
 
 ## Requirements
 
-- Next.js 13+ (App Router or Pages Router  -  the shims cover both).
+- Next.js 13+ (App Router or Pages Router; the shims cover both).
 - A project-root `tsconfig.json` with your `@/*` paths. The drop-in picks these
   up via Vite's `resolve.tsconfigPaths` (for widgets) and `tsx`'s tsconfig
   support (for the server).
 - `tailwindcss` in your `dependencies` if you use it in widgets (`@tailwindcss/vite`
-  alone is not enough  -  the widget pipeline needs `tailwindcss` directly
+  alone is not enough; the widget pipeline needs `tailwindcss` directly
   resolvable from the project).
 
 ## Example

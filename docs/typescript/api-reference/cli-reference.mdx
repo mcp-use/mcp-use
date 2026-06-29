@@ -1,0 +1,656 @@
+---
+title: "CLI Reference"
+description: "Command reference for the @mcp-use/cli package and mcp-use executable."
+icon: "terminal"
+---
+
+The `@mcp-use/cli` package installs the `mcp-use` executable. Use this page as the exhaustive command reference for local development, production builds, cloud deploys, saved MCP client sessions, skills, and CLI environment variables.
+
+For hands-on workflows, see the [CLI Client guide](/typescript/tooling/client-cli), [Tunneling guide](/tunneling/index), and [Manufact Cloud deployment guide](/typescript/server/deployment/mcp-use).
+
+## Command map
+
+<CardGroup cols={2}>
+  <Card title="Run locally" icon="flame" href="#dev">
+    `mcp-use dev` starts the development server, widget watcher, and Inspector.
+  </Card>
+  <Card title="Build and start" icon="box" href="#build">
+    `mcp-use build` writes production artifacts. `mcp-use start` runs the built server.
+  </Card>
+  <Card title="Deploy" icon="cloud-upload" href="#deploy">
+    `mcp-use deploy`, `mcp-use deployments`, and `mcp-use servers` manage Manufact Cloud resources.
+  </Card>
+  <Card title="Client CLI" icon="terminal" href="#client">
+    `mcp-use client` saves MCP servers, calls tools, reads resources, gets prompts, handles OAuth, and captures widget screenshots.
+  </Card>
+  <Card title="Tunnels" icon="train-front-tunnel" href="#tunneling-reference">
+    `mcp-use dev --tunnel` and `mcp-use start --tunnel` expose a local server through a public URL.
+  </Card>
+  <Card title="Skills and types" icon="wand" href="#skills-add">
+    `mcp-use skills add` installs agent skills. `mcp-use generate-types` writes widget type augmentation.
+  </Card>
+</CardGroup>
+
+## Install the CLI
+
+```bash
+npm install -g @mcp-use/cli
+```
+
+```bash
+npx @mcp-use/cli dev
+```
+
+```bash
+npm install --save-dev @mcp-use/cli
+```
+
+<Tip>
+  `create-mcp-use-app` installs the CLI as a project dependency.
+</Tip>
+
+## `dev`
+
+**Purpose:** Start a development server with TypeScript watching, widget builds, automatic restarts, and the Inspector.
+
+**Syntax:**
+
+```bash
+mcp-use dev [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `-p, --path <path>` | Project directory. | Current directory |
+| `--entry <file>` | MCP server entry file, relative to the project. | Auto-detected |
+| `--widgets-dir <dir>` | Widget directory, relative to the project. | `resources` |
+| `--mcp-dir <dir>` | Directory that contains the MCP entry file and resources. | None |
+| `--port <port>` | Server port. | `3000` |
+| `--host <host>` | Bind address. Use `0.0.0.0` to listen on all interfaces. | `0.0.0.0` |
+| `--no-open` | Do not open the Inspector automatically. | Opens by default |
+| `--no-hmr` | Disable Hot Module Reloading and use `tsx watch` instead. | HMR enabled |
+| `--tunnel` | Create a public tunnel for the local server. | Disabled |
+
+**Examples:**
+
+```bash
+mcp-use dev
+mcp-use dev --port 8080
+mcp-use dev --host 127.0.0.1 --no-open
+mcp-use dev --mcp-dir src/mcp
+mcp-use dev --entry src/server.ts --widgets-dir src/resources
+mcp-use dev --no-hmr
+mcp-use dev --tunnel
+```
+
+**Notes and behavior:**
+
+- The MCP endpoint is served at `/mcp`.
+- The Inspector is mounted at `/inspector` and opens automatically unless `--no-open` is set.
+- The command sets `NODE_ENV=development`, sets `PORT`, and sets `MCP_URL` to the tunnel URL or local server URL when `MCP_URL` is not already set.
+- HMR updates tools, prompts, resources, and resource templates without dropping connected clients.
+- Server configuration changes, middleware changes, and OAuth configuration changes require a restart.
+- `mcp-use dev` writes development session metadata to `.mcp-use/sessions.json`.
+- `--tunnel` uses the same tunnel service as `mcp-use start --tunnel`. See [Tunneling reference](#tunneling-reference).
+
+## `build`
+
+**Purpose:** Build TypeScript server code, bundle widgets, generate tool registry types, and write the production manifest.
+
+**Syntax:**
+
+```bash
+mcp-use build [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `-p, --path <path>` | Project directory. | Current directory |
+| `--entry <file>` | MCP server entry file, relative to the project. | Auto-detected |
+| `--widgets-dir <dir>` | Widget directory, relative to the project. | `resources` |
+| `--mcp-dir <dir>` | Directory that contains the MCP entry file and resources. | None |
+| `--with-inspector` | Include the Inspector in the production build. | Disabled |
+| `--inline` | Inline widget JavaScript and CSS into HTML. Required for the VS Code MCP Apps host. | Disabled |
+| `--no-inline` | Keep widget JavaScript and CSS as separate files. | Default behavior |
+| `--no-typecheck` | Skip the `tsc --noEmit` typecheck step. | Typecheck enabled |
+
+**Examples:**
+
+```bash
+mcp-use build
+mcp-use build --with-inspector
+mcp-use build --inline
+mcp-use build --no-typecheck
+mcp-use build --mcp-dir src/mcp
+mcp-use build -p ./my-server
+```
+
+**Notes and behavior:**
+
+- The command writes `dist/mcp-use.json`.
+- Widget `.tsx` files under the widget directory are bundled as standalone HTML pages.
+- The command generates `.mcp-use/tool-registry.d.ts` when it can load the server entry. Type generation errors during `build` are non-blocking.
+- Without `--mcp-dir`, TypeScript is transpiled with esbuild and typechecked with the local `typescript` binary unless `--no-typecheck` is set.
+- With `--mcp-dir`, the host app owns its build. The CLI skips full-project transpilation and records the TypeScript source entry in the manifest.
+- If `MCP_SERVER_URL` is set, widget builds receive that value for server URL and asset path generation.
+- The `public/` directory is copied to `dist/public/` when it exists.
+
+## `start`
+
+**Purpose:** Run a production server from built files or from the TypeScript source entry recorded for `--mcp-dir` projects.
+
+**Syntax:**
+
+```bash
+mcp-use start [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `-p, --path <path>` | Project directory. | Current directory |
+| `--entry <file>` | MCP server entry file, relative to the project. Overrides manifest detection. | Auto-detected |
+| `--mcp-dir <dir>` | Directory that contains the MCP entry file and resources. | None |
+| `--port <port>` | Server port. | `3000` |
+| `--tunnel` | Create a public tunnel for the local server. | Disabled |
+
+**Examples:**
+
+```bash
+mcp-use start
+mcp-use start --port 8080
+mcp-use start --mcp-dir src/mcp
+mcp-use start --tunnel
+mcp-use start -p ./my-server
+```
+
+**Notes and behavior:**
+
+- Port resolution order is `--port`, then `PORT`, then `3000`.
+- If the selected port is unavailable, the CLI chooses the next available port.
+- The command reads `dist/mcp-use.json` first. If the manifest has `entryPoint`, `start` runs that file.
+- If the manifest is missing or does not contain an entry point, the CLI checks common paths such as `dist/index.js`, `dist/server.js`, `dist/src/index.js`, and `dist/src/server.js`.
+- With `--mcp-dir`, the fallback list also checks `<mcp-dir>/index.ts`, `<mcp-dir>/index.tsx`, `dist/<mcp-dir>/index.js`, and `dist/<mcp-dir>/server.js`.
+- TypeScript source entries are run through the local `tsx` package when available, with `npx tsx` as a fallback.
+- The command sets `NODE_ENV=production`, sets `PORT`, and sets `MCP_URL` to the tunnel URL or `http://localhost:<port>` when `MCP_URL` is not already set.
+- The Inspector is only available when the build was created with `mcp-use build --with-inspector`.
+
+## Tunneling reference
+
+`mcp-use dev --tunnel` and `mcp-use start --tunnel` create a public URL that forwards to the local MCP server. The tunnel subdomain is stored in `dist/mcp-use.json` and reused across restarts when available.
+
+```bash
+mcp-use dev --tunnel
+mcp-use start --tunnel
+```
+
+Tunnel limits and lifecycle:
+
+| Limit or behavior | Value |
+| --- | --- |
+| Tunnel lifetime | Expires 24 hours after creation |
+| Inactive tunnel cleanup | 1 hour of no activity |
+| Creation rate limit | 10 tunnel creations per IP per hour |
+| Active tunnel limit | 5 active tunnels per IP |
+| Close behavior | The tunnel closes when the CLI process exits |
+
+The standalone package is also available:
+
+```bash
+npx @mcp-use/tunnel 3000
+```
+
+See the [Tunneling guide](/tunneling/index) for client setup and testing workflows.
+
+## `deploy`
+
+**Purpose:** Create or update a Manufact Cloud deployment for an MCP server.
+
+**Syntax:**
+
+```bash
+mcp-use deploy [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `--open` | Open the deployment in a browser after a successful deploy. | Disabled |
+| `--name <name>` | Deployment or server name. | Auto-generated |
+| `--port <port>` | Server port used by the deployed process. | `3000` |
+| `--runtime <runtime>` | Runtime, either `node` or `python`. | Auto-detected |
+| `--new` | Create a new deployment instead of reusing the linked project. | Disabled |
+| `--env <key=value...>` | Environment variable assignment. Repeatable. | None |
+| `--env-file <path>` | Load environment variables from a `.env` file. | None |
+| `--branch <name>` | Branch to deploy. Also scopes env sync to that branch preview environment. | Current git branch |
+| `--root-dir <path>` | Root directory inside the repository for monorepos. | Repository root |
+| `--org <slug-or-id>` | Target organization. | Active org |
+| `-y, --yes` | Skip confirmation prompts. | Disabled |
+| `--region <region>` | Deployment region: `US`, `EU`, or `APAC`. | `US` |
+| `--build-command <cmd>` | Build command override. | Auto-detected |
+| `--start-command <cmd>` | Start command override. | Auto-detected |
+| `--dockerfile <path>` | Non-default Dockerfile path, relative to `--root-dir` or repository root. | None |
+| `--watch-paths <glob...>` | Only auto-deploy when matching files change. Set on new-server creation for monorepos. | All changes |
+| `--wait-for-ci` | Hold GitHub auto-deploys until other check runs pass. Set on new-server creation. | Disabled |
+| `--no-github` | Upload local source without connecting GitHub. | Disabled |
+
+**Examples:**
+
+```bash
+mcp-use deploy
+mcp-use deploy --no-github
+mcp-use deploy --name my-server --open
+mcp-use deploy --env DATABASE_URL=postgres://... --env API_KEY=secret
+mcp-use deploy --env-file .env.production
+mcp-use deploy --runtime python
+mcp-use deploy --root-dir apps/mcp-server
+mcp-use deploy --root-dir apps/mcp-server --watch-paths "apps/mcp-server/**" "packages/shared/**"
+mcp-use deploy --new --name my-server-v2
+mcp-use deploy --org manufact-inc --region EU --yes
+```
+
+**Notes and behavior:**
+
+- The default path deploys from GitHub and prompts to install or connect the GitHub App when needed.
+- `--no-github` packs and uploads local source to a platform-managed repository.
+- Redeploys of a project already linked to a platform-managed server auto-detect the upload path. `--no-github` is only required on the first deploy for that path.
+- The command writes `.mcp-use/project.json` to link the local project to the cloud server.
+- The CLI adds `.mcp-use/` to `.gitignore` when it writes a project link.
+- Environment variables passed through `--env` and `--env-file` are synced to the target branch preview environment when `--branch` is set.
+
+## Authentication commands
+
+Authentication commands manage the user-level Manufact Cloud credentials in `~/.mcp-use/config.json`.
+
+### `login`
+
+**Purpose:** Authenticate the CLI with Manufact Cloud.
+
+**Syntax:**
+
+```bash
+mcp-use login [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `--api-key <key>` | Save an API key directly. Intended for CI and agent harnesses. | Browser/device flow |
+| `--org <org>` | Select an organization by slug, ID, or name without an interactive prompt. | Prompt when needed |
+| `--device-code <code>` | Redeem a pre-approved device code without opening a browser. | None |
+
+**Examples:**
+
+```bash
+mcp-use login
+mcp-use login --device-code ABC123
+mcp-use login --api-key mcp_... --org my-org
+```
+
+**Notes and behavior:**
+
+- Interactive login starts a device-code flow and opens a browser.
+- If the account belongs to multiple organizations and `--org` is omitted, the CLI prompts for an organization.
+- In non-TTY environments, use `--org` to avoid an organization selection prompt.
+- `MCP_USE_API_KEY` can provide the API key for non-interactive login.
+
+### `whoami`
+
+**Purpose:** Print the current authentication status and user information.
+
+**Syntax:**
+
+```bash
+mcp-use whoami
+```
+
+**Options:** None.
+
+**Examples:**
+
+```bash
+mcp-use whoami
+```
+
+**Notes and behavior:** The command reads `~/.mcp-use/config.json`.
+
+### `logout`
+
+**Purpose:** Remove saved Manufact Cloud credentials.
+
+**Syntax:**
+
+```bash
+mcp-use logout
+```
+
+**Options:** None.
+
+**Examples:**
+
+```bash
+mcp-use logout
+```
+
+**Notes and behavior:** The command removes credentials from `~/.mcp-use/config.json`.
+
+## Organization commands
+
+Organization commands control the active Manufact Cloud organization for cloud commands.
+
+| Command | Purpose | Syntax |
+| --- | --- | --- |
+| `org list` | List organizations available to the authenticated user. | `mcp-use org list` |
+| `org current` | Show the active organization. | `mcp-use org current` |
+| `org switch` | Select a different active organization interactively. | `mcp-use org switch` |
+
+**Notes and behavior:**
+
+- `deploy`, `deployments`, and `servers` use the active organization unless `--org` overrides it.
+- For CI or agent runs, pass `--org <org>` to `login`, `deploy`, `servers`, or `deployments` commands instead of switching global state. The value can be an organization slug, ID, or name.
+
+## Deployment management commands
+
+**Purpose:** Inspect and manage existing Manufact Cloud deployments.
+
+**Syntax:**
+
+```bash
+mcp-use deployments <subcommand> [options]
+```
+
+**Subcommands:**
+
+| Subcommand | Purpose | Options |
+| --- | --- | --- |
+| `list` / `ls` | List deployments. | `--limit <n>`, `--skip <n>`, `--sort <field:direction>` |
+| `get <deployment-id>` | Show deployment details. | None |
+| `logs <deployment-id>` | View runtime logs. | `-b, --build`, `-f, --follow` |
+| `restart <deployment-id>` | Trigger a new deployment on the same server. | `-f, --follow`, `--branch <name>` |
+| `stop <deployment-id>` | Stop a running deployment. | None |
+| `start <deployment-id>` | Start a stopped deployment. | None |
+| `delete <deployment-id>` / `rm <deployment-id>` | Delete a deployment. | `-y, --yes` |
+
+**Examples:**
+
+```bash
+mcp-use deployments list
+mcp-use deployments get dep_abc123
+mcp-use deployments logs dep_abc123 --build --follow
+mcp-use deployments restart dep_abc123 --branch main --follow
+mcp-use deployments stop dep_abc123
+mcp-use deployments start dep_abc123
+mcp-use deployments delete dep_abc123 --yes
+```
+
+**Notes and behavior:**
+
+- `logs` shows runtime logs by default. Use `--build` for build logs.
+- `restart` redeploys the same server and uses the deployment branch unless `--branch` is set.
+- `delete` prompts for confirmation unless `--yes` is set.
+
+## Server management commands
+
+**Purpose:** Manage cloud servers, which are long-lived Git-backed deploy targets that own deployments.
+
+**Syntax:**
+
+```bash
+mcp-use servers <subcommand> [options]
+```
+
+**Subcommands:**
+
+| Subcommand | Purpose | Options |
+| --- | --- | --- |
+| `list` / `ls` | List servers for an organization. | `--org <slug-or-id>`, `--limit <n>`, `--skip <n>`, `--sort <field:direction>` |
+| `get <id-or-slug>` | Show server details and recent deployments. | `--org <slug-or-id>` |
+| `update <id-or-slug>` | Update server configuration. | `--branch <name>`, `--name <name>`, `--description <text>`, `--build-command <cmd>`, `--start-command <cmd>`, `--root-dir <path>`, `--watch-paths <glob...>`, `--deploy-branches <glob...>`, `--wait-for-ci`, `--no-wait-for-ci`, `--org <slug-or-id>` |
+| `delete <server-id>` / `rm <server-id>` | Delete a server and its deployments. | `-y, --yes`, `--org <slug-or-id>` |
+| `env <subcommand>` | Manage server environment variables. | See [Server environment commands](#server-environment-commands). |
+
+**Examples:**
+
+```bash
+mcp-use servers list
+mcp-use servers get srv_abc123
+mcp-use servers update srv_abc123 --branch main
+mcp-use servers update srv_abc123 --build-command "npm run build"
+mcp-use servers update srv_abc123 --watch-paths "apps/api/**" "packages/shared/**" --deploy-branches "release/*"
+mcp-use servers delete srv_abc123 --yes
+```
+
+**Notes and behavior:**
+
+- `servers update --branch` changes the production branch for future production deploys.
+- Pass an empty string to `--build-command`, `--start-command`, `--root-dir`, `--watch-paths`, or `--deploy-branches` to clear that setting.
+- `--wait-for-ci` and `--no-wait-for-ci` control whether auto-deploys wait for other check runs before deploying.
+- `servers delete` prompts for confirmation unless `--yes` is set.
+
+## Server environment commands
+
+**Purpose:** List, add, update, and remove environment variables on a cloud server.
+
+**Syntax:**
+
+```bash
+mcp-use servers env <subcommand> [options]
+```
+
+**Subcommands:**
+
+| Subcommand | Purpose | Required options | Other options |
+| --- | --- | --- | --- |
+| `list` / `ls` | List environment variables. | `--server <id>` | `--branch <name>`, `--show-values` |
+| `add <KEY=VALUE>` | Add an environment variable. | `--server <id>` | `--env <environments>`, `--branch <name>`, `--sensitive` |
+| `update <key-or-id>` | Update an environment variable by key or UUID. | `--server <id>` | `--value <value>`, `--env <environments>`, `--branch <name>`, `--sensitive`, `--no-sensitive` |
+| `remove <key-or-id>` / `rm <key-or-id>` | Remove an environment variable by key or UUID. | `--server <id>` | `--branch <name>` |
+
+**Examples:**
+
+```bash
+mcp-use servers env list --server srv_abc123
+mcp-use servers env list --server srv_abc123 --show-values
+mcp-use servers env add --server srv_abc123 API_KEY=secret --sensitive
+mcp-use servers env add --server srv_abc123 FEATURE_FLAG=true --env preview,development
+mcp-use servers env update API_KEY --server srv_abc123 --value new-secret --sensitive
+mcp-use servers env remove API_KEY --server srv_abc123
+```
+
+**Notes and behavior:**
+
+- Values are masked by default. `--show-values` reveals non-sensitive values.
+- `--env <environments>` accepts comma-separated `production`, `preview`, and `development`.
+- `env add --env` defaults to all three environments when omitted.
+- `--branch <name>` scopes preview environment variables to a branch. Omit `--branch` for production resolution.
+- `env update` and `env remove` accept either a variable key or UUID.
+
+## `client`
+
+**Purpose:** Use MCP servers from the terminal. The client command can save server connections, call tools, read resources, get prompts, manage OAuth tokens, and render MCP Apps widgets as PNG screenshots.
+
+**Syntax:**
+
+```bash
+mcp-use client <subcommand>
+mcp-use client <name> <scope> <action>
+```
+
+**Top-level subcommands:**
+
+| Command | Purpose | Key options |
+| --- | --- | --- |
+| `connect [name] [url]` | Save an MCP server under a short name. | `--stdio`, `--auth <token>`, `--no-oauth`, `--auth-timeout <ms>` |
+| `list` | List saved servers. | None |
+| `remove <name>` | Remove a saved server. | None |
+| `screenshot --mcp <url> --tool <name>` | Render a widget from an ad-hoc MCP server. | `--mcp <url>`, `-H, --header <header>`, common screenshot options |
+
+**Per-server scopes:**
+
+| Scope | Actions |
+| --- | --- |
+| `tools` | `list`, `call <tool> [args...]`, `describe <tool>` |
+| `resources` | `list`, `read <uri>`, `subscribe <uri>`, `unsubscribe <uri>` |
+| `prompts` | `list`, `get <prompt> [args...]` |
+| `auth` | `status`, `refresh`, `logout` |
+| `screenshot` | `--tool <name> [args...]` |
+| Top-level per server | `interactive`, `disconnect` |
+
+**Examples:**
+
+```bash
+mcp-use client connect local http://localhost:3000/mcp
+mcp-use client connect fs "npx -y @modelcontextprotocol/server-filesystem /tmp" --stdio
+mcp-use client list
+mcp-use client local tools list
+mcp-use client local tools call read_file path=/tmp/test.txt
+mcp-use client local resources read "file:///tmp/data.json"
+mcp-use client local prompts get greeting name=Alice
+mcp-use client local auth status
+mcp-use client local screenshot --tool show-board boardId=demo
+mcp-use client screenshot --mcp https://mcp.example.com --tool show-board
+mcp-use client local disconnect
+```
+
+**Notes and behavior:**
+
+- Saved servers are stored in `~/.mcp-use/cli-sessions.json`.
+- OAuth tokens for saved HTTP servers are stored under `~/.mcp-use/oauth/<urlHash>/`.
+- `connect --auth <token>` stores a static bearer token and skips OAuth.
+- `connect --no-oauth` prevents automatic OAuth when the server returns `401`.
+- Tool and prompt arguments accept `key=value`, `key:=<json>`, or a single JSON object argument.
+- `tools call --screenshot` captures a widget screenshot when the tool declares a UI resource.
+- `resources subscribe` keeps the process running until interrupted.
+
+Common screenshot options:
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `--tool <name>` | Tool whose UI resource should be rendered. | Required |
+| `--width <px>` | Output image width. | Widget natural width |
+| `--height <px>` | Output image height. | Widget natural height |
+| `--device-scale-factor <n>` | Device pixel ratio. Must be greater than `0` and at most `4`. | `1` |
+| `--inspector <url>` | Inspector host that serves `/inspector/preview/:view`. | Auto-spawned |
+| `--theme <theme>` | Rendered color scheme. Accepted values are `light` and `dark`. | `light` |
+| `--output <path>` | Output PNG path. | `./<view>-<timestamp>.png` |
+| `--wait-for <selector>` | Readiness selector. | `body[data-view-ready="true"]` |
+| `--delay <ms>` | Extra wait after readiness. | `0` |
+| `--timeout <ms>` | Navigation and readiness timeout. | `30000` |
+| `--cdp-url <url>` | Existing CDP WebSocket URL instead of local Chrome. | None |
+| `--quiet` | Suppress development server output. | Disabled |
+
+<Card title="CLI Client guide" icon="terminal" href="/typescript/tooling/client-cli">
+  Use the guide for connection workflows, OAuth behavior, argument parsing examples, scripting patterns, and screenshots.
+</Card>
+
+## `skills add`
+
+**Purpose:** Install mcp-use AI agent skills for Cursor, Claude Code, and Codex.
+
+**Syntax:**
+
+```bash
+mcp-use skills add [options]
+mcp-use skills install [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `-p, --path <path>` | Project directory. | Current directory |
+
+**Examples:**
+
+```bash
+mcp-use skills add
+mcp-use skills add -p ./my-server
+mcp-use skills install
+```
+
+**Notes and behavior:**
+
+- `skills install` is an alias for `skills add`.
+- The command downloads the latest mcp-use skills from [github.com/mcp-use/mcp-use](https://github.com/mcp-use/mcp-use).
+- Skills are installed into `.cursor/skills/`, `.claude/skills/`, and `.agents/skills/`.
+- `create-mcp-use-app` can install skills during project creation unless `--no-skills` is used.
+
+## `generate-types`
+
+**Purpose:** Generate TypeScript module augmentation for MCP tool schemas.
+
+**Syntax:**
+
+```bash
+mcp-use generate-types [options]
+```
+
+**Options:**
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `-p, --path <path>` | Project directory. | Current directory |
+| `--server <file>` | Server entry file. | `index.ts` |
+
+**Examples:**
+
+```bash
+mcp-use generate-types
+mcp-use generate-types -p ./my-server
+mcp-use generate-types --server src/server.ts
+```
+
+**Notes and behavior:**
+
+- The command writes `.mcp-use/tool-registry.d.ts`.
+- `mcp-use dev` runs type generation automatically.
+- `mcp-use build` also attempts type generation when it can find a server entry, but build-time generation failures are non-blocking.
+- Include `.mcp-use/**/*` in `tsconfig.json` so widget code can see generated types.
+
+```json
+{
+  "include": ["index.ts", "src/**/*", "resources/**/*", ".mcp-use/**/*"]
+}
+```
+
+## Environment variables
+
+| Variable | Used by | Description | Default |
+| --- | --- | --- | --- |
+| `PORT` | `start`, server runtime | Server port when `--port` is not provided. `dev` and `start` also set this for the child process. | `3000` |
+| `NODE_ENV` | `dev`, `start`, widget builds | Runtime environment. `dev` sets `development`; `start` sets `production`. | Command-specific |
+| `MCP_URL` | `dev`, `start`, server runtime | Public or local base URL exposed to the server. Preserved when already set. | Local server URL or tunnel URL |
+| `MCP_SERVER_URL` | `build` | Build-time server URL injected into widget assets. | None |
+| `MCP_WEB_URL` | `login`, cloud auth | Manufact web URL for auth pages. | `https://manufact.com` |
+| `MCP_API_URL` | `login`, cloud API config | Manufact API URL. The CLI normalizes it to include `/api/v1`. | `https://cloud.manufact.com/api/v1` |
+| `MCP_USE_API_KEY` | `login` | API key for non-interactive login. | None |
+| `MCP_USE_API` | Tunnel cleanup and local tunnel API calls | Tunnel service API base used by integrated tunnel cleanup paths. | `https://local.mcp-use.run` |
+| `MCP_USE_TUNNEL_API` | `dev --tunnel` | Tunnel service API base used when creating development tunnels. | `https://local.mcp-use.run` |
+| `MCP_USE_CHROME_PATH` | `client screenshot` | Chrome executable path for screenshots. | Auto-detected |
+| `PUPPETEER_EXECUTABLE_PATH` | `client screenshot` | Fallback Chrome executable path. | Auto-detected |
+| `CHROME_PATH` | `client screenshot` | Fallback Chrome executable path. | Auto-detected |
+
+**Examples:**
+
+```bash
+PORT=8080 mcp-use start
+MCP_SERVER_URL=https://my-server.example.com mcp-use build
+MCP_USE_API_KEY=mcp_... mcp-use login --org my-org
+MCP_USE_CHROME_PATH=/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  mcp-use client local screenshot --tool show-board
+```
+
+## Related references
+
+- [CLI Client guide](/typescript/tooling/client-cli)
+- [Tunneling guide](/tunneling/index)
+- [Manufact Cloud deployment guide](/typescript/server/deployment/mcp-use)
+- [ServerConfig API reference](/typescript/api-reference/server/server-config)
+- [Sessions API reference](/typescript/api-reference/server/sessions)

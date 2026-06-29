@@ -1,26 +1,24 @@
 ---
-title: "Introduction"
-description: "Connect to MCP servers with the mcp-use client"
-icon: "list-start"
+title: "MCP Client"
+description: "Connect a TypeScript app to MCP servers and call tools, resources, and prompts."
+icon: "router"
 ---
 
-# MCP Client
+Use the TypeScript MCP client when your app needs to connect to one or more MCP servers. `MCPClient` stores server configuration, and each `MCPSession` is one live connection where you list tools, call tools, read resources, and fetch prompts.
 
-**mcp-use** provides a complete MCP client implementation for TypeScript that enables your applications to connect to and interact with any MCP server. Whether you're building AI agents, automation tools, or integrations, the MCPClient gives you full access to MCP protocol features with a clean, type-safe API.
+This page helps you choose the right client path and make your first call. For every constructor option and method signature, see the [`MCPClient` API reference](/typescript/api-reference/client/mcp-client) and [`MCPSession` API reference](/typescript/api-reference/client/mcp-session).
 
-## Key Features
+## Choose your client path
 
-- **Multi-server support**: Connect to multiple MCP servers simultaneously
-- **Multiple connection types**: STDIO, HTTP, and SSE transports
-- **Full MCP protocol**: Complete support for tools, resources, prompts, and notifications
-- **Sampling and elicitation**: Handle LLM sampling and form/URL elicitation with optional helpers (defaults, validation, typed results)
-- **Type-safe**: Full TypeScript support with automatic type inference
-- **Middleware support**: Add logging, metrics, and custom middleware
-- **Sandbox mode**: Secure execution environment for untrusted code
+| You are building | Start here | Import path |
+| --- | --- | --- |
+| A Node.js script, service, or agent integration | [`MCPClient` API reference](/typescript/api-reference/client/mcp-client) | `mcp-use` |
+| A browser app without React | [Environments](/typescript/client/environments) | `mcp-use/browser` |
+| A React app that manages MCP connections in UI | [React integration](/typescript/client/usemcp) | `mcp-use/react` |
 
-## Installation
+Node.js clients support HTTP and Standard I/O servers. Browser and React clients support HTTP servers.
 
-Install the mcp-use package:
+## Install
 
 <CodeGroup>
 ```bash npm
@@ -34,72 +32,106 @@ yarn add mcp-use
 ```
 </CodeGroup>
 
-## Quick Start
+## Connect and call a tool
 
-Here's a basic example of connecting to an MCP server and calling a tool:
-
-
-<a href="https://codesandbox.io/p/devbox/nice-ptolemy-9j887v?embed=1&file=%2Fsrc%2Findex.ts">
-<img noZoom src="https://codesandbox.io/static/img/play-codesandbox.svg" alt="Edit mcp-client-getting-started" />
-</a>
+This Node.js example connects to one HTTP server, lists available tools, calls one tool, and closes the connection.
 
 ```typescript
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from "mcp-use";
 
-// Create client and connect
 const client = new MCPClient({
   mcpServers: {
-    'my-server': {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-everything']
-    }
+    demo: {
+      url: "http://localhost:3000/mcp",
+    },
+  },
+});
+
+try {
+  const session = await client.createSession("demo");
+
+  const tools = await session.listTools();
+  console.log("Tools:", tools.map((tool) => tool.name));
+
+  const result = await session.callTool("echo", {
+    message: "Hello from mcp-use",
+  });
+
+  const firstBlock = result.content[0];
+  if (firstBlock?.type === "text") {
+    console.log(firstBlock.text);
   }
-})
-await client.createAllSessions()
-
-// Get a session for a specific server
-const session = client.getSession('my-server')
-
-// List available tools
-const tools = await session.listTools()
-console.log('Available tools:', tools)
-
-// Call a tool
-const result = await session.callTool('tool_name', { 
-  param: 'value' 
-})
-console.log('Result:', result)
-
-// Cleanup
-await client.closeAllSessions()
+} finally {
+  await client.close();
+}
 ```
 
-## Next Steps
+Replace `echo` and its arguments with a tool returned by `listTools()`. `createSession("demo")` throws when `demo` is not configured.
 
-<CardGroup cols={3}>
-  <Card title="Environments" icon="layer-group" href="/typescript/client/environments">
-    Use the client in Node.js, browser, and React applications
+## How the client is organized
+
+`MCPClient` is the configuration and lifecycle object. Create it once, then use it to add servers, open sessions, close sessions, or enable callbacks such as sampling and elicitation.
+
+`MCPSession` is the protocol object. Use a session to call tools, read resources, fetch prompts, subscribe to notifications, and set roots for one server.
+
+```typescript
+const url = "http://localhost:3000/mcp";
+const client = new MCPClient({ mcpServers: { demo: { url } } });
+const session = await client.createSession("demo");
+
+await session.listTools();
+await session.callTool("tool-name", {});
+
+await client.closeSession("demo");
+```
+
+To connect to every configured server, use `createAllSessions()`. To retrieve a session you already opened, use `getSession(name)`, which returns `null` when no session exists.
+
+## Configure servers
+
+Each entry under `mcpServers` is named by you. The fields inside the entry determine the transport.
+
+```typescript
+import { MCPClient } from "mcp-use";
+
+const client = new MCPClient({
+  mcpServers: {
+    productionApi: {
+      url: "https://api.example.com/mcp",
+      authToken: process.env.MCP_TOKEN,
+    },
+    localFiles: {
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "./"],
+    },
+  },
+});
+```
+
+Use `url` for a remote HTTP server. Use `command` and `args` for a local Standard I/O server. See the [`MCPClient` API reference](/typescript/api-reference/client/mcp-client) for every server config field, constructor option, callback, and lifecycle method.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="MCPClient reference" icon="router" href="/typescript/api-reference/client/mcp-client">
+    Server config fields, constructor options, callbacks, session lifecycle, and code mode methods.
   </Card>
-  <Card title="Configuration" icon="cog" href="/typescript/client/client-configuration">
-    Configure your client and understand connection types (STDIO, HTTP, SSE)
+  <Card title="Call tools" icon="wrench" href="/typescript/client/tools">
+    List server tools, call one by name, handle results, and set request timeouts.
   </Card>
-  <Card title="Elicitation" icon="check" href="/typescript/client/elicitation">
-    Handle form and URL elicitation with optional helpers (defaults, validation)
+  <Card title="Read resources" icon="folder-open" href="/typescript/client/resources">
+    List, read, and subscribe to server resources.
   </Card>
-  <Card title="Sampling" icon="pipette" href="/typescript/client/sampling">
-    Enable tools to request LLM completions via client callbacks
+  <Card title="Fetch prompts" icon="message-square" href="/typescript/client/prompts">
+    Retrieve prompt templates and pass prompt arguments.
   </Card>
-  <Card title="Tools" icon="wrench" href="/typescript/client/tools">
-    Invoke server functions and handle results
+  <Card title="Handle sampling" icon="pipette" href="/typescript/client/sampling">
+    Let servers request LLM completions through your client callback.
   </Card>
-  <Card title="Resources" icon="folder-open" href="/typescript/client/resources">
-    Read content from server resources
+  <Card title="Handle elicitation" icon="check" href="/typescript/client/elicitation">
+    Respond when servers ask the user for structured input or a URL action.
   </Card>
-  <Card title="Server Manager" icon="server" href="/typescript/client/server-manager">
-    Manage multiple MCP servers simultaneously
-  </Card>
-  <Card title="OAuth" icon="shield" href="/typescript/client/authentication">
-    Secure your connections with OAuth
+  <Card title="Use React" icon="react" href="/typescript/client/usemcp">
+    Manage browser MCP connections with `McpClientProvider` and hooks.
   </Card>
 </CardGroup>
-

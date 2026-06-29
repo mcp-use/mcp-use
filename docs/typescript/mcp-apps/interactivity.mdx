@@ -1,0 +1,130 @@
+---
+title: "Interactivity"
+description: "Add tool calls, widget state, follow-up messages, and display controls to MCP Apps widgets."
+icon: "mouse-pointer-click"
+---
+
+Interactive widgets can call tools, save UI state, send follow-up messages, and request a larger display mode. Use these APIs for user actions that should happen inside the widget instead of requiring another prompt.
+
+This guide assumes your widget already renders with `useWidget()`. See [Build widgets](/typescript/mcp-apps/widgets) first if you still need the server and widget setup.
+
+## Call tools from a widget
+
+Use `useCallTool()` when a button or form should call another MCP tool. The hook gives you loading, success, and error state.
+
+```tsx
+import { useCallTool } from "mcp-use/react";
+
+function DetailsButton({ productId }: { productId: string }) {
+  const { callTool, data, isPending, isError } = useCallTool("get-product");
+
+  return (
+    <section>
+      <button onClick={() => callTool({ productId })} disabled={isPending}>
+        {isPending ? "Loading..." : "View details"}
+      </button>
+
+      {isError && <p>Could not load product details.</p>}
+      {data && <pre>{JSON.stringify(data.structuredContent, null, 2)}</pre>}
+    </section>
+  );
+}
+```
+
+Prefer `useCallTool()` for user-facing actions. Use `useWidget().callTool` only for small one-off calls where you do not need hook-managed state.
+
+## Save widget state
+
+Use `setState` for UI state that should survive re-renders and be available to future model turns.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+type FavoritesState = {
+  favorites: string[];
+};
+
+function FavoriteButton({ id }: { id: string }) {
+  const { state, setState } = useWidget<{}, FavoritesState>();
+  const favorites = state?.favorites ?? [];
+  const isFavorite = favorites.includes(id);
+
+  async function toggleFavorite() {
+    await setState({
+      favorites: isFavorite
+        ? favorites.filter((favoriteId) => favoriteId !== id)
+        : [...favorites, id],
+    });
+  }
+
+  return (
+    <button onClick={toggleFavorite}>
+      {isFavorite ? "Remove favorite" : "Save favorite"}
+    </button>
+  );
+}
+```
+
+Use widget state for view state and user choices. Do not use widget state as your database.
+
+## Send a follow-up message
+
+Use `sendFollowUpMessage` when a widget action should ask the model to continue the conversation.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+function ExplainButton({ productName }: { productName: string }) {
+  const { sendFollowUpMessage } = useWidget();
+
+  return (
+    <button
+      onClick={() =>
+        sendFollowUpMessage(`Compare ${productName} with similar products.`)
+      }
+    >
+      Compare
+    </button>
+  );
+}
+```
+
+Follow-up messages create a new model turn. Use them for actions that need model reasoning, not for local UI updates.
+
+## Request display modes
+
+Use `requestDisplayMode` when a widget needs more room.
+
+```tsx
+import { useWidget } from "mcp-use/react";
+
+function DisplayModeControls() {
+  const { displayMode, requestDisplayMode } = useWidget();
+  const expanded = displayMode === "fullscreen" || displayMode === "pip";
+
+  return (
+    <button onClick={() => requestDisplayMode(expanded ? "inline" : "fullscreen")}>
+      {expanded ? "Exit" : "Expand"}
+    </button>
+  );
+}
+```
+
+The host may grant a different mode than requested. Read `displayMode` for the actual current mode.
+
+## Combine actions carefully
+
+A single click should usually do one main thing. For example:
+
+- call a tool to fetch more data
+- update widget state after a user choice
+- send a follow-up message for model reasoning
+- request fullscreen for a larger view
+
+If one action must do multiple things, update local widget state first so the UI responds immediately, then call the tool or send the follow-up message.
+
+## Next steps
+
+- Use [Model context](/typescript/mcp-apps/model-context) to decide what the model should know about these interactions.
+- Use [`useCallTool()`](/typescript/api-reference/react/usecalltool) for full call state and typing details.
+- Use [`useWidget()`](/typescript/api-reference/react/usewidget) for all host actions and display-mode behavior.

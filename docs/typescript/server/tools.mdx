@@ -1,468 +1,272 @@
 ---
 title: "Tools"
-description: "Building and configuring MCP tools"
+description: "Design and register TypeScript MCP tools with validated inputs, model-friendly descriptions, and useful results."
 icon: "wrench"
 ---
 
-Tools are the primary way MCP clients interact with your server. They represent functions that can be invoked with parameters and return results. This guide covers everything you need to know about creating powerful and reliable tools.
+Tools are callable actions on your MCP server. Use a tool when the client should look up data, run a workflow, mutate server-side state, or return an MCP App widget.
 
-<Tip>
-**Response Helpers**: Throughout this guide, you'll see code examples using response helpers like `text()`, `object()`, and `mix()`. These utilities simplify creating tool responses with proper typing and metadata. See [Response Helpers](./response-helpers) for a complete reference.
-</Tip>
+This guide focuses on tool design and common implementation patterns. Use the [Tools API reference](/typescript/api-reference/server/tools) for `ToolDefinition`, callback signatures, type inference, defaults, and return types.
 
-## Understanding Tools
+## Start with a model-friendly tool
 
-Tools in MCP are:
-- **Invocable Functions**: Clients can call them with parameters
-- **Typed**: Parameters and returns have defined types
-- **Async**: All tool handlers can be asynchronous
-
-## Basic Tool Structure
-
-Every tool has three main components:
+A good tool is narrow enough for a model to choose correctly. Give the tool a clear name, describe when to use it, validate every input with Zod, and return the smallest useful result.
 
 ```typescript
-import { z } from 'zod';
+import { MCPServer, object } from "mcp-use/server";
+import { z } from "zod";
 
-server.tool({
-  name: 'tool_name',           // Unique identifier
-  description: 'What it does',  // Clear description for clients
-  schema: z.object({...}),      // Zod schema for input validation
-}, async (params) => {...})    // Handler function
-```
-
-## Input Validation with Zod
-
-Tools use [Zod](https://zod.dev/) schemas for input validation. The server automatically validates inputs before calling your handler, so you can trust that the parameters match your schema.
-
-### Basic Input Types
-
-```typescript
-import { z } from 'zod';
-
-server.tool({
-  name: 'process_message',
-  description: 'Process a message with various options',
-  schema: z.object({
-    // Required string
-    message: z.string().describe('The message to process'),
-    
-    // Optional number with default
-    count: z.number().default(10).describe('Number of items'),
-    
-    // Optional boolean with default
-    verbose: z.boolean().default(false).describe('Enable verbose output'),
-    
-    // Optional object
-    config: z.object({
-      setting1: z.string(),
-      setting2: z.number()
-    }).optional().describe('Configuration object'),
-    
-    // Array of strings
-    items: z.array(z.string()).describe('List of items to process')
-  })
-}, async ({ message, count, verbose, config, items }) => {
-  // message, count, verbose, config, items are fully typed and validated
-  // count will be 10 if not provided
-  // verbose will be false if not provided
-  return text('Results...')
-})
-```
-
-
-## Tool Callbacks
-
-### Basic Response
-
-The simplest tool response is text. Use the `text()` helper for clean, readable code:
-
-<CodeGroup>
-
-```typescript Helper
-import { text } from 'mcp-use/server';
-
-async (params) => {
-  return text('Response text here');
-}
-```
-
-```typescript Expanded
-async (params) => {
-  return {
-    content: [{
-      type: 'text',
-      text: 'Response text here'
-    }],
-    _meta: {
-      mimeType: 'text/plain'
-    }
-  }
-}
-```
-
-</CodeGroup>
-
-### Multiple Content Items
-
-Tools can return multiple content items using the `mix()` helper:
-
-<CodeGroup>
-
-```typescript Helper (Recommended)
-import { mix, text, resource, object } from 'mcp-use/server';
-
-cb: async ({ data }) => {
-  return mix(
-    text('Analysis complete:'),
-    text(`Found ${data.length} items`),
-    resource('results://latest', object({ items: data }))
-  );
-}
-```
-
-```typescript Expanded
-cb: async ({ data }) => {
-  return {
-    content: [
-      {
-        type: 'text',
-        text: 'Analysis complete:'
-      },
-      {
-        type: 'text',
-        text: `Found ${data.length} items`
-      },
-      {
-        type: 'resource',
-        resource: {
-          uri: 'results://latest',
-          mimeType: 'application/json',
-          text: JSON.stringify({ items: data }, null, 2)
-        }
-      }
-    ]
-  }
-}
-```
-
-</CodeGroup>
-
-
-
-## Tool Annotations
-
-Add metadata to tools for better client integration:
-
-```typescript
-server.tool({
-  name: 'important_operation',
-  description: 'Performs an important operation',
-  schema: z.object({ ... }),
-  annotations: {
-    requiresAuth: true,
-    rateLimit: '10/minute',
-    deprecated: false
-  }
-}, async (params) => {
-  // Tool implementation
-})
-```
-
-## Returning Widgets from Tools
-
-This is the recommended way to expose widgets to a model. Since `exposeAsTool` defaults to `false`, widgets are registered as MCP resources only  -  defining a custom tool that calls `widget()` gives you full control over the tool's name, description, schema, and business logic.
-
-<Note>
-You must include the `widget: { name, ... }` config in your tool definition when returning widgets. This sets up all the registration-time metadata needed for proper widget rendering. The widget file must exist in your `resources/` folder, but does **not** need `exposeAsTool: true`  -  leaving it unset (or `false`) is the correct setup for this pattern.
-</Note>
-
-```typescript
-import { widget, text } from 'mcp-use/server';
-import { z } from 'zod';
-
-server.tool({
-  name: 'get-weather',
-  description: 'Get current weather for a city',
-  schema: z.object({
-    city: z.string().describe('City name')
-  }),
-  // Widget config sets all registration-time metadata
-  widget: {
-    name: 'weather-display',  // Must match a widget in resources/
-    invoking: 'Fetching weather...',
-    invoked: 'Weather loaded'
-  }
-}, async ({ city }) => {
-  // Fetch weather data
-  const weatherData = await fetchWeather(city);
-  
-  // Return widget with runtime data only
-  return widget({
-    props: weatherData,
-    output: text(`Weather in ${city}: ${weatherData.temp}°C`),
-    message: `Current weather in ${city}`
-  });
+const server = new MCPServer({
+  name: "inventory-server",
+  version: "1.0.0",
 });
-```
 
-**How it works:**
-- `widget: { name, invoking, invoked, ... }` on tool definition - Configures all widget metadata at registration time
-- `widget({ props, output, message })` helper - Returns runtime data only:
-  - `props` - Widget-only data passed to `useWidget().props` (hidden from model)
-  - `output` - Optional response helper (text(), object(), etc.) that the model sees
-  - `message` - Optional text message override
-- The widget must exist in your `resources/` folder as a `.tsx` file or folder
-
-See [UI Widgets](./mcp-apps) for complete widget creation and registration documentation.
-
-## OpenAI Apps SDK Integration
-
-For ChatGPT and OpenAI compatible clients:
-
-<Tip>
-**Recommended Approach**: The recommended way to expose widgets to a model is to use the [widget helper in a custom tool](./mcp-apps#custom-tools-with-widgets) as shown above. Alternatively, you can set `exposeAsTool: true` in your widget's metadata to [auto-register it as a tool](./mcp-apps#automatic-widget-registration). The manual approach below is shown for reference.
-</Tip>
-
-```typescript
-server.tool({
-  name: 'show_chart',
-  description: 'Display a chart',
-  schema: z.object({
-    data: z.array(z.any()).describe('The chart data')
-  }),
-  _meta: {
-    'openai/outputTemplate': 'ui://widgets/chart',
-    'openai/toolInvocation/invoking': 'Generating chart...',
-    'openai/toolInvocation/invoked': 'Chart generated',
-    'openai/widgetAccessible': true
-  }
-}, async ({ data }) => {
-  return {
-    _meta: {
-      'openai/outputTemplate': 'ui://widgets/chart'
+server.tool(
+  {
+    name: "get_inventory_item",
+    description: "Look up one inventory item by SKU.",
+    schema: z.object({
+      sku: z.string().describe("Inventory SKU, such as SKU-1234"),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
     },
-    content: [{
-      type: 'text',
-      text: 'Chart displayed'
-    }],
-    structuredContent: { data }
-  }
-})
+  },
+  async ({ sku }) => {
+    const item = await inventory.getItem(sku);
+    return object(item);
+  },
+);
 ```
 
-## Error Handling with error()
+Use names that describe the user task, not the internal API method. `get_inventory_item` is easier for a model to choose than `inventoryFindByPrimaryKey`.
 
-The `error()` helper provides a standardized way to return error responses from tools. It sets the `isError` flag to `true`, allowing clients to distinguish between successful results and error conditions. This ensures consistent error handling across your MCP server.
+## Describe inputs with Zod
 
-The `error()` helper creates a properly formatted error response with:
-- `isError: true` flag to indicate failure
-- Text content with your error message
-- Proper MIME type metadata
+Use Zod schemas for all tool inputs. The server validates the incoming arguments before your handler runs, and TypeScript infers the handler parameter type from the schema.
 
-
-<CodeGroup>
-
-```typescript Helper (Recommended)
-import { object, error } from 'mcp-use/server';
-
-server.tool({
-  name: 'external_api',
-  description: 'Call external API',
-  schema: z.object({
-    endpoint: z.string().url().describe('The API endpoint URL')
-  })
-}, async ({ endpoint }) => {
-  try {
-    const data = await callExternalAPI(endpoint);
-    return object(data);
-  } catch (err) {
-    // Use error() helper to signal failure to the client
-    return error(
-      `Unable to fetch data from ${endpoint}.\n` +
-      `Error: ${err.message}\n` +
-      `Please check the endpoint and try again.`
-    );
-  }
-})
+```typescript
+server.tool(
+  {
+    name: "search_orders",
+    description: "Search customer orders by status and date range.",
+    schema: z.object({
+      status: z.enum(["open", "fulfilled", "cancelled"]).optional(),
+      fromDate: z.string().date().describe("Start date in YYYY-MM-DD format"),
+      toDate: z.string().date().describe("End date in YYYY-MM-DD format"),
+      limit: z.number().int().min(1).max(50).default(10),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ status, fromDate, toDate, limit }) => {
+    const orders = await orders.search({ status, fromDate, toDate, limit });
+    return object({ orders });
+  },
+);
 ```
 
-```typescript Expanded
-server.tool({
-  name: 'external_api',
-  description: 'Call external API',
-  schema: z.object({
-    endpoint: z.string().url().describe('The API endpoint URL')
-  })
-}, async ({ endpoint }) => {
-  try {
-    const data = await callExternalAPI(endpoint);
-    return {
-      content: [{
-        type: 'text',
-        text: JSON.stringify(data, null, 2)
-      }],
-      structuredContent: data,
-      _meta: {
-        mimeType: 'application/json'
-      }
+Prefer descriptive field names and `.describe()` text that tells the model what value to provide. Use defaults for ordinary behavior, but keep defaults visible when they affect cost, safety, or output size.
+
+## Add tool annotations
+
+Tool annotations tell clients and models how risky a tool is. Set the main behavior hints explicitly, especially for tools exposed to ChatGPT or MCP catalogs.
+
+```typescript
+annotations: {
+  readOnlyHint: true,      // The tool does not change server or external state.
+  destructiveHint: false,  // The tool does not delete or overwrite data.
+  openWorldHint: true,     // The tool reads from external systems or live data.
+}
+```
+
+Use `readOnlyHint: false` for tools that create, update, delete, send, purchase, deploy, or otherwise change state. Use `destructiveHint: true` when the change can remove data or is hard to undo.
+
+Add `idempotentHint` when retry behavior matters. Set it to `true` only when repeating the same call has the same effect as running it once.
+
+## Return the right kind of result
+
+Use response helpers for most tool results. They produce MCP-compatible output without making the guide repeat raw result shapes.
+
+```typescript
+import { error, object, text } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "reserve_inventory",
+    description: "Reserve inventory for one order.",
+    schema: z.object({
+      orderId: z.string(),
+      sku: z.string(),
+      quantity: z.number().int().positive(),
+    }),
+    annotations: {
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ orderId, sku, quantity }) => {
+    const reservation = await inventory.reserve({ orderId, sku, quantity });
+
+    if (!reservation.ok) {
+      return error(reservation.reason);
     }
-  } catch (err) {
-    // Return error response with isError flag set
-    return {
-      isError: true,
-      content: [{
-        type: 'text',
-        text: `Unable to fetch data from ${endpoint}.\n` +
-              `Error: ${err.message}\n` +
-              `Please check the endpoint and try again.`
-      }],
-      _meta: {
-        mimeType: 'text/plain'
-      }
+
+    return object({
+      reservationId: reservation.id,
+      status: "reserved",
+    });
+  },
+);
+```
+
+Use:
+
+| Use case | Helper |
+| --- | --- |
+| Human-readable output | `text()` or `markdown()` |
+| Structured JSON | `object()` or `array()` |
+| Failed tool result | `error()` |
+| Multiple content blocks | `mix()` |
+| Widget result | `widget()` |
+
+See [Response Helpers](/typescript/server/response-helpers) for a chooser and [Response helpers API reference](/typescript/api-reference/server/response-helpers) for exact helper signatures and return shapes.
+
+## Return widgets from tools
+
+Return a widget when the user should inspect or interact with structured output. Configure the widget on the tool definition, then return runtime data with `widget({ props, output })`.
+
+The `widget.name` value must match a widget under `resources/`, such as `resources/product-search-result/widget.tsx`.
+
+```typescript
+import { text, widget } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "search_products",
+    description: "Search products and display matching results.",
+    schema: z.object({
+      query: z.string().describe("Product search query"),
+    }),
+    outputSchema: z.object({
+      query: z.string(),
+      results: z.array(z.object({ id: z.string(), name: z.string() })),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+    widget: {
+      name: "product-search-result",
+      invoking: "Searching...",
+      invoked: "Results loaded",
+    },
+  },
+  async ({ query }) => {
+    const results = await searchProducts(query);
+
+    return widget({
+      props: { query, results },
+      output: text(`Found ${results.length} products for "${query}"`),
+    });
+  },
+);
+```
+
+The model sees the `output` content. The widget reads `props` with `useWidget().props`. See [MCP Apps](/typescript/mcp-apps) for widget workflow guidance and [useWidget()](/typescript/api-reference/react/usewidget) for the React hook API.
+
+## Use `ctx` for request-aware tools
+
+The second callback argument, usually named `ctx`, exposes per-call capabilities such as authentication, client capability checks, sampling, elicitation, progress, notifications, and logging.
+
+```typescript
+server.tool(
+  {
+    name: "private_profile",
+    description: "Return the authenticated user's profile.",
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
+  },
+  async (_params, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
     }
-  }
-})
+
+    return object({
+      userId: ctx.auth.user.userId,
+      email: ctx.auth.user.email,
+    });
+  },
+);
 ```
 
-</CodeGroup>
+Use `ctx.auth` only for verified identity from server authentication. If you need client-reported caller metadata from `ctx.client.user()`, treat it as unverified and never use it for access control.
 
-## Client Identity & Caller Context
+See the [Tool context API reference](/typescript/api-reference/server/tool-context) for every `ctx` method, field, capability check, log level, and return type.
 
-Every tool handler receives `ctx.client`, which exposes both session-level client information and per-invocation caller context.
+## Handle tool failures deliberately
 
-### Session-level client info
-
-These values come from the MCP `initialize` handshake and remain stable for the lifetime of the connection:
+Return `error()` when the tool ran but the requested operation could not complete. Throw only for unexpected failures that should be treated as server errors.
 
 ```typescript
-server.tool({ name: 'check-client', schema: z.object({}) }, async (_p, ctx) => {
-  const { name, version } = ctx.client.info();      // "ChatGPT", "1.0.0"
-  const hasSampling = ctx.client.can('sampling');    // true / false
-  const isAppsClient = ctx.client.supportsApps();    // MCP Apps / ChatGPT
-  const uiExt = ctx.client.extension('io.modelcontextprotocol/ui');
-  return text(`${name} ${version}, apps: ${isAppsClient}`);
-});
+server.tool(
+  {
+    name: "fetch_invoice",
+    description: "Fetch one invoice by invoice ID.",
+    schema: z.object({ invoiceId: z.string() }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: true,
+    },
+  },
+  async ({ invoiceId }) => {
+    const invoice = await billing.findInvoice(invoiceId);
+
+    if (!invoice) {
+      return error(`Invoice ${invoiceId} was not found.`);
+    }
+
+    return object(invoice);
+  },
+);
 ```
 
-### Per-invocation caller context  -  `ctx.client.user()`
+Make error messages actionable. Tell the model or user what failed and which input caused the failure.
 
-`ctx.client.user()` returns normalized metadata from `params._meta` that some clients send with every `tools/call` request. It returns `undefined` for clients that do not include this metadata (Inspector, Claude Desktop, CLI, etc.).
+## Test a tool locally
 
-<Warning>
-This data is **client-reported and unverified**. Do not use it for access control. For verified identity, configure [OAuth authentication](./authentication) and use `ctx.auth`.
-</Warning>
+Run the development server and call the tool from the Inspector.
 
-```typescript
-server.tool({ name: 'personalise', schema: z.object({}) }, async (_p, ctx) => {
-  const caller = ctx.client.user();
-
-  if (!caller) {
-    return text("Hello! (no caller context available)");
-  }
-
-  const city = caller.location?.city ?? "there";
-  const greeting = caller.locale?.startsWith("it") ? "Ciao" : "Hello";
-  return text(`${greeting} from ${city}!`);
-});
+```bash
+npm run dev
 ```
 
-**Available fields on `UserContext`:**
+Then open `http://localhost:3000/inspector`, select the tool, enter test arguments, and verify both success and failure cases.
 
-| Field | Type | Description |
-|---|---|---|
-| `subject` | `string` | Stable opaque user identifier (same across conversations) |
-| `conversationId` | `string` | Current chat thread ID (changes per chat) |
-| `locale` | `string` | BCP-47 locale, e.g. `"it-IT"`  -  server-side, set at session start (see note below) |
-| `location` | `object` | `{ city, region, country, timezone, latitude, longitude }` |
-| `userAgent` | `string` | Browser / host user-agent string |
-| `timezoneOffsetMinutes` | `number` | UTC offset in minutes |
+## Next steps
 
-<Note>
-**`locale` vs `useWidget().locale`**: `ctx.client.user()?.locale` is detected server-side from the user's ChatGPT account language at session start. Inside a widget, `useWidget().locale` is the preferred alternative  -  it reads the same preference client-side (from `window.openai.locale` for the Apps SDK, or `HostContext.locale` for SEP-1865 hosts) and is therefore fresher and browser-aware. The values are usually the same but can differ when the account language differs from the browser language.
-</Note>
-
-### ChatGPT multi-tenant model
-
-ChatGPT establishes a **single MCP session for all users** of a deployed app. The MCP session ID alone is not enough to identify individual callers  -  use `ctx.client.user()` for that:
-
-```
-1 MCP session  ctx.session.sessionId               -  shared across ALL users
-  N subjects   ctx.client.user()?.subject          -  one per ChatGPT user account
-    M threads  ctx.client.user()?.conversationId   -  one per chat conversation
-```
-
-```typescript
-server.tool({ name: 'identify-caller', schema: z.object({}) }, async (_p, ctx) => {
-  const caller = ctx.client.user();
-  return object({
-    mcpSession:     ctx.session.sessionId,          // shared transport session
-    user:           caller?.subject ?? null,         // ChatGPT user ID
-    conversation:   caller?.conversationId ?? null,  // this chat thread
-  });
-});
-```
-
-## Logging from Tools
-
-Tools can send log messages to clients during execution using `ctx.log()`. This is useful for reporting progress, debugging tool behavior, and providing real-time feedback during long-running operations.
-
-```typescript
-server.tool({
-  name: 'process_files',
-  description: 'Process multiple files',
-  schema: z.object({
-    files: z.array(z.string())
-  })
-}, async ({ files }, ctx) => {
-  await ctx.log('info', 'Starting file processing');
-  
-  for (const file of files) {
-    await ctx.log('debug', `Processing ${file}`);
-    // ... process file ...
-  }
-  
-  await ctx.log('info', 'Processing completed');
-  return text(`Processed ${files.length} files`);
-})
-```
-
-The `ctx.log()` function accepts a log level (`'debug'`, `'info'`, `'notice'`, `'warning'`, `'error'`, `'critical'`, `'alert'`, `'emergency'`), a message string, and an optional logger name. See [Server Logging](./logging#tool-logging-with-ctxlog) for complete documentation on log levels and best practices.
-
-
-## Notifying Clients of Tool Changes
-
-When dynamically adding or removing tools, notify clients to refresh their tools cache:
-
-```typescript
-// Register a new tool dynamically
-server.tool({
-  name: 'new_tool',
-  description: 'A dynamically added tool',
-  schema: z.object({ input: z.string() })
-}, async ({ input }) => text(`Processed: ${input}`));
-
-// Notify all connected clients
-await server.sendToolsListChanged();
-```
-
-See [Notifications](./notifications) for more details.
-
-
-## Testing
-
-
-Use the built-in inspector for interactive testing:
-
-1. Start your server with the inspector
-2. Navigate to `http://localhost:3000/inspector`
-3. Select your tool from the list
-4. Enter parameter values
-5. Execute and view results
-
-## Next Steps
-
-- [Response Helpers](./response-helpers) - Utility functions for creating responses
-- [Resources Guide](./resources) - Managing static and dynamic content
-- [UI Widgets](./mcp-apps) - Creating interactive UI components
-- [Examples](https://github.com/mcp-use/mcp-use/tree/main/examples) - Real-world tool implementations
+<CardGroup cols={2}>
+  <Card title="Tools API reference" icon="terminal" href="/typescript/api-reference/server/tools">
+    Look up tool definitions, callback signatures, inferred types, and return shapes.
+  </Card>
+  <Card title="Response Helpers" icon="drill" href="/typescript/server/response-helpers">
+    Choose the right helper for text, JSON, errors, resources, media, and widgets.
+  </Card>
+  <Card title="MCP Apps" icon="blocks" href="/typescript/mcp-apps">
+    Return interactive widgets from tool results.
+  </Card>
+  <Card title="Authentication" icon="shield-check" href="/typescript/server/authentication/index">
+    Add verified user identity to protected tools.
+  </Card>
+</CardGroup>

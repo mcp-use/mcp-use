@@ -1,122 +1,124 @@
 ---
 title: "WorkOS Provider"
-description: "Configure WorkOS AuthKit OAuth for your MCP server"
+description: "Configure WorkOS AuthKit authentication for a TypeScript MCP server."
 icon: "/images/workos.svg"
 ---
 
-WorkOS uses Dynamic Client Registration (DCR). MCP clients discover WorkOS's OAuth endpoints via `.well-known` passthrough and register themselves directly with WorkOS. Your server only verifies the resulting tokens.
+Use the WorkOS provider when WorkOS AuthKit is your identity layer. MCP clients authenticate with WorkOS, and your MCP server verifies WorkOS-issued tokens.
 
-## Setup
+This guide covers the WorkOS setup path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthworkosprovider) for exact `oauthWorkOSProvider()` options, defaults, and errors.
 
-### 1. Create a WorkOS account
+## Configure WorkOS
 
-Sign up at the [WorkOS Dashboard](https://dashboard.workos.com/) and create a project.
+In the [WorkOS Dashboard](https://dashboard.workos.com/):
 
-### 2. Enable Dynamic Client Registration
+1. Create or open a project.
+2. Go to **Connect > Configuration**.
+3. Enable **Dynamic Client Registration**.
+4. Enable **Client ID Metadata Document** if your MCP clients support it.
+5. Add your MCP server URL as a **Resource Indicator**.
 
-In the WorkOS Dashboard, go to **Connect → Configuration** and enable **Dynamic Client Registration**.
-
-### 3. Configure redirect URIs
-
-Go to **Configuration → Redirects** and add your redirect URI:
+```text
+http://localhost:3000
 ```
-http://localhost:3000/callback
-```
 
-### 4. Environment variables
+The default mcp-use authorization challenge points clients to protected-resource metadata whose `resource` value is the server base URL. Add a path-specific resource indicator such as `http://localhost:3000/mcp` only when your clients request that scoped resource value.
+
+## Set environment variables
 
 ```bash
-MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app  # Full AuthKit domain
+MCP_USE_OAUTH_WORKOS_SUBDOMAIN=your-company.authkit.app
 ```
 
-## Configuration
+Use the full AuthKit domain as the subdomain value.
+
+## Configure the MCP server
 
 ```typescript
-import { MCPServer, oauthWorkOSProvider } from 'mcp-use/server'
+import { MCPServer, oauthWorkOSProvider } from "mcp-use/server";
 
-// Zero-config: reads MCP_USE_OAUTH_WORKOS_SUBDOMAIN
 const server = new MCPServer({
-  name: 'my-server',
-  version: '1.0.0',
-  oauth: oauthWorkOSProvider()
-})
+  name: "workos-server",
+  version: "1.0.0",
+  oauth: oauthWorkOSProvider(),
+});
 
-await server.listen(3000)
+await server.listen(3000);
 ```
 
-Or pass config explicitly:
+You can pass the AuthKit domain directly instead of using an environment variable:
 
 ```typescript
 oauth: oauthWorkOSProvider({
-  subdomain: 'your-company.authkit.app',
-
-  // Disable JWT verification during development only
-  verifyJwt: process.env.NODE_ENV === 'production',
-
-  // Override advertised scopes
-  // Default: ['email', 'offline_access', 'openid', 'profile']
-  scopesSupported: ['email', 'offline_access', 'openid', 'profile'],
-})
+  subdomain: "your-company.authkit.app",
+});
 ```
 
-<Tip>
-If you need to call the WorkOS Management API from your tool handlers, store your API key in any env var you like (e.g. `WORKOS_API_KEY`) and read it inside the tool  -  it isn't part of the OAuth provider config.
-</Tip>
+If your tools call the WorkOS Management API, store that API key separately. It is not part of the OAuth provider config.
 
-## Accessing user info in tools
+## Scope data by organization
 
-WorkOS provides standard OIDC claims plus organization context:
+WorkOS can include organization context in the token. Use it to filter tenant-specific data.
 
 ```typescript
+import { error, object } from "mcp-use/server";
+
 server.tool(
   {
-    name: 'get-profile',
-    description: 'Get authenticated user profile',
-  },
-  async (_args, ctx) => ({
-    userId: ctx.auth.user.userId,
-    email: ctx.auth.user.email,
-    name: ctx.auth.user.name,
-    organizationId: ctx.auth.user.organization_id,
-    roles: ctx.auth.user.roles,
-    scopes: ctx.auth.scopes,
-  })
-)
-```
-
-## Multi-tenant filtering
-
-Use `ctx.auth.user.organization_id` to scope data to the authenticated user's organization:
-
-```typescript
-server.tool(
-  {
-    name: 'get-documents',
-    description: 'Get documents for the authenticated organization',
+    name: "list_documents",
+    description: "List documents for the authenticated WorkOS organization.",
   },
   async (_args, ctx) => {
-    // Custom claims come back as `unknown`  -  narrow before use
-    const orgId = ctx.auth.user.organization_id as string | undefined
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
 
-    if (!orgId) {
-      return { content: [{ type: 'text', text: 'Organization context required' }], isError: true }
+    const organizationId = ctx.auth.user.organization_id as string | undefined;
+
+    if (!organizationId) {
+      return error("Organization context required.");
     }
 
     const documents = await db.documents.findMany({
-      where: { organizationId: orgId }
-    })
+      where: { organizationId },
+    });
 
-    return { content: [{ type: 'text', text: JSON.stringify(documents) }] }
-  }
-)
+    return object({ documents });
+  },
+);
 ```
 
-## Resources
+Use [User Context](/typescript/server/authentication/user-context) for shared access-control patterns.
 
-- [Runnable mcp-use + WorkOS AuthKit example](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos)
-- [WorkOS AuthKit MCP Guide](https://workos.com/docs/authkit/mcp)
-- [WorkOS Documentation](https://workos.com/docs)
+## Verify the setup
 
-## Next Steps
+Run the server and connect with an OAuth-capable MCP client.
 
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers WorkOS OAuth metadata.
+- The client signs in through WorkOS.
+- WorkOS issues an access token whose audience matches the MCP resource indicator.
+- Authenticated tool calls include `ctx.auth.user.userId`.
+- Organization-scoped tools reject calls without organization context.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Runnable WorkOS example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/oauth/workos">
+    Compare your setup with a working mcp-use WorkOS server.
+  </Card>
+  <Card title="WorkOS AuthKit MCP guide" icon="book-open" href="https://workos.com/docs/authkit/mcp">
+    Review WorkOS AuthKit MCP setup.
+  </Card>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Use WorkOS identity and organization data inside tools.
+  </Card>
+  <Card title="WorkOS provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthworkosprovider">
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>

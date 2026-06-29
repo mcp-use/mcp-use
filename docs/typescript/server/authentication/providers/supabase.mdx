@@ -1,165 +1,151 @@
 ---
 title: "Supabase Provider"
-description: "Configure Supabase OAuth 2.1 server authentication for your MCP server"
+description: "Configure Supabase OAuth 2.1 server authentication for a TypeScript MCP server."
 icon: "/images/icons/supabase.svg"
 ---
 
-Use [Supabase's OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server/getting-started) to sign users into your MCP server. Supabase handles the OAuth flow and issues the tokens; your server verifies them and you host the consent page.
+Use the Supabase provider when Supabase Auth is your OAuth authorization server. Supabase handles login, consent, Dynamic Client Registration, and token issuance. Your MCP server verifies Supabase tokens and can use the caller's access token for Row Level Security.
 
-## Prerequisites
+This guide covers the Supabase setup path. Use the [auth providers API reference](/typescript/api-reference/server/auth-providers#oauthsupabaseprovider) for exact `oauthSupabaseProvider()` options, defaults, and errors.
 
-Before your MCP server will work, configure these in the [Supabase Dashboard](https://app.supabase.com/):
+## Configure Supabase
 
-<Steps>
-  <Step title="Enable the OAuth 2.1 server">
-    **Authentication → Sign In / Providers → OAuth Server** → toggle on. Also toggle **Allow Dynamic OAuth Apps** so MCP clients can self-register.
-  </Step>
-  <Step title="Set the consent screen URL">
-    Point it at the route your MCP server will host, e.g. `http://localhost:3000/auth/consent`. Supabase redirects the browser here with `?authorization_id=<uuid>` after `/authorize`.
-  </Step>
-  <Step title="Enable a sign-in method">
-    Users must be signed in before they can consent. Pick one under **Authentication → Sign In / Providers**:
-    - **Anonymous sign-ins**  -  one-click guest sessions, ideal for demos
-    - **Email + password**, **magic links**, or **OAuth providers** (Google, GitHub, etc.)  -  for real apps
-  </Step>
-  <Step title="Copy your keys">
-    From **Project Settings**:
-    - **Project ID** (General)
-    - **Publishable key**  -  `sb_publishable_...` (API Keys). Used by *your* consent route and by tools that call Supabase  -  not by the provider itself.
-  </Step>
-</Steps>
+In the [Supabase Dashboard](https://app.supabase.com/):
 
-## Host the consent UI
+1. Go to **Authentication > Sign In / Providers > OAuth Server**.
+2. Enable the OAuth 2.1 server.
+3. Enable **Allow Dynamic OAuth Apps** so MCP clients can register.
+4. Set the consent screen URL to a route your app implements, such as `http://localhost:3000/auth/consent`.
+5. Enable at least one sign-in method for users.
+6. Copy the Project ID and publishable key.
 
-Supabase redirects the browser to the consent screen URL you configured above. Your route signs the user in, loads the authorization details with the Supabase JS SDK, and submits the approve/deny decision back to Supabase  -  mcp-use is not involved in this step.
+Supabase redirects users to your consent screen with an `authorization_id`. Your app must implement that route. The consent route signs the user in, loads the authorization details, and submits approve or deny back to Supabase.
 
-Don't want to build it from scratch? Start from the [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template)  -  it has sign-in, consent, and approve/deny already wired up. Or follow Supabase's [OAuth Server  -  Getting Started guide](https://supabase.com/docs/guides/auth/oauth-server/getting-started) to roll your own.
+Start from the [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template) if you do not already have a consent UI. Do not deploy the MCP server without a working consent route.
 
-## Environment variables
+## Set environment variables
 
 ```bash
-# Required (hosted Supabase)  -  read by oauthSupabaseProvider()
 MCP_USE_OAUTH_SUPABASE_PROJECT_ID=your-project-id
-
-# Optional override — point the provider at a self-hosted or local Supabase
-# instance (e.g. `supabase start`). Required instead of PROJECT_ID when you
-# aren't on supabase.co.
-# MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
-
-# Used by your consent UI and by tools calling Supabase REST/APIs.
-# Not read by oauthSupabaseProvider() itself.
 MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-## Configure the MCP server
+The provider reads the project ID. Your consent UI and tools that call Supabase use the publishable key.
 
-```typescript
-// server.ts
-import { MCPServer, oauthSupabaseProvider } from "mcp-use/server";
-
-const server = new MCPServer({
-  name: "my-server",
-  version: "1.0.0",
-  oauth: oauthSupabaseProvider(), // reads MCP_USE_OAUTH_SUPABASE_PROJECT_ID
-});
-
-await server.listen(3000);
-```
-
-## Configuration options
-
-```typescript
-oauthSupabaseProvider({
-  // Provide one of these (or set the matching env var):
-  projectId: "your-project-id",                 // hosted Supabase
-  // supabaseUrl: "http://localhost:54321",     // self-hosted / local
-
-  // Skip JWT verification  -  development only
-  verifyJwt: process.env.NODE_ENV === "production",
-
-  // Override advertised scopes
-  scopesSupported: ["openid", "profile", "email"],
-});
-```
-
-### Self-hosted / local Supabase
-
-For `supabase start` or a self-hosted instance, point the provider at your base URL instead of a project ID:
-
-```typescript
-const server = new MCPServer({
-  name: "my-server",
-  version: "1.0.0",
-  oauth: oauthSupabaseProvider({
-    supabaseUrl: "http://localhost:54321",
-  }),
-});
-```
-
-Or via env var:
+For local or self-hosted Supabase, set the Supabase URL instead of the hosted project ID:
 
 ```bash
 MCP_USE_OAUTH_SUPABASE_URL=http://localhost:54321
 ```
 
-`supabaseUrl` takes precedence over `projectId` when both are set. The provider derives the issuer and JWKS endpoint from this URL, so the local Supabase stack must expose `/auth/v1/.well-known/openid-configuration` (it does, by default).
-
-<Tip>
-  New Supabase projects sign tokens with **ES256** and expose a JWKS endpoint  -  the provider fetches it automatically, no secret needed. Legacy **HS256** projects can still pass a `jwtSecret` (or set `MCP_USE_OAUTH_SUPABASE_JWT_SECRET`), but new projects do not need it.
-</Tip>
-
-## Accessing user info in tools
+## Configure the MCP server
 
 ```typescript
-server.tool(
-  {
-    name: "get-user-info",
-    description: "Get authenticated user info",
-  },
-  async (_args, ctx) => ({
-    userId: ctx.auth.user.userId,
-    email: ctx.auth.user.email,
-    name: ctx.auth.user.name,
-    scopes: ctx.auth.scopes,
-  }),
-);
+import { MCPServer, oauthSupabaseProvider } from "mcp-use/server";
+
+const server = new MCPServer({
+  name: "supabase-server",
+  version: "1.0.0",
+  oauth: oauthSupabaseProvider(),
+});
+
+await server.listen(3000);
 ```
 
-You can also call Supabase from within a tool using the user's access token. Create a Supabase client scoped to the request so RLS policies see the caller as the authenticated user:
+For local or self-hosted Supabase, pass the URL directly when you prefer not to use environment variables:
+
+```typescript
+oauth: oauthSupabaseProvider({
+  supabaseUrl: "http://localhost:54321",
+});
+```
+
+New Supabase projects use ES256 tokens and expose JWKS metadata. Legacy HS256 projects may need a JWT secret; use the API reference for that option.
+
+## Use Supabase RLS from tools
+
+Create a Supabase client per request with the caller's access token. This lets Row Level Security evaluate policies as the authenticated user.
+
+Install the Supabase client when your tools call Supabase:
+
+```bash
+npm install @supabase/supabase-js
+```
 
 ```typescript
 import { createClient } from "@supabase/supabase-js";
+import { error, object } from "mcp-use/server";
+
+const supabaseUrl =
+  process.env.MCP_USE_OAUTH_SUPABASE_URL ??
+  `https://${process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID}.supabase.co`;
 
 server.tool(
   {
-    name: "list-notes",
-    description: "Fetch the user's notes",
+    name: "list_notes",
+    description: "Fetch notes visible to the authenticated Supabase user.",
   },
   async (_args, ctx) => {
+    if (!ctx.auth) {
+      return error("Unauthorized");
+    }
+
     const supabase = createClient(
-      `https://${process.env.MCP_USE_OAUTH_SUPABASE_PROJECT_ID}.supabase.co`,
+      supabaseUrl,
       process.env.MCP_USE_OAUTH_SUPABASE_PUBLISHABLE_KEY!,
       {
-        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-        global: { headers: { Authorization: `Bearer ${ctx.auth.accessToken}` } },
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+        global: {
+          headers: { Authorization: `Bearer ${ctx.auth.accessToken}` },
+        },
       },
     );
 
-    const { data, error } = await supabase.from("notes").select();
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    const { data, error: queryError } = await supabase.from("notes").select();
 
-    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+    if (queryError) {
+      return error(queryError.message);
+    }
+
+    return object({ notes: data });
   },
 );
 ```
 
-## Resources
+Use this pattern only when the tool needs to call Supabase as the user. For server-owned operations, use a separate server credential and enforce your own authorization checks.
 
-- [mcp-oauth-supabase-template](https://github.com/mcp-use/mcp-oauth-supabase-template)  -  starter template with the consent UI already wired up
-- [Supabase OAuth Server  -  Getting Started](https://supabase.com/docs/guides/auth/oauth-server/getting-started)
-- [Supabase OAuth Server  -  MCP Authentication](https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication)
-- [Row Level Security](https://supabase.com/docs/guides/auth/row-level-security)
+## Verify the setup
 
-## Next Steps
+Run the server and connect with an OAuth-capable MCP client.
 
-- [User Context](/typescript/server/authentication/user-context)  -  Access user information in tools
+```bash
+npm run dev
+```
+
+Confirm these cases:
+
+- The client discovers Supabase OAuth metadata.
+- The user can sign in and approve consent.
+- Authenticated tool calls include `ctx.auth.user.userId`.
+- RLS-backed tools only return rows visible to the caller.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Supabase OAuth template" icon="github" href="https://github.com/mcp-use/mcp-oauth-supabase-template">
+    Start from a consent UI wired for mcp-use and Supabase.
+  </Card>
+  <Card title="Supabase MCP Authentication" icon="book-open" href="https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication">
+    Review Supabase's MCP authentication guide.
+  </Card>
+  <Card title="User Context" icon="user" href="/typescript/server/authentication/user-context">
+    Use Supabase user data inside tools.
+  </Card>
+  <Card title="Supabase provider API reference" icon="terminal" href="/typescript/api-reference/server/auth-providers#oauthsupabaseprovider">
+    Look up exact provider options and defaults.
+  </Card>
+</CardGroup>

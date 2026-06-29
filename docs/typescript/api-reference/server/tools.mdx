@@ -1,0 +1,311 @@
+---
+title: "Tools"
+description: "Register and type MCP tools on an MCPServer API Documentation"
+icon: "wrench"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts"
+---
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/server/mcp-server.ts</a>
+</Callout>
+
+Tools are the executable actions an MCP server exposes to clients and models. You register a tool with `server.tool()`, passing a `ToolDefinition` (name, optional Zod `schema`, optional `outputSchema`, `annotations`, and `widget` config) plus a `ToolCallback` that runs when the tool is invoked. This page documents the registration method and the related types: `ToolDefinition`, `ToolCallback`, `ToolAnnotations`, `InputDefinition`, and the per-tool widget config.
+
+## Methods
+
+Registers a tool on the server and returns the server instance for chaining.
+
+```ts
+import { MCPServer } from "mcp-use/server"
+```
+
+### tool
+
+Registers a tool that MCP clients and models can invoke to perform actions such as reading files, calling APIs, running commands, or rendering widgets. Each tool has a name, an optional input schema, an optional output schema, and a callback.
+
+The callback may be supplied either as the `cb` field inside the definition or as the second `callback` argument. When both are present, the second argument wins (`callback || toolDefinition.cb`). If neither is supplied, the tool is still registered with the MCP SDK but without a handler. Calling `tool()` again with the same `name` re-registers (overwrites) that tool, which is how hot module reloading updates a tool during `mcp-use dev`.
+
+The input type passed to the callback is inferred from the definition's `schema` via `InferToolInput`, and the structured output type is inferred from `outputSchema` via `InferToolOutput`, so destructured parameters and `structuredContent` are fully typed. The `HasOAuth` type parameter on the server controls whether `ctx.auth` is available in the callback.
+
+If the definition includes a `widget` config, `tool()` automatically attaches widget metadata (for example `openai/outputTemplate`, `openai/toolInvocation/invoking`, `openai/toolInvocation/invoked`, `openai/widgetAccessible`, and `openai/resultCanProduceWidget`) to the tool's `_meta`, and wraps the callback so an empty text content entry is backfilled with `Displaying {widgetName}`. See the per-tool widget config below for defaults.
+
+```ts
+import { MCPServer, text } from "mcp-use/server"
+import { z } from "zod"
+
+const server = new MCPServer({
+  name: "simple-example-server",
+  version: "1.0.0",
+  description: "A simple MCP server example",
+})
+
+server.tool(
+  {
+    name: "hello-world",
+    description: "A simple tool that returns hello world",
+  },
+  async () => text("Hello World!"),
+)
+```
+
+**Type Parameters**
+><ParamField body="T" type="ToolDefinition<any, any, HasOAuth>" >   The tool definition type. Its `schema` and `outputSchema` drive input/output inference for the callback. </ParamField>
+
+**Parameters**
+><ParamField body="toolDefinition" type="T & ToolDefinition<any, any, HasOAuth>" required="true" >   The tool configuration object. See `ToolDefinition` for every field. </ParamField>
+><ParamField body="callback" type="ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>" >   Optional handler invoked when the tool is called. Alternative to `toolDefinition.cb`; if provided it takes precedence over `cb`. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="this" >   The server instance, enabling method chaining. </ResponseField>
+
+**Signature**
+```ts wrap
+public tool: <T extends ToolDefinition<any, any, HasOAuth>>(toolDefinition: T & ToolDefinition<any, any, HasOAuth>, callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>) => this
+```
+
+## Types
+
+### ToolDefinition
+
+Describes a single tool: its identity, schemas, callback, annotations, metadata, and optional widget config. This is the object passed as the first argument to `server.tool()`. Both `schema` and `outputSchema` are Zod schemas, and the type parameters `TInput`, `TOutput`, and `HasOAuth` flow into the `cb` callback so its parameters and structured output are typed.
+
+```ts
+import type { ToolDefinition } from "mcp-use/server"
+```
+
+**Fields**
+><ParamField body="name" type="string" required="true" >   Unique identifier for the tool. Must match the name passed to `useCallTool("name")` in widget components. Example: `"search-products"`. </ParamField>
+><ParamField body="title" type="string" >   Human-readable title displayed in clients and the inspector. If omitted, `name` is used. </ParamField>
+><ParamField body="description" type="string" >   LLM-facing description of what the tool does. Helps the model decide when to invoke it. </ParamField>
+><ParamField body="inputs" type="InputDefinition[]" >   Deprecated. Legacy input parameter definitions. Use `schema` instead. </ParamField>
+><ParamField body="schema" type="z.ZodTypeAny" >   Zod schema for input validation. Use `.describe()` on each field for model hints. Preferred over `inputs` for type safety. </ParamField>
+><ParamField body="outputSchema" type="z.ZodTypeAny" >   Zod schema for structured output. Enables output type inference in `useCallTool()`; types are generated to `.mcp-use/tool-registry.d.ts` when running `mcp-use dev`. </ParamField>
+><ParamField body="cb" type="ToolCallback<TInput, TOutput, HasOAuth>" >   Async callback that executes the tool. May be omitted here and passed as the second argument to `server.tool()` instead. </ParamField>
+><ParamField body="annotations" type="ToolAnnotations" >   Behavior hints for clients (read-only, destructive, etc.). See `ToolAnnotations`. </ParamField>
+><ParamField body="_meta" type="Record<string, unknown>" >   Arbitrary metadata for the tool. When a `widget` config is present, `server.tool()` augments this with widget-related keys. </ParamField>
+><ParamField body="widget" type="ToolWidgetConfig" >   Configuration for tools that return a widget via the `widget()` helper. Sets up widget metadata at registration time. See the per-tool widget config below. </ParamField>
+
+**Signature**
+```ts wrap
+interface ToolDefinition<TInput = Record<string, any>, TOutput extends Record<string, unknown> = Record<string, unknown>, HasOAuth extends boolean = false> {
+  name: string
+  title?: string
+  description?: string
+  inputs?: InputDefinition[]
+  schema?: z.ZodTypeAny
+  outputSchema?: z.ZodTypeAny
+  cb?: ToolCallback<TInput, TOutput, HasOAuth>
+  annotations?: ToolAnnotations
+  _meta?: Record<string, unknown>
+  widget?: ToolWidgetConfig
+}
+```
+
+A definition using `schema`, `outputSchema`, and `annotations` together (lifted from the `everything` example):
+
+```ts wrap
+import { object, error } from "mcp-use/server"
+import { z } from "zod"
+
+server.tool(
+  {
+    name: "calculate-stats",
+    description: "Calculate statistics with validated output structure",
+    schema: z.object({
+      numbers: z.array(z.number()).min(1).describe("Numbers to analyze"),
+    }),
+    outputSchema: z.object({
+      count: z.number(),
+      sum: z.number(),
+      mean: z.number(),
+      min: z.number(),
+      max: z.number(),
+    }),
+  },
+  async ({ numbers }) => {
+    if (numbers.length === 0) {
+      return error("Cannot calculate statistics on empty array")
+    }
+    const sorted = [...numbers].sort((a, b) => a - b)
+    const sum = numbers.reduce((a, b) => a + b, 0)
+    return object({
+      count: numbers.length,
+      sum,
+      mean: sum / numbers.length,
+      min: sorted[0],
+      max: sorted[sorted.length - 1],
+    })
+  },
+)
+```
+
+### ToolCallback
+
+The async handler that runs when a tool is invoked. It receives the validated input parameters as its first argument and an enhanced context object as its second, and must resolve to a tool result. The result may be a `TypedCallToolResult<TOutput>` (produced by helpers like `object()` when `outputSchema` is set) or a plain `CallToolResult` (produced by helpers like `text()`, `markdown()`, `mix()`, `error()`), since the SDK validates `structuredContent` at runtime only when present.
+
+The context exposes LLM sampling via `ctx.sample()`, progress reporting via `ctx.reportProgress()`, elicitation via `ctx.elicit()`, authentication info via `ctx.auth` (when OAuth is configured, gated by the `HasOAuth` type parameter), the HTTP request via `ctx.req`, and all other Hono `Context` properties. The type is defined through a method-signature helper to enable bivariant parameter checking, which lets callbacks destructure optional fields without explicitly marking them optional.
+
+```ts
+import type { ToolCallback } from "mcp-use/server"
+```
+
+**Type Parameters**
+><ParamField body="TInput" type="Record<string, any>" default="Record<string, any>" >   Input parameters type, normally inferred from the definition's `schema`. </ParamField>
+><ParamField body="TOutput" type="Record<string, unknown>" default="Record<string, unknown>" >   Output type that constrains `structuredContent` when `outputSchema` is defined. </ParamField>
+><ParamField body="HasOAuth" type="boolean" default="false" >   Whether OAuth is configured, which controls availability of `ctx.auth`. </ParamField>
+
+**Parameters (of the callback)**
+><ParamField body="params" type="TInput" required="true" >   The validated tool input. </ParamField>
+><ParamField body="ctx" type="EnhancedToolContext<HasOAuth>" required="true" >   The enhanced context combining `ToolContext` (sampling, progress, elicitation) with the Hono request context. </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="Promise<TypedCallToolResult<TOutput> | CallToolResult>" >   The tool result, typically built with a response helper from `mcp-use/server`. </ResponseField>
+
+**Signature**
+```ts wrap
+type ToolCallback<TInput = Record<string, any>, TOutput extends Record<string, unknown> = Record<string, unknown>, HasOAuth extends boolean = false> = (params: TInput, ctx: EnhancedToolContext<HasOAuth>) => Promise<TypedCallToolResult<TOutput> | CallToolResult>
+```
+
+### ToolAnnotations
+
+Behavior hints that describe a tool to clients so they can decide how to present or guard it (for example, marking a tool read-only or warning before a destructive call). `ToolAnnotations` is re-exported from `@modelcontextprotocol/sdk/types.js` for convenience and assigned to `ToolDefinition.annotations`. All fields are optional and act as hints only; they do not change server-side behavior.
+
+```ts
+import type { ToolAnnotations } from "mcp-use/server"
+```
+
+**Fields**
+><ParamField body="title" type="string" >   Human-readable title for the tool, for display purposes. </ParamField>
+><ParamField body="readOnlyHint" type="boolean" >   If true, the tool does not modify its environment. </ParamField>
+><ParamField body="destructiveHint" type="boolean" >   If true, the tool may perform destructive updates (only meaningful when `readOnlyHint` is false). </ParamField>
+><ParamField body="idempotentHint" type="boolean" >   If true, repeated calls with the same arguments have no additional effect (only meaningful when `readOnlyHint` is false). </ParamField>
+><ParamField body="openWorldHint" type="boolean" >   If true, the tool may interact with an open, external set of entities (for example, the web). </ParamField>
+
+**Usage** (lifted from the `everything` example):
+
+```ts wrap
+import { error, text } from "mcp-use/server"
+import { z } from "zod"
+
+server.tool(
+  {
+    name: "delete-item",
+    description: "Delete an item permanently",
+    schema: z.object({
+      itemId: z.string().describe("Item ID to delete"),
+    }),
+    annotations: {
+      destructiveHint: true,
+      readOnlyHint: false,
+      openWorldHint: false,
+    },
+  },
+  async ({ itemId }) => {
+    if (!items.has(itemId)) {
+      return error(`Item not found: ${itemId}`)
+    }
+    const item = items.get(itemId)
+    items.delete(itemId)
+    return text(`Deleted: ${item?.name}`)
+  },
+)
+```
+
+### InputDefinition
+
+A single legacy input parameter definition, used by `ToolDefinition.inputs` (and by prompt args). It predates Zod schema support. Prefer a Zod `schema` with `.describe()` on the `ToolDefinition` instead, which gives full type inference and richer model guidance. `InputDefinition` remains available for cases that build parameter lists dynamically.
+
+```ts
+import type { InputDefinition } from "mcp-use/server"
+```
+
+**Fields**
+><ParamField body="name" type="string" required="true" >   Parameter name (camelCase or kebab-case). Example: `"maxResults"`. </ParamField>
+><ParamField body="type" type='"string" | "number" | "boolean" | "object" | "array"' required="true" >   Parameter type. </ParamField>
+><ParamField body="description" type="string" >   Human-readable description that helps the model understand the parameter. </ParamField>
+><ParamField body="required" type="boolean" >   Whether the parameter is required. Defaults to `false`. </ParamField>
+><ParamField body="default" type="unknown" >   Default value used when the parameter is omitted. Example: `10`. </ParamField>
+
+**Signature**
+```ts wrap
+interface InputDefinition {
+  name: string
+  type: "string" | "number" | "boolean" | "object" | "array"
+  description?: string
+  required?: boolean
+  default?: unknown
+}
+```
+
+### ToolWidgetConfig
+
+The per-tool widget configuration, set as the `widget` field of a `ToolDefinition`. It configures the metadata the server emits so a tool's result renders as a widget in the inspector and in clients such as ChatGPT. When this config is present and has a `name`, `server.tool()` resolves the widget output template (`ui://widget/{name}.html`, with the server build id appended when set), attaches widget keys to the tool's `_meta`, and wraps the callback to backfill an empty text content entry.
+
+```ts
+import type { ToolDefinition } from "mcp-use/server"
+// The widget field type is ToolDefinition["widget"].
+```
+
+<Note>
+This shape is the type of `ToolDefinition.widget`. A separate exported `WidgetConfig` type exists in `mcp-use/server`, but that one describes a discovered widget directory (its `name`, `path`, `manifest`, and `component`) and is not the per-tool config used here.
+</Note>
+
+**Fields**
+><ParamField body="name" type="string" required="true" >   Widget name. Must match a file in `resources/` (for example `resources/weather-display.tsx`). Example: `"weather-display"`. </ParamField>
+><ParamField body="invoking" type="string" default='"Loading {name}..."' >   Status text shown while the tool is running. Defaults to `Loading {name}...` when omitted. </ParamField>
+><ParamField body="invoked" type="string" default='"{name} ready"' >   Status text shown after the tool completes. Defaults to `{name} ready` when omitted. </ParamField>
+><ParamField body="widgetAccessible" type="boolean" default="true" >   Whether the widget can initiate tool calls (for example via `useCallTool`). Defaults to `true`. </ParamField>
+><ParamField body="resultCanProduceWidget" type="boolean" default="true" >   Whether this tool result can produce a widget. Defaults to `true`. </ParamField>
+
+**Signature**
+```ts wrap
+interface ToolWidgetConfig {
+  name: string
+  invoking?: string
+  invoked?: string
+  widgetAccessible?: boolean
+  resultCanProduceWidget?: boolean
+}
+```
+
+**Usage** (lifted from the `everything` example):
+
+```ts wrap
+import { widget, text } from "mcp-use/server"
+import { z } from "zod"
+
+server.tool(
+  {
+    name: "browse-items",
+    description: "Browse items with a visual widget interface",
+    schema: z.object({
+      query: z.string().optional().describe("Optional search query"),
+    }),
+    widget: {
+      name: "everything-widget",
+      invoking: "Loading items...",
+      invoked: "Items loaded",
+    },
+  },
+  async ({ query }) => {
+    let results = Array.from(items.values())
+    if (query) {
+      const q = query.toLowerCase()
+      results = results.filter((i) => i.name.toLowerCase().includes(q))
+    }
+    const categories = [...new Set(results.map((i) => i.category))]
+    return widget({
+      props: { items: results, categories, totalCount: results.length },
+      output: text(
+        `Found ${results.length} items across ${categories.length} categories`,
+      ),
+    })
+  },
+)
+```
+
+## See also
+
+<Card title="Server" icon="server" href="/typescript/api-reference/server/mcp-server">
+The `MCPServer` class that hosts these tools, plus its constructor and lifecycle methods.
+</Card>
