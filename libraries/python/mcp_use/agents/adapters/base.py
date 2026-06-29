@@ -5,6 +5,7 @@ This module provides the abstract base class that all MCP tool adapters should i
 """
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Any, Generic, TypeVar
 
 from mcp.types import Prompt, Resource, Tool
@@ -79,6 +80,10 @@ class BaseAdapter(Generic[T], ABC):
         Returns:
             The fixed JSON schema.
         """
+        return self._fix_schema(deepcopy(schema))
+
+    def _fix_schema(self, schema: Any) -> Any:
+        """Normalize a copied schema recursively."""
         if isinstance(schema, dict):
             if "type" in schema and isinstance(schema["type"], list):
                 schema["anyOf"] = [{"type": t} for t in schema["type"]]
@@ -89,9 +94,9 @@ class BaseAdapter(Generic[T], ABC):
                 schema["type"] = "string"
 
             for key, value in schema.items():
-                schema[key] = self.fix_schema(value)  # Apply recursively
+                schema[key] = self._fix_schema(value)  # Apply recursively
         elif isinstance(schema, list):
-            return [self.fix_schema(item) for item in schema]
+            return [self._fix_schema(item) for item in schema]
         return schema
 
     async def _get_connectors(self, client: MCPClient) -> list[BaseConnector]:
