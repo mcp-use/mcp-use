@@ -231,6 +231,37 @@ describe("MCPServer.fromOpenAPI", () => {
     expect(result?.structuredContent).toEqual({ id: "todo_123" });
   });
 
+  it("returns an empty object for successful JSON responses with no body", async () => {
+    const fetchMock = vi.fn(async () => {
+      return new Response(null, {
+        status: 204,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    const server = MCPServer.fromOpenAPI({
+      spec: {
+        openapi: "3.1.0",
+        info: { title: "Delete API", version: "1.0.0" },
+        paths: {
+          "/items/{id}": {
+            delete: {
+              operationId: "deleteItem",
+              responses: { "204": { description: "deleted" } },
+            },
+          },
+        },
+      },
+      baseUrl: "https://api.example.com",
+      fetch: fetchMock,
+    });
+
+    const deleteItem = server.registrations.tools.get("deleteItem");
+    const result = await deleteItem?.handler({ id: "item_1" });
+
+    expect(result?.structuredContent).toEqual({});
+    expect(result?.isError).toBeFalsy();
+  });
+
   it("sends JSON request bodies", async () => {
     const fetchMock = vi.fn(async () => {
       return new Response("updated", {
