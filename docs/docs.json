@@ -45,18 +45,18 @@
             ]
           },
           {
+            "group": "Templates",
+            "icon": "layout-template",
+            "pages": [
+              "home/templates"
+            ]
+          },
+          {
             "group": "Libraries",
             "icon": "library",
             "pages": [
               "home/redirects/python",
               "home/redirects/typescript"
-            ]
-          },
-          {
-            "group": "Templates",
-            "icon": "layout-template",
-            "pages": [
-              "home/templates"
             ]
           }
         ]
