@@ -22,7 +22,10 @@ from mcp_use.telemetry.telemetry import Telemetry, telemetry
 _telemetry = Telemetry()
 
 if TYPE_CHECKING:
-    from mcp_use.client.code_executor import CodeExecutor
+    from collections.abc import Awaitable, Callable
+    from typing import Literal
+
+    from mcp_use.client.executors.base import BaseCodeExecutor, ExecutionResult
 
 
 class MCPClient:
@@ -46,6 +49,7 @@ class MCPClient:
         roots: list[Root] | None = None,
         list_roots_callback: ListRootsFnT | None = None,
         code_mode: bool = False,
+        code_executor: "BaseCodeExecutor | type[BaseCodeExecutor] | Literal['vm'] | Callable[[str, float], ExecutionResult | Awaitable[ExecutionResult]] | None" = None,  # noqa: E501
         verify: bool | None = True,
     ) -> None:
         """Initialize a new MCP client.
@@ -60,6 +64,12 @@ class MCPClient:
             list_roots_callback: Optional custom callback for roots/list requests.
             sampling_callback: Optional sampling callback function.
             code_mode: Whether to enable code execution mode for tools.
+            code_executor: Which executor runs agent code when ``code_mode`` is enabled.
+                ``None`` or ``"vm"`` uses the default in-process
+                :class:`~mcp_use.client.executors.vm.VMCodeExecutor` (trusted code
+                only, not a security boundary). Pass a :class:`BaseCodeExecutor`
+                subclass or instance, or a ``(code, timeout)`` callable, to run code
+                in your own (e.g. sandboxed) backend for untrusted input.
         """
         self.config: dict[str, Any] = {}
         self.allowed_servers: list[str] = allowed_servers
@@ -74,7 +84,8 @@ class MCPClient:
         self.code_mode = code_mode
         self.roots = roots
         self.list_roots_callback = list_roots_callback
-        self._code_executor: CodeExecutor | None = None
+        self._code_executor_spec = code_executor
+        self._code_executor: BaseCodeExecutor | None = None
         self._record_telemetry = True
         # Add default logging middleware if no middleware provided, or prepend it to existing middleware
         default_middleware = [default_logging_middleware]
@@ -120,6 +131,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         code_mode: bool = False,
+        code_executor: "BaseCodeExecutor | type[BaseCodeExecutor] | Literal['vm'] | Callable[[str, float], ExecutionResult | Awaitable[ExecutionResult]] | None" = None,  # noqa: E501
         verify: bool | None = True,
         roots: list[Root] | None = None,
         list_roots_callback: ListRootsFnT | None = None,
@@ -133,6 +145,9 @@ class MCPClient:
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
             code_mode: Whether to enable code execution mode for tools.
+            code_executor: Which executor runs agent code in code mode (default
+                in-process VM; pass a BaseCodeExecutor or callable for a sandboxed
+                backend). See ``MCPClient.__init__`` for details.
             roots: Optional list of Root objects to advertise to servers.
             list_roots_callback: Optional custom callback for roots/list requests.
         """
@@ -145,6 +160,7 @@ class MCPClient:
             message_handler=message_handler,
             logging_callback=logging_callback,
             code_mode=code_mode,
+            code_executor=code_executor,
             verify=verify,
             roots=roots,
             list_roots_callback=list_roots_callback,
@@ -161,6 +177,7 @@ class MCPClient:
         message_handler: MessageHandlerFnT | None = None,
         logging_callback: LoggingFnT | None = None,
         code_mode: bool = False,
+        code_executor: "BaseCodeExecutor | type[BaseCodeExecutor] | Literal['vm'] | Callable[[str, float], ExecutionResult | Awaitable[ExecutionResult]] | None" = None,  # noqa: E501
         verify: bool | None = True,
         roots: list[Root] | None = None,
         list_roots_callback: ListRootsFnT | None = None,
@@ -174,6 +191,9 @@ class MCPClient:
             sampling_callback: Optional sampling callback function.
             elicitation_callback: Optional elicitation callback function.
             code_mode: Whether to enable code execution mode for tools.
+            code_executor: Which executor runs agent code in code mode (default
+                in-process VM; pass a BaseCodeExecutor or callable for a sandboxed
+                backend). See ``MCPClient.__init__`` for details.
             roots: Optional list of Root objects to advertise to servers.
             list_roots_callback: Optional custom callback for roots/list requests.
         """
@@ -186,6 +206,7 @@ class MCPClient:
             message_handler=message_handler,
             logging_callback=logging_callback,
             code_mode=code_mode,
+            code_executor=code_executor,
             verify=verify,
             roots=roots,
             list_roots_callback=list_roots_callback,
@@ -460,6 +481,13 @@ class MCPClient:
         else:
             logger.debug("All sessions closed successfully")
 
+        # Release any resources held by the code executor (e.g. remote sandboxes).
+        if self._code_executor is not None:
+            try:
+                await self._code_executor.cleanup()
+            except Exception as e:
+                logger.error(f"Error during code executor cleanup: {e}")
+
     async def execute_code(self, code: str, timeout: float = 30.0) -> dict[str, Any]:
         """Execute Python code with access to MCP tools (code mode).
 
@@ -507,13 +535,46 @@ class MCPClient:
                 "Code execution mode is not enabled. Create the client with code_mode=True to use execute_code()."
             )
 
-        # Lazy import to avoid circular dependency
         if self._code_executor is None:
-            from mcp_use.client.code_executor import CodeExecutor
-
-            self._code_executor = CodeExecutor(self)
+            self._code_executor = self._resolve_code_executor()
 
         return await self._code_executor.execute(code, timeout)
+
+    def _resolve_code_executor(self) -> "BaseCodeExecutor":
+        """Resolve the configured ``code_executor`` spec into an executor instance.
+
+        Accepts: ``None``/``"vm"`` -> default in-process VMCodeExecutor; a
+        BaseCodeExecutor *instance* (used as-is); a BaseCodeExecutor *subclass*
+        (instantiated with this client); any other callable (wrapped in a
+        FunctionCodeExecutor and called as ``fn(code, timeout)``).
+
+        Raises:
+            ValueError: If the spec is not one of the supported forms.
+        """
+        # Lazy imports to avoid a circular import at module load time.
+        from mcp_use.client.executors.base import BaseCodeExecutor, FunctionCodeExecutor
+        from mcp_use.client.executors.vm import VMCodeExecutor
+
+        spec = self._code_executor_spec
+        if spec is None:
+            return VMCodeExecutor(self)
+        if isinstance(spec, BaseCodeExecutor):
+            return spec
+        # A BaseCodeExecutor subclass: instantiate it bound to this client.
+        # (Checked before the generic callable branch, since classes are callable.)
+        if isinstance(spec, type) and issubclass(spec, BaseCodeExecutor):
+            return spec(self)
+        # Guard the string compare with isinstance to avoid invoking a custom __eq__.
+        if isinstance(spec, str):
+            if spec == "vm":
+                return VMCodeExecutor(self)
+            raise ValueError(f"Unknown code_executor {spec!r}. The only supported string is 'vm'.")
+        if callable(spec):
+            return FunctionCodeExecutor(self, spec)
+        raise ValueError(
+            f"Invalid code_executor {spec!r}. Expected None, 'vm', a BaseCodeExecutor "
+            "instance or subclass, or a callable."
+        )
 
     async def search_tools(self, query: str = "", detail_level: str = "full") -> dict[str, Any]:
         """Search available MCP tools across all active sessions.
