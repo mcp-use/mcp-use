@@ -255,6 +255,7 @@ jobs:
     if: always() && github.event_name == 'pull_request' && needs.python-transport-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
+      issues: write
       pull-requests: write
     steps:
       - name: Download all test results
@@ -269,11 +270,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const transports = ['stdio', 'sse', 'streamable_http'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const transport of transports) {
               const xmlPath = path.join('test-results', `transport-test-results-${transport}`, `test-results-${transport}.xml`);
               let status = '⏭️ Skipped';
@@ -282,28 +283,28 @@ jobs:
               let failed = '-';
               let errors = '-';
               let time = '-';
-              
+
               if (fs.existsSync(xmlPath)) {
                 const content = fs.readFileSync(xmlPath, 'utf8');
-                
+
                 // Parse basic stats from JUnit XML
                 const testsMatch = content.match(/tests="(\d+)"/);
                 const failuresMatch = content.match(/failures="(\d+)"/);
                 const errorsMatch = content.match(/errors="(\d+)"/);
                 const timeMatch = content.match(/time="([\d.]+)"/);
-                
+
                 if (testsMatch) {
                   const totalTests = parseInt(testsMatch[1]);
                   const failureCount = failuresMatch ? parseInt(failuresMatch[1]) : 0;
                   const errorCount = errorsMatch ? parseInt(errorsMatch[1]) : 0;
                   const passedCount = totalTests - failureCount - errorCount;
-                  
+
                   tests = totalTests.toString();
                   passed = passedCount.toString();
                   failed = failureCount.toString();
                   errors = errorCount.toString();
                   time = timeMatch ? `${parseFloat(timeMatch[1]).toFixed(2)}s` : '-';
-                  
+
                   if (failureCount === 0 && errorCount === 0) {
                     status = '✅ Passed';
                   } else {
@@ -312,47 +313,54 @@ jobs:
                   }
                 }
               }
-              
+
               tableRows.push(`| ${transport} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All transport tests passed!' : '❌ Some transport tests failed';
-            
+
             const comment = `## Python Transport Tests Results
-            
+
             ${overallStatus}
-            
+
             | Transport | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const botComment = comments.find(c => 
-              c.user.type === 'Bot' && 
-              c.body.includes('## Python Transport Tests Results')
-            );
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: comment,
-              });
-            } else {
-              await github.rest.issues.createComment({
+
+            try {
+              const { data: comments } = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: comment,
               });
+
+              const botComment = comments.find(c =>
+                c.user.type === 'Bot' &&
+                c.body.includes('## Python Transport Tests Results')
+              );
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: comment,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: comment,
+                });
+              }
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(`Could not write transport test summary comment: ${error.message}`);
+              } else {
+                throw error;
+              }
             }
 
   python-primitive-tests:
@@ -420,6 +428,7 @@ jobs:
     if: always() && github.event_name == 'pull_request' && needs.python-primitive-tests.result != 'skipped'
     runs-on: ubuntu-latest
     permissions:
+      issues: write
       pull-requests: write
     steps:
       - name: Download all test results
@@ -434,11 +443,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth', 'roots'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const primitive of primitives) {
               const xmlPath = path.join('test-results', `primitive-test-results-${primitive}`, `test-results-${primitive}.xml`);
               let status = '⏭️ Skipped';
@@ -447,28 +456,28 @@ jobs:
               let failed = '-';
               let errors = '-';
               let time = '-';
-              
+
               if (fs.existsSync(xmlPath)) {
                 const content = fs.readFileSync(xmlPath, 'utf8');
-                
+
                 // Parse basic stats from JUnit XML
                 const testsMatch = content.match(/tests="(\d+)"/);
                 const failuresMatch = content.match(/failures="(\d+)"/);
                 const errorsMatch = content.match(/errors="(\d+)"/);
                 const timeMatch = content.match(/time="([\d.]+)"/);
-                
+
                 if (testsMatch) {
                   const totalTests = parseInt(testsMatch[1]);
                   const failureCount = failuresMatch ? parseInt(failuresMatch[1]) : 0;
                   const errorCount = errorsMatch ? parseInt(errorsMatch[1]) : 0;
                   const passedCount = totalTests - failureCount - errorCount;
-                  
+
                   tests = totalTests.toString();
                   passed = passedCount.toString();
                   failed = failureCount.toString();
                   errors = errorCount.toString();
                   time = timeMatch ? `${parseFloat(timeMatch[1]).toFixed(2)}s` : '-';
-                  
+
                   if (failureCount === 0 && errorCount === 0) {
                     status = '✅ Passed';
                   } else {
@@ -477,47 +486,54 @@ jobs:
                   }
                 }
               }
-              
+
               tableRows.push(`| ${primitive} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All primitive tests passed!' : '❌ Some primitive tests failed';
-            
+
             const comment = `## Python Primitive Tests Results
-            
+
             ${overallStatus}
-            
+
             | Primitive | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
-            // Find existing comment
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            
-            const botComment = comments.find(c => 
-              c.user.type === 'Bot' && 
-              c.body.includes('## Python Primitive Tests Results')
-            );
-            
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: comment,
-              });
-            } else {
-              await github.rest.issues.createComment({
+
+            try {
+              const { data: comments } = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: comment,
               });
+
+              const botComment = comments.find(c =>
+                c.user.type === 'Bot' &&
+                c.body.includes('## Python Primitive Tests Results')
+              );
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: comment,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: comment,
+                });
+              }
+            } catch (error) {
+              if (error.status === 403) {
+                core.warning(`Could not write primitive test summary comment: ${error.message}`);
+              } else {
+                throw error;
+              }
             }
 
   python-integration-tests:
@@ -956,7 +972,7 @@ jobs:
           [ -f "test-app/package.json" ] || exit 1
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
-      
+
       - name: Test dev command (non --dev flag only)
         if: matrix.flag == ''
         shell: bash
@@ -974,12 +990,12 @@ jobs:
               pnpm dev &
               ;;
           esac
-          
+
           DEV_PID=$!
-          
+
           # Wait for server to start (10 seconds should be enough)
           sleep 10
-          
+
           # Kill the dev server
           if [ "${{ runner.os }}" == "Windows" ]; then
             # On Windows, kill by port is more reliable than DEV_PID
@@ -993,8 +1009,8 @@ jobs:
           else
             kill $DEV_PID 2>/dev/null || true
           fi
-          
+
           # Wait for process to exit
           wait $DEV_PID 2>/dev/null || true
-          
+
           echo "✅ Dev server started and stopped successfully"

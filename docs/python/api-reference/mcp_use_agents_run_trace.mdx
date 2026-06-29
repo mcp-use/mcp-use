@@ -1,0 +1,315 @@
+---
+title: "Run Trace"
+description: "Run trace models for inspecting MCP agent tool use API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/run_trace.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/run_trace.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/agents/run_trace.py</a>
+</Callout>
+
+Run trace models for inspecting MCP agent tool use.
+
+## AgentRunTrace
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> AgentRunTrace</div>
+
+Inspectable trace for the most recent MCPAgent run.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.agents.run_trace import AgentRunTrace
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+<ParamField body="max_output_chars" type="int" required="True" >   Integer value </ParamField>
+<ParamField body="started_at" type="float" required="True" >   Parameter value </ParamField>
+<ParamField body="completed_at" type="float | None" required="True" >   Parameter value </ParamField>
+<ParamField body="final_output" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="error" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="tool_calls" type="list[ToolCallRecord]" required="True" >   List of items </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="query" type="str" required="True" >   Query string or input </ParamField>
+><ParamField body="max_output_chars" type="int" default="4000" >   Integer value </ParamField>
+><ParamField body="started_at" type="float" default="<factory>" >   Parameter value </ParamField>
+><ParamField body="completed_at" type="float | None" default="None" >   Parameter value </ParamField>
+><ParamField body="final_output" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="tool_calls" type="list[ToolCallRecord]" default="<factory>" >   List of items </ParamField>
+><ParamField body="_pending_by_id" type="dict[str, ToolCallRecord]" default="<factory>" >   Dictionary of key-value pairs </ParamField>
+
+**Signature**
+```python wrap
+def __init__(query: str, max_output_chars: int = 4000, started_at: float = <factory>, completed_at: float | None = None, final_output: str | None = None, error: str | None = None, tool_calls: list[ToolCallRecord] = <factory>, _pending_by_id: dict[str, ToolCallRecord] = <factory>):
+```
+
+</Card>
+<Card type="info">
+### `method` as_dict
+
+Return a JSON-serializable trace.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def as_dict():
+```
+
+</Card>
+
+<Card type="info">
+### `method` complete
+
+Mark the run as complete and close any unmatched tool calls.
+
+
+**Parameters**
+><ParamField body="final_output" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def complete(final_output: str | None = None, error: str | None = None):
+```
+
+</Card>
+
+<Card type="info">
+### `property` duration_ms
+
+Return elapsed time for a completed run.
+
+
+**Returns**
+><ResponseField name="returns" type="int | None" />
+
+**Signature**
+```python wrap
+def duration_ms():
+```
+
+</Card>
+
+<Card type="info">
+### `method` outputs_by_tool
+
+Return tool outputs grouped by tool name.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, list[Any]]" />
+
+**Signature**
+```python wrap
+def outputs_by_tool():
+```
+
+</Card>
+
+<Card type="info">
+### `method` record_tool_call
+
+Record a tool request emitted by the model.
+
+
+**Parameters**
+><ParamField body="tool" type="str" required="True" >   String value </ParamField>
+><ParamField body="tool_call_id" type="str | None" required="True" >   String value </ParamField>
+><ParamField body="tool_input" type="Any" required="True" >   Parameter value </ParamField>
+><ParamField body="log" type="str" default='' >   String value </ParamField>
+
+**Signature**
+```python wrap
+def record_tool_call(tool: str, tool_call_id: str | None, tool_input: Any, log: str = ""):
+```
+
+</Card>
+
+<Card type="info">
+### `method` record_tool_result
+
+Attach a tool result to the matching pending call when possible.
+
+
+**Parameters**
+><ParamField body="tool_call_id" type="str | None" required="True" >   String value </ParamField>
+><ParamField body="output" type="Any" required="True" >   Parameter value </ParamField>
+
+**Signature**
+```python wrap
+def record_tool_result(tool_call_id: str | None, output: Any):
+```
+
+</Card>
+
+<Card type="info">
+### `property` tool_call_count
+
+Return the number of tool calls observed in this run.
+
+
+**Returns**
+><ResponseField name="returns" type="int" />
+
+**Signature**
+```python wrap
+def tool_call_count():
+```
+
+</Card>
+
+<Card type="info">
+### `method` tool_counts
+
+Return per-tool usage counts for this run.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, int]" />
+
+**Signature**
+```python wrap
+def tool_counts():
+```
+
+</Card>
+
+</div>
+
+## ToolCallRecord
+
+<div>
+<RandomGradientBackground className="rounded-lg p-4 w-full h-full rounded-full">
+<div className="text-black">
+<div className="text-black font-bold text-xl mb-2 mt-8"><code className="!text-black">class</code> ToolCallRecord</div>
+
+A single tool call observed during an agent run.
+
+</div>
+</RandomGradientBackground>
+```python
+from mcp_use.agents.run_trace import ToolCallRecord
+```
+
+<Card type="info">
+**Attributes**
+>
+<ParamField body="index" type="int" required="True" >   Integer value </ParamField>
+<ParamField body="tool" type="str" required="True" >   String value </ParamField>
+<ParamField body="tool_call_id" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="input" type="Any" required="True" >   Parameter value </ParamField>
+<ParamField body="log" type="str" required="True" >   String value </ParamField>
+<ParamField body="started_at" type="float" required="True" >   Parameter value </ParamField>
+<ParamField body="completed_at" type="float | None" required="True" >   Parameter value </ParamField>
+<ParamField body="output" type="Any" required="True" >   Parameter value </ParamField>
+<ParamField body="output_preview" type="str | None" required="True" >   String value </ParamField>
+<ParamField body="error" type="str | None" required="True" >   String value </ParamField>
+
+</Card>
+
+<Card type="info">
+### `method` __init__
+
+**Parameters**
+><ParamField body="index" type="int" required="True" >   Integer value </ParamField>
+><ParamField body="tool" type="str" required="True" >   String value </ParamField>
+><ParamField body="tool_call_id" type="str | None" required="True" >   String value </ParamField>
+><ParamField body="input" type="Any" required="True" >   Parameter value </ParamField>
+><ParamField body="log" type="str" default='' >   String value </ParamField>
+><ParamField body="started_at" type="float" default="<factory>" >   Parameter value </ParamField>
+><ParamField body="completed_at" type="float | None" default="None" >   Parameter value </ParamField>
+><ParamField body="output" type="Any" default="None" >   Parameter value </ParamField>
+><ParamField body="output_preview" type="str | None" default="None" >   String value </ParamField>
+><ParamField body="error" type="str | None" default="None" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def __init__(index: int, tool: str, tool_call_id: str | None, input: Any, log: str = "", started_at: float = <factory>, completed_at: float | None = None, output: Any = None, output_preview: str | None = None, error: str | None = None):
+```
+
+</Card>
+<Card type="info">
+### `method` as_dict
+
+Return a JSON-serializable representation of this tool call.
+
+
+**Returns**
+><ResponseField name="returns" type="dict[str, Any]" />
+
+**Signature**
+```python wrap
+def as_dict():
+```
+
+</Card>
+
+<Card type="info">
+### `method` complete
+
+Attach the tool result to this record.
+
+
+**Parameters**
+><ParamField body="output" type="Any" required="True" >   Parameter value </ParamField>
+><ParamField body="max_output_chars" type="int" required="True" >   Integer value </ParamField>
+
+**Signature**
+```python wrap
+def complete(output: Any, max_output_chars: int):
+```
+
+</Card>
+
+<Card type="info">
+### `method` fail
+
+Mark the tool call as failed before a matching ToolMessage was emitted.
+
+
+**Parameters**
+><ParamField body="error" type="str" required="True" >   String value </ParamField>
+
+**Signature**
+```python wrap
+def fail(error: str):
+```
+
+</Card>
+
+<Card type="info">
+### `property` latency_ms
+
+Return elapsed time for a completed tool call.
+
+
+**Returns**
+><ResponseField name="returns" type="int | None" />
+
+**Signature**
+```python wrap
+def latency_ms():
+```
+
+</Card>
+
+</div>

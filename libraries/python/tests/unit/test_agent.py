@@ -331,6 +331,51 @@ class TestMCPAgentStream:
             "Block-based ToolMessage should be preserved in history"
         )
 
+    @pytest.mark.asyncio
+    async def test_stream_records_last_run_trace_for_tool_calls(self):
+        """stream() should expose tool call counts, inputs, and raw outputs after a run."""
+        llm = self._mock_llm()
+        client = MagicMock(spec=MCPClient)
+        agent = MCPAgent(llm=llm, client=client, max_steps=5, memory_enabled=True)
+        agent.callbacks = []
+        agent.telemetry = MagicMock()
+
+        executor = MagicMock()
+        agent._agent_executor = executor
+        agent._initialized = True
+
+        async def mock_astream(inputs, stream_mode=None, config=None):
+            yield {
+                "agent": {
+                    "messages": [
+                        AIMessage(
+                            content="checking the calculator",
+                            tool_calls=[{"name": "add", "args": {"a": 2, "b": 2}, "id": "call_1"}],
+                        )
+                    ]
+                }
+            }
+            yield {"tools": {"messages": [ToolMessage(content={"result": 4}, tool_call_id="call_1")]}}
+            yield {"agent": {"messages": [AIMessage(content="The answer is 4")]}}
+
+        executor.astream = MagicMock(side_effect=mock_astream)
+
+        outputs = []
+        async for item in agent.stream("Add 2 and 2 using the add tool", manage_connector=False):
+            outputs.append(item)
+
+        trace = agent.get_last_run_trace()
+
+        assert outputs[-1] == "The answer is 4"
+        assert trace is not None
+        assert trace.tool_call_count == 1
+        assert trace.tool_counts() == {"add": 1}
+        assert trace.final_output == "The answer is 4"
+        assert trace.tool_calls[0].input == {"a": 2, "b": 2}
+        assert trace.tool_calls[0].output == "{'result': 4}"
+        assert agent.get_last_tool_outputs() == {"add": ["{'result': 4}"]}
+        assert agent.get_last_tool_calls()[0]["tool"] == "add"
+
 
 class TestMCPAgentStreamEvents:
     """Tests for MCPAgent.stream_events."""
