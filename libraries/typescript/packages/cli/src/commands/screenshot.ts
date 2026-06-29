@@ -2,13 +2,18 @@ import chalk from "chalk";
 import { Command } from "commander";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
+import {
+  captureToolScreenshot as captureToolScreenshotCore,
+  detectToolResourceUri,
+  extractViewName,
+  findChrome,
+  resolveChromePath,
+  timestampSuffix,
+} from "@mcp-use/evals/screenshot";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
-import { captureScreenshot } from "../utils/cdp-screenshot.js";
-import { resolveChromePath } from "../utils/chrome-path.js";
 import { formatError, formatInfo, formatSchema } from "../utils/format.js";
 import { parseToolArgs } from "../utils/parse-args.js";
 import {
@@ -73,30 +78,7 @@ function collectHeader(value: string, previous: string[] = []): string[] {
   return previous.concat([value]);
 }
 
-interface ScreenshotBundle {
-  resourceUri: string;
-  resourceContents: unknown;
-  toolInput?: Record<string, unknown>;
-  toolOutput?: unknown;
-}
-
-/**
- * Inspect a tool's `_meta` for the UI resource URI it renders, if any. Falls back
- * to the OpenAI Apps `openai/outputTemplate` key for cross-ecosystem compatibility.
- */
-export function detectToolResourceUri(
-  tool: { _meta?: Record<string, unknown> } | undefined | null
-): string | null {
-  if (!tool) return null;
-  const meta = tool._meta;
-  if (!meta) return null;
-  const uiMeta = (meta.ui as { resourceUri?: string } | undefined) ?? undefined;
-  return (
-    uiMeta?.resourceUri ??
-    (meta["openai/outputTemplate"] as string | undefined) ??
-    null
-  );
-}
+export { detectToolResourceUri, extractViewName, findChrome, resolveChromePath, timestampSuffix };
 
 interface CaptureToolScreenshotInputs {
   session: MCPSession;
@@ -159,14 +141,9 @@ export async function captureToolScreenshot(
   inputs: CaptureToolScreenshotInputs,
   options: CaptureToolScreenshotOptions = {}
 ): Promise<CaptureToolScreenshotResult> {
-  const { width, height } = options;
   const theme: "light" | "dark" = options.theme ?? "light";
   const timeoutMs = options.timeoutMs ?? 30000;
   const delayMs = options.delayMs ?? 0;
-
-  const chromePath = options.cdpUrl ? undefined : resolveChromePath();
-  const view = extractViewName(inputs.resourceUri);
-
   const devOptions: ScreenshotOptions = {
     theme,
     timeout: String(timeoutMs),
@@ -177,51 +154,13 @@ export async function captureToolScreenshot(
   let devHandle: DevServerHandle | undefined;
   try {
     devHandle = await ensureDevServer(devOptions);
-
-    const resourceContents = await inputs.session.readResource(
-      inputs.resourceUri
-    );
-    const bundle: ScreenshotBundle = {
-      resourceUri: inputs.resourceUri,
-      resourceContents,
-      toolInput: inputs.toolArgs,
-      toolOutput: inputs.toolOutput,
-    };
-
-    const previewUrl = new URL(`/inspector/preview/${view}`, devHandle.url);
-    previewUrl.searchParams.set("theme", theme);
-    // Width also drives the inline-mode max-width inside the iframe: when set,
-    // the widget renders at this width, then we clip to it. When unset, the
-    // widget renders at its natural width (capped at 768).
-    if (width !== undefined) {
-      previewUrl.searchParams.set("width", String(width));
-    }
-
-    const ts = timestampSuffix();
-    const outputPath = path.resolve(options.output ?? `./${view}-${ts}.png`);
-    await mkdir(path.dirname(outputPath), { recursive: true });
-
-    const captured = await captureScreenshot({
-      url: previewUrl.toString(),
-      width,
-      height,
+    return await captureToolScreenshotCore(inputs, {
+      ...options,
       theme,
-      waitForSelector: options.waitFor ?? 'body[data-view-ready="true"]',
       timeoutMs,
-      outputPath,
-      chromePath,
-      cdpUrl: options.cdpUrl,
-      delayMs: Number.isFinite(delayMs) && delayMs > 0 ? delayMs : 0,
-      bundle,
-      deviceScaleFactor: options.deviceScaleFactor,
+      delayMs,
+      inspectorUrl: devHandle.url,
     });
-
-    return {
-      outputPath,
-      width: captured.width,
-      height: captured.height,
-      view,
-    };
   } finally {
     killChild(devHandle?.child);
   }
@@ -404,25 +343,6 @@ function killChild(child: ChildProcess | undefined) {
   } catch {
     // Ignore.
   }
-}
-
-/**
- * Returns a filesystem-safe timestamp string: YYYY-MM-DD_HH-mm-ss
- */
-export function timestampSuffix(date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const datePart = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const timePart = `${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
-  return `${datePart}_${timePart}`;
-}
-
-export function extractViewName(resourceUri: string): string {
-  // ui://<host>/<path>[.<buildId>].html
-  const m = resourceUri.match(/^ui:\/\/([^/]+)\/(.+)$/);
-  if (!m) return encodeURIComponent(resourceUri);
-  const name = m[2].replace(/\.html$/, "").replace(/\.[0-9a-f]+$/i, "");
-  // Built-in "widget" namespace: drop the host prefix to keep existing names short.
-  return m[1] === "widget" ? name : `${m[1]}-${name}`;
 }
 
 export function parseDimension(raw: string, name: string): number {

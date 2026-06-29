@@ -1,0 +1,61 @@
+apiVersion: mcp-use.com/evals/v1
+kind: EvalSuite
+
+name: mcp-apps-template-smoke
+intent: Deterministic + widget validation for create-mcp-use-app mcp-apps template
+
+server:
+  url: ${MCP_SERVER_URL}
+
+defaults:
+  timeoutMs: 90000
+  rubricThreshold: 0.7
+
+flows:
+  - id: smoke
+    type: agent
+    checks:
+      - id: search-mango-direct
+        call:
+          tool: search-tools
+          args:
+            query: mango
+        assert:
+          - kind: executionError
+            equals: false
+          - kind: jsonpath
+            path: $.structuredContent.results[0].fruit
+            equals: mango
+          - kind: widget
+            fields:
+              query: mango
+    scenarios:
+      - id: fruit-search-agent
+        tags: [agent]
+        turns:
+          - user: search for mango
+            expect:
+              tools:
+                - name: search-tools
+                  args:
+                    query: mango
+              result:
+                tool: search-tools
+                assert:
+                  - kind: jsonpath
+                    path: $.structuredContent.results[0].fruit
+                    equals: mango
+              widget:
+                fields:
+                  query: mango
+                screenshot:
+                  rubric: |
+                    The widget displays a fruit carousel or tile list that includes mango
+                    as one of the visible fruits. The UI should show mango prominently.
+                  threshold: 0.7
+                  tool: search-tools
+                  args:
+                    query: mango
+        expect:
+          tools:
+            forbidden: []

@@ -111,5 +111,18 @@ export type LlmStreamEvent =
       result: unknown;
       isError: boolean;
     }
+  | {
+      /**
+       * Token accounting for a single model call. Emitted once per LLM
+       * request, typically just before `done`. Providers that do not report
+       * usage simply never emit this event.
+       */
+      type: "usage";
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+      /** Provider-reported cost in USD, when available (e.g. OpenRouter). */
+      costUsd?: number;
+    }
   | { type: "error"; message: string }
   | { type: "done" };

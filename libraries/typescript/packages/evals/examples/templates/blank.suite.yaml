@@ -1,0 +1,21 @@
+apiVersion: mcp-use.com/evals/v1
+kind: EvalSuite
+
+name: blank-template-smoke
+intent: Deterministic checks for create-mcp-use-app blank template
+
+server:
+  url: ${MCP_SERVER_URL}
+
+flows:
+  - id: smoke
+    type: agent
+    checks:
+      - id: list-tools-empty
+        call:
+          mcp: listTools
+        assert:
+          - kind: equals
+            path: $
+            equals: []
+    scenarios: []

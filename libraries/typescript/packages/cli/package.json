@@ -47,6 +47,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@mcp-use/evals": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
     "@tailwindcss/vite": "^4.2.0",
     "@vitejs/plugin-react": "^6.0.0",
