@@ -12,7 +12,13 @@ import type {
   UIResourceDefinition,
   WidgetProps,
 } from "../types/index.js";
-import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import {
+  fsHelpers,
+  getCwd,
+  isDeno,
+  pathHelpers,
+  safeSubpath,
+} from "../utils/runtime.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -762,7 +768,10 @@ export function setupPublicRoutes(
   useDistDirectory: boolean = false
 ): void {
   app.get("/mcp-use/public/*", async (c: Context) => {
-    const filePath = c.req.path.replace("/mcp-use/public/", "");
+    // ponytail: reject path traversal before any fs access. pathHelpers.join does
+    // NOT sandbox to the base dir, so this guard is the real containment control.
+    const filePath = safeSubpath(c.req.path.replace("/mcp-use/public/", ""));
+    if (filePath === null) return c.notFound();
     const basePath = useDistDirectory ? "dist/public" : "public";
     const fullPath = pathHelpers.join(getCwd(), basePath, filePath);
 
@@ -811,13 +820,17 @@ export function setupFaviconRoute(
   }
 
   app.get("/favicon.ico", async (c: Context) => {
+    // Defense-in-depth: faviconPath is server config, but still keep it inside the
+    // public dir so a misconfigured path can't read arbitrary files.
+    const safeFavicon = safeSubpath(faviconPath);
+    if (safeFavicon === null) return c.notFound();
     const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, faviconPath);
+    const fullPath = pathHelpers.join(getCwd(), basePath, safeFavicon);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {
         const content = await fsHelpers.readFile(fullPath);
-        const contentType = getContentType(faviconPath);
+        const contentType = getContentType(safeFavicon);
         return new Response(content, {
           status: 200,
           headers: {

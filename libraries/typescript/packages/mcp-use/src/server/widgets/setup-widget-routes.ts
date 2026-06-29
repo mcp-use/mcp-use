@@ -6,7 +6,13 @@
  */
 
 import type { Hono as HonoType, Context } from "hono";
-import { pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+import {
+  pathHelpers,
+  fsHelpers,
+  getCwd,
+  safeSubpath,
+  safeSegment,
+} from "../utils/runtime.js";
 import {
   getContentType,
   processWidgetHtml,
@@ -34,8 +40,11 @@ export function setupWidgetRoutes(
 ): void {
   // Serve static assets (JS, CSS) from the assets directory
   app.get("/mcp-use/widgets/:widget/assets/*", async (c: Context) => {
-    const widget = c.req.param("widget")!;
-    const assetFile = c.req.path.split("/assets/")[1];
+    // Reject path traversal in both the widget name and the asset subpath.
+    const widget = safeSegment(c.req.param("widget")!);
+    const rawAsset = c.req.path.split("/assets/")[1];
+    const assetFile = rawAsset == null ? null : safeSubpath(rawAsset);
+    if (widget === null || assetFile === null) return c.notFound();
     const assetPath = pathHelpers.join(
       getCwd(),
       "dist",
@@ -63,7 +72,9 @@ export function setupWidgetRoutes(
 
   // Handle assets served from the wrong path (browser resolves ./assets/ relative to /mcp-use/widgets/)
   app.get("/mcp-use/widgets/assets/*", async (c: Context) => {
-    const assetFile = c.req.path.split("/assets/")[1];
+    const rawAsset = c.req.path.split("/assets/")[1];
+    const assetFile = rawAsset == null ? null : safeSubpath(rawAsset);
+    if (assetFile === null) return c.notFound();
     // Try to find which widget this asset belongs to by checking all widget directories
     const widgetsDir = pathHelpers.join(
       getCwd(),
@@ -99,7 +110,9 @@ export function setupWidgetRoutes(
   // Serve each widget's index.html at its route
   // e.g. GET /mcp-use/widgets/kanban-board -> dist/resources/widgets/kanban-board/index.html
   app.get("/mcp-use/widgets/:widget", async (c: Context) => {
-    const widget = c.req.param("widget")!;
+    // A `..` widget segment would otherwise climb out of the widgets dir.
+    const widget = safeSegment(c.req.param("widget")!);
+    if (widget === null) return c.notFound();
     const filePath = pathHelpers.join(
       getCwd(),
       "dist",
