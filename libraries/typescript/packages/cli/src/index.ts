@@ -37,6 +37,7 @@ import {
 } from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 import { getWidgetAssetBase } from "./utils/widget-paths.js";
+import { resolveStartPort } from "./utils/start-port.js";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -2624,17 +2625,8 @@ program
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
-      // Priority: --port flag > process.env.PORT > default
-      // Check if --port or -p was explicitly provided in command line
-      const portFlagProvided =
-        process.argv.includes("--port") ||
-        process.argv.includes("-p") ||
-        process.argv.some((arg) => arg.startsWith("--port=")) ||
-        process.argv.some((arg) => arg.startsWith("-p="));
-
-      let port = portFlagProvided
-        ? parseInt(options.port, 10) // Flag explicitly provided, use it
-        : parseInt(process.env.PORT || options.port || "3000", 10); // Check env, then default
+      // Priority: --port flag > process.env.PORT > default.
+      let port = resolveStartPort(process.argv, options.port, process.env.PORT);
 
       // Check if port is available, find alternative if needed
       if (!(await isPortAvailable(port))) {
