@@ -37,6 +37,7 @@ import {
 } from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
 import { getWidgetAssetBase } from "./utils/widget-paths.js";
+import { findAvailablePort, isPortAvailable } from "./utils/ports.js";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -119,32 +120,6 @@ function displayPackageVersions(projectPath?: string) {
       }
     }
   }
-}
-
-// Helper to check if port is available
-async function isPortAvailable(
-  port: number,
-  host: string = "localhost"
-): Promise<boolean> {
-  try {
-    await fetch(`http://${host}:${port}`);
-    return false; // Port is in use
-  } catch {
-    return true; // Port is available
-  }
-}
-
-// Helper to find an available port
-async function findAvailablePort(
-  startPort: number,
-  host: string = "localhost"
-): Promise<number> {
-  for (let port = startPort; port < startPort + 100; port++) {
-    if (await isPortAvailable(port, host)) {
-      return port;
-    }
-  }
-  throw new Error("No available ports found");
 }
 
 // Helper to check if server is ready
