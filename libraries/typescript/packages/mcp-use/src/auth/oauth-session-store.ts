@@ -9,7 +9,7 @@ import type {
   OAuthTokens,
   AuthorizationServerMetadata,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { sanitizeUrl } from "../utils/url-sanitize.js";
+import { sanitizeUrl } from "./url-sanitize.js";
 import type { KVStore } from "./kv-store.js";
 import type { StoredState } from "./types.js";
 

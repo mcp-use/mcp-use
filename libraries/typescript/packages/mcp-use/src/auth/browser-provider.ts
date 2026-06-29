@@ -5,7 +5,7 @@ import type {
   OAuthClientMetadata,
   OAuthTokens,
 } from "@modelcontextprotocol/sdk/shared/auth.js";
-import { sanitizeUrl } from "../utils/url-sanitize.js";
+import { sanitizeUrl } from "./url-sanitize.js";
 import { LocalStorageKVStore } from "./kv-store.js";
 import { OAuthSessionStore } from "./oauth-session-store.js";
 import type { StoredState } from "./types.js";

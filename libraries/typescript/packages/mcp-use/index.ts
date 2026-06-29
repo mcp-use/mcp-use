@@ -69,9 +69,6 @@ export type { StoredState } from "./src/auth/types.js";
 // Export React hooks
 export * from "./src/react/index.js";
 
-// Export utility functions
-export * from "./src/utils/index.js";
-
 // Export client prompts
 export { PROMPTS } from "./src/agents/index.js";
 

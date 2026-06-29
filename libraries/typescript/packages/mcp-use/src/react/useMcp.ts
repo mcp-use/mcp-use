@@ -20,10 +20,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
 import { Logger, type LogLevel, logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
-import { assert } from "../utils/assert.js";
-import { detectFavicon } from "../utils/favicon-detector.js";
-import { applyProxyConfig, type ProxyConfig } from "../utils/proxy-config.js";
-import { sanitizeUrl } from "../utils/url-sanitize.js";
+import { assert } from "./assert.js";
+import { detectFavicon } from "./favicon-detector.js";
+import { applyProxyConfig, type ProxyConfig } from "./proxy-config.js";
+import { sanitizeUrl } from "../auth/url-sanitize.js";
 import { getPackageVersion } from "../version.js";
 import {
   createBrowserOAuthProvider,

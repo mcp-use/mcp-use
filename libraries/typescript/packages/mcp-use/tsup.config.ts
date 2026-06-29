@@ -77,7 +77,6 @@ export default defineConfig([
       "src/client.ts",
       "src/server/index.ts",
       "src/telemetry/tel-fetch.ts",
-      "src/utils/index.ts",
       "src/client/prompts.ts",
     ],
     esbuildOptions(options) {

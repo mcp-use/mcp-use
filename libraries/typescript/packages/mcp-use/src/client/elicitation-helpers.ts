@@ -11,8 +11,8 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import type { JSONSchema } from "../utils/json-schema-to-zod/Type.js";
-import { JSONSchemaToZod } from "../utils/json-schema-to-zod/JSONSchemaToZod.js";
+import type { JSONSchema } from "./json-schema-to-zod/Type.js";
+import { JSONSchemaToZod } from "./json-schema-to-zod/JSONSchemaToZod.js";
 
 /** Content shape for ElicitResult when action is "accept". */
 export type ElicitContent = Record<

@@ -81,7 +81,7 @@ vi.mock("../../../src/telemetry/index.js", () => ({
   },
 }));
 
-vi.mock("../../../src/utils/favicon-detector.js", () => ({
+vi.mock("../../../src/react/favicon-detector.js", () => ({
   detectFavicon: vi.fn().mockResolvedValue(null),
 }));
 
