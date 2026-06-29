@@ -21,8 +21,8 @@ import type {
   JSONRPCMessage,
 } from "@modelcontextprotocol/sdk/types.js";
 import { X } from "lucide-react";
-import { useMcpClient } from "mcp-use/react";
-import type { MessageContentBlock } from "mcp-use/react";
+import { useMcpClient } from "@mcp-use/react";
+import type { MessageContentBlock } from "@mcp-use/react";
 import {
   memo,
   useCallback,

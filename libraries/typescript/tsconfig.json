@@ -14,6 +14,11 @@
     "composite": true
   },
   "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/client" },
+    { "path": "./packages/react" },
+    { "path": "./packages/server" },
+    { "path": "./packages/agent" },
     { "path": "./packages/mcp-use" },
     { "path": "./packages/inspector" },
     { "path": "./packages/cli" },

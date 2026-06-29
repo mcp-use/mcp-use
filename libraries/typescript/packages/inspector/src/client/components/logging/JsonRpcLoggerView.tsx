@@ -12,7 +12,7 @@ import {
   getAllRpcLogs,
   subscribeToRpcLogs,
   type RpcLogEntry,
-} from "mcp-use/react";
+} from "@mcp-use/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { copyToClipboard } from "@/client/utils/clipboard";

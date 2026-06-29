@@ -1139,7 +1139,7 @@ server.resource(
       // Step 1: Add a new widget file to the resources directory while the server is running.
       // This triggers the file watcher which should register the widget resource and
       // propagate it to existing sessions (the bug we fixed).
-      const widgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+      const widgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "@mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -1241,7 +1241,7 @@ server.tool(
       page,
     }) => {
       const widgetName = "hmr-readd-widget";
-      const firstWidgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+      const firstWidgetContent = `import { McpUseProvider, useWidget, type WidgetMetadata } from "@mcp-use/react";
 import React from "react";
 import { z } from "zod";
 

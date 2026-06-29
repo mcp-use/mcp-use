@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import type { MCPSession } from "mcp-use/client";
-import { MCPClient } from "mcp-use/client";
+import type { MCPSession } from "@mcp-use/client";
+import { MCPClient } from "@mcp-use/client";
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";

@@ -92,7 +92,7 @@ export async function* handleChatRequestStream(requestBody: {
     );
   }
 
-  const { MCPClient } = await import("mcp-use");
+  const { MCPClient } = await import("@mcp-use/client");
 
   const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
@@ -263,7 +263,7 @@ export async function handleChatRequest(requestBody: {
     );
   }
 
-  const { MCPClient } = await import("mcp-use");
+  const { MCPClient } = await import("@mcp-use/client");
 
   const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;

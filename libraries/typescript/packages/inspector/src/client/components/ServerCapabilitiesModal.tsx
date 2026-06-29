@@ -4,7 +4,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/client/components/ui/dialog";
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/react";
 import { Copy } from "lucide-react";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { toast } from "sonner";

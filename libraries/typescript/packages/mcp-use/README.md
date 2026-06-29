@@ -253,6 +253,9 @@ Or connect your GitHub repo on [manufact.com](https://manufact.com) — producti
 | **@mcp-use/inspector** | Web-based previewer and debugger for MCP servers              | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
 | **create-mcp-use-app** | Project scaffolding tool                        | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
+> [!NOTE]
+> **React Imports:** The `mcp-use` root package does not re-export React hooks directly at the root. React users should import from `mcp-use/react` or the scoped `@mcp-use/react` package directly.
+
 ---
 
 ## Also: MCP Agent & Client

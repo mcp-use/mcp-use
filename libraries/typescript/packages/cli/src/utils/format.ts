@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import type { CallToolResult } from "mcp-use/client";
+import type { CallToolResult } from "@mcp-use/client";
 
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b\[[0-9;]*m/g;

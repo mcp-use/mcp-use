@@ -16,7 +16,7 @@ import {
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
 import { ChevronDown, Info, Server, Settings } from "lucide-react";
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";

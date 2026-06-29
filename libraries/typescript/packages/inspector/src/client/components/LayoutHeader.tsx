@@ -54,7 +54,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/react";
 import { useEffect, useState } from "react";
 
 import { toast } from "sonner";

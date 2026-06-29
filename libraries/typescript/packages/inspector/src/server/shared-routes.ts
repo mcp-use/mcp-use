@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
-import { telFetch } from "mcp-use/telemetry/tel-fetch";
-import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { telFetch } from "@mcp-use/client";
+import { mountMcpProxy, mountOAuthProxy } from "@mcp-use/server";
 import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {

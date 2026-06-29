@@ -35,7 +35,7 @@ import {
   useMcpClient,
   type McpServer,
   type McpServerOptions,
-} from "mcp-use/react";
+} from "@mcp-use/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import {

@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import { Command } from "commander";
-import type { MCPSession } from "mcp-use/client";
-import { MCPClient } from "mcp-use/client";
-import type { NodeOAuthClientProvider } from "mcp-use/auth/node";
+import type { MCPSession } from "@mcp-use/client";
+import { MCPClient } from "@mcp-use/client";
+import type { NodeOAuthClientProvider } from "@mcp-use/client/auth/node";
 import { createInterface } from "node:readline";
 import {
   formatError,
