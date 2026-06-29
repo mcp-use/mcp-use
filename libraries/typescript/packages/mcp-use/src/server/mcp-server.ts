@@ -658,7 +658,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }
 
       // Create a proper tool entry with all required fields including the handler
-      const toolEntry = {
+      const toolEntry: Record<string, unknown> = {
         title: registration.config.title,
         description: registration.config.description ?? "",
         inputSchema: inputSchema,
@@ -666,6 +666,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         annotations: registration.config.annotations,
         execution: { taskSupport: "forbidden" as const },
         _meta: registration.config._meta,
+        securitySchemes: this.resolveSecuritySchemes(
+          registration.config as ToolDefinition
+        ),
         handler: registration.handler,
         enabled: true,
         disable: function (this: any) {
@@ -1373,6 +1376,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         annotations: config.annotations,
         execution: { taskSupport: "forbidden" },
         _meta: config._meta,
+        securitySchemes: this.resolveSecuritySchemes(config),
         handler: wrappedHandler,
         enabled: true,
         disable: function (this: RegisteredTool) {
@@ -2565,7 +2569,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           handler: actualCallback as any,
         });
       }
-      return originalTool.call(self, toolDefinition, actualCallback as any);
+      const result = originalTool.call(
+        self,
+        toolDefinition,
+        actualCallback as any
+      );
+      // SEP-1488: attach securitySchemes to the SDK's registered tool entry
+      // so the patched tools/list handler can emit it.
+      self.attachSecuritySchemes(
+        self.nativeServer as any,
+        toolDefinition.name,
+        toolDefinition as ToolDefinition
+      );
+      return result;
     }) as any;
 
     this.prompt = (<
@@ -2885,6 +2901,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         },
         wrappedHandler as any
       );
+
+      // SEP-1488: attach securitySchemes (resolved against defaultSecuritySchemes)
+      // so the patched tools/list handler emits the field.
+      this.attachSecuritySchemes(newServer as any, name, config);
 
       // Store ref for hot reload support
       sessionRefs.tools.set(name, registeredTool);
@@ -3287,10 +3307,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           innerFn
         )(mwCtx);
         // If middleware returned an array, reconstruct the list result shape
-        if (Array.isArray(filtered)) {
-          return { [resultKey]: filtered };
-        }
-        return filtered;
+        const listResult: Record<string, unknown> = Array.isArray(filtered)
+          ? { [resultKey]: filtered }
+          : (filtered as Record<string, unknown>);
+
+        return listResult;
       };
       (wrapped as any).__mcpListWrapped = true;
       handlers.set(method, wrapped);
@@ -3299,6 +3320,62 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     wrapListMethod("tools/list", "tools");
     wrapListMethod("resources/list", "resources");
     wrapListMethod("prompts/list", "prompts");
+  }
+
+  /**
+   * Resolve the securitySchemes for a tool, falling back to the server-wide
+   * `defaultSecuritySchemes`. SEP-1488 / OpenAI Apps SDK metadata is advertisement
+   * only — the resolved schemes are attached to the SDK's `_registeredTools` entry
+   * so the patched `tools/list` handler can emit them.
+   *
+   * Returns `undefined` when neither the tool nor the server declares any schemes,
+   * which keeps the field absent in the response (matches pre-patch behaviour).
+   */
+  public resolveSecuritySchemes(
+    config: ToolDefinition
+  ): NonNullable<ServerConfig["defaultSecuritySchemes"]> | undefined {
+    const schemes =
+      config.securitySchemes ?? this.config.defaultSecuritySchemes;
+    return schemes && schemes.length > 0 ? schemes : undefined;
+  }
+
+  /**
+   * Attach resolved securitySchemes to a native SDK `_registeredTools` entry.
+   * Idempotent and no-op when the tool entry isn't present yet.
+   * @internal
+   */
+  public attachSecuritySchemes(
+    nativeServer: { _registeredTools?: Record<string, unknown> },
+    toolName: string,
+    config: ToolDefinition
+  ): void {
+    const schemes = this.resolveSecuritySchemes(config);
+    if (!schemes) return;
+    const entry = nativeServer._registeredTools?.[toolName] as
+      | Record<string, unknown>
+      | undefined;
+    if (entry) {
+      entry.securitySchemes = schemes;
+    }
+  }
+
+  /**
+   * True when any registered tool's resolved securitySchemes contains
+   * `{ type: "noauth" }`. SEP-1488 / OpenAI Apps SDK mixed-auth servers must
+   * accept anonymous requests at the transport layer so clients can list tools
+   * and call public ones before signing in.
+   *
+   * The result is sampled at OAuth setup time (i.e. on `listen()` /
+   * `getHandler()`). Tools registered later via HMR won't flip the mode —
+   * restart the server if you switch a tool from oauth-only to mixed auth.
+   * @internal
+   */
+  public hasAnonymousTool(): boolean {
+    for (const { config } of this.registrations.tools.values()) {
+      const schemes = this.resolveSecuritySchemes(config);
+      if (schemes?.some((s) => s.type === "noauth")) return true;
+    }
+    return false;
   }
 
   /**
@@ -3913,7 +3990,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
-        { publicLandingPage: this.config.publicLandingPage }
+        {
+          optionalAuth: this.hasAnonymousTool(),
+          publicLandingPage: this.config.publicLandingPage,
+        }
       );
     }
 
@@ -4043,7 +4123,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
-        { publicLandingPage: this.config.publicLandingPage }
+        {
+          optionalAuth: this.hasAnonymousTool(),
+          publicLandingPage: this.config.publicLandingPage,
+        }
       );
     }
 

@@ -87,7 +87,7 @@ Load these before diving into tools/resources/widgets sections.
 
 - **[overview.md](references/authentication/overview.md)**
   - When: First time adding auth, understanding `ctx.auth`, or choosing a provider / integration mode
-  - Covers: Remote auth vs OAuth proxy, `oauth` config, `ctx.auth` shape, provider comparison, common mistakes
+  - Covers: Remote auth vs OAuth proxy, `oauth` config, `ctx.auth` shape, provider comparison, advertising auth to ChatGPT via `securitySchemes` + `authenticationRequired()`, common mistakes
 
 - **[auth0.md](references/authentication/auth0.md)**
   - When: Using Auth0 — DCR (Early Access) or a standard Regular Web App via `oauthProxy`
@@ -135,8 +135,8 @@ Load these before diving into tools/resources/widgets sections.
   - Covers: Prompt definition, parameterization, argument completion, prompt best practices
 
 - **[response-helpers.md](references/server/response-helpers.md)**
-  - When: Formatting responses from tools/resources (text, JSON, markdown, images, errors)
-  - Covers: `text()`, `object()`, `markdown()`, `image()`, `error()`, `mix()`
+  - When: Formatting responses from tools/resources (text, JSON, markdown, images, errors, sign-in challenges)
+  - Covers: `text()`, `object()`, `markdown()`, `image()`, `error()`, `authenticationRequired()`, `mix()`
 
 - **[proxy.md](references/server/proxy.md)**
   - When: Composing multiple MCP servers into one unified aggregator server

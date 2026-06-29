@@ -2,6 +2,7 @@ import type { InputDefinition } from "./common.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import type { ToolContext } from "./tool-context.js";
 import type { McpContext } from "./context.js";
+import type { SecurityScheme } from "./security.js";
 import type { z } from "zod";
 import type {
   ToolContentResult,
@@ -240,6 +241,21 @@ export interface ToolDefinition<
   cb?: ToolCallback<TInput, TOutput, HasOAuth>;
   /** Tool annotations */
   annotations?: ToolAnnotations;
+  /**
+   * Per-tool authentication advertisement (SEP-1488 / OpenAI Apps SDK).
+   *
+   * Listed as a top-level field on the Tool in `tools/list` responses.
+   * Use `[{ type: "noauth" }]` for anonymous tools, `[{ type: "oauth2", scopes: [...] }]`
+   * for tools that need a token, or both to advertise that anonymous calls work
+   * but linking unlocks more behaviour. Omit to inherit the server-wide
+   * `defaultSecuritySchemes` (if set).
+   *
+   * This is advertisement only — token verification still happens at the
+   * transport layer and inside the tool handler.
+   *
+   * @example [{ type: "noauth" }, { type: "oauth2", scopes: ["search.read"] }]
+   */
+  securitySchemes?: SecurityScheme[];
   /** Metadata for the tool */
   _meta?: Record<string, unknown>;
   /**

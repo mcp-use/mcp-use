@@ -363,6 +363,44 @@ server.tool({
   while maintaining consistent response structure.
 </Tip>
 
+### authenticationRequired()
+
+Signals that the caller must sign in before the tool can run. Returns an error result whose `_meta["mcp/www_authenticate"]` carries a `Bearer` challenge — ChatGPT and other [SEP-1488](https://modelcontextprotocol.io/specification/draft/server/tools#security-schemes)–aware clients pick this up and trigger their OAuth linking flow. Pair with [`securitySchemes`](./tools#advertising-authentication-securityschemes) on the tool so the client knows which sign-in UI to show ahead of time.
+
+```typescript
+import { authenticationRequired, text } from 'mcp-use/server';
+
+server.tool({
+  name: 'create_doc',
+  schema: z.object({ title: z.string() }),
+  securitySchemes: [{ type: 'oauth2', scopes: ['docs.write'] }],
+}, async ({ title }, ctx) => {
+  if (!ctx.auth) {
+    return authenticationRequired({
+      scopes: ['docs.write'],
+      resourceMetadataUrl: 'https://your-mcp.example.com/.well-known/oauth-protected-resource',
+    });
+  }
+  return text(`Created: ${title}`);
+});
+```
+
+**Options:**
+
+| Field | Type | Description |
+|---|---|---|
+| `message` | `string` | Human-readable text shown in the tool result content. Defaults to `errorDescription`. |
+| `error` | `string` | OAuth 2.0 error code. Defaults to `"invalid_token"`. Other RFC 6750 codes: `"invalid_request"`, `"insufficient_scope"`. Custom strings are accepted. |
+| `errorDescription` | `string` | Human-readable description carried in the `WWW-Authenticate` challenge. Defaults to `"Authentication required"`. |
+| `scopes` | `string[]` | Scopes the client should request when initiating sign-in. |
+| `resourceMetadataUrl` | `string` | URL of the protected-resource metadata document ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728)). |
+
+**Returns**: `CallToolResult` with `isError: true` and a `Bearer` challenge in `_meta["mcp/www_authenticate"]`.
+
+<Note>
+This helper is **advertisement** — it tells the client that auth is needed and where to go. Actual token verification belongs at the transport layer ([OAuth providers](./authentication/index)) or inside your tool handler. Use `authenticationRequired()` on the failure path only.
+</Note>
+
 ## Mixed Content
 
 ### mix()

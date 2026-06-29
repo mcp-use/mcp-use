@@ -41,6 +41,7 @@ export {
 export {
   array,
   audio,
+  authenticationRequired,
   binary,
   css,
   error,
@@ -55,6 +56,8 @@ export {
   text,
   widget,
   xml,
+  type AuthenticationErrorCode,
+  type AuthenticationRequiredOptions,
   type TypedCallToolResult,
   type WidgetResponseConfig,
 } from "./utils/response-helpers.js";

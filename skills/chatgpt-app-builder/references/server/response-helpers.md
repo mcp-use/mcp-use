@@ -292,6 +292,49 @@ server.tool(
 
 ---
 
+## authenticationRequired()
+
+Signal that the caller must sign in. Returns an error result whose `_meta["mcp/www_authenticate"]` carries a `Bearer` challenge — ChatGPT picks this up and triggers its OAuth linking UI (SEP-1488). Pair with `securitySchemes` on the tool definition (see [authentication/overview.md](../authentication/overview.md#advertising-auth-to-chatgpt-securityschemes--authenticationrequired)).
+
+```typescript
+import { authenticationRequired, text } from "mcp-use/server";
+
+server.tool(
+  {
+    name: "create_doc",
+    schema: z.object({ title: z.string() }),
+    securitySchemes: [{ type: "oauth2", scopes: ["docs.write"] }],
+  },
+  async ({ title }, ctx) => {
+    if (!ctx.auth) {
+      return authenticationRequired({
+        scopes: ["docs.write"],
+        resourceMetadataUrl:
+          "https://your-mcp.example.com/.well-known/oauth-protected-resource",
+      });
+    }
+    return text(`Created: ${title}`);
+  }
+);
+```
+
+**Options:**
+- `scopes?: string[]` — scopes the client should request when initiating sign-in
+- `resourceMetadataUrl?: string` — RFC 9728 protected-resource metadata URL
+- `error?: string` — OAuth 2.0 error code. Default `"invalid_token"`. Other RFC 6750 values: `"invalid_request"`, `"insufficient_scope"`
+- `errorDescription?: string` — description in the WWW-Authenticate challenge. Default `"Authentication required"`
+- `message?: string` — visible text shown to the user. Defaults to `errorDescription`
+
+**Use for:**
+- Auth-gated tools when `ctx.auth` is missing
+- Re-prompting sign-in when a token is expired or lacks required scopes (`error: "insufficient_scope"`)
+
+**Do NOT use for:**
+- Generic "permission denied" — use `error()` instead
+- Enforcement — this is the failure-path complement to `securitySchemes` advertisement; the actual token check still happens in the OAuth provider layer and your handler
+
+---
+
 ## widget()
 
 Return visual UI alongside data. Tool must have `widget: { name }` config.

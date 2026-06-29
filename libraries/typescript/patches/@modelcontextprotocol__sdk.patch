@@ -1,3 +1,17 @@
+diff --git a/dist/cjs/server/mcp.js b/dist/cjs/server/mcp.js
+index e10bb3da3b43331f37c88c8de3e6dfe277291f58..fa07bb29aa3cf089f0ecdc1ea77619d9bcb4d9f8 100644
+--- a/dist/cjs/server/mcp.js
++++ b/dist/cjs/server/mcp.js
+@@ -86,7 +86,8 @@ class McpServer {
+                     })(),
+                     annotations: tool.annotations,
+                     execution: tool.execution,
+-                    _meta: tool._meta
++                    _meta: tool._meta,
++                    securitySchemes: tool.securitySchemes
+                 };
+                 if (tool.outputSchema) {
+                     const obj = (0, zod_compat_js_1.normalizeObjectSchema)(tool.outputSchema);
 diff --git a/dist/cjs/server/zod-compat.js b/dist/cjs/server/zod-compat.js
 index 2e75c80c64d05fdf813ddd158cbefc48831d5b12..1a0065e02ba52691c8522598fcf38b2f21c2d4e3 100644
 --- a/dist/cjs/server/zod-compat.js
@@ -25,7 +39,7 @@ index 2e75c80c64d05fdf813ddd158cbefc48831d5b12..1a0065e02ba52691c8522598fcf38b2f
      }
      const v3Schema = schema;
 diff --git a/dist/cjs/types.js b/dist/cjs/types.js
-index 1f4553e7dae3fc97e7ba923a342e802469b30fce..fbd18dca1e42f1461cad21e1beaa65331a345d5b 100644
+index 1f4553e7dae3fc97e7ba923a342e802469b30fce..4f47421f83af203a334c29b0df49593be00cb694 100644
 --- a/dist/cjs/types.js
 +++ b/dist/cjs/types.js
 @@ -452,6 +452,10 @@ exports.ClientCapabilitiesSchema = z.object({
@@ -39,6 +53,35 @@ index 1f4553e7dae3fc97e7ba923a342e802469b30fce..fbd18dca1e42f1461cad21e1beaa6533
      /**
       * Present if the client supports sampling from an LLM.
       */
+@@ -1294,7 +1298,13 @@ exports.ToolSchema = z.object({
+      * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
+      * for notes on _meta usage.
+      */
+-    _meta: z.record(z.string(), z.unknown()).optional()
++    _meta: z.record(z.string(), z.unknown()).optional(),
++    /**
++     * Tool-level authentication advertisement (SEP-1488).
++     * Lets servers declare per-tool auth requirements so mixed-auth clients
++     * can surface the appropriate sign-in UI.
++     */
++    securitySchemes: z.array(z.object({ type: z.string() }).catchall(z.unknown())).optional()
+ });
+ /**
+  * Sent from the client to request a list of tools the server has.
+diff --git a/dist/esm/server/mcp.js b/dist/esm/server/mcp.js
+index 23639ce55eb4daebcfa4ece7bf3e1243478353d4..c25fa6fadeda53ed8a240db2d42b39600101e42d 100644
+--- a/dist/esm/server/mcp.js
++++ b/dist/esm/server/mcp.js
+@@ -83,7 +83,8 @@ export class McpServer {
+                     })(),
+                     annotations: tool.annotations,
+                     execution: tool.execution,
+-                    _meta: tool._meta
++                    _meta: tool._meta,
++                    securitySchemes: tool.securitySchemes
+                 };
+                 if (tool.outputSchema) {
+                     const obj = normalizeObjectSchema(tool.outputSchema);
 diff --git a/dist/esm/server/zod-compat.js b/dist/esm/server/zod-compat.js
 index be30a223061ff55d4462e5e43193b95c6f51d7ac..ef91904e94f4b07cc3b6c0e1346b5088335aa965 100644
 --- a/dist/esm/server/zod-compat.js
@@ -66,7 +109,7 @@ index be30a223061ff55d4462e5e43193b95c6f51d7ac..ef91904e94f4b07cc3b6c0e1346b5088
      }
      const v3Schema = schema;
 diff --git a/dist/esm/types.js b/dist/esm/types.js
-index 8edb88eca836fc93f4248ce4ab8c73b46d0e5c00..28990f16d5fa47b9022846e34b256bb3450ca560 100644
+index 8edb88eca836fc93f4248ce4ab8c73b46d0e5c00..5ec4e3ef63ddbc5602a7c8cecbd67bbe3c9dbb97 100644
 --- a/dist/esm/types.js
 +++ b/dist/esm/types.js
 @@ -416,6 +416,10 @@ export const ClientCapabilitiesSchema = z.object({
@@ -80,3 +123,18 @@ index 8edb88eca836fc93f4248ce4ab8c73b46d0e5c00..28990f16d5fa47b9022846e34b256bb3
      /**
       * Present if the client supports sampling from an LLM.
       */
+@@ -1256,7 +1260,13 @@ export const ToolSchema = z.object({
+      * See [MCP specification](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/47339c03c143bb4ec01a26e721a1b8fe66634ebe/docs/specification/draft/basic/index.mdx#general-fields)
+      * for notes on _meta usage.
+      */
+-    _meta: z.record(z.string(), z.unknown()).optional()
++    _meta: z.record(z.string(), z.unknown()).optional(),
++    /**
++     * Tool-level authentication advertisement (SEP-1488).
++     * Lets servers declare per-tool auth requirements so mixed-auth clients
++     * can surface the appropriate sign-in UI.
++     */
++    securitySchemes: z.array(z.object({ type: z.string() }).catchall(z.unknown())).optional()
+ });
+ /**
+  * Sent from the client to request a list of tools the server has.
