@@ -3,13 +3,13 @@ import { describe, expect, it } from "vitest";
 import { shouldReplaceAutoConnectConnection } from "../useAutoConnect";
 
 describe("shouldReplaceAutoConnectConnection", () => {
-  it("replaces a non-ready saved SSE connection when auto-connect now requires HTTP", () => {
+  it("replaces a non-ready connection when auto-connect config differs on legacy transport", () => {
     expect(
       shouldReplaceAutoConnectConnection(
         {
           url: "http://localhost:3002/mcp",
           state: "failed",
-          transportType: "sse",
+          transportType: "sse" as "http",
         },
         { url: "http://localhost:3002/mcp", transportType: "http" }
       )
@@ -22,7 +22,7 @@ describe("shouldReplaceAutoConnectConnection", () => {
         {
           url: "http://localhost:3002/mcp",
           state: "ready",
-          transportType: "sse",
+          transportType: "sse" as "http",
         },
         { url: "http://localhost:3002/mcp", transportType: "http" }
       )

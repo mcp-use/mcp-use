@@ -1,8 +1,10 @@
 import type {
   Client,
   ClientOptions,
-} from "@modelcontextprotocol/sdk/client/index.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
+  OAuthClientProvider,
+  Transport,
+} from "@modelcontextprotocol/client";
+import type { RequestOptions } from "@modelcontextprotocol/client";
 import type {
   CallToolResult,
   CompleteRequestParams,
@@ -13,14 +15,10 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
+  Resource,
   Root,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import {
-  CreateMessageRequestSchema,
-  ElicitRequestSchema,
-  ListRootsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { logger } from "../logging.js";
 import type { ConnectionManager } from "../task_managers/base.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
@@ -32,6 +30,15 @@ import { Telemetry } from "../telemetry/telemetry-node.js";
 export type NotificationHandler = (
   notification: Notification
 ) => void | Promise<void>;
+
+export type ConnectorAuthProvider = OAuthClientProvider & {
+  serverUrl?: string;
+};
+
+export type TransportWrapper = (
+  transport: Transport,
+  serverId: string
+) => Transport;
 
 export interface ConnectorInitOptions {
   /**
@@ -46,12 +53,12 @@ export interface ConnectorInitOptions {
   /**
    * OAuth client provider for automatic authentication
    */
-  authProvider?: any;
+  authProvider?: ConnectorAuthProvider;
   /**
    * Optional callback to wrap the transport before passing it to the Client.
    * Useful for logging, monitoring, or other transport-level interceptors.
    */
-  wrapTransport?: (transport: any, serverId: string) => any;
+  wrapTransport?: TransportWrapper;
   /**
    * Initial roots to provide to the server.
    * Roots allow the server to know which directories/files the client has access to.
@@ -66,15 +73,6 @@ export interface ConnectorInitOptions {
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
   /**
-   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
-   * Optional callback function to handle sampling requests from servers.
-   * When provided, the client will declare sampling capability and handle
-   * `sampling/createMessage` requests by calling this callback.
-   */
-  samplingCallback?: (
-    params: CreateMessageRequest["params"]
-  ) => Promise<CreateMessageResult>;
-  /**
    * Optional callback function to handle elicitation requests from servers.
    * When provided, the client will declare elicitation capability and handle
    * `elicitation/create` requests by calling this callback.
@@ -84,12 +82,6 @@ export interface ConnectorInitOptions {
    * - URL mode: Direct users to external URLs for sensitive interactions
    */
   onElicitation?: (
-    params: ElicitRequestFormParams | ElicitRequestURLParams
-  ) => Promise<ElicitResult>;
-  /**
-   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
-   */
-  elicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
   /**
@@ -114,7 +106,8 @@ export interface ConnectorInitOptions {
  */
 export abstract class BaseConnector {
   protected client: Client | null = null;
-  protected connectionManager: ConnectionManager<any> | null = null;
+  protected connectionManager: Pick<ConnectionManager<unknown>, "stop"> | null =
+    null;
   protected toolsCache: Tool[] | null = null;
   protected capabilitiesCache: Record<string, unknown> | null = null;
   protected serverInfoCache: { name: string; version?: string } | null = null;
@@ -124,30 +117,12 @@ export abstract class BaseConnector {
   protected rootsCache: Root[] = [];
 
   constructor(opts: ConnectorInitOptions = {}) {
-    // Support canonical and deprecated names
-    const finalOpts = {
-      ...opts,
-      onSampling: opts.onSampling ?? opts.samplingCallback,
-      onElicitation: opts.onElicitation ?? opts.elicitationCallback,
-    };
-    if (opts.samplingCallback && !opts.onSampling) {
-      logger.warn(
-        '[BaseConnector] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
-      );
+    this.opts = opts;
+    if (opts.roots) {
+      this.rootsCache = [...opts.roots];
     }
-    if (opts.elicitationCallback && !opts.onElicitation) {
-      console.warn(
-        '[BaseConnector] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
-      );
-    }
-    this.opts = finalOpts;
-    // Initialize roots from options
-    if (finalOpts.roots) {
-      this.rootsCache = [...finalOpts.roots];
-    }
-    // Register initial notification handler if provided
-    if (finalOpts.onNotification) {
-      this.notificationHandlers.push(finalOpts.onNotification);
+    if (opts.onNotification) {
+      this.notificationHandlers.push(opts.onNotification);
     }
   }
 
@@ -230,7 +205,12 @@ export abstract class BaseConnector {
     // The SDK registers specific handlers for progress and cancelled notifications
     // that bypass fallbackNotificationHandler entirely. Override them to also
     // forward to user-registered handlers so they appear in notification UIs.
-    const client = this.client as any;
+    const client = this.client as unknown as {
+      _notificationHandlers?: Map<
+        string,
+        (notification: Notification) => Promise<void>
+      >;
+    };
     const handlersMap = client._notificationHandlers as Map<
       string,
       (notification: Notification) => Promise<void>
@@ -329,7 +309,7 @@ export abstract class BaseConnector {
 
     // Handle roots/list requests from the server
     this.client.setRequestHandler(
-      ListRootsRequestSchema,
+      "roots/list",
       async (_request: unknown, _extra: unknown) => {
         logger.debug(
           `Server requested roots list, returning ${this.rootsCache.length} root(s)`
@@ -348,8 +328,8 @@ export abstract class BaseConnector {
       logger.debug("setupSamplingHandler: No client available");
       return;
     }
-    const samplingCallback = this.opts.onSampling ?? this.opts.samplingCallback;
-    if (!samplingCallback) {
+    const onSampling = this.opts.onSampling;
+    if (!onSampling) {
       logger.debug("setupSamplingHandler: No sampling callback provided");
       return;
     }
@@ -357,10 +337,10 @@ export abstract class BaseConnector {
     logger.debug("setupSamplingHandler: Setting up sampling request handler");
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
-      CreateMessageRequestSchema,
+      "sampling/createMessage",
       async (request: CreateMessageRequest, _extra: unknown) => {
         logger.debug("Server requested sampling, forwarding to callback");
-        return await samplingCallback(request.params);
+        return await onSampling(request.params);
       }
     );
     logger.debug(
@@ -377,9 +357,8 @@ export abstract class BaseConnector {
       logger.debug("setupElicitationHandler: No client available");
       return;
     }
-    const elicitationCallback =
-      this.opts.onElicitation ?? this.opts.elicitationCallback;
-    if (!elicitationCallback) {
+    const onElicitation = this.opts.onElicitation;
+    if (!onElicitation) {
       logger.debug("setupElicitationHandler: No elicitation callback provided");
       return;
     }
@@ -389,13 +368,13 @@ export abstract class BaseConnector {
     );
     // Handle elicitation/create requests from the server
     this.client.setRequestHandler(
-      ElicitRequestSchema,
+      "elicitation/create",
       async (
         request: { params: ElicitRequestFormParams | ElicitRequestURLParams },
         _extra: unknown
       ) => {
         logger.debug("Server requested elicitation, forwarding to callback");
-        return await elicitationCallback(request.params);
+        return await onElicitation(request.params);
       }
     );
     logger.debug(
@@ -499,7 +478,7 @@ export abstract class BaseConnector {
   /** Call a tool on the server. */
   async callTool(
     name: string,
-    args: Record<string, any>,
+    args: Record<string, unknown>,
     options?: RequestOptions
   ): Promise<CallToolResult> {
     if (!this.client) {
@@ -527,7 +506,6 @@ export abstract class BaseConnector {
     logger.debug(`Calling tool '${name}' with args`, args);
     const res = await this.client.callTool(
       { name, arguments: args },
-      undefined,
       enhancedOptions
     );
     logger.debug(`Tool '${name}' returned`, res);
@@ -591,11 +569,11 @@ export abstract class BaseConnector {
 
     try {
       logger.debug("Listing all resources (with auto-pagination)");
-      const allResources: any[] = [];
+      const allResources: Resource[] = [];
       let cursor: string | undefined = undefined;
 
       do {
-        const result: { resources?: any[]; nextCursor?: string } =
+        const result: { resources?: Resource[]; nextCursor?: string } =
           await this.client.listResources({ cursor }, options);
         allResources.push(...(result.resources || []));
         cursor = result.nextCursor;
@@ -716,21 +694,24 @@ export abstract class BaseConnector {
     }
   }
 
-  async getPrompt(name: string, args: Record<string, any>) {
+  async getPrompt(name: string, args: Record<string, unknown>) {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
 
     logger.debug(`Getting prompt ${name}`);
-    return await this.client.getPrompt({ name, arguments: args });
+    const promptArgs = Object.fromEntries(
+      Object.entries(args).map(([key, value]) => [key, String(value)])
+    );
+    return await this.client.getPrompt({ name, arguments: promptArgs });
   }
 
   /** Send a raw request through the client. */
   async request(
     method: string,
-    params: Record<string, any> | null = null,
+    params: Record<string, unknown> | null = null,
     options?: RequestOptions
-  ) {
+  ): Promise<unknown> {
     if (!this.client) {
       throw new Error("MCP client is not connected");
     }
@@ -738,7 +719,7 @@ export abstract class BaseConnector {
     logger.debug(`Sending raw request '${method}' with params`, params);
     return await this.client.request(
       { method, params: params ?? {} },
-      undefined as any,
+      undefined as never,
       options
     );
   }

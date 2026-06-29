@@ -301,21 +301,18 @@ function getCurrentPackageVersions(
     if (isDevelopment) {
       // In development mode, use workspace dependencies for all packages
       versions["mcp-use"] = "workspace:*";
-      versions["@mcp-use/cli"] = "workspace:*";
       versions["@mcp-use/inspector"] = "workspace:*";
     } else if (useCanary) {
       // In canary mode, use canary versions for published packages
       versions["mcp-use"] = "canary";
       // For unpublished packages, keep them as workspace dependencies
       // These packages are not available on npm registry yet
-      versions["@mcp-use/cli"] = "canary";
       versions["@mcp-use/inspector"] = "canary";
     } else {
       // In production mode, use latest for published packages
       versions["mcp-use"] = "latest";
       // For unpublished packages, keep them as workspace dependencies
       // These packages are not available on npm registry yet
-      versions["@mcp-use/cli"] = "latest";
       versions["@mcp-use/inspector"] = "latest";
     }
   } catch (error) {
@@ -364,10 +361,6 @@ function processTemplateFile(
       '"mcp-use": "workspace:*"'
     );
     processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "\^[^"]+"/,
-      '"@mcp-use/cli": "workspace:*"'
-    );
-    processedContent = processedContent.replace(
       /"@mcp-use\/inspector": "\^[^"]+"/,
       '"@mcp-use/inspector": "workspace:*"'
     );
@@ -382,14 +375,6 @@ function processTemplateFile(
       `"mcp-use": "canary"`
     );
     processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "workspace:\*"/,
-      `"@mcp-use/cli": "canary"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "\^[^"]+"/,
-      `"@mcp-use/cli": "canary"`
-    );
-    processedContent = processedContent.replace(
       /"@mcp-use\/inspector": "workspace:\*"/,
       `"@mcp-use/inspector": "canary"`
     );
@@ -402,10 +387,6 @@ function processTemplateFile(
     processedContent = processedContent.replace(
       /"mcp-use": "workspace:\*"/,
       `"mcp-use": "${versions["mcp-use"] || "latest"}"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "workspace:\*"/,
-      `"@mcp-use/cli": "${versions["@mcp-use/cli"] || "latest"}"`
     );
     processedContent = processedContent.replace(
       /"@mcp-use\/inspector": "workspace:\*"/,
@@ -793,10 +774,11 @@ program
           console.log("   └── README.md");
         } else if (validatedTemplate === "mcp-apps") {
           console.log("   ├── public/");
+          console.log("   ├── components/");
           console.log("   ├── resources/");
           console.log("   │   └── product-search-result/");
           console.log("   │       └── widget.tsx");
-          console.log("   ├── index.ts (server entry point)");
+          console.log("   ├── index.tsx (server entry point)");
           console.log("   ├── package.json");
           console.log("   ├── tsconfig.json");
           console.log("   └── README.md");

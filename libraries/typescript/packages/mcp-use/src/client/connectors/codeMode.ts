@@ -1,4 +1,8 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  CallToolResult,
+  RequestOptions,
+  Tool,
+} from "@modelcontextprotocol/client";
 import type { MCPClient } from "../../client.js";
 import { BaseConnector } from "../../connectors/base.js";
 
@@ -187,14 +191,16 @@ export class CodeModeConnector extends BaseConnector {
     return this._tools;
   }
 
-  async initialize(): Promise<any> {
+  async initialize(
+    _defaultRequestOptions?: RequestOptions
+  ): Promise<Awaited<ReturnType<BaseConnector["initialize"]>>> {
     this.toolsCache = this._tools;
-    return { capabilities: {}, version: "1.0.0" };
+    return {};
   }
 
   async callTool(
     name: string,
-    args: Record<string, any>
+    args: Record<string, unknown>
   ): Promise<CallToolResult> {
     if (name === "execute_code") {
       const code = args.code as string;

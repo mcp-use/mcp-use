@@ -56,14 +56,13 @@ export interface AuthConfig {
 
 export interface MCPServerConfig {
   url?: string;
-  transport?: "http" | "sse";
+  transport?: "http";
   headers?: Record<string, string>;
   authToken?: string;
   auth_token?: string;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
-  preferSse?: boolean;
 }
 
 export interface MCPConfig {

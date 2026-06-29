@@ -5,12 +5,8 @@
  * Used for integration testing
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Server } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
 // Create server instance
 const server = new Server(
@@ -26,7 +22,7 @@ const server = new Server(
 );
 
 // Tool handlers
-server.setRequestHandler(ListToolsRequestSchema, async () => {
+server.setRequestHandler("tools/list", async () => {
   return {
     tools: [
       {
@@ -51,7 +47,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler("tools/call", async (request) => {
   const { name, arguments: args } = request.params;
 
   if (name === "add") {

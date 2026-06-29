@@ -22,6 +22,11 @@ import { getSession } from "./utils/session-storage.js";
 import { formatError } from "./utils/format.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
+import { createEvalCommand } from "./commands/eval.js";
+import {
+  createDoctorCommand,
+  createInspectCommand,
+} from "./commands/doctor.js";
 import { createServersCommand } from "./commands/servers.js";
 import {
   orgCurrentCommand,
@@ -36,7 +41,16 @@ import {
   withNextShimsEnv,
 } from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
+import { ensureUserTsconfigJsx } from "./utils/ensure-user-tsconfig-jsx.js";
 import { getWidgetAssetBase } from "./utils/widget-paths.js";
+import {
+  diffMcpUseProjectConfigLocal,
+  loadMcpUseProjectConfig,
+  resolveMcpUseWorkspacePaths,
+  validateMcpUseProjectConfig,
+  type LoadedMcpUseProjectConfig,
+  type McpUseWorkspacePaths,
+} from "mcp-use/project-config";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -45,6 +59,79 @@ const packageContent = readFileSync(
 );
 const packageJson = JSON.parse(packageContent);
 const packageVersion = packageJson.version || "unknown";
+
+type JsonObject = Record<string, any>;
+
+async function readJsonFile<T extends JsonObject>(
+  filepath: string
+): Promise<T | null> {
+  try {
+    return JSON.parse(await readFile(filepath, "utf-8")) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function writeJsonFile(filepath: string, value: JsonObject) {
+  await mkdir(path.dirname(filepath), { recursive: true });
+  await writeFile(filepath, JSON.stringify(value, null, 2), "utf-8");
+}
+
+async function loadProjectContext(projectPath: string): Promise<{
+  projectConfig: LoadedMcpUseProjectConfig;
+  workspacePaths: McpUseWorkspacePaths;
+}> {
+  const projectConfig = await loadMcpUseProjectConfig(projectPath);
+  return {
+    projectConfig,
+    workspacePaths: resolveMcpUseWorkspacePaths(
+      projectPath,
+      projectConfig.config
+    ),
+  };
+}
+
+function relativeFromProject(
+  projectPath: string,
+  absolutePath: string
+): string {
+  return path.relative(projectPath, absolutePath).replace(/\\/g, "/");
+}
+
+function optionProvided(longName: string, shortName?: string): boolean {
+  return process.argv.some(
+    (arg) =>
+      arg === longName ||
+      arg.startsWith(`${longName}=`) ||
+      (shortName ? arg === shortName || arg.startsWith(`${shortName}=`) : false)
+  );
+}
+
+async function readBuildManifest(
+  paths: McpUseWorkspacePaths
+): Promise<JsonObject | null> {
+  return (
+    (await readJsonFile(paths.manifestPath)) ??
+    (await readJsonFile(paths.legacyManifestPath))
+  );
+}
+
+async function readTunnelSubdomain(
+  paths: McpUseWorkspacePaths
+): Promise<string | undefined> {
+  const state = await readJsonFile(paths.tunnelStatePath);
+  return typeof state?.subdomain === "string" ? state.subdomain : undefined;
+}
+
+async function writeTunnelSubdomain(
+  paths: McpUseWorkspacePaths,
+  subdomain: string
+) {
+  await writeJsonFile(paths.tunnelStatePath, {
+    subdomain,
+    updatedAt: new Date().toISOString(),
+  });
+}
 
 program
   .name("mcp-use")
@@ -336,7 +423,8 @@ async function startTunnel(
 async function resolveEntryFile(
   projectPath: string,
   cliEntry?: string,
-  mcpDir?: string
+  mcpDir?: string,
+  projectConfig?: LoadedMcpUseProjectConfig
 ): Promise<string> {
   if (cliEntry) {
     await access(path.join(projectPath, cliEntry)).catch(() => {
@@ -369,7 +457,27 @@ async function resolveEntryFile(
     );
   }
 
-  const candidates = ["index.ts", "src/index.ts", "server.ts", "src/server.ts"];
+  if (projectConfig?.source === "file") {
+    await access(path.join(projectPath, projectConfig.config.entry)).catch(
+      () => {
+        throw new Error(
+          `Configured entry file not found: ${projectConfig.config.entry}`
+        );
+      }
+    );
+    return projectConfig.config.entry;
+  }
+
+  const candidates = [
+    "index.ts",
+    "index.tsx",
+    "src/index.ts",
+    "src/index.tsx",
+    "server.ts",
+    "server.tsx",
+    "src/server.ts",
+    "src/server.tsx",
+  ];
   for (const candidate of candidates) {
     try {
       await access(path.join(projectPath, candidate));
@@ -444,9 +552,10 @@ function makeWidgetServerOnlyGuard(widgetName: string) {
 async function findServerFile(
   projectPath: string,
   cliEntry?: string,
-  cliMcpDir?: string
+  cliMcpDir?: string,
+  projectConfig?: LoadedMcpUseProjectConfig
 ): Promise<string> {
-  return resolveEntryFile(projectPath, cliEntry, cliMcpDir);
+  return resolveEntryFile(projectPath, cliEntry, cliMcpDir, projectConfig);
 }
 
 function isBunRuntime(): boolean {
@@ -480,7 +589,7 @@ async function generateToolRegistryTypesForServer(
     );
     console.log(
       chalk.gray(
-        "  Run `mcp-use generate-types` with node to refresh .mcp-use/tool-registry.d.ts."
+        "  Run `mcp-use typegen` with node to refresh .mcp-use/generated/tool-registry.d.ts."
       )
     );
     return "skipped";
@@ -500,6 +609,8 @@ async function generateToolRegistryTypesForServer(
       await loadNextJsEnvFiles(projectPath);
       await registerNextShimsInProcess();
     }
+
+    await ensureUserTsconfigJsx(projectPath);
 
     // Register tsx's loader hooks namespace-less + globally. We deliberately
     // do NOT use `tsImport` here: tsImport wraps tsx in a generated
@@ -591,6 +702,7 @@ async function buildWidgets(
   options: {
     inline?: boolean;
     widgetsDir?: string;
+    workspacePaths?: McpUseWorkspacePaths;
   } = {}
 ): Promise<Array<{ name: string; metadata: any }>> {
   const { inline = true } = options; // Default to true for VS Code compatibility
@@ -706,8 +818,19 @@ async function buildWidgets(
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
-    // Create temp directory for build artifacts
-    const tempDir = path.join(projectPath, ".mcp-use", widgetName);
+    const workspacePaths =
+      options.workspacePaths ?? resolveMcpUseWorkspacePaths(projectPath);
+    const outDir = path.join(
+      workspacePaths.viewsBuildDir,
+      "widgets",
+      widgetName
+    );
+    // Vite's HTML plugin emits the input HTML path relative to outDir. Keep the
+    // generated HTML inside the final widget output root so Rolldown never sees
+    // a relative path that escapes the output directory.
+    const tempDir = outDir;
+    const viteOutDir = outDir;
+    await fs.rm(outDir, { recursive: true, force: true });
     await fs.mkdir(tempDir, { recursive: true });
 
     // Create CSS file with Tailwind directives
@@ -775,15 +898,6 @@ if (container && Component) {
     await fs.writeFile(path.join(tempDir, "entry.tsx"), entryContent, "utf8");
     await fs.writeFile(path.join(tempDir, "index.html"), htmlContent, "utf8");
 
-    // Build with Vite
-    const outDir = path.join(
-      projectPath,
-      "dist",
-      "resources",
-      "widgets",
-      widgetName
-    );
-
     const baseUrl = getWidgetAssetBase(mcpUrl, widgetName);
 
     // Extract metadata from widget before building
@@ -791,9 +905,8 @@ if (container && Component) {
     try {
       // Use a completely isolated temp directory for metadata extraction to avoid conflicts
       const metadataTempDir = path.join(
-        projectPath,
-        ".mcp-use",
-        `${widgetName}-metadata`
+        workspacePaths.metadataCacheDir,
+        widgetName
       );
       await fs.mkdir(metadataTempDir, { recursive: true });
 
@@ -831,8 +944,19 @@ export default PostHog;
 
       const metadataServer = await createServer({
         root: metadataTempDir,
-        cacheDir: path.join(metadataTempDir, ".vite-cache"),
-        plugins: [serverOnlyGuard, nodeStubsPlugin, tailwindcss(), react()],
+        cacheDir: path.join(
+          workspacePaths.viteCacheDir,
+          "metadata",
+          widgetName
+        ),
+        plugins: [
+          serverOnlyGuard,
+          nodeStubsPlugin,
+          tailwindcss(),
+          // Force React's own JSX runtime for widget bundles — the project's
+          // tsconfig may set jsxImportSource: "mcp-use/jsx" for server inline JSX.
+          react({ jsxImportSource: "react" }),
+        ],
         // When the project has a tsconfig, enable Vite's native tsconfig-paths
         // resolver so `@/*` (or any custom alias) resolves through the
         // project's own paths config. Without a tsconfig, fall back to the
@@ -1042,75 +1166,86 @@ export default {
             buildServerOnlyGuard,
             buildNodeStubsPlugin,
             tailwindcss(),
-            react(),
+            react({ jsxImportSource: "react" }),
             viteSingleFile({ removeViteModuleLoader: true }),
           ]
-        : [buildServerOnlyGuard, buildNodeStubsPlugin, tailwindcss(), react()];
+        : [
+            buildServerOnlyGuard,
+            buildNodeStubsPlugin,
+            tailwindcss(),
+            react({ jsxImportSource: "react" }),
+          ];
 
-      await build({
-        root: tempDir,
-        base: baseUrl,
-        plugins: buildPlugins,
-        // Only use renderBuiltUrl for non-inline builds (external assets need runtime URL resolution)
-        ...(inline
-          ? {}
-          : {
-              experimental: {
-                renderBuiltUrl: (
-                  filename: string,
-                  { hostType }: { hostType: string }
-                ) => {
-                  if (["js", "css"].includes(hostType)) {
-                    return {
-                      runtime: `window.__getFile(${JSON.stringify(filename)})`,
-                    };
-                  } else {
-                    return { relative: true };
-                  }
-                },
-              },
-            }),
-        // When a tsconfig exists, enable Vite's native `resolve.tsconfigPaths`
-        // so the project's path aliases resolve naturally. Otherwise fall
-        // back to the legacy `@` → resourcesDir alias.
-        resolve: hasProjectTsconfig
-          ? { tsconfigPaths: true }
-          : { alias: { "@": resourcesDir } },
-        optimizeDeps: {
-          // Exclude Node.js-only packages from browser bundling
-          exclude: ["posthog-node"],
-        },
-        build: {
-          outDir,
-          emptyOutDir: true,
-          // Disable source maps to avoid CSP eval violations
-          // Source maps can use eval-based mappings which break strict CSP policies
-          sourcemap: false,
-          // Minify for smaller bundle size
-          minify: true,
-          // Widgets bundle React+Zod; suppress expected chunk size warning
-          chunkSizeWarningLimit: 1024,
-          // For inline builds, disable CSS code splitting and inline all assets
+      const previousCwd = process.cwd();
+      process.chdir(tempDir);
+      try {
+        await build({
+          root: ".",
+          base: baseUrl,
+          plugins: buildPlugins,
+          // Only use renderBuiltUrl for non-inline builds (external assets need runtime URL resolution)
           ...(inline
-            ? {
-                cssCodeSplit: false,
-                assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
-              }
-            : {}),
-          rolldownOptions: {
-            input: path.join(tempDir, "index.html"),
-            external: (id) => {
-              return false;
+            ? {}
+            : {
+                experimental: {
+                  renderBuiltUrl: (
+                    filename: string,
+                    { hostType }: { hostType: string }
+                  ) => {
+                    if (["js", "css"].includes(hostType)) {
+                      return {
+                        runtime: `window.__getFile(${JSON.stringify(filename)})`,
+                      };
+                    } else {
+                      return { relative: true };
+                    }
+                  },
+                },
+              }),
+          // When a tsconfig exists, enable Vite's native `resolve.tsconfigPaths`
+          // so the project's path aliases resolve naturally. Otherwise fall
+          // back to the legacy `@` → resourcesDir alias.
+          resolve: hasProjectTsconfig
+            ? { tsconfigPaths: true }
+            : { alias: { "@": resourcesDir } },
+          optimizeDeps: {
+            // Exclude Node.js-only packages from browser bundling
+            exclude: ["posthog-node"],
+          },
+          build: {
+            outDir: ".",
+            emptyOutDir: false,
+            // Disable source maps to avoid CSP eval violations
+            // Source maps can use eval-based mappings which break strict CSP policies
+            sourcemap: false,
+            // Minify for smaller bundle size
+            minify: true,
+            // Widgets bundle React+Zod; suppress expected chunk size warning
+            chunkSizeWarningLimit: 1024,
+            // For inline builds, disable CSS code splitting and inline all assets
+            ...(inline
+              ? {
+                  cssCodeSplit: false,
+                  assetsInlineLimit: 100000000, // Inline all assets under 100MB (effectively all)
+                }
+              : {}),
+            rollupOptions: {
+              input: "index.html",
+              external: (id) => {
+                return false;
+              },
             },
           },
-        },
-      });
+        });
+      } finally {
+        process.chdir(previousCwd);
+      }
 
       // Post-process JS bundles to patch Zod's JIT compilation
       // This prevents CSP eval violations in sandboxed iframes (MCP Apps hosts)
       // See: https://github.com/colinhacks/zod/issues/4461
       try {
-        const assetsDir = path.join(outDir, "assets");
+        const assetsDir = path.join(viteOutDir, "assets");
         const assetFiles = await fs.readdir(assetsDir);
         const jsFiles = assetFiles.filter((f) => f.endsWith(".js"));
 
@@ -1159,7 +1294,7 @@ export default {
       const mcpServerUrl = process.env.MCP_SERVER_URL;
       if (mcpServerUrl) {
         try {
-          const htmlPath = path.join(outDir, "index.html");
+          const htmlPath = path.join(viteOutDir, "index.html");
           let html = await fs.readFile(htmlPath, "utf8");
 
           // Inject window.__mcpPublicUrl and window.__getFile into <head>
@@ -1206,6 +1341,9 @@ export default {
         }
       }
 
+      await fs.rm(path.join(outDir, "entry.tsx"), { force: true });
+      await fs.rm(path.join(outDir, "styles.css"), { force: true });
+
       console.log(chalk.green(`    ✓ Built ${widgetName}`));
       return {
         status: "built" as const,
@@ -1218,10 +1356,12 @@ export default {
     }
   };
 
-  // Build all widgets in parallel
-  const buildResults = await Promise.all(
-    entries.map((entry) => buildSingleWidget(entry))
-  );
+  // Build sequentially: Vite/Rolldown derives HTML output paths from cwd, so
+  // each widget build temporarily runs from its own generated root.
+  const buildResults = [];
+  for (const entry of entries) {
+    buildResults.push(await buildSingleWidget(entry));
+  }
 
   const failed = buildResults.filter((r) => r.status === "failed");
   if (failed.length > 0) {
@@ -1309,10 +1449,14 @@ async function collectTsFiles(
  * esbuild strips types without analyzing them, so it cannot OOM on complex types.
  * Reads the project's tsconfig.json to determine source files, outDir, and compiler options.
  */
-async function transpileWithEsbuild(projectPath: string): Promise<void> {
+async function transpileWithEsbuild(
+  projectPath: string,
+  outDirOverride?: string
+): Promise<void> {
   const esbuild = await import("esbuild");
   const { promises: fs } = await import("node:fs");
 
+  await ensureUserTsconfigJsx(projectPath);
   const tsconfigPath = path.join(projectPath, "tsconfig.json");
   let tsconfig: any = {};
   try {
@@ -1323,7 +1467,7 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
   }
 
   const compilerOptions = tsconfig.compilerOptions || {};
-  const outDir = compilerOptions.outDir || "./dist";
+  const outDir = outDirOverride ?? compilerOptions.outDir ?? "./dist";
   const includePatterns = tsconfig.include || ["**/*.ts", "**/*.tsx"];
   const excludePatterns = tsconfig.exclude || ["node_modules", "dist"];
 
@@ -1338,14 +1482,16 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
     return;
   }
 
-  // Map tsconfig jsx setting to esbuild equivalent
+  // Map tsconfig jsx setting to esbuild equivalent. Default to "automatic"
+  // so inline JSX widget returns compile against jsxImportSource below.
   const jsxMap: Record<string, "automatic" | "transform" | "preserve"> = {
     "react-jsx": "automatic",
     "react-jsxdev": "automatic",
     react: "transform",
     preserve: "preserve",
   };
-  const jsx = jsxMap[compilerOptions.jsx] || undefined;
+  const jsx = jsxMap[compilerOptions.jsx] || "automatic";
+  const jsxImportSource = compilerOptions.jsxImportSource || "mcp-use/jsx";
 
   const target = (compilerOptions.target || "ES2022").toLowerCase();
 
@@ -1360,13 +1506,14 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
 
   await esbuild.build({
     entryPoints: files.map((f) => path.join(projectPath, f)),
-    outdir: path.join(projectPath, outDir),
+    outdir: path.resolve(projectPath, outDir),
     outbase,
     bundle: true,
     packages: "external",
     format,
     target,
     jsx,
+    jsxImportSource,
     sourcemap: compilerOptions.sourceMap ?? true,
     tsconfig: tsconfigPath,
     platform: "node",
@@ -1401,18 +1548,25 @@ program
     try {
       const projectPath = path.resolve(options.path);
       const { promises: fs } = await import("node:fs");
+      const { projectConfig, workspacePaths } =
+        await loadProjectContext(projectPath);
 
       displayPackageVersions(projectPath);
 
       // Resolve mcpDir for widgets + server entry
       const mcpDir = options.mcpDir as string | undefined;
-      const widgetsDir = resolveWidgetsDir(options.widgetsDir, mcpDir);
+      const widgetsDir =
+        (options.widgetsDir as string | undefined) ??
+        (projectConfig.source === "file"
+          ? projectConfig.config.viewsDir
+          : resolveWidgetsDir(undefined, mcpDir));
 
       // Build widgets first (this generates schemas)
       // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
       const builtWidgets = await buildWidgets(projectPath, {
         inline: options.inline ?? false,
         widgetsDir,
+        workspacePaths,
       });
 
       // Find the source server file before building
@@ -1421,7 +1575,8 @@ program
         sourceServerFile = await findServerFile(
           projectPath,
           options.entry,
-          options.mcpDir
+          options.mcpDir,
+          projectConfig
         );
       } catch (err) {
         // No server file found. Widget-only projects hit this on purpose,
@@ -1438,7 +1593,7 @@ program
       if (sourceServerFile) {
         console.log(chalk.gray("Generating tool registry types..."));
         // Type generation is a dev convenience (regenerates
-        // .mcp-use/tool-registry.d.ts). Keep it non-fatal during build so
+        // .mcp-use/generated/tool-registry.d.ts). Keep it non-fatal during build so
         // a runtime without the right loader hooks (e.g. bun alpine) or
         // an unrelated import-time error in the server file can't block
         // the Docker build.
@@ -1480,7 +1635,10 @@ program
       // manifest written below still records the .ts source as the entry.
       if (!mcpDir) {
         console.log(chalk.gray("Building TypeScript..."));
-        await transpileWithEsbuild(projectPath);
+        await transpileWithEsbuild(
+          projectPath,
+          relativeFromProject(projectPath, workspacePaths.serverBuildDir)
+        );
         console.log(chalk.green("✓ TypeScript build complete!"));
       } else {
         console.log(
@@ -1533,13 +1691,17 @@ program
         if (mcpDir) {
           entryPoint = sourceServerFile;
         } else {
-          // Check possible output locations based on common tsconfig patterns
-          // tsc may or may not preserve the src/ prefix depending on rootDir setting
+          // Check possible output locations based on common tsconfig patterns.
+          // esbuild may or may not preserve the src/ prefix depending on rootDir.
           const baseName = path.basename(sourceServerFile, ".ts") + ".js";
+          const serverBuildDir = relativeFromProject(
+            projectPath,
+            workspacePaths.serverBuildDir
+          );
           const possibleOutputs = [
-            `dist/${baseName}`, // rootDir set to project root or src
-            `dist/src/${baseName}`, // no rootDir, source in src/
-            `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+            `${serverBuildDir}/${baseName}`,
+            `${serverBuildDir}/src/${baseName}`,
+            `${serverBuildDir}/${sourceServerFile.replace(/\.tsx?$/, ".js")}`,
           ];
           for (const candidate of possibleOutputs) {
             try {
@@ -1558,7 +1720,7 @@ program
       try {
         await fs.access(publicDir);
         console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+        await fs.cp(publicDir, path.join(workspacePaths.buildDir, "public"), {
           recursive: true,
         });
         console.log(chalk.green("✓ Public assets copied"));
@@ -1567,9 +1729,9 @@ program
       }
 
       // Create build manifest
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      const manifestPath = workspacePaths.manifestPath;
 
-      // Read existing manifest to preserve tunnel subdomain and other fields
+      // Read existing manifest to preserve non-state build fields.
       let existingManifest: any = {};
       try {
         const existingContent = await fs.readFile(manifestPath, "utf-8");
@@ -1597,7 +1759,7 @@ program
 
       // Merge with existing manifest, preserving tunnel and other fields
       const manifest = {
-        ...existingManifest, // Preserve existing fields like tunnel
+        ...existingManifest,
         includeInspector,
         buildTime,
         buildId,
@@ -1656,9 +1818,23 @@ program
     try {
       process.env.MCP_USE_CLI_DEV = "1";
       const projectPath = path.resolve(options.path);
-      let port = parseInt(options.port, 10);
+      const { projectConfig, workspacePaths } =
+        await loadProjectContext(projectPath);
+      let port = parseInt(
+        optionProvided("--port")
+          ? options.port
+          : String(projectConfig.config.dev.port),
+        10
+      );
       const host = options.host;
       const useHmr = options.hmr !== false;
+      const withTunnel =
+        options.tunnel ||
+        (projectConfig.source === "file" && projectConfig.config.dev.tunnel);
+      const shouldOpen =
+        options.open !== false &&
+        (projectConfig.source !== "file" ||
+          projectConfig.config.dev.openInspector);
 
       displayPackageVersions(projectPath);
 
@@ -1674,17 +1850,22 @@ program
       const serverFile = await findServerFile(
         projectPath,
         options.entry,
-        options.mcpDir
+        options.mcpDir,
+        projectConfig
       );
 
       // Resolve the widgets directory and expose it via an env var so the
       // running MCPServer (which picks `resources/` by default) discovers
       // widgets at `<mcpDir>/resources` when the developer used --mcp-dir.
       // The env var is the contract: mcp-use/server reads it when no
-      // explicit `resourcesDir` is passed to mountWidgets.
+      // explicit `resourcesDir` is passed to mountViews.
       {
         const devMcpDir = options.mcpDir as string | undefined;
-        const devWidgetsDir = resolveWidgetsDir(options.widgetsDir, devMcpDir);
+        const devWidgetsDir =
+          (options.widgetsDir as string | undefined) ??
+          (projectConfig.source === "file"
+            ? projectConfig.config.viewsDir
+            : resolveWidgetsDir(undefined, devMcpDir));
         if (devWidgetsDir !== "resources") {
           process.env.MCP_USE_WIDGETS_DIR = devWidgetsDir;
         }
@@ -1695,31 +1876,22 @@ program
       let tunnelSubdomain: string | undefined = undefined;
       let tunnelUrl: string | undefined = undefined;
 
-      if (options.tunnel) {
+      if (withTunnel) {
         try {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
-          let existingSubdomain: string | undefined;
-
-          try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
-            if (existingSubdomain) {
-              console.log(
-                chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
-              );
-              const apiBase =
-                process.env.MCP_USE_TUNNEL_API || "https://local.mcp-use.run";
-              try {
-                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
-                  method: "DELETE",
-                });
-              } catch {
-                // Best-effort cleanup; ignore DELETE failures
-              }
+          const existingSubdomain = await readTunnelSubdomain(workspacePaths);
+          if (existingSubdomain) {
+            console.log(
+              chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
+            );
+            const apiBase =
+              process.env.MCP_USE_TUNNEL_API || "https://local.mcp-use.run";
+            try {
+              await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                method: "DELETE",
+              });
+            } catch {
+              // Best-effort cleanup; ignore DELETE failures
             }
-          } catch {
-            // Manifest doesn't exist or is invalid, that's okay
           }
 
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
@@ -1743,29 +1915,11 @@ program
 
           // Persist subdomain for reuse across restarts
           try {
-            let manifest: any = {};
-            try {
-              const manifestContent = await readFile(manifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch {
-              // File doesn't exist, create new manifest
-            }
-
-            if (!manifest.tunnel) {
-              manifest.tunnel = {};
-            }
-            manifest.tunnel.subdomain = tunnelSubdomain;
-
-            await mkdir(path.dirname(manifestPath), { recursive: true });
-            await writeFile(
-              manifestPath,
-              JSON.stringify(manifest, null, 2),
-              "utf-8"
-            );
+            await writeTunnelSubdomain(workspacePaths, tunnelSubdomain);
           } catch (error) {
             console.warn(
               chalk.yellow(
-                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+                `⚠️  Failed to save tunnel state: ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -1857,7 +2011,7 @@ program
         processes.push(serverCommand.process);
 
         // Auto-open inspector if enabled
-        if (options.open !== false) {
+        if (shouldOpen) {
           const startTime = Date.now();
           const browserHost = normalizeBrowserHost(host);
           const ready = await waitForServer(port, browserHost);
@@ -1957,6 +2111,8 @@ program
       const chokidar = (chokidarModule as any).default || chokidarModule;
       const { fileURLToPath } = await import("node:url");
       const { createRequire } = await import("node:module");
+
+      await ensureUserTsconfigJsx(projectPath);
 
       // Resolve the user's tsconfig up front — the server load path below
       // depends on tsx picking it up so `@/*` aliases resolve.
@@ -2434,25 +2590,17 @@ program
         // 2. Start tunnel if requested
         tunnelUrl = undefined;
         if (withTunnel) {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
-          let existingSubdomain: string | undefined;
-          try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
-            if (existingSubdomain) {
-              const apiBase =
-                process.env.MCP_USE_API || "https://local.mcp-use.run";
-              try {
-                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
-                  method: "DELETE",
-                });
-              } catch {
-                /* ignore */
-              }
+          const existingSubdomain = await readTunnelSubdomain(workspacePaths);
+          if (existingSubdomain) {
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            try {
+              await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                method: "DELETE",
+              });
+            } catch {
+              /* ignore */
             }
-          } catch {
-            /* ignore */
           }
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
           try {
@@ -2476,17 +2624,7 @@ program
 
           // Persist subdomain
           try {
-            const mPath = path.join(projectPath, "dist", "mcp-use.json");
-            let manifest: any = {};
-            try {
-              manifest = JSON.parse(await readFile(mPath, "utf-8"));
-            } catch {
-              /* ignore */
-            }
-            if (!manifest.tunnel) manifest.tunnel = {};
-            manifest.tunnel.subdomain = tunnelSubdomain;
-            await mkdir(path.dirname(mPath), { recursive: true });
-            await writeFile(mPath, JSON.stringify(manifest, null, 2), "utf-8");
+            await writeTunnelSubdomain(workspacePaths, tunnelSubdomain);
           } catch {
             /* ignore */
           }
@@ -2624,17 +2762,19 @@ program
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
+      const { projectConfig, workspacePaths } =
+        await loadProjectContext(projectPath);
       // Priority: --port flag > process.env.PORT > default
       // Check if --port or -p was explicitly provided in command line
-      const portFlagProvided =
-        process.argv.includes("--port") ||
-        process.argv.includes("-p") ||
-        process.argv.some((arg) => arg.startsWith("--port=")) ||
-        process.argv.some((arg) => arg.startsWith("-p="));
+      const portFlagProvided = optionProvided("--port");
 
       let port = portFlagProvided
         ? parseInt(options.port, 10) // Flag explicitly provided, use it
-        : parseInt(process.env.PORT || options.port || "3000", 10); // Check env, then default
+        : parseInt(
+            process.env.PORT ||
+              String(projectConfig.config.build.port || options.port || "3000"),
+            10
+          ); // Check env, then config/default
 
       // Check if port is available, find alternative if needed
       if (!(await isPortAvailable(port))) {
@@ -2652,38 +2792,27 @@ program
       let mcpUrl: string | undefined;
       let tunnelProcess: any = undefined;
       let tunnelSubdomain: string | undefined = undefined;
-      if (options.tunnel) {
+      const withTunnel =
+        options.tunnel ||
+        (projectConfig.source === "file" && projectConfig.config.dev.tunnel);
+      if (withTunnel) {
         try {
-          // Read existing subdomain from mcp-use.json if available
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
-          let existingSubdomain: string | undefined;
-
-          try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
-            if (existingSubdomain) {
-              console.log(
-                chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
-              );
-              // Release the stale subdomain so the first attempt can reclaim it
-              const apiBase =
-                process.env.MCP_USE_API || "https://local.mcp-use.run";
-              try {
-                await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
-                  method: "DELETE",
-                });
-              } catch {
-                // Best-effort cleanup; ignore DELETE failures
-              }
-            }
-          } catch (error) {
-            // Manifest doesn't exist or is invalid, that's okay
-            console.debug(
-              chalk.gray(
-                `Debug: Failed to read or parse mcp-use.json: ${error instanceof Error ? error.message : String(error)}`
-              )
+          // Read existing subdomain from local state if available.
+          const existingSubdomain = await readTunnelSubdomain(workspacePaths);
+          if (existingSubdomain) {
+            console.log(
+              chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
             );
+            // Release the stale subdomain so the first attempt can reclaim it
+            const apiBase =
+              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            try {
+              await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
+                method: "DELETE",
+              });
+            } catch {
+              // Best-effort cleanup; ignore DELETE failures
+            }
           }
 
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
@@ -2706,35 +2835,13 @@ program
           const subdomain = tunnelInfo.subdomain;
           tunnelSubdomain = subdomain;
 
-          // Update mcp-use.json with the subdomain
+          // Update local tunnel state with the subdomain
           try {
-            let manifest: any = {};
-            try {
-              const manifestContent = await readFile(manifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch {
-              // File doesn't exist, create new manifest
-            }
-
-            // Update or add tunnel subdomain
-            if (!manifest.tunnel) {
-              manifest.tunnel = {};
-            }
-            manifest.tunnel.subdomain = subdomain;
-
-            // Ensure dist directory exists
-            await mkdir(path.dirname(manifestPath), { recursive: true });
-
-            // Write updated manifest
-            await writeFile(
-              manifestPath,
-              JSON.stringify(manifest, null, 2),
-              "utf-8"
-            );
+            await writeTunnelSubdomain(workspacePaths, subdomain);
           } catch (error) {
             console.warn(
               chalk.yellow(
-                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+                `⚠️  Failed to save tunnel state: ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -2747,12 +2854,10 @@ program
       // Find the built server file
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
 
       try {
-        const manifestContent = await readFile(manifestPath, "utf-8");
-        const manifest = JSON.parse(manifestContent);
-        if (manifest.entryPoint) {
+        const manifest = await readBuildManifest(workspacePaths);
+        if (manifest?.entryPoint) {
           // Verify the entry point exists
           await access(path.join(projectPath, manifest.entryPoint));
           serverFile = manifest.entryPoint;
@@ -2768,16 +2873,24 @@ program
         // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
         // and `start` runs the source via tsx).
         const startMcpDir = options.mcpDir as string | undefined;
+        const serverBuildDir = relativeFromProject(
+          projectPath,
+          workspacePaths.serverBuildDir
+        );
 
         const serverCandidates = [
           ...(startMcpDir
             ? [
                 `${startMcpDir}/index.ts`,
                 `${startMcpDir}/index.tsx`,
-                `dist/${startMcpDir}/index.js`,
-                `dist/${startMcpDir}/server.js`,
+                `${serverBuildDir}/${startMcpDir}/index.js`,
+                `${serverBuildDir}/${startMcpDir}/server.js`,
               ]
             : []),
+          `${serverBuildDir}/index.js`,
+          `${serverBuildDir}/server.js`,
+          `${serverBuildDir}/src/index.js`,
+          `${serverBuildDir}/src/server.js`,
           "dist/index.js",
           "dist/server.js",
           "dist/src/index.js",
@@ -2798,7 +2911,7 @@ program
       if (!serverFile) {
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - ${relativeFromProject(projectPath, workspacePaths.manifestPath)} (manifest with entryPoint)\n  - ${relativeFromProject(projectPath, workspacePaths.serverBuildDir)}/index.js\n  - ${relativeFromProject(projectPath, workspacePaths.serverBuildDir)}/server.js\n  - dist/mcp-use.json (legacy manifest)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
           )
         );
         process.exit(1);
@@ -2953,6 +3066,122 @@ program
       console.error("Start failed:", error);
       process.exit(1);
     }
+  });
+
+function printCiEnvInstructions(projectPath: string) {
+  const configPath = path.join(projectPath, "mcp-use.json");
+  const linkPath = path.join(projectPath, ".mcp-use", "cloud", "link.json");
+
+  console.log("mcp-use CI environment variables\n");
+  console.log(
+    "Set these in CI instead of committing secrets or local link metadata:"
+  );
+  console.log("");
+  console.log(
+    "  MCP_USE_API_KEY    Secret. API key used by `mcp-use login --api-key`."
+  );
+  console.log(
+    "  MCP_USE_ORG_ID     Optional. Target organization id when CI cannot use local state."
+  );
+  console.log(
+    "  MCP_USE_SERVER_ID  Optional. Target server id when CI cannot use local state."
+  );
+  console.log("");
+  console.log("Local files used outside CI:");
+  console.log(
+    `  ${relativeFromProject(projectPath, configPath)}              committed project config`
+  );
+  console.log(
+    `  ${relativeFromProject(projectPath, linkPath)}   ignored local cloud link`
+  );
+  console.log("");
+  console.log("Example:");
+  console.log(
+    '  mcp-use login --api-key "$MCP_USE_API_KEY" --org "$MCP_USE_ORG_ID"'
+  );
+  console.log("  mcp-use config diff --json");
+  console.log("  mcp-use deploy");
+}
+
+const configCommand = program
+  .command("config")
+  .description("Validate and inspect local mcp-use project config");
+
+configCommand
+  .command("validate")
+  .description("Validate mcp-use.json without contacting Manufact Cloud")
+  .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .action(async (options) => {
+    const projectPath = path.resolve(options.path);
+    const result = await validateMcpUseProjectConfig(projectPath);
+
+    if (!result.ok) {
+      console.error(
+        chalk.red(`✗ Invalid ${relativeFromProject(projectPath, result.path)}`)
+      );
+      for (const issue of result.issues) {
+        console.error(chalk.red(`  ${issue.path}: ${issue.message}`));
+      }
+      process.exit(1);
+    }
+
+    const source =
+      result.source === "file"
+        ? relativeFromProject(projectPath, result.path)
+        : "defaults (no mcp-use.json found)";
+    console.log(chalk.green(`✓ mcp-use config is valid (${source})`));
+  });
+
+configCommand
+  .command("diff")
+  .description("Print local config/link/env differences without cloud access")
+  .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option("--json", "Print machine-readable JSON")
+  .action(async (options) => {
+    const projectPath = path.resolve(options.path);
+    const diff = await diffMcpUseProjectConfigLocal(projectPath);
+
+    if (options.json) {
+      console.log(JSON.stringify(diff, null, 2));
+      return;
+    }
+
+    console.log(`Mode: ${diff.mode}`);
+    console.log(
+      `Project: ${relativeFromProject(projectPath, diff.project.path)} (${diff.project.source})`
+    );
+    console.log(
+      `Link: ${diff.link.exists ? relativeFromProject(projectPath, diff.link.path) : "none"}`
+    );
+    console.log(`Differences: ${diff.differences.length}`);
+  });
+
+program
+  .command("link")
+  .description("Manage local Manufact Cloud project linking")
+  .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option(
+    "--print-ci-env",
+    "Print CI environment variable names and instructions without secret values"
+  )
+  .action(async (options) => {
+    const projectPath = path.resolve(options.path);
+    if (options.printCiEnv) {
+      printCiEnvInstructions(projectPath);
+      return;
+    }
+
+    console.error(
+      chalk.yellow(
+        "Only `mcp-use link --print-ci-env` is available locally right now."
+      )
+    );
+    console.error(
+      chalk.gray(
+        "Cloud link/pull/push commands will be added once the sync API contract is wired."
+      )
+    );
+    process.exit(1);
   });
 
 // Authentication commands
@@ -3111,37 +3340,66 @@ program.addCommand(createClientCommand());
 // Deployments command
 program.addCommand(createDeploymentsCommand());
 
+// Local diagnostics commands
+program.addCommand(createDoctorCommand());
+program.addCommand(createInspectCommand());
+program.addCommand(createEvalCommand());
+
 // Servers command
 program.addCommand(createServersCommand());
 
 // Skills command
 program.addCommand(createSkillsCommand());
 
+async function runTypegen(options: { path?: string; server?: string }) {
+  const projectPath = path.resolve(options.path ?? process.cwd());
+  const { projectConfig } = await loadProjectContext(projectPath);
+  const serverFile = await findServerFile(
+    projectPath,
+    options.server,
+    undefined,
+    projectConfig
+  );
+
+  console.log(chalk.blue("Generating tool registry types..."));
+  const result = await generateToolRegistryTypesForServer(
+    projectPath,
+    serverFile
+  );
+  if (result === "ok") {
+    console.log(chalk.green("✓ Tool registry types generated successfully"));
+  } else if (result === "failed") {
+    console.log(chalk.yellow("⚠ Tool registry type generation had errors"));
+  }
+  // "skipped" already logged its own warning inside the function.
+}
+
+async function runTscNoEmit(projectPath: string) {
+  const tscBin = path.join(
+    projectPath,
+    "node_modules",
+    "typescript",
+    "bin",
+    "tsc"
+  );
+  const tscArgs = isBunRuntime()
+    ? [tscBin, "--noEmit"]
+    : ["--max-old-space-size=4096", tscBin, "--noEmit"];
+  await runCommand(process.execPath, tscArgs, projectPath).promise;
+}
+
 // Generate types command
 program
   .command("generate-types")
+  .alias("typegen")
   .description(
-    "Generate TypeScript type definitions for tools (writes .mcp-use/tool-registry.d.ts)"
+    "Generate TypeScript type definitions for tools (writes .mcp-use/generated/tool-registry.d.ts)"
   )
   .option("-p, --path <path>", "Path to project directory", process.cwd())
-  .option("--server <file>", "Server entry file", "index.ts")
+  .option("--server <file>", "Server entry file")
   .action(async (options) => {
-    const projectPath = path.resolve(options.path);
-
     try {
-      console.log(chalk.blue("Generating tool registry types..."));
-      const result = await generateToolRegistryTypesForServer(
-        projectPath,
-        options.server
-      );
-      if (result === "ok") {
-        console.log(
-          chalk.green("✓ Tool registry types generated successfully")
-        );
-      } else if (result === "failed") {
-        console.log(chalk.yellow("⚠ Tool registry type generation had errors"));
-      }
-      // "skipped" already logged its own warning inside the function.
+      await runTypegen(options);
       process.exit(0);
     } catch (error) {
       console.error(
@@ -3151,6 +3409,28 @@ program
       if (error instanceof Error && error.stack) {
         console.error(chalk.gray(error.stack));
       }
+      process.exit(1);
+    }
+  });
+
+program
+  .command("check")
+  .description("Generate tool types and run TypeScript type checking")
+  .option("-p, --path <path>", "Path to project directory", process.cwd())
+  .option("--server <file>", "Server entry file")
+  .action(async (options) => {
+    const projectPath = path.resolve(options.path);
+    try {
+      await runTypegen(options);
+      console.log(chalk.gray("Type checking..."));
+      await runTscNoEmit(projectPath);
+      console.log(chalk.green("✓ Type check passed!"));
+      process.exit(0);
+    } catch (error) {
+      console.error(
+        chalk.red("Check failed:"),
+        error instanceof Error ? error.message : String(error)
+      );
       process.exit(1);
     }
   });

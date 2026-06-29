@@ -62,7 +62,7 @@ export function sanitizePackageName(raw: string): string {
 // Resolves what to scaffold given a raw user-supplied name.
 // `displayName` is the human-facing label (kept pretty when possible);
 // `packageName` is the npm-safe identifier flowed into package.json AND
-// any template files that embed it as a string literal (e.g. index.ts).
+// any template files that embed it as a string literal (e.g. index.ts/tsx).
 type ProjectInfo = {
   useCurrentDir: boolean;
   projectPath: string;
@@ -100,13 +100,15 @@ export function updatePackageJson(projectPath: string, projectName: string) {
 }
 
 export function updateIndexTs(projectPath: string, projectName: string) {
-  const indexPath = join(projectPath, "index.ts");
+  for (const fileName of ["index.ts", "index.tsx"]) {
+    const indexPath = join(projectPath, fileName);
 
-  if (!existsSync(indexPath)) {
-    return;
+    if (!existsSync(indexPath)) {
+      continue;
+    }
+
+    let content = readFileSync(indexPath, "utf-8");
+    content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
+    writeFileSync(indexPath, content);
   }
-
-  let content = readFileSync(indexPath, "utf-8");
-  content = content.replace(/\{\{PROJECT_NAME\}\}/g, projectName);
-  writeFileSync(indexPath, content);
 }

@@ -1,11 +1,12 @@
 import type {
   GetPromptResult,
   CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { InputDefinition, OptionalizeUndefinedFields } from "./common.js";
+} from "@modelcontextprotocol/server";
+import type { OptionalizeUndefinedFields } from "./common.js";
 import type { z } from "zod";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import type { ClientCapabilityChecker, McpContext } from "./context.js";
+import type { AuthRequirement } from "../oauth/types.js";
 
 // Re-export MCP SDK types for convenience
 export type { GetPromptResult };
@@ -33,8 +34,8 @@ export type EnhancedPromptContext<HasOAuth extends boolean = false> =
 export type InferPromptInput<T> = T extends { schema: infer S }
   ? S extends z.ZodTypeAny
     ? OptionalizeUndefinedFields<z.infer<S>>
-    : Record<string, any>
-  : Record<string, any>;
+    : Record<string, unknown>
+  : Record<string, unknown>;
 
 /**
  * Helper interface that uses method signature syntax to enable bivariant parameter checking.
@@ -44,27 +45,31 @@ interface PromptCallbackBivariant<TInput, HasOAuth extends boolean> {
   bivarianceHack(
     params: TInput,
     ctx: EnhancedPromptContext<HasOAuth>
-  ): Promise<CallToolResult | GetPromptResult | TypedCallToolResult<any>>;
+  ): Promise<
+    | CallToolResult
+    | GetPromptResult
+    | TypedCallToolResult<Record<string, unknown>>
+  >;
 }
 
 /**
- * Callback type for prompt execution - supports both CallToolResult (from helpers) and GetPromptResult (old API).
+ * Callback type for prompt execution - supports both CallToolResult (from helpers) and GetPromptResult.
  * Uses bivariant parameter checking for flexible destructuring patterns.
  *
  * @template TInput - Input parameters type
  * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
  */
 export type PromptCallback<
-  TInput = Record<string, any>,
+  TInput = Record<string, unknown>,
   HasOAuth extends boolean = false,
 > = PromptCallbackBivariant<TInput, HasOAuth>["bivarianceHack"];
 
 /**
- * Prompt definition with cb callback (old API)
+ * Prompt definition (metadata only; pass callback as second argument to server.prompt()).
  */
 export interface PromptDefinition<
-  TInput = Record<string, any>,
-  HasOAuth extends boolean = false,
+  _TInput = Record<string, unknown>,
+  _HasOAuth extends boolean = false,
 > {
   /**
    * Unique identifier for the prompt .
@@ -85,48 +90,12 @@ export interface PromptDefinition<
    * @example "Generate a code review checklist for the given file type"
    */
   description?: string;
-  /** Argument definitions (legacy, use schema instead) */
-  /** @deprecated Use schema instead */
-  args?: InputDefinition[];
   /**
    * Zod schema for input validation. Use .describe() on each field for user guidance.
    *
    * @example z.object({ language: z.string().describe("Programming language"), filePath: z.string().optional().describe("Path to file") })
    */
-  schema?: z.ZodObject<any>;
-  /** Async callback function that generates the prompt */
-  cb: PromptCallback<TInput, HasOAuth>;
-}
-
-/**
- * Prompt definition without cb callback (new API with separate callback parameter)
- */
-export interface PromptDefinitionWithoutCallback {
-  /**
-   * Unique identifier for the prompt .
-   *
-   * @example "code-review-template"
-   */
-  name: string;
-  /**
-   * Human-readable title displayed in prompt lists.
-   *
-   * @example "Code Review Template"
-   */
-  title?: string;
-  /**
-   * Description of what the prompt does.
-   *
-   * @example "Generate a code review checklist for the given file type"
-   */
-  description?: string;
-  /** Argument definitions (legacy, use schema instead) */
-  /** @deprecated Use schema instead */
-  args?: InputDefinition[];
-  /**
-   * Zod schema for input validation.
-   *
-   * @example z.object({ language: z.string().describe("Programming language") })
-   */
-  schema?: z.ZodObject<any>;
+  schema?: z.ZodObject<z.ZodRawShape>;
+  /** Optional authorization requirement enforced on prompts/list and prompts/get */
+  auth?: AuthRequirement;
 }

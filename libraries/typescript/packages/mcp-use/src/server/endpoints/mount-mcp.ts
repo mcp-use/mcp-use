@@ -1,14 +1,25 @@
 /**
  * MCP Endpoint Mounting
  *
- * Main orchestration function for mounting MCP endpoints at /mcp and /sse.
- * Uses a single native SDK transport instance to handle all sessions.
+ * Main orchestration function for mounting MCP endpoints at /mcp.
+ * Uses official SDK Streamable HTTP transport primitives under the Hono route
+ * shell that mcp-use owns.
+ *
+ * V2 should stay stateless-first at the product layer. Stateful session and
+ * stream-manager paths are compatibility/runtime plumbing for clients that need
+ * long-lived streams; new framework behavior should use request-scoped metadata,
+ * auth context, explicit handles, or persisted resources instead of remembered
+ * initialize/session state.
  */
 
 import type { Context, Hono as HonoType } from "hono";
 import { join } from "node:path";
 import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { generateLandingPage } from "../landing.js";
+import {
+  createSdkStreamableHttpTransport,
+  type SdkMcpServer,
+} from "../sdk-bridge.js";
 import type { SessionData, StreamManager } from "../sessions/index.js";
 import {
   FileSystemSessionStore,
@@ -17,136 +28,30 @@ import {
   startIdleCleanup,
 } from "../sessions/index.js";
 import type { ServerConfig } from "../types/index.js";
-import {
-  isJsonRpcRequest,
-  isJsonRpcResponse,
-} from "../utils/jsonrpc-helpers.js";
 import { runWithContext } from "../context-storage.js";
 import { getDebugLevel } from "../logging.js";
+import {
+  maybeForwardResponses,
+  registerSseStream,
+  type StreamableTransportWithSdkInternals,
+  wrapTransportForStreamManager,
+} from "../transport/stream-routing.js";
 import { generateUUID } from "../utils/runtime.js";
 
-// ---------------------------------------------------------------------------
-// Helpers for distributed SSE stream routing via StreamManager
-// ---------------------------------------------------------------------------
+type RequestInitWithDuplex = RequestInit & { duplex?: "half" };
 
 /**
- * Wrap a transport's send() method so that standalone SSE messages (notifications,
- * server-to-client requests) are routed through the StreamManager when the local
- * transport does not hold the SSE stream. Also registers outbound server-to-client
- * requests for distributed response correlation.
- */
-function wrapTransportForStreamManager(
-  transport: any,
-  sessionId: string,
-  streamManager: StreamManager
-): void {
-  const originalSend = transport.send.bind(transport);
-  transport.send = async (message: any, options?: any) => {
-    await originalSend(message, options);
-
-    // Replicate the SDK's requestId resolution so we can tell standalone-SSE
-    // messages apart from request-specific (POST response) messages.
-    let requestId = options?.relatedRequestId;
-    if (isJsonRpcResponse(message)) {
-      requestId = (message as any).id;
-    }
-
-    if (requestId !== undefined) return; // POST-response stream — SDK handled it
-
-    const sseStreamId = transport._standaloneSseStreamId || "_GET_stream";
-    const hasLocalStream = transport._streamMapping?.has(sseStreamId);
-
-    if (!hasLocalStream) {
-      // SDK stored the event for replay but could not deliver — route via StreamManager
-      const sseData = `event: message\ndata: ${JSON.stringify(message)}\n\n`;
-      try {
-        await streamManager.send([sessionId], sseData);
-      } catch (err) {
-        console.warn(
-          `[MCP] StreamManager send failed for session ${sessionId}:`,
-          err
-        );
-      }
-    }
-
-    // For server-to-client requests (sampling, elicitation, roots), register
-    // the outbound request so responses can be routed back to this server.
-    if (isJsonRpcRequest(message) && streamManager.registerOutboundRequest) {
-      try {
-        await streamManager.registerOutboundRequest(
-          (message as any).id,
-          sessionId
-        );
-      } catch (err) {
-        console.warn(`[MCP] Failed to register outbound request:`, err);
-      }
-    }
-  };
-}
-
-/**
- * After a GET request creates a standalone SSE stream inside the SDK transport,
- * extract the controller and register it with the StreamManager so cross-server
- * messages can be delivered.
- */
-async function registerSseStream(
-  transport: any,
-  sessionId: string,
-  streamManager: StreamManager
-): Promise<void> {
-  const sseStreamId = transport._standaloneSseStreamId || "_GET_stream";
-  const streamEntry = transport._streamMapping?.get(sseStreamId);
-  if (streamEntry?.controller) {
-    try {
-      await streamManager.create(sessionId, streamEntry.controller);
-    } catch (err) {
-      console.warn(
-        `[MCP] Failed to register SSE stream with StreamManager:`,
-        err
-      );
-    }
-  }
-}
-
-/**
- * For POST requests that may contain JSON-RPC responses to server-to-client
- * requests (sampling, elicitation, roots), check if they need to be forwarded
- * to another server instance via the StreamManager.
+ * Mount MCP server endpoints at /mcp.
  *
- * Clones the request so the original body remains readable for the SDK transport.
- */
-async function maybeForwardResponses(
-  request: Request,
-  sessionId: string,
-  streamManager: StreamManager
-): Promise<void> {
-  if (!streamManager.forwardInboundResponse) return;
-  try {
-    const cloned = request.clone();
-    const body = await cloned.json();
-    const messages = Array.isArray(body) ? body : [body];
-    for (const msg of messages) {
-      if (isJsonRpcResponse(msg)) {
-        await streamManager.forwardInboundResponse(msg as any, sessionId);
-      }
-    }
-  } catch {
-    // Not JSON or parsing error — not all POSTs carry routable responses
-  }
-}
-
-/**
- * Mount MCP server endpoints at /mcp and /sse
- *
- * Uses FetchStreamableHTTPServerTransport (Web Standard APIs) for proper bidirectional communication.
- * Follows the official Hono example from PR #1209.
+ * This is an internal boundary between the mcp-use Hono application and the
+ * official SDK transport. Keep protocol behavior delegated to the SDK where
+ * possible; any private transport access should be isolated here or in transport
+ * helpers with a clear SDK-version test/removal path.
  */
 export async function mountMcp(
   app: HonoType,
   mcpServerInstance: {
-    getServerForSession: (
-      sessionId?: string
-    ) => import("@modelcontextprotocol/sdk/server/mcp.js").McpServer;
+    getServerForSession: (sessionId?: string) => SdkMcpServer;
     cleanupSessionSubscriptions?: (sessionId: string) => void;
     cleanupSessionRefs?: (sessionId: string) => void;
   }, // The McpServer instance with getServerForSession() method
@@ -154,9 +59,6 @@ export async function mountMcp(
   config: ServerConfig,
   isProductionMode: boolean
 ): Promise<{ mcpMounted: boolean; idleCleanupInterval?: NodeJS.Timeout }> {
-  const { WebStandardStreamableHTTPServerTransport } =
-    await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
-
   const idleTimeoutMs = config.sessionIdleTimeoutMs ?? 86400000; // Default: 1 day
 
   // Initialize session store (pluggable - can be Redis, Postgres, etc.)
@@ -168,7 +70,7 @@ export async function mountMcp(
     (isProductionMode
       ? new InMemorySessionStore()
       : new FileSystemSessionStore({
-          path: join(process.cwd(), ".mcp-use", "sessions.json"),
+          path: join(process.cwd(), ".mcp-use", "state", "sessions.json"),
         }));
 
   // Initialize stream manager (pluggable - can be Redis Pub/Sub, Postgres NOTIFY, etc.)
@@ -177,7 +79,7 @@ export async function mountMcp(
     config.streamManager ?? new InMemoryStreamManager();
 
   // Map to store transports by session ID (following official Hono example from PR #1209)
-  const transports = new Map<string, any>();
+  const transports = new Map<string, StreamableTransportWithSdkInternals>();
 
   // Set up distributed response forwarding: when another server forwards a
   // JSON-RPC response (e.g. a sampling result) to us via Redis Pub/Sub, feed
@@ -189,16 +91,6 @@ export async function mountMcp(
         transport.onmessage(message);
       }
     });
-  }
-
-  // Warn if deprecated option is used
-  if (config.autoCreateSessionOnInvalidId !== undefined) {
-    console.warn(
-      "[MCP] WARNING: 'autoCreateSessionOnInvalidId' is deprecated and will be removed in a future version.\n" +
-        "The MCP specification requires clients to send a new InitializeRequest when receiving a 404 for stale sessions.\n" +
-        "Modern MCP clients handle this correctly. For session persistence across restarts, use the 'sessionStore' option.\n" +
-        "See: https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management"
-    );
   }
 
   // Start idle cleanup interval if configured (only in stateful mode)
@@ -323,32 +215,36 @@ export async function mountMcp(
       }
 
       const server = mcpServerInstance.getServerForSession();
-      const transport = new WebStandardStreamableHTTPServerTransport({
+      const sdkTransport = createSdkStreamableHttpTransport({
         sessionIdGenerator: undefined, // No session tracking
         // IMPORTANT: Always use JSON responses in stateless mode
         // Edge runtimes (Deno, Cloudflare Workers, Supabase) cannot maintain long-lived SSE streams
         // Even if client supports SSE, we must use request-response JSON in stateless environments
         enableJsonResponse: true,
       });
+      const transport =
+        sdkTransport as unknown as StreamableTransportWithSdkInternals;
 
       try {
-        await server.connect(transport);
+        await server.connect(sdkTransport);
 
         // If client doesn't support SSE, add the Accept header to bypass SDK validation
         // The transport requires Accept: text/event-stream even when using enableJsonResponse
         const request = c.req.raw;
         if (!clientSupportsSSE) {
-          // Clone request with modified headers
-          // Note: duplex is a Node.js-specific extension, cast to any to avoid TypeScript error
-          const modifiedRequest = new Request(request.url, {
+          // Clone request with modified headers.
+          const requestInit: RequestInitWithDuplex = {
             method: request.method,
             headers: {
               ...Object.fromEntries(request.headers.entries()),
               Accept: "application/json, text/event-stream",
             },
             body: request.body,
-            ...(request.body && ({ duplex: "half" } as any)),
-          });
+          };
+          if (request.body) {
+            requestInit.duplex = "half";
+          }
+          const modifiedRequest = new Request(request.url, requestInit);
           return await runWithContext(c, async () =>
             transport.handleRequest(modifiedRequest)
           );
@@ -398,7 +294,7 @@ export async function mountMcp(
         );
 
         const server = mcpServerInstance.getServerForSession(sessionId);
-        const transport = new WebStandardStreamableHTTPServerTransport({
+        const sdkTransport = createSdkStreamableHttpTransport({
           sessionIdGenerator: () => sessionId,
 
           onsessioninitialized: async (sid: string) => {
@@ -419,24 +315,26 @@ export async function mountMcp(
             mcpServerInstance.cleanupSessionRefs?.(sid);
           },
         });
+        const transport =
+          sdkTransport as unknown as StreamableTransportWithSdkInternals;
 
         wrapTransportForStreamManager(transport, sessionId, streamManager);
 
-        await server.connect(transport);
+        await server.connect(sdkTransport);
 
         // The SDK transport only sets _initialized and sessionId when it processes
         // an actual `initialize` request. Since this session was already established
         // before the restart, we restore that state directly so the transport
         // accepts any request type (tools/call, resources/read, etc.).
-        (transport as any)._initialized = true;
-        (transport as any).sessionId = sessionId;
+        transport._initialized = true;
+        transport.sessionId = sessionId;
 
         // Register immediately — don't wait for onsessioninitialized which only
         // fires on initialize requests and won't trigger for recovered sessions.
         transports.set(sessionId, transport);
         const metadata = await sessionStore.get(sessionId);
         const sessionData: SessionData = {
-          transport,
+          transport: sdkTransport,
           server,
           lastAccessedAt: Date.now(),
           context: c,
@@ -514,7 +412,7 @@ export async function mountMcp(
       // Generate session ID first so we can pass it to getServerForSession for ref storage
       const newSessionId = generateUUID();
       const server = mcpServerInstance.getServerForSession(newSessionId);
-      const transport = new WebStandardStreamableHTTPServerTransport({
+      const sdkTransport = createSdkStreamableHttpTransport({
         sessionIdGenerator: () => newSessionId,
 
         onsessioninitialized: async (sid: string) => {
@@ -525,7 +423,7 @@ export async function mountMcp(
 
           // Store full session data in memory (includes transport, server, context)
           const sessionData: SessionData = {
-            transport,
+            transport: sdkTransport,
             server,
             lastAccessedAt: Date.now(),
             context: c,
@@ -542,12 +440,16 @@ export async function mountMcp(
           // The server.oninitialized callback fires after the client sends the initialized notification
           server.server.oninitialized = async () => {
             const clientCapabilities = server.server.getClientCapabilities();
-            const clientInfo =
-              server.server.getClientVersion?.() ||
-              (server.server as any).getClientInfo?.() ||
-              {};
+            const sdkServer = server.server as typeof server.server & {
+              getClientInfo?: () => unknown;
+              getProtocolVersion?: () => unknown;
+            };
+            const clientInfo = (server.server.getClientVersion?.() ||
+              sdkServer.getClientInfo?.()) as
+              | SessionData["clientInfo"]
+              | undefined;
             const protocolVersion =
-              (server.server as any).getProtocolVersion?.() || "unknown";
+              sdkServer.getProtocolVersion?.() || "unknown";
 
             // Update metadata in sessionStore
             const metadata = await sessionStore.get(sid);
@@ -576,7 +478,7 @@ export async function mountMcp(
             Telemetry.getInstance()
               .trackServerInitialize({
                 protocolVersion: String(protocolVersion),
-                clientInfo: clientInfo || {},
+                clientInfo: (clientInfo ?? {}) as Record<string, unknown>,
                 clientCapabilities: clientCapabilities || {},
                 sessionId: sid,
               })
@@ -606,11 +508,13 @@ export async function mountMcp(
           mcpServerInstance.cleanupSessionRefs?.(sid);
         },
       });
+      const transport =
+        sdkTransport as unknown as StreamableTransportWithSdkInternals;
 
       wrapTransportForStreamManager(transport, newSessionId, streamManager);
 
       // Connect server to transport
-      await server.connect(transport);
+      await server.connect(sdkTransport);
 
       const newSessionResponse = await runWithContext(
         c,
@@ -624,13 +528,10 @@ export async function mountMcp(
     }
   };
 
-  // Mount the handler for all HTTP methods on both /mcp and /sse
-  for (const endpoint of ["/mcp", "/sse"]) {
-    app.on(["GET", "POST", "DELETE", "HEAD"], endpoint, handleRequest);
-  }
+  app.on(["GET", "POST", "DELETE", "HEAD"], "/mcp", handleRequest);
 
   console.log(
-    `[MCP] Server mounted at /mcp and /sse (${config.stateless ? "stateless" : "stateful"} mode)`
+    `[MCP] Server mounted at /mcp (${config.stateless ? "stateless" : "stateful"} mode)`
   );
 
   return { mcpMounted: true, idleCleanupInterval };

@@ -24,6 +24,7 @@ import {
   MCPClientInitEvent,
   ConnectorInitEvent,
   ClientAddServerEvent,
+  type ClientServerConfigTelemetryInput,
   ClientRemoveServerEvent,
   createServerRunEventData,
 } from "./events.js";
@@ -61,6 +62,16 @@ type RuntimeEnvironment =
 
 type StorageCapability = "filesystem" | "session-only";
 
+type TelemetryPayload = Record<string, unknown>;
+type NodeFs = typeof import("node:fs");
+type NodeOs = typeof import("node:os");
+type NodePath = typeof import("node:path");
+type RuntimeGlobal = typeof globalThis & {
+  Bun?: unknown;
+  Deno?: unknown;
+  EdgeRuntime?: unknown;
+};
+
 /**
  * Determine the current runtime environment: Bun, Deno, Cloudflare Workers, Edge runtime, Node.js, or `unknown`.
  *
@@ -68,13 +79,14 @@ type StorageCapability = "filesystem" | "session-only";
  */
 function detectRuntimeEnvironment(): RuntimeEnvironment {
   try {
+    const runtimeGlobal = globalThis as RuntimeGlobal;
     // Check for Bun
-    if (typeof (globalThis as any).Bun !== "undefined") {
+    if (typeof runtimeGlobal.Bun !== "undefined") {
       return "bun";
     }
 
     // Check for Deno
-    if (typeof (globalThis as any).Deno !== "undefined") {
+    if (typeof runtimeGlobal.Deno !== "undefined") {
       return "deno";
     }
 
@@ -87,7 +99,7 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
     }
 
     // Check for Edge runtime (Vercel Edge, etc.)
-    if (typeof (globalThis as any).EdgeRuntime !== "undefined") {
+    if (typeof runtimeGlobal.EdgeRuntime !== "undefined") {
       return "edge";
     }
 
@@ -145,7 +157,7 @@ class ScarfEventLogger {
     this.timeout = timeout;
   }
 
-  async logEvent(properties: Record<string, any>): Promise<void> {
+  async logEvent(properties: TelemetryPayload): Promise<void> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -171,21 +183,72 @@ class ScarfEventLogger {
   }
 }
 
-// PostHog types for Node
-type PostHogNodeClient = {
-  capture: (params: {
+class RawPostHogClient {
+  private readonly apiKey: string;
+  private readonly host: string;
+  private readonly flushAt: number;
+  private queue: Array<{
     distinctId: string;
     event: string;
-    properties?: Record<string, any>;
-  }) => void;
-  flush: () => void;
-  shutdown: () => Promise<void>;
-};
+    properties?: TelemetryPayload;
+    timestamp: string;
+  }> = [];
+  private flushing: Promise<void> | null = null;
+
+  constructor(apiKey: string, host: string, flushAt = 20) {
+    this.apiKey = apiKey;
+    this.host = host.replace(/\/$/, "");
+    this.flushAt = flushAt;
+  }
+
+  capture(params: {
+    distinctId: string;
+    event: string;
+    properties?: TelemetryPayload;
+  }): void {
+    this.queue.push({ ...params, timestamp: new Date().toISOString() });
+    if (this.queue.length >= this.flushAt) {
+      void this.flush();
+    }
+  }
+
+  async flush(): Promise<void> {
+    if (this.flushing) {
+      await this.flushing;
+    }
+    if (this.queue.length === 0) return;
+
+    const batch = this.queue.splice(0, this.queue.length);
+    this.flushing = telFetch(`${this.host}/batch/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        api_key: this.apiKey,
+        batch: batch.map((event) => ({
+          event: event.event,
+          distinct_id: event.distinctId,
+          properties: event.properties,
+          timestamp: event.timestamp,
+        })),
+      }),
+    })
+      .then(() => undefined)
+      .finally(() => {
+        this.flushing = null;
+      });
+
+    await this.flushing;
+  }
+
+  async shutdown(): Promise<void> {
+    await this.flush();
+  }
+}
 
 /**
  * Node.js Telemetry class that works in Node.js environments only.
  *
- * Uses posthog-node for telemetry, require("crypto") for secure random strings,
+ * Uses raw fetch for telemetry, require("crypto") for secure random strings,
  * and filesystem for user ID persistence.
  *
  * Usage: Tel.getInstance().trackMCPClientInit(...)
@@ -201,8 +264,7 @@ export class Telemetry {
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;
-  private _posthogNodeClient: PostHogNodeClient | null = null;
-  private _posthogLoading: Promise<void> | null = null;
+  private _posthogClient: RawPostHogClient | null = null;
   private _scarfClient: ScarfEventLogger | null = null;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
@@ -230,11 +292,11 @@ export class Telemetry {
     const canSupportTelemetry = this._runtimeEnvironment !== "unknown";
 
     if (telemetryDisabled) {
-      this._posthogNodeClient = null;
+      this._posthogClient = null;
       this._scarfClient = null;
       logger.debug("Telemetry disabled via environment variable");
     } else if (!canSupportTelemetry) {
-      this._posthogNodeClient = null;
+      this._posthogClient = null;
       this._scarfClient = null;
       logger.debug(
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
@@ -244,8 +306,15 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
 
-      // Initialize PostHog
-      this._posthogLoading = this._initPostHogNode();
+      this._posthogClient = new RawPostHogClient(
+        this.PROJECT_API_KEY,
+        this.HOST,
+        ["cloudflare-workers", "edge", "deno"].includes(
+          this._runtimeEnvironment
+        )
+          ? 1
+          : 20
+      );
 
       // Initialize Scarf (server-side only)
       try {
@@ -278,47 +347,6 @@ export class Telemetry {
     }
 
     return false;
-  }
-
-  private async _initPostHogNode(): Promise<void> {
-    try {
-      // Dynamic import of posthog-node
-      const { PostHog } = await import("posthog-node");
-
-      // Serverless/edge environments need immediate flushing
-      const isServerlessEnvironment = [
-        "cloudflare-workers",
-        "edge",
-        "deno",
-      ].includes(this._runtimeEnvironment);
-
-      const posthogOptions: {
-        host: string;
-        disableGeoip: boolean;
-        fetch: typeof telFetch;
-        flushAt?: number;
-        flushInterval?: number;
-      } = {
-        host: this.HOST,
-        disableGeoip: false,
-        fetch: telFetch,
-      };
-
-      if (isServerlessEnvironment) {
-        posthogOptions.flushAt = 1; // Send events immediately
-        posthogOptions.flushInterval = 0; // Don't wait for interval
-      }
-
-      this._posthogNodeClient = new PostHog(
-        this.PROJECT_API_KEY,
-        posthogOptions
-      );
-
-      logger.debug("PostHog Node.js client initialized");
-    } catch (e) {
-      logger.warn(`Failed to initialize PostHog Node.js telemetry: ${e}`);
-      this._posthogNodeClient = null;
-    }
   }
 
   /**
@@ -363,7 +391,7 @@ export class Telemetry {
    * Check if telemetry is enabled.
    */
   get isEnabled(): boolean {
-    return this._posthogNodeClient !== null || this._scarfClient !== null;
+    return this._posthogClient !== null || this._scarfClient !== null;
   }
 
   get userId(): string {
@@ -403,12 +431,12 @@ export class Telemetry {
       // Try to load Node.js modules
       // In CJS context, require should work
       // In ESM context, this will fail but we'll fall back gracefully
-      let fs: any, os: any, path: any;
+      let fs: NodeFs, os: NodeOs, path: NodePath;
 
       try {
-        fs = require("node:fs");
-        os = require("node:os");
-        path = require("node:path");
+        fs = require("node:fs") as NodeFs;
+        os = require("node:os") as NodeOs;
+        path = require("node:path") as NodePath;
       } catch (requireError) {
         // require not available (ESM build) - fall back to session ID
         // Generate session-based ID as fallback
@@ -455,7 +483,7 @@ export class Telemetry {
     }
   }
 
-  private _getCacheHome(os: any, path: any): string {
+  private _getCacheHome(os: NodeOs, path: NodePath): string {
     // XDG_CACHE_HOME for Linux and manually set envs
     const envVar = process.env.XDG_CACHE_HOME;
     if (envVar && path.isAbsolute(envVar)) {
@@ -481,12 +509,7 @@ export class Telemetry {
   }
 
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    // Wait for PostHog to load if it's still initializing
-    if (this._posthogLoading) {
-      await this._posthogLoading;
-    }
-
-    if (!this._posthogNodeClient && !this._scarfClient) {
+    if (!this._posthogClient && !this._scarfClient) {
       return;
     }
 
@@ -500,23 +523,23 @@ export class Telemetry {
     properties.source = this._source;
     properties.runtime = this._runtimeEnvironment;
 
-    // Send to PostHog (Node.js)
-    if (this._posthogNodeClient) {
+    // Send to PostHog via dependency-free raw fetch.
+    if (this._posthogClient) {
       try {
-        this._posthogNodeClient.capture({
+        this._posthogClient.capture({
           distinctId: currentUserId,
           event: event.name,
           properties,
         });
       } catch (e) {
-        logger.debug(`Failed to track PostHog Node event ${event.name}: ${e}`);
+        logger.debug(`Failed to track PostHog event ${event.name}: ${e}`);
       }
     }
 
     // Send to Scarf
     if (this._scarfClient) {
       try {
-        const scarfProperties: Record<string, any> = {
+        const scarfProperties: TelemetryPayload = {
           ...properties,
           user_id: currentUserId,
           event: event.name,
@@ -536,7 +559,7 @@ export class Telemetry {
    * Track package download event.
    * This is a public wrapper that safely accesses userId.
    */
-  async trackPackageDownload(properties?: Record<string, any>): Promise<void> {
+  async trackPackageDownload(properties?: TelemetryPayload): Promise<void> {
     return this._trackPackageDownloadInternal(this.userId, properties);
   }
 
@@ -545,7 +568,7 @@ export class Telemetry {
    */
   private async _trackPackageDownloadInternal(
     userId: string,
-    properties?: Record<string, any>
+    properties?: TelemetryPayload
   ): Promise<void> {
     if (!this._scarfClient) {
       return;
@@ -557,9 +580,9 @@ export class Telemetry {
     }
 
     try {
-      const fs = require("node:fs");
-      const path = require("node:path");
-      const os = require("node:os");
+      const fs = require("node:fs") as NodeFs;
+      const path = require("node:path") as NodePath;
+      const os = require("node:os") as NodeOs;
 
       if (!this._versionDownloadPath) {
         this._versionDownloadPath = path.join(
@@ -697,7 +720,7 @@ export class Telemetry {
 
   async trackClientAddServer(
     serverName: string,
-    serverConfig: Record<string, any>
+    serverConfig: ClientServerConfigTelemetryInput
   ): Promise<void> {
     if (!this.isEnabled) return;
     const event = new ClientAddServerEvent({ serverName, serverConfig });
@@ -751,7 +774,7 @@ export class Telemetry {
   /**
    * Identify the current user (browser only - no-op in Node.js)
    */
-  identify(userId: string, properties?: Record<string, any>): void {
+  identify(userId: string, properties?: TelemetryPayload): void {
     // No-op in Node.js
   }
 
@@ -770,13 +793,11 @@ export class Telemetry {
    * Flush the telemetry queue (Node.js only)
    */
   flush(): void {
-    if (this._posthogNodeClient) {
-      try {
-        this._posthogNodeClient.flush();
-        logger.debug("PostHog client telemetry queue flushed");
-      } catch (e) {
-        logger.debug(`Failed to flush PostHog client: ${e}`);
-      }
+    if (this._posthogClient) {
+      this._posthogClient
+        .flush()
+        .then(() => logger.debug("PostHog telemetry queue flushed"))
+        .catch((e) => logger.debug(`Failed to flush PostHog client: ${e}`));
     }
   }
 
@@ -784,9 +805,9 @@ export class Telemetry {
    * Shutdown the telemetry client (Node.js only)
    */
   async shutdown(): Promise<void> {
-    if (this._posthogNodeClient) {
+    if (this._posthogClient) {
       try {
-        await this._posthogNodeClient.shutdown();
+        await this._posthogClient.shutdown();
         logger.debug("PostHog client shutdown successfully");
       } catch (e) {
         logger.debug(`Error shutting down PostHog client: ${e}`);

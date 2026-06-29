@@ -94,8 +94,8 @@ run_test() {
             return 1
         fi
         
-        if [ ! -f "$app_name/index.ts" ]; then
-            echo -e "${RED}❌ FAILED: index.ts not found${NC}"
+        if [ ! -f "$app_name/index.ts" ] && [ ! -f "$app_name/index.tsx" ]; then
+            echo -e "${RED}❌ FAILED: index.ts or index.tsx not found${NC}"
             TESTS_FAILED=$((TESTS_FAILED + 1))
             return 1
         fi

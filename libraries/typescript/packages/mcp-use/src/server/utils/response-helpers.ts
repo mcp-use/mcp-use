@@ -1,4 +1,4 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import { fsHelpers, isDeno } from "./runtime.js";
 
 /**
@@ -278,7 +278,10 @@ export function audio(
  */
 export function resource(
   uri: string,
-  mimeTypeOrContent: string | CallToolResult | TypedCallToolResult<any>,
+  mimeTypeOrContent:
+    | string
+    | CallToolResult
+    | TypedCallToolResult<Record<string, unknown>>,
   text?: string
 ): ToolContentResult {
   // Handle 2-arg pattern: resource(uri, CallToolResult)
@@ -295,7 +298,7 @@ export function resource(
 
     // Get mimeType from _meta if available
     if (contentResult._meta && typeof contentResult._meta === "object") {
-      const meta = contentResult._meta as Record<string, any>;
+      const meta = contentResult._meta as Record<string, unknown>;
       if (meta.mimeType && typeof meta.mimeType === "string") {
         extractedMimeType = meta.mimeType;
       }
@@ -305,18 +308,18 @@ export function resource(
     if (contentResult.content && contentResult.content.length > 0) {
       const firstContent = contentResult.content[0];
       if (firstContent.type === "text" && "text" in firstContent) {
-        extractedText = (firstContent as any).text;
+        extractedText = firstContent.text;
       }
     }
 
-    const resourceContent: any = {
+    const resourceContent = {
       type: "resource",
       resource: {
         uri,
         ...(extractedMimeType && { mimeType: extractedMimeType }),
         ...(extractedText && { text: extractedText }),
       },
-    };
+    } as unknown as CallToolResult["content"][number];
 
     return {
       content: [resourceContent],
@@ -325,14 +328,14 @@ export function resource(
 
   // Handle 3-arg pattern: resource(uri, mimeType, text)
   const mimeType = mimeTypeOrContent as string | undefined;
-  const resourceContent: any = {
+  const resourceContent = {
     type: "resource",
     resource: {
       uri,
       ...(mimeType && { mimeType }),
       ...(text && { text }),
     },
-  };
+  } as unknown as CallToolResult["content"][number];
 
   return {
     content: [resourceContent],
@@ -394,26 +397,37 @@ export function error(message: string): TypedCallToolResult<never> {
  * )
  * ```
  */
-export function object<T extends Record<string, any>>(
+export function object<T extends readonly unknown[]>(
   data: T
-): TypedCallToolResult<T> {
-  return Array.isArray(data)
-    ? (array(data) as any)
-    : {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(data, null, 2),
-          },
-        ],
-        structuredContent: data,
-        _meta: {
-          mimeType: "application/json",
-        },
-      };
+): TypedCallToolResult<{ data: T }>;
+export function object<T extends Record<string, unknown>>(
+  data: T
+): TypedCallToolResult<T>;
+export function object(
+  data: Record<string, unknown> | readonly unknown[]
+):
+  | TypedCallToolResult<Record<string, unknown>>
+  | TypedCallToolResult<{ data: readonly unknown[] }> {
+  if (Array.isArray(data)) {
+    return array(data);
+  }
+  const objectData = data as Record<string, unknown>;
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(objectData, null, 2),
+      },
+    ],
+    structuredContent: objectData,
+    _meta: {
+      mimeType: "application/json",
+    },
+  };
 }
 
-export function array<T extends any[]>(
+export function array<T extends readonly unknown[]>(
   data: T
 ): TypedCallToolResult<{ data: T }> {
   return {
@@ -601,16 +615,16 @@ export function binary(
 }
 
 /**
- * Configuration for widget response utility (runtime data only).
- * Pass to widget() from a tool handler that has widget config at registration.
+ * Configuration for view response utility (runtime data only).
+ * Pass to view() from a tool handler that has widget config at registration.
  *
- * Per SEP-1865, widget data flows through standard MCP channels:
- * - Tool arguments are sent to the widget via `ui/notifications/tool-input`
+ * Per SEP-1865, view data flows through standard MCP channels:
+ * - Tool arguments are sent to the view via `ui/notifications/tool-input`
  * - Tool result (content + structuredContent) is sent via `ui/notifications/tool-result`
  * There is no custom `mcp-use/props` sideband; props go into structuredContent.
  */
-export interface WidgetResponseConfig<
-  TProps extends Record<string, any> = Record<string, any>,
+export interface ViewResponseConfig<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
 > {
   /**
    * Widget-only data sent as structuredContent in the tool result.
@@ -624,8 +638,6 @@ export interface WidgetResponseConfig<
    * @example { query: "mango", results: [{ fruit: "mango", color: "#FBF1E1" }] }
    */
   props?: TProps;
-  /** @deprecated Use `props` instead - Legacy alias for props */
-  data?: TProps;
   /**
    * Response helper result (text(), object(), etc.) that the model sees.
    * Summarizes the tool result for the conversation.
@@ -633,10 +645,10 @@ export interface WidgetResponseConfig<
    * @example text(`Weather in Paris: 22°C, Sunny`)
    * @example object({ count: 16, query: "mango" })
    */
-  output?: CallToolResult | TypedCallToolResult<any>;
+  output?: CallToolResult | TypedCallToolResult<Record<string, unknown>>;
   /**
    * Extra metadata sent in the tool result's `_meta`.
-   * The widget receives this via `useWidget().metadata`.
+   * The view receives this via `useView().metadata`.
    * Not added to model context. Use for pagination cursors, timestamps, etc.
    *
    * @example { totalCount: 1000, nextCursor: "abc123" }
@@ -650,13 +662,13 @@ export interface WidgetResponseConfig<
 }
 
 /**
- * Create a widget response for MCP tools
+ * Create a view response for MCP tools
  *
- * Returns runtime data for a widget. The widget configuration (name, invoking, invoked, etc.)
+ * Returns runtime data for a view. The view configuration (name, invoking, invoked, etc.)
  * should be set on the tool's `widget` property at registration time.
  *
- * @param config - Runtime data for the widget
- * @returns CallToolResult with widget props in metadata and tool output in content
+ * @param config - Runtime data for the view
+ * @returns CallToolResult with view props in structuredContent and tool output in content
  *
  * @example
  * ```typescript
@@ -670,19 +682,17 @@ export interface WidgetResponseConfig<
  *   }
  * }, async ({ city }) => {
  *   const weatherData = await fetchWeather(city);
- *   return widget({
- *     // Widget-only data (model doesn't see)
+ *   return view({
  *     props: { temperature: weatherData.temp, conditions: weatherData.conditions },
- *     // Model sees this summary
  *     output: text(`Weather in ${city}: ${weatherData.temp}°C`)
  *   });
  * })
  * ```
  */
-export function widget<
-  TProps extends Record<string, any> = Record<string, any>,
->(config: WidgetResponseConfig<TProps>): TypedCallToolResult<TProps> {
-  const props = config.props || config.data || {};
+export function view<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
+>(config: ViewResponseConfig<TProps>): TypedCallToolResult<TProps> {
+  const props = config.props || {};
   const { output, message, metadata } = config;
 
   const finalContent = message
@@ -709,6 +719,18 @@ export function widget<
   // surface that as TProps so the tool's return position is checked against outputSchema.
   return result as unknown as TypedCallToolResult<TProps>;
 }
+
+/** @deprecated Use `view()` instead. */
+export function widget<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
+>(config: ViewResponseConfig<TProps>): TypedCallToolResult<TProps> {
+  return view(config);
+}
+
+/** @deprecated Use `ViewResponseConfig` instead. */
+export type WidgetResponseConfig<
+  TProps extends Record<string, unknown> = Record<string, unknown>,
+> = ViewResponseConfig<TProps>;
 
 export function mix(...results: CallToolResult[]): CallToolResult {
   const structuredContent =

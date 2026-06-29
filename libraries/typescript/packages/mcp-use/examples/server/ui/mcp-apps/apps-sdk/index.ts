@@ -1,4 +1,4 @@
-import { MCPServer, object, widget } from "mcp-use/server";
+import { MCPServer, object, view } from "mcp-use/server";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -141,7 +141,7 @@ server.tool(
     };
 
     // Return widget with runtime data only
-    return widget({
+    return view({
       props: {
         city,
         temperature: weather.temperature,

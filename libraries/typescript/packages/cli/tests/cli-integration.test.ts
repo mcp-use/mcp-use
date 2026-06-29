@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   writeFileSync,
   mkdtempSync,
@@ -22,20 +22,31 @@ const TEST_TIMEOUT = 30000;
 // ~/.mcp-use directory while tests run.
 const FAKE_HOME = mkdtempSync(join(tmpdir(), "mcp-cli-home-"));
 
+afterAll(() => {
+  rmSync(FAKE_HOME, { recursive: true, force: true });
+});
+
 /**
  * Run a CLI command and capture output
  */
 async function runCLI(
   args: string[],
-  options: { timeout?: number; input?: string } = {}
+  options: {
+    timeout?: number;
+    input?: string;
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+  } = {}
 ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
   return new Promise((resolve, reject) => {
     const proc = spawn("node", [CLI_PATH, ...args], {
+      cwd: options.cwd,
       env: {
         ...process.env,
         NO_COLOR: "1", // Disable colors for easier testing
         HOME: FAKE_HOME,
         USERPROFILE: FAKE_HOME,
+        ...options.env,
       },
     });
 
@@ -90,7 +101,6 @@ describe("CLI Integration Tests", () => {
     if (testDir) {
       rmSync(testDir, { recursive: true, force: true });
     }
-    rmSync(FAKE_HOME, { recursive: true, force: true });
   });
 
   describe("Help Commands", () => {
@@ -368,6 +378,104 @@ describe("CLI Integration Tests", () => {
   });
 });
 
+describe("Project config commands", () => {
+  let configDir: string;
+
+  beforeAll(() => {
+    configDir = mkdtempSync(join(tmpdir(), "mcp-cli-config-test-"));
+    mkdirSync(join(configDir, ".mcp-use", "cloud"), { recursive: true });
+    writeFileSync(
+      join(configDir, "mcp-use.json"),
+      JSON.stringify({
+        version: 1,
+        name: "orders",
+        entry: "src/index.ts",
+        cloud: {
+          serverSlug: "orders",
+          serverId: "srv_config",
+        },
+      }),
+      "utf-8"
+    );
+    writeFileSync(
+      join(configDir, ".mcp-use", "cloud", "link.json"),
+      JSON.stringify({
+        serverId: "srv_link",
+        deploymentId: "dep_1",
+        linkedAt: "2026-01-01T00:00:00.000Z",
+      }),
+      "utf-8"
+    );
+  });
+
+  afterAll(() => {
+    if (configDir) {
+      rmSync(configDir, { recursive: true, force: true });
+    }
+  });
+
+  it("validates a local mcp-use.json", async () => {
+    const result = await runCLI(["config", "validate", "--path", configDir]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("mcp-use config is valid");
+  });
+
+  it("reports invalid local config fields", async () => {
+    const invalidDir = mkdtempSync(join(tmpdir(), "mcp-cli-config-invalid-"));
+    writeFileSync(
+      join(invalidDir, "mcp-use.json"),
+      JSON.stringify({ version: 1, dev: { port: "3000" } }),
+      "utf-8"
+    );
+
+    const result = await runCLI(["config", "validate", "--path", invalidDir]);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("dev.port");
+    rmSync(invalidDir, { recursive: true, force: true });
+  });
+
+  it("prints local-only config diff JSON", async () => {
+    const result = await runCLI(
+      ["config", "diff", "--path", configDir, "--json"],
+      {
+        env: {
+          MCP_USE_API_KEY: "",
+          MCP_USE_ORG_ID: "",
+          MCP_USE_SERVER_ID: "srv_env",
+        },
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    const diff = JSON.parse(result.stdout);
+    expect(diff.mode).toBe("local");
+    expect(diff.project.cloud.serverId).toBe("srv_config");
+    expect(diff.link.serverId).toBe("srv_link");
+    expect(diff.env.MCP_USE_SERVER_ID.present).toBe(true);
+    expect(
+      diff.differences.map((item: { field: string }) => item.field)
+    ).toEqual(["cloud.serverId", "cloud.serverId", "link.serverId"]);
+  });
+
+  it("prints CI env instructions without secret values", async () => {
+    const result = await runCLI([
+      "link",
+      "--print-ci-env",
+      "--path",
+      configDir,
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("MCP_USE_API_KEY");
+    expect(result.stdout).toContain("MCP_USE_ORG_ID");
+    expect(result.stdout).toContain("MCP_USE_SERVER_ID");
+    expect(result.stdout).not.toContain("srv_config");
+    expect(result.stdout).not.toContain("srv_link");
+  });
+});
+
 describe("Build command — import resolution", () => {
   let buildDir: string;
 
@@ -397,6 +505,13 @@ describe("Build command — import resolution", () => {
           name: "build-import-resolution-fixture",
           version: "0.0.0",
           type: "module",
+        })
+      );
+      writeFileSync(
+        join(buildDir, "mcp-use.json"),
+        JSON.stringify({
+          version: 1,
+          entry: "src/main.ts",
         })
       );
       writeFileSync(
@@ -435,7 +550,15 @@ export const message = greet("mcp-1733");
       const result = await runCLI(["build", "-p", buildDir, "--no-typecheck"]);
       expect(result.exitCode).toBe(0);
 
-      const bundled = readFileSync(join(buildDir, "dist/main.js"), "utf8");
+      const manifest = JSON.parse(
+        readFileSync(
+          join(buildDir, ".mcp-use", "build", "manifest.json"),
+          "utf8"
+        )
+      );
+      expect(manifest.entryPoint).toBe(".mcp-use/build/server/main.js");
+
+      const bundled = readFileSync(join(buildDir, manifest.entryPoint), "utf8");
 
       // Bare package import must survive to runtime (packages: "external").
       expect(bundled).toMatch(/from\s+["']mcp-use["']/);

@@ -3,13 +3,13 @@
  *
  * Covers:
  * - resolveCallbacks() precedence chain (config.ts)
- * - BaseConnector constructor deprecated-alias merging (base.ts)
+ * - BaseConnector constructor callback storage (base.ts)
  * - HttpConnector capability advertisement based on resolved callbacks
  *
  * Run with: pnpm test tests/unit/client/callback-resolution.test.ts
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { resolveCallbacks } from "../../../src/config.js";
 import type { CallbackConfig } from "../../../src/config.js";
 import { BaseConnector } from "../../../src/connectors/base.js";
@@ -42,30 +42,9 @@ describe("resolveCallbacks()", () => {
       expect(result.onSampling).toBe(samplingA);
     });
 
-    it("per-server deprecated samplingCallback wins over global onSampling", () => {
-      const result = resolveCallbacks(
-        { samplingCallback: samplingA },
-        { onSampling: samplingB }
-      );
-      expect(result.onSampling).toBe(samplingA);
-    });
-
     it("global onSampling used when per-server has none", () => {
       const result = resolveCallbacks({}, { onSampling: samplingB });
       expect(result.onSampling).toBe(samplingB);
-    });
-
-    it("global deprecated samplingCallback used as final fallback", () => {
-      const result = resolveCallbacks({}, { samplingCallback: samplingB });
-      expect(result.onSampling).toBe(samplingB);
-    });
-
-    it("per-server onSampling wins over per-server samplingCallback", () => {
-      const result = resolveCallbacks(
-        { onSampling: samplingA, samplingCallback: samplingB },
-        {}
-      );
-      expect(result.onSampling).toBe(samplingA);
     });
   });
 
@@ -78,30 +57,9 @@ describe("resolveCallbacks()", () => {
       expect(result.onElicitation).toBe(elicitA);
     });
 
-    it("per-server deprecated elicitationCallback wins over global onElicitation", () => {
-      const result = resolveCallbacks(
-        { elicitationCallback: elicitA },
-        { onElicitation: elicitB }
-      );
-      expect(result.onElicitation).toBe(elicitA);
-    });
-
     it("global onElicitation used when per-server has none", () => {
       const result = resolveCallbacks({}, { onElicitation: elicitB });
       expect(result.onElicitation).toBe(elicitB);
-    });
-
-    it("global deprecated elicitationCallback used as final fallback", () => {
-      const result = resolveCallbacks({}, { elicitationCallback: elicitB });
-      expect(result.onElicitation).toBe(elicitB);
-    });
-
-    it("per-server onElicitation wins over per-server elicitationCallback", () => {
-      const result = resolveCallbacks(
-        { onElicitation: elicitA, elicitationCallback: elicitB },
-        {}
-      );
-      expect(result.onElicitation).toBe(elicitA);
     });
   });
 
@@ -153,67 +111,15 @@ describe("resolveCallbacks()", () => {
   });
 });
 
-describe("BaseConnector constructor (deprecated alias merging)", () => {
-  let warnSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-
+describe("BaseConnector constructor", () => {
   it("stores onSampling as-is", () => {
     const connector = new BaseConnector({ onSampling: samplingA });
-    expect((connector as any).opts.onSampling).toBe(samplingA);
-  });
-
-  it("merges samplingCallback into onSampling when onSampling is absent", () => {
-    const connector = new BaseConnector({ samplingCallback: samplingA });
-    expect((connector as any).opts.onSampling).toBe(samplingA);
-  });
-
-  it("onSampling wins when both are provided", () => {
-    const connector = new BaseConnector({
-      onSampling: samplingA,
-      samplingCallback: samplingB,
-    });
     expect((connector as any).opts.onSampling).toBe(samplingA);
   });
 
   it("stores onElicitation as-is", () => {
     const connector = new BaseConnector({ onElicitation: elicitA });
     expect((connector as any).opts.onElicitation).toBe(elicitA);
-  });
-
-  it("merges elicitationCallback into onElicitation when onElicitation is absent", () => {
-    const connector = new BaseConnector({ elicitationCallback: elicitA });
-    expect((connector as any).opts.onElicitation).toBe(elicitA);
-  });
-
-  it("onElicitation wins when both are provided", () => {
-    const connector = new BaseConnector({
-      onElicitation: elicitA,
-      elicitationCallback: elicitB,
-    });
-    expect((connector as any).opts.onElicitation).toBe(elicitA);
-  });
-
-  it("emits deprecation warning for samplingCallback", () => {
-    new BaseConnector({ samplingCallback: samplingA });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("samplingCallback")
-    );
-  });
-
-  it("emits deprecation warning for elicitationCallback", () => {
-    new BaseConnector({ elicitationCallback: elicitA });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("elicitationCallback")
-    );
-  });
-
-  it("no warnings when using canonical names only", () => {
-    new BaseConnector({ onSampling: samplingA, onElicitation: elicitA });
-    expect(warnSpy).not.toHaveBeenCalled();
   });
 });
 

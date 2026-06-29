@@ -1,6 +1,7 @@
 import { logger } from "../logging.js";
 import type {
   BaseTelemetryEvent,
+  ClientServerConfigTelemetryInput,
   ConnectorInitEventData,
   MCPAgentExecutionEventData,
   MCPClientInitEventData,
@@ -36,21 +37,14 @@ import { getPackageVersion } from "./utils.js";
  */
 function generateUUID(): string {
   // Use globalThis.crypto.randomUUID() if available (modern browsers, Node.js 19+)
-  if (
-    typeof globalThis !== "undefined" &&
-    globalThis.crypto &&
-    typeof (globalThis.crypto as any).randomUUID === "function"
-  ) {
-    return (globalThis.crypto as any).randomUUID();
+  const crypto = globalThis.crypto;
+  if (crypto && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
   }
   // Fallback for older environments - use crypto.getRandomValues if available
-  if (
-    typeof globalThis !== "undefined" &&
-    globalThis.crypto &&
-    typeof (globalThis.crypto as any).getRandomValues === "function"
-  ) {
+  if (crypto && typeof crypto.getRandomValues === "function") {
     const array = new Uint8Array(16);
-    (globalThis.crypto as any).getRandomValues(array);
+    crypto.getRandomValues(array);
     // Convert to hex string
     const hex = Array.from(array, (v) => v.toString(16).padStart(2, "0")).join(
       ""
@@ -82,13 +76,10 @@ function secureRandomString(): string {
     return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
   }
   // Fallback to crypto.getRandomValues if available
-  if (
-    typeof globalThis !== "undefined" &&
-    globalThis.crypto &&
-    typeof (globalThis.crypto as any).getRandomValues === "function"
-  ) {
+  const crypto = globalThis.crypto;
+  if (crypto && typeof crypto.getRandomValues === "function") {
     const array = new Uint8Array(8);
-    (globalThis.crypto as any).getRandomValues(array);
+    crypto.getRandomValues(array);
     return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
   }
   // Last resort fallback - not cryptographically secure (should not happen in browser)
@@ -98,6 +89,10 @@ function secureRandomString(): string {
 type RuntimeEnvironment = "browser" | "unknown";
 
 type StorageCapability = "localStorage" | "session-only";
+type TelemetryPayload = Record<string, unknown>;
+type TelemetryWindow = Window & {
+  __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean;
+};
 
 const USER_ID_STORAGE_KEY = "mcp_use_user_id";
 
@@ -170,12 +165,49 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
 
 // PostHog types for Browser
 type PostHogBrowserClient = {
-  capture: (eventName: string, properties?: Record<string, any>) => void;
-  identify: (distinctId: string, properties?: Record<string, any>) => void;
+  init: (
+    apiKey: string,
+    options: {
+      api_host: string;
+      persistence: "localStorage";
+      autocapture: boolean;
+      capture_pageview: boolean;
+      disable_session_recording: boolean;
+      loaded: () => void;
+    }
+  ) => void;
+  capture: (eventName: string, properties?: TelemetryPayload) => void;
+  identify: (distinctId: string, properties?: TelemetryPayload) => void;
   reset: () => void;
   opt_out_capturing: () => void;
   opt_in_capturing: () => void;
 };
+
+function isPostHogBrowserClient(value: unknown): value is PostHogBrowserClient {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.init === "function" &&
+    typeof candidate.capture === "function" &&
+    typeof candidate.identify === "function" &&
+    typeof candidate.reset === "function" &&
+    typeof candidate.opt_out_capturing === "function" &&
+    typeof candidate.opt_in_capturing === "function"
+  );
+}
+
+function getPostHogBrowserClient(module: unknown): PostHogBrowserClient | null {
+  if (!module || typeof module !== "object") {
+    return null;
+  }
+
+  const exports = module as Record<string, unknown>;
+  const posthog = exports.default ?? exports.posthog;
+  return isPostHogBrowserClient(posthog) ? posthog : null;
+}
 
 /**
  * Browser Telemetry class that works in browser environments only.
@@ -250,8 +282,7 @@ export class Telemetry {
     // so a blocked localStorage doesn't defeat the opt-out.
     if (
       typeof window !== "undefined" &&
-      (window as unknown as { __MCP_USE_ANONYMIZED_TELEMETRY__?: boolean })
-        .__MCP_USE_ANONYMIZED_TELEMETRY__ === false
+      (window as TelemetryWindow).__MCP_USE_ANONYMIZED_TELEMETRY__ === false
     ) {
       return true;
     }
@@ -271,14 +302,9 @@ export class Telemetry {
     try {
       // Dynamic import of posthog-js
       const posthogModule = await import("posthog-js");
-      // Type assertion for posthog module structure - use unknown to avoid type conflicts
-      const posthogModuleTyped = posthogModule as unknown as {
-        default?: any;
-        posthog?: any;
-      };
-      const posthog = posthogModuleTyped.default || posthogModuleTyped.posthog;
+      const posthog = getPostHogBrowserClient(posthogModule);
 
-      if (!posthog || typeof posthog.init !== "function") {
+      if (!posthog) {
         throw new Error("posthog-js module did not export expected interface");
       }
 
@@ -294,7 +320,7 @@ export class Telemetry {
         },
       });
 
-      this._posthogBrowserClient = posthog as PostHogBrowserClient;
+      this._posthogBrowserClient = posthog;
     } catch (e) {
       logger.warn(`Failed to initialize PostHog browser telemetry: ${e}`);
       this._posthogBrowserClient = null;
@@ -534,7 +560,7 @@ export class Telemetry {
 
   async trackClientAddServer(
     serverName: string,
-    serverConfig: Record<string, any>
+    serverConfig: ClientServerConfigTelemetryInput
   ): Promise<void> {
     if (!this.isEnabled) return;
     const event = new ClientAddServerEvent({ serverName, serverConfig });
@@ -622,7 +648,7 @@ export class Telemetry {
    * Identify the current user (useful for linking sessions)
    * Browser only
    */
-  identify(userId: string, properties?: Record<string, any>): void {
+  identify(userId: string, properties?: TelemetryPayload): void {
     if (this._posthogBrowserClient) {
       try {
         this._posthogBrowserClient.identify(userId, properties);
@@ -668,7 +694,7 @@ export class Telemetry {
   /**
    * Track package download event (Node.js only - no-op in browser)
    */
-  async trackPackageDownload(properties?: Record<string, any>): Promise<void> {
+  async trackPackageDownload(properties?: TelemetryPayload): Promise<void> {
     // No-op in browser
   }
 }

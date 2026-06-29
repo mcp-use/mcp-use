@@ -6,6 +6,8 @@ settings:
 
 overrides:
   mcp-use: workspace:*
+  '@mcp-use/client': workspace:*
+  '@mcp-use/agent': workspace:*
   '@mcp-use/inspector': workspace:*
   '@mcp-use/cli': workspace:*
   create-mcp-use-app: workspace:*
@@ -36,7 +38,8 @@ overrides:
   dompurify: '>=3.4.0'
   minimatch: '>=10.2.1'
   rollup: '>=4.59.0'
-  '@modelcontextprotocol/sdk': '>=1.25.2'
+  '@modelcontextprotocol/client': '>=2.0.0-alpha.3'
+  '@modelcontextprotocol/server': '>=2.0.0-alpha.3'
   ai: '>=5.0.52'
   axios: '>=1.16.0'
   body-parser: '>=2.2.1'
@@ -59,11 +62,6 @@ overrides:
   langsmith: '>=0.6.0'
   follow-redirects: '>=1.16.0'
   better-auth: '>=1.6.2'
-
-patchedDependencies:
-  '@modelcontextprotocol/sdk':
-    hash: c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e
-    path: patches/@modelcontextprotocol__sdk.patch
 
 importers:
 
@@ -122,11 +120,48 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/agent:
+    dependencies:
+      '@langchain/anthropic':
+        specifier: ^1.0.0
+        version: 1.3.13(@langchain/core@1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0))
+      '@langchain/core':
+        specifier: ^1.1.8
+        version: 1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0)
+      '@langchain/openai':
+        specifier: ^1.0.0
+        version: 1.2.4(@langchain/core@1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0))(ws@8.21.0)
+      langchain:
+        specifier: ^1.2.3
+        version: 1.2.16(@langchain/core@1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0))(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(ws@8.21.0)(zod-to-json-schema@3.25.1(zod@4.3.5))
+      langfuse:
+        specifier: ^3.38.6
+        version: 3.38.6
+      langfuse-langchain:
+        specifier: ^3.38.6
+        version: 3.38.6(langchain@1.2.16(@langchain/core@1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0))(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(ws@8.21.0)(zod-to-json-schema@3.25.1(zod@4.3.5)))
+      mcp-use:
+        specifier: workspace:*
+        version: link:../mcp-use
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      rimraf:
+        specifier: ^6.1.3
+        version: 6.1.3
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: '>=4.1.0'
+        version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@25.6.0)(@vitest/coverage-v8@4.1.8)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
   packages/cli:
     dependencies:
-      '@mcp-use/inspector':
-        specifier: workspace:*
-        version: link:../inspector
       '@tailwindcss/vite':
         specifier: ^4.2.0
         version: 4.2.0(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
@@ -148,6 +183,9 @@ importers:
       esbuild:
         specifier: 0.27.1
         version: 0.27.1
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       mcp-use:
         specifier: workspace:*
         version: link:../mcp-use
@@ -178,6 +216,9 @@ importers:
       ws:
         specifier: '>=8.20.1'
         version: 8.21.0
+      yaml:
+        specifier: '>=2.8.3'
+        version: 2.8.3
       zod:
         specifier: 4.3.5
         version: 4.3.5
@@ -185,6 +226,34 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      vitest:
+        specifier: '>=4.1.0'
+        version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@25.6.0)(@vitest/coverage-v8@4.1.8)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
+  packages/client:
+    dependencies:
+      '@e2b/code-interpreter':
+        specifier: ^2.2.0
+        version: 2.3.3
+      '@modelcontextprotocol/client':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
+      mcp-use:
+        specifier: workspace:*
+        version: link:../mcp-use
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      rimraf:
+        specifier: ^6.1.3
+        version: 6.1.3
+      tsup:
+        specifier: ^8.5.1
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
       vitest:
         specifier: '>=4.1.0'
         version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@25.6.0)(@vitest/coverage-v8@4.1.8)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
@@ -339,15 +408,40 @@ importers:
       '@hono/node-server':
         specifier: '>=1.19.10'
         version: 1.19.13(hono@4.12.23)
+      '@modelcontextprotocol/client':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
+      '@modelcontextprotocol/server':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
+      '@scarf/scarf':
+        specifier: ^1.4.0
+        version: 1.4.0
+      hono:
+        specifier: '>=4.12.21'
+        version: 4.12.23
+      mcp-use:
+        specifier: workspace:*
+        version: link:../mcp-use
+      open:
+        specifier: ^11.0.0
+        version: 11.0.0
+      posthog-node:
+        specifier: ^5.24.17
+        version: 5.24.17
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.0.1
-        version: 1.0.1(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
-      '@modelcontextprotocol/sdk':
-        specifier: '>=1.25.2'
-        version: 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+        version: 1.0.1(@modelcontextprotocol/sdk@1.27.1(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
       '@paper-design/shaders-react':
         specifier: ^0.0.72
         version: 0.0.72(@types/react@19.2.17)(react@19.2.4)
+      '@playwright/test':
+        specifier: ^1.58.2
+        version: 1.58.2
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.15
         version: 1.1.15(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -372,21 +466,27 @@ importers:
       '@radix-ui/react-select':
         specifier: ^2.2.6
         version: 2.2.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      '@radix-ui/react-slot':
+        specifier: ^1.2.4
+        version: 1.2.4(@types/react@19.2.17)(react@19.2.4)
       '@radix-ui/react-switch':
         specifier: ^1.2.6
         version: 1.2.6(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      '@scarf/scarf':
-        specifier: ^1.4.0
-        version: 1.4.0
       '@tailwindcss/vite':
         specifier: ^4.2.0
         version: 4.2.0(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
       '@types/react-syntax-highlighter':
         specifier: ^15.5.13
         version: 15.5.13
+      '@vitejs/plugin-react':
+        specifier: ^6.0.0
+        version: 6.0.1(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -396,58 +496,6 @@ importers:
       cmdk:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      hono:
-        specifier: '>=4.12.21'
-        version: 4.12.23
-      lucide-react:
-        specifier: ^0.562.0
-        version: 0.562.0(react@19.2.4)
-      markdown-to-jsx:
-        specifier: ^9.7.4
-        version: 9.7.5(react@19.2.4)
-      mcp-use:
-        specifier: workspace:*
-        version: link:../mcp-use
-      motion:
-        specifier: ^12.34.2
-        version: 12.34.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      next-themes:
-        specifier: ^0.4.6
-        version: 0.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      open:
-        specifier: ^11.0.0
-        version: 11.0.0
-      posthog-node:
-        specifier: ^5.24.17
-        version: 5.24.17
-      react-resizable-panels:
-        specifier: ^4.6.4
-        version: 4.6.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      react-syntax-highlighter:
-        specifier: ^16.1.0
-        version: 16.1.0(react@19.2.4)
-      sonner:
-        specifier: ^2.0.7
-        version: 2.0.7(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      tailwind-merge:
-        specifier: ^3.5.0
-        version: 3.5.0
-      zod:
-        specifier: 4.3.5
-        version: 4.3.5
-    devDependencies:
-      '@playwright/test':
-        specifier: ^1.58.2
-        version: 1.58.2
-      '@radix-ui/react-slot':
-        specifier: ^1.2.4
-        version: 1.2.4(@types/react@19.2.17)(react@19.2.4)
-      '@types/express':
-        specifier: ^5.0.6
-        version: 5.0.6
-      '@vitejs/plugin-react':
-        specifier: ^6.0.0
-        version: 6.0.1(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
@@ -460,6 +508,18 @@ importers:
       express:
         specifier: ^5.2.1
         version: 5.2.1
+      lucide-react:
+        specifier: ^0.562.0
+        version: 0.562.0(react@19.2.4)
+      markdown-to-jsx:
+        specifier: ^9.7.4
+        version: 9.7.5(react@19.2.4)
+      motion:
+        specifier: ^12.34.2
+        version: 12.34.2(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       oauth2-mock-server:
         specifier: ^8.2.2
         version: 8.2.2
@@ -469,9 +529,21 @@ importers:
       react-dom:
         specifier: ^19.2.0
         version: 19.2.4(react@19.2.4)
+      react-resizable-panels:
+        specifier: ^4.6.4
+        version: 4.6.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react-router:
         specifier: ^7.15.0
         version: 7.16.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      react-syntax-highlighter:
+        specifier: ^16.1.0
+        version: 16.1.0(react@19.2.4)
+      sonner:
+        specifier: ^2.0.7
+        version: 2.0.7(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tailwind-merge:
+        specifier: ^3.5.0
+        version: 3.5.0
       tailwindcss:
         specifier: ^4.2.0
         version: 4.2.0
@@ -508,27 +580,21 @@ importers:
       '@langchain/core':
         specifier: ^1.1.8
         version: 1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0)
-      '@mcp-ui/server':
-        specifier: 6.1.0
-        version: 6.1.0(@cfworker/json-schema@4.1.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
       '@mcp-use/cli':
         specifier: workspace:*
         version: link:../cli
-      '@mcp-use/inspector':
-        specifier: workspace:*
-        version: link:../inspector
-      '@modelcontextprotocol/ext-apps':
-        specifier: 1.0.1
-        version: 1.0.1(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
-      '@modelcontextprotocol/sdk':
-        specifier: '>=1.25.2'
-        version: 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/client':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
+      '@modelcontextprotocol/server':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
       chalk:
         specifier: 4.1.2
         version: 4.1.2
-      express:
-        specifier: 5.2.1
-        version: 5.2.1
+      esbuild:
+        specifier: 0.27.1
+        version: 0.27.1
       hono:
         specifier: '>=4.12.21'
         version: 4.12.23
@@ -547,12 +613,6 @@ importers:
       node-mocks-http:
         specifier: 1.17.2
         version: 1.17.2(@types/express@5.0.6)(@types/node@25.6.0)
-      posthog-js:
-        specifier: 1.351.3
-        version: 1.351.3
-      posthog-node:
-        specifier: 5.24.17
-        version: 5.24.17
       react-router:
         specifier: ^7.15.0
         version: 7.16.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -560,6 +620,9 @@ importers:
       '@langchain/openai':
         specifier: ^1.0.0
         version: 1.2.4(@langchain/core@1.1.18(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(openai@6.17.0(ws@8.21.0)(zod@4.3.5))(ws@8.21.0))(ws@8.21.0)
+      '@mcp-use/inspector':
+        specifier: workspace:*
+        version: link:../inspector
       '@types/morgan':
         specifier: ^1.9.10
         version: 1.9.10
@@ -569,9 +632,6 @@ importers:
       ai:
         specifier: '>=5.0.52'
         version: 6.0.116(zod@4.3.5)
-      esbuild:
-        specifier: 0.27.1
-        version: 0.27.1
       eslint:
         specifier: ^9.39.2
         version: 9.39.2(jiti@2.6.1)
@@ -587,6 +647,9 @@ importers:
       morgan:
         specifier: ^1.10.1
         version: 1.10.1
+      posthog-js:
+        specifier: 1.351.3
+        version: 1.351.3
       react:
         specifier: ^19.2.0
         version: 19.2.4
@@ -859,6 +922,49 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  packages/mcp-use/examples/server/features/inline-jsx-widgets:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../../../..
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+      tailwindcss:
+        specifier: ^4.2.0
+        version: 4.2.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@mcp-use/cli':
+        specifier: workspace:*
+        version: link:../../../../../cli
+      '@tailwindcss/vite':
+        specifier: ^4.2.0
+        version: 4.2.0(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+      '@types/node':
+        specifier: ^25.0.2
+        version: 25.6.0
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.17
+      '@vitejs/plugin-react':
+        specifier: ^6.0.0
+        version: 6.0.1(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
   packages/mcp-use/examples/server/features/middleware:
     dependencies:
       mcp-use:
@@ -961,9 +1067,12 @@ importers:
 
   packages/mcp-use/examples/server/features/proxy:
     dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: '>=1.25.2'
-        version: 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/client':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
+      '@modelcontextprotocol/server':
+        specifier: '>=2.0.0-alpha.3'
+        version: 2.0.0-alpha.3
       mcp-use:
         specifier: workspace:*
         version: link:../../../..
@@ -1410,6 +1519,43 @@ importers:
       vite:
         specifier: '>=8.0.5'
         version: 8.0.16(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  test_app:
+    dependencies:
+      mcp-use:
+        specifier: workspace:*
+        version: link:../packages/mcp-use
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.2.0
+        version: 19.2.4(react@19.2.4)
+      react-router:
+        specifier: ^7.15.0
+        version: 7.16.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      tailwindcss:
+        specifier: ^4.2.0
+        version: 4.2.0
+      zod:
+        specifier: 4.3.5
+        version: 4.3.5
+    devDependencies:
+      '@types/node':
+        specifier: ^25.3.0
+        version: 25.6.0
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
 packages:
 
@@ -2271,26 +2417,14 @@ packages:
   '@manypkg/get-packages@1.1.3':
     resolution: {integrity: sha512-fo+QhuU3qE/2TQMQmbVMqaQ6EWbMhi4ABWP+O4AM1NqPBuy0OrApV5LO6BrrgnhtAHS2NH6RrVk9OL181tTi8A==}
 
-  '@mcp-ui/server@6.1.0':
-    resolution: {integrity: sha512-uxv9JrzEzHfdGo/V/KTFKp5WeCOsaiAoQZ3V88jw1dSXUofONEw4rMwEvVP3612aj/unS2TIeM0o1I0asfIxtw==}
-
-  '@modelcontextprotocol/ext-apps@0.3.1':
-    resolution: {integrity: sha512-Iivz2KwWK8xlRbiWwFB/C4NXqE8VJBoRCbBkJCN98ST2UbQvA6kfyebcLsypiqylJS467XOOaBcI9DeQ3t+zqA==}
-    peerDependencies:
-      '@modelcontextprotocol/sdk': '>=1.25.2'
-      react: ^19.2.0
-      react-dom: ^19.2.0
-      zod: 4.3.5
-    peerDependenciesMeta:
-      react:
-        optional: true
-      react-dom:
-        optional: true
+  '@modelcontextprotocol/client@2.0.0-alpha.3':
+    resolution: {integrity: sha512-NNjaRRwHMKDgARgAlPt0Vkj963A+zoBOX2TtHptNjncjYCwadxx+reU5/H+nlimZmibhJEUznNMQr3UktzBVig==}
+    engines: {node: '>=20'}
 
   '@modelcontextprotocol/ext-apps@1.0.1':
     resolution: {integrity: sha512-rAPzBbB5GNgYk216paQjGKUgbNXSy/yeR95c0ni6Y4uvhWI2AeF+ztEOqQFLBMQy/MPM+02pbVK1HaQmQjMwYQ==}
     peerDependencies:
-      '@modelcontextprotocol/sdk': '>=1.25.2'
+      '@modelcontextprotocol/sdk': ^1.24.0
       react: ^19.2.0
       react-dom: ^19.2.0
       zod: 4.3.5
@@ -2309,6 +2443,10 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@modelcontextprotocol/server@2.0.0-alpha.3':
+    resolution: {integrity: sha512-PYdVDA6x3joCy/rw1mGdMSvqisPKlmt5QN/ILcT8R7efgvmhij14L87lJrWAm4pszaThzwpV49BmBBTZWtlY3A==}
+    engines: {node: '>=20'}
 
   '@napi-rs/wasm-runtime@1.1.3':
     resolution: {integrity: sha512-xK9sGVbJWYb08+mTJt3/YV24WxvxpXcXtP6B172paPZ+Ts69Re9dAr7lKwJoeIx8OoeuimEiRZ7umkiUVClmmQ==}
@@ -4285,11 +4423,6 @@ packages:
     peerDependencies:
       acorn: ^6.0.0 || ^7.0.0 || ^8.0.0
 
-  acorn@8.15.0:
-    resolution: {integrity: sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==}
-    engines: {node: '>=0.4.0'}
-    hasBin: true
-
   acorn@8.16.0:
     resolution: {integrity: sha512-UVJyE9MttOsBQIDKw1skb9nAwQuR5wuGD3+82K6JgJlm/Y+KI92oNsMNGZCYdDsVtRHSak0pcV5Dno5+4jh9sw==}
     engines: {node: '>=0.4.0'}
@@ -5828,6 +5961,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  jsonc-parser@3.3.1:
+    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
+
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
 
@@ -6358,9 +6494,6 @@ packages:
   minizlib@3.1.0:
     resolution: {integrity: sha512-KZxYo1BUkWD2TVFLr0MQoM8vUUigWD3LlD83a/75BqC+4qE0Hb1Vo5v1FgcfaNXvfXzr+5EhQ6ing/CaBijTlw==}
     engines: {node: '>= 18'}
-
-  mlly@1.8.0:
-    resolution: {integrity: sha512-l8D9ODSRWLe2KHJSifWGwBqpTZXIXTeo8mlKjY+E2HAakaTeNpqAyBZ8GSqLzHgw4XmHmC8whvpjJNMbFZN7/g==}
 
   mlly@1.8.2:
     resolution: {integrity: sha512-d+ObxMQFmbt10sretNDytwt85VrbkhhUA/JBGm1MPaWJ65Cl4wOgLaB1NYvJSZ0Ef03MMEU/0xpPMXUIQ29UfA==}
@@ -7344,10 +7477,6 @@ packages:
   tinyexec@1.0.2:
     resolution: {integrity: sha512-W/KYk+NFhkmsYpuHq5JykngiOCnxeVL8v8dFnqxSD8qEEdRfXk1SDM6JzNqcERbcGYj9tMrDQBYV9cjgnunFIg==}
     engines: {node: '>=18'}
-
-  tinyglobby@0.2.16:
-    resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
-    engines: {node: '>=12.0.0'}
 
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
@@ -8700,20 +8829,18 @@ snapshots:
       globby: 11.1.0
       read-yaml-file: 1.1.0
 
-  '@mcp-ui/server@6.1.0(@cfworker/json-schema@4.1.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
+  '@modelcontextprotocol/client@2.0.0-alpha.3':
     dependencies:
-      '@modelcontextprotocol/ext-apps': 0.3.1(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
-      '@modelcontextprotocol/sdk': 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - react
-      - react-dom
-      - supports-color
-      - zod
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.0.6
+      jose: 6.1.3
+      pkce-challenge: 5.0.1
+      zod: 4.3.5
 
-  '@modelcontextprotocol/ext-apps@0.3.1(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
+  '@modelcontextprotocol/ext-apps@1.0.1(@modelcontextprotocol/sdk@1.27.1(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
+      '@modelcontextprotocol/sdk': 1.27.1(@cfworker/json-schema@4.1.1)(zod@4.3.5)
       zod: 4.3.5
     optionalDependencies:
       '@oven/bun-darwin-aarch64': 1.3.8
@@ -8736,32 +8863,7 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@modelcontextprotocol/ext-apps@1.0.1(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)':
-    dependencies:
-      '@modelcontextprotocol/sdk': 1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)
-      zod: 4.3.5
-    optionalDependencies:
-      '@oven/bun-darwin-aarch64': 1.3.8
-      '@oven/bun-darwin-x64': 1.3.8
-      '@oven/bun-darwin-x64-baseline': 1.3.8
-      '@oven/bun-linux-aarch64': 1.3.8
-      '@oven/bun-linux-aarch64-musl': 1.3.8
-      '@oven/bun-linux-x64': 1.3.8
-      '@oven/bun-linux-x64-baseline': 1.3.8
-      '@oven/bun-linux-x64-musl': 1.3.8
-      '@oven/bun-linux-x64-musl-baseline': 1.3.8
-      '@oven/bun-windows-x64': 1.3.8
-      '@oven/bun-windows-x64-baseline': 1.3.8
-      '@rollup/rollup-darwin-arm64': 4.57.1
-      '@rollup/rollup-darwin-x64': 4.57.1
-      '@rollup/rollup-linux-arm64-gnu': 4.57.1
-      '@rollup/rollup-linux-x64-gnu': 4.57.1
-      '@rollup/rollup-win32-arm64-msvc': 4.57.1
-      '@rollup/rollup-win32-x64-msvc': 4.57.1
-      react: 19.2.4
-      react-dom: 19.2.4(react@19.2.4)
-
-  '@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5)':
+  '@modelcontextprotocol/sdk@1.27.1(@cfworker/json-schema@4.1.1)(zod@4.3.5)':
     dependencies:
       '@hono/node-server': 1.19.13(hono@4.12.23)
       ajv: 8.18.0
@@ -8784,6 +8886,10 @@ snapshots:
       '@cfworker/json-schema': 4.1.1
     transitivePeerDependencies:
       - supports-color
+
+  '@modelcontextprotocol/server@2.0.0-alpha.3':
+    dependencies:
+      zod: 4.3.5
 
   '@napi-rs/wasm-runtime@1.1.3(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
@@ -11083,11 +11189,10 @@ snapshots:
   '@types/react-dom@19.2.3(@types/react@19.2.17)':
     dependencies:
       '@types/react': 19.2.17
-    optional: true
 
   '@types/react-syntax-highlighter@15.5.13':
     dependencies:
-      '@types/react': 19.2.14
+      '@types/react': 19.2.17
 
   '@types/react-test-renderer@19.1.0':
     dependencies:
@@ -11396,8 +11501,6 @@ snapshots:
   acorn-jsx@5.3.2(acorn@8.16.0):
     dependencies:
       acorn: 8.16.0
-
-  acorn@8.15.0: {}
 
   acorn@8.16.0: {}
 
@@ -13100,6 +13203,8 @@ snapshots:
 
   json5@2.2.3: {}
 
+  jsonc-parser@3.3.1: {}
+
   jsonfile@4.0.0:
     optionalDependencies:
       graceful-fs: 4.2.11
@@ -13797,13 +13902,6 @@ snapshots:
     dependencies:
       minipass: 7.1.3
 
-  mlly@1.8.0:
-    dependencies:
-      acorn: 8.15.0
-      pathe: 2.0.3
-      pkg-types: 1.3.1
-      ufo: 1.6.3
-
   mlly@1.8.2:
     dependencies:
       acorn: 8.16.0
@@ -14185,7 +14283,7 @@ snapshots:
   pkg-types@1.3.1:
     dependencies:
       confbox: 0.1.8
-      mlly: 1.8.0
+      mlly: 1.8.2
       pathe: 2.0.3
 
   platform@1.3.6: {}
@@ -15072,7 +15170,7 @@ snapshots:
       lines-and-columns: 1.2.4
       mz: 2.7.0
       pirates: 4.0.7
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       ts-interface-checker: 0.1.13
 
   supports-color@7.2.0:
@@ -15116,11 +15214,6 @@ snapshots:
   tinyexec@0.3.2: {}
 
   tinyexec@1.0.2: {}
-
-  tinyglobby@0.2.16:
-    dependencies:
-      fdir: 6.5.0(picomatch@4.0.4)
-      picomatch: 4.0.4
 
   tinyglobby@0.2.17:
     dependencies:
@@ -15191,7 +15284,7 @@ snapshots:
       source-map: 0.7.6
       sucrase: 3.35.1
       tinyexec: 0.3.2
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       tree-kill: 1.2.2
     optionalDependencies:
       postcss: 8.5.15
@@ -15499,7 +15592,7 @@ snapshots:
       std-env: 4.1.0
       tinybench: 2.9.0
       tinyexec: 1.0.2
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 8.0.16(@types/node@25.3.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
       why-is-node-running: 2.3.0
@@ -15530,7 +15623,7 @@ snapshots:
       std-env: 4.1.0
       tinybench: 2.9.0
       tinyexec: 1.0.2
-      tinyglobby: 0.2.16
+      tinyglobby: 0.2.17
       tinyrainbow: 3.1.0
       vite: 8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
       why-is-node-running: 2.3.0

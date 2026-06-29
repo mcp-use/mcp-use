@@ -25,7 +25,7 @@ const discoverOAuthProtectedResourceMetadata = vi.fn();
 const discoverAuthorizationServerMetadata = vi.fn();
 const refreshAuthorization = vi.fn();
 
-vi.mock("@modelcontextprotocol/sdk/client/auth.js", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
   discoverOAuthProtectedResourceMetadata: (...args: unknown[]) =>
     discoverOAuthProtectedResourceMetadata(...args),
   discoverAuthorizationServerMetadata: (...args: unknown[]) =>

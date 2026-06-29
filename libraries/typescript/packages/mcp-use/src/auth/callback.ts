@@ -1,5 +1,5 @@
 // callback.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
 import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust path
 import {
   MCP_AUTH_BROADCAST_CHANNEL,

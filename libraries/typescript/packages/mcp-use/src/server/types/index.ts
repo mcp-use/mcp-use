@@ -14,6 +14,16 @@ export {
 // Context types
 export { ClientCapabilityChecker, McpContext } from "./context.js";
 
+export type {
+  AuthContext,
+  AuthDecision,
+  AuthPredicate,
+  AuthRequirement,
+  AuthRequirementSummary,
+  Policy,
+  PolicyRequest,
+} from "../oauth/types.js";
+
 // Tool context types
 export {
   ToolContext,
@@ -28,23 +38,15 @@ export {
   ReadResourceCallback,
   ReadResourceTemplateCallback,
   InferTemplateParams,
-  ResourceTemplateConfig,
+  ResourceTemplateCallbacks,
   ResourceTemplateDefinition,
-  ResourceTemplateDefinitionWithoutCallback,
-  FlatResourceTemplateDefinition,
-  FlatResourceTemplateDefinitionWithoutCallback,
   ResourceDefinition,
-  ResourceDefinitionWithoutCallback,
   EnhancedResourceContext,
   // UIResource specific types
   UIResourceContent,
   WidgetProps,
   UIEncoding,
-  RemoteDomFramework,
   UIResourceDefinition,
-  ExternalUrlUIResource,
-  RawHtmlUIResource,
-  RemoteDomUIResource,
   AppsSdkUIResource,
   McpAppsUIResource,
   WidgetConfig,
@@ -66,11 +68,12 @@ export {
   ToolAnnotations,
 } from "./tool.js";
 
+export { ToolRef, createToolRef } from "./tool-ref.js";
+
 // Prompt types
 export {
   PromptCallback,
   PromptDefinition,
-  PromptDefinitionWithoutCallback,
   InferPromptInput,
   EnhancedPromptContext,
   GetPromptResult,

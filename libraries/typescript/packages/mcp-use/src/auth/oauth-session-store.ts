@@ -2,13 +2,13 @@ import {
   discoverOAuthProtectedResourceMetadata,
   discoverAuthorizationServerMetadata,
   refreshAuthorization,
-} from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
   OAuthTokens,
   AuthorizationServerMetadata,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import type { KVStore } from "./kv-store.js";
 import type { StoredState } from "./types.js";

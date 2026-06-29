@@ -1,12 +1,13 @@
-import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps";
+import { RESOURCE_MIME_TYPE } from "../server/views/mcp-apps-constants.js";
 
 export abstract class BaseTelemetryEvent {
   abstract get name(): string;
-  abstract get properties(): Record<string, any>;
+  abstract get properties(): TelemetryProperties;
 }
 
 // Supporting Interfaces - aligned with library types in server/types/
 // Note: Complex objects should be JSON stringified for analytics compatibility
+type TelemetryProperties = Record<string, unknown>;
 
 /**
  * Tool info for telemetry - matches ToolDefinition from server/types/tool.ts
@@ -41,8 +42,8 @@ interface Prompt {
   name: string;
   title?: string | null;
   description?: string | null;
-  /** JSON stringified args from PromptDefinition.args (InputDefinition[]) */
-  args?: string | null;
+  /** Whether the prompt has a Zod schema for arguments */
+  hasSchema?: boolean | null;
 }
 
 /**
@@ -101,7 +102,7 @@ export class MCPAgentExecutionEvent extends BaseTelemetryEvent {
     return "mcp_agent_execution";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       // Core execution info
       execution_method: this.data.executionMethod,
@@ -155,7 +156,7 @@ interface ServerRunEventData {
   resources?: Resource[] | null;
   prompts?: Prompt[] | null;
   templates?: Prompt[] | null;
-  capabilities?: Record<string, any> | null;
+  capabilities?: Record<string, unknown> | null;
   appsSdkResources?: Resource[] | null;
   appsSdkResourcesNumber?: number;
   mcpUiResources?: Resource[] | null;
@@ -197,7 +198,7 @@ export interface MCPServerTelemetryInfo {
           name: string;
           title?: string;
           description?: string;
-          args?: unknown;
+          schema?: unknown;
         };
         handler: unknown;
       }
@@ -298,7 +299,7 @@ export function createServerRunEventData(
             name: r.config.name,
             title: r.config.title ?? null,
             description: r.config.description ?? null,
-            args: r.config.args ? JSON.stringify(r.config.args) : null,
+            hasSchema: !!r.config.schema,
           }))
         : null,
     templates:
@@ -331,7 +332,7 @@ export class ServerRunEvent extends BaseTelemetryEvent {
     return "server_run";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       transport: this.data.transport,
       tools_number: this.data.toolsNumber,
@@ -373,8 +374,8 @@ export class ServerRunEvent extends BaseTelemetryEvent {
 
 export interface ServerInitializeEventData {
   protocolVersion: string;
-  clientInfo: Record<string, any>;
-  clientCapabilities: Record<string, any>;
+  clientInfo: Record<string, unknown>;
+  clientCapabilities: Record<string, unknown>;
   sessionId?: string | null;
 }
 
@@ -387,7 +388,7 @@ export class ServerInitializeEvent extends BaseTelemetryEvent {
     return "server_initialize_call";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       protocol_version: this.data.protocolVersion,
       client_info: JSON.stringify(this.data.clientInfo),
@@ -418,7 +419,7 @@ export class ServerToolCallEvent extends BaseTelemetryEvent {
     return "server_tool_call";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       tool_name: this.data.toolName,
       length_input_argument: this.data.lengthInputArgument,
@@ -450,7 +451,7 @@ export class ServerResourceCallEvent extends BaseTelemetryEvent {
     return "server_resource_call";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       name: this.data.name,
       description: this.data.description,
@@ -481,7 +482,7 @@ export class ServerPromptCallEvent extends BaseTelemetryEvent {
     return "server_prompt_call";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       name: this.data.name,
       description: this.data.description,
@@ -509,7 +510,7 @@ export class ServerContextEvent extends BaseTelemetryEvent {
     return `server_context_${this.data.contextType}`;
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       context_type: this.data.contextType,
       notification_type: this.data.notificationType ?? null,
@@ -540,7 +541,7 @@ export class MCPClientInitEvent extends BaseTelemetryEvent {
     return "mcpclient_init";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       code_mode: this.data.codeMode,
       sandbox: this.data.sandbox,
@@ -574,7 +575,7 @@ export class ConnectorInitEvent extends BaseTelemetryEvent {
     return "connector_init";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       connector_type: this.data.connectorType,
       server_command: this.data.serverCommand ?? null,
@@ -595,7 +596,17 @@ export class ConnectorInitEvent extends BaseTelemetryEvent {
  */
 interface ClientAddServerEventInput {
   serverName: string;
-  serverConfig: Record<string, any>;
+  serverConfig: ClientServerConfigTelemetryInput;
+}
+
+export interface ClientServerConfigTelemetryInput extends Record<
+  string,
+  unknown
+> {
+  url?: string;
+  transport?: string;
+  authToken?: unknown;
+  authProvider?: unknown;
 }
 
 export class ClientAddServerEvent extends BaseTelemetryEvent {
@@ -607,13 +618,14 @@ export class ClientAddServerEvent extends BaseTelemetryEvent {
     return "client_add_server";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     const { serverName, serverConfig } = this.data;
     const url = serverConfig.url;
 
     return {
       server_name: serverName,
-      server_url_domain: url ? this._extractHostname(url) : null,
+      server_url_domain:
+        typeof url === "string" ? this._extractHostname(url) : null,
       transport: serverConfig.transport ?? null,
       has_auth: !!(serverConfig.authToken || serverConfig.authProvider),
     };
@@ -648,7 +660,7 @@ export class ClientRemoveServerEvent extends BaseTelemetryEvent {
     return "client_remove_server";
   }
 
-  get properties(): Record<string, any> {
+  get properties(): TelemetryProperties {
     return {
       server_name: this.data.serverName,
     };

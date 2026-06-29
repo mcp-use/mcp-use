@@ -138,7 +138,7 @@ describe("deriveProjectInfo", () => {
     expect(info.useCurrentDir).toBe(true);
     expect(info.projectPath).toBe("/tmp/My Project");
     expect(info.displayName).toBe("My Project");
-    // Sanitized so package.json + index.ts string literal stay valid
+    // Sanitized so package.json + index.ts/tsx string literals stay valid
     expect(info.packageName).toBe("my-project");
   });
 
@@ -153,7 +153,7 @@ describe("deriveProjectInfo", () => {
 
 // End-to-end: simulates the actual file-mutation step the CLI runs against a
 // scratch directory shaped like a copied template. Verifies that the value
-// flowed into both files is npm-safe and produces a parseable index.ts.
+// flowed into template files is npm-safe and produces parseable entry files.
 describe("template file updates against a tmpdir fixture", () => {
   let dir: string;
 
@@ -209,5 +209,20 @@ describe("template file updates against a tmpdir fixture", () => {
     const match = indexContent.match(/name: "([^"]+)"/);
     expect(match).not.toBeNull();
     expect(match![1]).toBe(info.packageName);
+  });
+
+  it("also updates index.tsx templates", () => {
+    const info = deriveProjectInfo("mcp-app", "/scratch");
+    writeFileSync(
+      join(dir, "index.tsx"),
+      `export const server = {\n  name: "{{PROJECT_NAME}}",\n  title: "{{PROJECT_NAME}}",\n};\n`
+    );
+
+    updateIndexTs(dir, info.packageName);
+
+    const indexContent = readFileSync(join(dir, "index.tsx"), "utf-8");
+    expect(indexContent).toContain('name: "mcp-app"');
+    expect(indexContent).toContain('title: "mcp-app"');
+    expect(indexContent).not.toContain("{{PROJECT_NAME}}");
   });
 });

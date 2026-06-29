@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { MCPServer } from "../../src/server/index.js";
-import { widget } from "../../src/server/utils/response-helpers.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { view } from "../../src/server/utils/response-helpers.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 describe("Widget Helper Integration Tests", () => {
   let server: any;
@@ -123,7 +123,7 @@ describe("Widget Helper Integration Tests", () => {
         },
       },
       async (params: { message: string }) => {
-        return widget({
+        return view({
           props: params,
           message: "Displaying comparison-widget",
         });
@@ -145,7 +145,7 @@ describe("Widget Helper Integration Tests", () => {
         },
       },
       async () => {
-        return widget({
+        return view({
           props: { foo: "bar" },
           message: "Custom message",
         });

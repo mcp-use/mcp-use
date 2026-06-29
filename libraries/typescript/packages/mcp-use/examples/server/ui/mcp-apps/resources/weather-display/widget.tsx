@@ -1,4 +1,4 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -49,7 +49,7 @@ const WeatherDisplay: React.FC = () => {
     maxHeight,
     userAgent,
     safeArea,
-  } = useWidget<WeatherProps>();
+  } = useView<WeatherProps>();
 
   const isDark = theme === "dark";
 

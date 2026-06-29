@@ -1,4 +1,4 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 import "../styles.css";
@@ -25,7 +25,7 @@ export const widgetMetadata: WidgetMetadata = {
 type WeatherProps = z.infer<typeof propSchema>;
 
 const WeatherDisplay: React.FC = () => {
-  const { props, isPending } = useWidget<WeatherProps>();
+  const { props, isPending } = useView<WeatherProps>();
 
   return (
     <McpUseProvider debugger viewControls>

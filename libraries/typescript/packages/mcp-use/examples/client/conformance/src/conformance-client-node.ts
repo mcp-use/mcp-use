@@ -2,7 +2,7 @@
  * MCP Conformance Test Client (TypeScript / Node MCPClient)
  */
 
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
 import { MCPClient } from "mcp-use";
 import {
   handleElicitation,
@@ -76,7 +76,7 @@ async function main(): Promise<void> {
       },
     },
     {
-      elicitationCallback: handleElicitation,
+      onElicitation: handleElicitation,
     }
   );
 

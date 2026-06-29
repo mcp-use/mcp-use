@@ -5,17 +5,14 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
-import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
 import { MCPServer } from "../../src/server/index.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-
+} from "@modelcontextprotocol/client";
 describe("Elicitation Integration Tests", () => {
   let server: any;
   let client: Client;
@@ -160,7 +157,7 @@ describe("Elicitation Integration Tests", () => {
 
   describe("Form Mode", () => {
     it("handles simple form mode elicitation", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         expect(request.params.mode).toBe("form");
         expect(request.params.message).toBe("Enter your name");
         expect(request.params.requestedSchema).toHaveProperty("properties");
@@ -180,7 +177,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("uses default values when field missing", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: {},
@@ -196,7 +193,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("handles user decline", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "decline",
         } as ElicitResult;
@@ -211,7 +208,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("handles user cancel", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "cancel",
         } as ElicitResult;
@@ -228,7 +225,7 @@ describe("Elicitation Integration Tests", () => {
 
   describe("Server-Side Validation", () => {
     it("accepts valid data", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: {
@@ -249,7 +246,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("rejects invalid age (out of range)", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: {
@@ -272,7 +269,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("rejects invalid email format", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: {
@@ -293,7 +290,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("rejects wrong data types", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: {
@@ -316,7 +313,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("rejects missing required fields", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: {
@@ -339,7 +336,7 @@ describe("Elicitation Integration Tests", () => {
 
   describe("URL Mode", () => {
     it("handles URL mode elicitation", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         expect(request.params.mode).toBe("url");
         expect(request.params.url).toBe("https://example.com/oauth");
         expect(request.params.elicitationId).toBeTruthy();
@@ -358,7 +355,7 @@ describe("Elicitation Integration Tests", () => {
     });
 
     it("handles URL mode decline", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "decline",
         } as ElicitResult;
@@ -375,7 +372,7 @@ describe("Elicitation Integration Tests", () => {
     it("generates unique elicitation IDs", async () => {
       const ids: string[] = [];
 
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         ids.push(request.params.elicitationId);
         return { action: "accept" } as ElicitResult;
       });
@@ -393,7 +390,7 @@ describe("Elicitation Integration Tests", () => {
 
   describe("Timeout Handling", () => {
     it("supports timeout option", async () => {
-      client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+      client.setRequestHandler("elicitation/create", async (request: any) => {
         return {
           action: "accept",
           content: { answer: "Quick response" },
@@ -420,7 +417,7 @@ describe("Elicitation Integration Tests", () => {
         defaultField: z.string().default("default"),
       });
 
-      const jsonSchema = toJsonSchemaCompat(schema);
+      const jsonSchema = z.toJSONSchema(schema);
 
       expect(jsonSchema.type).toBe("object");
       expect(jsonSchema.properties.stringField.type).toBe("string");

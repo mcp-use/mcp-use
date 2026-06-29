@@ -4,7 +4,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import fs from "node:fs";
 import path from "node:path";
 import { BaseMCPClient } from "./client/base.js";
@@ -39,12 +39,8 @@ function trackNodeClientInit(
   callbacks: CallbackConfig
 ): void {
   const servers = Object.keys(config.mcpServers ?? {});
-  const hasSamplingCallback = !!(
-    callbacks.onSampling ?? callbacks.samplingCallback
-  );
-  const hasElicitationCallback = !!(
-    callbacks.onElicitation ?? callbacks.elicitationCallback
-  );
+  const hasSamplingCallback = !!callbacks.onSampling;
+  const hasElicitationCallback = !!callbacks.onElicitation;
   Tel.getInstance()
     .trackMCPClientInit({
       codeMode,
@@ -126,15 +122,6 @@ export interface MCPClientOptions {
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
   /**
-   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
-   * Optional callback function to handle sampling requests from servers.
-   * When provided, the client will declare sampling capability and handle
-   * `sampling/createMessage` requests by calling this callback.
-   */
-  samplingCallback?: (
-    params: CreateMessageRequest["params"]
-  ) => Promise<CreateMessageResult>;
-  /**
    * Optional callback function to handle elicitation requests from servers.
    * When provided, the client will declare elicitation capability and handle
    * `elicitation/create` requests by calling this callback.
@@ -147,17 +134,11 @@ export interface MCPClientOptions {
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
   /**
-   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
-   */
-  elicitationCallback?: (
-    params: ElicitRequestFormParams | ElicitRequestURLParams
-  ) => Promise<ElicitResult>;
-  /**
    * Optional callback function for server notifications.
    * Applied as default when per-server config does not specify one.
    */
   onNotification?: (
-    notification: import("@modelcontextprotocol/sdk/types.js").Notification
+    notification: import("@modelcontextprotocol/client").Notification
   ) => void | Promise<void>;
 }
 
@@ -293,7 +274,7 @@ export class MCPClient extends BaseMCPClient {
    * @param options - Optional client behavior configuration
    * @param options.codeMode - Enable code execution mode (boolean or advanced config)
    * @param options.onSampling - Callback for handling sampling requests from servers
-   * @param options.elicitationCallback - Callback for handling elicitation requests
+   * @param options.onElicitation - Callback for handling elicitation requests
    *
    * @example
    * ```typescript
@@ -374,32 +355,10 @@ export class MCPClient extends BaseMCPClient {
     // Build global callback defaults: config root merged with options (options win)
     const configRoot = this.config as MCPClientConfigShape;
     this._globalCallbacks = {
-      onSampling:
-        options?.onSampling ??
-        options?.samplingCallback ??
-        configRoot?.onSampling ??
-        configRoot?.samplingCallback,
-      samplingCallback:
-        options?.samplingCallback ?? configRoot?.samplingCallback,
-      onElicitation:
-        options?.onElicitation ??
-        options?.elicitationCallback ??
-        configRoot?.onElicitation ??
-        configRoot?.elicitationCallback,
-      elicitationCallback:
-        options?.elicitationCallback ?? configRoot?.elicitationCallback,
+      onSampling: options?.onSampling ?? configRoot?.onSampling,
+      onElicitation: options?.onElicitation ?? configRoot?.onElicitation,
       onNotification: options?.onNotification ?? configRoot?.onNotification,
     };
-    if (options?.samplingCallback && !options?.onSampling) {
-      console.warn(
-        '[MCPClient] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
-      );
-    }
-    if (options?.elicitationCallback && !options?.onElicitation) {
-      console.warn(
-        '[MCPClient] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
-      );
-    }
 
     if (this.codeMode) {
       this._setupCodeModeConnector();

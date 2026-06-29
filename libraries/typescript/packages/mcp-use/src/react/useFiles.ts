@@ -98,8 +98,8 @@ export function useFiles(): UseFilesResult {
   const isSupported = useMemo(() => {
     if (typeof window === "undefined") return false;
     return (
-      typeof (window.openai as any)?.uploadFile === "function" &&
-      typeof (window.openai as any)?.getFileDownloadUrl === "function"
+      typeof window.openai?.uploadFile === "function" &&
+      typeof window.openai?.getFileDownloadUrl === "function"
     );
   }, []);
 
@@ -109,7 +109,8 @@ export function useFiles(): UseFilesResult {
         file: File,
         options: UploadOptions = {}
       ): Promise<FileMetadata> => {
-        if (!isSupported) {
+        const openai = window.openai;
+        if (!isSupported || !openai?.uploadFile) {
           throw new Error(
             "[useFiles] File upload is not supported in this host. " +
               "Check `isSupported` before calling `upload`. " +
@@ -117,27 +118,20 @@ export function useFiles(): UseFilesResult {
           );
         }
 
-        const metadata = await ((window.openai as any).uploadFile(
-          file
-        ) as Promise<FileMetadata>);
+        const metadata = await openai.uploadFile(file);
 
         // Track in imageIds so the model can see the file, unless opted out.
         // Preserves existing privateContent to avoid wiping non-file widget state.
         const { modelVisible = true } = options;
-        if (modelVisible && window.openai?.setWidgetState) {
-          const prev = (window.openai.widgetState ?? {}) as Record<
-            string,
-            unknown
-          >;
+        if (modelVisible && openai.setWidgetState) {
+          const prev = (openai.widgetState ?? {}) as Record<string, unknown>;
           const imageIds = [
             ...((prev.imageIds as string[] | undefined) ?? []),
             metadata.fileId,
           ];
-          window.openai
-            .setWidgetState({ ...prev, imageIds } as any)
-            .catch((err: unknown) => {
-              console.warn("[useFiles] Failed to track imageId:", err);
-            });
+          openai.setWidgetState({ ...prev, imageIds }).catch((err: unknown) => {
+            console.warn("[useFiles] Failed to track imageId:", err);
+          });
         }
 
         return metadata;
@@ -148,16 +142,15 @@ export function useFiles(): UseFilesResult {
   const getDownloadUrl = useMemo(
     () =>
       async (file: FileMetadata): Promise<{ downloadUrl: string }> => {
-        if (!isSupported) {
+        const openai = window.openai;
+        if (!isSupported || !openai?.getFileDownloadUrl) {
           throw new Error(
             "[useFiles] File download is not supported in this host. " +
               "Check `isSupported` before calling `getDownloadUrl`. " +
               "File operations are only available through the OpenAI window.openai extension."
           );
         }
-        return (window.openai as any).getFileDownloadUrl(file) as Promise<{
-          downloadUrl: string;
-        }>;
+        return openai.getFileDownloadUrl(file);
       },
     [isSupported]
   );

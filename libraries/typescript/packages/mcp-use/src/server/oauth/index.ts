@@ -38,9 +38,20 @@ export {
 
 export {
   getAuth,
+  getAuthContext,
   hasAnyScope,
+  hasRole,
   hasScope,
   requireAnyScope,
   requireScope,
 } from "./utils.js";
 export type { AuthInfo } from "./utils.js";
+export type {
+  AuthContext,
+  AuthDecision,
+  AuthPredicate,
+  AuthRequirement,
+  AuthRequirementSummary,
+  Policy,
+  PolicyRequest,
+} from "./types.js";

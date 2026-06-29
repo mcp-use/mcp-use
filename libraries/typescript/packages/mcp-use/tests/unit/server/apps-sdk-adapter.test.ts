@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AppsSdkAdapter } from "../../../src/server/widgets/adapters/apps-sdk.js";
+import { AppsSdkAdapter } from "../../../src/server/views/adapters/apps-sdk.js";
 import type { UIResourceDefinition } from "../../../src/server/types/resource.js";
 
 describe("AppsSdkAdapter.buildResourceMetadata — widgetDescription default", () => {

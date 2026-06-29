@@ -4,9 +4,13 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { Notification } from "@modelcontextprotocol/sdk/types.js";
-import type { BaseConnector, ConnectorInitOptions } from "./connectors/base.js";
+} from "@modelcontextprotocol/client";
+import type { Notification } from "@modelcontextprotocol/client";
+import type {
+  BaseConnector,
+  ConnectorAuthProvider,
+  ConnectorInitOptions,
+} from "./connectors/base.js";
 import type { ClientInfo } from "./connectors/http.js";
 import { HttpConnector } from "./connectors/http.js";
 import { getPackageVersion } from "./version.js";
@@ -26,32 +30,14 @@ export type OnNotificationCallback = (
   notification: Notification
 ) => void | Promise<void>;
 
-/**
- * Callback options shared by per-server config and global defaults.
- * Canonical names: onSampling, onElicitation, onNotification.
- * Deprecated aliases: samplingCallback, elicitationCallback.
- */
+/** Callback options shared by per-server config and global defaults. */
 export interface CallbackConfig {
-  /** Callback for sampling requests from servers. */
   onSampling?: OnSamplingCallback;
-  /**
-   * @deprecated Use `onSampling` instead. Will be removed in a future version.
-   */
-  samplingCallback?: OnSamplingCallback;
-  /** Callback for elicitation requests from servers. */
   onElicitation?: OnElicitationCallback;
-  /**
-   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
-   */
-  elicitationCallback?: OnElicitationCallback;
-  /** Callback for notifications from servers. */
   onNotification?: OnNotificationCallback;
 }
 
-/**
- * Resolves effective callbacks from per-server and global config with precedence:
- * per-server canonical > per-server deprecated alias > global canonical > global deprecated alias.
- */
+/** Per-server callbacks override global defaults. */
 export function resolveCallbacks(
   perServer: CallbackConfig | undefined,
   globalDefaults: CallbackConfig | undefined
@@ -60,23 +46,10 @@ export function resolveCallbacks(
   onElicitation?: OnElicitationCallback;
   onNotification?: OnNotificationCallback;
 } {
-  const pickSampling =
-    perServer?.onSampling ??
-    perServer?.samplingCallback ??
-    globalDefaults?.onSampling ??
-    globalDefaults?.samplingCallback;
-  const pickElicitation =
-    perServer?.onElicitation ??
-    perServer?.elicitationCallback ??
-    globalDefaults?.onElicitation ??
-    globalDefaults?.elicitationCallback;
-  const pickNotification =
-    perServer?.onNotification ?? globalDefaults?.onNotification;
-
   return {
-    onSampling: pickSampling,
-    onElicitation: pickElicitation,
-    onNotification: pickNotification,
+    onSampling: perServer?.onSampling ?? globalDefaults?.onSampling,
+    onElicitation: perServer?.onElicitation ?? globalDefaults?.onElicitation,
+    onNotification: perServer?.onNotification ?? globalDefaults?.onNotification,
   };
 }
 
@@ -107,10 +80,7 @@ export interface HttpServerConfig extends BaseServerConfig {
   authToken?: string;
   /** @deprecated Use `authToken` instead. */
   auth_token?: string;
-  authProvider?: unknown;
-  transport?: "http" | "sse";
-  preferSse?: boolean;
-  disableSseFallback?: boolean;
+  authProvider?: ConnectorAuthProvider;
 }
 
 /**
@@ -175,18 +145,11 @@ export function createConnectorFromConfig(
   }
 
   if ("url" in serverConfig) {
-    // HttpConnector automatically handles streamable HTTP with SSE fallback
-    const transport = serverConfig.transport || "http";
-
     return new HttpConnector(serverConfig.url, {
       headers: serverConfig.headers,
       fetch: serverConfig.fetch,
       authToken: serverConfig.auth_token || serverConfig.authToken,
       authProvider: serverConfig.authProvider,
-      // Only force SSE if explicitly requested
-      preferSse: serverConfig.preferSse || transport === "sse",
-      // Disable SSE fallback if explicitly disabled in config
-      disableSseFallback: serverConfig.disableSseFallback,
       clientInfo,
       ...connectorOptions,
     });

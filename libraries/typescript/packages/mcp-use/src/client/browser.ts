@@ -1,11 +1,34 @@
 import type { CallbackConfig } from "../config.js";
 import { normalizeClientInfo, resolveCallbacks } from "../config.js";
-import type { BaseConnector } from "../connectors/base.js";
+import type {
+  BaseConnector,
+  ConnectorInitOptions,
+} from "../connectors/base.js";
 import { HttpConnector } from "../connectors/http.js";
 import { logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { getPackageVersion } from "../version.js";
-import { BaseMCPClient } from "./base.js";
+import {
+  BaseMCPClient,
+  type MCPClientConfig,
+  type MCPServerConfig,
+} from "./base.js";
+
+type BrowserServerConfig = MCPServerConfig & {
+  url?: string;
+  headers?: Record<string, string>;
+  fetch?: typeof fetch;
+  authToken?: string;
+  authProvider?: ConnectorInitOptions["authProvider"];
+  wrapTransport?: ConnectorInitOptions["wrapTransport"];
+  clientOptions?: ConnectorInitOptions["clientOptions"];
+  timeout?: number;
+  sseReadTimeout?: number;
+  gatewayUrl?: string;
+  serverId?: string;
+  reconnectionOptions?: ConnectorInitOptions["reconnectionOptions"];
+  clientInfo?: unknown;
+};
 
 /**
  * Browser-compatible MCPClient implementation
@@ -16,7 +39,7 @@ import { BaseMCPClient } from "./base.js";
  * - HTTP connector
  * - All base client functionality
  */
-function trackBrowserClientInit(config: Record<string, any>): void {
+function trackBrowserClientInit(config: MCPClientConfig): void {
   const servers = Object.keys(config.mcpServers ?? {});
   Tel.getInstance()
     .trackMCPClientInit({
@@ -40,12 +63,12 @@ export class BrowserMCPClient extends BaseMCPClient {
     return getPackageVersion();
   }
 
-  constructor(config?: Record<string, any>) {
+  constructor(config?: MCPClientConfig) {
     super(config);
     trackBrowserClientInit(this.config);
   }
 
-  public static fromDict(cfg: Record<string, any>): BrowserMCPClient {
+  public static fromDict(cfg: MCPClientConfig): BrowserMCPClient {
     return new BrowserMCPClient(cfg);
   }
 
@@ -54,8 +77,9 @@ export class BrowserMCPClient extends BaseMCPClient {
    * Supports HTTP connector only
    */
   protected createConnectorFromConfig(
-    serverConfig: Record<string, any>
+    serverConfig: MCPServerConfig
   ): BaseConnector {
+    const typedConfig = serverConfig as BrowserServerConfig;
     const {
       url,
       headers,
@@ -64,14 +88,12 @@ export class BrowserMCPClient extends BaseMCPClient {
       authProvider,
       wrapTransport,
       clientOptions,
-      disableSseFallback,
-      preferSse,
       timeout,
       sseReadTimeout,
       gatewayUrl,
       serverId,
       reconnectionOptions,
-    } = serverConfig;
+    } = typedConfig;
 
     if (!url) {
       throw new Error("Server URL is required");
@@ -80,13 +102,13 @@ export class BrowserMCPClient extends BaseMCPClient {
     // Resolve callbacks: per-server overrides global (from config root)
     const globalDefaults = this.config as CallbackConfig;
     const resolved = resolveCallbacks(
-      serverConfig as CallbackConfig,
+      typedConfig as CallbackConfig,
       globalDefaults
     );
 
     // Root clientInfo as fallback when server config omits it
     const clientInfo = normalizeClientInfo(
-      serverConfig.clientInfo ?? this.config.clientInfo
+      typedConfig.clientInfo ?? this.config.clientInfo
     );
 
     // Prepare connector options
@@ -100,8 +122,6 @@ export class BrowserMCPClient extends BaseMCPClient {
       onSampling: resolved.onSampling,
       onElicitation: resolved.onElicitation,
       onNotification: resolved.onNotification,
-      disableSseFallback,
-      preferSse,
       timeout,
       sseReadTimeout,
       clientInfo,

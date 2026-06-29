@@ -9,11 +9,7 @@
  * Run with `npm run test:types` (tsc --noEmit). Every `@ts-expect-error` line
  * MUST produce an error, or the check fails.
  */
-import {
-  object,
-  text,
-  widget,
-} from "../../src/server/utils/response-helpers.js";
+import { object, text, view } from "../../src/server/utils/response-helpers.js";
 import type { ToolCallback } from "../../src/server/types/tool.js";
 
 type WeatherInput = { city: string };
@@ -36,12 +32,12 @@ const badMissing: WeatherCb = async () => object({ city: "Paris" });
 
 // widget(): props become structuredContent, checked against outputSchema.
 const okWidget: WeatherCb = async () =>
-  widget({ props: { city: "Paris", tempC: 22 }, output: text("Paris: 22C") });
+  view({ props: { city: "Paris", tempC: 22 }, output: text("Paris: 22C") });
 
 // widget() with props that do not match outputSchema: rejected.
 const badWidgetProps = { city: "Paris", tempC: "warm" };
 // @ts-expect-error widget props must match outputSchema
-const badWidget: WeatherCb = async () => widget({ props: badWidgetProps });
+const badWidget: WeatherCb = async () => view({ props: badWidgetProps });
 
 // A tool with no outputSchema (TOutput defaults to Record<string, unknown>):
 // any structured shape is accepted.

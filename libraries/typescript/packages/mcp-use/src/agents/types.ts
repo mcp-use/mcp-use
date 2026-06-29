@@ -35,8 +35,6 @@ export interface MCPServerConfig {
   headers?: Record<string, string>;
   auth_token?: string;
   authToken?: string;
-  transport?: "http" | "sse";
-  preferSse?: boolean;
 }
 
 /**

@@ -2,7 +2,7 @@
  * MCP Conformance Test Client (TypeScript / BrowserMCPClient path)
  */
 
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
 import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
 import {
   handleElicitation,
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   const scenario = process.env.MCP_CONFORMANCE_SCENARIO || "";
   const serverConfig: Record<string, unknown> = {
     url: serverUrl,
-    elicitationCallback: handleElicitation,
+    onElicitation: handleElicitation,
   };
 
   const authProvider = isAuthScenario(scenario)

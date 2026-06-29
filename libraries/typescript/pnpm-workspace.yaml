@@ -17,3 +17,5 @@ minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
   - create-mcp-use-app
+  - "@modelcontextprotocol/client"
+  - "@modelcontextprotocol/server"

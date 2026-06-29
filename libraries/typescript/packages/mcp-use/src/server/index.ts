@@ -1,8 +1,13 @@
-export {
-  createMCPServer,
-  MCPServer,
-  type McpServerInstance,
-} from "./mcp-server.js";
+export { MCPServer, type McpServerInstance } from "./mcp-server.js";
+export type {
+  CodeModeContext,
+  CodeModeExecuteRequest,
+  CodeModeSandboxBackend,
+  CodeModeSearchRequest,
+  CodeModeToolDescriptor,
+  CodeModeToolPolicy,
+  EnableCodeModeOptions,
+} from "./code-mode.js";
 export type {
   FromOpenAPIOptions,
   OpenAPIAuth,
@@ -53,11 +58,21 @@ export {
   object,
   resource,
   text,
+  view,
   widget,
   xml,
   type TypedCallToolResult,
+  type ViewResponseConfig,
   type WidgetResponseConfig,
 } from "./utils/response-helpers.js";
+
+export {
+  streamable,
+  isStreamable,
+  type Streamable,
+} from "./utils/streamable.js";
+
+export { mountViews, mountWidgets } from "./views/index.js";
 
 // Completion utilities for prompt arguments
 export {
@@ -86,7 +101,9 @@ export {
 // OAuth utilities for authentication and authorization
 export {
   getAuth,
+  getAuthContext,
   hasAnyScope,
+  hasRole,
   hasScope,
   jwksVerifier,
   oauthAuth0Provider,
@@ -99,8 +116,13 @@ export {
   oauthWorkOSProvider,
   requireAnyScope,
   requireScope,
+  type AuthContext,
+  type AuthDecision,
   type Auth0ProviderConfig,
   type AuthInfo,
+  type AuthPredicate,
+  type AuthRequirement,
+  type AuthRequirementSummary,
   type BetterAuthProviderConfig,
   type ClerkProviderConfig,
   type CustomProviderConfig,
@@ -109,6 +131,8 @@ export {
   type OAuthProvider,
   type OAuthProxy,
   type OAuthProxyConfig,
+  type Policy,
+  type PolicyRequest,
   type SupabaseProviderConfig,
   type UserInfo,
   type VerifyToken,
@@ -139,13 +163,10 @@ export {
 // MCP-UI adapter utility functions
 export {
   buildWidgetUrl,
-  createExternalUrlResource,
   createMcpAppsResource,
-  createRawHtmlResource,
-  createRemoteDomResource,
   createUIResourceFromDefinition,
   type UrlConfig,
-} from "./widgets/mcp-ui-adapter.js";
+} from "./views/mcp-ui-adapter.js";
 
 // Protocol adapters for dual-protocol widget support
 export {
@@ -154,13 +175,13 @@ export {
   type CSPConfig,
   type ProtocolAdapter,
   type UnifiedWidgetMetadata,
-} from "./widgets/adapters/index.js";
+} from "./views/adapters/index.js";
 
-// Re-export useful constants from @modelcontextprotocol/ext-apps
+// MCP Apps Extension constants (inlined — see mcp-apps-constants.ts)
 export {
   RESOURCE_MIME_TYPE,
   RESOURCE_URI_META_KEY,
-} from "@modelcontextprotocol/ext-apps/server";
+} from "./views/mcp-apps-constants.js";
 
 // Middleware adapter utility functions
 export {
@@ -185,6 +206,32 @@ export {
   type ResourcesReadMiddlewareContext,
   type PromptsGetMiddlewareContext,
 } from "./middleware/mcp-middleware.js";
+export {
+  AuthzPolicyError,
+  createAuthzMiddleware,
+  evaluateAuthRequirement,
+} from "./middleware/policy.js";
+export {
+  DEFAULT_IDEMPOTENCY_STATE_KEY,
+  DEFAULT_TIMEOUT_SIGNAL_STATE_KEY,
+  TimeoutPolicyError,
+  createAuditLogMiddleware,
+  createIdempotencyKeyMiddleware,
+  createTimeoutPolicyMiddleware,
+  getIdempotencyKey,
+  lintMcpSecurity,
+  type AuditLogEvent,
+  type AuditLogMiddlewareOptions,
+  type IdempotencyKeyMiddlewareOptions,
+  type IdempotencyKeyOptions,
+  type MutatingToolMatcher,
+  type SecurityDoctorFinding,
+  type SecurityDoctorInput,
+  type SecurityDoctorReport,
+  type SecurityDoctorSeverity,
+  type SecurityDoctorTool,
+  type TimeoutPolicyOptions,
+} from "./middleware/production.js";
 
 // OAuth Proxy middleware for CORS-free OAuth flows
 export { mountOAuthProxy, type OAuthProxyOptions } from "./oauth/proxy.js";
@@ -203,8 +250,8 @@ export { generateToolRegistryTypes } from "./utils/tool-registry-generator.js";
 export type {
   AppsSdkUIResource,
   ClientCapabilityChecker,
+  ToolRef,
   DiscoverWidgetsOptions,
-  ExternalUrlUIResource,
   GetPromptResult,
   InputDefinition,
   McpAppsUIResource,
@@ -212,10 +259,8 @@ export type {
   PromptCallback,
   PromptDefinition,
   PromptResult,
-  RawHtmlUIResource,
   ReadResourceCallback,
   ReadResourceTemplateCallback,
-  RemoteDomUIResource,
   ResourceDefinition,
   ServerConfig,
   // MCP SDK type re-exports

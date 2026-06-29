@@ -4,6 +4,7 @@
 
 import type { Context as HonoContext } from "hono";
 import type { AuthInfo } from "../oauth/utils.js";
+import type { AuthContext } from "../oauth/types.js";
 
 /**
  * Client capability checker interface, available as `ctx.client` in all
@@ -13,14 +14,14 @@ export interface ClientCapabilityChecker {
   /** Returns true if the client advertised the given top-level capability */
   can(capability: string): boolean;
   /** Returns all capabilities advertised by the client */
-  capabilities(): Record<string, any>;
+  capabilities(): Record<string, unknown>;
   /** Returns the client's name and version from the initialize handshake */
   info(): { name?: string; version?: string };
   /**
    * Returns the settings for a specific MCP extension (SEP-1724), or
    * `undefined` if the client did not advertise it.
    */
-  extension(id: string): Record<string, any> | undefined;
+  extension(id: string): Record<string, unknown> | undefined;
   /**
    * Returns `true` if the client supports MCP Apps
    * (`io.modelcontextprotocol/ui` extension, SEP-1865).
@@ -38,6 +39,7 @@ export interface ClientCapabilityChecker {
  */
 export interface McpContextBase extends HonoContext {
   auth?: AuthInfo;
+  authContext?: AuthContext;
 }
 
 /**
@@ -56,6 +58,7 @@ export interface McpContextWithAuth extends HonoContext {
    * TypeScript knows this is always defined (non-undefined) when OAuth is configured.
    */
   auth: AuthInfo;
+  authContext: AuthContext;
 
   // Helper to narrow the type
   readonly __hasOAuth?: true;

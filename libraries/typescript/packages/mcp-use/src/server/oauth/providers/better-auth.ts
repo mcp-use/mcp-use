@@ -15,6 +15,7 @@ import type {
   OAuthProvider,
   UserInfo,
   BetterAuthOAuthConfig,
+  OAuthTokenVerificationResult,
 } from "./types.js";
 
 export class BetterAuthOAuthProvider implements OAuthProvider {
@@ -43,7 +44,7 @@ export class BetterAuthOAuthProvider implements OAuthProvider {
     return this.jwks;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<OAuthTokenVerificationResult> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
       console.warn("[Better Auth OAuth] ⚠️  JWT verification is disabled");

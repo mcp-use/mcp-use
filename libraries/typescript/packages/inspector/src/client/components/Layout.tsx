@@ -65,7 +65,7 @@ export function Layout({ children }: LayoutProps) {
       url: string,
       name?: string,
       proxyConfig?: any,
-      transportType?: "http" | "sse",
+      transportType?: "http",
       oauth?: OAuthStaticConfig,
       connectionMode: ConnectionMode = proxyConfig?.proxyAddress
         ? "proxy"
@@ -653,7 +653,7 @@ export function Layout({ children }: LayoutProps) {
 
         const url: string = srv.url;
         const name: string = srv.name ?? "Server";
-        const transportType: "http" | "sse" = srv.transportType ?? "http";
+        const transportType: "http" = srv.transportType ?? "http";
 
         // Build custom headers from auth config (same logic as useAutoConnect)
         const customHeaders: Record<string, string> = {

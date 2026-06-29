@@ -1,12 +1,11 @@
 import { MCPServer, object, text, completable } from "mcp-use/server";
 import { z } from "zod";
 
-// Create MCP server instance
 const server = new MCPServer({
   name: "{{PROJECT_NAME}}",
   title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
-  description: "My first MCP server with all features",
+  description: "Typed mcp-use starter server",
   instructions:
     "Use fetch-weather for current conditions, read config://settings before assuming user preferences, and use review-code only when the user asks for code feedback.",
   baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
@@ -21,17 +20,6 @@ const server = new MCPServer({
   ],
 });
 
-/**
- * Define UI Widgets
- * All React components in the `resources/` folder
- * are automatically registered as MCP tools and resources.
- *
- * Just export widgetMetadata with description and Zod schema,
- * and mcp-use handles the rest!
- *
- * Docs: https://manufact.com/docs/typescript/server/mcp-apps
- */
-
 /*
  * Define MCP tools
  * Docs: https://mcp-use.com/docs/typescript/server/tools
@@ -44,12 +32,12 @@ server.tool(
     schema: z.object({
       city: z.string().describe("The city to fetch the weather for"),
     }),
-    // Declare outputSchema for any tool that returns structuredContent so clients
+    // Declare outputSchema when a tool returns structuredContent so clients
     // can validate results and the model can reason about follow-up calls.
     outputSchema: z.object({
       city: z.string().describe("The city the weather is for"),
       conditions: z.string().describe("Human-readable weather conditions"),
-      temperature: z.string().describe("Current temperature"),
+      temperatureCelsius: z.number().describe("Current temperature in Celsius"),
     }),
     // Demo stub — no network. If you call an external weather API, set openWorldHint: true.
     annotations: {
@@ -61,7 +49,7 @@ server.tool(
   // The returned object is type-checked against the `outputSchema` above:
   // returning the wrong shape is a compile-time error.
   async ({ city }) => {
-    return object({ city, conditions: "sunny", temperature: "22°C" });
+    return object({ city, conditions: "sunny", temperatureCelsius: 22 });
   }
 );
 
@@ -108,7 +96,6 @@ server.prompt(
   }
 );
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 console.log(`Server running on port ${PORT}`);
-// Start the server
 server.listen(PORT);

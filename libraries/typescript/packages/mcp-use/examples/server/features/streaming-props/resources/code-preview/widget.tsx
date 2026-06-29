@@ -1,4 +1,4 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -24,7 +24,7 @@ type CodePreviewProps = z.infer<typeof propSchema>;
 
 const CodePreview: React.FC = () => {
   const { props, isPending, isStreaming, partialToolInput, theme } =
-    useWidget<CodePreviewProps>();
+    useView<CodePreviewProps>();
 
   const isDark = theme === "dark";
 

@@ -16,8 +16,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { MCPServer } from "../../src/server/index.js";
 import { object } from "../../src/server/utils/response-helpers.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 const TEST_PORT = 3096;
 const SERVER_URL = `http://localhost:${TEST_PORT}/mcp`;

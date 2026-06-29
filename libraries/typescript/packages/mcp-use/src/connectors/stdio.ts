@@ -1,7 +1,7 @@
-import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { StdioServerParameters } from "@modelcontextprotocol/client/stdio";
 import type { Writable } from "node:stream";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Client } from "@modelcontextprotocol/client";
 import process from "node:process";
 import type { ConnectorInitOptions } from "./base.js";
 
@@ -81,11 +81,12 @@ export class StdioConnector extends BaseConnector {
       };
 
       // 2. Start the connection manager -> returns a live transport
-      this.connectionManager = new StdioConnectionManager(
+      const connectionManager = new StdioConnectionManager(
         serverParams,
         this.errlog
       );
-      const transport = await this.connectionManager.start();
+      this.connectionManager = connectionManager;
+      const transport = await connectionManager.start();
 
       // 3. Create & connect the MCP client
       // Always advertise roots capability - server may query roots/list even if client has no roots
@@ -95,11 +96,8 @@ export class StdioConnector extends BaseConnector {
           ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
           // Add sampling capability if callback is provided
-          ...((this.opts.onSampling ?? this.opts.samplingCallback)
-            ? { sampling: {} }
-            : {}),
-          // Add elicitation capability if callback is provided
-          ...((this.opts.onElicitation ?? this.opts.elicitationCallback)
+          ...(this.opts.onSampling ? { sampling: {} } : {}),
+          ...(this.opts.onElicitation
             ? { elicitation: { form: {}, url: {} } }
             : {}),
         },

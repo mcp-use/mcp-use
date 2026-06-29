@@ -3,12 +3,9 @@
  * Tests server-side validation of returned data against Zod schemas
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import {
-  ElicitRequestSchema,
-  type ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import type { ElicitResult } from "@modelcontextprotocol/client";
 
 const SERVER_URL = "http://localhost:3002/mcp";
 
@@ -31,7 +28,7 @@ async function testValidation() {
   let testScenario = "";
 
   // Set up elicitation handler that can return different data based on scenario
-  client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+  client.setRequestHandler("elicitation/create", async (request: any) => {
     console.log(`\n📥 Elicitation request for: ${testScenario}`);
     console.log(`   Mode: ${request.params.mode || "form"}`);
     console.log(`   Message: ${request.params.message}`);

@@ -8,8 +8,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { MCPServer } from "../../src/server/index.js";
 import { text, error } from "../../src/server/utils/response-helpers.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 const TEST_PORT = 3097;
 const SERVER_URL = `http://localhost:${TEST_PORT}/mcp`;
@@ -134,7 +134,7 @@ describe("MCP Middleware — integration", () => {
       {
         name: "introduce",
         description: "An introduction prompt",
-        args: [{ name: "name", description: "Name", required: true }],
+        schema: z.object({ name: z.string().describe("Name") }),
       },
       async ({ name }) => text(`Hi, I'm ${name}!`)
     );

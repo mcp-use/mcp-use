@@ -6,9 +6,9 @@
  */
 
 import type { Context } from "hono";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { Implementation } from "@modelcontextprotocol/sdk/types.js";
+import type { Transport } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
+import type { Implementation } from "@modelcontextprotocol/server";
 
 /**
  * Serializable session metadata

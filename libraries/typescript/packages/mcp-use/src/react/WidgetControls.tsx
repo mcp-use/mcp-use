@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from "react";
-import { useWidget } from "./useWidget.js";
+import { useView } from "./useView.js";
 
 type Position =
   | "top-left"
@@ -78,7 +78,7 @@ export function WidgetControls({
     openExternal,
     requestDisplayMode,
     setState,
-  } = useWidget();
+  } = useView();
   const [isHovered, setIsHovered] = useState(false);
   const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -237,10 +237,11 @@ export function WidgetControls({
   useEffect(() => {
     if (!isOverlayOpen) return;
 
-    const handleClickOutside = (event: any) => {
+    const handleClickOutside = (event: MouseEvent) => {
       if (
         overlayRef.current &&
-        !overlayRef.current.contains(event.target as any)
+        event.target instanceof Node &&
+        !overlayRef.current.contains(event.target)
       ) {
         setIsOverlayOpen(false);
       }

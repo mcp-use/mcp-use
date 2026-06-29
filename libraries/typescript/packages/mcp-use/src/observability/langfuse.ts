@@ -12,7 +12,14 @@
 /// <reference path="./types.d.ts" />
 
 import type { BaseCallbackHandler } from "@langchain/core/callbacks/base";
+import type { Langfuse } from "langfuse";
 import { logger } from "../logging.js";
+
+type LangfuseMetadata = Record<string, unknown>;
+
+interface LangfuseCallbackConfig extends LangfuseMetadata {
+  verbose?: boolean;
+}
 
 /**
  * Retrieve the value of an environment variable when `process.env` is available.
@@ -27,6 +34,20 @@ function getEnvVar(key: string): string | undefined {
   return undefined;
 }
 
+function recordFromUnknown(value: unknown): LangfuseMetadata {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as LangfuseMetadata)
+    : {};
+}
+
+function stringMetadataValue(
+  metadata: LangfuseMetadata,
+  key: string
+): string | undefined {
+  const value = metadata[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 // Check if Langfuse is disabled via environment variable
 const langfuseDisabled =
   getEnvVar("MCP_USE_LANGFUSE")?.toLowerCase() === "false";
@@ -34,7 +55,7 @@ const langfuseDisabled =
 // Initialize variables - using const with object to avoid linter issues with mutable exports
 const langfuseState = {
   handler: null as BaseCallbackHandler | null,
-  client: null as any,
+  client: null as Langfuse | null,
   initPromise: null as Promise<void> | null,
 };
 
@@ -50,8 +71,8 @@ const langfuseState = {
  */
 async function initializeLangfuse(
   agentId?: string,
-  metadata?: Record<string, any>,
-  metadataProvider?: () => Record<string, any>,
+  metadata?: LangfuseMetadata,
+  metadataProvider?: () => LangfuseMetadata,
   tagsProvider?: () => string[]
 ): Promise<void> {
   try {
@@ -64,20 +85,20 @@ async function initializeLangfuse(
       return;
     }
 
-    const { CallbackHandler } = langfuseModule as any;
+    const { CallbackHandler } = langfuseModule;
     // Create a custom CallbackHandler wrapper to add logging and custom metadata
     class LoggingCallbackHandler extends CallbackHandler {
       private agentId?: string;
-      private metadata?: Record<string, any>;
-      private metadataProvider?: () => Record<string, any>;
+      private metadata?: LangfuseMetadata;
+      private metadataProvider?: () => LangfuseMetadata;
       private tagsProvider?: () => string[];
-      private verbose: boolean;
+      private isVerbose: boolean;
 
       constructor(
-        config?: any,
+        config?: LangfuseCallbackConfig,
         agentId?: string,
-        metadata?: Record<string, any>,
-        metadataProvider?: () => Record<string, any>,
+        metadata?: LangfuseMetadata,
+        metadataProvider?: () => LangfuseMetadata,
         tagsProvider?: () => string[]
       ) {
         super(config);
@@ -85,19 +106,19 @@ async function initializeLangfuse(
         this.metadata = metadata;
         this.metadataProvider = metadataProvider;
         this.tagsProvider = tagsProvider;
-        this.verbose = config?.verbose ?? false;
+        this.isVerbose = config?.verbose ?? false;
       }
 
       // Override to add custom metadata to traces
       async handleChainStart(
-        chain: any,
-        inputs: any,
+        chain: unknown,
+        inputs: unknown,
         runId?: string,
         parentRunId?: string,
         tags?: string[],
-        metadata?: any,
+        metadata?: unknown,
         name?: string,
-        kwargs?: any
+        kwargs?: unknown
       ): Promise<void> {
         logger.debug("Langfuse: Chain start intercepted");
 
@@ -107,9 +128,12 @@ async function initializeLangfuse(
 
         // Merge with existing tags and metadata
         const enhancedTags = [...(tags || []), ...customTags];
-        const enhancedMetadata = { ...(metadata || {}), ...metadataToAdd };
+        const enhancedMetadata = {
+          ...recordFromUnknown(metadata),
+          ...metadataToAdd,
+        };
 
-        if (this.verbose) {
+        if (this.isVerbose) {
           logger.debug(
             `Langfuse: Chain start with custom tags: ${JSON.stringify(enhancedTags)}`
           );
@@ -157,8 +181,8 @@ async function initializeLangfuse(
       }
 
       // Get metadata
-      private getMetadata(): any {
-        const metadata: any = {};
+      private getMetadata(): LangfuseMetadata {
+        const metadata: LangfuseMetadata = {};
 
         // Add environment metadata
         const env = this.getEnvironmentTag();
@@ -206,29 +230,29 @@ async function initializeLangfuse(
           return "hosted";
         }
 
-        // For any other values, use the value as-is but sanitized
+        // For other values, use the value as-is but sanitized
         return envLower.replace(/[^a-z0-9_-]/g, "_");
       }
 
-      async handleLLMStart(...args: any[]): Promise<void> {
+      async handleLLMStart(...args: unknown[]): Promise<void> {
         logger.debug("Langfuse: LLM start intercepted");
-        if (this.verbose) {
+        if (this.isVerbose) {
           logger.debug(`Langfuse: LLM start args: ${JSON.stringify(args)}`);
         }
         return super.handleLLMStart(...args);
       }
 
-      async handleToolStart(...args: any[]): Promise<void> {
+      async handleToolStart(...args: unknown[]): Promise<void> {
         logger.debug("Langfuse: Tool start intercepted");
-        if (this.verbose) {
+        if (this.isVerbose) {
           logger.debug(`Langfuse: Tool start args: ${JSON.stringify(args)}`);
         }
         return super.handleToolStart(...args);
       }
 
-      async handleRetrieverStart(...args: any[]): Promise<void> {
+      async handleRetrieverStart(...args: unknown[]): Promise<void> {
         logger.debug("Langfuse: Retriever start intercepted");
-        if (this.verbose) {
+        if (this.isVerbose) {
           logger.debug(
             `Langfuse: Retriever start args: ${JSON.stringify(args)}`
           );
@@ -236,17 +260,17 @@ async function initializeLangfuse(
         return super.handleRetrieverStart(...args);
       }
 
-      async handleAgentAction(...args: any[]): Promise<void> {
+      async handleAgentAction(...args: unknown[]): Promise<void> {
         logger.debug("Langfuse: Agent action intercepted");
-        if (this.verbose) {
+        if (this.isVerbose) {
           logger.debug(`Langfuse: Agent action args: ${JSON.stringify(args)}`);
         }
         return super.handleAgentAction(...args);
       }
 
-      async handleAgentEnd(...args: any[]): Promise<void> {
+      async handleAgentEnd(...args: unknown[]): Promise<void> {
         logger.debug("Langfuse: Agent end intercepted");
-        if (this.verbose) {
+        if (this.isVerbose) {
           logger.debug(`Langfuse: Agent end args: ${JSON.stringify(args)}`);
         }
         return super.handleAgentEnd(...args);
@@ -277,12 +301,12 @@ async function initializeLangfuse(
       enabled: getEnvVar("LANGFUSE_ENABLED") !== "false",
       // Set trace name - can be customized via metadata.trace_name or defaults to 'mcp-use-agent'
       traceName:
-        initialMetadata.trace_name ||
+        stringMetadataValue(initialMetadata, "trace_name") ||
         getEnvVar("LANGFUSE_TRACE_NAME") ||
         "mcp-use-agent",
       // Pass sessionId, userId, and tags to the handler
-      sessionId: initialMetadata.session_id || undefined,
-      userId: initialMetadata.user_id || undefined,
+      sessionId: stringMetadataValue(initialMetadata, "session_id"),
+      userId: stringMetadataValue(initialMetadata, "user_id"),
       tags: initialTags.length > 0 ? initialTags : undefined,
       metadata: initialMetadata || undefined,
     };
@@ -307,7 +331,7 @@ async function initializeLangfuse(
       metadata,
       metadataProvider,
       tagsProvider
-    ) as unknown as BaseCallbackHandler;
+    );
     logger.debug(
       "Langfuse observability initialized successfully with logging enabled"
     );
@@ -316,7 +340,7 @@ async function initializeLangfuse(
     try {
       const langfuseCore = await import("langfuse").catch(() => null);
       if (langfuseCore) {
-        const { Langfuse } = langfuseCore as any;
+        const { Langfuse } = langfuseCore;
         langfuseState.client = new Langfuse({
           publicKey: getEnvVar("LANGFUSE_PUBLIC_KEY"),
           secretKey: getEnvVar("LANGFUSE_SECRET_KEY"),

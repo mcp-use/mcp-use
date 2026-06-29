@@ -4,7 +4,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "../ui/tooltip";
 import { Spinner } from "../ui/spinner";
 import { cn } from "@/client/lib/utils";
 import { useEffect } from "react";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@modelcontextprotocol/client";
 
 interface PromptsDropdownProps {
   isOpen?: boolean;

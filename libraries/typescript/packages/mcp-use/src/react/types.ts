@@ -1,4 +1,5 @@
 import type {
+  CallToolResult,
   CompleteRequestParams,
   CompleteResult,
   CreateMessageRequest,
@@ -9,10 +10,11 @@ import type {
   Notification,
   Prompt,
   Resource,
-  ResourceTemplate,
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+  Transport,
+} from "@modelcontextprotocol/client";
+import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 /**
@@ -30,6 +32,11 @@ export type ReconnectionOptions = {
   maxRetries?: number;
 };
 
+export type TransportWrapper = (
+  transport: Transport,
+  serverId: string
+) => Transport;
+
 export type UseMcpOptions = {
   /** The /sse URL of your remote MCP server */
   url?: string;
@@ -39,10 +46,6 @@ export type UseMcpOptions = {
   proxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
-    /**
-     * @deprecated Use `headers` instead. This option will be removed in a future version.
-     */
-    customHeaders?: Record<string, string>;
   };
   /**
    * Connection policy used by higher-level clients such as the Inspector.
@@ -87,29 +90,8 @@ export type UseMcpOptions = {
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /**
-   * @deprecated Use `clientInfo` instead. This option will be removed in a future version.
-   * The `clientConfig` will be automatically derived from `clientInfo` for OAuth registration.
-   *
-   * Client configuration for OAuth registration (deprecated - derived from clientInfo).
-   */
-  clientConfig?: {
-    /** Client name (used for OAuth registration) */
-    name?: string;
-    /** Client version (used for OAuth registration) */
-    version?: string;
-    /** Client URI/homepage (used for OAuth registration) */
-    uri?: string;
-    /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
-    logo_uri?: string;
-  };
   /** Headers that can be used to bypass auth */
   headers?: Record<string, string>;
-  /**
-   * @deprecated Use `headers` instead. This option will be removed in a future version.
-   * Custom headers that can be used to bypass auth
-   */
-  customHeaders?: Record<string, string>;
   /**
    * @deprecated Use `logLevel` instead. This option will be removed in a future version.
    * Whether to enable verbose debug logging to the console and the log state.
@@ -169,22 +151,13 @@ export type UseMcpOptions = {
   /**
    * Transport type preference.
    *
-   * @deprecated The 'sse' option is deprecated. Use 'http' or 'auto' instead.
-   *
-   * As of MCP spec 2025-11-25, the old HTTP+SSE transport is deprecated in favor
-   * of Streamable HTTP (unified endpoint). StreamableHTTP still supports SSE for
-   * notifications - it just uses a single /mcp endpoint instead of separate endpoints.
-   *
-   * **Backward compatibility:** 'sse' option still works and is maintained.
-   *
    * Options:
-   * - 'auto': Try HTTP (Streamable HTTP), fallback to SSE if needed (recommended)
-   * - 'http': Use Streamable HTTP only (recommended for new code)
-   * - 'sse': Use old SSE transport (deprecated, but still works)
+   * - 'auto': Same as 'http' (streamable HTTP)
+   * - 'http': Use Streamable HTTP (recommended)
    *
    * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
    */
-  transportType?: "auto" | "http" | "sse";
+  transportType?: "auto" | "http";
   /**
    * Prevent automatic authentication popup/redirect on initial connection (default: false)
    * When true, the connection will enter 'pending_auth' state and wait for user to call authenticate()
@@ -236,7 +209,7 @@ export type UseMcpOptions = {
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
   sseReadTimeout?: number;
   /** Optional callback to wrap the transport before passing it to the Client. Useful for logging, monitoring, or other transport-level interceptors. */
-  wrapTransport?: (transport: any, serverId: string) => any;
+  wrapTransport?: TransportWrapper;
   /** Callback function that is invoked when a notification is received from the MCP server */
   onNotification?: (notification: Notification) => void;
   /**
@@ -245,15 +218,6 @@ export type UseMcpOptions = {
    * `sampling/createMessage` requests by calling this callback.
    */
   onSampling?: (
-    params: CreateMessageRequest["params"]
-  ) => Promise<CreateMessageResult>;
-  /**
-   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
-   * Optional callback function to handle sampling requests from servers.
-   * When provided, the client will declare sampling capability and handle
-   * `sampling/createMessage` requests by calling this callback.
-   */
-  samplingCallback?: (
     params: CreateMessageRequest["params"]
   ) => Promise<CreateMessageResult>;
   /**
@@ -266,12 +230,6 @@ export type UseMcpOptions = {
    * - URL mode: Direct users to external URLs for sensitive interactions
    */
   onElicitation?: (
-    params: ElicitRequestFormParams | ElicitRequestURLParams
-  ) => Promise<ElicitResult>;
-  /**
-   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
-   */
-  elicitationCallback?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
   /**
@@ -391,7 +349,7 @@ export type UseMcpResult = {
     icon?: string;
   };
   /** Server capabilities from the initialize response */
-  capabilities?: Record<string, any>;
+  capabilities?: Record<string, unknown>;
   /**
    * The current state of the MCP connection:
    * - 'discovering': Checking server existence and capabilities (including auth requirements).
@@ -471,7 +429,7 @@ export type UseMcpResult = {
       /** AbortSignal to cancel the request */
       signal?: AbortSignal;
     }
-  ) => Promise<any>;
+  ) => Promise<CallToolResult>;
   /**
    * Function to list resources from the MCP server.
    * @returns A promise that resolves when resources are refreshed.
@@ -511,7 +469,7 @@ export type UseMcpResult = {
   ) => Promise<{
     messages: Array<{
       role: "user" | "assistant";
-      content: { type: string; text?: string; [key: string]: any };
+      content: { type: string; text?: string; [key: string]: unknown };
     }>;
   }>;
   /**

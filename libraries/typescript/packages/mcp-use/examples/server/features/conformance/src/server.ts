@@ -404,15 +404,13 @@ server.resource(
 server.resourceTemplate(
   {
     name: "template_resource",
-    resourceTemplate: {
-      uriTemplate: "test://template/{id}/data",
-      name: "Template Resource",
-      description: "A templated resource",
-      mimeType: "application/json",
-      callbacks: {
-        complete: {
-          id: ["foo", "bar", "baz", "qux"],
-        },
+    uriTemplate: "test://template/{id}/data",
+    title: "Template Resource",
+    description: "A templated resource",
+    mimeType: "application/json",
+    callbacks: {
+      complete: {
+        id: ["foo", "bar", "baz", "qux"],
       },
     },
   },
@@ -578,7 +576,7 @@ server.tool(
       windSpeed: 10,
     };
 
-    return widget({
+    return view({
       props: {
         city,
         ...weather,

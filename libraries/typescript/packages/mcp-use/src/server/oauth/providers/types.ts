@@ -11,6 +11,13 @@
  * will reintroduce proxy-mode behavior in a future change.
  */
 
+export type OAuthTokenPayload = Record<string, unknown>;
+
+export interface OAuthTokenVerificationResult {
+  payload: OAuthTokenPayload;
+  protectedHeader?: unknown;
+}
+
 export interface OAuthProvider {
   /**
    * Verify and decode a JWT token
@@ -18,14 +25,14 @@ export interface OAuthProvider {
    * @returns The decoded and verified token payload
    * @throws Error if token is invalid or verification fails
    */
-  verifyToken(token: string): Promise<{ payload: Record<string, unknown> }>;
+  verifyToken(token: string): Promise<OAuthTokenVerificationResult>;
 
   /**
    * Extract user information from a verified token payload
    * @param payload - The verified JWT payload
    * @returns User information object
    */
-  getUserInfo(payload: Record<string, unknown>): UserInfo | Promise<UserInfo>;
+  getUserInfo(payload: OAuthTokenPayload): UserInfo | Promise<UserInfo>;
 
   /**
    * Get the OAuth issuer URL
@@ -213,8 +220,8 @@ export interface CustomOAuthConfig extends BaseOAuthConfig {
   authEndpoint: string;
   tokenEndpoint: string;
   grantTypesSupported?: string[];
-  verifyToken: (token: string) => Promise<{ payload: Record<string, unknown> }>;
-  getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
+  verifyToken: (token: string) => Promise<OAuthTokenVerificationResult>;
+  getUserInfo?: (payload: OAuthTokenPayload) => UserInfo;
   /** User info endpoint URL */
   userInfoEndpoint?: string;
   /** Audience for JWT verification */

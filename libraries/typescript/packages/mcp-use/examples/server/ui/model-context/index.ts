@@ -1,4 +1,4 @@
-import { MCPServer, widget } from "mcp-use/server";
+import { MCPServer, view } from "mcp-use/server";
 import { z } from "zod";
 
 /**
@@ -55,7 +55,7 @@ server.tool(
     },
   },
   async ({ category }) => {
-    return widget({
+    return view({
       props: {
         products,
         initialCategory: category ?? null,

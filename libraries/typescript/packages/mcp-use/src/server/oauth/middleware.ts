@@ -7,6 +7,30 @@
 
 import type { Context, Next } from "hono";
 import type { OAuthProvider, OAuthProxy } from "./providers/types.js";
+import { createAuthContext } from "./utils.js";
+
+function stringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+  if (typeof value === "string") {
+    return value.split(" ").filter(Boolean);
+  }
+  return [];
+}
+
+function extractRoles(payload: Record<string, unknown>): string[] {
+  const roles = new Set<string>(stringArray(payload.roles));
+  const realmAccess = payload.realm_access;
+  if (realmAccess && typeof realmAccess === "object") {
+    for (const role of stringArray(
+      (realmAccess as Record<string, unknown>).roles
+    )) {
+      roles.add(role);
+    }
+  }
+  return Array.from(roles);
+}
 
 /**
  * Create bearer authentication middleware for a given OAuth provider or proxy
@@ -70,22 +94,40 @@ export function createBearerAuthMiddleware(
 
       // Create complete auth object
       const scope = payload.scope as string | undefined;
+      const scopes = scope ? scope.split(" ") : [];
+      const permissions = stringArray(payload.permissions);
+      const roles = extractRoles(payload);
+      const authContext = createAuthContext({
+        user,
+        payload,
+        scopes,
+        permissions,
+        roles,
+      });
       const authInfo = {
         user,
         payload,
         accessToken: token,
         // Extract scopes from scope claim (OAuth standard)
-        scopes: scope ? scope.split(" ") : [],
+        scopes,
         // Extract permissions (Auth0 style, or custom)
-        permissions: (payload.permissions as string[]) || [],
+        permissions,
+        roles,
+        context: authContext,
       };
 
       // Attach to context in multiple ways for maximum compatibility:
       // 1. Set in Hono's variable storage (accessible via c.get('auth'))
       c.set("auth", authInfo);
+      c.set("authContext", authContext);
 
       // 2. Set as direct property for destructuring support ({auth} in tool callbacks)
-      (c as any).auth = authInfo;
+      const contextWithAuth = c as Context & {
+        auth?: typeof authInfo;
+        authContext?: typeof authContext;
+      };
+      contextWithAuth.auth = authInfo;
+      contextWithAuth.authContext = authContext;
 
       // Also set individual properties for backward compatibility
       c.set("user", user);

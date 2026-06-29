@@ -1,4 +1,4 @@
-import { useWidget, type WidgetMetadata } from "mcp-use/react";
+import { useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -22,7 +22,7 @@ export const widgetMetadata: WidgetMetadata = {
 type DisplayInfoProps = z.infer<typeof propSchema>;
 
 const DisplayInfo: React.FC = () => {
-  const { props, isPending } = useWidget<DisplayInfoProps>();
+  const { props, isPending } = useView<DisplayInfoProps>();
 
   if (isPending || !props || !props.title || !props.message) {
     return (

@@ -25,6 +25,8 @@
  */
 
 import type { AuthInfo } from "../oauth/utils.js";
+import type { AuthContext } from "../oauth/types.js";
+import type { ClientCapabilityChecker } from "../types/context.js";
 
 /**
  * Context passed to every MCP middleware handler.
@@ -40,10 +42,22 @@ export interface MiddlewareContext {
   method: string;
   /** JSON-RPC request params (mutable — mutations are passed downstream) */
   params: Record<string, unknown>;
+  /** Current tool name for `tools/call`; kept separate so handler input is not mutated */
+  toolName?: string;
+  /** Request-level metadata supplied on this MCP operation, when present */
+  requestMeta?: Record<string, unknown>;
+  /** Request-scoped client capabilities. Do not fall back to session state for stateless shaping. */
+  clientCapabilities?: Record<string, unknown>;
+  /** Request-scoped client info, when supplied by the request metadata */
+  clientInfo?: Record<string, unknown>;
+  /** Request-scoped client capability helper */
+  client?: ClientCapabilityChecker;
   /** Session info if available (HTTP transports only) */
   session?: { sessionId: string };
   /** OAuth info extracted from JWT, present when OAuth is configured */
   auth?: AuthInfo;
+  /** Normalized authorization context derived from OAuth info */
+  authContext?: AuthContext;
   /** Shared state Map for passing data across middleware in the same request */
   state: Map<string, unknown>;
 }

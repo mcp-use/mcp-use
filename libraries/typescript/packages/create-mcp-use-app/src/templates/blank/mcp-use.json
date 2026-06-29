@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.mcp-use.dev/mcp-use.v1.json",
+  "version": 1,
+  "name": "blank",
+  "entry": "index.ts",
+  "viewsDir": "resources",
+  "publicDir": "public",
+  "cloud": {
+    "serverSlug": "blank",
+    "watchPaths": ["index.ts", "src/**", "resources/**", "public/**"]
+  }
+}

@@ -1,7 +1,7 @@
 import type {
   OAuthClientInformation,
   OAuthMetadata,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 
 /**
  * Internal type for storing OAuth state in localStorage during the OAuth flow.

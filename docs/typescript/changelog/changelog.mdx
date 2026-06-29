@@ -6,6 +6,31 @@ rss: true
 tag: "New"
 ---
 
+<Update label="v2.0.0-alpha.0" description="In development (V2 branch)" tags={["Alpha"]}>
+  ## SDK v2 alpha — smaller installs, clearer packages
+
+  Work in progress on the `V2` branch. See the [v2 migration guide](/typescript/v2-migration) for upgrade steps.
+
+  **Phase 1 (dependency externalization)**
+  - `@mcp-use/cli` and `@mcp-use/inspector` are optional peers of `mcp-use` — no longer pulled in on every `npm i mcp-use`
+  - Dynamic `mcp-use` bin forwards to `@mcp-use/cli` with an install hint when missing
+  - Scaffolds add `@mcp-use/cli` as a devDependency
+  - Inspector production UI defaults to CDN (`inspector-cdn.mcp-use.com`); set `INSPECTOR_USE_CDN=false` for offline
+  - Tool-only servers skip the Vite widget toolchain when `resources/` is empty
+  - Inlined MCP Apps constants — removed `@modelcontextprotocol/ext-apps` (and its optional Bun binary)
+  - Removed unused `express`; `posthog-js` is an optional peer (browser only)
+
+  **Phase 2 (package split — milestone 1)**
+  - New packages: `@mcp-use/client`, `@mcp-use/agent` (re-export shims; subpaths unchanged)
+  - Root `mcp-use` exports client/agent lazily with deprecation warnings
+
+  **Not yet in alpha**
+  - Official `@modelcontextprotocol/server` v2 SDK migration (waiting on stable release)
+  - Full source move into split packages
+  - Stateless-first transport default
+  - Widget → view rename
+</Update>
+
 <Update label="v1.33.0" description="June 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.33.0&title=MCP%20Apps%20primary%20widget%20runtime&date=2026-06&lang=typescript" alt="Release 1.33.0" />

@@ -7,8 +7,8 @@
 import {
   auth,
   extractWWWAuthenticateParams,
-} from "@modelcontextprotocol/sdk/client/auth.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
+import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 
 export type OAuthRetryFetchOptions = {
   /** Max number of 403 retries (for auth/scope-retry-limit). Omit for scope-step-up. */

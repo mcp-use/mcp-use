@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  createEnhancedContext,
   createClientCapabilityChecker,
   supportsApps,
 } from "../../../src/server/tools/tool-execution-helpers.js";
@@ -185,5 +186,52 @@ describe("supportsApps() — standalone utility", () => {
       const checker = createClientCapabilityChecker(caps);
       expect(checker.supportsApps()).toBe(supportsApps(caps));
     }
+  });
+});
+
+describe("request _meta client capabilities", () => {
+  const createContext = (
+    sessionCapabilities: Record<string, unknown> | undefined,
+    requestMeta: Record<string, unknown> | undefined
+  ) =>
+    createEnhancedContext(
+      undefined,
+      async () => ({}) as any,
+      async () => ({ action: "decline" }) as any,
+      undefined,
+      undefined,
+      undefined,
+      sessionCapabilities,
+      "session-1",
+      new Map(),
+      { name: "remembered-client", version: "1.0.0" },
+      requestMeta
+    );
+
+  it("honors capabilities supplied on request _meta", () => {
+    const ctx = createContext(undefined, {
+      clientCapabilities: mcpAppsCaps,
+      clientInfo: { name: "stateless-client", version: "2.0.0" },
+    });
+
+    expect(ctx.client.supportsApps()).toBe(true);
+    expect(ctx.client.extension(MCP_UI_EXTENSION)).toEqual({
+      mimeTypes: [MCP_UI_MIME],
+    });
+    expect(ctx.client.info()).toEqual({
+      name: "stateless-client",
+      version: "2.0.0",
+    });
+  });
+
+  it("does not infer stateless request capabilities from remembered session state", () => {
+    const ctx = createContext(mcpAppsCaps, {
+      clientCapabilities: {},
+      clientInfo: { name: "stateless-client" },
+    });
+
+    expect(ctx.client.supportsApps()).toBe(false);
+    expect(ctx.client.extension(MCP_UI_EXTENSION)).toBeUndefined();
+    expect(ctx.client.info()).toEqual({ name: "stateless-client" });
   });
 });

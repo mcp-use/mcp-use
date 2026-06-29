@@ -1,12 +1,17 @@
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Transport } from "@modelcontextprotocol/client";
 import type {
   JSONRPCMessage,
   MessageExtraInfo,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { TransportSendOptions } from "@modelcontextprotocol/sdk/shared/transport.js";
+} from "@modelcontextprotocol/client";
+import type { TransportSendOptions } from "@modelcontextprotocol/client";
 import { Logger } from "../logging.js";
 
 const logger = Logger.get("RpcLogger");
+
+type ExtendedTransport = Transport & {
+  start?: () => Promise<void> | void;
+  sessionId?: string;
+};
 
 export interface RpcLogEntry {
   serverId: string;
@@ -29,7 +34,7 @@ class RpcLogStore {
       "[RPC Logger] Publishing log:",
       entry.direction,
       entry.serverId,
-      (entry.message as any)?.method
+      "method" in entry.message ? entry.message.method : undefined
     );
     this.logs.push(entry);
 
@@ -162,8 +167,9 @@ export function wrapTransportForLogging(
     }
 
     async start(): Promise<void> {
-      if (typeof (this.inner as any).start === "function") {
-        await (this.inner as any).start();
+      const inner = this.inner as ExtendedTransport;
+      if (typeof inner.start === "function") {
+        await inner.start();
       }
     }
 
@@ -178,7 +184,7 @@ export function wrapTransportForLogging(
         timestamp: new Date().toISOString(),
         message,
       });
-      await this.inner.send(message as any, options as any);
+      await this.inner.send(message, options);
     }
 
     async close(): Promise<void> {
@@ -186,7 +192,7 @@ export function wrapTransportForLogging(
     }
 
     get sessionId(): string | undefined {
-      return (this.inner as any).sessionId;
+      return (this.inner as ExtendedTransport).sessionId;
     }
 
     setProtocolVersion?(version: string): void {

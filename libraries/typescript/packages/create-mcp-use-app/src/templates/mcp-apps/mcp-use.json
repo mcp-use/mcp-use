@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.mcp-use.dev/mcp-use.v1.json",
+  "version": 1,
+  "name": "mcp-apps",
+  "entry": "index.tsx",
+  "viewsDir": "resources",
+  "publicDir": "public",
+  "cloud": {
+    "serverSlug": "mcp-apps",
+    "watchPaths": ["index.tsx", "components/**", "resources/**", "public/**"]
+  }
+}

@@ -24,13 +24,14 @@ const telemetryBrowserPlugin: Plugin = {
 };
 
 const sharedConfig: Partial<Options> = {
-  format: ["cjs", "esm"],
+  format: ["esm"],
   outDir: "dist",
   keepNames: true,
   dts: false, // We run tsc separately for declarations
   external: [
-    // Keep MCP SDK external (peer dependency)
-    "@modelcontextprotocol/sdk",
+    // Keep MCP SDK external for ESM (peer dependency); CJS bundles via noExternal below
+    "@modelcontextprotocol/client",
+    "@modelcontextprotocol/server",
     // Keep Tailwind CSS and its dependencies external (native modules)
     "tailwindcss",
     "@tailwindcss/vite",
@@ -56,29 +57,43 @@ const sharedConfig: Partial<Options> = {
     // Keep Redis external (optional dependency, uses Node.js built-ins)
     "redis",
     "@redis/client",
-    // Keep posthog-node external for browser builds (browser uses posthog-js)
-    "posthog-node",
+    "posthog-js",
   ],
 };
 
 export default defineConfig([
   // ── Node.js / server entries ────────────────────────────────────────────────
   // These import telemetry-node.ts directly and must NOT have the substitution
-  // plugin, so server code gets real PostHog-node + Scarf tracking.
+  // plugin, so server code gets raw-fetch PostHog + Scarf tracking.
   {
     ...sharedConfig,
     entry: [
       "index.ts",
       "src/adapters/index.ts",
       "src/agents/index.ts",
+      "src/agents/utils/index.ts",
       "src/auth/index.ts",
       "src/auth/index-node.ts",
       "src/bin.ts",
       "src/client.ts",
+      "src/config-file.ts",
+      "src/errors.ts",
+      "src/connectors/base.ts",
+      "src/eval/index.ts",
+      "src/connectors/http.ts",
+      "src/connectors/stdio.ts",
+      "src/managers/server_manager.ts",
+      "src/managers/tools/index.ts",
+      "src/observability/index.ts",
+      "src/project-config.ts",
       "src/server/index.ts",
+      "src/telemetry/index.ts",
+      "src/telemetry/instrumentation.ts",
       "src/telemetry/tel-fetch.ts",
       "src/utils/index.ts",
       "src/client/prompts.ts",
+      "src/jsx/jsx-runtime.ts",
+      "src/jsx/jsx-dev-runtime.ts",
     ],
     esbuildOptions(options) {
       // Preserve node: prefix for Deno compatibility

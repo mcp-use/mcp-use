@@ -10,6 +10,7 @@ import type {
   UnknownObject,
   ToolRegistry,
 } from "./widget-types.js";
+import type { ToolRef } from "../server/types/tool-ref.js";
 
 // Discriminated union state machine (4 states)
 type CallToolIdleState = {
@@ -134,17 +135,22 @@ type ResolveOutput<TName extends keyof ToolRegistry> =
  * - `callTool` - fire-and-forget with optional side effect callbacks
  * - `callToolAsync` - returns a Promise for the result
  *
- * Types are automatically inferred from the tool name when using `mcp-use dev`.
- * The dev server generates type definitions in `.mcp-use/tool-registry.d.ts`.
+ * Prefer passing the `ToolRef` returned by `server.tool()` when the server and
+ * view share a TypeScript graph. That path is zero-codegen: the ref carries the
+ * input/output types as phantom types while runtime still sends the tool name.
+ *
+ * String tool names remain supported. They are typed from an explicit generated
+ * registry when projects run `mcp-use typegen` / `mcp-use check`, or by explicit
+ * generics when the client is intentionally decoupled from the server source.
  *
  * @param name - The name of the tool to call (auto-typed from ToolRegistry)
  * @returns State and methods for calling the tool
  *
  * @example
  * ```tsx
- * // Auto-typed from ToolRegistry (when using mcp-use dev)
- * const { callTool, data, isPending } = useCallTool("search-flights");
- * // callTool, data are fully typed based on your server's tool definition
+ * // Zero-codegen path: use the ToolRef returned by server.tool()
+ * const { callTool, data, isPending } = useCallTool(searchFlights);
+ * // callTool and data are typed from the server's tool definition
  *
  * // Fire-and-forget with callbacks
  * callTool({ destination: "NYC" }, {
@@ -155,7 +161,7 @@ type ResolveOutput<TName extends keyof ToolRegistry> =
  * // Or async/await
  * const result = await callToolAsync({ destination: "NYC" });
  *
- * // Explicit generics as escape hatch
+ * // Explicit generics as an escape hatch for decoupled clients
  * const { callTool } = useCallTool<{ query: string }, { results: string[] }>("custom-tool");
  * ```
  */
@@ -164,16 +170,32 @@ export function useCallTool<TName extends keyof ToolRegistry>(
   name: TName
 ): UseCallToolReturn<ResolveInput<TName>, ResolveOutput<TName>>;
 
-// Overload 2: Fallback with explicit generics
-// eslint-disable-next-line no-redeclare
+// Overload 2: string-name calls with explicit generics or generated registry types.
+
 export function useCallTool<
   TArgs extends UnknownObject | null = null,
   TResponse extends Partial<CallToolResponse> = CallToolResponse,
 >(name: string): UseCallToolReturn<TArgs, TResponse>;
 
+// Overload 3: ToolRef-based (zero codegen, types from server.tool() return)
+
+export function useCallTool<
+  R extends ToolRef<string, unknown, Record<string, unknown>>,
+>(
+  ref: R
+): UseCallToolReturn<
+  R["_types"]["input"],
+  R["_types"]["output"] extends Record<string, unknown>
+    ? CallToolResponse & { structuredContent: R["_types"]["output"] }
+    : CallToolResponse
+>;
+
 // Implementation
-// eslint-disable-next-line no-redeclare
-export function useCallTool(name: string): any {
+
+export function useCallTool(
+  nameOrRef: string | ToolRef<string, unknown, Record<string, unknown>>
+): unknown {
+  const name = typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
   const [{ status, data, error }, setCallToolState] = useState<
     Omit<
       CallToolState<CallToolResponse>,
@@ -183,12 +205,14 @@ export function useCallTool(name: string): any {
 
   const callIdRef = useRef(0);
 
-  const execute = async (args: any): Promise<CallToolResponse> => {
+  const execute = async (
+    args: UnknownObject | null
+  ): Promise<CallToolResponse> => {
     const callId = ++callIdRef.current;
     setCallToolState({ status: "pending", data: undefined, error: undefined });
 
     try {
-      let raw: any;
+      let raw: unknown;
 
       if (typeof window !== "undefined") {
         const bridge = getMcpAppsBridge();
@@ -218,44 +242,50 @@ export function useCallTool(name: string): any {
     }
   };
 
+  const isSideEffects = (
+    value: unknown
+  ): value is SideEffects<UnknownObject | null, CallToolResponse> =>
+    !!value &&
+    typeof value === "object" &&
+    ("onSuccess" in value || "onError" in value || "onSettled" in value);
+
   const callToolAsync = useCallback(
-    ((args?: any) => {
-      if (args === undefined) {
-        return execute(null);
-      }
-      return execute(args);
-    }) as any,
+    ((args?: UnknownObject | null) => execute(args ?? null)) as CallToolAsyncFn<
+      UnknownObject | null,
+      CallToolResponse
+    >,
     [name]
   );
 
   const callTool = useCallback(
-    ((firstArg?: any, sideEffects?: any) => {
-      let args: any;
+    ((
+      firstArg?:
+        | UnknownObject
+        | null
+        | SideEffects<UnknownObject | null, CallToolResponse>,
+      sideEffects?: SideEffects<UnknownObject | null, CallToolResponse>
+    ) => {
+      let args: UnknownObject | null;
+      let resolvedSideEffects = sideEffects;
 
       // Detect if first arg is side effects object
-      if (
-        firstArg &&
-        typeof firstArg === "object" &&
-        ("onSuccess" in firstArg ||
-          "onError" in firstArg ||
-          "onSettled" in firstArg)
-      ) {
+      if (isSideEffects(firstArg)) {
         args = null;
-        sideEffects = firstArg;
+        resolvedSideEffects = firstArg;
       } else {
-        args = firstArg === undefined ? null : firstArg;
+        args = firstArg ?? null;
       }
 
       execute(args)
         .then((data) => {
-          sideEffects?.onSuccess?.(data, args);
-          sideEffects?.onSettled?.(data, undefined, args);
+          resolvedSideEffects?.onSuccess?.(data, args);
+          resolvedSideEffects?.onSettled?.(data, undefined, args);
         })
         .catch((error) => {
-          sideEffects?.onError?.(error, args);
-          sideEffects?.onSettled?.(undefined, error, args);
+          resolvedSideEffects?.onError?.(error, args);
+          resolvedSideEffects?.onSettled?.(undefined, error, args);
         });
-    }) as any,
+    }) as CallToolFn<UnknownObject | null, CallToolResponse>,
     [name]
   );
 

@@ -7,22 +7,11 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
-
-// Mock PostHog before importing Telemetry
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+import {
+  expectPostHogEvent,
+  installTelemetryFetchMock,
+  restoreTelemetryFetchMock,
+} from "./telemetry-test-utils.js";
 
 // Mock fs module for config loading
 vi.mock("node:fs", () => ({
@@ -62,12 +51,13 @@ describe("MCPClient Telemetry Integration", () => {
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
     vi.resetModules();
     vi.clearAllMocks();
-    mockCapture.mockClear();
+    installTelemetryFetchMock();
   });
 
   afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
+    restoreTelemetryFetchMock();
     vi.clearAllMocks();
   });
 
@@ -76,15 +66,9 @@ describe("MCPClient Telemetry Integration", () => {
       const { MCPClient } = await import("../../../src/client.js");
 
       new MCPClient();
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Verify telemetry was tracked via PostHog capture
-      expect(mockCapture).toHaveBeenCalled();
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         code_mode: false,
         sandbox: false,
         all_callbacks: false,
@@ -98,13 +82,9 @@ describe("MCPClient Telemetry Integration", () => {
       const { MCPClient } = await import("../../../src/client.js");
 
       new MCPClient(undefined, { codeMode: true });
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         code_mode: true,
       });
     });
@@ -118,13 +98,9 @@ describe("MCPClient Telemetry Integration", () => {
           executor: "vm",
         },
       });
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         code_mode: true,
       });
     });
@@ -140,13 +116,9 @@ describe("MCPClient Telemetry Integration", () => {
       };
 
       new MCPClient(config);
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         code_mode: false,
         sandbox: false,
         all_callbacks: false,
@@ -159,15 +131,11 @@ describe("MCPClient Telemetry Integration", () => {
     it("should track init event with sampling callback", async () => {
       const { MCPClient } = await import("../../../src/client.js");
 
-      const samplingCallback = vi.fn();
-      new MCPClient(undefined, { samplingCallback });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const onSampling = vi.fn();
+      new MCPClient(undefined, { onSampling });
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         all_callbacks: false, // Only sampling, not elicitation
       });
     });
@@ -175,15 +143,11 @@ describe("MCPClient Telemetry Integration", () => {
     it("should track init event with elicitation callback", async () => {
       const { MCPClient } = await import("../../../src/client.js");
 
-      const elicitationCallback = vi.fn();
-      new MCPClient(undefined, { elicitationCallback });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const onElicitation = vi.fn();
+      new MCPClient(undefined, { onElicitation });
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         all_callbacks: false, // Only elicitation, not sampling
       });
     });
@@ -191,16 +155,12 @@ describe("MCPClient Telemetry Integration", () => {
     it("should track init event with all callbacks", async () => {
       const { MCPClient } = await import("../../../src/client.js");
 
-      const samplingCallback = vi.fn();
-      const elicitationCallback = vi.fn();
-      new MCPClient(undefined, { samplingCallback, elicitationCallback });
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      const onSampling = vi.fn();
+      const onElicitation = vi.fn();
+      new MCPClient(undefined, { onSampling, onElicitation });
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         all_callbacks: true,
       });
     });
@@ -215,13 +175,9 @@ describe("MCPClient Telemetry Integration", () => {
       };
 
       MCPClient.fromDict(config);
-      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcpclient_init");
+      expect(event.properties).toMatchObject({
         code_mode: false,
         sandbox: false,
         all_callbacks: false,

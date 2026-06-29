@@ -9,10 +9,9 @@ import {
   completable as sdkCompletable,
   type CompletableSchema,
   type CompleteCallback,
-} from "@modelcontextprotocol/sdk/server/completable.js";
+} from "@modelcontextprotocol/server";
 import type { ResourceTemplateCallbacks } from "../types/resource.js";
-import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { SchemaInput } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/server";
 import type { z } from "zod";
 
 /**
@@ -98,25 +97,25 @@ export function completable<
 >(schema: T, complete: z.infer<T>[]): CompletableSchema<T>;
 
 // Overload 2: Callback (all types) for complex cases
-// eslint-disable-next-line no-redeclare
+
 export function completable<T extends z.ZodTypeAny>(
   schema: T,
   complete: (
-    value: SchemaInput<T>,
+    value: z.infer<T>,
     context?: CompletionContext
-  ) => Promise<SchemaInput<T>[]> | SchemaInput<T>[]
+  ) => Promise<z.infer<T>[]> | z.infer<T>[]
 ): CompletableSchema<T>;
 
 // Implementation
-// eslint-disable-next-line no-redeclare
+
 export function completable<T extends z.ZodTypeAny>(
   schema: T,
   complete:
     | z.infer<T>[]
     | ((
-        value: SchemaInput<T>,
+        value: z.infer<T>,
         context?: CompletionContext
-      ) => Promise<SchemaInput<T>[]> | SchemaInput<T>[])
+      ) => Promise<z.infer<T>[]> | z.infer<T>[])
 ): CompletableSchema<T> {
   let callback: CompleteCallback<T>;
 
@@ -128,12 +127,12 @@ export function completable<T extends z.ZodTypeAny>(
         return String(item).toLowerCase().startsWith(prefix);
       });
       // Cast to SDK input type for CompleteCallback compatibility
-      return filtered as SchemaInput<T>[];
+      return filtered as z.infer<T>[];
     };
   } else {
     // Overload 2: wrap the callback to match SDK's CompleteCallback signature
     callback = async (value, context) => {
-      return await complete(value, context as CompletionContext);
+      return await complete(value as z.infer<T>, context as CompletionContext);
     };
   }
 

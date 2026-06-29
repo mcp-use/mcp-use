@@ -8,12 +8,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { MCPServer, completable } from "../../src/server/index.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import type {
   CompleteRequestParams,
   CompleteResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 describe("Completion Integration Tests", () => {
   let server: any;
@@ -85,26 +85,28 @@ describe("Completion Integration Tests", () => {
     );
 
     // Add resource template with completion
-    server.resourceTemplate({
-      uriTemplate: "file:///{path}",
-      name: "File",
-      description: "Read a file",
-      schema: z.object({
-        path: completable(z.string(), [
-          "/home/user/documents",
-          "/home/user/downloads",
-          "/home/user/projects",
-        ]),
-      }),
-      readCallback: async ({ path }) => ({
+    server.resourceTemplate(
+      {
+        name: "File",
+        uriTemplate: "file:///{path}",
+        description: "Read a file",
+        schema: z.object({
+          path: completable(z.string(), [
+            "/home/user/documents",
+            "/home/user/downloads",
+            "/home/user/projects",
+          ]),
+        }),
+      },
+      async (_uri, { path }) => ({
         contents: [
           {
             uri: `file:///${path}`,
             text: `Content of ${path}`,
           },
         ],
-      }),
-    });
+      })
+    );
 
     // Start server
     await server.listen(TEST_PORT);

@@ -1,4 +1,4 @@
-import { MCPServer, widget, text } from "mcp-use/server";
+import { MCPServer, view, text } from "mcp-use/server";
 import { z } from "zod";
 
 const server = new MCPServer({
@@ -53,7 +53,7 @@ server.tool(
     },
   },
   async ({ language, description, code }) => {
-    return widget({
+    return view({
       props: {
         language,
         description,
@@ -83,7 +83,7 @@ server.tool(
     },
   },
   async ({ title, description, content }) => {
-    return widget({
+    return view({
       props: {
         language: "json",
         description: `${title}: ${description}`,

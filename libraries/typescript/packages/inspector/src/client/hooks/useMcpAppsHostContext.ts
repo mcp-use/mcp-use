@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import type { PlaygroundSettings } from "../context/WidgetDebugContext";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
@@ -113,10 +113,10 @@ export function useMcpAppsHostContext({
       safeAreaInsets: playground.safeAreaInsets,
       styles: { variables: buildHostStyleVariables() as any },
       toolInfo: tool
-        ? {
+        ? ({
             id: toolCallId,
             tool: tool,
-          }
+          } as McpUiHostContext["toolInfo"])
         : undefined,
     }),
     [

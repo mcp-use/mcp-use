@@ -3,7 +3,6 @@ import { Command } from "commander";
 import type { MCPSession } from "mcp-use/client";
 import { MCPClient } from "mcp-use/client";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -292,54 +291,11 @@ interface DevServerHandle {
 }
 
 /**
- * Resolve the path to `@mcp-use/inspector`'s standalone CLI entry. Throws
- * with a clear message when the inspector package can't be located — that
- * usually means the workspace hasn't been installed/built.
- *
- * We can't use `require.resolve('@mcp-use/inspector')` because the inspector
- * package's `exports` field only declares an `import` condition, so CJS
- * resolution fails. Subpath resolution (`/dist/cli.js`, `/package.json`)
- * also fails because neither is listed in `exports`. So we walk up from
- * both the current module and the CWD looking for the installed package.
- */
-function resolveInspectorCli(): string {
-  const candidateRoots = new Set<string>();
-  // CJS: __dirname is defined; ESM: derive from import.meta.url.
-  const moduleDir =
-    typeof __dirname !== "undefined"
-      ? __dirname
-      : path.dirname(new URL(import.meta.url).pathname);
-  candidateRoots.add(moduleDir);
-  candidateRoots.add(process.cwd());
-
-  for (const start of candidateRoots) {
-    let dir = start;
-    while (true) {
-      const candidate = path.join(
-        dir,
-        "node_modules",
-        "@mcp-use",
-        "inspector",
-        "dist",
-        "cli.js"
-      );
-      if (existsSync(candidate)) return candidate;
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  }
-  throw new Error(
-    "Could not locate `@mcp-use/inspector` in node_modules. Install the inspector package or pass --inspector <url> to use an existing instance."
-  );
-}
-
-/**
  * Resolve a usable inspector host:
  *
  *   - When `--inspector <url>` is given, probe it (strict: must return the
  *     inspector's JSON health payload) and use it.
- *   - Otherwise, always spawn a fresh `@mcp-use/inspector` on a free port.
+ *   - Otherwise, spawn `@mcp-use/inspector` via npx on a free port.
  *
  * Note: we no longer try to reuse a server on `localhost:3000`. A Vite-only
  * dev server (or any unrelated 200-returning service) would otherwise be
@@ -365,14 +321,14 @@ async function ensureDevServer(
     console.error(formatInfo(`Starting inspector on port ${port}…`));
   }
 
-  const inspectorCli = resolveInspectorCli();
   const child = spawn(
-    process.execPath,
-    [inspectorCli, "--port", String(port), "--no-open"],
+    "npx",
+    ["--yes", "@mcp-use/inspector", "--port", String(port), "--no-open"],
     {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, MCP_INSPECTOR_MODE: "standalone" },
+      shell: process.platform === "win32",
     }
   );
 

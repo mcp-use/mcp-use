@@ -395,10 +395,9 @@ describe("Session persistence across server restart", () => {
     const { MCPServer, InMemorySessionStore } =
       await import("../../../src/server/index.js");
     const { serve } = await import("@hono/node-server");
-    const { Client } =
-      await import("@modelcontextprotocol/sdk/client/index.js");
+    const { Client } = await import("@modelcontextprotocol/client");
     const { StreamableHTTPClientTransport } =
-      await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+      await import("@modelcontextprotocol/client");
     const { z } = await import("zod");
 
     // Shared session store that survives across server lifecycles

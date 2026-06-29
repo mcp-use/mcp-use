@@ -1,4 +1,4 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 import "../styles.css";
@@ -24,7 +24,7 @@ export const widgetMetadata: WidgetMetadata = {
 type GreetingProps = z.infer<typeof propSchema>;
 
 const GreetingCard: React.FC = () => {
-  const { props, isPending } = useWidget<GreetingProps>();
+  const { props, isPending } = useView<GreetingProps>();
 
   return (
     <McpUseProvider debugger viewControls autoSize>

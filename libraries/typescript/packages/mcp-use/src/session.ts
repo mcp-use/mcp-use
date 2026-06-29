@@ -5,8 +5,8 @@ import type {
   Notification,
   Root,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
+} from "@modelcontextprotocol/client";
+import type { RequestOptions } from "@modelcontextprotocol/client";
 import type { BaseConnector, NotificationHandler } from "./connectors/base.js";
 
 /**
@@ -307,7 +307,7 @@ export class MCPSession {
    */
   async callTool(
     name: string,
-    args: Record<string, any> = {},
+    args: Record<string, unknown> = {},
     options?: RequestOptions
   ): Promise<CallToolResult> {
     return this.connector.callTool(name, args, options);
@@ -462,7 +462,7 @@ export class MCPSession {
    * console.log(prompt.messages);
    * ```
    */
-  async getPrompt(name: string, args: Record<string, any>) {
+  async getPrompt(name: string, args: Record<string, unknown>) {
     return this.connector.getPrompt(name, args);
   }
 
@@ -481,7 +481,7 @@ export class MCPSession {
    */
   async request(
     method: string,
-    params: Record<string, any> | null = null,
+    params: Record<string, unknown> | null = null,
     options?: RequestOptions
   ) {
     return this.connector.request(method, params, options);

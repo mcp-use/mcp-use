@@ -25,11 +25,9 @@
 
 ## 📦 Related Packages
 
-| Package                                                                                                    | Description             | Version                                                                                                         |
-| ---------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use)              | Core MCP framework      | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| [@mcp-use/cli](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/cli)             | Build tool for MCP apps | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| [@mcp-use/inspector](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector) | Web-based MCP inspector | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| Package                                                                                       | Description        | Version                                                                                   |
+| --------------------------------------------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------- |
+| [mcp-use](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use) | MCP SDK framework  | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use) |
 
 ---
 
@@ -40,6 +38,7 @@ Create a new MCP application in seconds:
 ```bash
 npx create-mcp-use-app my-mcp-server
 cd my-mcp-server
+npm run dev
 ```
 
 That's it! Your MCP server is running at `http://localhost:3000` with the inspector automatically opened in your browser.
@@ -59,11 +58,11 @@ my-mcp-server/
 ├── .env.example          # Environment variables template
 ├── .gitignore           # Git ignore rules
 ├── README.md            # Project documentation
-├── src/
-│   └── index.ts         # MCP server entry point with example tools
+├── mcp-use.json         # Root mcp-use project config
+├── index.ts             # MCP server entry point with example tools
 ├── resources/           # UI widgets directory
 │   └── example-widget.tsx  # Example React widget
-└── dist/               # Build output (generated)
+└── .mcp-use/            # Build output and generated files
 ```
 
 ### Pre-configured Features
@@ -111,7 +110,7 @@ npx create-mcp-use-app my-project
 ```bash
 # Use a specific template
 npx create-mcp-use-app my-project --template mcp-apps
-npx create-mcp-use-app my-project --template mcp-ui
+npx create-mcp-use-app my-project --template blank
 
 # Use a GitHub repository as a template
 npx create-mcp-use-app my-project --template owner/repo
@@ -145,7 +144,7 @@ The starter template includes:
 
 - Comprehensive MCP server setup with all features
 - Example tool, resource, and prompt
-- Both MCP-UI and OpenAI Apps SDK widget examples
+- Example tool, resource, and prompt
 - Full TypeScript configuration
 - Development and production scripts
 
@@ -155,23 +154,11 @@ Perfect for getting started with all available features or building full-feature
 
 The mcp-apps template includes:
 
-- MCP server setup focused on OpenAI Apps SDK integration
-- OpenAI Apps SDK compatible widgets
-- Example display-weather widget
-- Optimized for OpenAI assistant integration
+- MCP server setup focused on MCP Apps-compatible clients
+- Direct inline JSX widget returns for simple visual responses
+- Advanced file-based widget example with state and tool interactions
 
-Ideal for building MCP servers that integrate with OpenAI's Apps SDK.
-
-### MCP-UI Template
-
-The mcp-ui template includes:
-
-- MCP server setup focused on MCP-UI resources
-- Interactive UI components example
-- Kanban board widget demonstration
-- Clean, focused setup for UI-first applications
-
-Best for building MCP servers with rich interactive UI components.
+Ideal for building MCP servers that render widgets in ChatGPT, Claude, and other MCP Apps-compatible clients.
 
 ### GitHub Repository Templates
 
@@ -206,14 +193,13 @@ The scaffolded project includes these dependencies:
 ### Core Dependencies
 
 - `mcp-use` - The MCP framework
-- `@mcp-use/cli` - Build and development tool
-- `@mcp-use/inspector` - Web-based debugger
 
 ### Development Dependencies
 
 - `typescript` - TypeScript compiler
-- `tsx` - TypeScript executor for development
 - `@types/node` - Node.js type definitions
+
+The `mcp-use` package provides the `mcp-use` command used by `npm run dev`, `npm run build`, and `npm run start`.
 
 ### Template-Specific Dependencies
 
@@ -250,7 +236,7 @@ This will:
 npm run build
 ```
 
-Creates an optimized build in the `dist/` directory.
+Creates an optimized build in `.mcp-use/build`.
 
 ### Start Production Server
 
@@ -268,7 +254,7 @@ After creating your app, here's what to do next:
 
 ### 1. Explore the Example Server
 
-Open `src/index.ts` to see how to:
+Open `index.ts` to see how to:
 
 - Define MCP tools with Zod schemas
 - Create resources for data access
@@ -285,28 +271,14 @@ The inspector automatically opens at `http://localhost:3000/inspector` where you
 
 ### 3. Create a UI Widget
 
-Edit `resources/example-widget.tsx` or create new widgets:
+In the `mcp-apps` template, return simple widgets directly from tool handlers:
 
 ```tsx
-import React from "react";
-import { useMcp } from "mcp-use/react";
+/** @jsxImportSource mcp-use/jsx */
+import { text } from "mcp-use/server";
+import MyWidget from "./components/MyWidget";
 
-export default function MyWidget() {
-  const { callTool } = useMcp();
-
-  const handleClick = async () => {
-    const result = await callTool("my_tool", {
-      param: "value",
-    });
-    console.log(result);
-  };
-
-  return (
-    <div>
-      <button onClick={handleClick}>Call MCP Tool</button>
-    </div>
-  );
-}
+return <MyWidget message="Hello" _output={text("Hello")} />;
 ```
 
 ### 4. Connect to AI
@@ -385,49 +357,58 @@ The `tsconfig.json` is pre-configured for MCP development:
 ### Creating a Tool
 
 ```typescript
-server.tool("search_database", {
-  description: "Search for records in the database",
-  parameters: z.object({
-    query: z.string().describe("Search query"),
-    limit: z.number().optional().default(10),
-  }),
-  execute: async ({ query, limit }) => {
-    // Your tool logic here
-    const results = await db.search(query, limit);
-    return { results };
+import { object } from "mcp-use/server";
+import { z } from "zod";
+
+server.tool(
+  {
+    name: "search-database",
+    description: "Search for records in the database",
+    schema: z.object({
+      query: z.string().describe("Search query"),
+      limit: z.number().min(1).max(50).default(10).describe("Max results"),
+    }),
   },
-});
+  async ({ query, limit }) => {
+    const results = await db.search(query, limit);
+    return object({ results });
+  }
+);
 ```
 
 ### Creating a Resource
 
 ```typescript
-server.resource("user_profile", {
-  description: "Current user profile data",
-  uri: "user://profile",
-  mimeType: "application/json",
-  fetch: async () => {
-    const profile = await getUserProfile();
-    return JSON.stringify(profile);
+server.resource(
+  {
+    name: "user-profile",
+    description: "Current user profile data",
+    uri: "user://profile",
   },
-});
+  async () => {
+    const profile = await getUserProfile();
+    return object(profile);
+  }
+);
 ```
 
 ### Creating a Prompt
 
 ```typescript
-server.prompt("code_review", {
-  description: "Review code for best practices",
-  arguments: [
-    { name: "code", description: "Code to review", required: true },
-    { name: "language", description: "Programming language", required: false },
-  ],
-  render: async ({ code, language }) => {
-    return `Please review this ${
-      language || ""
-    } code for best practices:\n\n${code}`;
+import { text } from "mcp-use/server";
+
+server.prompt(
+  {
+    name: "code-review",
+    description: "Review code for best practices",
+    schema: z.object({
+      code: z.string().describe("Code to review"),
+      language: z.string().optional().describe("Programming language"),
+    }),
   },
-});
+  async ({ code, language }) =>
+    text(`Please review this ${language ?? ""} code:\n\n${code}`)
+);
 ```
 
 ---

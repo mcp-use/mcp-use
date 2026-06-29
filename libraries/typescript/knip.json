@@ -1,7 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
+  "ignoreIssues": {
+    "packages/mcp-use/src/server/views/inline-widget-entry-gen.ts": ["exports", "types"]
+  },
   "rules": {
-    "optionalPeerDependencies": "off"
+    "optionalPeerDependencies": "off",
+    "duplicates": "off"
   },
   "ignoreWorkspaces": [
     "packages/mcp-use/examples/**",
@@ -21,13 +25,15 @@
         "tests/types/**/*.ts"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
+      "ignore": [
+        "src/server/views/inline-widget-bundler.ts",
+        "src/server/views/inline-widget-esbuild-plugin.ts",
+        "src/server/views/inline-widget-transform.ts"
+      ],
       "ignoreBinaries": ["lsof", "sleep", "dev"]
     },
     "packages/cli": {
-      "project": ["src/**/*.ts", "tests/**/*.ts"],
-      "ignoreDependencies": [
-        "@mcp-use/inspector"
-      ]
+      "project": ["src/**/*.ts", "tests/**/*.ts"]
     },
     "packages/inspector": {
       "entry": [

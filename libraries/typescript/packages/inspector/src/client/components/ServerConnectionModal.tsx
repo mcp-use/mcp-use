@@ -44,7 +44,7 @@ interface ServerConnectionModalProps {
   onConnect: (config: {
     url: string;
     name?: string;
-    transportType: "http" | "sse";
+    transportType: "http";
     proxyConfig?: {
       proxyAddress?: string;
       headers?: Record<string, string>;

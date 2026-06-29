@@ -1,0 +1,300 @@
+---
+title: "Migrating to v2"
+description: "Upgrade guide from mcp-use v1.x to v2"
+icon: "arrow-up"
+---
+
+v2 is a **breaking major** focused on a smaller install footprint, clearer package boundaries, and cleaner server defaults. Most MCP **servers** need only dependency and script changes; client and agent apps should switch import paths.
+
+<Note>
+v2 is developed on the `V2` branch. Pin `mcp-use@2.0.0-alpha` (or workspace canary) while upgrading.
+</Note>
+
+<Note>
+The SDK-first V2 target is for the main `mcp-use` package to own `mcp-use dev`, `mcp-use build`, and `mcp-use start`. Some interim alpha builds still require `@mcp-use/cli` as an explicit dev dependency while that packaging move lands.
+</Note>
+
+## Summary of changes
+
+| Area | v1 | v2 |
+|------|----|----|
+| Server package | `mcp-use` (+ heavy transitive deps) | `mcp-use` — framework runtime first, inspector externalized |
+| CLI | Transitive via `mcp-use` | SDK-first target: `mcp-use` owns `dev` / `build` / `start`; interim alphas may require `@mcp-use/cli` |
+| Inspector UI | Bundled React tree in npm install | Production UI from CDN; thin server mount package |
+| Client | `mcp-use/client` or root `mcp-use` | Prefer `@mcp-use/client` |
+| Agent | `mcp-use/agent` or root `mcp-use` | Prefer `@mcp-use/agent` |
+| Module format | CJS + ESM dual builds | **ESM-only** for library packages |
+| HTTP transport | SSE + streamable HTTP | **Streamable HTTP only** (legacy SSE removed) |
+| Registration API | `tool(name, schema, cb)`, `inputs`/`args` aliases | **Two-arg only:** `tool(def, callback)` |
+| Views / widgets | `widget()`, `mountWidgets`, `useWidget` | **`view()`, `mountViews`, `useView`** (widget names deprecated) |
+| Inline JSX | Not supported | **`return <MyView ... />`** via `mcp-use/jsx` runtime |
+| `@mcp-ui/server` | Optional UI helpers | **Removed** — use `mcp-use/server` view APIs |
+| MCP SDK | `@modelcontextprotocol/sdk` v1 | **SDK v2-only:** split `@modelcontextprotocol/server` + `@modelcontextprotocol/client` packages |
+| Tool-only servers | Could fail boot (Vite mount) | Boot without widget toolchain when `resources/` is empty |
+| `@modelcontextprotocol/ext-apps` | Hard dependency (+ optional Bun binary) | Constants inlined in mcp-use |
+
+## SDK-first V2 decisions
+
+v2 treats the official MCP SDK as the protocol owner. mcp-use wraps the SDK with framework defaults, OAuth providers, Hono runtime integration, views/apps, local dev, validation, deployment, and agent-readable diagnostics.
+
+- **Lean by default:** remove duplicate abstractions, stale compatibility shims, and dependencies that do not buy real user value.
+- **No fallback-first modeling:** fallbacks are migration shims, explicit host capability branches, or deliberate degraded modes. Prefer normal TypeScript branching, such as `ctx.client.supportsApps()`, over framework-level fallback abstractions.
+- **Stateless-first product semantics:** do not make new app behavior depend on remembered initialize capabilities or `Mcp-Session-Id`. If a request needs client capabilities, auth principal, or host metadata, pass it on the request or load it from explicit persisted state.
+- **SDK v2-only imports:** v2 code should use the split `@modelcontextprotocol/server` and `@modelcontextprotocol/client` packages, not the legacy monolithic `@modelcontextprotocol/sdk`.
+- **Config/workspace split:** committed project intent belongs in root `mcp-use.json`; generated build output, local sessions, caches, cloud link metadata, screenshots, eval runs, and logs belong under ignored `.mcp-use/`.
+
+## Phase 4 breaking changes
+
+These landed on the V2 branch after the first alpha cut. If you upgraded early, re-read this section.
+
+### ESM-only library packages
+
+`mcp-use`, `@mcp-use/client`, and `@mcp-use/agent` ship **ESM only**. There is no `require()`-able CJS build.
+
+```typescript
+// Before (v1)
+const { MCPServer } = require("mcp-use/server");
+
+// After (v2)
+import { MCPServer } from "mcp-use/server";
+```
+
+Ensure `"type": "module"` in your `package.json`, or use dynamic `import()` from CJS entry files.
+
+### Streamable HTTP only (SSE removed)
+
+Legacy MCP-over-SSE transport is **removed**. Clients and hosts must use **streamable HTTP** (`/mcp`).
+
+- Remove `transportType: "sse"` and `SSEClientTransport` usage.
+- The `/sse` route alias is gone.
+- `HttpConnector` and `useMcp` default to streamable HTTP with no SSE fallback.
+
+### Registration API: two-arg only
+
+`tool`, `prompt`, `resource`, and `resourceTemplate` accept **exactly two arguments**: a definition object and a callback.
+
+```typescript
+// Before (removed)
+server.tool("search", { inputs: z.object({ q: z.string() }) }, async ({ q }) => { ... });
+server.tool("search", schema, cb);
+server.resource("doc", { readCallback: async () => ... });
+
+// After (v2)
+server.tool(
+  { name: "search", inputSchema: z.object({ q: z.string() }) },
+  async ({ q }) => { ... }
+);
+server.resource({ uri: "doc://...", name: "doc" }, async () => { ... });
+```
+
+Removed aliases: `cb`, `readCallback`, `inputs`, `args`, nested `resourceTemplate` overloads.
+
+### Views primary API (widget aliases deprecated)
+
+Public API names are **`view`**, **`useView`**, **`mountViews`**, **`ViewResponseConfig`**, **`UseViewResult`**.
+
+```typescript
+// Before (deprecated — still works with warnings)
+import { widget, mountWidgets, useWidget } from "mcp-use/server";
+
+// After (v2)
+import { view, mountViews, useView } from "mcp-use/server";
+```
+
+Wire-format aliases are unchanged for compatibility: `/mcp-use/widgets/`, `ui://widget/`, `widget.tsx`, `widgetMetadata`.
+
+### Inline JSX + ToolRef
+
+Return views directly from tool handlers with JSX:
+
+```typescript
+import { view, ToolRef } from "mcp-use/server";
+
+server.tool({ name: "weather", inputSchema: z.object({ city: z.string() }) }, async ({ city }) => {
+  return view(<WeatherCard city={city} />);
+});
+```
+
+`mcp-use dev` and `mcp-use build` patch your `tsconfig.json` (when missing) with:
+
+```json
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "mcp-use/jsx"
+  }
+}
+```
+
+Use `ToolRef` to reference another tool's result inside JSX props. File-based widgets in `resources/*.tsx` are unchanged.
+
+### `@mcp-ui/server` removed
+
+Drop `@mcp-ui/server` from dependencies. Legacy UI types (`externalUrl`, `rawHtml`, `remoteDom`) are gone — use `view()` / file-based views and `RESOURCE_MIME_TYPE` from `mcp-use/server`.
+
+### Client / React option renames (hard-deleted in v2)
+
+| Removed | Use instead |
+|---------|-------------|
+| `samplingCallback` | `onSampling` |
+| `elicitationCallback` | `onElicitation` |
+| `customHeaders` | `headers` |
+| `clientConfig` (useMcp) | `clientInfo` (OAuth fields derived automatically) |
+| `MCPServer.server` | `MCPServer.nativeServer` |
+
+### MCP SDK v2
+
+mcp-use v2 depends on split MCP packages:
+
+| v1 | v2 |
+|----|-----|
+| `@modelcontextprotocol/sdk` | `@modelcontextprotocol/server` (server) |
+| `@modelcontextprotocol/sdk/client` | `@modelcontextprotocol/client` (client) |
+
+Subpath imports like `@modelcontextprotocol/sdk/server/mcp.js` collapse to package-root exports. Pin alpha versions matching mcp-use's peer range while v2 stabilizes.
+
+## Minimum upgrade (typical MCP server)
+
+### 1. Update dependencies
+
+```json
+{
+  "dependencies": {
+    "mcp-use": "^2.0.0"
+  }
+}
+```
+
+For interim alpha builds where the CLI bin is still published separately:
+
+```json
+{
+  "devDependencies": {
+    "@mcp-use/cli": "^4.0.0"
+  }
+}
+```
+
+Optional (embedded inspector in production builds):
+
+```json
+{
+  "devDependencies": {
+    "@mcp-use/inspector": "^12.0.0"
+  }
+}
+```
+
+### 2. Scripts stay the same
+
+If you use the scaffold defaults, no script changes:
+
+```json
+{
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start"
+  }
+}
+```
+
+If `mcp-use dev` fails with "CLI not found" on an alpha build, install `@mcp-use/cli` or run `npx @mcp-use/cli dev`.
+
+### 3. Server imports (unchanged)
+
+```typescript
+import { MCPServer } from "mcp-use/server";
+// or
+import { MCPServer } from "mcp-use";
+```
+
+Server APIs under `mcp-use/server` remain the primary surface in v2.
+
+## Client and agent apps
+
+Replace root imports:
+
+```typescript
+// Before (deprecated in v2)
+import { MCPClient, MCPAgent } from "mcp-use";
+
+// After
+import { MCPClient } from "@mcp-use/client";
+import { MCPAgent } from "@mcp-use/agent";
+```
+
+Subpaths still work during the transition:
+
+```typescript
+import { MCPClient } from "mcp-use/client";
+import { MCPAgent } from "mcp-use/agent";
+```
+
+Root `import { MCPClient } from "mcp-use"` still works but logs a **deprecation warning** and lazy-loads the underlying module.
+
+## Inspector
+
+### Embedded in your server (`/inspector`)
+
+- **Development:** unchanged — local Vite HMR when running `mcp-use dev`.
+- **Production:** UI loads from `https://inspector-cdn.mcp-use.com` by default (same-origin API stays on your server).
+- **Air-gapped / offline:** set `INSPECTOR_USE_CDN=false` on the server process.
+
+### Standalone
+
+```bash
+npx @mcp-use/inspector
+```
+
+## View / widget servers
+
+- Empty or missing `resources/` → no Vite dev server on boot (tool-only servers work out of the box).
+- File-based views in `resources/*.tsx` → unchanged; interim alphas may still need `@mcp-use/cli` for `dev` / `build`.
+- Inline JSX in server `.ts`/`.tsx` files → the CLI patches `tsconfig.json` on first `dev` / `build`.
+
+## Removed or optional in v2
+
+| Removed / optional | Migration |
+|--------------------|-----------|
+| CJS builds of `mcp-use`, `@mcp-use/client`, `@mcp-use/agent` | Use ESM `import` |
+| Legacy SSE transport (`/sse`, `SSEClientTransport`, `transportType: "sse"`) | Streamable HTTP only |
+| `@mcp-ui/server` | `view()` / `mountViews` from `mcp-use/server` |
+| `@modelcontextprotocol/ext-apps` transitive install | Use `RESOURCE_MIME_TYPE` / `RESOURCE_URI_META_KEY` from `mcp-use/server` |
+| `samplingCallback` / `elicitationCallback` | `onSampling` / `onElicitation` |
+| `customHeaders` / `clientConfig` (useMcp) | `headers` / `clientInfo` |
+| `MCPServer.server` getter | `nativeServer` |
+| `express` (unused) | Use Hono / `mcp-use/server` middleware |
+| `posthog-js` in server install | Optional peer; browser telemetry only |
+| Hard `@mcp-use/cli` + `@mcp-use/inspector` deps | Inspector stays externalized; CLI is moving into the main `mcp-use` package, with `@mcp-use/cli` as an interim-alpha dependency/wrapper |
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="mcp-use: command not found / CLI not installed">
+    Install the CLI: `npm i -D @mcp-use/cli` or use `npx @mcp-use/cli dev`.
+  </Accordion>
+  <Accordion title="Inspector blank in production">
+    Ensure outbound HTTPS to `inspector-cdn.mcp-use.com`, or set `INSPECTOR_USE_CDN=false` and install `@mcp-use/inspector` to serve local `dist/web`.
+  </Accordion>
+  <Accordion title="pnpm: Cannot find package @mcp-use/inspector">
+    Under pnpm, optional peers are not hoisted. Add `@mcp-use/inspector` to your app `devDependencies` if you mount the inspector.
+  </Accordion>
+  <Accordion title="Deprecation warning from mcp-use root import">
+    Switch to `@mcp-use/client` or `@mcp-use/agent` (or `mcp-use/client`, `mcp-use/agent` subpaths).
+  </Accordion>
+  <Accordion title="Inline JSX does not compile">
+    Run `mcp-use dev` or `mcp-use build` once so the CLI can patch `tsconfig.json`, or set `jsx: "react-jsx"` and `jsxImportSource: "mcp-use/jsx"` manually.
+  </Accordion>
+  <Accordion title="SSE client fails to connect">
+    Upgrade to streamable HTTP. SSE is not supported in v2.
+  </Accordion>
+</AccordionGroup>
+
+## Still planned
+
+- Official `@mcp-use/server` npm rename separate from `mcp-use` npm name
+- Hard delete of deprecated widget → view aliases (wire protocol unchanged)
+- Optional `mcp-server.ts` module extraction for maintainability
+
+Track progress in the [changelog](/typescript/changelog/changelog).

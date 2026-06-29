@@ -12,14 +12,13 @@ import type {
   ElicitResult,
   CallToolResult,
   ElicitRequest,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import { runWithContext, getRequestContext } from "../context-storage.js";
 import type {
   ToolDefinition,
   ToolCallback,
   InferToolInput,
   InferToolOutput,
-  InputDefinition,
 } from "../types/index.js";
 import {
   type SessionData,
@@ -32,7 +31,7 @@ import {
  */
 interface ToolServerContext<_HasOAuth extends boolean = false> {
   /** Official MCP Server instance */
-  server: {
+  nativeServer: {
     registerTool: (
       name: string,
       config: Record<string, unknown>,
@@ -64,8 +63,6 @@ interface ToolServerContext<_HasOAuth extends boolean = false> {
   registeredTools: string[];
   /** Convert Zod schema to params */
   convertZodSchemaToParams(schema: z.ZodTypeAny): Record<string, z.ZodSchema>;
-  /** Create params schema from inputs */
-  createParamsSchema(inputs: InputDefinition[]): Record<string, z.ZodSchema>;
   /** Create message for sampling */
   createMessage(
     params: CreateMessageRequest["params"],
@@ -82,20 +79,16 @@ interface ToolServerContext<_HasOAuth extends boolean = false> {
  *
  * Supports Apps SDK metadata for ChatGPT integration via the _meta field.
  *
- * @param toolDefinition - Configuration object containing tool metadata and handler function
+ * @param toolDefinition - Configuration object containing tool metadata
  * @param toolDefinition.name - Unique identifier for the tool
  * @param toolDefinition.description - Optional human-readable description of what the tool does
- * @param toolDefinition.inputs - Array of input parameter definitions (legacy, use schema instead)
- * @param toolDefinition.schema - Zod object schema for input validation (preferred)
+ * @param toolDefinition.schema - Zod object schema for input validation
  * @param toolDefinition.outputSchema - Zod object schema for structured output validation
- * @param toolDefinition.cb - Async callback function that executes the tool logic with provided parameters
- * @param toolDefinition._meta - Optional metadata for the tool (e.g. Apps SDK metadata)
- * @param callback - Optional separate callback function (alternative to cb property)
+ * @param callback - Async callback function that executes the tool logic
  * @returns The server instance for method chaining
  *
  * @example
  * ```typescript
- * // Using Zod schema (preferred)
  * server.tool({
  *   name: 'calculate',
  *   description: 'Performs mathematical calculations',
@@ -103,24 +96,15 @@ interface ToolServerContext<_HasOAuth extends boolean = false> {
  *     expression: z.string(),
  *     precision: z.number().optional()
  *   }),
- *   cb: async ({ expression, precision = 2 }) => {
- *     const result = eval(expression)
- *     return text(`Result: ${result.toFixed(precision)}`)
- *   }
+ * }, async ({ expression, precision = 2 }) => {
+ *   const result = eval(expression)
+ *   return text(`Result: ${result.toFixed(precision)}`)
  * })
  *
- * // Using legacy inputs array
  * server.tool({
  *   name: 'greet',
  *   schema: z.object({ name: z.string().describe("The name to greet") }),
  * }, async ({ name }) => text(`Hello, ${name}!`))
- * )
- *
- * // With separate callback for better typing
- * server.tool({
- *   name: 'add',
- *   schema: z.object({ a: z.number(), b: z.number() })
- * }, async ({ a, b }) => text(`${a + b}`))
  * ```
  */
 export function toolRegistration<
@@ -129,33 +113,12 @@ export function toolRegistration<
 >(
   this: TContext,
   toolDefinition: T,
-  callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, boolean>
+  callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>, boolean>
 ): TContext {
-  // Determine which callback to use
-  const actualCallback = callback || toolDefinition.cb;
+  const inputSchema: z.ZodTypeAny | Record<string, z.ZodSchema> =
+    toolDefinition.schema ?? {};
 
-  if (!actualCallback) {
-    throw new Error(
-      `Tool '${toolDefinition.name}' must have either a cb property or a callback parameter`
-    );
-  }
-
-  // Determine input schema - prefer schema over inputs
-  let inputSchema: z.ZodTypeAny | Record<string, z.ZodSchema>;
-
-  if (toolDefinition.schema) {
-    // Pass the full Zod schema directly to the SDK
-    // The SDK's normalizeObjectSchema() can handle full Zod object schemas
-    inputSchema = toolDefinition.schema;
-  } else if (toolDefinition.inputs && toolDefinition.inputs.length > 0) {
-    // Fall back to inputs array for backward compatibility
-    inputSchema = this.createParamsSchema(toolDefinition.inputs);
-  } else {
-    // No schema defined - pass empty object which SDK converts to z.object({})
-    inputSchema = {};
-  }
-
-  this.server.registerTool(
+  this.nativeServer.registerTool(
     toolDefinition.name,
     {
       title: toolDefinition.title,
@@ -217,7 +180,7 @@ export function toolRegistration<
       const enhancedContext = createEnhancedContext(
         requestContext,
         this.createMessage.bind(this),
-        this.server.server.elicitInput.bind(this.server.server),
+        this.nativeServer.server.elicitInput.bind(this.nativeServer.server),
         progressToken,
         sendNotification,
         session?.logLevel,
@@ -230,10 +193,10 @@ export function toolRegistration<
 
       // Execute callback
       const executeCallback = async () => {
-        if (actualCallback.length >= 2) {
-          return await (actualCallback as any)(params, enhancedContext);
+        if (callback.length >= 2) {
+          return await (callback as any)(params, enhancedContext);
         }
-        return await (actualCallback as any)(params);
+        return await (callback as any)(params);
       };
 
       if (requestContext) {

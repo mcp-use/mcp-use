@@ -11,21 +11,15 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
+const originalFetch = globalThis.fetch;
+const mockFetch = vi.fn(async () => new Response("", { status: 200 }));
 
-// Mock PostHog before importing Telemetry
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+type RawPostHogBatchEvent = {
+  event: string;
+  distinct_id: string;
+  properties: Record<string, unknown>;
+  timestamp: string;
+};
 
 // Mock fs module
 vi.mock("node:fs", () => ({
@@ -46,6 +40,7 @@ describe("Telemetry", () => {
   beforeEach(() => {
     // Save original environment
     originalEnv = { ...process.env };
+    globalThis.fetch = mockFetch as typeof fetch;
     // Reset modules to get fresh Telemetry instance
     vi.resetModules();
   });
@@ -53,8 +48,21 @@ describe("Telemetry", () => {
   afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
+    globalThis.fetch = originalFetch;
     vi.clearAllMocks();
   });
+
+  function latestPostHogBatch(): RawPostHogBatchEvent[] {
+    const call = mockFetch.mock.calls
+      .filter(([url]) => String(url).includes("/batch/"))
+      .at(-1);
+    expect(call).toBeDefined();
+    return (
+      JSON.parse(String(call?.[1]?.body)) as {
+        batch: RawPostHogBatchEvent[];
+      }
+    ).batch;
+  }
 
   describe("singleton pattern", () => {
     it("should return the same instance on multiple calls", async () => {
@@ -146,7 +154,7 @@ describe("Telemetry", () => {
 
     it("should capture events with correct properties when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockCapture.mockClear();
+      mockFetch.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
@@ -164,10 +172,12 @@ describe("Telemetry", () => {
       });
 
       await telemetry.capture(event);
+      await telemetry.shutdown();
 
-      expect(mockCapture).toHaveBeenCalledWith(
+      expect(latestPostHogBatch()).toContainEqual(
         expect.objectContaining({
           event: "mcpclient_init",
+          distinct_id: expect.any(String),
           properties: expect.objectContaining({
             code_mode: true,
             all_callbacks: true,
@@ -361,36 +371,59 @@ describe("Telemetry", () => {
   });
 
   describe("flush and shutdown", () => {
-    it("should call PostHog flush when telemetry is enabled", async () => {
+    it("should flush queued PostHog events when telemetry is enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockFlush.mockClear();
+      mockFetch.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
+      const { MCPClientInitEvent } =
+        await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
 
-      // Wait for PostHog to initialize (it's async)
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await telemetry.capture(
+        new MCPClientInitEvent({
+          codeMode: false,
+          sandbox: false,
+          allCallbacks: false,
+          verify: false,
+          servers: [],
+          numServers: 0,
+          isBrowser: false,
+        })
+      );
 
       telemetry.flush();
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(mockFlush).toHaveBeenCalled();
+      expect(latestPostHogBatch()[0].event).toBe("mcpclient_init");
     });
 
-    it("should call PostHog shutdown when telemetry is enabled", async () => {
+    it("should flush on shutdown when telemetry is enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockShutdown.mockClear();
+      mockFetch.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
+      const { MCPClientInitEvent } =
+        await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
 
-      // Wait for PostHog to initialize (it's async)
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await telemetry.capture(
+        new MCPClientInitEvent({
+          codeMode: false,
+          sandbox: false,
+          allCallbacks: false,
+          verify: false,
+          servers: [],
+          numServers: 0,
+          isBrowser: false,
+        })
+      );
 
-      telemetry.shutdown();
+      await telemetry.shutdown();
 
-      expect(mockShutdown).toHaveBeenCalled();
+      expect(latestPostHogBatch()[0].event).toBe("mcpclient_init");
     });
   });
 });

@@ -11,7 +11,12 @@ import {
   decodeProtectedHeader,
   decodeJwt,
 } from "jose";
-import type { OAuthProvider, UserInfo, SupabaseOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  SupabaseOAuthConfig,
+  OAuthTokenVerificationResult,
+} from "./types.js";
 
 export class SupabaseOAuthProvider implements OAuthProvider {
   private config: SupabaseOAuthConfig;
@@ -44,7 +49,7 @@ export class SupabaseOAuthProvider implements OAuthProvider {
     return this.jwks;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<OAuthTokenVerificationResult> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
       console.warn(

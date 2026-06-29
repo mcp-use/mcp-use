@@ -1,4 +1,4 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 import { Card } from "@/components/card";
@@ -25,7 +25,7 @@ export const widgetMetadata: WidgetMetadata = {
 type ItemsProps = z.infer<typeof propSchema>;
 
 const ItemsDisplay: React.FC = () => {
-  const { props } = useWidget<ItemsProps>();
+  const { props } = useView<ItemsProps>();
   return (
     <div style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
       <Card title="Items (from @/lib/server-data)">

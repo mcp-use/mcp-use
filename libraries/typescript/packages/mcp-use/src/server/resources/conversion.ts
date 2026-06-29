@@ -2,7 +2,7 @@ import type {
   CallToolResult,
   ReadResourceResult,
   ResourceContents,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 
 /**
  * Check if a result is a ReadResourceResult (has 'contents' array)
@@ -20,7 +20,7 @@ function isReadResourceResult(
 function extractMimeType(result: CallToolResult): string {
   // Check _meta for explicit MIME type
   if (result._meta && typeof result._meta === "object") {
-    const meta = result._meta as Record<string, any>;
+    const meta = result._meta as Record<string, unknown>;
     if (meta.mimeType && typeof meta.mimeType === "string") {
       return meta.mimeType;
     }
@@ -32,7 +32,7 @@ function extractMimeType(result: CallToolResult): string {
 
     // Image content
     if (firstContent.type === "image") {
-      return (firstContent as any).mimeType || "image/png";
+      return (firstContent as { mimeType?: string }).mimeType || "image/png";
     }
 
     // Text content - default to text/plain
@@ -42,7 +42,11 @@ function extractMimeType(result: CallToolResult): string {
 
     // Resource content
     if (firstContent.type === "resource") {
-      const resourceData = (firstContent as any).resource;
+      const resourceData = (
+        firstContent as {
+          resource?: { mimeType?: string };
+        }
+      ).resource;
       return resourceData?.mimeType || "application/octet-stream";
     }
   }
@@ -56,7 +60,7 @@ function extractMimeType(result: CallToolResult): string {
  */
 function isBinaryContent(result: CallToolResult): boolean {
   if (result._meta && typeof result._meta === "object") {
-    const meta = result._meta as Record<string, any>;
+    const meta = result._meta as Record<string, unknown>;
     return meta.isBinary === true || meta.isImage === true;
   }
   return false;

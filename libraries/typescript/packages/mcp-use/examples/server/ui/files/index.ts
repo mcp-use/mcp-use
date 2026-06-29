@@ -1,4 +1,4 @@
-import { MCPServer, widget } from "mcp-use/server";
+import { MCPServer, view } from "mcp-use/server";
 import { z } from "zod";
 
 /**
@@ -36,7 +36,7 @@ server.tool(
     },
   },
   async () => {
-    return widget({
+    return view({
       props: {},
       message:
         "File manager opened. You can upload files and retrieve download links. " +

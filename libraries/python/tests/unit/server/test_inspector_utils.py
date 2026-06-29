@@ -51,6 +51,49 @@ def _make_request(path: str, query_string: bytes = b"") -> Request:
     return Request(scope)
 
 
+def test_resolve_inspector_use_cdn_defaults_to_cdn():
+    assert inspector_utils.resolve_inspector_use_cdn({}) is True
+
+
+def test_resolve_inspector_use_cdn_honors_false():
+    assert inspector_utils.resolve_inspector_use_cdn({"INSPECTOR_USE_CDN": "false"}) is False
+
+
+def test_resolve_inspector_use_cdn_honors_true():
+    assert inspector_utils.resolve_inspector_use_cdn({"INSPECTOR_USE_CDN": "true"}) is True
+
+
+def test_get_inspector_version_prefers_env():
+    assert (
+        inspector_utils.get_inspector_version({"INSPECTOR_VERSION": "1.2.3"})
+        == "1.2.3"
+    )
+
+
+def test_get_inspector_version_falls_back_to_latest():
+    assert inspector_utils.get_inspector_version({}) == "latest"
+
+
+def test_inspector_cdn_js_url_uses_versioned_bundle():
+    url = inspector_utils.inspector_cdn_js_url(
+        cdn_base="https://inspector-cdn.mcp-use.com",
+        inspector_version="11.0.0",
+    )
+    assert url == "https://inspector-cdn.mcp-use.com/inspector@11.0.0.js"
+
+
+def test_generate_cdn_shell_html_loads_versioned_bundle():
+    html = inspector_utils.generate_cdn_shell_html(
+        cdn_base="https://inspector-cdn.mcp-use.com",
+        inspector_version="11.0.0",
+    )
+
+    assert 'src="https://inspector-cdn.mcp-use.com/inspector@11.0.0.js"' in html
+    assert "window.__MCP_INSPECTOR_MODE__ = 'embedded'" in html
+    assert "window.__MCP_PROXY_URL__ = null" in html
+    assert "window.__INSPECTOR_VERSION__ = '11.0.0'" in html
+
+
 @pytest.mark.anyio
 async def test_inspector_index_redirects_to_prefixed_path():
     response = await inspector_utils._inspector_index(
@@ -64,7 +107,26 @@ async def test_inspector_index_redirects_to_prefixed_path():
 
 
 @pytest.mark.anyio
-async def test_inspector_index_rewrites_asset_paths_for_custom_mount(monkeypatch):
+async def test_inspector_index_serves_cdn_shell_by_default(monkeypatch):
+    monkeypatch.delenv("INSPECTOR_USE_CDN", raising=False)
+
+    response = await inspector_utils._inspector_index(
+        _make_request("/mcp/inspector", b"autoConnect=http://testserver/mcp"),
+        mcp_path="/mcp",
+        inspector_path="/mcp/inspector",
+    )
+
+    body = response.body.decode("utf-8")
+    assert response.status_code == 200
+    assert "inspector-cdn.mcp-use.com/inspector@" in body
+    assert 'type="module"' in body
+    assert "/inspector/assets/" not in body
+
+
+@pytest.mark.anyio
+async def test_inspector_index_rewrites_asset_paths_for_unpkg_fallback(monkeypatch):
+    monkeypatch.setenv("INSPECTOR_USE_CDN", "false")
+
     html = """
     <html>
       <head>
@@ -88,8 +150,8 @@ async def test_inspector_index_rewrites_asset_paths_for_custom_mount(monkeypatch
 
     body = response.body.decode("utf-8")
     assert response.status_code == 200
-    assert f"{inspector_utils.INSPECTOR_CDN_BASE_URL}/assets/index.js" in body
-    assert f"{inspector_utils.INSPECTOR_CDN_BASE_URL}/assets/index.css" in body
+    assert f"{inspector_utils.UNPKG_DIST_BASE}/assets/index.js" in body
+    assert f"{inspector_utils.UNPKG_DIST_BASE}/assets/index.css" in body
     assert "/inspector/assets/" not in body
 
 

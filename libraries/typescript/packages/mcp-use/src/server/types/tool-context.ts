@@ -9,7 +9,7 @@ import type {
   CreateMessageRequest,
   CreateMessageResult,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import type { z } from "zod";
 import type { UserContext } from "../tools/tool-execution-helpers.js";
 
@@ -111,7 +111,7 @@ export interface ElicitFormParams {
   /** Human-readable message explaining why the information is needed */
   message: string;
   /** JSON Schema defining the structure of the expected response */
-  requestedSchema: Record<string, any>;
+  requestedSchema: Record<string, unknown>;
   /** Mode specifier (optional for backwards compatibility, defaults to "form") */
   mode?: "form";
 }
@@ -337,7 +337,7 @@ export interface ToolContext {
      * // { sampling: {}, roots: { listChanged: true }, elicitation: { form: {}, url: {} } }
      * ```
      */
-    capabilities(): Record<string, any>;
+    capabilities(): Record<string, unknown>;
 
     /**
      * Get the connecting client's name and version from the MCP initialize handshake.
@@ -366,7 +366,7 @@ export interface ToolContext {
      * }
      * ```
      */
-    extension(id: string): Record<string, any> | undefined;
+    extension(id: string): Record<string, unknown> | undefined;
 
     /**
      * Returns `true` if the client advertises MCP Apps support

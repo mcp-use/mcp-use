@@ -5,11 +5,7 @@
  * Implements the MCP resources/subscribe and resources/unsubscribe protocol.
  */
 
-import type { McpServer as OfficialMcpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import {
-  SubscribeRequestSchema,
-  UnsubscribeRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import type { McpServer as OfficialMcpServer } from "@modelcontextprotocol/server";
 import type { SessionData } from "../sessions/index.js";
 import { getRequestContext } from "../context-storage.js";
 
@@ -35,7 +31,7 @@ export class ResourceSubscriptionManager {
   ): void {
     // Register resources/subscribe handler per MCP specification
     server.server.setRequestHandler(
-      SubscribeRequestSchema,
+      "resources/subscribe",
       async (request: { params: { uri: string } }) => {
         const { uri } = request.params;
 
@@ -65,7 +61,7 @@ export class ResourceSubscriptionManager {
 
     // Register resources/unsubscribe handler per MCP specification
     server.server.setRequestHandler(
-      UnsubscribeRequestSchema,
+      "resources/unsubscribe",
       async (request: { params: { uri: string } }) => {
         const { uri } = request.params;
 

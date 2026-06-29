@@ -2,7 +2,7 @@ import type {
   CallToolResult,
   ContentBlock,
   Prompt,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import type { McpServer } from "mcp-use/react";
 import React, {
   useCallback,

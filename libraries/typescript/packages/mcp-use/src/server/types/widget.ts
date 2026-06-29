@@ -1,9 +1,9 @@
 import type { AppsSdkMetadata } from "./resource.js";
 import type { InputDefinition, ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from "@modelcontextprotocol/server";
 import type { z } from "zod";
-import type { CSPConfig } from "../widgets/adapters/types.js";
+import type { CSPConfig } from "../views/adapters/types.js";
 
 export interface WidgetMetadata {
   /**

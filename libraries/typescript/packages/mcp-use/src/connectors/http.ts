@@ -1,13 +1,9 @@
-import {
-  Client,
-  type ClientOptions,
-} from "@modelcontextprotocol/sdk/client/index.js";
+import { Client, type ClientOptions } from "@modelcontextprotocol/client";
 import {
   StreamableHTTPClientTransport,
-  StreamableHTTPError,
-} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+  SdkHttpError,
+} from "@modelcontextprotocol/client";
 import { logger } from "../logging.js";
-import { SseConnectionManager } from "../task_managers/sse.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
@@ -31,8 +27,6 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
   timeout?: number; // HTTP request timeout (ms)
   sseReadTimeout?: number; // SSE read timeout (ms)
   clientInfo?: ClientInfo;
-  preferSse?: boolean; // Force SSE transport instead of trying streamable HTTP first
-  disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
   gatewayUrl?: string; // Optional gateway URL to route requests through
   serverId?: string; // Optional server ID for gateway observability
   reconnectionOptions?: {
@@ -44,7 +38,7 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
 }
 
 type StreamableHttpFailure = {
-  fallbackReason: string;
+  reason: string;
   is401Error: boolean;
   httpStatusCode?: number;
 };
@@ -56,12 +50,10 @@ export class HttpConnector extends BaseConnector {
   private readonly sseReadTimeout: number;
   private readonly customFetch?: typeof fetch;
   private readonly clientInfo: ClientInfo;
-  private readonly preferSse: boolean;
-  private readonly disableSseFallback: boolean;
   private readonly gatewayUrl?: string;
   private readonly serverId?: string;
   private readonly reconnectionOptions?: HttpConnectorOptions["reconnectionOptions"];
-  private transportType: "streamable-http" | "sse" | null = null;
+  private transportType: "streamable-http" | null = null;
   private streamableTransport: StreamableHTTPClientTransport | null = null;
 
   constructor(baseUrl: string, opts: HttpConnectorOptions = {}) {
@@ -103,8 +95,6 @@ export class HttpConnector extends BaseConnector {
       name: "http-connector",
       version: "1.0.0",
     };
-    this.preferSse = opts.preferSse ?? false;
-    this.disableSseFallback = opts.disableSseFallback ?? false;
     this.reconnectionOptions = opts.reconnectionOptions;
   }
 
@@ -115,49 +105,51 @@ export class HttpConnector extends BaseConnector {
         ...(this.opts.clientOptions?.capabilities || {}),
         roots: { listChanged: true },
         ...(this.opts.onSampling ? { sampling: {} } : {}),
-        ...((this.opts.onElicitation ?? this.opts.elicitationCallback)
+        ...(this.opts.onElicitation
           ? { elicitation: { form: {}, url: {} } }
           : {}),
       },
     };
   }
 
-  private unwrapStreamableError(err: unknown): StreamableHTTPError | null {
-    if (err instanceof StreamableHTTPError) {
+  private unwrapStreamableError(err: unknown): SdkHttpError | null {
+    if (err instanceof SdkHttpError) {
       return err;
     }
-    if (err instanceof Error && err.cause instanceof StreamableHTTPError) {
+    if (err instanceof Error && err.cause instanceof SdkHttpError) {
       return err.cause;
     }
     return null;
   }
 
   private classifyStreamableHttpFailure(err: unknown): StreamableHttpFailure {
-    let fallbackReason = "Unknown error";
+    let reason = "Unknown error";
     let is401Error = false;
     let httpStatusCode: number | undefined;
 
     const streamableErr = this.unwrapStreamableError(err);
     if (streamableErr) {
-      is401Error = streamableErr.code === 401;
-      httpStatusCode = streamableErr.code;
+      // ponytail: v2 types SdkHttpError.code as SdkErrorCode; runtime uses HTTP status
+      const httpCode = streamableErr.code as unknown as number;
+      is401Error = httpCode === 401;
+      httpStatusCode = httpCode;
 
       if (
-        streamableErr.code === 400 &&
+        httpCode === 400 &&
         streamableErr.message.includes("Missing session ID")
       ) {
-        fallbackReason =
-          "Server requires session ID (FastMCP compatibility) - using SSE transport";
-        logger.warn(`⚠️  ${fallbackReason}`);
-      } else if (streamableErr.code === 404 || streamableErr.code === 405) {
-        fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
-        logger.debug(fallbackReason);
+        reason =
+          "Server requires session ID (FastMCP compatibility) but streamable HTTP failed";
+        logger.warn(`⚠️  ${reason}`);
+      } else if (httpCode === 404 || httpCode === 405) {
+        reason = `Server returned ${httpCode} - server likely doesn't support streamable HTTP`;
+        logger.debug(reason);
       } else {
-        fallbackReason = `Server returned ${streamableErr.code}: ${streamableErr.message}`;
-        logger.debug(fallbackReason);
+        reason = `Server returned ${httpCode}: ${streamableErr.message}`;
+        logger.debug(reason);
       }
 
-      return { fallbackReason, is401Error, httpStatusCode };
+      return { reason, is401Error, httpStatusCode };
     }
 
     if (err instanceof Error) {
@@ -171,113 +163,54 @@ export class HttpConnector extends BaseConnector {
         errorStr.includes("Bad Request: Missing session ID") ||
         errorMsg.includes("FastMCP session ID error")
       ) {
-        fallbackReason =
-          "Server requires session ID (FastMCP compatibility) - using SSE transport";
-        logger.warn(`⚠️  ${fallbackReason}`);
+        reason =
+          "Server requires session ID (FastMCP compatibility) but streamable HTTP failed";
+        logger.warn(`⚠️  ${reason}`);
       } else if (
         errorStr.includes("405 Method Not Allowed") ||
         errorStr.includes("404 Not Found")
       ) {
-        fallbackReason = "Server doesn't support streamable HTTP (405/404)";
-        logger.debug(fallbackReason);
+        reason = "Server doesn't support streamable HTTP (405/404)";
+        logger.debug(reason);
       } else {
-        fallbackReason = `Streamable HTTP failed: ${err.message}`;
-        logger.debug(fallbackReason);
+        reason = `Streamable HTTP failed: ${err.message}`;
+        logger.debug(reason);
       }
     }
 
-    return { fallbackReason, is401Error, httpStatusCode };
+    return { reason, is401Error, httpStatusCode };
   }
 
-  /** Establish connection to the MCP implementation via HTTP (streamable or SSE). */
+  /** Establish connection to the MCP implementation via streamable HTTP. */
   async connect(): Promise<void> {
     if (this.connected) {
       logger.debug("Already connected to MCP implementation");
       return;
     }
 
-    // baseUrl is already set correctly in constructor:
-    // - If gateway is configured: baseUrl = gateway URL (with X-Target-URL header)
-    // - If no gateway: baseUrl = original URL
     const baseUrl = this.baseUrl;
-
-    // If preferSse is set, skip directly to SSE
-    if (this.preferSse) {
-      logger.debug(`Connecting to MCP implementation via HTTP/SSE: ${baseUrl}`);
-      await this.connectWithSse(baseUrl);
-      return;
-    }
-
-    // Try streamable HTTP first, then fall back to SSE
     logger.debug(`Connecting to MCP implementation via HTTP: ${baseUrl}`);
 
     try {
-      // Try streamable HTTP transport first (debug: routine connection detail, not info-level)
       logger.debug("🔄 Attempting streamable HTTP transport...");
       await this.connectWithStreamableHttp(baseUrl);
       logger.debug("✅ Successfully connected via streamable HTTP");
     } catch (err: unknown) {
       logger.debug("Streamable HTTP connect failed", err);
-      const { fallbackReason, is401Error, httpStatusCode } =
-        this.classifyStreamableHttpFailure(err);
+      const { reason, is401Error } = this.classifyStreamableHttpFailure(err);
 
-      // Don't fallback on 401 - SSE will fail too
       if (is401Error) {
-        logger.info("Authentication required - skipping SSE fallback");
+        logger.info("Authentication required");
         await this.cleanupResources();
-        const authError = new Error("Authentication required") as any;
+        const authError = new Error("Authentication required") as Error & {
+          code: number;
+        };
         authError.code = 401;
         throw authError;
       }
 
-      if (this.disableSseFallback) {
-        logger.info("SSE fallback disabled - failing connection");
-        await this.cleanupResources();
-        throw new Error(`Streamable HTTP connection failed: ${fallbackReason}`);
-      }
-
-      // Always try SSE fallback for maximum compatibility
-      logger.debug("🔄 Falling back to SSE transport...");
-
-      try {
-        await this.connectWithSse(baseUrl);
-      } catch (sseErr: any) {
-        logger.error("Failed to connect with both transports:");
-        logger.error(`  Streamable HTTP: ${fallbackReason}`);
-        logger.error(`  SSE: ${sseErr}`);
-        await this.cleanupResources();
-
-        // Preserve 401 error code if SSE also failed with 401
-        const sseIs401 =
-          sseErr?.message?.includes("401") ||
-          sseErr?.message?.includes("Unauthorized");
-        if (sseIs401) {
-          const authError = new Error("Authentication required") as any;
-          authError.code = 401;
-          throw authError;
-        }
-
-        // Preserve original HTTP status code if it was captured
-        // This allows useMcp's proxy fallback to detect 4xx errors
-        const finalError = new Error(
-          `Could not connect to server with any available transport. Streamable HTTP: ${fallbackReason}`
-        );
-
-        if (httpStatusCode !== undefined) {
-          // Use Object.defineProperty to ensure the code property is properly set and accessible
-          Object.defineProperty(finalError, "code", {
-            value: httpStatusCode,
-            writable: false,
-            enumerable: true,
-            configurable: true,
-          });
-          logger.debug(
-            `Preserving HTTP status code ${httpStatusCode} in error for proxy fallback detection`
-          );
-        }
-
-        throw finalError;
-      }
+      await this.cleanupResources();
+      throw new Error(`Streamable HTTP connection failed: ${reason}`);
     }
   }
 
@@ -291,14 +224,10 @@ export class HttpConnector extends BaseConnector {
         headers: this.headers,
       });
 
-      // Create StreamableHTTPClientTransport directly
-      // The official SDK's StreamableHTTPClientTransport automatically handles session IDs
-      // when client.connect() is called - it sends initialize, gets session ID from response header,
-      // and opens the SSE stream with that session ID
       const streamableTransport = new StreamableHTTPClientTransport(
         new URL(baseUrl),
         {
-          authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK
+          authProvider: this.opts.authProvider,
           fetch: this.customFetch,
           requestInit: {
             headers: this.headers,
@@ -310,25 +239,19 @@ export class HttpConnector extends BaseConnector {
             maxRetries: 2,
             ...this.reconnectionOptions,
           },
-          // Don't pass sessionId - let the SDK generate it automatically during connect()
         }
       );
 
-      // Store transport for cleanup (we'll create ConnectionManager later if needed for reconnection)
       let transport: StreamableHTTPClientTransport = streamableTransport;
 
-      // Wrap transport if wrapper is provided
       if (this.opts.wrapTransport) {
-        const serverId = this.baseUrl; // Use URL as server ID for now
+        const serverId = this.baseUrl;
         transport = this.opts.wrapTransport(
           transport,
           serverId
         ) as StreamableHTTPClientTransport;
       }
 
-      // Create and connect the client
-      // This performs both initialize AND initialized notification
-      // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = this.buildClientOptions();
       logger.debug(
         `Creating Client with capabilities:`,
@@ -336,23 +259,14 @@ export class HttpConnector extends BaseConnector {
       );
       this.client = new Client(this.clientInfo, clientOptions);
 
-      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
-      // The server may call roots/list during initialization if it advertises roots capability
       this.setupRootsHandler();
       logger.debug("Roots handler registered before connect");
 
       try {
-        // Connect with timeout
-        // The SDK's StreamableHTTPClientTransport should automatically:
-        // 1. Send POST initialize request
-        // 2. Extract mcp-session-id from response header
-        // 3. Open GET SSE stream with that session ID in header
         await this.client.connect(transport, {
           timeout: this.timeout,
         });
 
-        // Verify session ID is available after connect
-        // The transport should have the session ID from the initialize response
         const sessionId = streamableTransport.sessionId;
         if (sessionId) {
           logger.debug(`Session ID obtained: ${sessionId}`);
@@ -362,7 +276,6 @@ export class HttpConnector extends BaseConnector {
           );
         }
       } catch (connectErr) {
-        // Check if the error is due to missing session ID during connection handshake
         if (connectErr instanceof Error) {
           const errMsg = connectErr.message || connectErr.toString();
           if (
@@ -370,7 +283,6 @@ export class HttpConnector extends BaseConnector {
             errMsg.includes("Bad Request: Missing session ID") ||
             errMsg.includes("Mcp-Session-Id header is required")
           ) {
-            // Wrap it in a more specific error so the outer catch can detect it
             const wrappedError = new Error(
               `Session ID error: ${errMsg}. The SDK should automatically extract session ID from initialize response.`
             );
@@ -381,13 +293,7 @@ export class HttpConnector extends BaseConnector {
         throw connectErr;
       }
 
-      // Store the transport for later cleanup
       this.streamableTransport = streamableTransport;
-      // Create a minimal connection manager wrapper for cleanup purposes.
-      // Note: terminateSession() is invoked from cleanupResources() *before*
-      // the SDK's client.close() aborts the transport's abort controller.
-      // Calling terminateSession() here would race the abort and surface a
-      // spurious AbortError on every clean shutdown.
       this.connectionManager = {
         stop: async () => {
           if (this.streamableTransport) {
@@ -400,82 +306,22 @@ export class HttpConnector extends BaseConnector {
             }
           }
         },
-      } as any;
+      };
 
       this.connected = true;
       this.transportType = "streamable-http";
       this.setupNotificationHandler();
       this.setupSamplingHandler();
       this.setupElicitationHandler();
-      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
       );
 
-      // Track connector initialization
       this.trackConnectorInit({
         serverUrl: this.baseUrl,
         publicIdentifier: `${this.baseUrl} (streamable-http)`,
       });
     } catch (err) {
-      // Clean up partial resources before throwing
-      await this.cleanupResources();
-      throw err;
-    }
-  }
-
-  private async connectWithSse(baseUrl: string): Promise<void> {
-    try {
-      // Create and start the SSE connection manager
-      // Note: The MCP SDK's SSEClientTransport doesn't expose timeout configuration directly
-      // Timeout handling is managed by the underlying EventSource and fetch implementations
-      this.connectionManager = new SseConnectionManager(baseUrl, {
-        authProvider: this.opts.authProvider, // ← Pass OAuth provider to SDK (same as streamable HTTP)
-        requestInit: {
-          headers: this.headers,
-        },
-      });
-      let transport = await this.connectionManager.start();
-
-      // Wrap transport if wrapper is provided
-      if (this.opts.wrapTransport) {
-        const serverId = this.baseUrl; // Use URL as server ID for now
-        transport = this.opts.wrapTransport(transport, serverId);
-      }
-
-      // Create and connect the client
-      // Always advertise roots capability - server may query roots/list even if client has no roots
-      const clientOptions = this.buildClientOptions();
-      logger.debug(
-        `Creating Client with capabilities (SSE):`,
-        JSON.stringify(clientOptions.capabilities, null, 2)
-      );
-      this.client = new Client(this.clientInfo, clientOptions);
-
-      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
-      // The server may call roots/list during initialization if it advertises roots capability
-      this.setupRootsHandler();
-      logger.debug("Roots handler registered before connect (SSE)");
-
-      await this.client.connect(transport);
-
-      this.connected = true;
-      this.transportType = "sse";
-      this.setupNotificationHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
-      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
-      logger.debug(
-        `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`
-      );
-
-      // Track connector initialization
-      this.trackConnectorInit({
-        serverUrl: this.baseUrl,
-        publicIdentifier: `${this.baseUrl} (sse)`,
-      });
-    } catch (err) {
-      // Clean up partial resources before throwing
       await this.cleanupResources();
       throw err;
     }
@@ -489,17 +335,11 @@ export class HttpConnector extends BaseConnector {
     };
   }
 
-  /**
-   * Get the transport type being used (streamable-http or sse)
-   */
-  getTransportType(): "streamable-http" | "sse" | null {
+  /** Get the transport type being used (streamable-http). */
+  getTransportType(): "streamable-http" | null {
     return this.transportType;
   }
 
-  // Send the streamable-HTTP DELETE *before* super.cleanupResources() invokes
-  // client.close(). The SDK's transport.close() aborts the shared abort
-  // controller, and terminateSession()'s DELETE fetch reuses that signal —
-  // running it after close() rejects immediately with AbortError.
   protected async cleanupResources(): Promise<void> {
     if (this.streamableTransport) {
       try {

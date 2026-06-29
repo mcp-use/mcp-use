@@ -628,17 +628,4 @@ export function setupOAuthRoutes(
       bearer_methods_supported: ["header"],
     });
   });
-
-  // Path-scoped protected resource metadata for the `/sse` transport, which is
-  // mounted alongside `/mcp` and is equally protected by the bearer middleware.
-  app.get("/.well-known/oauth-protected-resource/sse", (c: Context) => {
-    const authServer = proxyMode ? baseUrl : oauth.getIssuer();
-
-    return c.json({
-      resource: `${baseUrl}/sse`,
-      authorization_servers: [authServer],
-      scopes_supported: oauth.getScopesSupported(),
-      bearer_methods_supported: ["header"],
-    });
-  });
 }

@@ -17,8 +17,8 @@ import {
   getRequestContext,
   object,
 } from "../../src/server/index.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 const TEST_PORT = 3097;
 const SERVER_URL = `http://localhost:${TEST_PORT}/mcp`;
@@ -53,10 +53,6 @@ describe("Request Context Propagation — getRequestContext and ctx.auth in tool
 
     // Simulate OAuth middleware: set auth on the Hono Context before MCP routes
     server.app.use("/mcp", async (c, next) => {
-      c.set("auth", { token: "test-token" });
-      await next();
-    });
-    server.app.use("/sse", async (c, next) => {
       c.set("auth", { token: "test-token" });
       await next();
     });

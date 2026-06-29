@@ -2,7 +2,13 @@ import type {
   CallToolResult,
   GetPromptResult,
   PromptMessage,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
 
 /**
  * Check if a result is a GetPromptResult (has 'messages' array)
@@ -44,17 +50,18 @@ export function convertToolResultToPromptResult(
   const messages: PromptMessage[] = [];
 
   // Normalize content to an array for consistent processing
-  let contentArray: any[] = [];
-  if ((result as any).content) {
-    const content = (result as any).content;
+  let contentArray: unknown[] = [];
+  const resultRecord = asRecord(result);
+  if (resultRecord?.content) {
+    const content = resultRecord.content;
     if (Array.isArray(content)) {
       // Standard case: content is already an array
       contentArray = content;
-    } else if (typeof content === "object" && content.type) {
+    } else if (asRecord(content)?.type) {
       // Edge case: content is a single object with type (wrap in array)
       contentArray = [content];
     }
-  } else if (typeof result === "object" && (result as any).type) {
+  } else if (resultRecord?.type) {
     // Edge case: result itself is a bare content item (no content property)
     contentArray = [result];
   }
@@ -63,7 +70,8 @@ export function convertToolResultToPromptResult(
   for (const content of contentArray) {
     // Each content item becomes a user message
     // According to MCP spec, prompt messages can have text, image, audio, or resource content
-    if (content.type === "text") {
+    const contentRecord = asRecord(content);
+    if (contentRecord?.type === "text") {
       const textContent = content as { type: "text"; text: string };
       messages.push({
         role: "user",
@@ -72,7 +80,7 @@ export function convertToolResultToPromptResult(
           text: textContent.text,
         },
       });
-    } else if (content.type === "image") {
+    } else if (contentRecord?.type === "image") {
       const imageContent = content as {
         type: "image";
         data: string;
@@ -86,7 +94,7 @@ export function convertToolResultToPromptResult(
           mimeType: imageContent.mimeType || "image/png",
         },
       });
-    } else if (content.type === "resource") {
+    } else if (contentRecord?.type === "resource") {
       // Embedded resource in prompt
       const resourceContent = content as {
         type: "resource";
@@ -98,24 +106,26 @@ export function convertToolResultToPromptResult(
         };
       };
 
-      const resourceData = resourceContent.resource;
-      const embeddedResource: any = {
-        type: "resource",
-        resource: {
-          uri: resourceData.uri,
-          mimeType: resourceData.mimeType,
-        },
-      };
-
-      if (resourceData.text) {
-        embeddedResource.resource.text = resourceData.text;
-      } else if (resourceData.blob) {
-        embeddedResource.resource.blob = resourceData.blob;
-      }
-
       messages.push({
         role: "user",
-        content: embeddedResource,
+        content:
+          resourceContent.resource.blob !== undefined
+            ? {
+                type: "resource",
+                resource: {
+                  uri: resourceContent.resource.uri,
+                  mimeType: resourceContent.resource.mimeType,
+                  blob: resourceContent.resource.blob,
+                },
+              }
+            : {
+                type: "resource",
+                resource: {
+                  uri: resourceContent.resource.uri,
+                  mimeType: resourceContent.resource.mimeType,
+                  text: resourceContent.resource.text ?? "",
+                },
+              },
       });
     }
   }

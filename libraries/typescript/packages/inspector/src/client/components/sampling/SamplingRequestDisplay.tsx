@@ -16,8 +16,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
-import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageResult } from "@modelcontextprotocol/client";
 import {
   Check,
   Copy,
@@ -204,15 +203,7 @@ export function SamplingRequestDisplay({
   const handleApprove = () => {
     if (!request) return;
 
-    const validationResult = CreateMessageResultSchema.safeParse(messageResult);
-    if (!validationResult.success) {
-      toast.error("Invalid response", {
-        description: `Validation failed: ${validationResult.error.message}`,
-      });
-      return;
-    }
-
-    onApprove(request.id, validationResult.data);
+    onApprove(request.id, messageResult as CreateMessageResult);
     onClose();
 
     // Show success toast with navigation back to tools tab

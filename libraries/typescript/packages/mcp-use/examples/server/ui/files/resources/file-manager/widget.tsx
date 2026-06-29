@@ -1,7 +1,7 @@
 import {
   McpUseProvider,
   useFiles,
-  useWidget,
+  useView,
   type WidgetMetadata,
 } from "mcp-use/react";
 import React, { useRef, useState } from "react";
@@ -25,7 +25,7 @@ type UploadedFile = {
 };
 
 const FileManager: React.FC = () => {
-  const { isPending, theme } = useWidget();
+  const { isPending, theme } = useView();
   const { upload, getDownloadUrl, isSupported } = useFiles();
   const isDark = theme === "dark";
 

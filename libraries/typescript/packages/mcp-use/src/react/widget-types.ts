@@ -13,7 +13,7 @@ export type FileMetadata = { fileId: string };
 /**
  * Registry for tool type definitions. This interface is automatically augmented
  * by the dev server when you use `mcp-use dev`. Type definitions are generated
- * from your tool schemas and written to `.mcp-use/tool-registry.d.ts`.
+ * from your tool schemas and written to `.mcp-use/generated/tool-registry.d.ts`.
  *
  * You can also manually augment this interface for custom typing:
  *
@@ -93,7 +93,7 @@ export type CallToolResponse = {
   content: Array<{
     type: string;
     text?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   }>;
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
@@ -191,7 +191,8 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
 
 declare global {
   interface Window {
-    openai?: API<any> & OpenAiGlobals<any, any, any, any>;
+    openai?: API<UnknownObject> &
+      OpenAiGlobals<UnknownObject, UnknownObject, UnknownObject, UnknownObject>;
     __getFile?: (filename: string) => string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
@@ -205,7 +206,7 @@ declare global {
 /**
  * Shared fields for the useWidget hook result (everything except props and isPending)
  */
-interface UseWidgetResultBase<
+interface UseViewResultBase<
   TState = UnknownObject,
   TOutput = UnknownObject,
   TMetadata = UnknownObject,
@@ -525,7 +526,7 @@ interface UseWidgetResultBase<
 }
 
 /**
- * Result type for the useWidget hook.
+ * Result type for the useView hook.
  *
  * Uses a discriminated union on `isPending`:
  * - When `isPending` is `true`, `props` is `Partial<TProps>` (fields may be undefined).
@@ -533,18 +534,18 @@ interface UseWidgetResultBase<
  *
  * This allows TypeScript to narrow the type after an `if (isPending)` guard:
  * ```tsx
- * const { props, isPending } = useWidget<{ city: string }>();
+ * const { props, isPending } = useView<{ city: string }>();
  * if (isPending) return <Loading />;
  * // props.city is `string` here, not `string | undefined`
  * ```
  */
-export type UseWidgetResult<
+export type UseViewResult<
   TProps = UnknownObject,
   TState = UnknownObject,
   TOutput = UnknownObject,
   TMetadata = UnknownObject,
   TToolInput = UnknownObject,
-> = UseWidgetResultBase<TState, TOutput, TMetadata, TToolInput> &
+> = UseViewResultBase<TState, TOutput, TMetadata, TToolInput> &
   (
     | {
         /**
@@ -584,3 +585,12 @@ export type UseWidgetResult<
         props: TProps;
       }
   );
+
+/** @deprecated Use `UseViewResult` instead. */
+export type UseWidgetResult<
+  TProps = UnknownObject,
+  TState = UnknownObject,
+  TOutput = UnknownObject,
+  TMetadata = UnknownObject,
+  TToolInput = UnknownObject,
+> = UseViewResult<TProps, TState, TOutput, TMetadata, TToolInput>;

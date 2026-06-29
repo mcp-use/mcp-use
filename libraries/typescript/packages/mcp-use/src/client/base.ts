@@ -3,6 +3,12 @@ import { logger } from "../logging.js";
 import { MCPSession } from "../session.js";
 import { Tel } from "../telemetry/index.js";
 
+export type MCPServerConfig = Record<string, unknown>;
+
+export type MCPClientConfig = Record<string, unknown> & {
+  mcpServers?: Record<string, MCPServerConfig>;
+};
+
 /**
  * Base MCPClient class with shared functionality across all environments.
  *
@@ -37,7 +43,7 @@ export abstract class BaseMCPClient {
    * Internal configuration object containing MCP server definitions.
    * @protected
    */
-  protected config: Record<string, any> = {};
+  protected config: MCPClientConfig = {};
 
   /**
    * Map of server names to their active sessions.
@@ -74,7 +80,7 @@ export abstract class BaseMCPClient {
    * });
    * ```
    */
-  constructor(config?: Record<string, any>) {
+  constructor(config?: MCPClientConfig) {
     if (config) {
       this.config = config;
     }
@@ -99,7 +105,7 @@ export abstract class BaseMCPClient {
    * });
    * ```
    */
-  public static fromDict(_cfg: Record<string, any>): BaseMCPClient {
+  public static fromDict(_cfg: MCPClientConfig): BaseMCPClient {
     // This will be overridden by concrete implementations
     throw new Error("fromDict must be implemented by concrete class");
   }
@@ -128,7 +134,7 @@ export abstract class BaseMCPClient {
    * @see {@link removeServer} for removing servers
    * @see {@link getServerConfig} for retrieving configurations
    */
-  public addServer(name: string, serverConfig: Record<string, any>): void {
+  public addServer(name: string, serverConfig: MCPServerConfig): void {
     this.config.mcpServers = this.config.mcpServers || {};
     this.config.mcpServers[name] = serverConfig;
     Tel.getInstance().trackClientAddServer(name, serverConfig);
@@ -202,7 +208,7 @@ export abstract class BaseMCPClient {
    *
    * @see {@link getConfig} for retrieving the entire configuration
    */
-  public getServerConfig(name: string): Record<string, any> {
+  public getServerConfig(name: string): MCPServerConfig | undefined {
     return this.config.mcpServers?.[name];
   }
 
@@ -219,7 +225,7 @@ export abstract class BaseMCPClient {
    *
    * @see {@link getServerConfig} for retrieving individual server configurations
    */
-  public getConfig(): Record<string, any> {
+  public getConfig(): MCPClientConfig {
     return this.config ?? {};
   }
 
@@ -235,7 +241,7 @@ export abstract class BaseMCPClient {
    * @protected
    */
   protected abstract createConnectorFromConfig(
-    serverConfig: Record<string, any>
+    serverConfig: MCPServerConfig
   ): BaseConnector | Promise<BaseConnector>;
 
   /**
@@ -520,7 +526,7 @@ export abstract class BaseMCPClient {
       try {
         logger.debug(`Closing session for server ${serverName}`);
         await this.closeSession(serverName);
-      } catch (e: any) {
+      } catch (e: unknown) {
         const errorMsg = `Failed to close session for server '${serverName}': ${e}`;
         logger.error(errorMsg);
         errors.push(errorMsg);

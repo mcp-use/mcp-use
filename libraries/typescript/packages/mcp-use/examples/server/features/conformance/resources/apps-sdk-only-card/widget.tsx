@@ -1,4 +1,4 @@
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { z } from "zod";
 
@@ -20,9 +20,9 @@ export const widgetMetadata: WidgetMetadata = {
 type AppsSdkOnlyCardProps = z.infer<typeof propSchema>;
 
 const AppsSdkOnlyCard: React.FC = () => {
-  const { props, isPending, theme } = useWidget<AppsSdkOnlyCardProps>();
+  const { props, isPending, theme } = useView<AppsSdkOnlyCardProps>();
   const isDark = theme === "dark";
-  // Props = merged (toolInput + structuredContent); useWidget handles expose-as-tool vs returned-by-tool
+  // Props = merged (toolInput + structuredContent); useView handles expose-as-tool vs returned-by-tool
   const message = props?.message;
 
   return (

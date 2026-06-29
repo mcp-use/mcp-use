@@ -13,7 +13,12 @@
  */
 
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from "jose";
-import type { OAuthProvider, UserInfo, WorkOSOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  WorkOSOAuthConfig,
+  OAuthTokenVerificationResult,
+} from "./types.js";
 
 export class WorkOSOAuthProvider implements OAuthProvider {
   private config: WorkOSOAuthConfig;
@@ -32,7 +37,7 @@ export class WorkOSOAuthProvider implements OAuthProvider {
     return this.jwks;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<OAuthTokenVerificationResult> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
       console.warn("[WorkOS OAuth] ⚠️  JWT verification is disabled");
@@ -57,18 +62,21 @@ export class WorkOSOAuthProvider implements OAuthProvider {
     }
   }
 
-  getUserInfo(payload: any): UserInfo {
+  getUserInfo(payload: Record<string, unknown>): UserInfo {
+    const scope = payload.scope as string | undefined;
     return {
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      username: payload.preferred_username,
-      picture: payload.picture,
+      userId: payload.sub as string,
+      email: payload.email as string | undefined,
+      name: payload.name as string | undefined,
+      username: payload.preferred_username as string | undefined,
+      picture: payload.picture as string | undefined,
       // WorkOS includes permissions and roles in token
-      permissions: payload.permissions || [],
-      roles: payload.roles || [],
+      permissions: Array.isArray(payload.permissions)
+        ? (payload.permissions as string[])
+        : [],
+      roles: Array.isArray(payload.roles) ? (payload.roles as string[]) : [],
       // Include scope as well
-      scopes: payload.scope ? payload.scope.split(" ") : [],
+      scopes: scope ? scope.split(" ") : [],
       // Additional WorkOS-specific claims
       email_verified: payload.email_verified,
       organization_id: payload.org_id,

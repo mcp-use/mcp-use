@@ -5,7 +5,7 @@
  */
 
 import type { Hono as HonoType } from "hono";
-import { readBuildManifest } from "../widgets/index.js";
+import { readBuildManifest } from "../views/index.js";
 
 /**
  * Mount MCP Inspector UI at /inspector

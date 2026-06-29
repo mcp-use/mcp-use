@@ -1,6 +1,6 @@
 // useMcp.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
+import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 import { probeAuthParams } from "../auth/probe-www-auth.js";
 import {
   runAuthPopup,
@@ -13,12 +13,13 @@ import type {
   CompleteResult,
   Prompt,
   Resource,
-  ResourceTemplate,
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+  Transport,
+} from "@modelcontextprotocol/client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
-import { Logger, type LogLevel, logger } from "../logging.js";
+import { Logger, type LogLevel } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "../utils/assert.js";
 import { detectFavicon } from "../utils/favicon-detector.js";
@@ -39,7 +40,7 @@ const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
 
 // Define Transport types literal for clarity
-type TransportType = "http" | "sse";
+type TransportType = "http";
 
 type UseMcpAuthProvider = OAuthClientProvider & {
   tokens?: () => Promise<
@@ -52,6 +53,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
     client_id: string;
     client_secret?: string;
   } | null>;
+  getAuthorizationCode?: () => Promise<string | null | undefined>;
   /**
    * Returns a `fetch` scoped to this provider that routes OAuth requests
    * through the configured OAuth proxy (bypassing CORS) while leaving the
@@ -64,6 +66,15 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   getKey?: (keySuffix: string) => string;
   /** Stable hash of the server URL, used to scope OAuth result messages. */
   serverUrlHash?: string;
+};
+
+type HealthCheckSession = {
+  _healthCheckCleanup?: (() => void) | null;
+};
+
+type ServerIcon = {
+  src?: string;
+  url?: string;
 };
 
 /**
@@ -107,10 +118,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         )
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
-    clientConfig = {},
     authProvider: providedAuthProvider,
     headers: headersOption,
-    customHeaders: customHeadersOption,
     proxyConfig,
     autoProxyFallback = true,
     debug: _debug = false,
@@ -129,9 +138,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     clientOptions,
     onNotification,
     onSampling: onSamplingOption,
-    samplingCallback: samplingCallbackOption,
     onElicitation: onElicitationOption,
-    elicitationCallback: elicitationCallbackOption,
     oauth: oauthOptions,
   } = options;
 
@@ -163,27 +170,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     return inst;
   }, [url, logLevelOption, _debug]);
 
-  // Support both new and deprecated names with deprecation warnings
-  const headers = headersOption ?? customHeadersOption ?? {};
-  if (customHeadersOption && !headersOption) {
-    instanceLogger.warn(
-      '[useMcp] The "customHeaders" option is deprecated. Use "headers" instead.'
-    );
-  }
-
-  const onSampling = onSamplingOption ?? samplingCallbackOption;
-  if (samplingCallbackOption && !onSamplingOption) {
-    instanceLogger.warn(
-      '[useMcp] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
-    );
-  }
-
-  const onElicitation = onElicitationOption ?? elicitationCallbackOption;
-  if (elicitationCallbackOption && !onElicitationOption) {
-    logger.warn(
-      '[useMcp] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
-    );
-  }
+  const headers = headersOption ?? {};
+  const onSampling = onSamplingOption;
+  const onElicitation = onElicitationOption;
 
   // Build clientInfo with defaults, merging with provided clientInfo
   const defaultClientInfo = useMemo(
@@ -217,18 +206,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     [mergedClientInfo]
   );
 
-  // Use explicit clientConfig if provided (with deprecation warning), otherwise use derived.
-  const oauthClientConfig = useMemo(() => {
-    if (clientConfig && Object.keys(clientConfig).length > 0) {
-      instanceLogger.warn(
-        "[useMcp] The 'clientConfig' option is deprecated and will be removed in a future version. " +
-          "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
-      );
-      // Merge derived config with explicit config (explicit takes precedence for backward compatibility)
-      return { ...derivedOAuthClientConfig, ...clientConfig };
-    }
-    return derivedOAuthClientConfig;
-  }, [clientConfig, derivedOAuthClientConfig]);
+  const oauthClientConfig = derivedOAuthClientConfig;
 
   // Parse autoProxyFallback configuration
   const autoProxyFallbackConfig = useMemo(() => {
@@ -298,15 +276,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       return proxyConfig;
     }
 
-    const latestHeaders =
-      proxyConfig?.headers ?? proxyConfig?.customHeaders ?? {};
+    const latestHeaders = proxyConfig?.headers ?? {};
     return {
       ...effectiveProxyConfig,
       headers: {
         ...latestHeaders,
-        ...(effectiveProxyConfig.headers ??
-          effectiveProxyConfig.customHeaders ??
-          {}),
+        ...(effectiveProxyConfig.headers ?? {}),
       },
     };
   }, [effectiveProxyConfig, proxyConfig]);
@@ -347,7 +322,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       ? (options._initialServerInfo as UseMcpResult["serverInfo"])
       : undefined
   );
-  const [capabilities, setCapabilities] = useState<Record<string, any>>();
+  const [capabilities, setCapabilities] = useState<Record<string, unknown>>();
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
@@ -462,9 +437,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           const session = clientToClose.getSession(serverName);
 
           // Clean up health check monitoring if it exists
-          if (session && (session as any)._healthCheckCleanup) {
-            (session as any)._healthCheckCleanup();
-            (session as any)._healthCheckCleanup = null;
+          const sessionWithHealthCheck = session as
+            | (typeof session & HealthCheckSession)
+            | null;
+          if (sessionWithHealthCheck?._healthCheckCleanup) {
+            sessionWithHealthCheck._healthCheckCleanup();
+            sessionWithHealthCheck._healthCheckCleanup = null;
           }
 
           // Only try to close if session exists (avoids noisy warning logs)
@@ -510,7 +488,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       // Extract HTTP status code from error if available
       const errorCode =
         connectionError && "code" in connectionError
-          ? (connectionError as any).code
+          ? (connectionError as Error & { code?: unknown }).code
           : undefined;
 
       // Check if we should try automatic proxy fallback
@@ -731,16 +709,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         const serverName = USE_MCP_SERVER_NAME;
 
         // Build server config
-        const serverConfig: any = {
-          url: url, // Use original URL, not transformed proxy URL
-          transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
+        const serverConfig: Record<string, unknown> = {
+          url: url,
+          transport: "http",
           timeout,
           sseReadTimeout,
-          // Only disable SSE fallback when user explicitly set transportType: "http"
-          // Don't disable it when we're in auto mode and just trying HTTP first
-          disableSseFallback: transportType === "http",
-          // Use SSE transport when explicitly requested
-          preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
           // Pass a fetch that scopes OAuth-proxy routing to this server's
           // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
@@ -806,7 +779,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           onSampling,
           onElicitation,
           wrapTransport: wrapTransport
-            ? (transport: any) => {
+            ? (transport: Transport) => {
                 addLog(
                   "debug",
                   "Applying transport wrapper for server:",
@@ -814,7 +787,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                   "url:",
                   url
                 );
-                return wrapTransport(transport, url);
+                return wrapTransport(transport, url ?? "");
               }
             : undefined,
         });
@@ -930,7 +903,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           });
 
           // Store cleanup function for later
-          (session as any)._healthCheckCleanup = cleanup;
+          (session as typeof session & HealthCheckSession)._healthCheckCleanup =
+            cleanup;
         }
 
         // Track successful connection
@@ -998,7 +972,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           const loadIconPromise = (async () => {
             try {
               // Check if server provided icons in the serverInfo
-              const serverIcons = (serverInfo as any).icons;
+              const serverIcons = (serverInfo as { icons?: ServerIcon[] })
+                .icons;
               if (
                 serverIcons &&
                 Array.isArray(serverIcons) &&
@@ -1242,9 +1217,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
                 if (authResult === "REDIRECT") {
                   // Step 2: Get the authorization code that was captured during redirectToAuthorization
-                  const authCode = await (
-                    authProviderRef.current as any
-                  ).getAuthorizationCode?.();
+                  const authCode =
+                    await authProviderRef.current.getAuthorizationCode?.();
                   if (!authCode) {
                     throw new Error(
                       "Authorization code not captured by headless provider"
@@ -1312,28 +1286,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     let finalStatus: "success" | "auth_redirect" | "failed" | "fallback" =
       "failed";
 
-    if (transportType === "sse") {
-      addLog("debug", "Using SSE-only transport mode");
-      finalStatus = await tryConnectWithTransport("sse");
-    } else if (transportType === "http") {
-      addLog("debug", "Using HTTP-only transport mode");
-      finalStatus = await tryConnectWithTransport("http");
-    } else {
-      addLog("debug", "Using auto transport mode (HTTP with SSE fallback)");
-      const httpResult = await tryConnectWithTransport("http");
-
-      if (
-        httpResult === "fallback" &&
-        isMountedRef.current &&
-        stateRef.current !== "authenticating"
-      ) {
-        addLog("info", "HTTP failed, attempting SSE fallback...");
-        const sseResult = await tryConnectWithTransport("sse");
-        finalStatus = sseResult;
-      } else {
-        finalStatus = httpResult;
-      }
-    }
+    finalStatus = await tryConnectWithTransport("http");
 
     // Reset connecting flag for all terminal states and auth_redirect
     // auth_redirect needs to reset the flag so the auth callback can reconnect
@@ -2089,9 +2042,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       const refType =
         params.ref.type === "ref/prompt" ? "prompt" : "resource template";
       const refId =
-        params.ref.type === "ref/prompt"
-          ? (params.ref as any).name
-          : (params.ref as any).uri;
+        params.ref.type === "ref/prompt" ? params.ref.name : params.ref.uri;
 
       addLog("info", `Requesting completions for ${refType} "${refId}"`);
 
@@ -2370,7 +2321,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   }, [retry, addLog]);
 
   useEffect(() => {
-    let retryTimeoutId: number | null = null;
+    let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
     if (state === "failed" && autoRetry && connectAttemptRef.current > 0) {
       // Prevent duplicate scheduling - only schedule if not already scheduled
@@ -2387,7 +2338,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           if (isMountedRef.current && stateRef.current === "failed") {
             retryRef.current();
           }
-        }, delay) as any;
+        }, delay);
       }
     } else if (state !== "failed") {
       // Reset the ref when not in failed state

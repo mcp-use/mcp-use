@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";

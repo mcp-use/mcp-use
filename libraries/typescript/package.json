@@ -17,9 +17,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm run build:mcp-use && pnpm run build:other",
+    "build": "pnpm run build:mcp-use && pnpm run build:client-agent && pnpm run build:other",
     "build:mcp-use": "pnpm --filter mcp-use build",
-    "build:other": "pnpm --filter '{packages/*}' --filter '!mcp-use' build",
+    "build:client-agent": "pnpm --filter @mcp-use/client --filter @mcp-use/agent build",
+    "build:other": "pnpm --filter '{packages/*}' --filter '!mcp-use' --filter '!@mcp-use/client' --filter '!@mcp-use/agent' build",
     "test": "pnpm run -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -29,6 +30,7 @@
     "knip": "knip",
     "knip:deps": "knip --dependencies --no-exit-code",
     "knip:production": "knip --production",
+    "knip:guardrails": "node scripts/check-v2-guardrails.mjs",
     "dev": "pnpm run -r --parallel dev",
     "prepare": "husky",
     "changeset": "changeset",
@@ -61,11 +63,10 @@
   },
   "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937",
   "pnpm": {
-    "patchedDependencies": {
-      "@modelcontextprotocol/sdk": "patches/@modelcontextprotocol__sdk.patch"
-    },
     "overrides": {
       "mcp-use": "workspace:*",
+      "@mcp-use/client": "workspace:*",
+      "@mcp-use/agent": "workspace:*",
       "@mcp-use/inspector": "workspace:*",
       "@mcp-use/cli": "workspace:*",
       "create-mcp-use-app": "workspace:*",
@@ -96,7 +97,8 @@
       "dompurify": ">=3.4.0",
       "minimatch": ">=10.2.1",
       "rollup": ">=4.59.0",
-      "@modelcontextprotocol/sdk": ">=1.25.2",
+      "@modelcontextprotocol/client": ">=2.0.0-alpha.3",
+      "@modelcontextprotocol/server": ">=2.0.0-alpha.3",
       "ai": ">=5.0.52",
       "axios": ">=1.16.0",
       "body-parser": ">=2.2.1",

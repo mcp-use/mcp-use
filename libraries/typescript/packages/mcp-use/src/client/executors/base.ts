@@ -1,6 +1,7 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import type { MCPClient } from "../../client.js";
 import { logger } from "../../logging.js";
+import type { MCPSession } from "../../session.js";
 
 export interface ExecutionResult {
   result: unknown;
@@ -35,7 +36,7 @@ export type SearchToolsFunction = (
 export interface ToolNamespaceInfo {
   serverName: string;
   tools: Tool[];
-  session: any;
+  session: MCPSession;
 }
 
 /**

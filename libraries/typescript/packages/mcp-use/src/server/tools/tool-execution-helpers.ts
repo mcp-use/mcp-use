@@ -5,7 +5,7 @@
  * Extracted from tool-registration.ts to reduce duplication and improve maintainability.
  */
 
-import type { z } from "zod";
+import { z } from "zod";
 import type { Context } from "hono";
 import type {
   CreateMessageRequest,
@@ -14,8 +14,7 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   ElicitRequest,
-} from "@modelcontextprotocol/sdk/types.js";
-import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
+} from "@modelcontextprotocol/server";
 import { ElicitationValidationError } from "../../errors.js";
 import { generateUUID } from "../utils/runtime.js";
 import type {
@@ -56,7 +55,7 @@ function extractContextData(honoCtx: Context): Record<string, unknown> {
 
   // Copy auth explicitly if set via c.set("auth", ...)
   try {
-    const auth = honoCtx.get("auth" as any);
+    const auth = honoCtx.get("auth");
     if (auth) data.auth = auth;
   } catch {
     // Ignore
@@ -222,7 +221,7 @@ interface SessionContextResult {
   sendNotification:
     | ((notification: {
         method: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }) => Promise<void>)
     | undefined;
 }
@@ -237,7 +236,7 @@ export function findSessionContext(
   extraProgressToken?: number,
   extraSendNotification?: (notification: {
     method: string;
-    params: Record<string, any>;
+    params: Record<string, unknown>;
   }) => Promise<void>
 ): SessionContextResult {
   const requestContext = initialRequestContext;
@@ -277,7 +276,7 @@ async function sendProgressNotification(
   sendNotification:
     | ((notification: {
         method: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }) => Promise<void>)
     | undefined,
   progressToken: number | undefined,
@@ -325,7 +324,7 @@ async function withTimeout<T>(
  */
 interface ParsedElicitParams {
   sdkParams: ElicitRequestFormParams | ElicitRequestURLParams;
-  zodSchema: z.ZodObject<any> | null;
+  zodSchema: z.ZodObject<z.ZodRawShape> | null;
   options: ElicitOptions | undefined;
 }
 
@@ -334,11 +333,11 @@ interface ParsedElicitParams {
  */
 function parseElicitParams(
   messageOrParams: string | ElicitFormParams | ElicitUrlParams,
-  schemaOrUrlOrOptions?: z.ZodObject<any> | string | ElicitOptions,
+  schemaOrUrlOrOptions?: z.ZodObject<z.ZodRawShape> | string | ElicitOptions,
   maybeOptions?: ElicitOptions
 ): ParsedElicitParams {
   let sdkParams: ElicitRequestFormParams | ElicitRequestURLParams;
-  let zodSchema: z.ZodObject<any> | null = null;
+  let zodSchema: z.ZodObject<z.ZodRawShape> | null = null;
   let options: ElicitOptions | undefined;
 
   if (typeof messageOrParams === "string") {
@@ -360,8 +359,8 @@ function parseElicitParams(
       "_def" in schemaOrUrlOrOptions
     ) {
       options = maybeOptions;
-      zodSchema = schemaOrUrlOrOptions as z.ZodObject<any>;
-      const jsonSchema = toJsonSchemaCompat(schemaOrUrlOrOptions as any);
+      zodSchema = schemaOrUrlOrOptions as z.ZodObject<z.ZodRawShape>;
+      const jsonSchema = z.toJSONSchema(schemaOrUrlOrOptions as z.ZodType);
 
       sdkParams = {
         mode: "form",
@@ -446,7 +445,10 @@ export function createSampleMethod(
           temperature: options.temperature,
         }),
         ...(options?.stopSequences && { stopSequences: options.stopSequences }),
-        ...(options?.metadata && { metadata: options.metadata }),
+        ...(options?.metadata && {
+          metadata:
+            options.metadata as CreateMessageRequest["params"]["metadata"],
+        }),
       };
     } else {
       sampleParams = promptOrParams;
@@ -532,12 +534,12 @@ export function createElicitMethod(
   ) => Promise<ElicitResult>
 ): (
   messageOrParams: string | ElicitFormParams | ElicitUrlParams,
-  schemaOrUrlOrOptions?: z.ZodObject<any> | string | ElicitOptions,
+  schemaOrUrlOrOptions?: z.ZodObject<z.ZodRawShape> | string | ElicitOptions,
   maybeOptions?: ElicitOptions
 ) => Promise<ElicitResult> {
   return async (
     messageOrParams: string | ElicitFormParams | ElicitUrlParams,
-    schemaOrUrlOrOptions?: z.ZodObject<any> | string | ElicitOptions,
+    schemaOrUrlOrOptions?: z.ZodObject<z.ZodRawShape> | string | ElicitOptions,
     maybeOptions?: ElicitOptions
   ): Promise<ElicitResult> => {
     const { sdkParams, zodSchema, options } = parseElicitParams(
@@ -597,7 +599,7 @@ function createReportProgressMethod(
   sendNotification:
     | ((notification: {
         method: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }) => Promise<void>)
     | undefined
 ):
@@ -681,7 +683,7 @@ function createLogMethod(
   sendNotification:
     | ((notification: {
         method: string;
-        params: Record<string, any>;
+        params: Record<string, unknown>;
       }) => Promise<void>)
     | undefined,
   minLogLevel?: string
@@ -722,12 +724,76 @@ function createLogMethod(
 const MCP_UI_EXTENSION_ID = "io.modelcontextprotocol/ui";
 const MCP_UI_MIME_TYPE = "text/html;profile=mcp-app";
 
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * Extract client metadata carried on a single MCP request.
+ *
+ * Stateless clients can send capabilities in `params._meta`; when they do,
+ * tools/list metadata can be shaped from those facts. Missing metadata means
+ * "unknown", not "reuse whatever a previous initialize said".
+ */
+export function extractRequestClientMetadata(
+  requestMeta: Record<string, unknown> | undefined
+): {
+  clientCapabilities?: Record<string, unknown>;
+  clientInfo?: Record<string, unknown>;
+} {
+  const meta = asRecord(requestMeta);
+  if (!meta) return {};
+
+  const client = asRecord(meta.client) ?? asRecord(meta["mcp/client"]);
+  const clientCapabilities =
+    asRecord(meta["mcp/clientCapabilities"]) ??
+    asRecord(meta.clientCapabilities) ??
+    asRecord(meta.capabilities) ??
+    asRecord(client?.capabilities);
+  const clientInfo =
+    asRecord(meta["mcp/clientInfo"]) ??
+    asRecord(meta.clientInfo) ??
+    asRecord(client?.info);
+
+  return {
+    ...(clientCapabilities ? { clientCapabilities } : {}),
+    ...(clientInfo ? { clientInfo } : {}),
+  };
+}
+
+/**
+ * Resolve client metadata for a callback context.
+ *
+ * Request `_meta` is authoritative when it carries client capabilities or
+ * client info. Session metadata remains only a stateful-transport compatibility
+ * fallback; an explicit request-level `{ clientCapabilities: {} }` must not
+ * inherit stale remembered capabilities from an earlier initialize.
+ */
+export function resolveClientMetadata(
+  requestMeta: Record<string, unknown> | undefined,
+  sessionClientCapabilities?: Record<string, unknown>,
+  sessionClientInfo?: Record<string, unknown>
+): {
+  clientCapabilities?: Record<string, unknown>;
+  clientInfo?: Record<string, unknown>;
+} {
+  const requestClientMetadata = extractRequestClientMetadata(requestMeta);
+
+  return {
+    clientCapabilities:
+      requestClientMetadata.clientCapabilities ?? sessionClientCapabilities,
+    clientInfo: requestClientMetadata.clientInfo ?? sessionClientInfo,
+  };
+}
+
 /**
  * Checks whether a raw client capabilities object advertises support for
  * MCP Apps (SEP-1865 / `io.modelcontextprotocol/ui` extension).
  *
  * Useful at server setup time when you want to conditionally register
- * widget-enabled tool variants before any callback is invoked.
+ * widget-enabled tool variants before callbacks run.
  *
  * @example
  * ```typescript
@@ -739,21 +805,21 @@ const MCP_UI_MIME_TYPE = "text/html;profile=mcp-app";
  * ```
  */
 export function supportsApps(
-  clientCapabilities: Record<string, any> | undefined
+  clientCapabilities: Record<string, unknown> | undefined
 ): boolean {
-  return (
-    (clientCapabilities as any)?.extensions?.[
-      MCP_UI_EXTENSION_ID
-    ]?.mimeTypes?.includes(MCP_UI_MIME_TYPE) ?? false
-  );
+  const extension = asRecord(asRecord(clientCapabilities)?.extensions)?.[
+    MCP_UI_EXTENSION_ID
+  ];
+  const mimeTypes = asRecord(extension)?.mimeTypes;
+  return Array.isArray(mimeTypes) && mimeTypes.includes(MCP_UI_MIME_TYPE);
 }
 
 /**
  * Create client capability checker object
  */
 export function createClientCapabilityChecker(
-  clientCapabilities: Record<string, any> | undefined,
-  clientInfo?: Record<string, any>,
+  clientCapabilities: Record<string, unknown> | undefined,
+  clientInfo?: Record<string, unknown>,
   requestMeta?: Record<string, unknown>
 ) {
   const caps = clientCapabilities || {};
@@ -763,7 +829,7 @@ export function createClientCapabilityChecker(
       return capability in caps;
     },
 
-    capabilities(): Record<string, any> {
+    capabilities(): Record<string, unknown> {
       return { ...caps }; // Return a copy to prevent mutation
     },
 
@@ -789,8 +855,10 @@ export function createClientCapabilityChecker(
      * if (ctx.client.supportsApps()) { ... }
      * ```
      */
-    extension(id: string): Record<string, any> | undefined {
-      return (caps as any)?.extensions?.[id];
+    extension(id: string): Record<string, unknown> | undefined {
+      return asRecord(asRecord(caps)?.extensions)?.[id] as
+        | Record<string, unknown>
+        | undefined;
     },
 
     /**
@@ -894,7 +962,7 @@ function createSendNotificationMethod(
 }
 
 /**
- * Create sendNotificationToSession method for any session
+ * Create sendNotificationToSession method for a target session
  */
 function createSendNotificationToSessionMethod(
   sessions: Map<string, SessionData> | undefined
@@ -964,18 +1032,29 @@ export function createEnhancedContext(
 ): Context & {
   sample: ReturnType<typeof createSampleMethod>;
   elicit: ReturnType<typeof createElicitMethod>;
-  reportProgress: (params: {
-    progress: number;
-    total?: number;
-  }) => Promise<void>;
-  log: (level: string, data: unknown, logger?: string) => Promise<void>;
+  reportProgress: ReturnType<typeof createReportProgressMethod>;
+  log: ReturnType<typeof createLogMethod>;
   client: ReturnType<typeof createClientCapabilityChecker>;
-  session: { id?: string };
-  sendNotification: typeof sendNotification;
+  session?: { sessionId: string };
+  sendNotification?: ReturnType<typeof createSendNotificationMethod>;
+  sendNotificationToSession?: ReturnType<
+    typeof createSendNotificationToSessionMethod
+  >;
 } {
-  const enhancedContext: any = baseContext
+  const enhancedContext = (baseContext
     ? extractContextData(baseContext)
-    : {};
+    : {}) as unknown as Context & {
+    sample: ReturnType<typeof createSampleMethod>;
+    elicit: ReturnType<typeof createElicitMethod>;
+    reportProgress: ReturnType<typeof createReportProgressMethod>;
+    log: ReturnType<typeof createLogMethod>;
+    client: ReturnType<typeof createClientCapabilityChecker>;
+    session?: { sessionId: string };
+    sendNotification?: ReturnType<typeof createSendNotificationMethod>;
+    sendNotificationToSession?: ReturnType<
+      typeof createSendNotificationToSessionMethod
+    >;
+  };
 
   enhancedContext.sample = createSampleMethod(
     createMessage,
@@ -992,10 +1071,16 @@ export function createEnhancedContext(
 
   enhancedContext.log = createLogMethod(sendNotification, minLogLevel);
 
+  const {
+    clientCapabilities: effectiveClientCapabilities,
+    clientInfo: effectiveClientInfo,
+  } = resolveClientMetadata(requestMeta, clientCapabilities, clientInfo);
+
   // Pass requestMeta into the checker so ctx.client.user() is per-invocation
+  // and request-level client capabilities win over remembered session state.
   enhancedContext.client = createClientCapabilityChecker(
-    clientCapabilities,
-    clientInfo,
+    effectiveClientCapabilities,
+    effectiveClientInfo,
     requestMeta
   );
 
@@ -1038,12 +1123,19 @@ export function createEnhancedContext(
 export function buildHandlerContext(
   sessionId: string | undefined,
   sessions: Map<string, SessionData>
-): { session: SessionData | undefined; enhancedCtx: any } {
+): {
+  session: SessionData | undefined;
+  enhancedCtx: Record<string, unknown> & {
+    client: ReturnType<typeof createClientCapabilityChecker>;
+  };
+} {
   const session = sessionId ? sessions.get(sessionId) : undefined;
   const requestContext = getRequestContext() || session?.context;
-  const enhancedCtx: any = requestContext
-    ? extractContextData(requestContext)
-    : {};
+  const enhancedCtx = (
+    requestContext ? extractContextData(requestContext) : {}
+  ) as Record<string, unknown> & {
+    client: ReturnType<typeof createClientCapabilityChecker>;
+  };
   Object.defineProperty(enhancedCtx, "client", {
     value: createClientCapabilityChecker(
       session?.clientCapabilities,

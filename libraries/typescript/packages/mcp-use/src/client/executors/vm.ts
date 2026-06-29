@@ -2,8 +2,10 @@ import type { MCPClient, VMExecutorOptions } from "../../client.js";
 import { logger } from "../../logging.js";
 import { BaseCodeExecutor, type ExecutionResult } from "./base.js";
 
+type NodeVMModule = typeof import("node:vm");
+
 // Lazy-loaded VM module - may not be available in all environments (e.g., Deno)
-let vm: any = null;
+let vm: NodeVMModule | null = null;
 let vmCheckAttempted = false;
 
 /**
@@ -30,7 +32,7 @@ function tryLoadVM(): boolean {
     const nodeRequire = typeof require !== "undefined" ? require : null;
     if (nodeRequire) {
       // Use dynamic module name to hide from bundler
-      vm = nodeRequire(getVMModuleName());
+      vm = nodeRequire(getVMModuleName()) as NodeVMModule;
       return true;
     }
   } catch (error) {
@@ -60,7 +62,7 @@ async function tryLoadVMAsync(): Promise<boolean> {
   try {
     // Try ESM dynamic import - use dynamic module name to hide from bundler
     // This prevents Deno's bundler from trying to resolve node:vm at build time
-    vm = await import(/* @vite-ignore */ getVMModuleName());
+    vm = (await import(/* @vite-ignore */ getVMModuleName())) as NodeVMModule;
     return true;
   } catch (error) {
     logger.debug(
@@ -99,9 +101,9 @@ export class VMCodeExecutor extends BaseCodeExecutor {
   /**
    * Ensure VM module is loaded before execution
    */
-  private async ensureVMLoaded(): Promise<void> {
+  private async ensureVMLoaded(): Promise<NodeVMModule> {
     if (vm !== null) {
-      return;
+      return vm;
     }
 
     const loaded = await tryLoadVMAsync();
@@ -111,6 +113,10 @@ export class VMCodeExecutor extends BaseCodeExecutor {
           "Please use E2B executor instead or run in a Node.js environment."
       );
     }
+    if (vm === null) {
+      throw new Error("node:vm module failed to initialize");
+    }
+    return vm;
   }
 
   /**
@@ -123,14 +129,14 @@ export class VMCodeExecutor extends BaseCodeExecutor {
     const effectiveTimeout = timeout ?? this.defaultTimeout;
 
     // Ensure VM module is loaded
-    await this.ensureVMLoaded();
+    const vmModule = await this.ensureVMLoaded();
 
     // Ensure all servers are connected
     await this.ensureServersConnected();
 
     const logs: string[] = [];
     const startTime = Date.now();
-    let result: any = null;
+    let result: unknown = null;
     let error: string | null = null;
 
     try {
@@ -150,7 +156,7 @@ export class VMCodeExecutor extends BaseCodeExecutor {
       `;
 
       // Create a script
-      const script = new vm.Script(wrappedCode, {
+      const script = new vmModule.Script(wrappedCode, {
         filename: "agent_code.js",
       });
 
@@ -161,21 +167,22 @@ export class VMCodeExecutor extends BaseCodeExecutor {
       });
 
       result = await promise;
-    } catch (e: any) {
-      error = e.message || String(e);
+    } catch (e: unknown) {
+      const executionError = e as Error & { code?: string };
+      error = executionError.message || String(e);
       // Check for timeout error
       // Check for vm timeout specific error message
       if (
-        e.code === "ERR_SCRIPT_EXECUTION_TIMEOUT" ||
-        e.message === "Script execution timed out." ||
+        executionError.code === "ERR_SCRIPT_EXECUTION_TIMEOUT" ||
+        executionError.message === "Script execution timed out." ||
         (typeof error === "string" &&
           (error.includes("timed out") || error.includes("timeout")))
       ) {
         error = "Script execution timed out";
       }
       // Capture stack trace if available for debugging (optional)
-      if (e.stack) {
-        logger.debug(`Code execution error stack: ${e.stack}`);
+      if (executionError.stack) {
+        logger.debug(`Code execution error stack: ${executionError.stack}`);
       }
     }
 
@@ -194,7 +201,9 @@ export class VMCodeExecutor extends BaseCodeExecutor {
    *
    * @param logs - Array to capture console output
    */
-  private async _buildContext(logs: string[]): Promise<any> {
+  private async _buildContext(
+    logs: string[]
+  ): Promise<Record<string, unknown>> {
     // Helper to capture logs
     const logHandler = (...args: unknown[]) => {
       logs.push(
@@ -284,7 +293,8 @@ export class VMCodeExecutor extends BaseCodeExecutor {
 
     sandbox.__tool_namespaces = Object.keys(toolNamespaces);
 
-    return vm.createContext(sandbox);
+    const vmModule = await this.ensureVMLoaded();
+    return vmModule.createContext(sandbox);
   }
 
   /**

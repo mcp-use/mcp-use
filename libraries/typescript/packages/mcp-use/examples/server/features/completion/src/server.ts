@@ -69,25 +69,27 @@ server.prompt(
 /**
  * Resource template with completion for path variable
  */
-server.resourceTemplate({
-  uriTemplate: "file:///{path}",
-  name: "File",
-  description: "Read a file from common directories",
-  schema: z.object({
-    path: completable(z.string(), [
-      "/home/user/documents",
-      "/home/user/downloads",
-      "/home/user/projects",
-    ]),
-  }),
-  readCallback: async ({ path }) => ({
+server.resourceTemplate(
+  {
+    name: "File",
+    uriTemplate: "file:///{path}",
+    description: "Read a file from common directories",
+    schema: z.object({
+      path: completable(z.string(), [
+        "/home/user/documents",
+        "/home/user/downloads",
+        "/home/user/projects",
+      ]),
+    }),
+  },
+  async (_uri, { path }) => ({
     contents: [
       {
         uri: `file:///${path}`,
         text: `Content of ${path}`,
       },
     ],
-  }),
-});
+  })
+);
 
 await server.listen();

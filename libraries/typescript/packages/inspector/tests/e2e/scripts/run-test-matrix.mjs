@@ -257,6 +257,8 @@ async function main() {
       cdnServer = result.server;
       const cdnPort = result.port;
       playwrightEnv.INSPECTOR_CDN_BASE = `http://127.0.0.1:${cdnPort}`;
+      // Matrix runs with NODE_ENV=test; force CDN path to match production default.
+      playwrightEnv.INSPECTOR_USE_CDN = "true";
       console.log(
         `📦 Local CDN server started at http://127.0.0.1:${cdnPort}\n`
       );

@@ -2,35 +2,34 @@ import type { z } from "zod";
 import type {
   GetPromptResult,
   CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import type {
+  EnhancedPromptContext,
   PromptDefinition,
-  PromptDefinitionWithoutCallback,
   PromptCallback,
-} from "../types.js";
+} from "../types/index.js";
+import type { SessionData } from "../sessions/index.js";
 import { convertToolResultToPromptResult } from "./conversion.js";
 
 interface PromptServerContext {
-  server: {
+  nativeServer: {
     registerPrompt(
       name: string,
       metadata: {
         title?: string;
         description: string;
-        argsSchema: z.ZodObject<any> | Record<string, z.ZodSchema> | undefined;
+        argsSchema: z.ZodObject | Record<string, z.ZodSchema> | undefined;
       },
       getPromptCallback: (
         params: Record<string, unknown>,
-        extra?: any
+        extra?: unknown
       ) => Promise<GetPromptResult>
     ): void;
   };
   registeredPrompts: string[];
-  createParamsSchema: (
-    args: import("../types/common.js").InputDefinition[]
-  ) => Record<string, z.ZodSchema>;
+  sessions?: Map<string, SessionData>;
   convertZodSchemaToParams: (
-    schema: z.ZodObject<any>
+    schema: z.ZodObject
   ) => Record<string, z.ZodSchema>;
 }
 
@@ -38,24 +37,18 @@ interface PromptServerContext {
  * Define a prompt template
  *
  * Registers a prompt template with the MCP server that clients can use to generate
- * structured prompts for AI models. Prompts can now use the same response helpers
+ * structured prompts for AI models. Prompts can use the same response helpers
  * as tools (text(), object(), markdown(), etc.) for a unified API.
- *
- * Supports two patterns:
- * 1. Old API: Single object with cb property
- * 2. New API: Definition object + separate callback (like tools and resources)
  *
  * @param promptDefinition - Configuration object containing prompt metadata
  * @param promptDefinition.name - Unique identifier for the prompt template
  * @param promptDefinition.description - Human-readable description of the prompt's purpose
- * @param promptDefinition.args - Array of argument definitions (legacy, use schema instead)
- * @param promptDefinition.schema - Zod object schema for input validation (preferred)
- * @param callback - Optional separate callback function (new API pattern)
+ * @param promptDefinition.schema - Zod object schema for input validation
+ * @param callback - Async callback that returns prompt messages or response helpers
  * @returns The server instance for method chaining
  *
  * @example
  * ```typescript
- * // New API: Using response helpers (recommended)
  * server.prompt(
  *   {
  *     name: 'code-review',
@@ -64,51 +57,21 @@ interface PromptServerContext {
  *   },
  *   async ({ language, code }) => text(`Please review this ${language} code:\n\n${code}`)
  * )
- *
- * // Old API: Still supported for backward compatibility
- * server.prompt({
- *   name: 'greeting',
- *   args: [{ name: 'name', type: 'string', required: true }],
- *   cb: async ({ name }) => ({
- *     messages: [{
- *       role: 'user',
- *       content: { type: 'text', text: `Hello, ${name}!` }
- *     }]
- *   })
- * })
  * ```
  */
 export function registerPrompt(
   this: PromptServerContext,
-  promptDefinition: PromptDefinition | PromptDefinitionWithoutCallback,
-  callback?: PromptCallback
+  promptDefinition: PromptDefinition,
+  callback: PromptCallback
 ): PromptServerContext {
-  // Determine which callback to use
-  const actualCallback = callback || (promptDefinition as PromptDefinition).cb;
-
-  if (!actualCallback) {
-    throw new Error(
-      `Prompt '${promptDefinition.name}' must have either a cb property or a callback parameter`
-    );
-  }
-
-  // Determine input schema - prefer schema over args
-  let argsSchema: Record<string, z.ZodSchema> | undefined;
-  if ((promptDefinition as any).schema) {
-    argsSchema = this.convertZodSchemaToParams(
-      (promptDefinition as any).schema
-    );
-  } else if (promptDefinition.args && promptDefinition.args.length > 0) {
-    argsSchema = this.createParamsSchema(promptDefinition.args);
-  } else {
-    // No schema validation when neither schema nor args are provided
-    argsSchema = undefined;
-  }
+  const argsSchema = promptDefinition.schema
+    ? this.convertZodSchemaToParams(promptDefinition.schema)
+    : undefined;
 
   // Wrap the callback to support both CallToolResult and GetPromptResult
   const wrappedCallback = async (
     params: Record<string, unknown>,
-    extra?: Record<string, unknown>
+    extra?: unknown
   ): Promise<GetPromptResult> => {
     // Get the HTTP request context from AsyncLocalStorage
     const { getRequestContext, runWithContext } =
@@ -119,7 +82,7 @@ export function registerPrompt(
     const initialRequestContext = getRequestContext();
 
     // Find session context
-    const sessions = (this as any).sessions || new Map();
+    const sessions = this.sessions ?? new Map<string, SessionData>();
     const { requestContext, session } = findSessionContext(
       sessions,
       initialRequestContext,
@@ -130,9 +93,9 @@ export function registerPrompt(
     // Create enhanced context with client capability checker.
     // Use Object.defineProperty to ensure the own property is created even
     // when the Hono Context prototype has a non-writable or accessor property.
-    const enhancedContext: any = requestContext
-      ? Object.create(requestContext)
-      : {};
+    const enhancedContext = (
+      requestContext ? Object.create(requestContext) : {}
+    ) as EnhancedPromptContext;
     Object.defineProperty(enhancedContext, "client", {
       value: createClientCapabilityChecker(
         session?.clientCapabilities,
@@ -144,11 +107,15 @@ export function registerPrompt(
     });
 
     // Execute callback with context
+    const callbackWithOptionalContext = callback as (
+      params: Record<string, unknown>,
+      ctx?: EnhancedPromptContext
+    ) => ReturnType<PromptCallback>;
     const executeCallback = async () => {
-      if (actualCallback.length >= 2) {
-        return await (actualCallback as any)(params, enhancedContext);
+      if (callback.length >= 2) {
+        return await callbackWithOptionalContext(params, enhancedContext);
       }
-      return await (actualCallback as any)(params);
+      return await callbackWithOptionalContext(params);
     };
 
     const result = requestContext
@@ -164,12 +131,12 @@ export function registerPrompt(
     return convertToolResultToPromptResult(result as CallToolResult);
   };
 
-  this.server.registerPrompt(
+  this.nativeServer.registerPrompt(
     promptDefinition.name,
     {
       title: promptDefinition.title,
       description: promptDefinition.description ?? "",
-      argsSchema: argsSchema as any, // Type assertion for Zod v4 compatibility
+      argsSchema,
     },
     wrappedCallback
   );

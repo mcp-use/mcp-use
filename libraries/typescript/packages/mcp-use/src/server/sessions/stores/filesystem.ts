@@ -26,7 +26,7 @@ import type { SessionStore } from "./index.js";
  */
 export interface FileSystemSessionStoreConfig {
   /**
-   * Path to the session file (default: .mcp-use/sessions.json in project root)
+   * Path to the session file (default: .mcp-use/state/sessions.json in project root)
    */
   path?: string;
 
@@ -57,7 +57,7 @@ export interface FileSystemSessionStoreConfig {
  *   name: 'dev-server',
  *   version: '1.0.0',
  *   sessionStore: new FileSystemSessionStore({
- *     path: '.mcp-use/sessions.json'
+ *     path: '.mcp-use/state/sessions.json'
  *   })
  * });
  * ```
@@ -73,7 +73,7 @@ export class FileSystemSessionStore implements SessionStore {
 
   constructor(config: FileSystemSessionStoreConfig = {}) {
     this.filePath =
-      config.path ?? join(process.cwd(), ".mcp-use", "sessions.json");
+      config.path ?? join(process.cwd(), ".mcp-use", "state", "sessions.json");
     this.debounceMs = config.debounceMs ?? 100;
     this.maxAgeMs = config.maxAgeMs ?? 24 * 60 * 60 * 1000; // 24 hours
 
@@ -109,21 +109,22 @@ export class FileSystemSessionStore implements SessionStore {
 
         this.sessions.set(sessionId, sessionMetadata);
       }
-    } catch (error: any) {
-      if (error.code === "ENOENT") {
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code === "ENOENT") {
         // File doesn't exist - this is fine for first run
         console.log(`[FileSystemSessionStore] No existing sessions file`);
       } else if (error instanceof SyntaxError) {
         // Corrupted JSON - start fresh
         console.warn(
           `[FileSystemSessionStore] Corrupted session file, starting fresh:`,
-          error.message
+          error instanceof Error ? error.message : String(error)
         );
       } else {
         // Other errors (permissions, etc.) - log but continue
         console.warn(
           `[FileSystemSessionStore] Error loading sessions, starting fresh:`,
-          error.message
+          error instanceof Error ? error.message : String(error)
         );
       }
     }
@@ -253,10 +254,10 @@ export class FileSystemSessionStore implements SessionStore {
       const tempPath = `${this.filePath}.tmp`;
       await writeFile(tempPath, JSON.stringify(data, null, 2), "utf-8");
       await rename(tempPath, this.filePath);
-    } catch (error: any) {
+    } catch (error) {
       console.error(
         `[FileSystemSessionStore] Error saving sessions:`,
-        error.message
+        error instanceof Error ? error.message : String(error)
       );
 
       // Clean up temp file if it exists

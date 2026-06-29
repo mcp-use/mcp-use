@@ -15,11 +15,11 @@
  */
 
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Transport } from "@modelcontextprotocol/client";
 import type {
   CallToolResult,
   JSONRPCMessage,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { X } from "lucide-react";
 import { useMcpClient } from "mcp-use/react";
 import type { MessageContentBlock } from "mcp-use/react";

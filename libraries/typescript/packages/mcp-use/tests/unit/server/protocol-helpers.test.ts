@@ -3,7 +3,7 @@ import {
   applyClaudeResourceDomain,
   computeClaudeResourceDomain,
   isClaudeClient,
-} from "../../../src/server/widgets/protocol-helpers.js";
+} from "../../../src/server/views/protocol-helpers.js";
 
 describe("protocol helpers", () => {
   describe("Claude resource domains", () => {

@@ -6,7 +6,12 @@
  */
 
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { OAuthProvider, UserInfo, KeycloakOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  KeycloakOAuthConfig,
+  OAuthTokenVerificationResult,
+} from "./types.js";
 
 export class KeycloakOAuthProvider implements OAuthProvider {
   private config: KeycloakOAuthConfig;
@@ -29,7 +34,7 @@ export class KeycloakOAuthProvider implements OAuthProvider {
     return this.jwks;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<OAuthTokenVerificationResult> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
       console.warn("[Keycloak OAuth] ⚠️  JWT verification is disabled");
@@ -44,7 +49,7 @@ export class KeycloakOAuthProvider implements OAuthProvider {
       }
       const payload = JSON.parse(
         Buffer.from(parts[1], "base64url").toString("utf8")
-      );
+      ) as Record<string, unknown>;
       return { payload };
     }
 
@@ -72,16 +77,23 @@ export class KeycloakOAuthProvider implements OAuthProvider {
 
     // Extract resource access for permissions
     const permissions: string[] = [];
-    if (payload.resource_access) {
-      Object.entries(payload.resource_access).forEach(
-        ([resource, access]: [string, any]) => {
-          if (access.roles) {
-            access.roles.forEach((role: string) => {
+    const resourceAccess = payload.resource_access as
+      | Record<string, unknown>
+      | undefined;
+    if (resourceAccess) {
+      for (const [resource, access] of Object.entries(resourceAccess)) {
+        const roles =
+          access && typeof access === "object"
+            ? (access as Record<string, unknown>).roles
+            : undefined;
+        if (Array.isArray(roles)) {
+          roles
+            .filter((role): role is string => typeof role === "string")
+            .forEach((role) => {
               permissions.push(`${resource}:${role}`);
             });
-          }
         }
-      );
+      }
     }
 
     const scope = payload.scope as string | undefined;

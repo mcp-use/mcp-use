@@ -15,11 +15,6 @@ export interface ProxyConfig {
    * Additional headers to include in requests
    */
   headers?: Record<string, string>;
-  /**
-   * @deprecated Use `headers` instead. This option will be removed in a future version.
-   * Additional custom headers to include in requests
-   */
-  customHeaders?: Record<string, string>;
 }
 
 /**
@@ -77,15 +72,7 @@ export function applyProxyConfig(
   originalUrl: string,
   proxyConfig?: ProxyConfig
 ): ProxyResult {
-  // Support both new and deprecated names with deprecation warning
-  const proxyHeaders = proxyConfig?.headers ?? proxyConfig?.customHeaders ?? {};
-  if (proxyConfig?.customHeaders && !proxyConfig?.headers) {
-    console.warn(
-      '[applyProxyConfig] The "customHeaders" option in proxyConfig is deprecated. Use "headers" instead.'
-    );
-  }
-
-  // No proxy configured - return original URL with any custom headers
+  const proxyHeaders = proxyConfig?.headers ?? {};
   if (!proxyConfig?.proxyAddress) {
     return {
       url: originalUrl,

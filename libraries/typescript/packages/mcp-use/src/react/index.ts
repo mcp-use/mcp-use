@@ -28,23 +28,27 @@ export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/te
 export type {
   Prompt,
   Resource,
-  ResourceTemplate,
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 // Export ModelContext component and module-level API
 export { ModelContext, modelContext } from "./model-context.js";
 
-// Export widget hooks and types
+// Export view hooks and types (primary API)
 export { ErrorBoundary } from "./ErrorBoundary.js";
 export { Image } from "./Image.js";
 export { ThemeProvider } from "./ThemeProvider.js";
 export {
+  useView,
+  useViewProps,
+  useViewState,
+  useViewTheme,
   useWidget,
   useWidgetProps,
   useWidgetState,
   useWidgetTheme,
-} from "./useWidget.js";
+} from "./useView.js";
 export type {
   API,
   CallToolResponse,
@@ -59,6 +63,7 @@ export type {
   ToolRegistry,
   UnknownObject,
   UserAgent,
+  UseViewResult,
   UseWidgetResult,
 } from "./widget-types.js";
 export { WidgetControls } from "./WidgetControls.js";
@@ -77,6 +82,8 @@ export type {
   CallToolAsyncFn,
   UseCallToolReturn,
 } from "./useCallTool.js";
+
+export { createTypedHooks } from "./createTypedHooks.js";
 
 // Export generateHelpers factory and related types
 export { generateHelpers } from "./generateHelpers.js";
@@ -122,5 +129,16 @@ export {
   type RpcLogEntry,
 } from "./rpc-logger.js";
 
-// Export WidgetMetadata type for widget developers
+export type { ToolRef } from "../server/types/tool-ref.js";
+
 export type { WidgetMetadata } from "../server/types/widget.js";
+
+export { useStreamableProps } from "./useStreamableProps.js";
+
+export { defineWidget } from "./widget-config.js";
+export type {
+  ComponentWidgetConfig,
+  WidgetCSPConfig,
+  WidgetComponent,
+  WidgetPermissions,
+} from "./widget-config.js";

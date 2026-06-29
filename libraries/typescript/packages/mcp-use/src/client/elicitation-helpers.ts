@@ -10,7 +10,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import type { JSONSchema } from "../utils/json-schema-to-zod/Type.js";
 import { JSONSchemaToZod } from "../utils/json-schema-to-zod/JSONSchemaToZod.js";
 

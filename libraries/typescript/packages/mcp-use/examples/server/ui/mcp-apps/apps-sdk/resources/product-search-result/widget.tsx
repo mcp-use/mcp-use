@@ -1,6 +1,6 @@
 import { AppsSDKUIProvider } from "@openai/apps-sdk-ui/components/AppsSDKUIProvider";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { McpUseProvider, useWidget, type WidgetMetadata } from "mcp-use/react";
+import { McpUseProvider, useView, type WidgetMetadata } from "mcp-use/react";
 import React from "react";
 import { Link } from "react-router";
 import { Accordion } from "./components/Accordion";
@@ -17,7 +17,7 @@ export const widgetMetadata: WidgetMetadata = {
 };
 
 const ProductSearchResult: React.FC = () => {
-  const { props, mcp_url, isPending } = useWidget<ProductSearchResultProps>();
+  const { props, mcp_url, isPending } = useView<ProductSearchResultProps>();
 
   console.log(props);
 

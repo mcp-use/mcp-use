@@ -6,9 +6,25 @@ import {
 import { z } from "zod";
 import {
   isCompletable,
-  getCompleter,
-} from "@modelcontextprotocol/sdk/server/completable.js";
+  type CompleteCallback,
+  type CompletableSchema,
+} from "@modelcontextprotocol/server";
 import { toResourceTemplateCompleteCallbacks } from "../../../src/server/utils/completion-helpers.js";
+
+/** v2 removed getCompleter — read Symbol(mcp.completable) metadata from schema */
+function getCompleter<T extends z.ZodTypeAny>(
+  schema: CompletableSchema<T>
+): CompleteCallback<T> {
+  const sym = Object.getOwnPropertySymbols(schema).find(
+    (s) => s.description === "mcp.completable"
+  );
+  if (!sym) {
+    throw new Error("Schema is not completable");
+  }
+  return (
+    schema as unknown as Record<symbol, { complete: CompleteCallback<T> }>
+  )[sym].complete;
+}
 
 describe("completable()", () => {
   const mustGetCompleter = <T extends z.ZodTypeAny>(schema: T) => {

@@ -5,7 +5,10 @@
  * type safety and developer experience.
  */
 
-import type { OAuthProvider } from "./providers/types.js";
+import type {
+  OAuthProvider,
+  OAuthTokenVerificationResult,
+} from "./providers/types.js";
 import { SupabaseOAuthProvider } from "./providers/supabase.js";
 import { Auth0OAuthProvider } from "./providers/auth0.js";
 import { ClerkOAuthProvider } from "./providers/clerk.js";
@@ -75,13 +78,13 @@ export interface CustomProviderConfig {
   issuer: string;
   authEndpoint: string;
   tokenEndpoint: string;
-  verifyToken: (token: string) => Promise<any>;
+  verifyToken: (token: string) => Promise<OAuthTokenVerificationResult>;
   jwksUrl?: string;
   userInfoEndpoint?: string;
   scopesSupported?: string[];
   audience?: string;
   grantTypesSupported?: string[];
-  getUserInfo?: (payload: any) => UserInfo;
+  getUserInfo?: (payload: Record<string, unknown>) => UserInfo;
 }
 
 /**

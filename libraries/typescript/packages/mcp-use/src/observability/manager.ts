@@ -18,9 +18,9 @@ export interface ObservabilityConfig {
   /** Agent ID for tagging traces */
   agentId?: string;
   /** Metadata to add to traces */
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   /** Function to get current metadata from agent */
-  metadataProvider?: () => Record<string, any>;
+  metadataProvider?: () => Record<string, unknown>;
   /** Function to get current tags from agent */
   tagsProvider?: () => string[];
 }
@@ -33,8 +33,8 @@ export class ObservabilityManager {
   private verbose: boolean;
   private observe: boolean;
   private agentId?: string;
-  private metadata?: Record<string, any>;
-  private metadataProvider?: () => Record<string, any>;
+  private metadata?: Record<string, unknown>;
+  private metadataProvider?: () => Record<string, unknown>;
   private tagsProvider?: () => string[];
 
   constructor(config: ObservabilityConfig = {}) {
@@ -156,7 +156,7 @@ export class ObservabilityManager {
   }
 
   /**
-   * Check if any callbacks are available.
+   * Check whether callbacks are available.
    * @returns True if callbacks are available, False otherwise.
    */
   async hasCallbacks(): Promise<boolean> {
@@ -177,7 +177,7 @@ export class ObservabilityManager {
     enabled: boolean;
     callbackCount: number;
     handlerNames: string[];
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
     tags: string[];
   }> {
     const callbacks = await this.getCallbacks();
@@ -256,11 +256,8 @@ export class ObservabilityManager {
         typeof callback.shutdownAsync === "function"
       ) {
         await callback.shutdownAsync();
-      } else if (
-        "shutdown" in callback &&
-        typeof callback.shutdown === "function"
-      ) {
-        await (callback as any).shutdown();
+      } else if (hasShutdown(callback)) {
+        await callback.shutdown();
       }
     }
     logger.debug("ObservabilityManager: All handlers shutdown");
@@ -276,4 +273,10 @@ export class ObservabilityManager {
     }
     return "ObservabilityManager(no handlers)";
   }
+}
+
+function hasShutdown(
+  callback: BaseCallbackHandler
+): callback is BaseCallbackHandler & { shutdown: () => void | Promise<void> } {
+  return "shutdown" in callback && typeof callback.shutdown === "function";
 }

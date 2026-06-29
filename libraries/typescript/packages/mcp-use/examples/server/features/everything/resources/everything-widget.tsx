@@ -16,13 +16,13 @@ import {
 } from "react";
 import {
   McpUseProvider,
-  useWidget,
-  useWidgetProps,
-  useWidgetState,
-  useWidgetTheme,
+  useView,
+  useViewProps,
+  useViewState,
+  useViewTheme,
   ErrorBoundary,
   type WidgetMetadata,
-  type UseWidgetResult,
+  type UseViewResult,
   type CallToolResponse,
   type Theme,
   type UnknownObject,
@@ -134,11 +134,11 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 // ============================================================================
-// Theme-aware colors hook — exercises useWidgetTheme() return type
+// Theme-aware colors hook — exercises useViewTheme() return type
 // ============================================================================
 
 function useColors() {
-  const theme: Theme = useWidgetTheme();
+  const theme: Theme = useViewTheme();
   return useMemo(
     () => ({
       background: theme === "dark" ? "#1e1e1e" : "#ffffff",
@@ -260,12 +260,12 @@ class CustomErrorBoundary extends Component<
 // ============================================================================
 // STEP 4: Default export — main widget component
 // Exercises: useWidget<Props>(), isPending guard, callTool, setState/state,
-//            useWidgetProps, useWidgetState, useCallback, useMemo, useState,
+//            useViewProps, useViewState, useCallback, useMemo, useState,
 //            useReducer, useEffect, form handling, React.CSSProperties
 // ============================================================================
 
 export default function EverythingWidget() {
-  // Core hook with generic type parameter — UseWidgetResult<Props> validates return type
+  // Core hook with generic type parameter — UseViewResult<Props> validates return type
   const {
     props,
     isPending,
@@ -282,11 +282,11 @@ export default function EverythingWidget() {
     locale,
     mcp_url,
     isAvailable,
-  }: UseWidgetResult<Props> = useWidget<Props>();
+  }: UseViewResult<Props> = useView<Props>();
 
   // Standalone hooks — exercises their type signatures
-  const standaloneProps = useWidgetProps<Props>();
-  const [widgetState, setWidgetState] = useWidgetState<{
+  const standaloneProps = useViewProps<Props>();
+  const [widgetState, setWidgetState] = useViewState<{
     favorites: string[];
   }>();
 

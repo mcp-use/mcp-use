@@ -6,7 +6,12 @@
  */
 
 import { jwtVerify, createRemoteJWKSet } from "jose";
-import type { OAuthProvider, UserInfo, Auth0OAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  Auth0OAuthConfig,
+  OAuthTokenVerificationResult,
+} from "./types.js";
 
 export class Auth0OAuthProvider implements OAuthProvider {
   private config: Auth0OAuthConfig;
@@ -30,7 +35,7 @@ export class Auth0OAuthProvider implements OAuthProvider {
     return this.jwks;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<OAuthTokenVerificationResult> {
     // Skip verification in development mode if configured
     if (this.config.verifyJwt === false) {
       console.warn("[Auth0 OAuth] ⚠️  JWT verification is disabled");
@@ -43,7 +48,7 @@ export class Auth0OAuthProvider implements OAuthProvider {
       }
       const payload = JSON.parse(
         Buffer.from(parts[1], "base64url").toString("utf8")
-      );
+      ) as Record<string, unknown>;
       return { payload };
     }
 

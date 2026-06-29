@@ -1,6 +1,6 @@
 // libraries/typescript/packages/inspector/src/client/components/chat/InlineElicitationCard.tsx
 import { useState } from "react";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ElicitResult } from "@modelcontextprotocol/client";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
 import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";

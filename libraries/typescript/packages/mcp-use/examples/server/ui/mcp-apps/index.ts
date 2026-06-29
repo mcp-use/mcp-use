@@ -1,4 +1,4 @@
-import { MCPServer, object, widget } from "mcp-use/server";
+import { MCPServer, object, view } from "mcp-use/server";
 import { z } from "zod";
 import { setTimeout as sleep } from "timers/promises";
 
@@ -75,7 +75,7 @@ server.tool(
       windSpeed: 10,
     };
 
-    return widget({
+    return view({
       props: {
         city,
         ...weather,
@@ -116,7 +116,7 @@ server.tool(
       windSpeed: 10,
     };
 
-    return widget({
+    return view({
       props: {
         city,
         ...weather,
@@ -142,7 +142,7 @@ server.tool(
     },
   },
   async ({ name, greeting }) =>
-    widget({
+    view({
       props: {
         name,
         greeting,
@@ -202,5 +202,5 @@ Try these tools:
 To test Issue #930 fix:
 1. Call get-weather-delayed with city="Paris"
 2. Widget should appear immediately showing loading state
-3. After 5 seconds, widget updates with weather data
+3. After 5 seconds, view updates with weather data
 `);

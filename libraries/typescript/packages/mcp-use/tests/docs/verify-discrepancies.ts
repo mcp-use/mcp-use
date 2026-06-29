@@ -82,7 +82,8 @@ async function checkSDKExports() {
         note =
           "React component - should be imported from mcp-use/react or documented separately";
       } else if (type === "AppsSDKUIProvider") {
-        note = "External package - from @mcp-ui/server, not mcp-use";
+        note =
+          "Removed in v2 — Apps SDK provider was from legacy @mcp-ui/server";
       } else if (type === "ToolAnnotations") {
         note = "May be internal type or from @modelcontextprotocol/sdk";
       } else if (type === "PromptResult") {

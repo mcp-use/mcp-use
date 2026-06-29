@@ -492,7 +492,7 @@ describe("server OAuth integration", () => {
     errorSpy.mockRestore();
   });
 
-  it("protects the /sse transport with bearer auth (regression: /sse bypass)", async () => {
+  it("protects the /mcp transport with bearer auth", async () => {
     const app = new Hono();
 
     const proxy = oauthProxy({
@@ -508,39 +508,27 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
-    // Register OAuth via the real setup path (mirrors MCPServer.listen()).
     await setupOAuthForServer(app, proxy, svc.baseUrl, { complete: false });
 
-    // Stub handlers standing in for the mounted MCP JSON-RPC handler. These are
-    // registered after the middleware, matching mountMcp() ordering.
-    for (const endpoint of ["/mcp", "/sse"]) {
-      app.on(["GET", "POST"], endpoint, (c) => c.json({ ok: true }));
-    }
+    app.on(["GET", "POST"], "/mcp", (c) => c.json({ ok: true }));
 
-    // Unauthenticated requests to /sse must be rejected (the bypass).
-    const sseGet = await fetch(`${svc.baseUrl}/sse`);
-    expect(sseGet.status).toBe(401);
-
-    const ssePost = await fetch(`${svc.baseUrl}/sse`, { method: "POST" });
-    expect(ssePost.status).toBe(401);
-
-    // Authenticated requests to /sse reach the handler.
-    const sseAuthorized = await fetch(`${svc.baseUrl}/sse`, {
-      headers: { Authorization: "Bearer token-123" },
-    });
-    expect(sseAuthorized.status).toBe(200);
-
-    // /mcp remains protected too.
     const mcpUnauthorized = await fetch(`${svc.baseUrl}/mcp`);
     expect(mcpUnauthorized.status).toBe(401);
 
-    // Path-scoped protected-resource metadata is advertised for /sse.
+    const mcpPost = await fetch(`${svc.baseUrl}/mcp`, { method: "POST" });
+    expect(mcpPost.status).toBe(401);
+
+    const mcpAuthorized = await fetch(`${svc.baseUrl}/mcp`, {
+      headers: { Authorization: "Bearer token-123" },
+    });
+    expect(mcpAuthorized.status).toBe(200);
+
     const metaResponse = await fetch(
-      `${svc.baseUrl}/.well-known/oauth-protected-resource/sse`
+      `${svc.baseUrl}/.well-known/oauth-protected-resource/mcp`
     );
     expect(metaResponse.status).toBe(200);
     const metadata = await metaResponse.json();
-    expect(metadata.resource).toBe(`${svc.baseUrl}/sse`);
+    expect(metadata.resource).toBe(`${svc.baseUrl}/mcp`);
   });
 
   it("proxies OAuth metadata for path-suffix issuers at canonical well-known paths", async () => {

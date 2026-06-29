@@ -34,7 +34,7 @@ vi.mock("../../../src/react/mcp-apps-bridge.js", () => ({
   getMcpAppsBridge: () => bridge,
 }));
 
-const { useWidget } = await import("../../../src/react/useWidget.js");
+const { useView } = await import("../../../src/react/useView.js");
 const { useCallTool } = await import("../../../src/react/useCallTool.js");
 const { McpUseProvider } = await import("../../../src/react/McpUseProvider.js");
 const { ModelContext, _resetModelContextForTesting } =
@@ -158,10 +158,10 @@ afterEach(() => {
 
 describe("MCP Apps primary widget runtime", () => {
   it("uses MCP Apps data and actions when ChatGPT also exposes window.openai", async () => {
-    let latest: ReturnType<typeof useWidget> | undefined;
+    let latest: ReturnType<typeof useView> | undefined;
 
     function TestComponent() {
-      latest = useWidget();
+      latest = useView();
       return null;
     }
 
@@ -203,10 +203,10 @@ describe("MCP Apps primary widget runtime", () => {
     bridge.connect.mockReturnValue(new Promise<void>(() => {}));
     bridge.isConnected.mockReturnValue(false);
 
-    let latest: ReturnType<typeof useWidget> | undefined;
+    let latest: ReturnType<typeof useView> | undefined;
 
     function TestComponent() {
-      latest = useWidget();
+      latest = useView();
       return null;
     }
 
@@ -233,10 +233,10 @@ describe("MCP Apps primary widget runtime", () => {
   });
 
   it("preserves ModelContext annotations when widget state is overwritten", async () => {
-    let latest: ReturnType<typeof useWidget> | undefined;
+    let latest: ReturnType<typeof useView> | undefined;
 
     function TestComponent() {
-      latest = useWidget();
+      latest = useView();
       return <ModelContext content="Viewing product A" />;
     }
 

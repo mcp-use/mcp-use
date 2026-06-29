@@ -508,6 +508,7 @@
                   "typescript/getting-started/welcome",
                   "typescript/getting-started/quickstart",
                   "typescript/getting-started/installation",
+                  "typescript/v2-migration",
                   "typescript/changelog/changelog"
                 ]
               },

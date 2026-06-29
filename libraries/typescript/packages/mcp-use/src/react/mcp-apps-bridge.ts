@@ -99,15 +99,17 @@ class McpAppsBridge {
 
       // Handle responses
       if ("result" in message || "error" in message) {
-        const response = message as any;
+        const response = message as JSONRPCResponse;
         if (response.id !== null && response.id !== undefined) {
           const pending = this.pendingRequests.get(response.id);
           if (pending) {
             this.pendingRequests.delete(response.id);
             if ("error" in response && response.error) {
               pending.reject(new Error(response.error.message));
-            } else {
+            } else if ("result" in response) {
               pending.resolve(response.result);
+            } else {
+              pending.resolve(undefined);
             }
           }
         }
@@ -152,7 +154,10 @@ class McpAppsBridge {
     };
 
     // Helper to serialize console arguments for postMessage
-    const serializeForPostMessage = (value: any, seen = new WeakSet()): any => {
+    const serializeForPostMessage = (
+      value: unknown,
+      seen = new WeakSet<object>()
+    ): unknown => {
       // Handle primitives
       if (value === null || value === undefined) return value;
       if (typeof value !== "object") return value;
@@ -215,11 +220,12 @@ class McpAppsBridge {
       // Handle plain objects
       try {
         seen.add(value);
-        const serialized: any = {};
-        for (const key in value) {
-          if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const serialized: Record<string, unknown> = {};
+        const record = value as Record<string, unknown>;
+        for (const key in record) {
+          if (Object.prototype.hasOwnProperty.call(record, key)) {
             try {
-              serialized[key] = serializeForPostMessage(value[key], seen);
+              serialized[key] = serializeForPostMessage(record[key], seen);
             } catch {
               serialized[key] = "[Unserializable]";
             }
@@ -234,7 +240,7 @@ class McpAppsBridge {
     // Helper to send logging notification
     const sendLog = (
       level: "log" | "warn" | "error" | "info" | "debug",
-      args: any[]
+      args: unknown[]
     ) => {
       try {
         // Serialize arguments to prevent DataCloneError
@@ -257,27 +263,27 @@ class McpAppsBridge {
     };
 
     // Wrap console methods
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       sendLog("log", args);
       originalConsole.log(...args);
     };
 
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       sendLog("warn", args);
       originalConsole.warn(...args);
     };
 
-    console.error = (...args: any[]) => {
+    console.error = (...args: unknown[]) => {
       sendLog("error", args);
       originalConsole.error(...args);
     };
 
-    console.info = (...args: any[]) => {
+    console.info = (...args: unknown[]) => {
       sendLog("info", args);
       originalConsole.info(...args);
     };
 
-    console.debug = (...args: any[]) => {
+    console.debug = (...args: unknown[]) => {
       sendLog("debug", args);
       originalConsole.debug(...args);
     };

@@ -422,7 +422,7 @@ server.tool(
 
 // ============================================================================
 // TOOL: Widget config + widget() return
-// Tests: widget: { name, invoking, invoked }, widget({ props, output })
+// Tests: widget: { name, invoking, invoked }, view({ props, output })
 // Paired with resources/everything-widget.tsx
 // ============================================================================
 
@@ -446,7 +446,7 @@ server.tool(
       results = results.filter((i) => i.name.toLowerCase().includes(q));
     }
     const categories = [...new Set(results.map((i) => i.category))];
-    return widget({
+    return view({
       props: { items: results, categories, totalCount: results.length },
       output: text(
         `Found ${results.length} items across ${categories.length} categories`

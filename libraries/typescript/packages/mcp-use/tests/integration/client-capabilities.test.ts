@@ -23,8 +23,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { MCPServer } from "../../src/server/index.js";
 import { text, object } from "../../src/server/utils/response-helpers.js";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 const MCP_UI_EXTENSION = "io.modelcontextprotocol/ui";
 const MCP_UI_MIME = "text/html;profile=mcp-app";
@@ -100,11 +100,13 @@ describe("Client Capabilities Integration Tests", () => {
     );
 
     // Prompt that captures ctx.client values
-    server.prompt({
-      name: "client-info-prompt",
-      description: "Captures ctx.client from a prompt callback",
-      schema: z.object({}),
-      cb: async (_params, ctx) => {
+    server.prompt(
+      {
+        name: "client-info-prompt",
+        description: "Captures ctx.client from a prompt callback",
+        schema: z.object({}),
+      },
+      async (_params, ctx) => {
         capturedFromPrompt = {
           info: ctx.client.info(),
           can_sampling: ctx.client.can("sampling"),
@@ -114,8 +116,8 @@ describe("Client Capabilities Integration Tests", () => {
         return {
           messages: [{ role: "user", content: { type: "text", text: "ok" } }],
         };
-      },
-    });
+      }
+    );
 
     await server.listen(TEST_PORT);
     await new Promise((resolve) => setTimeout(resolve, 100));

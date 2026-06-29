@@ -5,7 +5,8 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
-} from "@modelcontextprotocol/sdk/types.js";
+  Tool,
+} from "@modelcontextprotocol/client";
 import React, {
   createContext,
   useCallback,
@@ -18,13 +19,21 @@ import React, {
 } from "react";
 import { Logger } from "../logging.js";
 import type { StorageProvider } from "./storage/StorageProvider.js";
-import type { UseMcpOptions, UseMcpResult } from "./types.js";
+import type { TransportWrapper, UseMcpOptions, UseMcpResult } from "./types.js";
 import { useMcp } from "./useMcp.js";
 
 // Module-level logger for McpClientProvider & friends
 const providerLogger = Logger.get("McpClientProvider");
 
 // ===== Types =====
+
+type ToolWithMeta = Tool & {
+  _meta?: Record<string, unknown>;
+};
+
+type VersionedMcpServerOptions = McpServerOptions & {
+  _updateVersion?: number;
+};
 
 /**
  * MCP notification received from a server
@@ -90,10 +99,7 @@ export interface McpServer extends UseMcpResult {
  */
 export interface McpServerOptions extends Omit<
   UseMcpOptions,
-  | "samplingCallback"
-  | "onElicitation"
-  | "elicitationCallback"
-  | "onNotification"
+  "onSampling" | "onElicitation" | "onNotification"
 > {
   name?: string;
   authProvider?: UseMcpOptions["authProvider"];
@@ -184,7 +190,7 @@ interface McpServerWrapperProps {
   };
   cachedMetadata?: import("./storage/StorageProvider.js").CachedServerMetadata;
   onUpdate: (server: McpServer) => void;
-  rpcWrapTransport?: (transport: any, serverId: string) => any;
+  rpcWrapTransport?: TransportWrapper;
   onGlobalSamplingRequest?: (
     request: PendingSamplingRequest,
     serverId: string,
@@ -288,7 +294,7 @@ function McpServerWrapper({
   const combinedWrapTransport = useMemo(() => {
     if (!rpcWrapTransport && !optionsWrapTransport) return undefined;
 
-    return (transport: any) => {
+    return (transport: Parameters<TransportWrapper>[0]) => {
       let wrapped = transport;
 
       // Apply RPC logging first if enabled
@@ -557,7 +563,7 @@ function McpServerWrapper({
           name: t.name,
           description: t.description,
           inputSchema: t.inputSchema,
-          _meta: (t as any)._meta,
+          _meta: (t as ToolWithMeta)._meta,
         }))
         .sort((a, b) => a.name.localeCompare(b.name))
     );
@@ -922,7 +928,7 @@ export function McpClientProvider({
 
   // Load RPC transport wrapper if enabled
   const [rpcWrapTransport, setRpcWrapTransport] = useState<
-    ((transport: any, serverId: string) => any) | undefined
+    TransportWrapper | undefined
   >(undefined);
   const [rpcLoggingReady, setRpcLoggingReady] = useState(false);
 
@@ -1268,12 +1274,13 @@ export function McpClientProvider({
         }
 
         // Merge the new options with the existing ones
-        const updatedOptions: McpServerOptions & { _updateVersion?: number } = {
+        const updatedOptions: VersionedMcpServerOptions = {
           ...currentConfig.options,
           ...options,
           // Add a version counter to force React to remount the wrapper
           _updateVersion:
-            ((currentConfig.options as any)._updateVersion || 0) + 1,
+            ((currentConfig.options as VersionedMcpServerOptions)
+              ._updateVersion || 0) + 1,
         };
 
         // Capture the existing wrapper before mutating state so its
@@ -1405,7 +1412,7 @@ export function McpClientProvider({
       {children}
       {mergedServerConfigs.map((config) => (
         <McpServerWrapper
-          key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
+          key={`${config.id}-v${(config.options as VersionedMcpServerOptions)._updateVersion || 0}`}
           id={config.id}
           options={config.options}
           defaultCallbackUrl={defaultCallbackUrl}

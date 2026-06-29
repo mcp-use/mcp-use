@@ -1,15 +1,15 @@
 import type {
   ReadResourceResult,
   CallToolResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+} from "@modelcontextprotocol/server";
+import type { CompleteResourceTemplateCallback } from "@modelcontextprotocol/server";
 import type { ResourceAnnotations } from "./common.js";
 import type { ToolAnnotations } from "./tool.js";
-import type { AdaptersConfig } from "@mcp-ui/server";
 import type { TypedCallToolResult } from "../utils/response-helpers.js";
 import type { ClientCapabilityChecker, McpContext } from "./context.js";
-import type { UnifiedWidgetMetadata } from "../widgets/adapters/types.js";
+import type { UnifiedWidgetMetadata } from "../views/adapters/types.js";
 import type { z } from "zod";
+import type { AuthRequirement } from "../oauth/types.js";
 
 // UIResourceContent type from MCP-UI
 export type UIResourceContent = {
@@ -113,7 +113,11 @@ export type EnhancedResourceContext<HasOAuth extends boolean = false> =
 interface ReadResourceCallbackBivariant<HasOAuth extends boolean> {
   bivarianceHack(
     ctx: EnhancedResourceContext<HasOAuth>
-  ): Promise<CallToolResult | ReadResourceResult | TypedCallToolResult<any>>;
+  ): Promise<
+    | CallToolResult
+    | ReadResourceResult
+    | TypedCallToolResult<Record<string, unknown>>
+  >;
 }
 
 /**
@@ -132,8 +136,8 @@ export type ReadResourceCallback<HasOAuth extends boolean = false> =
 export type InferTemplateParams<T> = T extends { schema: infer S }
   ? S extends z.ZodTypeAny
     ? z.infer<S>
-    : Record<string, any>
-  : Record<string, any>;
+    : Record<string, unknown>
+  : Record<string, unknown>;
 
 /**
  * Callback type for reading a resource template with parameters.
@@ -147,33 +151,41 @@ export type InferTemplateParams<T> = T extends { schema: infer S }
  *
  * The implementation checks callback.length to determine which signature to use.
  *
- * @template TParams - Type for URI template parameters (defaults to Record<string, any>)
+ * @template TParams - Type for URI template parameters (defaults to Record<string, unknown>)
  * @template HasOAuth - Whether OAuth is configured (affects ctx.auth availability)
  */
 export type ReadResourceTemplateCallback<
-  TParams extends Record<string, any> = Record<string, any>,
+  TParams extends Record<string, unknown> = Record<string, unknown>,
   HasOAuth extends boolean = false,
 > =
   | (() => Promise<
-      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+      | CallToolResult
+      | ReadResourceResult
+      | TypedCallToolResult<Record<string, unknown>>
     >)
   | ((
       uri: URL
     ) => Promise<
-      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+      | CallToolResult
+      | ReadResourceResult
+      | TypedCallToolResult<Record<string, unknown>>
     >)
   | ((
       uri: URL,
       params: TParams
     ) => Promise<
-      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+      | CallToolResult
+      | ReadResourceResult
+      | TypedCallToolResult<Record<string, unknown>>
     >)
   | ((
       uri: URL,
       params: TParams,
       ctx: EnhancedResourceContext<HasOAuth>
     ) => Promise<
-      CallToolResult | ReadResourceResult | TypedCallToolResult<any>
+      | CallToolResult
+      | ReadResourceResult
+      | TypedCallToolResult<Record<string, unknown>>
     >);
 
 /**
@@ -186,9 +198,18 @@ export interface ResourceTemplateCallbacks {
 }
 
 /**
- * Configuration for a resource template
+ * Resource template definition (metadata only; pass callback as second argument to server.resourceTemplate()).
  */
-export interface ResourceTemplateConfig {
+export interface ResourceTemplateDefinition<
+  _HasOAuth extends boolean = false,
+  _TParams extends Record<string, unknown> = Record<string, unknown>,
+> {
+  /**
+   * Unique identifier for the template.
+   *
+   * @example "user-profile"
+   */
+  name: string;
   /**
    * URI template with {param} placeholders for dynamic resources.
    *
@@ -197,164 +218,27 @@ export interface ResourceTemplateConfig {
    */
   uriTemplate: string;
   /**
-   * Unique name for the template.
+   * Human-readable title for the resource.
    *
-   * @example "user-profile"
+   * @example "User Profile"
    */
-  name?: string;
+  title?: string;
+  /**
+   * Description of what the resource contains.
+   *
+   * @example "User profile data for the given userId"
+   */
+  description?: string;
   /**
    * MIME type of the resource content (e.g., "text/plain", "application/json").
    *
    * @example "application/json"
    */
   mimeType?: string;
-  /**
-   * Description of what the resource contains.
-   *
-   * @example "User profile data for the given userId"
-   */
-  description?: string;
-  /** Complete callback for the resource template */
-  callbacks?: ResourceTemplateCallbacks;
-}
-
-/**
- * Resource template definition with readCallback (old API)
- */
-export interface ResourceTemplateDefinition<
-  HasOAuth extends boolean = false,
-  TParams extends Record<string, any> = Record<string, any>,
-> {
-  name: string;
-  resourceTemplate: ResourceTemplateConfig;
-  title?: string;
-  description?: string;
-  annotations?: ResourceAnnotations;
-  /**
-   * Optional Zod schema for URI template parameters. When provided, narrows
-   * the `params` argument in the callback to `z.infer<schema>`.
-   *
-   * @example z.object({ id: z.string() })
-   */
-  schema?: z.ZodTypeAny;
-  readCallback: ReadResourceTemplateCallback<TParams, HasOAuth>;
-  _meta?: Record<string, unknown>;
-}
-
-/**
- * Resource template definition without readCallback (new API with separate callback parameter)
- */
-export interface ResourceTemplateDefinitionWithoutCallback {
-  name: string;
-  resourceTemplate: ResourceTemplateConfig;
-  title?: string;
-  description?: string;
-  annotations?: ResourceAnnotations;
-  /**
-   * Optional Zod schema for URI template parameters. When provided, narrows
-   * the `params` argument in the callback to `z.infer<schema>`.
-   *
-   * @example z.object({ id: z.string() })
-   */
-  schema?: z.ZodTypeAny;
-  _meta?: Record<string, unknown>;
-}
-
-/**
- * Flat resource template definition with readCallback (new API)
- *
- * Simplified structure where uriTemplate is directly on the definition object
- * instead of nested in a resourceTemplate property.
- */
-export interface FlatResourceTemplateDefinition<
-  HasOAuth extends boolean = false,
-  TParams extends Record<string, any> = Record<string, any>,
-> {
-  /**
-   * Unique identifier for the template.
-   *
-   * @example "user-profile"
-   */
-  name: string;
-  /**
-   * URI template with {param} placeholders.
-   *
-   * @example "user://{userId}/profile"
-   */
-  uriTemplate: string;
-  /**
-   * Human-readable title for the resource.
-   *
-   * @example "User Profile"
-   */
-  title?: string;
-  /**
-   * Description of what the resource contains.
-   *
-   * @example "User profile data for the given userId"
-   */
-  description?: string;
-  /**
-   * MIME type of the resource content.
-   *
-   * @example "application/json"
-   */
-  mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
-  /**
-   * Optional Zod schema for URI template parameters. When provided, narrows
-   * the `params` argument in the readCallback to `z.infer<schema>`.
-   *
-   * @example z.object({ id: z.string() })
-   */
-  schema?: z.ZodTypeAny;
-  /** Async callback function that returns the resource content */
-  readCallback: ReadResourceTemplateCallback<TParams, HasOAuth>;
-  _meta?: Record<string, unknown>;
-  /** Complete callback for the resource template */
-  callbacks?: ResourceTemplateCallbacks;
-}
-
-/**
- * Flat resource template definition without readCallback (new API with separate callback parameter)
- *
- * Simplified structure where uriTemplate is directly on the definition object
- * instead of nested in a resourceTemplate property.
- */
-export interface FlatResourceTemplateDefinitionWithoutCallback {
-  /**
-   * Unique identifier for the template.
-   *
-   * @example "user-profile"
-   */
-  name: string;
-  /**
-   * URI template with {param} placeholders.
-   *
-   * @example "user://{userId}/profile"
-   */
-  uriTemplate: string;
-  /**
-   * Human-readable title for the resource.
-   *
-   * @example "User Profile"
-   */
-  title?: string;
-  /**
-   * Description of what the resource contains.
-   *
-   * @example "User profile data for the given userId"
-   */
-  description?: string;
-  /**
-   * MIME type of the resource content.
-   *
-   * @example "application/json"
-   */
-  mimeType?: string;
-  /** Optional annotations for the resource */
-  annotations?: ResourceAnnotations;
+  /** Optional authorization requirement enforced on resources/list and resources/read */
+  auth?: AuthRequirement;
   /**
    * Optional Zod schema for URI template parameters. When provided, narrows
    * the `params` argument in the callback to `z.infer<schema>`.
@@ -368,9 +252,9 @@ export interface FlatResourceTemplateDefinitionWithoutCallback {
 }
 
 /**
- * Resource definition with readCallback (old API)
+ * Resource definition (metadata only; pass callback as second argument to server.resource()).
  */
-export interface ResourceDefinition<HasOAuth extends boolean = false> {
+export interface ResourceDefinition<_HasOAuth extends boolean = false> {
   /**
    * Unique identifier for the resource.
    *
@@ -396,47 +280,6 @@ export interface ResourceDefinition<HasOAuth extends boolean = false> {
    * @example "Application configuration and user preferences"
    */
   description?: string;
-  /** MIME type of the resource content (required for old API) */
-  mimeType: string;
-  /** Optional annotations for the resource */
-  annotations?: ResourceAnnotations;
-  /** Async callback function that returns the resource content */
-  readCallback: ReadResourceCallback<HasOAuth>;
-  _meta?: Record<string, unknown>;
-  /** Complete callback for the resource template */
-  callbacks?: ResourceTemplateCallbacks;
-}
-
-/**
- * Resource definition without readCallback (new API with separate callback parameter)
- * MIME type is optional when using response helpers - it's inferred from the helper
- */
-export interface ResourceDefinitionWithoutCallback {
-  /**
-   * Unique identifier for the resource.
-   *
-   * @example "app-settings"
-   */
-  name: string;
-  /**
-   * URI pattern for accessing the resource.
-   *
-   * @example "config://app-settings"
-   * @example "app://greeting"
-   */
-  uri: string;
-  /**
-   * Human-readable title for the resource.
-   *
-   * @example "App Settings"
-   */
-  title?: string;
-  /**
-   * Description of what the resource contains.
-   *
-   * @example "Application configuration and user preferences"
-   */
-  description?: string;
   /**
    * MIME type (optional when using text(), object(), etc.—inferred from the helper).
    *
@@ -445,6 +288,8 @@ export interface ResourceDefinitionWithoutCallback {
   mimeType?: string;
   /** Optional annotations for the resource */
   annotations?: ResourceAnnotations;
+  /** Optional authorization requirement enforced on resources/list and resources/read */
+  auth?: AuthRequirement;
   _meta?: Record<string, unknown>;
   /** Complete callback for the resource template */
   callbacks?: ResourceTemplateCallbacks;
@@ -466,11 +311,6 @@ export interface WidgetProps {
  * Encoding options for UI resources
  */
 export type UIEncoding = "text" | "blob";
-
-/**
- * Framework options for Remote DOM resources
- */
-export type RemoteDomFramework = "react" | "webcomponents";
 
 /**
  * Base properties shared by all UI resource types
@@ -537,55 +377,18 @@ interface BaseUIResourceDefinition {
    */
   toolOutput?:
     | ((
-        params: Record<string, any>
+        params: Record<string, unknown>
       ) =>
-        | import("@modelcontextprotocol/sdk/types.js").CallToolResult
-        | import("../utils/response-helpers.js").TypedCallToolResult<any>)
-    | import("@modelcontextprotocol/sdk/types.js").CallToolResult
-    | import("../utils/response-helpers.js").TypedCallToolResult<any>;
+        | import("@modelcontextprotocol/server").CallToolResult
+        | import("../utils/response-helpers.js").TypedCallToolResult<
+            Record<string, unknown>
+          >)
+    | import("@modelcontextprotocol/server").CallToolResult
+    | import("../utils/response-helpers.js").TypedCallToolResult<
+        Record<string, unknown>
+      >;
 
   _meta?: Record<string, unknown>;
-}
-
-/**
- * External URL UI resource - serves widget via iframe (legacy MCP-UI)
- */
-export interface ExternalUrlUIResource extends BaseUIResourceDefinition {
-  type: "externalUrl";
-  /** Widget identifier (e.g., 'kanban-board', 'chart') */
-  widget: string;
-  /** Adapter configuration */
-  adapters?: AdaptersConfig;
-  /** Apps SDK metadata fields */
-  appsSdkMetadata?: AppsSdkMetadata;
-}
-
-/**
- * Raw HTML UI resource - direct HTML content (legacy MCP-UI)
- */
-export interface RawHtmlUIResource extends BaseUIResourceDefinition {
-  type: "rawHtml";
-  /** HTML content to render */
-  htmlContent: string;
-  /** Adapter configuration */
-  adapters?: AdaptersConfig;
-  /** Apps SDK metadata fields */
-  appsSdkMetadata?: AppsSdkMetadata;
-}
-
-/**
- * Remote DOM UI resource - scripted UI components (legacy MCP-UI)
- */
-export interface RemoteDomUIResource extends BaseUIResourceDefinition {
-  type: "remoteDom";
-  /** JavaScript code for remote DOM manipulation */
-  script: string;
-  /** Framework for remote DOM (defaults to 'react') */
-  framework?: RemoteDomFramework;
-  /** Adapter configuration */
-  adapters?: AdaptersConfig;
-  /** Apps SDK metadata fields */
-  appsSdkMetadata?: AppsSdkMetadata;
 }
 
 /**
@@ -633,12 +436,7 @@ export interface McpAppsUIResource extends BaseUIResourceDefinition {
 /**
  * Discriminated union of all UI resource types
  */
-export type UIResourceDefinition =
-  | ExternalUrlUIResource
-  | RawHtmlUIResource
-  | RemoteDomUIResource
-  | AppsSdkUIResource
-  | McpAppsUIResource;
+export type UIResourceDefinition = AppsSdkUIResource | McpAppsUIResource;
 
 export interface WidgetConfig {
   /** Widget directory name */

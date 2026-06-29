@@ -3,7 +3,7 @@ import {
   Image,
   McpUseProvider,
   useCallTool,
-  useWidget,
+  useView,
   type WidgetMetadata,
 } from "mcp-use/react";
 import React, { useCallback } from "react";
@@ -37,6 +37,12 @@ export const widgetMetadata: WidgetMetadata = {
   },
 };
 type FavoritesState = { favorites: string[] };
+type FruitDetailsResponse = {
+  structuredContent: {
+    fruit: string;
+    facts: string[];
+  };
+};
 
 const ProductSearchResult: React.FC = () => {
   const {
@@ -48,17 +54,15 @@ const ProductSearchResult: React.FC = () => {
     locale,
     state,
     setState,
-  } = useWidget<ProductSearchResultProps, FavoritesState>();
+  } = useView<ProductSearchResultProps, FavoritesState>();
 
   const {
     callTool: getFruitDetails,
     data: fruitDetails,
     isPending: isLoadingDetails,
-  } = useCallTool("get-fruit-details");
+  } = useCallTool<{ fruit: string }, FruitDetailsResponse>("get-fruit-details");
 
-  const selectedFruit = fruitDetails?.structuredContent as
-    | { fruit: string; facts?: string[] }
-    | undefined;
+  const selectedFruit = fruitDetails?.structuredContent;
   const favorites = state?.favorites ?? [];
 
   const toggleFavorite = useCallback(

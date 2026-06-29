@@ -240,9 +240,13 @@ async function isMcpProject(cwd: string = process.cwd()): Promise<boolean> {
     const pkg = JSON.parse(content);
     return !!(
       pkg.dependencies?.["mcp-use"] ||
-      pkg.dependencies?.["@modelcontextprotocol/sdk"] ||
+      pkg.dependencies?.["@modelcontextprotocol/client"] ||
+      pkg.dependencies?.["@modelcontextprotocol/client"] ||
+      pkg.dependencies?.["@modelcontextprotocol/server"] ||
       pkg.devDependencies?.["mcp-use"] ||
-      pkg.devDependencies?.["@modelcontextprotocol/sdk"]
+      pkg.devDependencies?.["@modelcontextprotocol/client"] ||
+      pkg.devDependencies?.["@modelcontextprotocol/client"] ||
+      pkg.devDependencies?.["@modelcontextprotocol/server"]
     );
   } catch {
     return false;
@@ -1694,7 +1698,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         serverId: serverResult.server.id,
       });
       console.log(
-        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
+        chalk.gray(
+          `  Linked to this project (stored in .mcp-use/cloud/link.json)`
+        )
       );
       console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
     }

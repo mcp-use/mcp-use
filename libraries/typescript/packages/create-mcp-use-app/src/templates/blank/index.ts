@@ -1,6 +1,5 @@
 import { MCPServer } from "mcp-use/server";
 
-// Create MCP server instance
 const server = new MCPServer({
   name: "{{PROJECT_NAME}}",
   title: "{{PROJECT_NAME}}", // display name
@@ -19,24 +18,13 @@ const server = new MCPServer({
 });
 
 /**
- * Define UI Widgets
- * All React components in the `resources/` folder
- * are automatically registered as MCP tools and resources.
- *
- * Just export widgetMetadata with description and Zod schema,
- * and mcp-use handles the rest!
- *
- * Docs: https://mcp-use.com/docs/typescript/server/mcp-apps
- */
-
-/*
  * Define MCP tools
  * Docs: https://mcp-use.com/docs/typescript/server/tools
  *
  * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
  * `widget`, ...) are exported from `mcp-use/server`.
 
-import { text } from "mcp-use/server";
+import { object } from "mcp-use/server";
 import { z } from "zod";
 
 server.tool(
@@ -46,12 +34,25 @@ server.tool(
     schema: z.object({
       city: z.string().describe("The city to fetch the weather for"),
     }),
+    outputSchema: z.object({
+      city: z.string(),
+      conditions: z.string(),
+      temperatureCelsius: z.number(),
+    }),
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      openWorldHint: false,
+    },
   },
   async ({ city }) => {
-    const response = await fetch(`https://wttr.in/${city}?format=j1`);
-    const data: any = await response.json();
-    const current = data.current_condition[0];
-    return text(`The weather in ${city} is ${current.weatherDesc[0].value}. Temperature: ${current.temp_C}°C, Humidity: ${current.humidity}%`);
+    const weather = {
+      city,
+      conditions: "sunny",
+      temperatureCelsius: 22,
+    };
+
+    return object(weather);
   }
 );
  */
@@ -62,14 +63,18 @@ server.tool(
 
 import { object } from "mcp-use/server";
 
-server.resource({
-  name: "config",
-  uri: "config://settings",
-  description: "Server configuration",
-}, async () => object({
-  theme: "dark",
-  language: "en",
-}));
+server.resource(
+  {
+    name: "config",
+    uri: "config://settings",
+    description: "Server configuration",
+  },
+  async () =>
+    object({
+      theme: "dark",
+      language: "en",
+    })
+);
 */
 
 /*
@@ -92,7 +97,6 @@ server.prompt(
   }
 ); */
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const PORT = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 3000;
 console.log(`Server running on port ${PORT}`);
-// Start the server
 server.listen(PORT);

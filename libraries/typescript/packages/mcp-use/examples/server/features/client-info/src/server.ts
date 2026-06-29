@@ -36,7 +36,7 @@
  * ctx.auth (requires OAuth) provides server-verified identity (email, scopes).
  */
 
-import { MCPServer, object, text, widget } from "mcp-use/server";
+import { MCPServer, object, text, view } from "mcp-use/server";
 import z from "zod";
 
 const server = new MCPServer({
@@ -214,7 +214,7 @@ server.tool(
     if (ctx.client.supportsApps()) {
       const summary = `Hello, ${name}${locationHint}! (rendered as MCP Apps widget via ${clientLabel})`;
       console.log(`[adaptive-greeting] MCP Apps path → widget | ${summary}`);
-      return widget({
+      return view({
         props: {
           greeting: `Hello, ${name}!`,
           clientName: clientLabel,

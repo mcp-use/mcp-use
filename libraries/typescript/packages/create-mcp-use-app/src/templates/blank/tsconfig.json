@@ -6,19 +6,19 @@
     "moduleResolution": "bundler",
     "allowJs": true,
     "strict": true,
-    "outDir": "./dist",
+    "outDir": "./.mcp-use/build/server",
     "sourceMap": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "incremental": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "tsBuildInfoFile": "./.mcp-use/cache/tsconfig.tsbuildinfo",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/**/*.d.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["index.ts", "src/**/*", "resources/**/*", "server.ts", ".mcp-use/generated/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", ".mcp-use/build"]
 }

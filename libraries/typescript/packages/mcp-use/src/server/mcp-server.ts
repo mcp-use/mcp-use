@@ -1,23 +1,33 @@
 import {
-  McpServer as OfficialMcpServer,
-  ResourceTemplate,
+  createSdkMcpServer,
+  createSdkResourceTemplate,
+  ProtocolError,
+  ProtocolErrorCode,
+  type CreateMessageRequest,
+  type CreateMessageResult,
   type RegisteredPrompt,
   type RegisteredResource,
   type RegisteredResourceTemplate,
   type RegisteredTool,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
+  type SdkMcpServer as OfficialMcpServer,
+} from "./sdk-bridge.js";
+import type { Context, Hono as HonoType, Next } from "hono";
 import type {
-  CreateMessageRequest,
-  CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
-import type { Hono as HonoType } from "hono";
+  CallToolResult,
+  GetPromptResult,
+  ReadResourceResult,
+} from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
+import type { MCPSession } from "../session.js";
 
+import {
+  enableServerCodeMode,
+  type EnableCodeModeOptions,
+} from "./code-mode.js";
 import { countChanges, logChanges, syncPrimitive } from "./hmr-sync.js";
-import { mountInspectorUI } from "./inspector/index.js";
+import { mountInspectorUI } from "./inspector/mount.js";
 import {
   registerOpenAPITools,
   type FromOpenAPIOptions,
@@ -31,20 +41,21 @@ import {
 import {
   convertZodSchemaToParams,
   createParamsSchema,
-  toolRegistration,
-} from "./tools/index.js";
+} from "./tools/schema-helpers.js";
+import { toolRegistration } from "./tools/tool-registration.js";
 import {
-  mountWidgets,
+  mountViews,
   setupFaviconRoute,
   setupPublicRoutes,
   uiResourceRegistration,
-} from "./widgets/index.js";
-import { generateWidgetUri } from "./widgets/widget-helpers.js";
-import { buildDualProtocolMetadata } from "./widgets/protocol-helpers.js";
+} from "./views/index.js";
+import { generateWidgetUri } from "./views/widget-helpers.js";
+import { buildDualProtocolMetadata } from "./views/protocol-helpers.js";
+import { extractInlineJsxMetadata } from "./views/extract-inline-jsx-metadata.js";
 import { toResourceTemplateCompleteCallbacks } from "./utils/completion-helpers.js";
 
 import { getRequestContext, runWithContext } from "./context-storage.js";
-import { mountMcp as mountMcpHelper } from "./endpoints/index.js";
+import { mountMcp as mountMcpHelper } from "./endpoints/mount-mcp.js";
 import { requestLogger } from "./logging.js";
 import {
   getActiveSessions,
@@ -53,16 +64,20 @@ import {
   sendPromptsListChanged,
   sendResourcesListChanged,
   sendToolsListChanged,
-} from "./notifications/index.js";
+} from "./notifications/notification-registration.js";
 import type { OAuthProvider } from "./oauth/providers/types.js";
+import type { AuthRequirement, PolicyRequest } from "./oauth/types.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
-import { listRoots, onRootsChanged } from "./roots/index.js";
+import { listRoots, onRootsChanged } from "./roots/roots-registration.js";
 import type { SessionData } from "./sessions/index.js";
 import {
   buildHandlerContext,
+  createClientCapabilityChecker,
   createEnhancedContext,
+  extractRequestClientMetadata,
   findSessionContext,
   isValidLogLevel,
+  resolveClientMetadata,
 } from "./tools/tool-execution-helpers.js";
 import type { ServerConfig } from "./types/index.js";
 import type {
@@ -76,11 +91,12 @@ import type {
   InferTemplateParams,
   ResourceDefinition,
   ResourceTemplateDefinition,
-  ResourceTemplateCallbacks,
+  UIResourceDefinition,
 } from "./types/resource.js";
 import type {
   InferToolInput,
   InferToolOutput,
+  ToolCallbackWithContext,
   ToolCallback,
   ToolDefinition,
 } from "./types/tool.js";
@@ -106,6 +122,15 @@ import type {
   MiddlewareContext,
 } from "./middleware/mcp-middleware.js";
 import { composeMiddleware } from "./middleware/mcp-middleware.js";
+import { createAuthzMiddleware } from "./middleware/policy.js";
+import { createToolRef } from "./types/tool-ref.js";
+
+function toKebabCase(str: string): string {
+  return str
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1-$2")
+    .toLowerCase();
+}
 
 /**
  * Validates that a key is safe to use as a property name to prevent prototype pollution.
@@ -117,6 +142,155 @@ import { composeMiddleware } from "./middleware/mcp-middleware.js";
 function isSafePropertyKey(key: string): boolean {
   return key !== "__proto__" && key !== "constructor" && key !== "prototype";
 }
+
+function isMcpSession(value: unknown): value is MCPSession {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "callTool" in value &&
+    typeof value.callTool === "function"
+  );
+}
+
+function hasArrayProperty<K extends string>(
+  value: unknown,
+  key: K
+): value is Record<K, unknown[]> {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    key in value &&
+    Array.isArray((value as Record<K, unknown>)[key])
+  );
+}
+
+type HonoMiddleware = (c: Context, next: Next) => Promise<Response | void>;
+type UnknownRecord = Record<string, unknown>;
+type CustomRouteHandler = (
+  c: Context,
+  next: Next
+) => Response | void | Promise<Response | void>;
+type HandlerExtra = {
+  _meta?: { progressToken?: number } & UnknownRecord;
+  sendNotification?: (notification: {
+    method: string;
+    params: UnknownRecord;
+  }) => Promise<void>;
+};
+type ToolHandlerResult = ReturnType<
+  ToolCallbackWithContext<UnknownRecord, UnknownRecord, boolean>
+>;
+type ToolHandlerInvoker = (
+  params: UnknownRecord,
+  ctx?: unknown
+) => ToolHandlerResult;
+// ponytail: HMR/session replay needs SDK-private registration maps. Keep the
+// permissive type at this one boundary until the official SDK exposes public
+// mutation/replay helpers or SdkBridge grows a maintained adapter for it.
+type PrivateSdkServer = any;
+function asPrivateSdkServer(server: OfficialMcpServer): PrivateSdkServer {
+  // ponytail: SDK v2 does not expose registration maps used for HMR/session
+  // replay. Keep the unsafe boundary centralized until SdkBridge grows public
+  // helpers for these internals.
+  return server as unknown as PrivateSdkServer;
+}
+type SdkResourceMetadata = {
+  title?: string;
+  description?: string;
+  mimeType?: string;
+  annotations?: unknown;
+  _meta?: Record<string, unknown>;
+};
+type SdkResourceReadCallback = (
+  ...args: unknown[]
+) => Promise<ReadResourceResult> | ReadResourceResult;
+type SdkResourceTemplate = ReturnType<typeof createSdkResourceTemplate>;
+type SdkStaticResourceRegistrar = (
+  name: string,
+  uri: string,
+  metadata: SdkResourceMetadata,
+  readCallback: SdkResourceReadCallback
+) => RegisteredResource;
+type SdkTemplateResourceRegistrar = (
+  name: string,
+  template: SdkResourceTemplate,
+  metadata: SdkResourceMetadata,
+  readCallback: SdkResourceReadCallback
+) => RegisteredResourceTemplate;
+
+function registerSdkStaticResource(
+  server: OfficialMcpServer,
+  name: string,
+  uri: string,
+  metadata: SdkResourceMetadata,
+  readCallback: unknown
+): RegisteredResource {
+  // ponytail: SDK overloads are narrower than our resource helper adapters.
+  // Keep the private cast at the SDK boundary instead of infecting callers.
+  return (server.registerResource as unknown as SdkStaticResourceRegistrar)(
+    name,
+    uri,
+    metadata,
+    readCallback as SdkResourceReadCallback
+  );
+}
+
+function registerSdkTemplateResource(
+  server: OfficialMcpServer,
+  name: string,
+  template: SdkResourceTemplate,
+  metadata: SdkResourceMetadata,
+  readCallback: unknown
+): RegisteredResourceTemplate {
+  // ponytail: SDK overloads are narrower than our resource helper adapters.
+  // Keep the private cast at the SDK boundary instead of infecting callers.
+  return (server.registerResource as unknown as SdkTemplateResourceRegistrar)(
+    name,
+    template,
+    metadata,
+    readCallback as SdkResourceReadCallback
+  );
+}
+
+function setSdkRequestHandler(
+  server: OfficialMcpServer["server"],
+  method: string,
+  handler: unknown
+): void {
+  // ponytail: method-string request handlers are SDK-private in this version,
+  // but logging/setLevel still needs the runtime hook.
+  (
+    server.setRequestHandler as unknown as (
+      method: string,
+      handler: unknown
+    ) => void
+  )(method, handler);
+}
+type ListRequestHandler = (
+  req: { params?: UnknownRecord },
+  extra: HandlerExtra
+) => Promise<unknown> | unknown;
+type ListRequestHandlerWithMarker = ListRequestHandler & {
+  __mcpListWrapped?: true;
+};
+type ResourceContentSummary = {
+  mimeType?: string;
+  text?: string;
+  blob?: string;
+};
+type StreamableRef = {
+  key: string;
+  streamable: {
+    value: Promise<unknown>;
+    _subscribe(fn: (value: unknown) => void): void;
+    _unsubscribeAll(): void;
+  };
+};
+type ToolResultWithMarkers = {
+  content?: Array<{ type: string; text?: string }>;
+  _meta?: UnknownRecord;
+  [key: symbol]: unknown;
+};
 
 /**
  * Auto-selects a favicon from the icons array based on priority.
@@ -156,10 +330,14 @@ function selectFaviconFromIcons(
 /**
  * MCP Server class
  *
- * MCPServerClass provides a complete MCP (Model Context Protocol) server implementation
- * built on top of the Hono web framework. It combines MCP protocol handling with HTTP
- * server capabilities, making it easy to build tools, resources, and prompts that can
- * be accessed by MCP clients.
+ * MCPServerClass provides the mcp-use framework layer on top of the official MCP SDK.
+ * The SDK owns protocol behavior; this class owns the product shell around it: Hono
+ * routes, OAuth setup, views/apps, middleware, local dev hooks, diagnostics, and
+ * ergonomic tool/resource/prompt registration.
+ *
+ * Keep this boundary SDK-first. Public APIs may stay friendlier than the SDK
+ * (`schema: z.object(...)`, inline JSX views, Hono helpers), but protocol-sensitive
+ * behavior should be delegated to the SDK or isolated behind an internal bridge.
  * The server can be run as a standalone HTTP server or integrated into existing
  * applications (Cloudflare Workers, Vercel Edge Functions, etc.) using {@link getHandler}.
  *
@@ -251,9 +429,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   /**
    * Native MCP server instance from the official SDK.
    *
-   * This is the underlying server from `@modelcontextprotocol/sdk` that handles
-   * the MCP protocol. Exposed publicly for advanced use cases that need direct
-   * access to SDK functionality.
+   * This is the underlying server from `@modelcontextprotocol/server` that handles
+   * MCP protocol semantics. It is an advanced escape hatch for SDK features that
+   * mcp-use does not wrap yet.
+   *
+   * Do not use this to depend on SDK-private fields from application code. Any
+   * mcp-use internals that must touch private SDK state should stay isolated,
+   * documented, and covered by SDK-version/conformance tests.
    *
    * @example
    * ```typescript
@@ -262,14 +444,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * ```
    */
   public readonly nativeServer: OfficialMcpServer;
-
-  /**
-   * @deprecated Use {@link nativeServer} instead.
-   * Kept for backward compatibility with older code.
-   */
-  public get server(): OfficialMcpServer {
-    return this.nativeServer;
-  }
 
   /**
    * Server configuration including name, version, OAuth settings, etc.
@@ -306,7 +480,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * re-registering routes on the immutable Hono router.
    */
 
-  public _customRoutes = new Map<string, ((...args: any[]) => any)[]>();
+  public _customRoutes = new Map<string, CustomRouteHandler[]>();
 
   /**
    * Registered MCP operation-level middleware entries.
@@ -372,16 +546,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   private oauthSetupState = {
     complete: false,
     provider: undefined as OAuthProvider | undefined,
-    middleware: undefined as
-      | ((c: any, next: any) => Promise<Response | void>)
-      | undefined,
+    middleware: undefined as HonoMiddleware | undefined,
   };
   public oauthProvider?: OAuthProvider;
-  private oauthMiddleware?: (c: any, next: any) => Promise<Response | void>;
+  private oauthMiddleware?: HonoMiddleware;
 
   /**
-   * Storage for registrations that can be replayed on new server instances
-   * Following the official SDK pattern where each session gets its own server instance
+   * Storage for registrations that can be replayed on new server instances.
+   *
+   * The SDK owns the live protocol registries; mcp-use keeps this declarative
+   * registry so stateless requests, hot reload, and compatibility sessions can
+   * rebuild an SDK server without treating SDK internals as source of truth.
+   * New product features should read from this registry or request context, not
+   * from remembered session state.
    * @internal Exposed for telemetry purposes
    */
   public registrations = {
@@ -408,6 +585,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * when using the widget() helper with returnsWidget option
    */
   public widgetDefinitions = new Map<string, Record<string, unknown>>();
+
+  /** @internal Inline view registry populated by auto-detection from mcp-use/jsx runtime */
+  public _inlineWidgetRegistry = new Map<
+    string,
+    import("./views/inline-widget-middleware.js").InlineWidgetManifestEntry
+  >();
+  /** @internal Whether the inline view middleware has been registered */
+  private _inlineWidgetMiddlewareRegistered = false;
 
   /**
    * Storage for SDK-registered tool/prompt/resource references per session.
@@ -472,6 +657,39 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     this.mcpMiddlewares.push({ pattern, handler });
   }
 
+  private _getAuthRequirement(
+    request: PolicyRequest
+  ): AuthRequirement | undefined {
+    if (request.kind === "tool" && request.name) {
+      return this.registrations.tools.get(request.name)?.config.auth;
+    }
+
+    if (request.kind === "prompt" && request.name) {
+      return this.registrations.prompts.get(request.name)?.config.auth;
+    }
+
+    if (request.kind === "resource") {
+      const resources = Array.from(this.registrations.resources.values());
+      const resource = resources.find(
+        ({ config }) =>
+          (request.uri && config.uri === request.uri) ||
+          (request.name && config.name === request.name)
+      );
+      if (resource?.config.auth) return resource.config.auth;
+
+      const templates = Array.from(
+        this.registrations.resourceTemplates.values()
+      );
+      return templates.find(
+        ({ config }) =>
+          (request.uri && config.uriTemplate === request.uri) ||
+          (request.name && config.name === request.name)
+      )?.config.auth;
+    }
+
+    return undefined;
+  }
+
   /**
    * Proxy to another MCP server(s).
    *
@@ -493,7 +711,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * ```
    */
   public async proxy(
-    config: Record<string, any> | any,
+    config: Record<string, unknown> | MCPSession,
     options?: { namespace?: string }
   ): Promise<void> {
     // Dynamic import to avoid bringing client code into server bundle unless used
@@ -501,7 +719,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     const { mountSession } = await import("./utils/proxy-client.js");
 
     // If it's an MCPSession (duck typing by checking for callTool method)
-    if (config && typeof config.callTool === "function") {
+    if (isMcpSession(config)) {
       await mountSession(this, config, options?.namespace);
       return;
     }
@@ -509,7 +727,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Otherwise, treat config as a map of namespaces to server configs
     const proxyClient = new MCPClient({
       mcpServers: config,
-      onSampling: async (params: any) => {
+      onSampling: async (
+        params: Parameters<OfficialMcpServer["server"]["createMessage"]>[0]
+      ) => {
         try {
           const { getRequestContext } = await import("./context-storage.js");
           const { findSessionContext } =
@@ -538,7 +758,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           };
         }
       },
-      onElicitation: async (params: any) => {
+      onElicitation: async (
+        params: Parameters<OfficialMcpServer["server"]["elicitInput"]>[0]
+      ) => {
         try {
           const { getRequestContext } = await import("./context-storage.js");
           const { findSessionContext } =
@@ -567,7 +789,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     const sessions = await proxyClient.createAllSessions(true);
 
     for (const [namespace, session] of Object.entries(sessions)) {
-      await mountSession(this, session as any, namespace);
+      await mountSession(this, session, namespace);
     }
   }
 
@@ -584,7 +806,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param toolCallback - The tool callback function
    * @internal
    */
-  public addWidgetTool(toolDefinition: any, toolCallback: any): void {
+  public addWidgetTool(
+    toolDefinition: ToolDefinition,
+    toolCallback: ToolCallback
+  ): void {
     // Guard against prototype pollution
     if (!isSafePropertyKey(toolDefinition.name)) {
       console.warn(
@@ -598,7 +823,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     );
 
     // First register normally to update wrapper's registrations
-    (this.tool as any)(toolDefinition, toolCallback);
+    (
+      this.tool as unknown as (
+        definition: ToolDefinition,
+        callback: ToolCallback
+      ) => unknown
+    )(toolDefinition, toolCallback);
 
     const widgetName = toolDefinition.name;
 
@@ -622,7 +852,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // This ensures the tool and resources are queryable before notifications are sent
     for (const [sessionId, session] of this.sessions) {
       if (!session.server) continue;
-      const nativeServer = session.server as any;
+      const nativeServer = asPrivateSdkServer(session.server);
 
       // Get the registered tool from wrapper (which has the converted schema)
       const registration = this.registrations.tools.get(toolDefinition.name);
@@ -638,7 +868,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       if (registration.config.schema) {
         try {
           inputSchema = this.convertZodSchemaToParams(
-            registration.config.schema as any
+            registration.config.schema
           );
         } catch (e) {
           console.warn(
@@ -646,13 +876,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           );
           inputSchema = {};
         }
-      } else if (
-        registration.config.inputs &&
-        registration.config.inputs.length > 0
-      ) {
-        inputSchema = this.createParamsSchema(
-          registration.config.inputs as any
-        );
       } else {
         inputSchema = {};
       }
@@ -668,10 +891,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         _meta: registration.config._meta,
         handler: registration.handler,
         enabled: true,
-        disable: function (this: any) {
+        disable: function (this: RegisteredTool) {
           this.enabled = false;
         },
-        enable: function (this: any) {
+        enable: function (this: RegisteredTool) {
           this.enabled = true;
         },
         remove: () => {
@@ -682,12 +905,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             );
             return;
           }
-          delete nativeServer._registeredTools[toolDefinition.name];
+          delete nativeServer._registeredTools?.[toolDefinition.name];
         },
-        update: function (this: any, updates: Record<string, unknown>) {
+        update: function (
+          this: RegisteredTool,
+          updates: Record<string, unknown>
+        ) {
           Object.assign(this, updates);
         },
-      };
+      } as unknown as RegisteredTool;
 
       // Add directly to SDK's _registeredTools for this session
       if (nativeServer._registeredTools) {
@@ -704,15 +930,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           // Already registered by propagateWidgetResourcesToSessions
         } else {
           try {
-            const registered = session.server.registerResource(
+            const registered = registerSdkStaticResource(
+              session.server,
               resourceReg.config.name,
               resourceReg.config.uri,
               {
                 title: resourceReg.config.title,
                 description: resourceReg.config.description,
                 mimeType: resourceReg.config.mimeType || "text/html+skybridge",
-              } as any,
-              resourceReg.handler as any
+              },
+              resourceReg.handler
             );
             if (sessionRefs?.resources) {
               sessionRefs.resources.set(resourceKey, registered);
@@ -735,28 +962,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           // Already registered by propagateWidgetResourcesToSessions
         } else {
           try {
-            const uriTemplate =
-              resourceTemplateReg.config.resourceTemplate.uriTemplate;
-            const resourceCallbacks =
-              resourceTemplateReg.config.resourceTemplate.callbacks;
-            const template = new ResourceTemplate(uriTemplate, {
+            const uriTemplate = resourceTemplateReg.config.uriTemplate;
+            const resourceCallbacks = resourceTemplateReg.config.callbacks;
+            const template = createSdkResourceTemplate(uriTemplate, {
               list: undefined,
               complete: toResourceTemplateCompleteCallbacks(
                 resourceCallbacks?.complete
               ),
             });
 
-            const registered = session.server.registerResource(
+            const registered = registerSdkTemplateResource(
+              session.server,
               resourceTemplateReg.config.name,
               template,
               {
                 title: resourceTemplateReg.config.title,
                 description: resourceTemplateReg.config.description,
                 mimeType:
-                  resourceTemplateReg.config.resourceTemplate.mimeType ||
-                  "text/html+skybridge",
-              } as any,
-              resourceTemplateReg.handler as any
+                  resourceTemplateReg.config.mimeType || "text/html+skybridge",
+              },
+              resourceTemplateReg.handler
             );
             if (sessionRefs?.resourceTemplates) {
               sessionRefs.resourceTemplates.set(
@@ -849,15 +1074,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Add static resource
       if (resourceReg) {
         try {
-          const registered = session.server.registerResource(
+          const registered = registerSdkStaticResource(
+            session.server,
             resourceReg.config.name,
             resourceReg.config.uri,
             {
               title: resourceReg.config.title,
               description: resourceReg.config.description,
               mimeType: resourceReg.config.mimeType || "text/html+skybridge",
-            } as any,
-            resourceReg.handler as any
+            },
+            resourceReg.handler
           );
           // Track in session refs so syncPrimitive preserves it during HMR
           if (sessionRefs?.resources) {
@@ -874,28 +1100,26 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Add resource template
       if (resourceTemplateReg) {
         try {
-          const uriTemplate =
-            resourceTemplateReg.config.resourceTemplate.uriTemplate;
-          const resourceCallbacks =
-            resourceTemplateReg.config.resourceTemplate.callbacks;
-          const template = new ResourceTemplate(uriTemplate, {
+          const uriTemplate = resourceTemplateReg.config.uriTemplate;
+          const resourceCallbacks = resourceTemplateReg.config.callbacks;
+          const template = createSdkResourceTemplate(uriTemplate, {
             list: undefined,
             complete: toResourceTemplateCompleteCallbacks(
               resourceCallbacks?.complete
             ),
           });
 
-          const registered = session.server.registerResource(
+          const registered = registerSdkTemplateResource(
+            session.server,
             resourceTemplateReg.config.name,
             template,
             {
               title: resourceTemplateReg.config.title,
               description: resourceTemplateReg.config.description,
               mimeType:
-                resourceTemplateReg.config.resourceTemplate.mimeType ||
-                "text/html+skybridge",
-            } as any,
-            resourceTemplateReg.handler as any
+                resourceTemplateReg.config.mimeType || "text/html+skybridge",
+            },
+            resourceTemplateReg.handler
           );
           // Track in session refs so syncPrimitive preserves it during HMR
           if (sessionRefs?.resourceTemplates) {
@@ -938,7 +1162,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     toolName: string,
     updates: {
       description?: string;
-      schema?: unknown; // Raw Zod schema - will be converted internally
+      schema?: z.ZodTypeAny; // Raw Zod schema - will be converted internally
       _meta?: Record<string, unknown>;
     }
   ): boolean {
@@ -954,7 +1178,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     let inputSchema: Record<string, unknown> | undefined;
     if ("schema" in updates) {
       try {
-        inputSchema = this.convertZodSchemaToParams(updates.schema as any);
+        inputSchema = updates.schema
+          ? this.convertZodSchemaToParams(updates.schema)
+          : {};
       } catch (e) {
         console.warn(
           `[WIDGET-HMR] Failed to convert schema for ${toolName}:`,
@@ -993,13 +1219,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       };
     }
     if ("schema" in updates) {
-      registration.config.schema = updates.schema as any;
+      registration.config.schema = updates.schema;
     }
 
     // Update the SDK's internal _registeredTools for all sessions
     for (const [, session] of this.sessions) {
       if (!session.server) continue;
-      const nativeServer = session.server as any;
+      const nativeServer = asPrivateSdkServer(session.server);
       const toolEntry = nativeServer._registeredTools?.[toolName];
       if (toolEntry) {
         if (updates.description !== undefined) {
@@ -1029,7 +1255,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
         if ("schema" in updates) {
           if (inputSchema !== undefined) {
-            toolEntry.inputSchema = inputSchema;
+            toolEntry.inputSchema =
+              inputSchema as unknown as RegisteredTool["inputSchema"];
           } else {
             // Explicit schema removal
             delete toolEntry.inputSchema;
@@ -1097,7 +1324,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Widgets are registered through wrapper methods that also touch native server state;
     // if we only clean per-session state, re-adding the same widget can fail with
     // "Resource ... is already registered".
-    const rootNativeServer = this.nativeServer as any;
+    const rootNativeServer = asPrivateSdkServer(this.nativeServer);
     if (rootNativeServer._registeredTools?.[toolName]) {
       delete rootNativeServer._registeredTools[toolName];
     }
@@ -1124,7 +1351,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Remove from SDK's internal state for all sessions
     for (const [, session] of this.sessions) {
       if (!session.server) continue;
-      const nativeServer = session.server as any;
+      const nativeServer = asPrivateSdkServer(session.server);
 
       // Remove tool
       if (nativeServer._registeredTools?.[toolName]) {
@@ -1230,8 +1457,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // like ctx.log(), ctx.sample(), ctx.elicit(), etc.
     const wrapHandler = (
       rawHandler: unknown,
-      session: { server?: any },
-      sessionId?: string
+      session: { server?: OfficialMcpServer },
+      sessionId?: string,
+      toolName?: string
     ): ((
       params: Record<string, unknown>,
       extra?: {
@@ -1241,11 +1469,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           params: Record<string, unknown>;
         }) => Promise<void>;
       }
-    ) => Promise<any>) => {
+    ) => Promise<unknown>) => {
       // Capture references needed by the closure (avoids aliasing `this`)
       const sessions = this.sessions;
       const createMessageFn = this.createMessage.bind(this);
-      const actualCallback = rawHandler as any;
+      const actualCallback = rawHandler as ToolHandlerInvoker;
 
       return async (
         params: Record<string, unknown>,
@@ -1286,6 +1514,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 )
               ) as Record<string, unknown>)
             : undefined;
+        const {
+          clientCapabilities: effectiveClientCapabilities,
+          clientInfo: effectiveClientInfo,
+        } = resolveClientMetadata(
+          requestMeta,
+          resolvedSession?.clientCapabilities,
+          resolvedSession?.clientInfo
+        );
 
         const nativeServer = session.server;
         const enhancedContext = createEnhancedContext(
@@ -1296,29 +1532,44 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           progressToken,
           sendNotification,
           resolvedSession?.logLevel,
-          resolvedSession?.clientCapabilities,
+          effectiveClientCapabilities,
           sessionId,
           sessions,
-          resolvedSession?.clientInfo,
+          effectiveClientInfo,
           requestMeta
         );
 
         const mwCtx: MiddlewareContext = {
           method: "tools/call",
           params: params as Record<string, unknown>,
+          toolName,
           session: sessionId ? { sessionId } : undefined,
           auth: requestContext?.get("auth"),
+          authContext: requestContext?.get("authContext"),
+          requestMeta,
+          clientCapabilities: effectiveClientCapabilities,
+          clientInfo: effectiveClientInfo,
+          client: createClientCapabilityChecker(
+            effectiveClientCapabilities,
+            effectiveClientInfo,
+            requestMeta
+          ),
           state: new Map(),
         };
 
         const innerFn = async () => {
-          // Propagate auth and any middleware state to the enhanced context
+          // Propagate auth and middleware state to the enhanced context
           // so tool handlers see data set by middleware (e.g., bearer auth).
-          if (mwCtx.auth && !(enhancedContext as any).auth) {
-            (enhancedContext as any).auth = mwCtx.auth;
+          const enhancedContextRecord =
+            enhancedContext as unknown as UnknownRecord;
+          if (mwCtx.auth && !enhancedContextRecord.auth) {
+            enhancedContextRecord.auth = mwCtx.auth;
+          }
+          if (mwCtx.authContext && !enhancedContextRecord.authContext) {
+            enhancedContextRecord.authContext = mwCtx.authContext;
           }
           for (const [key, value] of mwCtx.state) {
-            (enhancedContext as any)[key] = value;
+            enhancedContextRecord[key] = value;
           }
 
           if (actualCallback.length >= 2) {
@@ -1342,8 +1593,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       name: string,
       config: ToolDefinition,
       handler: unknown,
-      nativeServer: any,
-      session?: { server?: any },
+      nativeServer: PrivateSdkServer,
+      session?: { server?: OfficialMcpServer },
       sessionId?: string
     ): RegisteredTool => {
       // For HMR, we need to preserve Zod schemas properly
@@ -1352,8 +1603,6 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       if (config.schema) {
         // Pass the Zod schema directly - it will be used for validation
         inputSchema = config.schema;
-      } else if (config.inputs && config.inputs.length > 0) {
-        inputSchema = this.createParamsSchema(config.inputs);
       } else {
         // Create proper Zod schema instead of plain {} to ensure safeParseAsync works
         inputSchema = z.object({});
@@ -1362,7 +1611,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Wrap the raw handler with session context so that ctx.log(), ctx.sample(),
       // ctx.elicit(), etc. work correctly after HMR updates
       const wrappedHandler = session?.server
-        ? wrapHandler(handler, session, sessionId)
+        ? wrapHandler(handler, session, sessionId, name)
         : handler;
 
       return {
@@ -1389,7 +1638,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             );
             return;
           }
-          delete nativeServer._registeredTools[name];
+          delete nativeServer._registeredTools?.[name];
         },
         update: function (
           this: RegisteredTool,
@@ -1397,7 +1646,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         ) {
           Object.assign(this, updates);
         },
-      } as RegisteredTool;
+      } as unknown as RegisteredTool;
     };
 
     // --- TOOLS ---
@@ -1408,10 +1657,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       // Don't remove widget-registered tools during index.ts HMR sync.
       // Widget tools are managed by the Vite file watcher, not by index.ts.
       shouldRemove: (_key, reg) => {
-        const meta = (reg.config as any)?._meta;
-        const hasWidgetConfig = !!(reg.config as any)?.widget;
-        const hasUiResourceUri = !!(meta?.ui as any)?.resourceUri;
-        return !hasWidgetConfig && !hasUiResourceUri;
+        const config = reg.config as ToolDefinition & {
+          __inlineWidget?: unknown;
+        };
+        const meta = config._meta;
+        const uiMeta = meta?.ui as Record<string, unknown> | undefined;
+        const hasWidgetConfig = !!config.widget;
+        const hasUiResourceUri = !!uiMeta?.resourceUri;
+        const isInlineWidget = !!config.__inlineWidget;
+        return !hasWidgetConfig && !hasUiResourceUri && !isInlineWidget;
       },
       sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
         sessionId,
@@ -1425,14 +1679,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             );
             return null;
           }
-          const nativeServer = session.server as any;
+          const nativeServer = asPrivateSdkServer(session.server);
           const toolEntry = createToolEntry(
             name,
             config as ToolDefinition,
             handler,
             nativeServer
           );
-          nativeServer._registeredTools[name] = toolEntry;
+          if (nativeServer._registeredTools) {
+            nativeServer._registeredTools[name] = toolEntry;
+          }
           // Ensure tools/list and tools/call handlers are registered on the SDK server.
           // This is idempotent -- only registers handlers the first time (when
           // _toolHandlersInitialized is false), which happens when the session was
@@ -1457,11 +1713,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           );
           return;
         }
-        const nativeServer = session.server as any;
+        const nativeServer = asPrivateSdkServer(session.server);
 
         // Rebuild _registeredTools object with new name in same position
-        const oldTools = nativeServer._registeredTools;
-        const newTools: Record<string, any> = {};
+        const oldTools = nativeServer._registeredTools ?? {};
+        const newTools: Record<string, RegisteredTool> = {};
         for (const key of Object.keys(oldTools)) {
           if (key === oldKey) {
             newTools[newKey] = createToolEntry(
@@ -1503,14 +1759,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           );
           return;
         }
-        const nativeServer = session.server as any;
+        const nativeServer = asPrivateSdkServer(session.server);
 
         // Update in place to preserve order
         if (nativeServer._registeredTools?.[key]) {
           let enrichedConfig = config as ToolDefinition;
 
           // Check if this is a widget tool
-          const isWidgetTool = !!(config as any)?.widget;
+          const isWidgetTool = !!(config as ToolDefinition).widget;
 
           // For widget tools, preserve dual-protocol metadata from the existing tool
           // The new config from HMR only has basic metadata from server.tool() call
@@ -1534,7 +1790,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 ...((newMeta.ui as Record<string, unknown>) || {}),
               },
             };
-            (config as any)._meta = mergedMeta;
+            (config as ToolDefinition)._meta = mergedMeta;
             enrichedConfig = config as ToolDefinition;
           }
 
@@ -1562,18 +1818,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: PromptDefinition,
       handler: unknown
     ): RegisteredPrompt => {
-      let argsSchema: Record<string, any> | undefined;
+      let argsSchema: Record<string, z.ZodSchema> | undefined;
       if (config.schema) {
         argsSchema = this.convertZodSchemaToParams(config.schema);
-      } else if (config.args && config.args.length > 0) {
-        argsSchema = this.createParamsSchema(config.args);
       }
       // Wrap handler to support both CallToolResult and GetPromptResult (same as listen() method)
-      const wrappedHandler = async (...args: any[]) => {
-        const result = await (handler as any)(...args);
+      const promptHandler = handler as (
+        params: UnknownRecord,
+        extra?: unknown
+      ) => Promise<CallToolResult | GetPromptResult>;
+      const wrappedHandler = async (
+        params: UnknownRecord,
+        extra?: unknown
+      ): Promise<GetPromptResult> => {
+        const result = await promptHandler(params, extra);
 
         // If it's already a GetPromptResult, return as-is
-        if ("messages" in result && Array.isArray(result.messages)) {
+        if (hasArrayProperty(result, "messages")) {
           return result;
         }
 
@@ -1587,9 +1848,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         {
           title: config.title,
           description: config.description ?? "",
-          argsSchema: argsSchema as any,
+          argsSchema,
         },
-        wrappedHandler as any
+        wrappedHandler
       );
     };
 
@@ -1632,11 +1893,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           );
           return;
         }
-        const nativeServer = session.server as any;
+        const nativeServer = asPrivateSdkServer(session.server);
 
         // Rebuild _registeredPrompts object with new name in same position
         const oldPrompts = nativeServer._registeredPrompts || {};
-        const newPrompts: Record<string, any> = {};
+        const newPrompts: Record<string, RegisteredPrompt> = {};
         for (const key of Object.keys(oldPrompts)) {
           if (key === oldKey) {
             // Register new prompt to get proper entry, then move to correct position
@@ -1646,7 +1907,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               config as PromptDefinition,
               handler
             );
-            delete nativeServer._registeredPrompts[newKey]; // Remove from end
+            delete oldPrompts[newKey]; // Remove from end
             newPrompts[newKey] = registered;
           } else {
             newPrompts[key] = oldPrompts[key];
@@ -1683,38 +1944,40 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         const promptRef = refs?.prompts.get(key);
         if (promptRef) {
           const newReg = config as PromptDefinition;
-          let argsSchema: Record<string, any> | undefined;
+          let argsSchema: Record<string, z.ZodSchema> | undefined;
           if (newReg.schema) {
             argsSchema = this.convertZodSchemaToParams(newReg.schema);
-          } else if (newReg.args && newReg.args.length > 0) {
-            argsSchema = this.createParamsSchema(newReg.args);
           }
 
           // Wrap handler to support both CallToolResult and GetPromptResult
           // This ensures prompts can use tool response helpers (text(), object(), etc.)
+          const promptHandler = handler as (
+            params: UnknownRecord,
+            extra?: unknown
+          ) => Promise<CallToolResult | GetPromptResult>;
           const wrappedHandler = async (
             params: Record<string, unknown>,
-            extra?: any
-          ) => {
-            const result = await (handler as any)(params, extra);
+            extra?: unknown
+          ): Promise<GetPromptResult> => {
+            const result = await promptHandler(params, extra);
 
             // If it's already a GetPromptResult, return as-is
-            if ("messages" in result && Array.isArray(result.messages)) {
-              return result as any;
+            if (hasArrayProperty(result, "messages")) {
+              return result;
             }
 
             // Convert CallToolResult to GetPromptResult
             const { convertToolResultToPromptResult } =
               await import("./prompts/conversion.js");
-            return convertToolResultToPromptResult(result) as any;
+            return convertToolResultToPromptResult(result);
           };
 
           promptRef.update({
             title: newReg.title,
             description: newReg.description,
-            argsSchema: argsSchema as any,
-            callback: wrappedHandler as any,
-          });
+            argsSchema,
+            callback: wrappedHandler,
+          } as unknown as Parameters<typeof promptRef.update>[0]);
         }
       },
     });
@@ -1728,11 +1991,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       handler: unknown
     ): RegisteredResource => {
       // Wrap handler to support both CallToolResult and ReadResourceResult
-      const wrappedHandler = async (extra?: any) => {
-        const result = await (handler as any)(extra);
+      const resourceHandler = handler as (
+        extra?: unknown
+      ) => Promise<CallToolResult | ReadResourceResult>;
+      const wrappedHandler = async (
+        extra?: unknown
+      ): Promise<ReadResourceResult> => {
+        const result = await resourceHandler(extra);
 
         // If it's already a ReadResourceResult, return as-is
-        if ("contents" in result && Array.isArray(result.contents)) {
+        if (hasArrayProperty(result, "contents")) {
           return result;
         }
 
@@ -1742,7 +2010,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         return convertToolResultToResourceResult(config.uri, result);
       };
 
-      return server.registerResource(
+      return registerSdkStaticResource(
+        server,
         config.name || name,
         config.uri,
         {
@@ -1750,7 +2019,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           description: config.description,
           mimeType: config.mimeType || "text/plain",
         },
-        wrappedHandler as any
+        wrappedHandler
       );
     };
 
@@ -1759,15 +2028,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Widget resources (ui://widget/*) are only registered on initial load, not during HMR
     // Copy them to the new server's registrations to prevent deletion
     for (const [key, registration] of this.registrations.resources) {
-      const uri = (registration.config as any).uri;
+      const uri = registration.config.uri;
       if (uri && uri.startsWith("ui://widget/")) {
         other.registrations.resources.set(key, registration);
       }
     }
     // ALSO preserve widget resource templates (for dynamic URIs)
     for (const [key, registration] of this.registrations.resourceTemplates) {
-      const uriTemplate = (registration.config as any).resourceTemplate
-        ?.uriTemplate;
+      const uriTemplate = (registration.config as ResourceTemplateDefinition)
+        .uriTemplate;
       if (uriTemplate && uriTemplate.startsWith("ui://widget/")) {
         other.registrations.resourceTemplates.set(key, registration);
       }
@@ -1811,11 +2080,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           );
           return;
         }
-        const nativeServer = session.server as any;
+        const nativeServer = asPrivateSdkServer(session.server);
 
         // Rebuild _registeredResources object with new key in same position
         const oldResources = nativeServer._registeredResources || {};
-        const newResources: Record<string, any> = {};
+        const newResources: Record<
+          string,
+          RegisteredResource | RegisteredResourceTemplate
+        > = {};
         for (const key of Object.keys(oldResources)) {
           if (key === oldKey) {
             const registered = registerResourceOnSession(
@@ -1824,7 +2096,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               config as ResourceDefinition,
               handler
             );
-            delete nativeServer._registeredResources[newKey]; // Remove from end
+            delete oldResources[newKey]; // Remove from end
             newResources[newKey] = registered;
           } else {
             newResources[key] = oldResources[key];
@@ -1837,7 +2109,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           const newRefs = new Map<string, RegisteredResource>();
           for (const [k, v] of refs.resources) {
             if (k === oldKey) {
-              newRefs.set(newKey, newResources[newKey]);
+              newRefs.set(newKey, newResources[newKey] as RegisteredResource);
             } else {
               newRefs.set(k, v);
             }
@@ -1864,11 +2136,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
           // Wrap handler to support both CallToolResult and ReadResourceResult
           // This ensures resources can use tool response helpers (text(), object(), etc.)
-          const wrappedHandler = async (extra?: any) => {
-            const result = await (handler as any)(extra);
+          const resourceHandler = handler as (
+            extra?: unknown
+          ) => Promise<CallToolResult | ReadResourceResult>;
+          const wrappedHandler = async (
+            extra?: unknown
+          ): Promise<ReadResourceResult> => {
+            const result = await resourceHandler(extra);
 
             // If it's already a ReadResourceResult, return as-is
-            if ("contents" in result && Array.isArray(result.contents)) {
+            if (hasArrayProperty(result, "contents")) {
               return result;
             }
 
@@ -1884,7 +2161,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               description: newReg.description,
               mimeType: newReg.mimeType || "text/plain",
             },
-            callback: wrappedHandler as any,
+            callback: wrappedHandler,
           });
         }
       },
@@ -1898,40 +2175,31 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       config: ResourceTemplateDefinition,
       handler: unknown
     ): RegisteredResourceTemplate => {
-      const isFlatStructure = "uriTemplate" in config;
-      const uriTemplate = isFlatStructure
-        ? (config as any).uriTemplate
-        : config.resourceTemplate.uriTemplate;
-      const mimeType = isFlatStructure
-        ? (config as any).mimeType
-        : config.resourceTemplate.mimeType;
-      const templateDescription = isFlatStructure
-        ? undefined
-        : config.resourceTemplate.description;
-      const resourceCallbacks: ResourceTemplateCallbacks | undefined =
-        isFlatStructure
-          ? (config as any).callbacks
-          : config.resourceTemplate.callbacks;
-
-      const template = new ResourceTemplate(uriTemplate, {
+      const template = createSdkResourceTemplate(config.uriTemplate, {
         list: undefined,
         complete: toResourceTemplateCompleteCallbacks(
-          resourceCallbacks?.complete
+          config.callbacks?.complete
         ),
       });
       const metadata: Record<string, unknown> = {};
       if (config.title) metadata.title = config.title;
-      if (config.description || templateDescription)
-        metadata.description = config.description || templateDescription;
-      if (mimeType) metadata.mimeType = mimeType;
+      if (config.description) metadata.description = config.description;
+      if (config.mimeType) metadata.mimeType = config.mimeType;
       if (config.annotations) metadata.annotations = config.annotations;
 
       // Wrap handler to support both CallToolResult and ReadResourceResult
-      const wrappedHandler = async (uri: URL, extra?: any) => {
-        const result = await (handler as any)(uri, extra);
+      const templateHandler = handler as (
+        uri: URL,
+        extra?: unknown
+      ) => Promise<CallToolResult | ReadResourceResult>;
+      const wrappedHandler = async (
+        uri: URL,
+        extra?: unknown
+      ): Promise<ReadResourceResult> => {
+        const result = await templateHandler(uri, extra);
 
         // If it's already a ReadResourceResult, return as-is
-        if ("contents" in result && Array.isArray(result.contents)) {
+        if (hasArrayProperty(result, "contents")) {
           return result;
         }
 
@@ -1941,12 +2209,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         return convertToolResultToResourceResult(uri.toString(), result);
       };
 
-      return server.registerResource(
+      return registerSdkTemplateResource(
+        server,
         name,
         template,
-        metadata as any,
-        wrappedHandler as any
-      ) as unknown as RegisteredResourceTemplate;
+        metadata,
+        wrappedHandler
+      );
     };
 
     // --- RESOURCE TEMPLATES ---
@@ -1956,7 +2225,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       newRegistrations: other.registrations.resourceTemplates,
       sessions: sessionContexts.map(({ sessionId, session, refs }) => ({
         sessionId,
-        getRefs: () => refs?.resourceTemplates as Map<string, any> | undefined,
+        getRefs: () => refs?.resourceTemplates,
         register: (name, config, handler) => {
           if (!session.server) return null;
           // Guard against prototype pollution
@@ -1988,11 +2257,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           );
           return;
         }
-        const nativeServer = session.server as any;
+        const nativeServer = asPrivateSdkServer(session.server);
 
         // Resource templates are stored in _registeredResources with URI as key
         const oldResources = nativeServer._registeredResources || {};
-        const newResources: Record<string, any> = {};
+        const newResources: Record<
+          string,
+          RegisteredResource | RegisteredResourceTemplate
+        > = {};
         for (const key of Object.keys(oldResources)) {
           if (key === oldKey) {
             const registered = registerTemplateOnSession(
@@ -2001,7 +2273,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               config as ResourceTemplateDefinition,
               handler
             );
-            delete nativeServer._registeredResources[newKey]; // Remove from end
+            delete oldResources[newKey]; // Remove from end
             newResources[newKey] = registered;
           } else {
             newResources[key] = oldResources[key];
@@ -2014,7 +2286,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           const newRefs = new Map<string, RegisteredResourceTemplate>();
           for (const [k, v] of refs.resourceTemplates) {
             if (k === oldKey) {
-              newRefs.set(newKey, newResources[newKey]);
+              newRefs.set(
+                newKey,
+                newResources[newKey] as RegisteredResourceTemplate
+              );
             } else {
               newRefs.set(k, v);
             }
@@ -2037,7 +2312,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           (s) => s.sessionId === sessionCtx.sessionId
         )!;
         if (!session.server) return;
-        const nativeServer = session.server as any;
+        const nativeServer = asPrivateSdkServer(session.server);
 
         // Get original keys order
         const originalKeys = Object.keys(
@@ -2057,13 +2332,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
         // Rebuild to preserve original order
         const current = nativeServer._registeredResources || {};
-        const newResources: Record<string, any> = {};
+        const newResources: Record<
+          string,
+          RegisteredResource | RegisteredResourceTemplate
+        > = {};
         for (const k of originalKeys) {
           if (current[k]) {
             newResources[k] = current[k];
           }
         }
-        // Add any new keys that weren't in original
+        // Add new keys that weren't in original
         for (const k of Object.keys(current)) {
           if (!newResources[k]) {
             newResources[k] = current[k];
@@ -2102,18 +2380,19 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // existing _meta object in place, because session-level _registeredTools
     // entries share the same _meta reference (see createToolEntry).
     for (const [, toolReg] of this.registrations.tools) {
-      const config = toolReg.config as any;
+      const config = toolReg.config;
       const widgetConfig = config?.widget;
       const widgetName = widgetConfig?.name;
       if (!widgetConfig || !widgetName || !config._meta) continue;
-      if (config._meta.ui?.resourceUri) continue;
+      const configUi = config._meta.ui as UnknownRecord | undefined;
+      if (configUi?.resourceUri) continue;
 
       const widgetDef = this.widgetDefinitions.get(widgetName);
       const widgetType = widgetDef?.widgetType as string | undefined;
       if (widgetType !== "mcpApps") continue;
 
       const outputTemplate = config._meta["openai/outputTemplate"];
-      if (!outputTemplate) continue;
+      if (typeof outputTemplate !== "string") continue;
 
       const adapterDef = {
         type: "mcpApps" as const,
@@ -2121,7 +2400,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         metadata: widgetDef?.metadata,
       };
       const dualMeta = buildDualProtocolMetadata(
-        adapterDef as any,
+        adapterDef as unknown as UIResourceDefinition,
         outputTemplate
       );
       Object.assign(config._meta, dualMeta);
@@ -2271,8 +2550,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * Uses globalThis to work across ESM module boundaries.
    * @internal
    */
-  public static getLastCreatedInstance(): MCPServerClass<any> | null {
-    return (globalThis as any).__mcpUseLastServer || null;
+  public static getLastCreatedInstance(): MCPServerClass<boolean> | null {
+    return (
+      (
+        globalThis as typeof globalThis & {
+          __mcpUseLastServer?: MCPServerClass<boolean>;
+        }
+      ).__mcpUseLastServer ?? null
+    );
   }
 
   /**
@@ -2360,7 +2645,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
 
     // Track this instance for HMR support (CLI dev mode uses this to find the server)
     // Uses globalThis to work across ESM module boundaries with cache-busting imports
-    (globalThis as any).__mcpUseLastServer = this;
+    (
+      globalThis as typeof globalThis & {
+        __mcpUseLastServer?: MCPServerClass<boolean>;
+      }
+    ).__mcpUseLastServer = this;
 
     // Auto-detect stateless mode: Deno = stateless, Node.js = stateful
     if (this.config.stateless === undefined) {
@@ -2396,7 +2685,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     };
 
     // Create native SDK server instance with capabilities
-    this.nativeServer = new OfficialMcpServer(
+    this.nativeServer = createSdkMcpServer(
       {
         name: config.name,
         version: config.version,
@@ -2455,6 +2744,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // Wrap registration methods to capture registrations for multi-session support
     this.wrapRegistrationMethods();
 
+    this._registerMcpMiddleware(
+      "*",
+      createAuthzMiddleware({
+        getRequirement: (request) => this._getAuthRequirement(request),
+      })
+    );
+
     // Return proxied instance that allows direct access to Hono methods
     return createHonoProxy(this, this.app);
   }
@@ -2473,10 +2769,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     const self = this;
 
     this.tool = (<
-      T extends import("./types/index.js").ToolDefinition<any, any, HasOAuth>,
+      T extends import("./types/index.js").ToolDefinition<
+        unknown,
+        UnknownRecord,
+        HasOAuth
+      >,
     >(
       toolDefinition: T,
-      callback?: import("./types/index.js").ToolCallback<
+      callback: import("./types/index.js").ToolCallback<
         import("./types/index.js").InferToolInput<T>,
         import("./types/index.js").InferToolOutput<T>,
         HasOAuth
@@ -2504,7 +2804,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           // Build dual-protocol tool metadata. Per SEP-1865: tool _meta.ui
           // only has resourceUri. CSP belongs on the resource, not the tool.
           const dualMeta = buildDualProtocolMetadata(
-            adapterDef as any,
+            adapterDef as unknown as UIResourceDefinition,
             outputTemplate,
             toolDefinition._meta
           );
@@ -2534,12 +2834,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       }
 
-      let actualCallback = callback || toolDefinition.cb;
+      let actualCallback = callback;
 
       // If widget config is set, wrap the callback to inject widget metadata into response
       if (widgetConfig && widgetName && actualCallback) {
         const originalCallback = actualCallback;
-        actualCallback = (async (params: any, ctx: any) => {
+        actualCallback = (async (
+          params: import("./types/index.js").InferToolInput<T>,
+          ctx: import("./types/index.js").EnhancedToolContext<HasOAuth>
+        ) => {
           const result = await originalCallback(params, ctx);
 
           // Per OpenAI Apps SDK docs and SEP-1865: protocol fields belong on the
@@ -2547,11 +2850,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           // The tool call result _meta is only for app-specific widget data.
           // We only fill in an empty text placeholder if needed.
           if (result && typeof result === "object") {
+            const resultRecord = result as ToolResultWithMarkers;
             if (
-              (result as any).content?.[0]?.type === "text" &&
-              !(result as any).content[0].text
+              resultRecord.content?.[0]?.type === "text" &&
+              !resultRecord.content[0].text
             ) {
-              (result as any).content[0].text = `Displaying ${widgetName}`;
+              resultRecord.content[0].text = `Displaying ${widgetName}`;
             }
           }
 
@@ -2559,92 +2863,146 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }) as typeof actualCallback;
       }
 
+      // Auto-detect inline view JSX at registration time by inspecting the
+      // handler source. When the mcp-use/jsx runtime compiles JSX, handler.toString()
+      // contains patterns like `jsx(ComponentName, { ..., _output: ... })`.
+      if (actualCallback && !widgetConfig) {
+        try {
+          const meta = extractInlineJsxMetadata(actualCallback.toString());
+          if (meta) {
+            const entry: import("./views/inline-widget-middleware.js").InlineWidgetManifestEntry =
+              {
+                toolName: toolDefinition.name,
+                widgetName: toKebabCase(meta.componentNames[0]),
+                componentPath: "",
+                invoking: meta.invoking,
+                invoked: meta.invoked,
+                prefersBorder: meta.prefersBorder,
+                csp: meta.csp,
+                fileParams: meta.fileParams,
+              };
+            self._inlineWidgetRegistry.set(toolDefinition.name, entry);
+            self._ensureInlineWidgetMiddleware();
+          }
+        } catch {
+          // toString() inspection is best-effort
+        }
+      }
+
+      // Wrap callback to auto-wire streamable prop notifications.
+      if (actualCallback) {
+        const preStreamableWrap = actualCallback;
+        actualCallback = (async (
+          params: import("./types/index.js").InferToolInput<T>,
+          ctx: import("./types/index.js").EnhancedToolContext<HasOAuth>
+        ) => {
+          const result = await preStreamableWrap(params, ctx);
+          if (result && typeof result === "object") {
+            const MARKER = Symbol.for("mcp-use:streamable-props");
+            const resultRecord = result as ToolResultWithMarkers;
+            const refs = resultRecord[MARKER] as StreamableRef[] | undefined;
+            if (refs && refs.length > 0) {
+              const sid = (ctx as { session?: { sessionId?: string } }).session
+                ?.sessionId;
+              for (const ref of refs) {
+                ref.streamable._subscribe((newValue) => {
+                  if (sid) {
+                    self
+                      .sendNotificationToSession(
+                        sid,
+                        "mcp-use/notifications/props-update",
+                        { key: ref.key, value: newValue }
+                      )
+                      .catch(() => {});
+                  }
+                });
+              }
+              const allDone = refs.map((r) => r.streamable.value);
+              Promise.all(allDone).then(() => {
+                refs.forEach((r) => r.streamable._unsubscribeAll());
+              });
+            }
+            const widgetMarker = resultRecord[
+              Symbol.for("mcp-use:inline-widget")
+            ] as { closeWidget?: boolean } | undefined;
+            if (widgetMarker?.closeWidget) {
+              if (!result._meta) result._meta = {};
+              result._meta["openai/closeWidget"] = true;
+            }
+            delete resultRecord[MARKER];
+            delete resultRecord[Symbol.for("mcp-use:inline-widget")];
+          }
+          return result;
+        }) as typeof actualCallback;
+      }
+
       if (actualCallback) {
         self.registrations.tools.set(toolDefinition.name, {
-          config: toolDefinition as any,
-          handler: actualCallback as any,
+          config: toolDefinition,
+          handler: actualCallback,
         });
       }
-      return originalTool.call(self, toolDefinition, actualCallback as any);
-    }) as any;
+      originalTool.call(self, toolDefinition, actualCallback);
+      return createToolRef<
+        typeof toolDefinition.name,
+        import("./types/index.js").InferToolInput<typeof toolDefinition>,
+        import("./types/index.js").InferToolOutput<typeof toolDefinition>
+      >(toolDefinition.name);
+    }) as typeof this.tool;
 
-    this.prompt = (<
-      T extends
-        | import("./types/index.js").PromptDefinition<any, HasOAuth>
-        | import("./types/index.js").PromptDefinitionWithoutCallback,
-    >(
+    this.prompt = (<T extends PromptDefinition<UnknownRecord, HasOAuth>>(
       promptDefinition: T,
-      callback?: import("./types/index.js").PromptCallback<
+      callback: import("./types/index.js").PromptCallback<
         import("./types/index.js").InferPromptInput<T>,
         HasOAuth
       >
     ) => {
-      // First call originalPrompt which creates the wrapped handler with conversion logic
-      const result = originalPrompt.call(
-        self as any,
-        promptDefinition,
-        callback as any
-      );
+      const result = originalPrompt.call(self, promptDefinition, callback);
 
-      // After originalPrompt returns, the registeredPrompts list is updated
-      // Store the prompt info in registrations for HMR (the handler is already wrapped by originalPrompt)
-      const actualCallback = callback || (promptDefinition as any).cb;
-      if (actualCallback && !(self as any).isReplaying) {
-        // Store the raw callback - the wrapping will happen again during sync via originalPrompt
+      if (callback && !(self as { isReplaying?: boolean }).isReplaying) {
         self.registrations.prompts.set(promptDefinition.name, {
-          config: promptDefinition as any,
-          handler: actualCallback as any,
+          config: promptDefinition,
+          handler: callback,
         });
       }
       return result;
-    }) as any;
+    }) as typeof this.prompt;
 
     this.resource = ((
-      resourceDefinition:
-        | import("./types/index.js").ResourceDefinition<HasOAuth>
-        | import("./types/index.js").ResourceDefinitionWithoutCallback,
-      callback?: import("./types/index.js").ReadResourceCallback<HasOAuth>
+      resourceDefinition: import("./types/index.js").ResourceDefinition<HasOAuth>,
+      callback: import("./types/index.js").ReadResourceCallback<HasOAuth>
     ) => {
-      const actualCallback =
-        callback || (resourceDefinition as any).readCallback;
-      if (actualCallback) {
-        const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
-        self.registrations.resources.set(resourceKey, {
-          config: resourceDefinition as any,
-          handler: actualCallback as any,
-        });
-      }
-      return originalResource.call(self, resourceDefinition, callback as any);
-    }) as any;
+      const resourceKey = `${resourceDefinition.name}:${resourceDefinition.uri}`;
+      self.registrations.resources.set(resourceKey, {
+        config: resourceDefinition,
+        handler: callback,
+      });
+      return originalResource.call(self, resourceDefinition, callback);
+    }) as typeof this.resource;
 
     this.resourceTemplate = ((
-      templateDefinition:
-        | import("./types/index.js").ResourceTemplateDefinition<HasOAuth, any>
-        | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
-        | import("./types/index.js").FlatResourceTemplateDefinition<
-            HasOAuth,
-            any
-          >
-        | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
-      callback?: import("./types/index.js").ReadResourceTemplateCallback<
-        any,
+      templateDefinition: import("./types/index.js").ResourceTemplateDefinition<
+        HasOAuth,
+        UnknownRecord
+      >,
+      callback: import("./types/index.js").ReadResourceTemplateCallback<
+        UnknownRecord,
         HasOAuth
       >
     ) => {
-      const actualCallback =
-        callback || (templateDefinition as any).readCallback;
-      if (actualCallback) {
-        self.registrations.resourceTemplates.set(templateDefinition.name, {
-          config: templateDefinition as any,
-          handler: actualCallback as any,
-        });
-      }
-      return originalResourceTemplate.call(
-        self,
-        templateDefinition,
-        callback as any
-      );
-    }) as any;
+      self.registrations.resourceTemplates.set(templateDefinition.name, {
+        config: templateDefinition,
+        // ponytail: resource template callbacks are variadic and OAuth-generic;
+        // store them through the non-public replay registry as the SDK boundary.
+        handler: callback as unknown as ReadResourceTemplateCallback,
+      });
+      return (
+        originalResourceTemplate as unknown as (
+          definition: typeof templateDefinition,
+          callback: unknown
+        ) => unknown
+      ).call(self, templateDefinition, callback);
+    }) as typeof this.resourceTemplate;
   }
 
   /**
@@ -2668,7 +3026,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       }));
     };
 
-    const newServer = new OfficialMcpServer(
+    const newServer = createSdkMcpServer(
       {
         name: this.config.name,
         version: this.config.version,
@@ -2702,7 +3060,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     // trigger list_changed notifications but the tools/list handler wouldn't exist,
     // causing -32601 "Method not found" errors on clients.
     // These calls are idempotent -- they check internal *HandlersInitialized flags.
-    const serverAny = newServer as any;
+    const serverAny = asPrivateSdkServer(newServer);
     if (typeof serverAny.setToolRequestHandlers === "function") {
       serverAny.setToolRequestHandlers();
     }
@@ -2726,11 +3084,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     for (const [name, registration] of this.registrations.tools) {
       const { config, handler: actualCallback } = registration;
 
-      let inputSchema: Record<string, any>;
+      let inputSchema: Record<string, z.ZodSchema>;
       if (config.schema) {
         inputSchema = this.convertZodSchemaToParams(config.schema);
-      } else if (config.inputs && config.inputs.length > 0) {
-        inputSchema = this.createParamsSchema(config.inputs);
       } else {
         inputSchema = {};
       }
@@ -2805,6 +3161,14 @@ class MCPServerClass<HasOAuth extends boolean = false> {
                 )
               ) as Record<string, unknown>)
             : undefined;
+        const {
+          clientCapabilities: effectiveClientCapabilities,
+          clientInfo: effectiveClientInfo,
+        } = resolveClientMetadata(
+          requestMeta,
+          session?.clientCapabilities,
+          session?.clientInfo
+        );
 
         const enhancedContext = createEnhancedContext(
           requestContext,
@@ -2813,34 +3177,50 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           progressToken,
           sendNotification,
           session?.logLevel,
-          session?.clientCapabilities,
+          effectiveClientCapabilities,
           sessionId,
           this.sessions,
-          session?.clientInfo,
+          effectiveClientInfo,
           requestMeta
         );
 
         const mwCtx: MiddlewareContext = {
           method: "tools/call",
           params: params as Record<string, unknown>,
+          toolName: name,
           session: sessionId ? { sessionId } : undefined,
           auth: requestContext?.get("auth"),
+          authContext: requestContext?.get("authContext"),
+          requestMeta,
+          clientCapabilities: effectiveClientCapabilities,
+          clientInfo: effectiveClientInfo,
+          client: createClientCapabilityChecker(
+            effectiveClientCapabilities,
+            effectiveClientInfo,
+            requestMeta
+          ),
           state: new Map(),
         };
 
         const innerFn = async () => {
           // Propagate auth and any middleware state to the enhanced context
-          if (mwCtx.auth && !(enhancedContext as any).auth) {
-            (enhancedContext as any).auth = mwCtx.auth;
+          const enhancedContextRecord =
+            enhancedContext as unknown as UnknownRecord;
+          if (mwCtx.auth && !enhancedContextRecord.auth) {
+            enhancedContextRecord.auth = mwCtx.auth;
+          }
+          if (mwCtx.authContext && !enhancedContextRecord.authContext) {
+            enhancedContextRecord.authContext = mwCtx.authContext;
           }
           for (const [key, value] of mwCtx.state) {
-            (enhancedContext as any)[key] = value;
+            enhancedContextRecord[key] = value;
           }
 
+          const callbackInvoker = actualCallback as ToolHandlerInvoker;
           if (actualCallback.length >= 2) {
-            return await (actualCallback as any)(mwCtx.params, enhancedContext);
+            return await callbackInvoker(mwCtx.params, enhancedContext);
           }
-          return await (actualCallback as any)(mwCtx.params);
+          return await callbackInvoker(mwCtx.params);
         };
 
         const executeCallback = () =>
@@ -2883,7 +3263,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           annotations: config.annotations,
           _meta: config._meta,
         },
-        wrappedHandler as any
+        wrappedHandler as unknown as Parameters<
+          OfficialMcpServer["registerTool"]
+        >[2]
       );
 
       // Store ref for hot reload support
@@ -2898,18 +3280,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       let argsSchema: Record<string, z.ZodSchema> | undefined;
       if (config.schema) {
         argsSchema = this.convertZodSchemaToParams(config.schema);
-      } else if (config.args && config.args.length > 0) {
-        argsSchema = this.createParamsSchema(config.args);
       } else {
-        // No schema validation when neither schema nor args are provided
         argsSchema = undefined;
       }
 
       // Wrap handler to support both CallToolResult and GetPromptResult
       const wrappedHandler = async (
         params: Record<string, unknown>,
-        extra?: any
-      ) => {
+        extra?: unknown
+      ): Promise<GetPromptResult> => {
         let success = true;
         let errorType: string | null = null;
 
@@ -2918,34 +3297,39 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           params: params as Record<string, unknown>,
           session: sessionId ? { sessionId } : undefined,
           auth: getRequestContext()?.get("auth"),
+          authContext: getRequestContext()?.get("authContext"),
           state: new Map(),
         };
 
         const innerFn = async () => {
           const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
 
-          const result = await (handler as any)(
+          const promptHandler = handler as (
+            params: UnknownRecord,
+            ctx?: unknown
+          ) => Promise<CallToolResult | GetPromptResult>;
+          const result = await promptHandler(
             mwCtx.params,
-            (handler as any).length >= 2 ? enhancedCtx : undefined
+            promptHandler.length >= 2 ? enhancedCtx : undefined
           );
 
           // If it's already a GetPromptResult, return as-is
-          if ("messages" in result && Array.isArray(result.messages)) {
-            return result as any;
+          if (hasArrayProperty(result, "messages")) {
+            return result;
           }
 
           // Convert CallToolResult to GetPromptResult
           const { convertToolResultToPromptResult } =
             await import("./prompts/conversion.js");
-          return convertToolResultToPromptResult(result) as any;
+          return convertToolResultToPromptResult(result);
         };
 
         try {
-          return await composeMiddleware(
+          return (await composeMiddleware(
             this.mcpMiddlewares,
             "prompts/get",
             innerFn
-          )(mwCtx);
+          )(mwCtx)) as GetPromptResult;
         } catch (err) {
           success = false;
           errorType = err instanceof Error ? err.name : "unknown_error";
@@ -2967,9 +3351,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         {
           title: config.title,
           description: config.description ?? "",
-          argsSchema: argsSchema as any,
+          argsSchema,
         },
-        wrappedHandler as any
+        wrappedHandler
       );
 
       // Store ref for hot reload support
@@ -2980,29 +3364,35 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     for (const [_key, registration] of this.registrations.resources) {
       const { config, handler } = registration;
       // Wrap handler to support both CallToolResult and ReadResourceResult
-      const wrappedHandler = async (extra?: any) => {
+      const wrappedHandler = async (
+        extra?: unknown
+      ): Promise<ReadResourceResult> => {
         let success = true;
         let errorType: string | null = null;
-        let contents: any[] = [];
+        let contents: ResourceContentSummary[] = [];
 
         const mwCtx: MiddlewareContext = {
           method: "resources/read",
           params: { uri: config.uri },
           session: sessionId ? { sessionId } : undefined,
           auth: getRequestContext()?.get("auth"),
+          authContext: getRequestContext()?.get("authContext"),
           state: new Map(),
         };
 
         const innerFn = async () => {
           const { enhancedCtx } = buildHandlerContext(sessionId, this.sessions);
 
-          const result = await (handler as any)(
-            (handler as any).length >= 1 ? enhancedCtx : undefined
+          const resourceHandler = handler as (
+            ctx?: unknown
+          ) => Promise<CallToolResult | ReadResourceResult>;
+          const result = await resourceHandler(
+            resourceHandler.length >= 1 ? enhancedCtx : undefined
           );
           // If it's already a ReadResourceResult, return as-is
-          if ("contents" in result && Array.isArray(result.contents)) {
-            contents = result.contents;
-            return result as any;
+          if (hasArrayProperty(result, "contents")) {
+            contents = result.contents as ResourceContentSummary[];
+            return result;
           }
           // Convert CallToolResult to ReadResourceResult
           const { convertToolResultToResourceResult } =
@@ -3010,17 +3400,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
           const converted = convertToolResultToResourceResult(
             config.uri,
             result
-          ) as any;
+          );
           contents = converted.contents || [];
           return converted;
         };
 
         try {
-          return await composeMiddleware(
+          return (await composeMiddleware(
             this.mcpMiddlewares,
             "resources/read",
             innerFn
-          )(mwCtx);
+          )(mwCtx)) as ReadResourceResult;
         } catch (err) {
           success = false;
           errorType = err instanceof Error ? err.name : "unknown_error";
@@ -3030,7 +3420,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             .trackServerResourceCall({
               name: config.name,
               description: config.description ?? null,
-              contents: contents.map((c: any) => ({
+              contents: contents.map((c) => ({
                 mime_type: c.mimeType ?? null,
                 text: c.text ? `[text: ${c.text.length} chars]` : null,
                 blob: c.blob ? `[blob: ${c.blob.length} bytes]` : null,
@@ -3042,15 +3432,16 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
       };
 
-      const registeredResource = newServer.registerResource(
+      const registeredResource = registerSdkStaticResource(
+        newServer,
         config.name,
         config.uri,
         {
           title: config.title,
           description: config.description,
           mimeType: config.mimeType || "text/plain",
-        } as any,
-        wrappedHandler as any
+        },
+        wrappedHandler
       );
 
       // Store ref for hot reload support (use same key as registrations.resources)
@@ -3062,68 +3453,54 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     for (const [_name, registration] of this.registrations.resourceTemplates) {
       const { config, handler } = registration;
 
-      // Detect structure type: flat (uriTemplate on config) vs nested (resourceTemplate.uriTemplate)
-      const isFlatStructure = "uriTemplate" in config;
-
-      // Extract uriTemplate and metadata based on structure
-      const uriTemplate = isFlatStructure
-        ? (config as any).uriTemplate
-        : config.resourceTemplate.uriTemplate;
-
-      const mimeType = isFlatStructure
-        ? (config as any).mimeType
-        : config.resourceTemplate.mimeType;
-
-      const templateDescription = isFlatStructure
-        ? undefined
-        : config.resourceTemplate.description;
-
-      const resourceCallbacks: ResourceTemplateCallbacks | undefined =
-        isFlatStructure
-          ? (config as any).callbacks
-          : config.resourceTemplate.callbacks;
-
-      // Create ResourceTemplate instance from SDK
-      const template = new ResourceTemplate(uriTemplate, {
+      const template = createSdkResourceTemplate(config.uriTemplate, {
         list: undefined,
         complete: toResourceTemplateCompleteCallbacks(
-          resourceCallbacks?.complete
+          config.callbacks?.complete
         ),
       });
 
-      // Create metadata object
       const metadata: Record<string, unknown> = {};
       if (config.title) {
         metadata.title = config.title;
       }
-      if (config.description || templateDescription) {
-        metadata.description = config.description || templateDescription;
+      if (config.description) {
+        metadata.description = config.description;
       }
-      if (mimeType) {
-        metadata.mimeType = mimeType;
+      if (config.mimeType) {
+        metadata.mimeType = config.mimeType;
       }
       if (config.annotations) {
         metadata.annotations = config.annotations;
       }
 
-      const registeredResourceTemplate = newServer.registerResource(
+      const registeredResourceTemplate = registerSdkTemplateResource(
+        newServer,
         config.name,
         template,
-        metadata as any,
-        async (uri: URL, extra?: any) => {
+        metadata,
+        async (uri: URL, extra?: unknown): Promise<ReadResourceResult> => {
           let success = true;
           let errorType: string | null = null;
-          let contents: any[] = [];
+          let contents: ResourceContentSummary[] = [];
 
           try {
             // Parse URI parameters from the template
-            const params = this.parseTemplateUri(uriTemplate, uri.toString());
-            const result = await (handler as any)(uri, params, extra);
+            const params = this.parseTemplateUri(
+              config.uriTemplate,
+              uri.toString()
+            );
+            const templateHandler = handler as (
+              uri: URL,
+              params: Record<string, string>,
+              extra?: unknown
+            ) => Promise<CallToolResult | ReadResourceResult>;
+            const result = await templateHandler(uri, params, extra);
 
             // If it's already a ReadResourceResult, return as-is
-            if ("contents" in result && Array.isArray(result.contents)) {
-              contents = result.contents;
-              return result as any;
+            if (hasArrayProperty(result, "contents")) {
+              contents = result.contents as ResourceContentSummary[];
+              return result;
             }
 
             // Convert CallToolResult to ReadResourceResult
@@ -3132,7 +3509,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
             const converted = convertToolResultToResourceResult(
               uri.toString(),
               result
-            ) as any;
+            );
             contents = converted.contents || [];
             return converted;
           } catch (err) {
@@ -3144,7 +3521,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
               .trackServerResourceCall({
                 name: config.name,
                 description: config.description ?? null,
-                contents: contents.map((c: any) => ({
+                contents: contents.map((c) => ({
                   mimeType: c.mimeType ?? null,
                   text: c.text ? `[text: ${c.text.length} chars]` : null,
                   blob: c.blob ? `[blob: ${c.blob.length} bytes]` : null,
@@ -3168,22 +3545,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     // Register logging/setLevel handler per MCP specification
-    newServer.server.setRequestHandler(
-      z.object({ method: z.literal("logging/setLevel") }).passthrough(),
-      (async (request: { params?: { level?: string } }, extra?: any) => {
+    setSdkRequestHandler(
+      newServer.server,
+      "logging/setLevel",
+      async (request: { params?: { level?: string } }, _extra?: unknown) => {
         const level = request.params?.level;
 
         // Validate log level parameter
         if (!level) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
+          throw new ProtocolError(
+            ProtocolErrorCode.InvalidParams,
             "Missing 'level' parameter"
           );
         }
 
         if (!isValidLogLevel(level)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
+          throw new ProtocolError(
+            ProtocolErrorCode.InvalidParams,
             `Invalid log level '${level}'. Must be one of: debug, info, notice, warning, error, critical, alert, emergency`
           );
         }
@@ -3221,8 +3599,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         console.warn(
           "[MCP] Could not find session for logging/setLevel request"
         );
-        throw new McpError(ErrorCode.InternalError, "Could not find session");
-      }) as any
+        throw new ProtocolError(
+          ProtocolErrorCode.InternalError,
+          "Could not find session"
+        );
+      }
     );
 
     // Register resource subscription handlers
@@ -3254,9 +3635,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     nativeSrv: OfficialMcpServer,
     sessionId?: string
   ): void {
-    const handlers = (nativeSrv as any).server?._requestHandlers as
-      | Map<string, (req: any, extra: any) => any>
-      | undefined;
+    const handlers = (
+      nativeSrv.server as unknown as {
+        _requestHandlers?: Map<string, ListRequestHandlerWithMarker>;
+      }
+    )._requestHandlers;
     if (!handlers) return;
 
     const wrapListMethod = (
@@ -3266,20 +3649,54 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       const original = handlers.get(method);
       if (!original) return;
       // Avoid double-wrapping the same function
-      if ((original as any).__mcpListWrapped) return;
+      if (original.__mcpListWrapped) return;
 
       const mcpMiddlewares = () => this.mcpMiddlewares;
-      const wrapped = async (req: any, extra: any) => {
+      const wrapped: ListRequestHandlerWithMarker = async (
+        req: { params?: UnknownRecord },
+        extra: HandlerExtra
+      ) => {
+        const params =
+          req?.params && typeof req.params === "object" ? req.params : {};
+        const rawExtraMeta =
+          extra?._meta && typeof extra._meta === "object"
+            ? Object.fromEntries(
+                Object.entries(extra._meta).filter(
+                  ([key]) => key !== "progressToken"
+                )
+              )
+            : undefined;
+        const requestMeta =
+          params._meta && typeof params._meta === "object"
+            ? {
+                ...(rawExtraMeta || {}),
+                ...(params._meta as Record<string, unknown>),
+              }
+            : rawExtraMeta;
+        const { clientCapabilities, clientInfo } =
+          extractRequestClientMetadata(requestMeta);
         const mwCtx: MiddlewareContext = {
           method,
-          params: {},
+          params: params as Record<string, unknown>,
+          requestMeta,
+          clientCapabilities,
+          clientInfo,
+          client: createClientCapabilityChecker(
+            clientCapabilities,
+            clientInfo,
+            requestMeta
+          ),
           session: sessionId ? { sessionId } : undefined,
           auth: getRequestContext()?.get("auth"),
+          authContext: getRequestContext()?.get("authContext"),
           state: new Map(),
         };
         const innerFn = async () => {
           const result = await original(req, extra);
-          return result[resultKey] ?? result;
+          if (result && typeof result === "object" && resultKey in result) {
+            return (result as UnknownRecord)[resultKey] ?? result;
+          }
+          return result;
         };
         const filtered = await composeMiddleware(
           mcpMiddlewares(),
@@ -3292,7 +3709,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         }
         return filtered;
       };
-      (wrapped as any).__mcpListWrapped = true;
+      wrapped.__mcpListWrapped = true;
       handlers.set(method, wrapped);
     };
 
@@ -3324,8 +3741,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param toolDefinition.name - Unique tool name (used by clients to call it)
    * @param toolDefinition.description - Human-readable description of what the tool does
    * @param toolDefinition.schema - Zod schema for validating input parameters
-   * @param toolDefinition.cb - Optional callback function (can also be second parameter)
-   * @param callback - Optional callback function (alternative to toolDefinition.cb)
+   * @param callback - Callback function that executes the tool
    * @returns This server instance for method chaining
    *
    * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
@@ -3381,10 +3797,170 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link ToolDefinition} for all configuration options
    * @see {@link ToolCallback} for callback signature
    */
-  public tool!: <T extends ToolDefinition<any, any, HasOAuth>>(
-    toolDefinition: T & ToolDefinition<any, any, HasOAuth>,
+  public tool!: <T extends ToolDefinition<unknown, UnknownRecord, HasOAuth>>(
+    toolDefinition: T & ToolDefinition<unknown, UnknownRecord, HasOAuth>,
     callback?: ToolCallback<InferToolInput<T>, InferToolOutput<T>, HasOAuth>
-  ) => this;
+  ) => import("./types/tool-ref.js").ToolRef<
+    T["name"] extends string ? T["name"] : string,
+    InferToolInput<T>,
+    InferToolOutput<T>
+  >;
+
+  /**
+   * Enable server-native code mode for authorized requests.
+   *
+   * Code mode dynamically swaps `tools/list` to expose only `search_tools` and
+   * `execute_js` when `activate` allows it. Registered tools remain internal and
+   * direct backing-tool calls are denied while code mode is active. JavaScript
+   * execution is delegated to the supplied sandbox backend; mcp-use intentionally
+   * ships no default `node:vm` executor.
+   */
+  public enableCodeMode(options: EnableCodeModeOptions): this {
+    enableServerCodeMode(this, options);
+    return this;
+  }
+
+  /**
+   * Register multiple tools at once and return a typed map for use with `createTypedHooks`.
+   */
+  public defineTools<
+    T extends Record<
+      string,
+      {
+        schema?: z.ZodTypeAny;
+        outputSchema?: z.ZodTypeAny;
+        description?: string;
+        handler: (...args: unknown[]) => unknown;
+        [key: string]: unknown;
+      }
+    >,
+  >(definitions: T): T {
+    for (const [name, def] of Object.entries(definitions)) {
+      const { handler, ...toolDef } = def;
+      (
+        this.tool as unknown as (
+          definition: ToolDefinition,
+          callback: unknown
+        ) => unknown
+      )({ name, ...toolDef } as ToolDefinition, handler);
+    }
+    return definitions;
+  }
+
+  /**
+   * Lazily register the inline view tools/list middleware.
+   * @internal
+   */
+  public _ensureInlineWidgetMiddleware(): void {
+    if (this._inlineWidgetMiddlewareRegistered) return;
+    this._inlineWidgetMiddlewareRegistered = true;
+
+    const registry = this._inlineWidgetRegistry;
+    const buildId = this.buildId;
+
+    this._registerMcpMiddleware("tools/list", async (ctx, next) => {
+      const result = await next();
+      if (registry.size === 0) return result;
+
+      const tools: UnknownRecord[] = Array.isArray(result)
+        ? result
+        : (((result as { tools?: UnknownRecord[] } | undefined)?.tools ??
+            []) as UnknownRecord[]);
+
+      const shapedTools = tools.map((tool) => {
+        const toolName = typeof tool.name === "string" ? tool.name : undefined;
+        const entry = toolName ? registry.get(toolName) : undefined;
+        if (!entry) return tool;
+
+        const _meta = {
+          ...((tool._meta as Record<string, unknown> | undefined) || {}),
+        };
+        const ui = {
+          ...((_meta.ui as Record<string, unknown> | undefined) || {}),
+        };
+        const buildIdPart = buildId ? `-${buildId}` : "";
+        const resourceUri = `ui://widget/${entry.widgetName}${buildIdPart}.html`;
+
+        if (!ctx.client?.supportsApps()) {
+          delete ui.resourceUri;
+          delete ui.csp;
+          delete ui.prefersBorder;
+          delete ui.visibility;
+          delete ui.permissions;
+          delete ui.domain;
+          delete _meta["openai/outputTemplate"];
+          delete _meta["openai/toolInvocation/invoking"];
+          delete _meta["openai/toolInvocation/invoked"];
+          delete _meta["openai/widgetCSP"];
+          delete _meta["openai/widgetPrefersBorder"];
+          delete _meta["openai/fileParams"];
+          delete _meta["openai/widgetDomain"];
+
+          const strippedMeta = {
+            ..._meta,
+            ...(Object.keys(ui).length > 0 ? { ui } : {}),
+          };
+          if (Object.keys(ui).length === 0) {
+            delete strippedMeta.ui;
+          }
+
+          const { _meta: _removedMeta, ...plainTool } = tool;
+          return Object.keys(strippedMeta).length > 0
+            ? { ...plainTool, _meta: strippedMeta }
+            : plainTool;
+        }
+
+        ui.resourceUri = resourceUri;
+        _meta.ui = ui;
+        _meta["openai/outputTemplate"] = resourceUri;
+        _meta["openai/toolInvocation/invoking"] =
+          entry.invoking ?? `Loading ${entry.widgetName}...`;
+        _meta["openai/toolInvocation/invoked"] =
+          entry.invoked ?? `${entry.widgetName} ready`;
+
+        if (entry.csp) {
+          ui.csp = entry.csp;
+          const sdkCsp: Record<string, unknown> = {};
+          if (entry.csp.connectDomains)
+            sdkCsp.connect_domains = entry.csp.connectDomains;
+          if (entry.csp.resourceDomains)
+            sdkCsp.resource_domains = entry.csp.resourceDomains;
+          if (entry.csp.frameDomains)
+            sdkCsp.frame_domains = entry.csp.frameDomains;
+          if (entry.csp.redirectDomains)
+            sdkCsp.redirect_domains = entry.csp.redirectDomains;
+          _meta["openai/widgetCSP"] = sdkCsp;
+        }
+        if (entry.prefersBorder !== undefined) {
+          ui.prefersBorder = entry.prefersBorder;
+          _meta["openai/widgetPrefersBorder"] = entry.prefersBorder;
+        }
+        if (entry.visibility) {
+          ui.visibility = entry.visibility;
+        }
+        if (entry.fileParams) {
+          _meta["openai/fileParams"] = entry.fileParams;
+        }
+        if (entry.permissions) {
+          ui.permissions = entry.permissions;
+        }
+        if (entry.domain) {
+          ui.domain = entry.domain;
+          _meta["openai/widgetDomain"] = entry.domain;
+        }
+
+        return { ...tool, _meta };
+      });
+
+      if (Array.isArray(result)) {
+        return shapedTools;
+      }
+      if (result && typeof result === "object") {
+        return { ...(result as UnknownRecord), tools: shapedTools };
+      }
+      return { tools: shapedTools };
+    });
+  }
 
   /**
    * Converts a Zod schema to MCP parameter format.
@@ -3448,10 +4024,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link resourceTemplate} for parameterized resources
    */
   public resource!: (
-    resourceDefinition:
-      | ResourceDefinition<HasOAuth>
-      | import("./types/index.js").ResourceDefinitionWithoutCallback,
-    callback?: ReadResourceCallback<HasOAuth>
+    resourceDefinition: ResourceDefinition<HasOAuth>,
+    callback: ReadResourceCallback<HasOAuth>
   ) => this;
 
   /**
@@ -3500,14 +4074,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @see {@link resource} for static resources
    */
   public resourceTemplate!: <
-    T extends
-      | ResourceTemplateDefinition<HasOAuth, any>
-      | import("./types/index.js").ResourceTemplateDefinitionWithoutCallback
-      | import("./types/index.js").FlatResourceTemplateDefinition<HasOAuth, any>
-      | import("./types/index.js").FlatResourceTemplateDefinitionWithoutCallback,
+    T extends ResourceTemplateDefinition<HasOAuth, UnknownRecord>,
   >(
     templateDefinition: T,
-    callback?: ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>
+    callback: ReadResourceTemplateCallback<InferTemplateParams<T>, HasOAuth>
   ) => this;
 
   /**
@@ -3566,17 +4136,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @see {@link PromptDefinition} for all configuration options
    */
-  public prompt!: <
-    T extends
-      | PromptDefinition<any, HasOAuth>
-      | import("./types/index.js").PromptDefinitionWithoutCallback,
-  >(
-    promptDefinition: T &
-      (
-        | PromptDefinition<any, HasOAuth>
-        | import("./types/index.js").PromptDefinitionWithoutCallback
-      ),
-    callback?: PromptCallback<InferPromptInput<T>, HasOAuth>
+  public prompt!: <T extends PromptDefinition<UnknownRecord, HasOAuth>>(
+    promptDefinition: T & PromptDefinition<UnknownRecord, HasOAuth>,
+    callback: PromptCallback<InferPromptInput<T>, HasOAuth>
   ) => this;
 
   /**
@@ -3697,7 +4259,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   public uiResource = (
     definition: Parameters<typeof uiResourceRegistration>[1]
   ) => {
-    return uiResourceRegistration(this as any, definition);
+    return uiResourceRegistration(
+      this as unknown as Parameters<typeof uiResourceRegistration>[0],
+      definition
+    ) as this;
   };
 
   /**
@@ -3863,14 +4428,17 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    */
   public async createMessage(
     params: CreateMessageRequest["params"],
-    options?: any
+    options?: Parameters<OfficialMcpServer["server"]["createMessage"]>[1]
   ): Promise<CreateMessageResult> {
     return await this.nativeServer.server.createMessage(params, options);
   }
 
   async listen(port?: number): Promise<void> {
     // During HMR reload, skip listen() - CLI manages the server lifecycle
-    if ((globalThis as any).__mcpUseHmrMode) {
+    if (
+      (globalThis as typeof globalThis & { __mcpUseHmrMode?: boolean })
+        .__mcpUseHmrMode
+    ) {
       return;
     }
 
@@ -3917,13 +4485,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       );
     }
 
-    await mountWidgets(this as any, {
+    await mountViews(this, {
       baseRoute: "/mcp-use/widgets",
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
       // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
+      // `mountViews` applies its own default (`"resources"`).
       ...(process.env.MCP_USE_WIDGETS_DIR
         ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
         : {}),
@@ -4048,13 +4616,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     console.log("[MCP] Mounting widgets");
-    await mountWidgets(this as any, {
+    await mountViews(this, {
       baseRoute: "/mcp-use/widgets",
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
       // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
+      // `mountViews` applies its own default (`"resources"`).
       ...(process.env.MCP_USE_WIDGETS_DIR
         ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
         : {}),
@@ -4189,113 +4757,6 @@ interface MCPServerConstructor {
 // Export MCPServer constructor with proper return typing
 // This allows both: `function foo(server: MCPServer)` and `new MCPServer()`
 // TypeScript allows both a type and a const with the same name (declaration merging)
-// eslint-disable-next-line @typescript-eslint/no-redeclare, no-redeclare
-export const MCPServer: MCPServerConstructor = MCPServerClass as any;
-
-/**
- * Create a new MCP server instance
- *
- * @param name - Server name
- * @param config - Optional server configuration
- * @param config.version - Server version (defaults to '1.0.0')
- * @param config.description - Server description
- * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
- * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
- * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation (global when configured)
- *   - If not set: host validation is disabled
- *   - If set: host validation is enabled for all routes
- *   - See {@link ServerConfig.allowedOrigins} for detailed documentation
- * @param config.sessionIdleTimeoutMs - Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
- * @returns McpServerInstance with both MCP and Hono methods
- *
- * @example
- * ```typescript
- * // Recommended: Use class constructor (matches MCPClient/MCPAgent pattern)
- * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   description: 'My MCP server'
- * })
- *
- * // Legacy: Factory function (still supported for backward compatibility)
- * const server = createMCPServer('my-server', {
- *   version: '1.0.0',
- *   description: 'My MCP server'
- * })
- *
- * // Production mode with explicit allowed origins
- * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   allowedOrigins: [
- *     'https://myapp.com',
- *     'https://app.myapp.com'
- *   ]
- * })
- *
- * // With custom host (e.g., for Docker or remote access)
- * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   host: '0.0.0.0' // or 'myserver.com'
- * })
- *
- * // With full base URL (e.g., behind a proxy or custom domain)
- * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
- * })
- * ```
- */
-
-/**
- * @deprecated Use `new MCPServer({ name, ... })` instead. This factory function is maintained for backward compatibility.
- *
- * @example
- * ```typescript
- * // Old (deprecated)
- * const server = createMCPServer('my-server', { version: '1.0.0' })
- *
- * // New (recommended)
- * const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
- * ```
- */
-// Overload: when OAuth is configured
-
-export function createMCPServer(
-  name: string,
-  config: Partial<ServerConfig> & { oauth: NonNullable<ServerConfig["oauth"]> }
-): McpServerInstance<true>;
-
-// Overload: when OAuth is not configured
-// eslint-disable-next-line no-redeclare
-export function createMCPServer(
-  name: string,
-  config?: Partial<ServerConfig>
-): McpServerInstance<false>;
-
-// Implementation
-// eslint-disable-next-line no-redeclare
-export function createMCPServer(
-  name: string,
-  config: Partial<ServerConfig> = {}
-): McpServerInstance<boolean> {
-  const instance = new MCPServerClass({
-    name,
-    version: config.version || "1.0.0",
-    description: config.description,
-    title: config.title,
-    websiteUrl: config.websiteUrl,
-    icons: config.icons,
-    host: config.host,
-    baseUrl: config.baseUrl,
-    allowedOrigins: config.allowedOrigins,
-    sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
-    autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,
-    oauth: config.oauth,
-    favicon: config.favicon,
-  }) as any;
-
-  return instance as unknown as McpServerInstance<boolean>;
-}
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export const MCPServer: MCPServerConstructor =
+  MCPServerClass as unknown as MCPServerConstructor;

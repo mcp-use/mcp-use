@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import {
   Check,
   ChevronDown,

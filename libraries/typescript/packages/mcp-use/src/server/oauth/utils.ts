@@ -7,6 +7,7 @@
 
 import type { Context, Next } from "hono";
 import type { UserInfo } from "./providers/types.js";
+import type { AuthContext } from "./types.js";
 
 /**
  * Authentication information extracted from context
@@ -17,6 +18,94 @@ export interface AuthInfo {
   accessToken: string;
   scopes: string[];
   permissions: string[];
+  roles: string[];
+  context: AuthContext;
+}
+
+function stringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === "string");
+  }
+  if (typeof value === "string") {
+    return value.split(" ").filter(Boolean);
+  }
+  return [];
+}
+
+function organizationFromClaims(
+  claims: Record<string, unknown>
+): AuthContext["organization"] {
+  const id =
+    typeof claims.org_id === "string"
+      ? claims.org_id
+      : typeof claims.organization_id === "string"
+        ? claims.organization_id
+        : undefined;
+  const slug =
+    typeof claims.org_slug === "string"
+      ? claims.org_slug
+      : typeof claims.organization_slug === "string"
+        ? claims.organization_slug
+        : undefined;
+  const name =
+    typeof claims.org_name === "string"
+      ? claims.org_name
+      : typeof claims.organization_name === "string"
+        ? claims.organization_name
+        : undefined;
+
+  return id || slug || name ? { id, slug, name } : undefined;
+}
+
+/**
+ * Normalize provider-specific OAuth claims into the small authorization shape
+ * used by policy middleware and tool callbacks.
+ */
+export function createAuthContext(auth: {
+  user?: UserInfo;
+  payload?: Record<string, unknown>;
+  scopes?: string[];
+  permissions?: string[];
+  roles?: string[];
+}): AuthContext {
+  const claims = auth.payload ?? {};
+  const subject =
+    typeof claims.sub === "string"
+      ? claims.sub
+      : typeof auth.user?.sub === "string"
+        ? auth.user.sub
+        : undefined;
+  const scopes = auth.scopes ?? stringArray(claims.scope);
+  const permissions = auth.permissions ?? stringArray(claims.permissions);
+  const roles = auth.roles ?? stringArray(claims.roles);
+
+  const context: AuthContext = {
+    subject,
+    user: auth.user,
+    claims,
+    scopes,
+    permissions,
+    roles,
+    organization: organizationFromClaims(claims),
+    hasScope: (scope) => scopes.includes(scope),
+    hasPermission: (permission) => permissions.includes(permission),
+    hasRole: (role) => roles.includes(role),
+    can: (action, resource) =>
+      permissions.includes(action) ||
+      scopes.includes(action) ||
+      (resource?.type
+        ? permissions.includes(`${resource.type}:${action}`) ||
+          scopes.includes(`${resource.type}:${action}`)
+        : false),
+  };
+
+  return context;
+}
+
+export function getAuthContext(context: Context): AuthContext {
+  const authContext = context.get("authContext") as AuthContext | undefined;
+  if (authContext) return authContext;
+  return getAuth(context).context;
 }
 
 /**
@@ -120,6 +209,12 @@ export function hasAnyScope(context: Context, needed: string[]): boolean {
   return needed.some(
     (scope) => scopes.includes(scope) || permissions.includes(scope)
   );
+}
+
+export function hasRole(context: Context, needed: string | string[]): boolean {
+  const { roles } = getAuth(context);
+  const requiredRoles = Array.isArray(needed) ? needed : [needed];
+  return requiredRoles.every((role) => roles.includes(role));
 }
 
 /**

@@ -13,7 +13,9 @@ npm run dev
 
 Open [http://localhost:3000/inspector](http://localhost:3000/inspector) with your browser to test your server.
 
-You can start building by editing the entry file. Add tools, resources, and prompts — the server auto-reloads as you edit.
+You can start building by editing `index.tsx`. Return simple widgets directly from tool handlers with inline JSX, or add advanced file-based widgets under `resources/`.
+
+Project settings live in the root `mcp-use.json`.
 
 ## Learn More
 

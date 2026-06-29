@@ -2,14 +2,13 @@
  * Simple test client to verify elicitation implementation
  */
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import {
-  ElicitRequestSchema,
-  type ElicitRequestFormParams,
-  type ElicitRequestURLParams,
-  type ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Client } from "@modelcontextprotocol/client";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import type {
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+} from "@modelcontextprotocol/client";
 
 const SERVER_URL = "http://localhost:3002/mcp";
 
@@ -38,7 +37,7 @@ async function testElicitation() {
   );
 
   // Set up elicitation handler
-  client.setRequestHandler(ElicitRequestSchema, async (request: any) => {
+  client.setRequestHandler("elicitation/create", async (request: any) => {
     console.log("\n📥 Received elicitation request:");
     console.log("  Mode:", request.params.mode || "form");
     console.log("  Message:", request.params.message);

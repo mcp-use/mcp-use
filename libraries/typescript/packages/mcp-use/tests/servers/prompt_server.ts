@@ -5,12 +5,8 @@
  * Used by tests/docs/prompts-example.test.ts.
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  GetPromptRequestSchema,
-  ListPromptsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Server } from "@modelcontextprotocol/server";
+import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 
 const server = new Server(
   { name: "prompt-test-server", version: "1.0.0" },
@@ -43,11 +39,11 @@ const PROMPTS = [
   },
 ];
 
-server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+server.setRequestHandler("prompts/list", async () => ({
   prompts: PROMPTS,
 }));
 
-server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+server.setRequestHandler("prompts/get", async (request) => {
   const { name, arguments: args } = request.params;
   const prompt = PROMPTS.find((p) => p.name === name);
 

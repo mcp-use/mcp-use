@@ -1,4 +1,4 @@
-import { MCPServer, text, widget } from "mcp-use/server";
+import { MCPServer, text, view } from "mcp-use/server";
 import z from "zod";
 import { getGreeting, sampleItems } from "@/lib/server-data";
 
@@ -36,7 +36,7 @@ server.tool(
     },
   },
   async ({ name }) =>
-    widget({
+    view({
       props: {
         greeting: await getGreeting(name),
         items: sampleItems,

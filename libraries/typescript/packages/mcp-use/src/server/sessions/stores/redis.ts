@@ -30,7 +30,11 @@ import type { SessionMetadata } from "../session-manager.js";
  */
 export interface RedisClient {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string, options?: any): Promise<string | null>;
+  set(
+    key: string,
+    value: string,
+    options?: Record<string, unknown>
+  ): Promise<string | null>;
   setEx?(key: string, seconds: number, value: string): Promise<string | null>; // node-redis v5+
   setex?(key: string, seconds: number, value: string): Promise<string | null>; // ioredis
   del(key: string | string[]): Promise<number>;

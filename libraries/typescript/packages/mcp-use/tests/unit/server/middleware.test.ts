@@ -5,6 +5,12 @@ import {
   type MiddlewareContext,
   type McpMiddlewareEntry,
 } from "../../../src/server/middleware/mcp-middleware.js";
+import {
+  createAuthzMiddleware,
+  evaluateAuthRequirement,
+  AuthzPolicyError,
+} from "../../../src/server/middleware/policy.js";
+import { createAuthContext } from "../../../src/server/oauth/utils.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -356,5 +362,88 @@ describe("composeMiddleware next() guard", () => {
     await expect(composed(makeCtx())).rejects.toThrow(
       "next() called multiple times"
     );
+  });
+});
+
+describe("authz policy middleware", () => {
+  const auth = createAuthContext({
+    user: { sub: "user-1" },
+    payload: { sub: "user-1" },
+    scopes: ["orders:read"],
+    permissions: ["orders:view"],
+    roles: ["ops"],
+  });
+
+  it("filters unauthorized tools from tools/list", async () => {
+    const middleware = createAuthzMiddleware({
+      getRequirement: (request) =>
+        request.name === "delete_order"
+          ? { scopes: ["orders:write"] }
+          : undefined,
+    });
+    const ctx = makeCtx("tools/list");
+    ctx.authContext = auth;
+
+    const result = await middleware(ctx, async () => [
+      { name: "search_orders" },
+      { name: "delete_order" },
+    ]);
+
+    expect(result).toEqual([{ name: "search_orders" }]);
+  });
+
+  it("returns a tool error for unauthorized tools/call", async () => {
+    const middleware = createAuthzMiddleware({
+      getRequirement: () => ({ permissions: ["orders:delete"] }),
+    });
+    const ctx = makeCtx("tools/call");
+    ctx.authContext = auth;
+    ctx.params = { name: "delete_order", arguments: { id: "ord_1" } };
+
+    const result = await middleware(ctx, async () => {
+      throw new Error("handler should not run");
+    });
+
+    expect(result).toMatchObject({
+      isError: true,
+      _meta: {
+        "mcp-use/auth": {
+          code: "forbidden",
+        },
+      },
+    });
+  });
+
+  it("throws structured errors for unauthorized resources/read", async () => {
+    const middleware = createAuthzMiddleware({
+      getRequirement: () => ({ authenticated: true }),
+    });
+    const ctx = makeCtx("resources/read");
+    ctx.params = { uri: "secret://orders" };
+
+    await expect(middleware(ctx, async () => "ok")).rejects.toBeInstanceOf(
+      AuthzPolicyError
+    );
+  });
+
+  it("runs custom predicates for concrete requests", async () => {
+    await expect(
+      evaluateAuthRequirement(
+        {
+          predicate: ({ auth, input }) =>
+            auth?.subject === input?.ownerId
+              ? { allow: true }
+              : { allow: false, code: "forbidden" },
+        },
+        {
+          kind: "tool",
+          operation: "tools/call",
+          name: "read_order",
+          input: { ownerId: "user-1" },
+          auth,
+        },
+        { includePredicate: true }
+      )
+    ).resolves.toMatchObject({ allow: true });
   });
 });

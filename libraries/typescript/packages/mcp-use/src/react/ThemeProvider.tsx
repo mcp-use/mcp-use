@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useState } from "react";
 import { applyHostStyleVariables } from "./host-styles.js";
-import { useWidget } from "./useWidget.js";
+import { useView } from "./useView.js";
 
 /**
  * ThemeProvider that manages dark mode class on document root
@@ -17,7 +17,7 @@ export const ThemeProvider: React.FC<{
   children: React.ReactNode;
   colorScheme?: boolean;
 }> = ({ children, colorScheme = true }) => {
-  const { hostContext } = useWidget();
+  const { hostContext } = useView();
   const [systemPreference, setSystemPreference] = useState<"light" | "dark">(
     () => {
       if (typeof window === "undefined") return "light";
@@ -40,7 +40,7 @@ export const ThemeProvider: React.FC<{
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // Calculate effective theme. useWidget() normalizes a missing host theme to
+  // Calculate effective theme. useView() normalizes a missing host theme to
   // "light" for consumers, so ThemeProvider reads the raw host context to avoid
   // treating an omitted host value as an explicit light-mode preference.
   const hostTheme =

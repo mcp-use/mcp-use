@@ -310,11 +310,14 @@ export function mountOAuthProxy(
             `[OAuth Proxy] Metadata fetch failed: ${response.status} ${response.statusText}`
           );
         }
-        return c.json(
-          {
+        return new Response(
+          JSON.stringify({
             error: `Failed to fetch OAuth metadata: ${response.status} ${response.statusText}`,
-          },
-          response.status as any
+          }),
+          {
+            status: response.status,
+            headers: { "Content-Type": "application/json" },
+          }
         );
       }
 
@@ -462,7 +465,7 @@ export function mountOAuthProxy(
         headers[key] = value;
       });
 
-      let responseBody: any = null;
+      let responseBody: unknown = null;
       const contentTypeHeader = headers["content-type"] || "";
 
       // Handle different response types

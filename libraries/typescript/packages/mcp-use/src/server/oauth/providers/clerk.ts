@@ -16,7 +16,12 @@
  */
 
 import { jwtVerify, createRemoteJWKSet, decodeJwt } from "jose";
-import type { OAuthProvider, UserInfo, ClerkOAuthConfig } from "./types.js";
+import type {
+  OAuthProvider,
+  UserInfo,
+  ClerkOAuthConfig,
+  OAuthTokenVerificationResult,
+} from "./types.js";
 
 export class ClerkOAuthProvider implements OAuthProvider {
   private config: ClerkOAuthConfig;
@@ -38,7 +43,7 @@ export class ClerkOAuthProvider implements OAuthProvider {
     return this.jwks;
   }
 
-  async verifyToken(token: string): Promise<any> {
+  async verifyToken(token: string): Promise<OAuthTokenVerificationResult> {
     if (this.config.verifyJwt === false) {
       console.warn("[Clerk OAuth] ⚠️  JWT verification is disabled");
       console.warn("[Clerk OAuth]     Enable verifyJwt: true for production");
@@ -65,20 +70,25 @@ export class ClerkOAuthProvider implements OAuthProvider {
     }
   }
 
-  getUserInfo(payload: any): UserInfo {
+  getUserInfo(payload: Record<string, unknown>): UserInfo {
     // Clerk includes org permissions as an array when using organizations
-    const orgPermissions: string[] = payload.org_permissions || [];
+    const orgPermissions = Array.isArray(payload.org_permissions)
+      ? payload.org_permissions.filter(
+          (permission): permission is string => typeof permission === "string"
+        )
+      : [];
+    const scope = payload.scope as string | undefined;
 
     return {
-      userId: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      username: payload.username,
-      picture: payload.picture,
+      userId: payload.sub as string,
+      email: payload.email as string | undefined,
+      name: payload.name as string | undefined,
+      username: payload.username as string | undefined,
+      picture: payload.picture as string | undefined,
       // Org role exposed as a role array for consistency with other providers
-      roles: payload.org_role ? [payload.org_role] : [],
+      roles: payload.org_role ? [payload.org_role as string] : [],
       permissions: orgPermissions,
-      scopes: payload.scope ? payload.scope.split(" ") : [],
+      scopes: scope ? scope.split(" ") : [],
       // Clerk-specific claims
       email_verified: payload.email_verified,
       org_id: payload.org_id,

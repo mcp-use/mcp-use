@@ -2,7 +2,7 @@ import {
   McpUseProvider,
   ModelContext,
   modelContext,
-  useWidget,
+  useView,
   type WidgetMetadata,
 } from "mcp-use/react";
 import React, { useState } from "react";
@@ -34,7 +34,7 @@ type Product = { id: string; name: string; price: number; category: string };
 type Props = z.infer<typeof propSchema>;
 
 const ContextDemo: React.FC = () => {
-  const { props, isPending, theme } = useWidget<Props>();
+  const { props, isPending, theme } = useView<Props>();
   const isDark = theme === "dark";
 
   const products: Product[] = props.products ?? [];

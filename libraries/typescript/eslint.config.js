@@ -232,6 +232,7 @@ export default [
       ...eslint.configs.recommended.rules,
       ...tseslint.configs.recommended.rules,
       "no-undef": "off", // TypeScript handles undefined checks
+      "no-redeclare": "off", // TypeScript overloads intentionally redeclare symbols
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": [
         "error",
@@ -279,6 +280,52 @@ export default [
       },
     },
   },
+  // mcp-use server boundary (v2): server must not import agent/client barrels
+  {
+    files: ["packages/mcp-use/src/server/**/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/src/agents/**", "../agents/**", "../../agents/**"],
+              message:
+                "Server code must not import agents — keep @mcp-use/agent separate.",
+            },
+            {
+              group: [
+                "**/src/client/**",
+                "../client/**",
+                "../../client/**",
+                "**/src/client.ts",
+              ],
+              message:
+                "Server code must not import client — keep @mcp-use/client separate.",
+            },
+            {
+              group: ["@mcp-use/cli", "@mcp-use/cli/**"],
+              message:
+                "Server must not statically import CLI — use dynamic import at dev boundaries only.",
+            },
+            {
+              group: ["@mcp-ui/server", "@mcp-ui/client", "@mcp-ui/**"],
+              message:
+                "@mcp-ui/* was removed in v2 — use mcp-use/server view APIs.",
+            },
+            {
+              group: [
+                "@modelcontextprotocol/sdk",
+                "@modelcontextprotocol/sdk/**",
+              ],
+              message:
+                "Use @modelcontextprotocol/server or @modelcontextprotocol/client (v2 split packages).",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // mcp-use package (source files only, excludes config/test files)
   {
     files: ["packages/mcp-use/src/**/*.ts", "packages/mcp-use/index.ts"],
@@ -287,6 +334,31 @@ export default [
         "error",
         { devDependencies: false },
       ],
+    },
+  },
+  // Strict typing gate for the V2 surfaces already cleaned in this branch.
+  // ponytail: do not enable this globally until SDK-private/HMR/agent legacy
+  // boundaries are refactored; keeping it scoped prevents new regressions in
+  // the APIs we just hardened.
+  {
+    files: [
+      "packages/mcp-use/src/eval/**/*.ts",
+      "packages/mcp-use/src/telemetry/instrumentation.ts",
+      "packages/mcp-use/src/server/views/**/*.ts",
+      "packages/mcp-use/src/server/middleware/policy.ts",
+      "packages/mcp-use/src/server/middleware/production.ts",
+      "packages/mcp-use/src/project-config.ts",
+      "packages/mcp-use/src/server/sdk-bridge.ts",
+      "packages/mcp-use/src/client/connectors/codeMode.ts",
+      "packages/mcp-use/src/client/executors/base.ts",
+      "packages/mcp-use/src/client/executors/vm.ts",
+      "packages/mcp-use/src/client/executors/e2b.ts",
+      "packages/mcp-use/src/react/useCallTool.ts",
+      "packages/mcp-use/src/react/createTypedHooks.ts",
+      "packages/mcp-use/src/react/generateHelpers.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "error",
     },
   },
   // Test files

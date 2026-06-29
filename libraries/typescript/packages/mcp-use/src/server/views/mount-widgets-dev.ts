@@ -1,0 +1,1518 @@
+/**
+ * Development mode widget mounting with Vite HMR
+ *
+ * This module handles serving widgets from the resources/ directory in development mode
+ * with hot module replacement (HMR) support. It uses Vite to transform and serve
+ * React/TSX widget files with live reloading during development.
+ */
+
+import type { Context, Hono as HonoType, Next } from "hono";
+import type { IncomingMessage, Server as HttpServer } from "node:http";
+import type { Duplex } from "node:stream";
+import { adaptConnectMiddleware } from "../connect-adapter.js";
+import type { UIResourceDefinition, WidgetProps } from "../types/resource.js";
+import type { ToolCallback, ToolDefinition } from "../types/tool.js";
+import type { WidgetMetadata } from "../types/widget.js";
+import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import {
+  registerWidgetFromTemplate,
+  setupFaviconRoute,
+  setupPublicRoutes,
+} from "./widget-helpers.js";
+import type {
+  MountWidgetsOptions,
+  RegisterWidgetCallback,
+  RemoveWidgetToolCallback,
+  WidgetMountConfig,
+  UpdateWidgetToolCallback,
+} from "./widget-types.js";
+import { discoverWidgetFileEntries } from "./discover-widget-files.js";
+
+const TMP_MCP_USE_DIR = ".mcp-use";
+
+const DEFAULT_HMR_PORT = 24678;
+
+interface ViteHotChannel {
+  send(...args: unknown[]): unknown;
+}
+
+interface ViteDevServerLike {
+  watcher: {
+    add(path: string): void;
+    on(
+      event: string,
+      handler: (...args: string[]) => void | Promise<void>
+    ): void;
+  };
+  moduleGraph: {
+    onFileChange(file: string): void;
+    getModuleById(id: string): unknown;
+    invalidateModule(module: unknown): void;
+  };
+  ssrLoadModule(path: string): Promise<Record<string, unknown>>;
+  warmupRequest?: (url: string) => Promise<unknown>;
+  transformRequest: (url: string) => Promise<unknown>;
+  waitForRequestsIdle?: (url: string) => Promise<unknown>;
+  config: {
+    server: {
+      hmr?: { port?: number } | boolean;
+    };
+  };
+  middlewares: unknown;
+  registrations: {
+    tools: Map<string, ToolRegistryRegistration>;
+  };
+  ws?: ViteHotChannel;
+  hot?: ViteHotChannel;
+  environments?: {
+    client?: {
+      hot?: ViteHotChannel;
+    };
+  };
+}
+
+type CreateViteServer = (
+  config: Record<string, unknown>
+) => Promise<ViteDevServerLike>;
+type VitePluginFactory = (options?: Record<string, unknown>) => unknown;
+type ToolRegistryRegistration = {
+  config: ToolDefinition;
+  handler: ToolCallback;
+};
+
+type HonoWithViteWsProxy = HonoType & {
+  __viteWsProxy?: (httpServer: HttpServer) => void;
+};
+
+function addUnique(values: string[] | undefined, value: string): string[] {
+  return values?.includes(value) ? values : [...(values || []), value];
+}
+
+function enrichWidgetMetadataForDev(
+  metadata: WidgetMetadata["metadata"],
+  serverBaseUrl: string
+): WidgetMetadata["metadata"] | undefined {
+  if (!metadata) return undefined;
+  const serverOrigin = serverBaseUrl ? new URL(serverBaseUrl).origin : null;
+  if (!serverOrigin) return metadata;
+
+  const csp = { ...(metadata.csp || {}) };
+  for (const field of [
+    "connectDomains",
+    "resourceDomains",
+    "baseUriDomains",
+  ] as const) {
+    csp[field] = addUnique(csp[field], serverOrigin);
+  }
+
+  const wsOrigin = serverOrigin.replace(/^http/, "ws");
+  csp.connectDomains = addUnique(csp.connectDomains, wsOrigin);
+  csp.scriptDirectives = addUnique(csp.scriptDirectives, "'unsafe-eval'");
+
+  return { ...metadata, csp };
+}
+
+/**
+ * When a project has a `src/` tree (typical for Next.js apps), emit a
+ * Tailwind `@source` directive so shared components imported via
+ * `@/components/...` contribute their class names to the widget's CSS.
+ * Returns an empty string when the directory is absent.
+ *
+ * Shared by the initial widget CSS generation and the on-the-fly HMR
+ * path so both stay in sync.
+ */
+async function computeProjectSrcSourceLine(
+  widgetTempDir: string
+): Promise<string> {
+  const projectSrcPath = pathHelpers.join(getCwd(), "src");
+  if (!(await fsHelpers.existsSync(projectSrcPath))) return "";
+  const relative = pathHelpers
+    .relative(widgetTempDir, projectSrcPath)
+    .replace(/\\/g, "/");
+  return `@source "${relative}";\n`;
+}
+
+async function findAvailablePort(startPort: number): Promise<number> {
+  const net = await import("node:net");
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    // Listen without specifying a host so Node binds to `::` (all interfaces,
+    // both IPv4 and IPv6). This matches how Vite creates its WebSocket server,
+    // so we detect conflicts regardless of address family.
+    server.listen(startPort, () => {
+      const port = (server.address() as { port: number }).port;
+      server.close(() => resolve(port));
+    });
+    server.on("error", () => {
+      findAvailablePort(startPort + 1).then(resolve);
+    });
+  });
+}
+
+/**
+ * Configuration for development widget mounting
+ */
+type MountWidgetsDevOptions = MountWidgetsOptions;
+
+/**
+ * Mounts local widget sources under the project's resources directory into a shared Vite dev server with HMR so they can be served and inspected during development.
+ *
+ * Discovers top-level `.tsx`/`.ts` widget files and folders containing `widget.tsx`, generates per-widget temporary entry and HTML files under `.mcp-use`, starts a single Vite middleware server that watches the resources directory for changes, and registers each widget via the provided callback for MCP-UI compatibility.
+ *
+ * @param app - Hono application instance to mount middleware and routes onto
+ * @param serverConfig - Server configuration (base URL, port, CSP, favicon, etc.) used to configure routes and Vite origin
+ * @param registerWidget - Callback invoked to register each discovered widget with the running server
+ * @param updateWidgetTool - Callback invoked to update widget tool metadata during HMR
+ * @param removeWidgetTool - Callback invoked to remove widget tool when widget is deleted/renamed
+ * @param options - Optional overrides: `baseRoute` to change the mount path (default: `/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
+ * @returns Nothing.
+ */
+export async function mountWidgetsDev(
+  app: HonoType,
+  serverConfig: WidgetMountConfig,
+  registerWidget: RegisterWidgetCallback,
+  updateWidgetTool: UpdateWidgetToolCallback,
+  removeWidgetTool: RemoveWidgetToolCallback,
+  options?: MountWidgetsDevOptions
+): Promise<void> {
+  const { promises: fs } = await import("node:fs");
+  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  // Resolution order for the widgets directory:
+  //   1. Caller-supplied `options.resourcesDir`
+  //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
+  //      or mcpUseConfig.mcpDir points at e.g. `src/mcp`)
+  //   3. Default `"resources"` at the project root
+  const resourcesDir =
+    options?.resourcesDir || process.env.MCP_USE_WIDGETS_DIR || "resources";
+
+  const entries = await discoverWidgetFileEntries({ resourcesDir });
+  if (entries.length === 0) {
+    return;
+  }
+
+  const hasWidgets = true;
+  console.log("[WIDGETS] Mounting widgets in development mode");
+
+  // Create a temp directory for widget entry files
+  const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
+
+  // Clean up stale widget directories in .mcp-use
+  try {
+    // Check if .mcp-use exists
+    await fs.access(tempDir);
+
+    // Get list of current widget names
+    const currentWidgetNames = new Set(entries.map((e) => e.name));
+
+    // Read existing directories in .mcp-use
+    const existingDirs = await fs.readdir(tempDir, { withFileTypes: true });
+
+    // Remove directories that are not in current widgets
+    for (const dirent of existingDirs) {
+      if (dirent.isDirectory() && !currentWidgetNames.has(dirent.name)) {
+        const staleDir = pathHelpers.join(tempDir, dirent.name);
+        await fs.rm(staleDir, { recursive: true, force: true });
+        console.log(`[WIDGETS] Cleaned up stale widget: ${dirent.name}`);
+      }
+    }
+  } catch {
+    // .mcp-use doesn't exist yet, no cleanup needed
+  }
+
+  await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
+
+  // Import dev dependencies - these are optional and only needed for dev mode
+  // Using dynamic imports with createRequire to resolve from user's project directory
+  let createServer: CreateViteServer | undefined;
+  let react: VitePluginFactory | undefined;
+  let tailwindcss: VitePluginFactory | undefined;
+  // When the project has a tsconfig.json, we enable Vite's native
+  // `resolve.tsconfigPaths` option so a widget can `import '@/components/...'`
+  // and the project's `@/*` paths resolve natively. Without a tsconfig, we
+  // fall back to a hardcoded `@` → resources alias below.
+  let hasProjectTsconfig = false;
+
+  try {
+    // Use createRequire to resolve modules from the user's project directory (getCwd())
+    // instead of from the mcp-use package location
+    const { createRequire } = await import("node:module");
+    const { pathToFileURL } = await import("node:url");
+
+    // Create a require function that resolves from the user's project directory
+    const userProjectRequire = createRequire(
+      pathToFileURL(pathHelpers.join(getCwd(), "package.json")).href
+    );
+
+    // Resolve the actual module paths from the user's project
+    const vitePath = userProjectRequire.resolve("vite");
+    const reactPluginPath = userProjectRequire.resolve("@vitejs/plugin-react");
+    const tailwindPath = userProjectRequire.resolve("@tailwindcss/vite");
+
+    // Now import using the resolved paths (use pathToFileURL for Windows compatibility)
+    const viteModule = (await import(pathToFileURL(vitePath).href)) as {
+      createServer: CreateViteServer;
+    };
+    createServer = viteModule.createServer;
+    const reactModule = (await import(pathToFileURL(reactPluginPath).href)) as {
+      default: VitePluginFactory;
+    };
+    react = reactModule.default;
+    const tailwindModule = (await import(pathToFileURL(tailwindPath).href)) as {
+      default: VitePluginFactory;
+    };
+    tailwindcss = tailwindModule.default;
+
+    const candidateTsconfig = pathHelpers.join(getCwd(), "tsconfig.json");
+    if (await fsHelpers.existsSync(candidateTsconfig)) {
+      hasProjectTsconfig = true;
+    }
+  } catch (error) {
+    throw new Error(
+      "❌ Widget dependencies not installed!\n\n" +
+        "To use MCP widgets with resources folder, you need to install the required dependencies:\n\n" +
+        "  npm install vite @vitejs/plugin-react @tailwindcss/vite\n" +
+        "  # or\n" +
+        "  pnpm add vite @vitejs/plugin-react @tailwindcss/vite\n\n" +
+        "These dependencies are automatically included in projects created with 'create-mcp-use-app'.\n" +
+        "For production, pre-build your widgets using 'mcp-use build'."
+    );
+  }
+
+  if (!createServer || !react || !tailwindcss) {
+    throw new Error("Widget dev dependencies did not expose expected exports");
+  }
+
+  const widgets = entries.map((entry) => {
+    return {
+      name: entry.name,
+      description: `Widget: ${entry.name}`,
+      entry: entry.path,
+    };
+  });
+
+  // Import slugifyWidgetName for URL-safe directory names
+  const { slugifyWidgetName } = await import("./widget-helpers.js");
+
+  // Create entry files for each widget
+  for (const widget of widgets) {
+    // Use slugified name for temp directory to match URL routing
+    const slugifiedName = slugifyWidgetName(widget.name);
+    const widgetTempDir = pathHelpers.join(tempDir, slugifiedName);
+    await fs.mkdir(widgetTempDir, { recursive: true });
+
+    // Create a CSS file with Tailwind and @source directives to scan resources
+    const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
+    const relativeResourcesPath = pathHelpers
+      .relative(widgetTempDir, resourcesPath)
+      .replace(/\\/g, "/");
+
+    // Calculate relative path to mcp-use package dynamically
+    const mcpUsePath = pathHelpers.join(getCwd(), "node_modules", "mcp-use");
+    const relativeMcpUsePath = pathHelpers
+      .relative(widgetTempDir, mcpUsePath)
+      .replace(/\\/g, "/");
+
+    const projectSrcSource = await computeProjectSrcSourceLine(widgetTempDir);
+
+    const cssContent = `@import "tailwindcss";
+
+/* Configure Tailwind to scan the resources directory and mcp-use package */
+@source "${relativeResourcesPath}";
+@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
+${projectSrcSource}`;
+    await fs.writeFile(
+      pathHelpers.join(widgetTempDir, "styles.css"),
+      cssContent,
+      "utf8"
+    );
+
+    const entryContent = `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles.css'
+import Component from '${widget.entry.replace(/\\/g, "/")}'
+
+const container = document.getElementById('widget-root')
+if (container && Component) {
+  const root = createRoot(container)
+  root.render(<Component />)
+  
+  // Signal to parent that widget has mounted (after a brief delay for initial render)
+  setTimeout(() => {
+    window.parent.postMessage({ type: 'mcp-inspector:widget:ready' }, '*')
+  }, 100)
+}
+`;
+
+    // Include Vite client and React refresh preamble explicitly
+    // This is needed when loading in sandboxed iframes where auto-injection may not work
+    // Use the base route path (not full URL) so URLs resolve against the document origin.
+    // This works both locally and behind reverse proxies (ngrok, E2B, etc.)
+    const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
+    const htmlContent = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${widget.name} Widget</title>${
+      serverConfig.favicon
+        ? `
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+        : ""
+    }
+    <script type="module" src="${fullBaseUrl}/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '${fullBaseUrl}/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <script type="module" src="${fullBaseUrl}/${slugifiedName}/entry.tsx"></script>
+  </body>
+</html>`;
+
+    await fs.writeFile(
+      pathHelpers.join(widgetTempDir, "entry.tsx"),
+      entryContent,
+      "utf8"
+    );
+    await fs.writeFile(
+      pathHelpers.join(widgetTempDir, "index.html"),
+      htmlContent,
+      "utf8"
+    );
+  }
+
+  // Note: WebSocket protocol (ws/wss) is auto-detected by Vite client from the page URL
+
+  // Create a single shared Vite dev server for all widgets
+  if (hasWidgets) {
+    console.log(
+      `[WIDGETS] Serving ${entries.length} widget(s) with shared Vite dev server and HMR`
+    );
+  }
+
+  // Create a plugin to handle CSS imports in SSR only
+  const ssrCssPlugin = {
+    name: "ssr-css-handler",
+    enforce: "pre" as const,
+    resolveId(
+      id: string,
+      importer: string | undefined,
+      options?: { ssr?: boolean }
+    ) {
+      // Only intercept CSS in SSR mode - be very explicit about this
+      if (
+        options &&
+        options.ssr === true &&
+        (id.endsWith(".css") || id.endsWith(".module.css"))
+      ) {
+        return "\0ssr-css:" + id;
+      }
+      // Don't interfere with normal resolution
+      return null;
+    },
+    load(id: string, options?: { ssr?: boolean }) {
+      // Only return empty export for CSS files in SSR mode
+      if (options && options.ssr === true && id.startsWith("\0ssr-css:")) {
+        return "export default {}";
+      }
+      // Don't interfere with normal loading
+      return null;
+    },
+  };
+
+  // Create a plugin to ensure Vite watches the resources directory for HMR
+  const warmWidgetEntry: {
+    current: (slugifiedName: string, reason: string) => Promise<void>;
+  } = {
+    current: async () => {
+      // No-op until Vite server is fully initialised.
+    },
+  };
+  const watchResourcesPlugin = {
+    name: "watch-resources",
+    configureServer(server: ViteDevServerLike) {
+      // Explicitly add the resources directory to Vite's watch list
+      // This ensures HMR works when widget source files change
+      const resourcesPath = pathHelpers.join(getCwd(), resourcesDir);
+      server.watcher.add(resourcesPath);
+      if (hasWidgets) {
+        console.log(`[WIDGETS] Watching resources directory: ${resourcesPath}`);
+      }
+
+      // Watch for file deletions and clean up corresponding .mcp-use directories
+      server.watcher.on("unlink", async (filePath: string) => {
+        // Check if the deleted file is a widget file
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+
+        // Single file widget (e.g., widget-name.tsx)
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          const widgetName = relativePath.replace(/\.tsx?$/, "");
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const widgetDir = pathHelpers.join(tempDir, slugifiedName);
+
+          // Remove from widgets array
+          const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
+          if (widgetIdx !== -1) {
+            widgets.splice(widgetIdx, 1);
+          }
+
+          // Remove MCP registrations
+          removeWidgetTool(widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Removed widget (file deleted): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+        // Folder-based widget (e.g., widget-name/widget.tsx)
+        else if (relativePath.endsWith("widget.tsx")) {
+          const parts = relativePath.split("/");
+          if (parts.length === 2) {
+            const widgetName = parts[0];
+            const slugifiedName = slugifyWidgetName(widgetName);
+            const widgetDir = pathHelpers.join(tempDir, slugifiedName);
+
+            // Remove from widgets array
+            const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
+            if (widgetIdx !== -1) {
+              widgets.splice(widgetIdx, 1);
+            }
+
+            // Remove MCP registrations
+            removeWidgetTool(widgetName);
+
+            try {
+              await fs.access(widgetDir);
+              await fs.rm(widgetDir, { recursive: true, force: true });
+              console.log(
+                `[WIDGETS] Removed widget (file deleted): ${widgetName}`
+              );
+            } catch {
+              // Widget directory doesn't exist, nothing to clean up
+            }
+          }
+        }
+      });
+
+      // Watch for directory deletions (folder-based widgets)
+      server.watcher.on("unlinkDir", async (dirPath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, dirPath);
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+
+        // Check if this is a top-level directory in resources/
+        if (relativePath && !relativePath.includes("/")) {
+          const widgetName = relativePath;
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const widgetDir = pathHelpers.join(tempDir, slugifiedName);
+
+          // Remove from widgets array
+          const widgetIdx = widgets.findIndex((w) => w.name === widgetName);
+          if (widgetIdx !== -1) {
+            widgets.splice(widgetIdx, 1);
+          }
+
+          // Remove MCP registrations
+          removeWidgetTool(widgetName);
+
+          try {
+            await fs.access(widgetDir);
+            await fs.rm(widgetDir, { recursive: true, force: true });
+            console.log(
+              `[WIDGETS] Removed widget (directory deleted): ${widgetName}`
+            );
+          } catch {
+            // Widget directory doesn't exist, nothing to clean up
+          }
+        }
+      });
+
+      // Helper: Create temp entry/HTML files for a widget
+      const createWidgetTempFiles = async (
+        widgetName: string,
+        entryPath: string
+      ) => {
+        // Use slugified name for temp directory to match URL routing
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+        const slugifiedName = slugifyWidgetName(widgetName);
+        const widgetTempDir = pathHelpers.join(tempDir, slugifiedName);
+        await fs.mkdir(widgetTempDir, { recursive: true });
+
+        // Create a CSS file with Tailwind and @source directives to scan resources
+        const relativeResourcesPath = pathHelpers
+          .relative(widgetTempDir, resourcesPath)
+          .replace(/\\/g, "/");
+
+        // Calculate relative path to mcp-use package dynamically
+        const mcpUsePath = pathHelpers.join(
+          getCwd(),
+          "node_modules",
+          "mcp-use"
+        );
+        const relativeMcpUsePath = pathHelpers
+          .relative(widgetTempDir, mcpUsePath)
+          .replace(/\\/g, "/");
+
+        const projectSrcSource =
+          await computeProjectSrcSourceLine(widgetTempDir);
+
+        const cssContent = `@import "tailwindcss";
+
+/* Configure Tailwind to scan the resources directory and mcp-use package */
+@source "${relativeResourcesPath}";
+@source "${relativeMcpUsePath}/**/*.{ts,tsx,js,jsx}";
+${projectSrcSource}`;
+        await fs.writeFile(
+          pathHelpers.join(widgetTempDir, "styles.css"),
+          cssContent,
+          "utf8"
+        );
+
+        const entryContent = `import React from 'react'
+import { createRoot } from 'react-dom/client'
+import './styles.css'
+import Component from '${entryPath.replace(/\\/g, "/")}'
+
+const container = document.getElementById('widget-root')
+if (container && Component) {
+  const root = createRoot(container)
+  root.render(<Component />)
+}
+`;
+
+        // Use the base route path for URLs so they resolve against the document origin
+        const fullBaseUrl = `${serverConfig.serverBaseUrl}${baseRoute}`;
+        const htmlContent = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>${widgetName} Widget</title>${
+      serverConfig.favicon
+        ? `
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+        : ""
+    }
+    <script type="module" src="${fullBaseUrl}/@vite/client"></script>
+    <script type="module">
+      import RefreshRuntime from '${fullBaseUrl}/@react-refresh';
+      RefreshRuntime.injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+      window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+  </head>
+  <body>
+    <div id="widget-root"></div>
+    <script type="module" src="${fullBaseUrl}/${slugifiedName}/entry.tsx"></script>
+  </body>
+</html>`;
+
+        await fs.writeFile(
+          pathHelpers.join(widgetTempDir, "entry.tsx"),
+          entryContent,
+          "utf8"
+        );
+        await fs.writeFile(
+          pathHelpers.join(widgetTempDir, "index.html"),
+          htmlContent,
+          "utf8"
+        );
+      };
+
+      // Helper: Extract metadata and register/update widget
+      const extractAndRegisterWidget = async (
+        widgetName: string,
+        entryPath: string,
+        changedFilePath?: string,
+        isHmrUpdate: boolean = false
+      ) => {
+        // Invalidate the changed file in Vite's module graph
+        // This propagates invalidation to importers (e.g., widget.tsx when types.ts changes)
+        if (changedFilePath) {
+          server.moduleGraph.onFileChange(changedFilePath);
+        }
+
+        // Also explicitly invalidate the widget entry module
+        const entryMod = server.moduleGraph.getModuleById(entryPath);
+        if (entryMod) {
+          server.moduleGraph.invalidateModule(entryMod);
+        }
+
+        // Load module with fresh exports
+        const mod = await server.ssrLoadModule(entryPath);
+
+        // Extract metadata
+        let metadata: WidgetMetadata = {};
+        if (mod.widgetMetadata) {
+          metadata = mod.widgetMetadata as WidgetMetadata;
+
+          // Handle props field (preferred) or inputs field (deprecated) for Zod schema
+          const schemaField = metadata.props || metadata.inputs;
+          if (schemaField) {
+            try {
+              // Pass the full Zod schema object directly (don't extract .shape)
+              // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+              // and raw shapes, so we preserve the full schema here
+              metadata.props = schemaField;
+              // Also set inputs as alias for backward compatibility
+              if (!metadata.inputs) {
+                metadata.inputs = schemaField;
+              }
+            } catch (error) {
+              console.warn(
+                `[WIDGET] Failed to extract schema for ${widgetName}:`,
+                error
+              );
+            }
+          }
+        }
+
+        // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for all widget registrations.
+        const enrichedCspMetadata = enrichWidgetMetadataForDev(
+          metadata.metadata,
+          serverConfig.serverBaseUrl
+        );
+
+        // For HMR updates, use the direct update path to avoid re-registration issues
+        if (isHmrUpdate) {
+          const schemaField = metadata.props || metadata.inputs;
+
+          // Import helpers for widget registration
+          const { slugifyWidgetName, processWidgetHtml } =
+            await import("./widget-helpers.js");
+          const { buildDualProtocolMetadata, getBuildIdPart } =
+            await import("./protocol-helpers.js");
+
+          // Determine widget type based on metadata presence (same logic as createWidgetRegistration)
+          const widgetType =
+            metadata.appsSdkMetadata && !metadata.metadata
+              ? "appsSdk"
+              : "mcpApps";
+          const slugifiedName = slugifyWidgetName(widgetName);
+          const description = metadata.description || `Widget: ${widgetName}`;
+
+          // Re-read and process HTML for the update
+          const htmlPath = pathHelpers.join(
+            tempDir,
+            slugifiedName,
+            "index.html"
+          );
+          let html = "";
+          try {
+            html = await fsHelpers.readFileSync(htmlPath);
+            html = processWidgetHtml(
+              html,
+              widgetName,
+              serverConfig.serverBaseUrl
+            );
+          } catch (e) {
+            console.warn(
+              `[WIDGET-HMR] Failed to read HTML for ${widgetName}:`,
+              e
+            );
+          }
+
+          // Build the resource URI (same as initial registration)
+          const buildIdPart = getBuildIdPart(undefined); // dev mode has no buildId
+          const resourceUri = `ui://widget/${widgetName}${buildIdPart}.html`;
+
+          const hmrDefinition: UIResourceDefinition =
+            widgetType === "appsSdk"
+              ? {
+                  name: widgetName,
+                  type: "appsSdk",
+                  description,
+                  props: schemaField as unknown as WidgetProps,
+                  htmlTemplate: html,
+                  appsSdkMetadata: metadata.appsSdkMetadata,
+                }
+              : {
+                  name: widgetName,
+                  type: "mcpApps",
+                  description,
+                  props: schemaField as unknown as WidgetProps,
+                  htmlTemplate: html,
+                  metadata: metadata.metadata ? enrichedCspMetadata : undefined,
+                  appsSdkMetadata: metadata.appsSdkMetadata,
+                };
+
+          // Build dual-protocol _meta for the tool definition:
+          // - MCP Apps: ui.resourceUri, ui/resourceUri (deprecated)
+          // - Apps SDK: openai/outputTemplate, openai/widgetCSP, openai/description
+          const dualProtocolMeta = buildDualProtocolMetadata(
+            hmrDefinition,
+            resourceUri
+          );
+
+          // Assemble full _meta: mcp-use/widget + dual-protocol fields
+          const fullMeta: Record<string, unknown> = {
+            "mcp-use/widget": {
+              name: widgetName,
+              slugifiedName: slugifiedName,
+              title: metadata.title || widgetName,
+              description: description,
+              type: widgetType,
+              props: schemaField,
+              html: html,
+              dev: true,
+              exposeAsTool: metadata.exposeAsTool ?? false,
+            },
+            ui: {},
+            // mcp-use private extension: props schema for inspector PropsConfigDialog.
+            // Not part of SEP-1865; other hosts will ignore this key.
+            ...(schemaField ? { "mcp-use/propsSchema": schemaField } : {}),
+            ...dualProtocolMeta,
+          };
+
+          const updated = updateWidgetTool(widgetName, {
+            description: description,
+            schema: schemaField,
+            _meta: fullMeta,
+          });
+
+          if (updated) {
+            return;
+          }
+
+          // Tool was removed (e.g., by index.ts HMR sync) - fall through
+          // to full registration below to re-create it
+          console.log(
+            `[WIDGET-HMR] Tool ${widgetName} not found, falling back to full registration`
+          );
+        }
+
+        // Full registration for new widgets (use enriched CSP with ws, unsafe-eval for dev)
+        const { slugifyWidgetName } = await import("./widget-helpers.js");
+        const slugifiedName = slugifyWidgetName(widgetName);
+        const metadataToRegister = {
+          ...metadata,
+          metadata: metadata.metadata
+            ? (enrichedCspMetadata ?? metadata.metadata)
+            : undefined,
+          ...(metadata.description
+            ? {}
+            : { description: `Widget: ${widgetName}` }),
+        } as Record<string, unknown>;
+        await registerWidgetFromTemplate(
+          widgetName,
+          pathHelpers.join(tempDir, slugifiedName, "index.html"),
+          metadataToRegister,
+          serverConfig,
+          registerWidget,
+          true // isDev
+        );
+      };
+
+      // Watch for widget file changes and re-extract metadata
+      server.watcher.on("change", async (filePath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Check if this is a widget-related file
+        let isWidgetFile = false;
+        let widgetName = "";
+
+        // Single file widget (e.g., widget-name.tsx at root)
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          isWidgetFile = true;
+          widgetName = relativePath.replace(/\.tsx?$/, "");
+        }
+        // Any file inside a widget folder (e.g., widget-name/types.ts, widget-name/components/foo.tsx)
+        else if (relativePath.includes("/")) {
+          const parts = relativePath.split("/");
+          const potentialWidgetName = parts[0];
+          // Check if this folder is a registered widget
+          const widget = widgets.find((w) => w.name === potentialWidgetName);
+          if (widget) {
+            isWidgetFile = true;
+            widgetName = potentialWidgetName;
+          }
+        }
+
+        if (isWidgetFile) {
+          const widget = widgets.find((w) => w.name === widgetName);
+          if (widget) {
+            try {
+              // Pass isHmrUpdate=true for existing widgets to use the update path
+              await extractAndRegisterWidget(
+                widget.name,
+                widget.entry,
+                filePath,
+                true // isHmrUpdate
+              );
+              console.log(`[WIDGETS] Reloaded metadata for ${widget.name}`);
+
+              // Regenerate tool registry types
+              import("../utils/tool-registry-generator.js")
+                .then(({ generateToolRegistryTypes }) =>
+                  generateToolRegistryTypes(server.registrations.tools)
+                )
+                .catch(() => {
+                  /* Ignore errors */
+                });
+            } catch (error) {
+              console.warn(
+                `[WIDGET] Failed to reload metadata for ${widget.name}:`,
+                error
+              );
+            }
+          }
+        }
+      });
+
+      // Watch for new widget files/folders being added
+      server.watcher.on("add", async (filePath: string) => {
+        const relativePath = pathHelpers.relative(resourcesPath, filePath);
+
+        // Single file widget at root (e.g., "new-widget.tsx")
+        if (
+          (relativePath.endsWith(".tsx") || relativePath.endsWith(".ts")) &&
+          !relativePath.includes("/")
+        ) {
+          const widgetName = relativePath.replace(/\.tsx?$/, "");
+
+          // Check if already registered
+          if (!widgets.find((w) => w.name === widgetName)) {
+            try {
+              // Add to widgets array
+              widgets.push({
+                name: widgetName,
+                description: `Widget: ${widgetName}`,
+                entry: filePath,
+              });
+
+              // Create temp files and register widget
+              await createWidgetTempFiles(widgetName, filePath);
+              await warmWidgetEntry.current(widgetName, "watch-add-file");
+              await extractAndRegisterWidget(widgetName, filePath);
+
+              console.log(`[WIDGETS] New widget added: ${widgetName}`);
+
+              // Regenerate tool registry types
+              import("../utils/tool-registry-generator.js")
+                .then(({ generateToolRegistryTypes }) =>
+                  generateToolRegistryTypes(server.registrations.tools)
+                )
+                .catch(() => {
+                  /* Ignore errors */
+                });
+            } catch (error) {
+              console.warn(
+                `[WIDGET] Failed to add new widget ${widgetName}:`,
+                error
+              );
+              // Remove from widgets array if registration failed
+              const idx = widgets.findIndex((w) => w.name === widgetName);
+              if (idx !== -1) widgets.splice(idx, 1);
+            }
+          }
+        }
+        // New widget.tsx inside a folder (e.g., "new-widget/widget.tsx")
+        else if (relativePath.endsWith("widget.tsx")) {
+          const parts = relativePath.split("/");
+          if (parts.length === 2) {
+            const widgetName = parts[0];
+
+            // Check if already registered
+            if (!widgets.find((w) => w.name === widgetName)) {
+              try {
+                // Add to widgets array
+                widgets.push({
+                  name: widgetName,
+                  description: `Widget: ${widgetName}`,
+                  entry: filePath,
+                });
+
+                // Create temp files and register widget
+                await createWidgetTempFiles(widgetName, filePath);
+                await warmWidgetEntry.current(widgetName, "watch-add-folder");
+                await extractAndRegisterWidget(widgetName, filePath);
+
+                console.log(`[WIDGETS] New widget added: ${widgetName}`);
+
+                // Regenerate tool registry types
+                import("../utils/tool-registry-generator.js")
+                  .then(({ generateToolRegistryTypes }) =>
+                    generateToolRegistryTypes(server.registrations.tools)
+                  )
+                  .catch(() => {
+                    /* Ignore errors */
+                  });
+              } catch (error) {
+                console.warn(
+                  `[WIDGET] Failed to add new widget ${widgetName}:`,
+                  error
+                );
+                // Remove from widgets array if registration failed
+                const idx = widgets.findIndex((w) => w.name === widgetName);
+                if (idx !== -1) widgets.splice(idx, 1);
+              }
+            }
+          }
+        }
+      });
+    },
+  };
+
+  // Create a plugin to provide browser stubs for Node.js-only packages
+  // posthog-node is server-side telemetry that can't run in browser
+  const nodeStubsPlugin = {
+    name: "node-stubs",
+    enforce: "pre" as const,
+    resolveId(id: string) {
+      // Stub posthog-node and its subpaths for browser
+      if (id === "posthog-node" || id.startsWith("posthog-node/")) {
+        return "\0virtual:posthog-node-stub";
+      }
+      return null;
+    },
+    load(id: string) {
+      if (id === "\0virtual:posthog-node-stub") {
+        // Return a browser-compatible stub that mimics posthog-node API
+        return `
+export class PostHog {
+  constructor() {}
+  capture() {}
+  identify() {}
+  alias() {}
+  flush() { return Promise.resolve(); }
+  shutdown() { return Promise.resolve(); }
+}
+export default PostHog;
+`;
+      }
+      return null;
+    },
+  };
+
+  // Fail the dev build with a clear error if a widget transitively imports a
+  // Next.js server-runtime module. These are shimmed in the MCP server
+  // process (see @mcp-use/cli next-shims-*) but have no browser equivalent,
+  // so the right move in a widget is to fetch the data through a tool call.
+  // Keep in sync with `@mcp-use/cli`'s next-shims-registry.json.
+  const serverOnlyGuard = {
+    name: "mcp-use-widget-server-only-guard",
+    enforce: "pre" as const,
+    resolveId(id: string, importer: string | undefined) {
+      const rejected = new Set([
+        "server-only",
+        "client-only",
+        "next/cache",
+        "next/headers",
+        "next/navigation",
+        "next/server",
+      ]);
+      if (!rejected.has(id)) return null;
+      const from = importer ? ` (imported from ${importer})` : "";
+      throw new Error(
+        `Widget imports "${id}"${from}, which is a Next.js server-only ` +
+          `module. Widgets run in a browser iframe and cannot use server ` +
+          `APIs.\n\n` +
+          `To fix:\n` +
+          `  • Remove the import from the widget (or from any module the ` +
+          `widget transitively imports)\n` +
+          `  • If the widget needs data from ${id}, read it inside an MCP ` +
+          `tool and pass the result through the widget's props`
+      );
+    },
+  };
+
+  // Plugin to patch Zod's JIT compilation to prevent CSP eval violations
+  // This is needed because Zod 4.x uses new Function() for JIT compilation
+  // which violates strict CSP in sandboxed iframes (MCP Apps hosts)
+  // See: https://github.com/colinhacks/zod/issues/4461
+  const zodJitlessPlugin = {
+    name: "zod-jitless",
+    enforce: "pre" as const,
+    transform(code: string, id: string) {
+      // Only transform Zod core files
+      if (!id.includes("zod") || !id.includes("core")) {
+        return null;
+      }
+
+      // Patch globalConfig = {} to globalConfig = { jitless: true }
+      // In non-minified source, the pattern is straightforward
+      const zodConfigPatterns = [
+        /export\s+const\s+globalConfig\s*=\s*\{\s*\}/g,
+        /const\s+globalConfig\s*=\s*\{\s*\}/g,
+      ];
+
+      let transformed = code;
+      let patched = false;
+
+      for (const pattern of zodConfigPatterns) {
+        // Reset lastIndex for global regex before test
+        pattern.lastIndex = 0;
+        if (pattern.test(transformed)) {
+          // Reset again before replace
+          pattern.lastIndex = 0;
+          transformed = transformed.replace(pattern, (match) =>
+            match.replace(/=\s*\{\s*\}/, "={ jitless: true }")
+          );
+          patched = true;
+        }
+      }
+
+      return patched ? transformed : null;
+    },
+  };
+
+  // Strip `widgetMetadata` export from browser builds so React Fast Refresh
+  // works. Widget files export both a React component (default) and
+  // `widgetMetadata` (named). The React plugin can't hot-update files with
+  // non-component exports and falls back to full-reload. By removing the
+  // export for the browser, Fast Refresh sees only the component and can
+  // do proper HMR. The SSR build keeps the export for metadata extraction.
+  // Make widget files compatible with React Fast Refresh by stripping the
+  // `widgetMetadata` named export for browser builds. SSR keeps it for
+  // metadata extraction. Also injects `import.meta.hot.accept()` as a
+  // safety net so even unusual export patterns never cascade to full-reload.
+  const widgetHmrPlugin = {
+    name: "widget-hmr-compat",
+    enforce: "pre" as const,
+    transform(code: string, id: string, options?: { ssr?: boolean }) {
+      if (options?.ssr) return null;
+      const cleanId = id.replace(/[?#].*$/, "");
+      if (!cleanId.endsWith(".tsx") && !cleanId.endsWith(".ts")) return null;
+      if (!code.includes("widgetMetadata")) return null;
+
+      let result = code;
+      // Strip all forms of widgetMetadata export
+      result = result.replace(
+        /export\s+(const|let|var)\s+widgetMetadata\b/g,
+        "const _widgetMetadata"
+      );
+      result = result.replace(
+        /export\s*\{[^}]*\bwidgetMetadata\b[^}]*\}/g,
+        (match) => {
+          // Remove widgetMetadata from export list, keep others
+          const cleaned = match
+            .replace(/\bwidgetMetadata\b\s*(as\s+\w+)?\s*,?\s*/g, "")
+            .replace(/,\s*\}/, " }")
+            .replace(/\{\s*\}/, "{ /* stripped */ }");
+          return cleaned.includes("{ /* stripped */ }") ? "" : cleaned;
+        }
+      );
+
+      // Safety net: ensure the module self-accepts HMR even if we missed
+      // an export pattern, preventing cascade to full-reload
+      if (!result.includes("import.meta.hot")) {
+        result += "\nif (import.meta.hot) { import.meta.hot.accept(); }\n";
+      }
+
+      return result;
+    },
+  };
+
+  // Suppress all full-page reloads for widgets. The widgetHmrPlugin makes
+  // widget files self-accepting (import.meta.hot.accept()), so React Fast
+  // Refresh handles component updates at the module level. Full-page reloads
+  // must be suppressed because widgets run inside iframes that receive host
+  // context (window.openai props) via postMessage — a reload would wipe that
+  // state. Dep re-optimization reloads are also suppressed; instead we rely
+  // on optimizeDeps.include + resolve.dedupe to pre-bundle all React deps
+  // in a single pass, preventing duplicate React instances.
+  const suppressFullReloadPlugin = {
+    name: "suppress-widget-full-reload",
+    configureServer(srv: ViteDevServerLike) {
+      const channels: ViteHotChannel[] = [];
+      if (srv.ws) channels.push(srv.ws);
+      if (srv.hot) channels.push(srv.hot);
+      if (srv.environments?.client?.hot)
+        channels.push(srv.environments.client.hot);
+
+      for (const channel of channels) {
+        if (!channel?.send) continue;
+        const origSend = channel.send.bind(channel);
+        channel.send = (...args: unknown[]) => {
+          const msg = args[0];
+          if (
+            (msg &&
+              typeof msg === "object" &&
+              "type" in msg &&
+              msg.type === "full-reload") ||
+            (typeof msg === "string" && msg.includes('"type":"full-reload"'))
+          ) {
+            return;
+          }
+          return origSend(...args);
+        };
+      }
+    },
+    handleHotUpdate({ file }: { file: string }) {
+      if (file.endsWith(".html")) return [];
+      return undefined;
+    },
+  };
+
+  // Build the optimizeDeps config. We point `entries` directly at widget
+  // source files so esbuild scans their imports and pre-bundles ALL deps
+  // at startup. The temp entry files use absolute import paths that esbuild
+  // can't follow, so we scan widget sources instead. We also include the
+  // core deps from the generated entry template (react, react-dom/client).
+  const widgetSourceEntries = widgets.map((w) => w.entry);
+  const coreDeps = [
+    "react",
+    "react/jsx-runtime",
+    "react/jsx-dev-runtime",
+    "react-dom",
+    "react-dom/client",
+    "mcp-use/react",
+  ];
+
+  const hmrPort = await findAvailablePort(DEFAULT_HMR_PORT);
+
+  const viteServer = await createServer({
+    root: tempDir,
+    base: baseRoute + "/",
+    plugins: [
+      serverOnlyGuard,
+      zodJitlessPlugin,
+      nodeStubsPlugin,
+      ssrCssPlugin,
+      widgetHmrPlugin,
+      suppressFullReloadPlugin,
+      watchResourcesPlugin,
+      tailwindcss(),
+      react({ jsxImportSource: "react" }),
+    ],
+    resolve: {
+      // Dedupe everything React-related so all importers share one runtime
+      // instance — without this, an HMR re-evaluation can introduce a
+      // second React module and the hooks dispatcher snaps to null on the
+      // next render ("Cannot read properties of null (reading 'useState')").
+      dedupe: [
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "react/jsx-dev-runtime",
+        "react-dom/client",
+      ],
+      // With a tsconfig, Vite's native tsconfigPaths resolver owns `@/*`
+      // (it picks up whatever aliases the project already defines).
+      // Without one, fall back to the legacy hardcoded `@` → resourcesDir.
+      ...(hasProjectTsconfig
+        ? { tsconfigPaths: true }
+        : { alias: { "@": pathHelpers.join(getCwd(), resourcesDir) } }),
+    },
+    build: {
+      // Disable source maps to avoid CSP eval violations
+      // Source maps can use eval-based mappings which violate strict CSP
+      sourcemap: false,
+      // Minify for production builds
+      minify: true,
+    },
+    server: {
+      middlewareMode: true,
+      // NOTE: We intentionally do NOT set `origin` here.
+      // Setting origin to a localhost URL (e.g., "http://localhost:3000") causes Vite
+      // to hardcode absolute URLs for all module imports (@fs/, @vite/client, etc.).
+      // When the server runs behind a reverse proxy (ngrok, E2B, Cloudflare tunnels),
+      // the browser can't access localhost, breaking all dynamic module loading.
+      // Without `origin`, Vite generates relative URLs that resolve against the
+      // document origin, which works both locally and behind proxies.
+      //
+      // Allow all hosts so the Vite middleware works behind reverse proxies
+      // Without this, Vite returns 403 for requests with non-localhost Host headers
+      allowedHosts: true,
+      hmr: {
+        // Explicitly set the internal HMR WebSocket port so we can proxy to it.
+        // In middleware mode, Vite creates a standalone WebSocket server.
+        // We need to know this port to forward upgrade requests from the main server.
+        // Port is chosen dynamically so multiple dev servers can run (e.g. 24678, 24679, ...).
+        port: hmrPort,
+        // Configure the CLIENT to connect to the main server port instead of Vite's
+        // standalone port. Our WebSocket proxy on the main server forwards
+        // to Vite's internal port. This enables HMR through reverse proxies.
+        // - Behind HTTPS proxy (ngrok/E2B): client connects to wss://host:443/...
+        //   → proxy → port 3000 → our WS proxy → Vite WS on port 24678
+        // - Local: client connects to ws://localhost:3000/...
+        //   → our WS proxy → Vite WS on port 24678
+        clientPort: serverConfig.serverBaseUrl.startsWith("https:")
+          ? 443
+          : Number(serverConfig.serverPort) || 3000,
+      },
+      watch: {
+        // Watch the resources directory for HMR to work
+        // This ensures changes to widget source files trigger hot reload
+        ignored: ["**/node_modules/**", "**/.git/**"],
+        // Enable polling on Linux where file watching may not work reliably
+        // (especially in Docker, WSL, VMs, or network filesystems)
+        usePolling: process.platform === "linux",
+        // If polling is enabled, check every 100ms (reasonable default)
+        interval: 100,
+      },
+    },
+    // Explicitly tell Vite to watch files outside root
+    // This is needed because widget entry files import from resources directory
+    optimizeDeps: {
+      // Scan widget source files at startup so all deps are pre-bundled
+      // before any browser connects. Avoids mid-session "optimized
+      // dependencies changed" reloads that create duplicate React instances.
+      entries: widgetSourceEntries,
+      include: coreDeps,
+      // Exclude Node.js-only packages from browser bundling
+      exclude: ["posthog-node"],
+    },
+    ssr: {
+      // Force Vite to transform these packages in SSR instead of using external requires
+      noExternal: ["@openai/apps-sdk-ui", "react-router"],
+      // Mark Node.js-only packages as external in SSR mode
+      external: ["posthog-node"],
+    },
+    define: {
+      // Define process.env for SSR context
+      "process.env.NODE_ENV": JSON.stringify(
+        process.env.NODE_ENV || "development"
+      ),
+      "import.meta.env.DEV": true,
+      "import.meta.env.PROD": false,
+      "import.meta.env.MODE": JSON.stringify("development"),
+      "import.meta.env.SSR": true,
+    },
+  });
+
+  // Pre-bundle a widget's dependencies via Vite's optimizer before the inspector
+  // requests its assets. Without this, the browser races against `depsOptimizer`
+  // and can fetch optimized deps with a stale hash, manifesting as 504s on
+  // `/.vite/deps/*` requests on first widget render.
+  const warmedWidgetEntries = new Set<string>();
+  warmWidgetEntry.current = async (widgetName: string, _reason: string) => {
+    const slugifiedName = slugifyWidgetName(widgetName);
+    const entryUrl = `/${slugifiedName}/entry.tsx`;
+    if (warmedWidgetEntries.has(entryUrl)) return;
+
+    try {
+      if (typeof viteServer.warmupRequest === "function") {
+        await viteServer.warmupRequest(entryUrl);
+      } else {
+        await viteServer.transformRequest(entryUrl);
+      }
+      if (typeof viteServer.waitForRequestsIdle === "function") {
+        await viteServer.waitForRequestsIdle(entryUrl);
+      }
+      warmedWidgetEntries.add(entryUrl);
+    } catch (error) {
+      console.warn(`[WIDGETS] Failed to warm widget entry ${entryUrl}:`, error);
+    }
+  };
+
+  // Set up WebSocket proxy for Vite HMR through the main HTTP server.
+  // In middleware mode, Vite creates its own WebSocket on a random port (e.g., 24678).
+  // Reverse proxies (ngrok, E2B) only forward traffic on the main port.
+  // This proxy intercepts WebSocket upgrade requests on the main server at the widget
+  // base path and forwards them to Vite's internal WebSocket server.
+  // Read HMR port from resolved config (we set it explicitly above)
+  const viteHmrPort =
+    (viteServer.config.server.hmr as { port?: number })?.port ??
+    DEFAULT_HMR_PORT;
+  if (viteHmrPort) {
+    if (hasWidgets) {
+      console.log(
+        `[WIDGETS] Vite HMR WebSocket on port ${viteHmrPort}, setting up proxy on main server`
+      );
+    }
+
+    // Store the proxy setup function - it will be called when the HTTP server is available
+    const hmrPort = viteHmrPort;
+    const widgetRoute = baseRoute;
+    // Pre-import net module at setup time (works in both CJS and ESM)
+    const netModule = await import("node:net");
+    const setupWsProxy = (httpServer: import("http").Server) => {
+      httpServer.on(
+        "upgrade",
+        (req: IncomingMessage, socket: Duplex, head: Buffer) => {
+          // Only proxy requests to the widget base route
+          if (
+            req.url?.startsWith(`${widgetRoute}/`) ||
+            req.url === widgetRoute
+          ) {
+            const upstream = netModule.createConnection(
+              { port: hmrPort, host: "localhost" },
+              () => {
+                // Forward the original upgrade request to Vite's WebSocket server
+                const rawRequest =
+                  `${req.method} ${req.url} HTTP/${req.httpVersion}\r\n` +
+                  Object.entries(req.headers)
+                    .map(([k, v]) => `${k}: ${v}`)
+                    .join("\r\n") +
+                  "\r\n\r\n";
+                upstream.write(rawRequest);
+                if (head.length > 0) upstream.write(head);
+                // Pipe bidirectionally
+                socket.pipe(upstream);
+                upstream.pipe(socket);
+              }
+            );
+            upstream.on("error", () => socket.destroy());
+            socket.on("error", () => upstream.destroy());
+          }
+        }
+      );
+    };
+
+    // Store for later use when HTTP server is available
+    (app as HonoWithViteWsProxy).__viteWsProxy = setupWsProxy;
+  }
+
+  // Custom middleware to handle widget-specific paths
+  app.use(`${baseRoute}/*`, async (c: Context, next: Next) => {
+    const url = new URL(c.req.url);
+    const pathname = url.pathname;
+    const widgetMatch = pathname.replace(baseRoute, "").match(/^\/([^/]+)/);
+
+    if (widgetMatch) {
+      // URL contains slugified widget name, need to find original widget name
+      const slugifiedNameFromUrl = widgetMatch[1];
+      const { slugifyWidgetName } = await import("./widget-helpers.js");
+      const widget = widgets.find(
+        (w) => slugifyWidgetName(w.name) === slugifiedNameFromUrl
+      );
+
+      if (widget) {
+        // If requesting the root of a widget, serve its index.html
+        // Use slugified name for URL paths
+        const relativePath = pathname.replace(baseRoute, "");
+        if (
+          relativePath === `/${slugifiedNameFromUrl}` ||
+          relativePath === `/${slugifiedNameFromUrl}/`
+        ) {
+          // Rewrite the URL for Vite by creating a new request with modified URL
+          const newUrl = new URL(c.req.url);
+          newUrl.pathname = `${baseRoute}/${slugifiedNameFromUrl}/index.html`;
+          // Create a new request with modified URL and update the context
+          const newRequest = new Request(newUrl.toString(), c.req.raw);
+          // Update the request in the context by creating a new context-like object
+          Object.defineProperty(c, "req", {
+            value: {
+              ...c.req,
+              url: newUrl.toString(),
+              raw: newRequest,
+            },
+            writable: false,
+            configurable: true,
+          });
+        }
+      }
+    }
+
+    await next();
+  });
+
+  // Mount the single Vite server for all widgets using adapter
+  const viteMiddleware = await adaptConnectMiddleware(
+    viteServer.middlewares,
+    `${baseRoute}/*`
+  );
+  app.use(`${baseRoute}/*`, viteMiddleware);
+
+  // Serve static files from public directory in dev mode
+  // Only set up if not already configured (e.g., in constructor)
+  if (!serverConfig.publicRoutesMode) {
+    setupPublicRoutes(app, false);
+    setupFaviconRoute(app, serverConfig.favicon, false);
+  }
+
+  // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware
+  // (like the inspector) which might intercept the request and return the wrong content
+  app.use(`${baseRoute}/*`, async (c: Context) => {
+    const url = new URL(c.req.url);
+    // Check if it's an asset request
+    const isAsset = url.pathname.match(
+      /\.(js|css|png|jpg|jpeg|svg|json|ico|woff2?|tsx?)$/i
+    );
+
+    // For assets or any unhandled request, return a clean 404
+    // This prevents fall-through to inspector middleware
+    const message = isAsset ? "Widget asset not found" : "Widget not found";
+    return c.text(message, 404);
+  });
+
+  for (const widget of widgets) {
+    const slugifiedName = slugifyWidgetName(widget.name);
+    console.log(
+      `[WIDGET] ${widget.name} mounted at ${baseRoute}/${slugifiedName}`
+    );
+  }
+
+  // register a tool and resource for each widget
+  for (const widget of widgets) {
+    // Extract metadata from the widget file using Vite SSR
+    let metadata: WidgetMetadata = {};
+
+    try {
+      const mod = await viteServer.ssrLoadModule(widget.entry);
+      if (mod.widgetMetadata) {
+        metadata = mod.widgetMetadata as WidgetMetadata;
+
+        // Handle props field (preferred) or inputs field (deprecated) for Zod schema
+        const schemaField = metadata.props || metadata.inputs;
+        if (schemaField) {
+          try {
+            // Pass the full Zod schema object directly (don't extract .shape)
+            // The SDK's normalizeObjectSchema() can handle both complete Zod schemas
+            // and raw shapes, so we preserve the full schema here
+            metadata.props = schemaField;
+            // Also set inputs as alias for backward compatibility
+            if (!metadata.inputs) {
+              metadata.inputs = schemaField;
+            }
+          } catch (error) {
+            console.warn(
+              `[WIDGET] Failed to extract schema for ${widget.name}:`,
+              error
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[WIDGET] Failed to load metadata for ${widget.name}:`,
+        error
+      );
+    }
+
+    // Enrich CSP with server origin and dev defaults (ws, unsafe-eval) for initial registration.
+    // Same logic as extractAndRegisterWidget - the initial loop bypassed this before.
+    const enrichedCspMetadata = enrichWidgetMetadataForDev(
+      metadata.metadata,
+      serverConfig.serverBaseUrl
+    );
+
+    const metadataToRegister = {
+      ...metadata,
+      metadata: metadata.metadata
+        ? (enrichedCspMetadata ?? metadata.metadata)
+        : undefined,
+      ...(metadata.description ? {} : { description: widget.description }),
+    } as Record<string, unknown>;
+
+    // Use the extracted helper to register the widget
+    const slugifiedName = slugifyWidgetName(widget.name);
+    await warmWidgetEntry.current(widget.name, "initial-registration");
+    await registerWidgetFromTemplate(
+      widget.name,
+      pathHelpers.join(tempDir, slugifiedName, "index.html"),
+      metadataToRegister,
+      serverConfig,
+      registerWidget,
+      true // isDev
+    );
+  }
+}

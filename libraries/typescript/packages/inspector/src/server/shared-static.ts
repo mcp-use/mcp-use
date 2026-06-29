@@ -9,12 +9,21 @@ import {
 import { getInspectorVersion } from "./version.js";
 
 // ---------------------------------------------------------------------------
-// CDN mode (opt-in)
-// Set INSPECTOR_USE_CDN=true to serve the inspector shell from CDN instead of
-// local dist/web/ files. Defaults to false so existing tests and workflows are
-// unaffected until the CDN is deployed and validated end-to-end.
+// CDN mode (production default)
+// Production (NODE_ENV=production) serves a minimal HTML shell that loads the
+// inspector bundle from CDN. Set INSPECTOR_USE_CDN=false for offline/air-gapped
+// installs that serve dist/web/ locally. Set INSPECTOR_USE_CDN=true to force CDN
+// in non-production environments (e.g. e2e matrix tests with NODE_ENV=test).
 // ---------------------------------------------------------------------------
-const USE_CDN = process.env.INSPECTOR_USE_CDN === "true";
+export function resolveInspectorUseCdn(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (env.INSPECTOR_USE_CDN === "false") return false;
+  if (env.INSPECTOR_USE_CDN === "true") return true;
+  return env.NODE_ENV === "production";
+}
+
+const USE_CDN = resolveInspectorUseCdn();
 
 // Version is embedded at build time — works regardless of where cli.js is
 // located in the installed package (avoids path-traversal bugs when bundled).
@@ -25,7 +34,6 @@ const INSPECTOR_VERSION = getInspectorVersion();
 const CDN_BASE =
   process.env.INSPECTOR_CDN_BASE ?? "https://inspector-cdn.mcp-use.com";
 const CDN_JS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.js`;
-const CDN_CSS_URL = `${CDN_BASE}/inspector@${INSPECTOR_VERSION}.css`;
 
 /**
  * Inspector deployment mode. Identifies how the inspector is being served so the
@@ -183,7 +191,6 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
       href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="${CDN_CSS_URL}" />
     <title>Inspector | mcp-use</title>
     <meta
       name="description"
@@ -241,11 +248,12 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
 /**
  * Register routes that serve the inspector client.
  *
- * Default (INSPECTOR_USE_CDN unset or "false"): serves built files from
- * dist/web/ exactly as before.
+ * Production default: serves a minimal inline HTML shell that loads the
+ * inspector bundle from CDN (CSS is injected by the JS bundle).
  *
- * Opt-in (INSPECTOR_USE_CDN=true): serves a minimal inline HTML shell that
- * loads the inspector bundle from CDN. No local file reads at request time.
+ * Offline override (INSPECTOR_USE_CDN=false): serves built files from
+ * dist/web/. Dev (NODE_ENV !== production) also serves dist/web/ unless
+ * INSPECTOR_USE_CDN=true is set explicitly.
  */
 export function registerStaticRoutes(
   app: Hono,

@@ -1,11 +1,43 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MCPServer } from "../../../src/server/mcp-server.js";
 import {
-  widget,
+  view,
   text,
   object,
 } from "../../../src/server/utils/response-helpers.js";
 import { z } from "zod";
+
+type ToolCallResult = {
+  content: Array<{ type: string; text?: string }>;
+  structuredContent?: Record<string, unknown>;
+};
+
+type RegisteredTool =
+  MCPServer["registrations"]["tools"] extends Map<string, infer T> ? T : never;
+type ToolContextArg = Parameters<RegisteredTool["handler"]>[1];
+
+async function callRegisteredTool(
+  server: MCPServer,
+  name: string,
+  params: Record<string, unknown>
+): Promise<ToolCallResult> {
+  const toolHandler = server.registrations.tools.get(name);
+  expect(toolHandler).toBeDefined();
+  return (await toolHandler!.handler(
+    params,
+    {} as ToolContextArg
+  )) as ToolCallResult;
+}
+
+function firstText(result: ToolCallResult): string | undefined {
+  return result.content[0]?.text;
+}
+
+function outputTemplateFor(server: MCPServer, toolName: string): unknown {
+  return server.registrations.tools.get(toolName)?.config._meta?.[
+    "openai/outputTemplate"
+  ];
+}
 
 describe("Widget Data Flow", () => {
   let server: MCPServer;
@@ -56,22 +88,17 @@ describe("Widget Data Flow", () => {
         }
       );
 
-      // Call the tool
-      const toolHandler = server.registrations.tools.get("get-weather");
-      expect(toolHandler).toBeDefined();
-
-      const result = await toolHandler!.handler(
-        { city: "London", temp: 15 },
-        {} as any
-      );
+      await callRegisteredTool(server, "get-weather", {
+        city: "London",
+        temp: 15,
+      });
 
       // Per SEP-1865: outputTemplate is on tool definition, not on result
-      const toolReg = server.registrations.tools.get("get-weather");
-      const outputTemplate = (toolReg?.config as any)?._meta?.[
-        "openai/outputTemplate"
-      ];
+      const outputTemplate = outputTemplateFor(server, "get-weather");
       expect(outputTemplate).toBeDefined();
-      expect(outputTemplate).toMatch(/ui:\/\/widget\/test-widget/);
+      expect(outputTemplate).toEqual(
+        expect.stringMatching(/ui:\/\/widget\/test-widget/)
+      );
     });
   });
 
@@ -112,7 +139,7 @@ describe("Widget Data Flow", () => {
             name: `User ${i + 1}`,
           }));
 
-          return widget({
+          return view({
             props: {
               rows,
               tableName,
@@ -124,29 +151,24 @@ describe("Widget Data Flow", () => {
         }
       );
 
-      // Call the tool
-      const toolHandler = server.registrations.tools.get("get-table-data");
-      expect(toolHandler).toBeDefined();
-
-      const result = await toolHandler!.handler(
-        { tableName: "users" },
-        {} as any
-      );
+      const result = await callRegisteredTool(server, "get-table-data", {
+        tableName: "users",
+      });
 
       // Verify response structure
-      expect((result.content as any)[0]?.text).toBe(
-        "Retrieved 100 rows from users table"
-      );
+      expect(firstText(result)).toBe("Retrieved 100 rows from users table");
       // Per SEP-1865: widget props go in structuredContent, outputTemplate on tool definition
-      expect((result as any).structuredContent).toBeDefined();
-      expect((result as any).structuredContent.rows).toHaveLength(100);
-      expect((result as any).structuredContent.tableName).toBe("users");
+      const structuredContent = result.structuredContent as
+        | { rows: unknown[]; tableName: string }
+        | undefined;
+      expect(structuredContent).toBeDefined();
+      expect(structuredContent?.rows).toHaveLength(100);
+      expect(structuredContent?.tableName).toBe("users");
 
-      const toolReg = server.registrations.tools.get("get-table-data");
-      const outputTemplate = (toolReg?.config as any)?._meta?.[
-        "openai/outputTemplate"
-      ];
-      expect(outputTemplate).toMatch(/ui:\/\/widget\/table-widget/);
+      const outputTemplate = outputTemplateFor(server, "get-table-data");
+      expect(outputTemplate).toEqual(
+        expect.stringMatching(/ui:\/\/widget\/table-widget/)
+      );
     });
   });
 
@@ -184,28 +206,21 @@ describe("Widget Data Flow", () => {
           const items = [1, 2, 3];
           const total = 100;
 
-          return widget({
+          return view({
             props: { items, total, category },
             message: `Found ${total} items in ${category}`,
           });
         }
       );
 
-      // Call the tool
-      const toolHandler = server.registrations.tools.get("get-items");
-      expect(toolHandler).toBeDefined();
-
-      const result = await toolHandler!.handler(
-        { category: "electronics" },
-        {} as any
-      );
+      const result = await callRegisteredTool(server, "get-items", {
+        category: "electronics",
+      });
 
       // Verify response structure
-      expect((result.content as any)[0]?.text).toBe(
-        "Found 100 items in electronics"
-      );
+      expect(firstText(result)).toBe("Found 100 items in electronics");
       // Per SEP-1865: widget props go in structuredContent
-      expect((result as any).structuredContent).toEqual({
+      expect(result.structuredContent).toEqual({
         items: [1, 2, 3],
         total: 100,
         category: "electronics",
@@ -244,7 +259,7 @@ describe("Widget Data Flow", () => {
           },
         },
         async ({ query }) => {
-          return widget({
+          return view({
             props: {
               results: ["result1", "result2"],
               metadata: { page: 1, total: 50 },
@@ -257,24 +272,22 @@ describe("Widget Data Flow", () => {
         }
       );
 
-      // Call the tool
-      const toolHandler = server.registrations.tools.get("search");
-      expect(toolHandler).toBeDefined();
-
-      const result = await toolHandler!.handler(
-        { query: "test query" },
-        {} as any
-      );
+      const result = await callRegisteredTool(server, "search", {
+        query: "test query",
+      });
 
       // Verify response structure - object should be stringified in content
-      const parsedOutput = JSON.parse((result.content as any)[0]?.text);
+      const parsedOutput = JSON.parse(firstText(result) || "{}") as {
+        summary?: string;
+        count?: number;
+      };
       expect(parsedOutput.summary).toBe(
         'Search for "test query" returned 50 results'
       );
       expect(parsedOutput.count).toBe(50);
 
       // When output has structuredContent, it takes precedence over props
-      expect((result as any).structuredContent).toEqual({
+      expect(result.structuredContent).toEqual({
         summary: 'Search for "test query" returned 50 results',
         count: 50,
       });
@@ -310,23 +323,21 @@ describe("Widget Data Flow", () => {
           },
         },
         async ({ id }) => {
-          return widget({
+          return view({
             props: { id, value: "test" },
             message: "Legacy message format", // Deprecated but should still work
           });
         }
       );
 
-      // Call the tool
-      const toolHandler = server.registrations.tools.get("legacy-tool");
-      expect(toolHandler).toBeDefined();
-
-      const result = await toolHandler!.handler({ id: "123" }, {} as any);
+      const result = await callRegisteredTool(server, "legacy-tool", {
+        id: "123",
+      });
 
       // Verify response structure
-      expect((result.content as any)[0]?.text).toBe("Legacy message format");
+      expect(firstText(result)).toBe("Legacy message format");
       // Per SEP-1865: widget props go in structuredContent
-      expect((result as any).structuredContent).toEqual({
+      expect(result.structuredContent).toEqual({
         id: "123",
         value: "test",
       });
@@ -360,7 +371,7 @@ describe("Widget Data Flow", () => {
           },
         },
         async ({ value }) => {
-          return widget({
+          return view({
             props: { value },
             message: "This should be used (message takes precedence)",
             output: text("This should be ignored"),
@@ -368,14 +379,12 @@ describe("Widget Data Flow", () => {
         }
       );
 
-      // Call the tool
-      const toolHandler = server.registrations.tools.get("priority-tool");
-      expect(toolHandler).toBeDefined();
-
-      const result = await toolHandler!.handler({ value: 42 }, {} as any);
+      const result = await callRegisteredTool(server, "priority-tool", {
+        value: 42,
+      });
 
       // Verify message takes precedence over output.content
-      expect((result.content as any)[0]?.text).toBe(
+      expect(firstText(result)).toBe(
         "This should be used (message takes precedence)"
       );
     });
@@ -404,18 +413,19 @@ describe("Widget Data Flow", () => {
           widget: { name: "text-helper-widget" },
         },
         async ({ count }) => {
-          return widget({
+          return view({
             props: { items: Array(count).fill(0), count },
             output: text(`Found ${count} items`),
           });
         }
       );
 
-      const toolHandler = server.registrations.tools.get("text-tool");
-      const result = await toolHandler!.handler({ count: 5 }, {} as any);
+      const result = await callRegisteredTool(server, "text-tool", {
+        count: 5,
+      });
 
-      expect((result.content as any)[0]?.text).toBe("Found 5 items");
-      expect((result as any).structuredContent.count).toBe(5);
+      expect(firstText(result)).toBe("Found 5 items");
+      expect(result.structuredContent?.count).toBe(5);
     });
 
     it("should support object() helper as output", async () => {
@@ -440,21 +450,25 @@ describe("Widget Data Flow", () => {
           widget: { name: "object-helper-widget" },
         },
         async ({ id }) => {
-          return widget({
+          return view({
             props: { fullData: { id, value: "data" } },
             output: object({ summary: `ID: ${id}`, status: "success" }),
           });
         }
       );
 
-      const toolHandler = server.registrations.tools.get("object-tool");
-      const result = await toolHandler!.handler({ id: "abc123" }, {} as any);
+      const result = await callRegisteredTool(server, "object-tool", {
+        id: "abc123",
+      });
 
-      const parsedOutput = JSON.parse((result.content as any)[0]?.text);
+      const parsedOutput = JSON.parse(firstText(result) || "{}") as {
+        summary?: string;
+        status?: string;
+      };
       expect(parsedOutput.summary).toBe("ID: abc123");
       expect(parsedOutput.status).toBe("success");
       // When output has structuredContent, it takes precedence over props
-      expect((result as any).structuredContent).toEqual({
+      expect(result.structuredContent).toEqual({
         summary: "ID: abc123",
         status: "success",
       });
@@ -484,18 +498,19 @@ describe("Widget Data Flow", () => {
         async ({ type }) => {
           const data = { records: [1, 2, 3], type };
           // Generate output based on data
-          return widget({
+          return view({
             props: data,
             output: text(`${data.type}: ${data.records.length} records`),
           });
         }
       );
 
-      const toolHandler = server.registrations.tools.get("function-tool");
-      const result = await toolHandler!.handler({ type: "users" }, {} as any);
+      const result = await callRegisteredTool(server, "function-tool", {
+        type: "users",
+      });
 
-      expect((result.content as any)[0]?.text).toBe("users: 3 records");
-      expect((result as any).structuredContent.type).toBe("users");
+      expect(firstText(result)).toBe("users: 3 records");
+      expect(result.structuredContent?.type).toBe("users");
     });
   });
 });

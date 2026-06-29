@@ -15,6 +15,8 @@ Open [http://localhost:3000/inspector](http://localhost:3000/inspector) with you
 
 You can start building by editing the entry file. Add tools, resources, and prompts — the server auto-reloads as you edit.
 
+Project settings live in the root `mcp-use.json`.
+
 ## Learn More
 
 To learn more about mcp-use and MCP:

@@ -8,22 +8,21 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  expectPostHogEvent,
+  flushPostHogTelemetry,
+  installTelemetryFetchMock,
+  restoreTelemetryFetchMock,
+} from "./telemetry-test-utils.js";
+import { BaseConnector } from "../../../src/connectors/base.js";
 
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
-
-// Mock PostHog before importing Telemetry (same pattern as telemetry.test.ts)
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+type MockToolCall = Record<string, unknown>;
+type MockLlm = {
+  invoke: ReturnType<typeof vi.fn>;
+  stream: ReturnType<typeof vi.fn>;
+  _llm_type: string;
+  modelName: string;
+};
 
 // Mock fs module
 vi.mock("node:fs", () => ({
@@ -77,8 +76,10 @@ vi.mock("langchain", () => ({
   },
   AIMessage: class {
     content: string;
-    tool_calls: any[];
-    constructor(content: string | { content: string; tool_calls?: any[] }) {
+    tool_calls: MockToolCall[];
+    constructor(
+      content: string | { content: string; tool_calls?: MockToolCall[] }
+    ) {
       if (typeof content === "string") {
         this.content = content;
         this.tool_calls = [];
@@ -159,16 +160,21 @@ vi.mock("../../../src/observability/index.js", () => ({
 }));
 
 // Mock BaseConnector
-class MockConnector {
-  publicIdentifier = "mock-connector";
-  isClientConnected = true;
+class MockConnector extends BaseConnector {
+  constructor(private identifier = "mock-connector") {
+    super();
+  }
+
+  get publicIdentifier(): Record<string, string> {
+    return { name: this.identifier };
+  }
+
   connect = vi.fn().mockResolvedValue(undefined);
-  disconnect = vi.fn().mockResolvedValue(undefined);
   listTools = vi.fn().mockResolvedValue([]);
 }
 
 describe("MCPAgent Telemetry Integration", () => {
-  let mockLlm: any;
+  let mockLlm: MockLlm;
   let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
@@ -177,7 +183,7 @@ describe("MCPAgent Telemetry Integration", () => {
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
     vi.resetModules();
     vi.clearAllMocks();
-    mockCapture.mockClear();
+    installTelemetryFetchMock();
 
     // Create a minimal mock LLM
     mockLlm = {
@@ -192,9 +198,11 @@ describe("MCPAgent Telemetry Integration", () => {
     };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await flushPostHogTelemetry();
     // Restore original environment
     process.env = originalEnv;
+    restoreTelemetryFetchMock();
     vi.clearAllMocks();
   });
 
@@ -205,7 +213,7 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
         maxSteps: 5,
         memoryEnabled: true,
       });
@@ -213,15 +221,10 @@ describe("MCPAgent Telemetry Integration", () => {
       await agent.initialize();
 
       // Run the agent
-      const result = await agent.run("test query");
+      await agent.run("test query");
 
-      // Verify telemetry was tracked via PostHog capture
-      expect(mockCapture).toHaveBeenCalled();
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         execution_method: "stream",
         query: "test query",
         success: true,
@@ -236,27 +239,23 @@ describe("MCPAgent Telemetry Integration", () => {
       const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
 
       const connector1 = new MockConnector();
-      const connector2 = new MockConnector();
-      connector2.publicIdentifier = "mock-connector-2";
+      const connector2 = new MockConnector("mock-connector-2");
 
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector1 as any, connector2 as any],
+        connectors: [connector1, connector2],
         maxSteps: 3,
       });
 
       await agent.initialize();
       await agent.run("test query");
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         server_count: 2,
         server_identifiers: expect.arrayContaining([
-          "mock-connector",
-          "mock-connector-2",
+          { name: "mock-connector" },
+          { name: "mock-connector-2" },
         ]),
       });
     });
@@ -267,17 +266,14 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       await agent.initialize();
       await agent.run("test query");
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         total_tools_available: expect.any(Number),
         tools_available_names: expect.any(Array),
       });
@@ -289,24 +285,19 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       await agent.initialize();
       await agent.run("test query");
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         execution_time_ms: expect.any(Number),
       });
 
       // Verify execution time is reasonable (> 0)
-      expect(
-        captureCall[0].properties.execution_time_ms
-      ).toBeGreaterThanOrEqual(0);
+      expect(event.properties.execution_time_ms).toBeGreaterThanOrEqual(0);
     });
 
     it("should track manageConnector parameter", async () => {
@@ -315,17 +306,14 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       await agent.initialize();
       await agent.run("test query", undefined, false);
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         manage_connector: false,
       });
     });
@@ -337,7 +325,7 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       await agent.initialize();
@@ -349,11 +337,8 @@ describe("MCPAgent Telemetry Integration", () => {
 
       await agent.run("test query", undefined, true, externalHistory);
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         external_history_used: true,
       });
     });
@@ -364,18 +349,15 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
         memoryEnabled: true,
       });
 
       await agent.initialize();
       await agent.run("first query");
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         conversation_history_length: expect.any(Number),
       });
     });
@@ -388,7 +370,7 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
         maxSteps: 5,
       });
 
@@ -400,12 +382,8 @@ describe("MCPAgent Telemetry Integration", () => {
         events.push(event);
       }
 
-      // Verify telemetry was tracked with streamEvents method
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         execution_method: "streamEvents",
         query: "test query",
         success: true,
@@ -418,7 +396,7 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       await agent.initialize();
@@ -428,11 +406,8 @@ describe("MCPAgent Telemetry Integration", () => {
         // Just consume events
       }
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties.response).toContain("STREAMED RESPONSE");
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties.response).toContain("STREAMED RESPONSE");
     });
   });
 
@@ -443,7 +418,7 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       // Don't initialize - this should cause an error
@@ -466,18 +441,15 @@ describe("MCPAgent Telemetry Integration", () => {
       const client = new MCPClient();
       const agent = new MCPAgent({
         llm: mockLlm,
-        client: client as any,
+        client,
         useServerManager: false,
       });
 
       await agent.initialize();
       await agent.run("test query");
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         use_server_manager: false,
       });
     });
@@ -490,17 +462,14 @@ describe("MCPAgent Telemetry Integration", () => {
       const connector = new MockConnector();
       const agent = new MCPAgent({
         llm: mockLlm,
-        connectors: [connector as any],
+        connectors: [connector],
       });
 
       await agent.initialize();
       await agent.run("test query");
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcp_agent_execution"
-      );
-      expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      const event = await expectPostHogEvent("mcp_agent_execution");
+      expect(event.properties).toMatchObject({
         model_provider: "openai",
         model_name: "gpt-4",
       });

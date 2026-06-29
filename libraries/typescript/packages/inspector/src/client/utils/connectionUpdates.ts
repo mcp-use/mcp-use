@@ -58,7 +58,7 @@ function getAutoProxyFallbackAddress(
 interface ConnectionLike {
   url?: string;
   name?: string;
-  transportType?: "http" | "sse";
+  transportType?: "http";
   connectionMode?: ConnectionMode;
   connectionType?: "Direct" | "Via Proxy";
   proxyConfig?: {
@@ -75,7 +75,7 @@ interface ConnectionLike {
 export interface EditableConnectionConfig {
   url: string;
   name?: string;
-  transportType: "http" | "sse";
+  transportType: "http";
   connectionMode?: ConnectionMode;
   connectionType?: "Direct" | "Via Proxy";
   proxyConfig?: {
@@ -150,7 +150,7 @@ function normalizeConnection(
 ): {
   url: string;
   name: string;
-  transportType: "http" | "sse";
+  transportType: "http";
   proxyAddress: string;
   connectionMode: ConnectionMode;
   headers: Record<string, string>;

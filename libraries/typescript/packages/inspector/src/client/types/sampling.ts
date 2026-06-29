@@ -1,7 +1,7 @@
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 export interface PendingSamplingRequest {
   id: string;

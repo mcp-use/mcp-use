@@ -1,10 +1,10 @@
 // browser-provider.ts
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
   OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 import { sanitizeUrl } from "../utils/url-sanitize.js";
 import { LocalStorageKVStore } from "./kv-store.js";
 import { OAuthSessionStore } from "./oauth-session-store.js";

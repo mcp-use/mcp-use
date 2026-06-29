@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
+    setupFiles: ["./tests/setup-jsdom.ts"],
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     exclude: ["node_modules/**", "dist/**", "tests/deno/**"],
     coverage: {

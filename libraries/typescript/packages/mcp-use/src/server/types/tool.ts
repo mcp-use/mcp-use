@@ -1,5 +1,4 @@
-import type { InputDefinition } from "./common.js";
-import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/server";
 import type { ToolContext } from "./tool-context.js";
 import type { McpContext } from "./context.js";
 import type { z } from "zod";
@@ -7,6 +6,7 @@ import type {
   ToolContentResult,
   TypedCallToolResult,
 } from "../utils/response-helpers.js";
+import type { AuthRequirement } from "../oauth/types.js";
 
 // Re-export MCP SDK types for convenience
 export type { ToolAnnotations };
@@ -128,7 +128,7 @@ interface ToolCallbackBivariant<
  * ```
  */
 export type ToolCallback<
-  TInput = Record<string, any>,
+  TInput = Record<string, unknown>,
   TOutput extends Record<string, unknown> = Record<string, unknown>,
   HasOAuth extends boolean = false,
 > = ToolCallbackBivariant<TInput, TOutput, HasOAuth>["bivarianceHack"];
@@ -138,7 +138,7 @@ export type ToolCallback<
  * This variant always requires the context parameter.
  */
 export type ToolCallbackWithContext<
-  TInput = Record<string, any>,
+  TInput = Record<string, unknown>,
   TOutput extends Record<string, unknown> = Record<string, unknown>,
   HasOAuth extends boolean = false,
 > = (
@@ -156,8 +156,8 @@ export type ToolCallbackWithContext<
 export type InferToolInput<T> = T extends { schema: infer S }
   ? S extends z.ZodTypeAny
     ? z.infer<S>
-    : Record<string, any>
-  : Record<string, any>;
+    : Record<string, unknown>
+  : Record<string, unknown>;
 
 /**
  * Extract output type from a tool definition's output schema
@@ -169,9 +169,9 @@ export type InferToolOutput<T> = T extends { outputSchema: infer S }
   : Record<string, unknown>;
 
 export interface ToolDefinition<
-  TInput = Record<string, any>,
-  TOutput extends Record<string, unknown> = Record<string, unknown>,
-  HasOAuth extends boolean = false,
+  _TInput = Record<string, unknown>,
+  _TOutput extends Record<string, unknown> = Record<string, unknown>,
+  _HasOAuth extends boolean = false,
 > {
   /**
    * Unique identifier for the tool .
@@ -195,56 +195,39 @@ export interface ToolDefinition<
    * @example "Search products by query and display results in a visual widget"
    */
   description?: string;
-  /** Input parameter definitions (legacy, use schema instead) */
-  /** @deprecated Use schema instead */
-  inputs?: InputDefinition[];
   /**
-   * Zod schema for input validation. Use .describe() on each field for LLM hints.
-   * Preferred over inputs for type safety and better model guidance.
+   * Zod schema for input validation.
+   *
+   * This is the mcp-use public authoring API. Internally, the SDK bridge converts
+   * it to the official SDK `inputSchema` shape, so application code should not
+   * import SDK schema helpers just to define normal tools. Use `.describe()` on
+   * each field for LLM-facing hints.
    *
    * @example z.object({ query: z.string().describe("Search term"), limit: z.number().optional().describe("Max results") })
    */
   schema?: z.ZodTypeAny;
   /**
-   * Zod schema for structured output. Enables type inference in useCallTool().
-   * Types are generated to .mcp-use/tool-registry.d.ts when using mcp-use dev.
+   * Zod schema for structured output.
+   *
+   * Enables `ToolRef` / `useCallTool(toolRef)` inference in the zero-codegen path.
+   * Generated registries are a secondary path for string-name or cross-package
+   * clients and should be produced explicitly under `.mcp-use/generated/`.
    *
    * @example z.object({ fruit: z.string(), color: z.string(), facts: z.array(z.string()) })
    */
   outputSchema?: z.ZodTypeAny;
-  /**
-   * Async callback function that executes the tool.
-   * Receives tool parameters and an enhanced context with sampling, auth, and request info.
-   *
-   * @example
-   * ```typescript
-   * // Simple tool without context
-   * cb: async ({ name }) => ({
-   *   content: [{ type: 'text', text: `Hello, ${name}!` }]
-   * })
-   *
-   * // Tool with sampling support
-   * cb: async ({ text }, ctx) => {
-   *   const result = await ctx.sample({
-   *     messages: [{ role: 'user', content: { type: 'text', text } }]
-   *   });
-   *   return { content: result.content };
-   * }
-   *
-   * // Tool with authentication
-   * cb: async ({ userId }, ctx) => {
-   *   return { content: [{ type: 'text', text: `User: ${ctx.auth.user.email}` }] };
-   * }
-   * ```
-   */
-  cb?: ToolCallback<TInput, TOutput, HasOAuth>;
   /** Tool annotations */
   annotations?: ToolAnnotations;
+  /** Optional authorization requirement enforced on tools/list and tools/call */
+  auth?: AuthRequirement;
   /** Metadata for the tool */
   _meta?: Record<string, unknown>;
   /**
-   * Configuration for tools that return a widget via the widget() helper.
-   * Sets up all the required metadata at registration time for proper widget rendering.
+   * Configuration for tools that return a view via the legacy `widget()` helper.
+   *
+   * Direct inline JSX returns are the first-class V2 path. Keep this option for
+   * explicit file-based views, migration, or advanced cases where the framework
+   * cannot infer the view from the returned component.
    *
    * @example
    * ```typescript

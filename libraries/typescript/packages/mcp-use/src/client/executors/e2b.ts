@@ -1,10 +1,42 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import type { E2BExecutorOptions, MCPClient } from "../../client.js";
 import { logger } from "../../logging.js";
 import { BaseCodeExecutor, type ExecutionResult } from "./base.js";
 
-// Dynamic import type for E2B Sandbox
-type Sandbox = any;
+interface E2BSandbox {
+  files: {
+    write(path: string, content: string): Promise<void>;
+  };
+  commands: {
+    run(
+      command: string,
+      options: {
+        timeoutMs: number;
+        onStdout?: (data: string) => Promise<void> | void;
+      }
+    ): Promise<{
+      stdout: string;
+      stderr: string;
+      exitCode: number;
+    }>;
+  };
+  kill(): Promise<void>;
+}
+
+interface E2BSandboxConstructor {
+  create(
+    template: string,
+    options: { apiKey: string; timeoutMs: number }
+  ): Promise<E2BSandbox>;
+}
+
+type ToolCallMessage = {
+  type: "__MCP_TOOL_CALL__";
+  id: string;
+  server: string;
+  tool: string;
+  args?: Record<string, unknown>;
+};
 
 /**
  * E2B-based code executor using remote sandboxes.
@@ -12,8 +44,8 @@ type Sandbox = any;
  */
 export class E2BCodeExecutor extends BaseCodeExecutor {
   private e2bApiKey: string;
-  private codeExecSandbox: Sandbox | null = null;
-  private SandboxClass: any = null;
+  private codeExecSandbox: E2BSandbox | null = null;
+  private SandboxClass: E2BSandboxConstructor | null = null;
   private timeoutMs: number;
 
   constructor(client: MCPClient, options: E2BExecutorOptions) {
@@ -31,7 +63,9 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
 
     try {
       // @ts-ignore - Optional dependency, may not be installed
-      const e2b = await import("@e2b/code-interpreter");
+      const e2b = (await import("@e2b/code-interpreter")) as {
+        Sandbox: E2BSandboxConstructor;
+      };
       this.SandboxClass = e2b.Sandbox;
     } catch (error) {
       throw new Error(
@@ -45,10 +79,13 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
   /**
    * Get or create a dedicated sandbox for code execution.
    */
-  private async getOrCreateCodeExecSandbox(): Promise<Sandbox> {
+  private async getOrCreateCodeExecSandbox(): Promise<E2BSandbox> {
     if (this.codeExecSandbox) return this.codeExecSandbox;
 
     await this.ensureSandboxClass();
+    if (!this.SandboxClass) {
+      throw new Error("E2B Sandbox class failed to load");
+    }
     logger.debug("Starting E2B sandbox for code execution...");
 
     this.codeExecSandbox = await this.SandboxClass.create("base", {
@@ -180,7 +217,7 @@ if ('${safeServerName}' !== '${serverName}') {
    */
   async execute(code: string, timeout = 30000): Promise<ExecutionResult> {
     const startTime = Date.now();
-    let result: any = null;
+    let result: unknown = null;
     let error: string | null = null;
     let logs: string[] = [];
 
@@ -228,10 +265,13 @@ ${shim}
             const lines = data.split("\n");
             for (const line of lines) {
               if (line.trim().startsWith('{"type":"__MCP_TOOL_CALL__"')) {
-                const call = JSON.parse(line);
+                const call = JSON.parse(line) as Partial<ToolCallMessage>;
                 if (call.type === "__MCP_TOOL_CALL__") {
                   // Execute tool on host
                   try {
+                    if (!call.id || !call.server || !call.tool) {
+                      throw new Error("Malformed MCP tool call from sandbox");
+                    }
                     logger.debug(
                       `[E2B Bridge] Calling tool ${call.server}.${call.tool}`
                     );
@@ -246,16 +286,16 @@ ${shim}
 
                     const toolResult = await session.connector.callTool(
                       call.tool,
-                      call.args
+                      call.args ?? {}
                     );
 
                     // Extract result from MCP response
-                    let extractedResult: any = toolResult;
+                    let extractedResult: unknown = toolResult;
                     if (toolResult.content && toolResult.content.length > 0) {
                       const item = toolResult.content[0];
                       if (item.type === "text") {
                         try {
-                          extractedResult = JSON.parse(item.text);
+                          extractedResult = JSON.parse(item.text ?? "");
                         } catch {
                           extractedResult = item.text;
                         }
@@ -270,16 +310,18 @@ ${shim}
                       resultPath,
                       JSON.stringify({ data: extractedResult })
                     );
-                  } catch (err: any) {
+                  } catch (err: unknown) {
+                    const message =
+                      err instanceof Error ? err.message : String(err);
                     logger.error(
-                      `[E2B Bridge] Tool execution failed: ${err.message}`
+                      `[E2B Bridge] Tool execution failed: ${message}`
                     );
                     // Write error back to sandbox
                     const resultPath = `/tmp/mcp_result_${call.id}.json`;
                     await sandbox.files.write(
                       resultPath,
                       JSON.stringify({
-                        error: err.message || String(err),
+                        error: message,
                       })
                     );
                   }
@@ -329,8 +371,8 @@ ${shim}
           });
         }
       }
-    } catch (e: any) {
-      error = e.message || String(e);
+    } catch (e: unknown) {
+      error = e instanceof Error ? e.message : String(e);
 
       // Check for timeout
       if (error && (error.includes("timeout") || error.includes("timed out"))) {

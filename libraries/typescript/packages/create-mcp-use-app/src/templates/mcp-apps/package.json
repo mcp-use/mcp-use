@@ -8,24 +8,20 @@
   "keywords": [
     "mcp",
     "server",
-    "starter",
     "tools",
+    "inline-jsx",
     "resources",
-    "prompts",
-    "uiresource",
-    "ui",
     "react",
     "widgets",
-    "mcp-ui",
     "apps-sdk"
   ],
-  "main": "dist/index.js",
+  "main": ".mcp-use/build/server/index.js",
   "scripts": {
     "build": "mcp-use build",
     "dev": "mcp-use dev",
     "start": "mcp-use start",
     "deploy": "mcp-use deploy",
-    "postinstall": "mcp-use generate-types || exit 0"
+    "check": "mcp-use check"
   },
   "dependencies": {
     "@openai/apps-sdk-ui": "^0.2.1",
@@ -40,7 +36,7 @@
     "@types/node": "^25.3.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "tsx": "^4.21.0"
   }
 }

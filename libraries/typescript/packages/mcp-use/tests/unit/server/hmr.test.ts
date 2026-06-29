@@ -434,7 +434,7 @@ describe("HMR - syncRegistrationsFrom", () => {
   });
 
   describe("Error Handling", () => {
-    it("should handle injection errors gracefully and log error", () => {
+    it("should handle missing SDK-private injection maps gracefully", () => {
       const mockSession = {
         id: "bad-session",
         server: {} as any, // Missing _registeredTools
@@ -460,14 +460,11 @@ describe("HMR - syncRegistrationsFrom", () => {
         server.syncRegistrationsFrom(otherServer);
       }).not.toThrow();
 
-      // Verify error was logged (syncPrimitive format)
+      // Missing SDK-private maps are tolerated as a no-op. This can happen
+      // when the SDK changes internals or a session mock only implements the
+      // public surface; HMR should never crash the dev server for that.
       const errors = getErrors();
-      expect(
-        errors.some((log) =>
-          log.includes('[HMR] Failed to add Tools "tool-to-fail"')
-        )
-      ).toBe(true);
-      expect(errors.some((log) => log.includes("bad-session"))).toBe(true);
+      expect(errors).toEqual([]);
     });
   });
 

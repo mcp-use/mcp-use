@@ -91,7 +91,7 @@ interface MCPServerConnectionEventData {
   serverId: string;
   serverUrl: string;
   success: boolean;
-  connectionType?: "http" | "sse";
+  connectionType?: "http";
   error?: string;
 }
 
@@ -144,7 +144,7 @@ export class MCPChatMessageEvent implements BaseTelemetryEvent {
 interface MCPServerAddedEventData {
   serverId: string;
   serverUrl: string;
-  connectionType?: "http" | "sse";
+  connectionType?: "http";
   viaProxy?: boolean;
 }
 

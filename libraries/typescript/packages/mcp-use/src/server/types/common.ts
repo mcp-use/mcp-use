@@ -130,21 +130,6 @@ export interface ServerConfig {
   allowedOrigins?: string[];
   sessionIdleTimeoutMs?: number; // Idle timeout for sessions in milliseconds (default: 86400000 = 1 day)
   /**
-   * @deprecated This option is deprecated and will be removed in a future version.
-   *
-   * The MCP specification requires clients to send a new InitializeRequest when they receive
-   * a 404 response for a stale session. Modern MCP clients
-   * handle this correctly. The server now follows the spec strictly by returning 404 for invalid
-   * session IDs.
-   *
-   * If you need session persistence across server restarts, use the `sessionStore` option
-   * with a persistent storage backend (Redis, PostgreSQL, etc.) instead.
-   *
-   * @see {@link sessionStore} for persistent session storage
-   * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports#session-management
-   */
-  autoCreateSessionOnInvalidId?: boolean;
-  /**
    * Enable stateless mode (no session tracking)
    * - Default: true for Deno (edge runtimes), false for Node.js
    * - Set to true to force stateless mode
@@ -397,8 +382,8 @@ export interface ServerConfig {
 }
 
 /**
- * Input parameter definition (legacy; prefer Zod schema with .describe()).
- * Used by tools.inputs and prompts.args.
+ * Input parameter definition for widget props (WidgetProps).
+ * Tool and prompt registration use Zod schemas instead.
  */
 export interface InputDefinition {
   /**

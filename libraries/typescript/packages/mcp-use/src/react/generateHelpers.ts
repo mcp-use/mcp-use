@@ -3,11 +3,11 @@
  */
 
 import { useCallTool as useCallToolBase } from "./useCallTool.js";
-import { useWidget } from "./useWidget.js";
+import { useView } from "./useView.js";
 import type {
   CallToolResponse,
   UnknownObject,
-  UseWidgetResult,
+  UseViewResult,
 } from "./widget-types.js";
 import type { UseCallToolReturn } from "./useCallTool.js";
 
@@ -65,7 +65,7 @@ export type TypedUseCallTool<TMap extends ToolMap> = <
 ) => UseCallToolReturn<ToolInput<TMap, TName>, ToolOutput<TMap, TName>>;
 
 /**
- * Helper type to convert null to UnknownObject for useWidget compatibility
+ * Helper type to convert null to UnknownObject for useView compatibility
  */
 type WidgetInputType<T> = T extends null ? UnknownObject : T;
 
@@ -74,7 +74,7 @@ type WidgetInputType<T> = T extends null ? UnknownObject : T;
  */
 export type TypedUseToolInfo<TMap extends ToolMap> = <
   TName extends keyof TMap & string,
->() => UseWidgetResult<
+>() => UseViewResult<
   WidgetInputType<ToolInput<TMap, TName>>,
   UnknownObject,
   ToolOutput<TMap, TName>,
@@ -86,7 +86,7 @@ export type TypedUseToolInfo<TMap extends ToolMap> = <
  * Generate fully-typed hook helpers from a tool map.
  *
  * **NOTE**: This is an alternative to the automatic ToolRegistry approach.
- * When using `mcp-use dev`, types are auto-generated in `.mcp-use/tool-registry.d.ts`
+ * When using `mcp-use dev`, types are auto-generated in `.mcp-use/generated/tool-registry.d.ts`
  * and `useCallTool` is automatically typed without needing this factory.
  *
  * Use this factory for advanced use cases like:
@@ -135,7 +135,7 @@ export function generateHelpers<TMap extends ToolMap>() {
    */
   const useToolInfo = <TName extends keyof TMap & string>() => {
     // Use type assertion since we know the mapping is correct
-    return useWidget() as UseWidgetResult<
+    return useView() as UseViewResult<
       WidgetInputType<ToolInput<TMap, TName>>,
       UnknownObject,
       ToolOutput<TMap, TName>,
@@ -183,8 +183,8 @@ export type InferToolMapFromSchemas<
   T extends Record<
     string,
     {
-      schema?: any;
-      outputSchema?: any;
+      schema?: unknown;
+      outputSchema?: unknown;
     }
   >,
 > = {
