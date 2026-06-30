@@ -70,7 +70,16 @@ export default defineConfig([
   // plugin, so server code gets real PostHog-node + Scarf tracking.
   {
     ...sharedConfig,
-    entry: ["index.ts", "src/bin.ts", "src/telemetry/tel-fetch.ts"],
+    entry: {
+      // The bare entries below output to dist/index.* and dist/src/bin.* etc.
+      // Object syntax is required for src/server/config/index so the output
+      // lands at dist/src/server/config/index.js, matching tsc's .d.ts layout
+      // and the package.json "./config" export.
+      index: "index.ts",
+      "src/bin": "src/bin.ts",
+      "src/telemetry/tel-fetch": "src/telemetry/tel-fetch.ts",
+      "src/server/config/index": "src/server/config/index.ts",
+    },
     esbuildOptions(options) {
       // Preserve node: prefix for Deno compatibility
       options.platform = "neutral";

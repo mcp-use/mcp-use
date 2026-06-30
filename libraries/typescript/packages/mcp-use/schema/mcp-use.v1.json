@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.mcp-use.dev/mcp-use.v1.json",
+  "title": "mcp-use project config",
+  "description": "Configuration for an mcp-use project (mcp-use.json). Generated from the Zod schema in src/server/config/schema.ts.",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "default": 1,
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "name": {
+      "type": "string"
+    },
+    "entry": {
+      "type": "string"
+    },
+    "viewsDir": {
+      "default": "resources",
+      "type": "string"
+    },
+    "publicDir": {
+      "default": "public",
+      "type": "string"
+    },
+    "outDir": {
+      "default": ".mcp-use/build",
+      "type": "string"
+    },
+    "basePath": {
+      "default": "/mcp",
+      "type": "string"
+    },
+    "assetPrefix": {
+      "default": null,
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "dev": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "port": {
+          "default": 3000,
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "host": {
+          "default": "localhost",
+          "type": "string"
+        },
+        "openInspector": {
+          "default": true,
+          "type": "boolean"
+        },
+        "tunnel": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "build": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "command": {
+          "default": "mcp-use build",
+          "type": "string"
+        },
+        "startCommand": {
+          "default": "mcp-use start",
+          "type": "string"
+        },
+        "port": {
+          "default": 3000,
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "inline": {
+          "default": false,
+          "type": "boolean"
+        },
+        "typecheck": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cloud": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "serverSlug": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "serverId": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "organization": {
+          "default": null,
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "region": {
+          "default": "AUTO",
+          "type": "string"
+        },
+        "productionBranch": {
+          "default": "main",
+          "type": "string"
+        },
+        "watchPaths": {
+          "default": [
+            "src/**",
+            "resources/**"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deployBranchPatterns": {
+          "default": [
+            "feature/*"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "waitForCi": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "env": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "files": {
+          "default": [
+            ".env"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "syncOnDeploy": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "eval": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "specs": {
+          "default": [
+            "evals/**/*.yaml"
+          ],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaultRunner": {
+          "default": "local",
+          "type": "string"
+        },
+        "baselineDir": {
+          "default": "evals/baselines",
+          "type": "string"
+        },
+        "outputDir": {
+          "default": ".mcp-use/eval/runs",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
