@@ -137,8 +137,9 @@ vi.mock("../../../src/adapters/langchain_adapter.js", () => ({
   },
 }));
 
-// Mock MCPClient
-vi.mock("../../../src/client.js", () => ({
+// Mock MCPClient (partial — preserve the rest of @mcp-use/client's surface)
+vi.mock("@mcp-use/client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   MCPClient: class {
     getAllActiveSessions = vi.fn().mockReturnValue({});
     createAllSessions = vi.fn().mockResolvedValue({});
@@ -461,7 +462,7 @@ describe("MCPAgent Telemetry Integration", () => {
   describe("useServerManager tracking", () => {
     it("should track useServerManager configuration", async () => {
       const { MCPAgent } = await import("../../../src/agents/mcp_agent.js");
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("@mcp-use/client");
 
       const client = new MCPClient();
       const agent = new MCPAgent({

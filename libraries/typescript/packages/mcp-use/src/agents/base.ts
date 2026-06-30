@@ -1,4 +1,4 @@
-import type { MCPSession } from "../session.js";
+import type { MCPSession } from "@mcp-use/client";
 
 export abstract class BaseAgent {
   protected session: MCPSession;

@@ -1,5 +1,5 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
-import type { BaseConnector } from "../../connectors/base.js";
+import type { BaseConnector } from "@mcp-use/client";
 import type { IServerManager } from "../types.js";
 import type { SchemaOutputT } from "./base.js";
 import { z } from "zod";

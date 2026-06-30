@@ -67,11 +67,6 @@
       "import": "./dist/src/browser-agent.js",
       "require": "./dist/src/browser-agent.cjs"
     },
-    "./client": {
-      "types": "./dist/src/client.d.ts",
-      "import": "./dist/src/client.js",
-      "require": "./dist/src/client.cjs"
-    },
     "./react": {
       "types": "./dist/src/react/index.d.ts",
       "import": "./dist/src/react/index.js",
@@ -217,6 +212,7 @@
     "@hono/node-server": "1.19.13",
     "@mcp-ui/server": "6.1.0",
     "@mcp-use/cli": "workspace:*",
+    "@mcp-use/client": "workspace:*",
     "@mcp-use/inspector": "workspace:*",
     "@modelcontextprotocol/ext-apps": "1.0.1",
     "@modelcontextprotocol/sdk": "1.26.0",

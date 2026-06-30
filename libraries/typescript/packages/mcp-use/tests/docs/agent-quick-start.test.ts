@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { MCPClient } from "../../src/client.js";
+import { MCPClient } from "@mcp-use/client";
 import { MCPAgent } from "../../src/agents/mcp_agent.js";
 import { ChatOpenAI } from "@langchain/openai";
 import { resolve, dirname } from "node:path";

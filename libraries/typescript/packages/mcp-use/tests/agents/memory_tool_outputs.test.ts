@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { ChatOpenAI } from "@langchain/openai";
 import { describe, expect, it } from "vitest";
 import { MCPAgent } from "../../src/agents/mcp_agent.js";
-import { MCPClient } from "../../src/client.js";
+import { MCPClient } from "@mcp-use/client";
 import { logger } from "../../src/logging.js";
 import { HumanMessage, AIMessage, ToolMessage } from "@langchain/core/messages";
 

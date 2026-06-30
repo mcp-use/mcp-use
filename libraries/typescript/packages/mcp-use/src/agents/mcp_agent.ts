@@ -13,12 +13,12 @@ import {
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
 import { LangChainAdapter } from "../adapters/langchain_adapter.js";
-import type { MCPClient } from "../client.js";
-import type { BaseConnector } from "../connectors/base.js";
+import type { MCPClient } from "@mcp-use/client";
+import type { BaseConnector } from "@mcp-use/client";
 import { logger } from "../logging.js";
 import { ServerManager } from "../managers/server_manager.js";
 import { ObservabilityManager } from "../observability/index.js";
-import type { MCPSession } from "../session.js";
+import type { MCPSession } from "@mcp-use/client";
 import { extractModelInfo } from "../telemetry/index.js";
 import { Telemetry } from "../telemetry/telemetry-node.js";
 import { getPackageVersion } from "../version.js";
@@ -342,7 +342,7 @@ export class MCPAgent {
           `Creating MCPClient with ${Object.keys(this.mcpServersConfig).length} server(s)...`
         );
         // Dynamically import MCPClient (Node.js version)
-        const { MCPClient } = await import("../client.js");
+        const { MCPClient } = await import("@mcp-use/client");
         this.client = new MCPClient({ mcpServers: this.mcpServersConfig });
         logger.debug("✅ MCPClient created successfully");
       }

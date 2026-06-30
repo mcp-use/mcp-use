@@ -1,5 +1,5 @@
-import type { MCPClient } from "../client.js";
-import type { BaseConnector } from "../connectors/base.js";
+import type { MCPClient } from "@mcp-use/client";
+import type { BaseConnector } from "@mcp-use/client";
 import { logger } from "../logging.js";
 
 /**

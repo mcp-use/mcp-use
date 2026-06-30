@@ -497,7 +497,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     options?: { namespace?: string }
   ): Promise<void> {
     // Dynamic import to avoid bringing client code into server bundle unless used
-    const { MCPClient } = await import("../client.js");
+    const { MCPClient } = await import("@mcp-use/client");
     const { mountSession } = await import("./utils/proxy-client.js");
 
     // If it's an MCPSession (duck typing by checking for callTool method)

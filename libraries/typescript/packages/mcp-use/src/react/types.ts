@@ -13,7 +13,7 @@ import type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { BrowserMCPClient } from "../client/browser.js";
+import type { BrowserMCPClient } from "@mcp-use/client";
 
 /**
  * SDK-level reconnection options for streamable HTTP transports.

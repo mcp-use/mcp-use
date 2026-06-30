@@ -7,8 +7,8 @@ import type {
   SystemMessage,
 } from "langchain";
 import type { LangChainAdapter } from "../adapters/langchain_adapter.js";
-import type { MCPClient } from "../client.js";
-import type { BaseConnector } from "../connectors/base.js";
+import type { MCPClient } from "@mcp-use/client";
+import type { BaseConnector } from "@mcp-use/client";
 import type { ServerManager } from "../managers/server_manager.js";
 import type { LLMConfig } from "./utils/llm_provider.js";
 

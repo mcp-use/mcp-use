@@ -89,7 +89,9 @@ describe("CommonJS Compatibility", () => {
 
     it("should create MCPClient instance", () => {
       expect(client).toBeDefined();
-      expect(client.constructor.name).toBe("MCPClient");
+      // The class is re-exported through @mcp-use/client; esbuild's CJS bundling
+      // may prefix the constructor name (e.g. "_MCPClient"), so match the suffix.
+      expect(client.constructor.name).toMatch(/MCPClient$/);
     });
 
     it("should get session", () => {

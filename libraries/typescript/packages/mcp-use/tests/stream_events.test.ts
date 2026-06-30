@@ -15,7 +15,7 @@ import type { StreamEvent } from "../index.js";
 import { MCPAgent, MCPClient } from "../index.js";
 
 // Mock the MCP client for testing
-vi.mock("../src/client.js", () => {
+vi.mock("@mcp-use/client", async (importOriginal) => {
   class MockMCPClient {
     getAllActiveSessions = vi.fn().mockResolvedValue({});
     createAllSessions = vi.fn().mockResolvedValue({});
@@ -23,6 +23,7 @@ vi.mock("../src/client.js", () => {
     close = vi.fn().mockResolvedValue(undefined);
   }
   return {
+    ...(await importOriginal<Record<string, unknown>>()),
     MCPClient: MockMCPClient,
   };
 });

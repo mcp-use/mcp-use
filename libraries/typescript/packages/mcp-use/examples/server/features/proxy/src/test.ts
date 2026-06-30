@@ -1,4 +1,4 @@
-import { MCPClient } from "mcp-use/client";
+import { MCPClient } from "@mcp-use/client";
 
 async function main() {
   console.log("Connecting to aggregator...");

@@ -5,7 +5,7 @@
  * MCP tools, including code execution mode.
  */
 
-import { CODE_MODE_AGENT_PROMPT } from "../../client/connectors/codeMode.js";
+import { CODE_MODE_AGENT_PROMPT } from "@mcp-use/client";
 
 /**
  * Collection of prompt templates for MCP agents.

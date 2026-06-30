@@ -59,7 +59,8 @@ const sharedClient = {
   closeSession: vi.fn(),
 };
 
-vi.mock("../../../src/client/browser.js", () => ({
+vi.mock("@mcp-use/client", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   BrowserMCPClient: vi.fn(function () {
     return sharedClient;
   }),

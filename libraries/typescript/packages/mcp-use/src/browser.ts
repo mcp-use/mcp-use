@@ -5,16 +5,16 @@
  * `mcp-use/browser/agent` so this entry stays free of langchain dependencies.
  */
 
-export { BrowserMCPClient as MCPClient } from "./client/browser.js";
+export { BrowserMCPClient as MCPClient } from "@mcp-use/client";
 
 // Export connectors that work in the browser
-export { BaseConnector } from "./connectors/base.js";
-export type { NotificationHandler } from "./connectors/base.js";
-export { HttpConnector } from "./connectors/http.js";
+export { BaseConnector } from "@mcp-use/client";
+export type { NotificationHandler } from "@mcp-use/client";
+export { HttpConnector } from "@mcp-use/client";
 
 // Export session and notification types
-export { MCPSession } from "./session.js";
-export type { Notification, Root } from "./session.js";
+export { MCPSession } from "@mcp-use/client";
+export type { Notification, Root } from "@mcp-use/client";
 
 // Export OAuth utilities
 export { BrowserOAuthClientProvider } from "./auth/browser-provider.js";

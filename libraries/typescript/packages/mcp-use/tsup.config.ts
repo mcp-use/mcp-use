@@ -74,10 +74,8 @@ export default defineConfig([
       "src/auth/index.ts",
       "src/auth/index-node.ts",
       "src/bin.ts",
-      "src/client.ts",
       "src/server/index.ts",
       "src/telemetry/tel-fetch.ts",
-      "src/client/prompts.ts",
     ],
     esbuildOptions(options) {
       // Preserve node: prefix for Deno compatibility

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { MCPClient } from "../../src/client.js";
+import { MCPClient } from "@mcp-use/client";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 

@@ -1,4 +1,4 @@
-import type { MCPSession } from "../../session.js";
+import type { MCPSession } from "@mcp-use/client";
 import type { MCPServer } from "../mcp-server.js";
 import { z } from "zod";
 

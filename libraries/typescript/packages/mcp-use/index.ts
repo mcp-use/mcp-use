@@ -11,17 +11,17 @@
 
 import { MCPAgent } from "./src/agents/mcp_agent.js";
 import { RemoteAgent } from "./src/agents/remote.js";
-import { MCPClient } from "./src/client.js";
+import { MCPClient } from "@mcp-use/client";
 import type {
   OnElicitationCallback,
   OnNotificationCallback,
   OnSamplingCallback,
-} from "./src/config.js";
-import { loadConfigFile } from "./src/config-file.js";
-import type { NotificationHandler } from "./src/connectors/base.js";
-import { BaseConnector } from "./src/connectors/base.js";
-import { HttpConnector } from "./src/connectors/http.js";
-import { StdioConnector } from "./src/connectors/stdio.js";
+} from "@mcp-use/client";
+import { loadConfigFile } from "@mcp-use/client";
+import type { NotificationHandler } from "@mcp-use/client";
+import { BaseConnector } from "@mcp-use/client";
+import { HttpConnector } from "@mcp-use/client";
+import { StdioConnector } from "@mcp-use/client";
 
 import type { CreateMessageRequest } from "@modelcontextprotocol/sdk/types.js";
 import { Logger, logger } from "./src/logging.js";
@@ -31,7 +31,7 @@ import {
   type Notification,
   type Root,
   type Tool,
-} from "./src/session.js";
+} from "@mcp-use/client";
 
 export { BaseAdapter } from "./src/adapters/index.js";
 // Export AI SDK utilities
@@ -104,21 +104,21 @@ export type {
   ExecutorOptions,
   MCPClientOptions,
   VMExecutorOptions,
-} from "./src/client.js";
+} from "@mcp-use/client";
 
 export {
   BaseCodeExecutor,
   E2BCodeExecutor,
   isVMAvailable,
   VMCodeExecutor,
-} from "./src/client.js";
+} from "@mcp-use/client";
 
 export type {
   ExecutionResult,
   SearchToolsFunction,
   ToolNamespaceInfo,
   ToolSearchResult,
-} from "./src/client/codeExecutor.js";
+} from "@mcp-use/client";
 
 // Export custom error types
 export {
@@ -156,8 +156,8 @@ export {
   getDefaults,
   reject,
   validate,
-} from "./src/client/elicitation-helpers.js";
+} from "@mcp-use/client";
 export type {
   ElicitContent,
   ElicitValidationResult,
-} from "./src/client/elicitation-helpers.js";
+} from "@mcp-use/client";

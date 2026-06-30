@@ -1,6 +1,6 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { LangChainAdapter } from "../adapters/langchain_adapter.js";
-import type { MCPClient } from "../client.js";
+import type { MCPClient } from "@mcp-use/client";
 
 export interface IServerManager {
   readonly initializedServers: Record<string, boolean>;

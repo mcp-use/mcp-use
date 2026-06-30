@@ -1,8 +1,8 @@
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type { LangChainAdapter } from "../adapters/langchain_adapter.js";
-import type { MCPClient } from "../client.js";
-import type { BaseConnector } from "../connectors/base.js";
-import type { MCPSession } from "../session.js";
+import type { MCPClient } from "@mcp-use/client";
+import type { BaseConnector } from "@mcp-use/client";
+import type { MCPSession } from "@mcp-use/client";
 import type { IServerManager } from "./types.js";
 import { logger } from "../logging.js";
 import { AcquireActiveMCPServerTool } from "./tools/acquire_active_mcp_server.js";

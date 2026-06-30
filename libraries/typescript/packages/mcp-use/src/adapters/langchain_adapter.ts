@@ -1,4 +1,4 @@
-import type { JSONSchema } from "../client/json-schema-to-zod/index.js";
+import type { JSONSchema } from "@mcp-use/client";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type {
   CallToolResult,
@@ -7,9 +7,9 @@ import type {
   Prompt,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { ZodTypeAny } from "zod";
-import type { BaseConnector } from "../connectors/base.js";
+import type { BaseConnector } from "@mcp-use/client";
 
-import { JSONSchemaToZod } from "../client/json-schema-to-zod/index.js";
+import { JSONSchemaToZod } from "@mcp-use/client";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { logger } from "../logging.js";
