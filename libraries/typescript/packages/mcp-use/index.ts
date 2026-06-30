@@ -9,8 +9,6 @@
  * do NOT export server-related modules from this file.
  */
 
-import { MCPAgent } from "./src/agents/mcp_agent.js";
-import { RemoteAgent } from "./src/agents/remote.js";
 import { MCPClient } from "@mcp-use/client";
 import type {
   OnElicitationCallback,
@@ -32,19 +30,6 @@ import {
   type Root,
   type Tool,
 } from "@mcp-use/client";
-
-export { BaseAdapter } from "./src/adapters/index.js";
-// Export AI SDK utilities
-export * from "./src/agents/utils/index.js";
-export { ServerManager } from "./src/managers/server_manager.js";
-
-export * from "./src/managers/tools/index.js";
-
-// Export observability utilities
-export {
-  ObservabilityManager,
-  type ObservabilityConfig,
-} from "./src/observability/index.js";
 
 // Export telemetry utilities
 export {
@@ -69,25 +54,14 @@ export type { StoredState } from "./src/auth/types.js";
 // Export React hooks
 export * from "./src/react/index.js";
 
-// Export client prompts
-export { PROMPTS } from "./src/agents/index.js";
-
-// !!! NEVER EXPORT @langchain/core types it causes OOM errors when building the package
-// Note: Message classes (AIMessage, BaseMessage, etc.) are not re-exported to avoid
-// forcing TypeScript to deeply analyze @langchain/core types.
-// Import them directly from "@langchain/core/messages" if needed.
-// Same for StreamEvent - import from "@langchain/core/tracers/log_stream"
-
 export {
   BaseConnector,
   HttpConnector,
   loadConfigFile,
   Logger,
   logger,
-  MCPAgent,
   MCPClient,
   MCPSession,
-  RemoteAgent,
   StdioConnector,
 };
 

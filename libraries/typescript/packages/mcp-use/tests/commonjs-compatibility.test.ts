@@ -16,17 +16,7 @@ describe("CommonJS Compatibility", () => {
 
     expect(mcpUse).toBeDefined();
     expect(mcpUse.MCPClient).toBeDefined();
-    expect(mcpUse.MCPAgent).toBeDefined();
     expect(typeof mcpUse.MCPClient).toBe("function");
-    expect(typeof mcpUse.MCPAgent).toBe("function");
-  });
-
-  it("should import agent subpath from CommonJS bundle", () => {
-    const agentModule = require("../dist/src/agents/index.cjs");
-
-    expect(agentModule).toBeDefined();
-    expect(agentModule.MCPAgent).toBeDefined();
-    expect(typeof agentModule.MCPAgent).toBe("function");
   });
 
   it("should import auth subpath from CommonJS bundle", () => {
@@ -230,7 +220,7 @@ describe("CommonJS Compatibility", () => {
       const mcpUse = require("../dist/index.cjs");
 
       // Check that main exports are available
-      const expectedExports = ["MCPClient", "MCPAgent"];
+      const expectedExports = ["MCPClient"];
 
       for (const exportName of expectedExports) {
         expect(mcpUse[exportName]).toBeDefined();
@@ -239,12 +229,10 @@ describe("CommonJS Compatibility", () => {
     });
 
     it("should work with destructuring", () => {
-      const { MCPClient, MCPAgent } = require("../dist/index.cjs");
+      const { MCPClient } = require("../dist/index.cjs");
 
       expect(MCPClient).toBeDefined();
-      expect(MCPAgent).toBeDefined();
       expect(typeof MCPClient).toBe("function");
-      expect(typeof MCPAgent).toBe("function");
     });
 
     it("should work with default require", () => {

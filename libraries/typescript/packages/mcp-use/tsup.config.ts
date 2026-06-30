@@ -69,8 +69,6 @@ export default defineConfig([
     ...sharedConfig,
     entry: [
       "index.ts",
-      "src/adapters/index.ts",
-      "src/agents/index.ts",
       "src/auth/index.ts",
       "src/auth/index-node.ts",
       "src/bin.ts",
@@ -85,7 +83,6 @@ export default defineConfig([
 
   // ── Browser entries ─────────────────────────────────────────────────────────
   // connectors/base.ts is exported from src/browser.ts and imports telemetry-node.ts.
-  // LangChain agents live in src/browser-agent.ts (mcp-use/browser/agent).
   // The plugin below substitutes telemetry-node with telemetry-browser at build time
   // so the browser bundle contains zero Node.js built-in calls.
   //
@@ -95,7 +92,6 @@ export default defineConfig([
     ...sharedConfig,
     entry: {
       "src/browser": "src/browser.ts",
-      "src/browser-agent": "src/browser-agent.ts",
       "src/react/index": "src/react/index.ts",
     },
     esbuildPlugins: [telemetryBrowserPlugin],

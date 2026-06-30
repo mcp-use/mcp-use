@@ -1,5 +1,3 @@
-export { extractModelInfo } from "./utils.js";
-
 // Re-export telemetry utilities
 // Node.js implementation is used as the base and swapped with browser implementation
 // in browser bundles via tsup's telemetry-browser-substitution plugin.

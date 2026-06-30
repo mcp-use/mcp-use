@@ -25,7 +25,7 @@ import {
   ServerRunEvent,
   ServerToolCallEvent,
 } from "./events.js";
-import { getPackageVersion } from "./utils.js";
+import { getPackageVersion } from "../version.js";
 
 /**
  * Generate a UUID-like identifier suitable for browser and similar runtimes.

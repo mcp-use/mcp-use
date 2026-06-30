@@ -27,6 +27,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./browser": {
+      "types": "./dist/browser-agent.d.ts",
+      "import": "./dist/browser-agent.js",
+      "require": "./dist/browser-agent.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -39,11 +44,57 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "build": "tsup && tsc --emitDeclarationOnly --declaration",
-    "dev": "tsc --watch"
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:unit": "vitest run --exclude 'tests/integration/**'",
+    "test:integration": "vitest run tests/integration",
+    "test:integration:agent": "vitest run tests/integration/agent",
+    "test:integration:run": "vitest run tests/integration/agent/test_agent_run.test.ts",
+    "test:integration:stream": "vitest run tests/integration/agent/test_agent_stream.test.ts",
+    "test:integration:streamevents": "vitest run tests/integration/agent/test_agent_stream_events.test.ts",
+    "test:integration:structured": "vitest run tests/integration/agent/test_agent_structured_output.test.ts",
+    "test:integration:manager": "vitest run tests/integration/agent/test_server_manager.test.ts",
+    "test:integration:observability": "vitest run tests/integration/agent/test_agent_observability.test.ts",
+    "test:integration:codemode": "vitest run tests/integration/agent/test_code_mode.test.ts"
   },
   "dependencies": {
-    "@mcp-use/client": "workspace:*"
+    "@mcp-use/client": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.26.0",
+    "chalk": "4.1.2"
+  },
+  "optionalDependencies": {
+    "cli-highlight": "2.1.11"
+  },
+  "peerDependencies": {
+    "@langchain/anthropic": "^1.3.0",
+    "@langchain/core": "^1.1.0",
+    "@langchain/openai": "^1.2.0",
+    "langchain": "^1.2.10",
+    "langfuse": "^3.38.6",
+    "langfuse-langchain": "^3.38.6",
+    "zod": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@langchain/anthropic": {
+      "optional": true
+    },
+    "@langchain/openai": {
+      "optional": true
+    },
+    "langfuse": {
+      "optional": true
+    },
+    "langfuse-langchain": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@langchain/openai": "^1.2.8",
+    "ai": "^6.0.116",
+    "vitest": "^4.1.0",
+    "zod": "4.3.5"
   },
   "publishConfig": {
     "access": "public"
