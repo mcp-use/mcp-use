@@ -46,6 +46,8 @@
 | [anthropic_integration_example.py](anthropic_integration_example.py) | Anthropic API integration |
 | [langchain_integration_example.py](langchain_integration_example.py) | LangChain integration |
 | [google_integration_example.py](google_integration_example.py) | Google API integration |
+| [ollama_integration_example.py](ollama_integration_example.py) | Ollama (local LLM) integration |
+
 
 ## MCP Server Integrations
 
