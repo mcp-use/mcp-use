@@ -89,7 +89,7 @@ export interface RedisSessionStoreConfig {
  *
  * @example
  * ```typescript
- * import { MCPServer, RedisSessionStore, RedisStreamManager } from 'mcp-use/server';
+ * import { MCPServer, RedisSessionStore, RedisStreamManager } from 'mcp-use';
  * import { createClient } from 'redis';
  *
  * // Create Redis clients (two needed for Pub/Sub)

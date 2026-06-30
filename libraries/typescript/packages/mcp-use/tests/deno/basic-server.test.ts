@@ -12,7 +12,7 @@
 
 /* globals Deno */
 
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import z from "zod";
 import {
   assertEquals,

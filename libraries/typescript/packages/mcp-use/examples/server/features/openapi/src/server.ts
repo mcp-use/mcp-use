@@ -1,4 +1,4 @@
-import { MCPServer, type OpenAPIDocument } from "mcp-use/server";
+import { MCPServer, type OpenAPIDocument } from "mcp-use";
 
 const PORT = Number(process.env.PORT ?? 3010);
 const WEATHER_API_BASE_URL = "https://api.weather.gov";

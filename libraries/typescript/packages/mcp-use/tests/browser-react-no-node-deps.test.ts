@@ -1,8 +1,8 @@
 /**
- * Test to verify that mcp-use/react and mcp-use/browser do not import Node.js dependencies
+ * Test to verify that mcp-use/react (the view runtime) does not import Node.js dependencies.
  *
- * This test checks both static analysis of built files and runtime behavior.
- * It is expected to FAIL initially, proving that Node.js dependencies are being bundled.
+ * This test checks both static analysis of built files and runtime behavior. The MCP
+ * client browser bundle moved to @mcp-use/client and is tested there.
  */
 
 import { execFileSync } from "node:child_process";
@@ -66,15 +66,6 @@ const NODE_NPM_PACKAGES = [
   "@hono/node-server",
   "@redis/client",
   "posthog-node",
-];
-
-const LANGCHAIN_PACKAGES = [
-  "@langchain/core",
-  "@langchain/openai",
-  "@langchain/anthropic",
-  "@langchain/google-genai",
-  "@langchain/langgraph",
-  "langchain",
 ];
 
 /**
@@ -253,45 +244,6 @@ function checkForNodePackages(content: string, filePath: string): string[] {
           `Line ${index + 1}: import("${packageName}") - ${filePath}`
         );
       }
-    }
-  });
-
-  return violations;
-}
-
-function checkForLangchainPackages(
-  content: string,
-  filePath: string
-): string[] {
-  const violations: string[] = [];
-  const lines = content.split("\n");
-
-  lines.forEach((line, index) => {
-    const requirePattern = /(?:__)?require\(["']([^"']+)["']\)/g;
-    const importPattern = /import\s+.*from\s+["']([^"']+)["']/g;
-    const dynamicImportPattern = /import\(["']([^"']+)["']\)/g;
-
-    let match;
-
-    const checkPackage = (packageName: string) => {
-      if (
-        LANGCHAIN_PACKAGES.includes(packageName) ||
-        LANGCHAIN_PACKAGES.some((pkg) => packageName.startsWith(pkg + "/"))
-      ) {
-        violations.push(
-          `Line ${index + 1}: langchain import "${packageName}" - ${filePath}`
-        );
-      }
-    };
-
-    while ((match = requirePattern.exec(line)) !== null) {
-      checkPackage(match[1]);
-    }
-    while ((match = importPattern.exec(line)) !== null) {
-      checkPackage(match[1]);
-    }
-    while ((match = dynamicImportPattern.exec(line)) !== null) {
-      checkPackage(match[1]);
     }
   });
 
@@ -492,163 +444,6 @@ import('${modulePath}')
         const stdout = error.stdout?.toString() || "";
         throw new Error(
           `Failed to import/execute mcp-use/react in browser-like environment:\n${stderr || stdout || error.message}`
-        );
-      } finally {
-        // Clean up temp file
-        try {
-          unlinkSync(tmpFile);
-        } catch (error) {
-          // File might already be deleted or permissions issue - log but don't fail test
-          console.debug(`Failed to cleanup temp file: ${error}`);
-        }
-      }
-    });
-  });
-
-  describe("mcp-use/browser", () => {
-    const browserEntryFile = join(distDir, "src", "browser.js");
-
-    it("should not import Node.js built-in modules in built output", () => {
-      if (!statSync(browserEntryFile, { throwIfNoEntry: false })) {
-        throw new Error(
-          `Built file not found: ${browserEntryFile}. Please run 'npm run build' first.`
-        );
-      }
-
-      const dependencyFiles = getDependencyFiles(browserEntryFile);
-      const allViolations: string[] = [];
-
-      dependencyFiles.forEach((file) => {
-        try {
-          const content = readFileSync(file, "utf-8");
-          const violations = checkForNodeBuiltins(content, file);
-          allViolations.push(...violations);
-        } catch (error) {
-          // File might not exist or be readable, skip
-          console.debug(`Skipped file ${file}: ${error}`);
-        }
-      });
-
-      if (allViolations.length > 0) {
-        console.error(
-          "\n❌ Found Node.js built-in module imports in mcp-use/browser:\n"
-        );
-        allViolations.forEach((violation) => {
-          console.error(`  - ${violation}`);
-        });
-      }
-
-      expect(allViolations).toEqual([]);
-    });
-
-    it("should not import Node.js-specific npm packages in built output", () => {
-      if (!statSync(browserEntryFile, { throwIfNoEntry: false })) {
-        throw new Error(
-          `Built file not found: ${browserEntryFile}. Please run 'npm run build' first.`
-        );
-      }
-
-      const dependencyFiles = getDependencyFiles(browserEntryFile);
-      const allViolations: string[] = [];
-
-      dependencyFiles.forEach((file) => {
-        try {
-          const content = readFileSync(file, "utf-8");
-          const violations = checkForNodePackages(content, file);
-          allViolations.push(...violations);
-        } catch (error) {
-          // File might not exist or be readable, skip
-          console.debug(`Skipped file ${file}: ${error}`);
-        }
-      });
-
-      if (allViolations.length > 0) {
-        console.error(
-          "\n❌ Found Node.js-specific npm packages in mcp-use/browser:\n"
-        );
-        allViolations.forEach((violation) => {
-          console.error(`  - ${violation}`);
-        });
-      }
-
-      expect(allViolations).toEqual([]);
-    });
-
-    it("should not import langchain packages in built output", () => {
-      if (!statSync(browserEntryFile, { throwIfNoEntry: false })) {
-        throw new Error(
-          `Built file not found: ${browserEntryFile}. Please run 'npm run build' first.`
-        );
-      }
-
-      const dependencyFiles = getDependencyFiles(browserEntryFile);
-      const allViolations: string[] = [];
-
-      dependencyFiles.forEach((file) => {
-        try {
-          const content = readFileSync(file, "utf-8");
-          const violations = checkForLangchainPackages(content, file);
-          allViolations.push(...violations);
-        } catch (error) {
-          console.debug(`Skipped file ${file}: ${error}`);
-        }
-      });
-
-      if (allViolations.length > 0) {
-        console.error("\n❌ Found langchain imports in mcp-use/browser:\n");
-        allViolations.forEach((violation) => {
-          console.error(`  - ${violation}`);
-        });
-      }
-
-      expect(allViolations).toEqual([]);
-    });
-
-    // Run in subprocess to avoid vitest's module caching issues
-    // NOTE: This test uses minimal global mocks that may not accurately reflect
-    // real browser behavior. Code that depends on deeper browser API functionality
-    // may pass these tests but fail in actual browsers. Consider using a real
-    // browser environment (Playwright/Puppeteer) or jsdom for more accurate testing.
-    it("should import and execute code successfully in browser-like environment", () => {
-      const modulePath = join(distDir, "src", "browser.js").replace(/\\/g, "/");
-
-      // Script that simulates browser environment and imports the module
-      const testScript = `
-globalThis.process = { env: { NODE_ENV: 'production' } };
-globalThis.window = { location: { origin: 'http://localhost:3000' }, addEventListener: () => {}, removeEventListener: () => {} };
-globalThis.document = {};
-globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
-import('${modulePath}')
-  .then(m => {
-    if (!m.MCPClient) throw new Error('MCPClient not exported');
-    if (typeof m.MCPClient !== 'function') throw new Error('MCPClient is not a function');
-    if (!m.Tel) throw new Error('Tel not exported');
-    const tel = m.Tel.getInstance();
-    if (!tel) throw new Error('Tel.getInstance() returned falsy');
-    if (!m.logger) throw new Error('logger not exported');
-    m.logger.info('Test log');
-    const version = m.getPackageVersion();
-    if (typeof version !== 'string') throw new Error('getPackageVersion did not return string');
-    console.log('__TEST_SUCCESS__');
-  })
-  .catch(e => { console.error('FAIL:', e.message); process.exit(1); });
-`;
-
-      // Write script to temp file to avoid shell escaping issues
-      const tmpFile = join(__dirname, "..", ".test-browser-runtime.mjs");
-      writeFileSync(tmpFile, testScript);
-
-      try {
-        const result = execFileSync("node", [tmpFile], {
-          encoding: "utf-8",
-          timeout: 10000,
-        });
-        expect(result).toContain("__TEST_SUCCESS__");
-      } catch (error: any) {
-        const stderr = error.stderr?.toString() || "";
-        const stdout = error.stdout?.toString() || "";
-        throw new Error(
-          `Failed to import/execute mcp-use/browser in browser-like environment:\n${stderr || stdout || error.message}`
         );
       } finally {
         // Clean up temp file

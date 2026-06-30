@@ -50,7 +50,7 @@ async function checkSDKExports() {
     // Check in server exports
     if (serverIndexContent.includes(type)) {
       found = true;
-      location = "mcp-use/server";
+      location = "mcp-use";
     }
 
     // Check in type files
@@ -64,7 +64,7 @@ async function checkSDKExports() {
         content.includes(`export class ${type}`)
       ) {
         found = true;
-        location = `mcp-use/server (types/${typeFile})`;
+        location = `mcp-use (types/${typeFile})`;
         break;
       }
     }

@@ -18,7 +18,7 @@
  * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
  */
 
-import type { MCPServer } from "mcp-use/server";
+import type { MCPServer } from "mcp-use";
 import {
   createClient,
   type OAuthAuthorizationDetails,

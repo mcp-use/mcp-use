@@ -58,6 +58,9 @@ const sharedConfig: Partial<Options> = {
     "@redis/client",
     // Keep posthog-node external for browser builds (browser uses posthog-js)
     "posthog-node",
+    // Keep the MCP client external — the server reaches it only via a lazy
+    // dynamic import in proxy(), so it must never be bundled into the server.
+    "@mcp-use/client",
   ],
 };
 
@@ -67,12 +70,7 @@ export default defineConfig([
   // plugin, so server code gets real PostHog-node + Scarf tracking.
   {
     ...sharedConfig,
-    entry: [
-      "index.ts",
-      "src/bin.ts",
-      "src/server/index.ts",
-      "src/telemetry/tel-fetch.ts",
-    ],
+    entry: ["index.ts", "src/bin.ts", "src/telemetry/tel-fetch.ts"],
     esbuildOptions(options) {
       // Preserve node: prefix for Deno compatibility
       options.platform = "neutral";
@@ -80,16 +78,15 @@ export default defineConfig([
   },
 
   // ── Browser entries ─────────────────────────────────────────────────────────
-  // connectors/base.ts is exported from src/browser.ts and imports telemetry-node.ts.
-  // The plugin below substitutes telemetry-node with telemetry-browser at build time
-  // so the browser bundle contains zero Node.js built-in calls.
+  // The MCP-UI view runtime (mcp-use/react) runs in the browser. The plugin below
+  // substitutes telemetry-node with telemetry-browser at build time so the bundle
+  // contains zero Node.js built-in calls.
   //
-  // Use object entry syntax to preserve the src/ prefix in output paths so that
-  // dist/src/browser.js and dist/src/react/index.js match package.json exports.
+  // Use object entry syntax to preserve the src/ prefix in the output path so that
+  // dist/src/react/index.js matches the package.json export.
   {
     ...sharedConfig,
     entry: {
-      "src/browser": "src/browser.ts",
       "src/react/index": "src/react/index.ts",
     },
     esbuildPlugins: [telemetryBrowserPlugin],

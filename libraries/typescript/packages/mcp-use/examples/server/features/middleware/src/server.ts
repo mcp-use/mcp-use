@@ -1,4 +1,4 @@
-import { MCPServer, text, error } from "mcp-use/server";
+import { MCPServer, text, error } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({

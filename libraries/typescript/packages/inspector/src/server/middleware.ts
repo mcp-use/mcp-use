@@ -13,7 +13,7 @@ import { registerStaticRoutes } from "./shared-static.js";
  *
  * @example
  * ```typescript
- * import { MCPServer } from 'mcp-use/server'
+ * import { MCPServer } from 'mcp-use'
  * import { mountInspector } from '@mcp-use/inspector'
  *
  * const server = new MCPServer({ name: 'my-server', version: '1.0.0' })

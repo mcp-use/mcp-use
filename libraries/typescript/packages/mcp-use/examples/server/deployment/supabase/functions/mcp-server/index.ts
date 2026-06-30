@@ -1,5 +1,5 @@
 // MCP Server deployed on Supabase Edge Functions
-import { MCPServer, text } from "npm:mcp-use/server";
+import { MCPServer, text } from "npm:mcp-use";
 
 const server = new MCPServer({
   name: "test-app",

@@ -3,7 +3,7 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { acceptWithDefaults } from "mcp-use";
+import { acceptWithDefaults } from "@mcp-use/client";
 
 type Tool = {
   name: string;

@@ -20,7 +20,7 @@ import {
   type OnNotificationCallback,
   type OnSamplingCallback,
   MCPClient,
-} from "mcp-use";
+} from "@mcp-use/client";
 
 const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
 

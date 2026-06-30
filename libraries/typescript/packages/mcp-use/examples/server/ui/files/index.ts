@@ -1,4 +1,4 @@
-import { MCPServer, widget } from "mcp-use/server";
+import { MCPServer, widget } from "mcp-use";
 import { z } from "zod";
 
 /**

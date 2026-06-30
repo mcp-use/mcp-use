@@ -1,4 +1,4 @@
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 
 /**
  * ════════════════════════════════════════════════════════════════════

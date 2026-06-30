@@ -7,7 +7,7 @@
  * bearer token on MCP requests — the MCP server only verifies the JWT.
  */
 
-import { MCPServer, oauthKeycloakProvider, object } from "mcp-use/server";
+import { MCPServer, oauthKeycloakProvider, object } from "mcp-use";
 
 declare const process: { env: Record<string, string | undefined> };
 

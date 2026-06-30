@@ -5,7 +5,7 @@
  * Valid header: X-Custom-Auth: custom-auth-token-xyz
  */
 
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const CUSTOM_HEADER_NAME = "X-Custom-Auth";

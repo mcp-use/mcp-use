@@ -51,7 +51,7 @@ export interface FileSystemSessionStoreConfig {
  *
  * @example
  * ```typescript
- * import { MCPServer, FileSystemSessionStore } from 'mcp-use/server';
+ * import { MCPServer, FileSystemSessionStore } from 'mcp-use';
  *
  * const server = new MCPServer({
  *   name: 'dev-server',

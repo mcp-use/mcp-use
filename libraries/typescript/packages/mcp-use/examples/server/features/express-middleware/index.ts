@@ -10,7 +10,7 @@
  * - Custom POST route
  */
 
-import { MCPServer, text, object } from "mcp-use/server";
+import { MCPServer, text, object } from "mcp-use";
 import { z } from "zod";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";

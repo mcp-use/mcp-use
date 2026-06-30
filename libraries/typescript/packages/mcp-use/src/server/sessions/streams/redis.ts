@@ -62,7 +62,7 @@ export interface RedisStreamManagerConfig {
  *
  * @example
  * ```typescript
- * import { MCPServer, RedisStreamManager } from 'mcp-use/server';
+ * import { MCPServer, RedisStreamManager } from 'mcp-use';
  * import { createClient } from 'redis';
  *
  * // Create two separate Redis clients (required for Pub/Sub)

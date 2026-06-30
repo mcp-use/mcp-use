@@ -25,7 +25,7 @@
  * 3. Or open the Inspector at http://localhost:3000/inspector
  */
 
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 import z from "zod";
 
 // Track current mode

@@ -1,4 +1,4 @@
-import { MCPServer, object, widget } from "mcp-use/server";
+import { MCPServer, object, widget } from "mcp-use";
 import { z } from "zod";
 import { setTimeout as sleep } from "timers/promises";
 

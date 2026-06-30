@@ -78,7 +78,7 @@ export interface McpProxyOptions {
  * @example
  * ```typescript
  * import { Hono } from "hono";
- * import { mountMcpProxy } from "mcp-use/server";
+ * import { mountMcpProxy } from "mcp-use";
  *
  * const app = new Hono();
  *

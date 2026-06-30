@@ -552,7 +552,7 @@ async function generateToolRegistryTypesForServer(
 
       // Native dynamic import with a cache-buster. With tsx registered
       // globally and without a namespace, the whole dependency tree (user
-      // entry + transitive `@/lib/...` imports + `mcp-use/server`) resolves
+      // entry + transitive `@/lib/...` imports + `mcp-use`) resolves
       // through tsx's tsconfig-aware resolver.
       await import(`${pathToFileURL(serverFile).href}?t=${Date.now()}`);
     } finally {
@@ -567,9 +567,11 @@ async function generateToolRegistryTypesForServer(
     }
 
     const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+    // `generateToolRegistryTypes` is re-exported from the `mcp-use` main entry
+    // (the server surface). The old `dist/src/server/index.js` runtime bundle no
+    // longer exists — that path now holds only declaration files.
     const { generateToolRegistryTypes } = await import(
-      pathToFileURL(path.join(mcpUsePath, "dist", "src", "server", "index.js"))
-        .href
+      pathToFileURL(path.join(mcpUsePath, "dist", "index.js")).href
     ).then((mod) => mod);
 
     if (!generateToolRegistryTypes) {
@@ -1680,7 +1682,7 @@ program
       // Resolve the widgets directory and expose it via an env var so the
       // running MCPServer (which picks `resources/` by default) discovers
       // widgets at `<mcpDir>/resources` when the developer used --mcp-dir.
-      // The env var is the contract: mcp-use/server reads it when no
+      // The env var is the contract: mcp-use reads it when no
       // explicit `resourcesDir` is passed to mountWidgets.
       {
         const devMcpDir = options.mcpDir as string | undefined;

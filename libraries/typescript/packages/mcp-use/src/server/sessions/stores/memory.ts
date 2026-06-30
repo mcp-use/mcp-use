@@ -28,7 +28,7 @@ import type { SessionMetadata } from "../session-manager.js";
  *
  * @example
  * ```typescript
- * import { MCPServer, InMemorySessionStore } from 'mcp-use/server';
+ * import { MCPServer, InMemorySessionStore } from 'mcp-use';
  *
  * const server = new MCPServer({
  *   name: 'my-server',

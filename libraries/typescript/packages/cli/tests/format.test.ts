@@ -14,7 +14,7 @@ import {
   formatKeyValue,
   formatPromptMessages,
 } from "../src/utils/format.js";
-import type { CallToolResult } from "mcp-use";
+import type { CallToolResult } from "@mcp-use/client";
 
 describe("Format Utilities", () => {
   describe("formatTable", () => {

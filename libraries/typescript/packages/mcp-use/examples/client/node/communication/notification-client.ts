@@ -26,7 +26,7 @@ import {
   MCPSession,
   type Notification,
   type Root,
-} from "mcp-use";
+} from "@mcp-use/client";
 
 const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
 

@@ -9,7 +9,7 @@
  */
 
 import type { OAuth2Server } from "oauth2-mock-server";
-import { MCPServer, oauthCustomProvider, text, object } from "mcp-use/server";
+import { MCPServer, oauthCustomProvider, text, object } from "mcp-use";
 
 export interface OAuthProviderConfig {
   name: string;

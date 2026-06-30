@@ -3,7 +3,7 @@
  */
 
 import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
-import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
+import { BrowserMCPClient } from "@mcp-use/client";
 import {
   handleElicitation,
   isAuthScenario,
@@ -13,7 +13,7 @@ import {
   type ConformanceSession,
 } from "./conformance-shared.js";
 import { createOAuthRetryFetch } from "./oauth-retry-fetch.js";
-import { probeAuthParams } from "mcp-use";
+import { probeAuthParams } from "@mcp-use/client";
 import { createHeadlessConformanceOAuthProvider } from "./headless-oauth-provider.js";
 
 async function main(): Promise<void> {

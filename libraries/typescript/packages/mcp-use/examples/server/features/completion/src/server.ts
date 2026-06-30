@@ -1,4 +1,4 @@
-import { MCPServer, completable } from "mcp-use/server";
+import { MCPServer, completable } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({

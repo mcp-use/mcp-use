@@ -27,7 +27,7 @@ import {
   oauthSupabaseProvider,
   error,
   object,
-} from "mcp-use/server";
+} from "mcp-use";
 import { createClient } from "@supabase/supabase-js";
 import { mountAuthRoutes } from "./auth-routes.js";
 

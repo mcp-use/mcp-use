@@ -22,7 +22,7 @@ import {
   jwksVerifier,
   object,
   error,
-} from "mcp-use/server";
+} from "mcp-use";
 
 const domain = process.env.AUTH0_DOMAIN;
 const clientId = process.env.AUTH0_CLIENT_ID;

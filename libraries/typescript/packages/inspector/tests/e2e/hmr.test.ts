@@ -453,7 +453,7 @@ server.tool(
     const minimalServer = `/**
  * Minimal server for HMR blank test
  */
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 
 const server = new MCPServer({
   name: "ConformanceTestServer",
@@ -475,7 +475,7 @@ await server.listen();
     const addToolContent = `/**
  * Minimal server for HMR blank test
  */
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 
 const server = new MCPServer({
   name: "ConformanceTestServer",

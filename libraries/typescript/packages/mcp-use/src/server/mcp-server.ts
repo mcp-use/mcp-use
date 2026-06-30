@@ -3329,11 +3329,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @returns This server instance for method chaining
    *
    * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
-   * `widget`, etc.) are exported from `mcp-use/server` — see {@link text}.
+   * `widget`, etc.) are exported from `mcp-use` — see {@link text}.
    *
    * @example
    * ```typescript
-   * import { text } from "mcp-use/server";
+   * import { text } from "mcp-use";
    *
    * // Basic tool
    * server.tool({
@@ -3346,7 +3346,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @example
    * ```typescript
-   * import { text } from "mcp-use/server";
+   * import { text } from "mcp-use";
    * import { z } from "zod";
    *
    * // Tool with parameters
@@ -3364,7 +3364,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @example
    * ```typescript
-   * import { text, error } from "mcp-use/server";
+   * import { text, error } from "mcp-use";
    *
    * // Tool with context (for OAuth)
    * server.tool({

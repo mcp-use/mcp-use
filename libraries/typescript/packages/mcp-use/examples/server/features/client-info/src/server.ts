@@ -36,7 +36,7 @@
  * ctx.auth (requires OAuth) provides server-verified identity (email, scopes).
  */
 
-import { MCPServer, object, text, widget } from "mcp-use/server";
+import { MCPServer, object, text, widget } from "mcp-use";
 import z from "zod";
 
 const server = new MCPServer({

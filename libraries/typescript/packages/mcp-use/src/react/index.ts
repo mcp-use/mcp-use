@@ -30,6 +30,7 @@ export {
 } from "./useWidget.js";
 export type {
   API,
+  AppsSdkWindowOpenAi,
   CallToolResponse,
   FileMetadata,
   MessageContentBlock,

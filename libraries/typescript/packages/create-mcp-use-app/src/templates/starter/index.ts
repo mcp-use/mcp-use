@@ -1,4 +1,4 @@
-import { MCPServer, object, text, completable } from "mcp-use/server";
+import { MCPServer, object, text, completable } from "mcp-use";
 import { z } from "zod";
 
 // Create MCP server instance

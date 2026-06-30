@@ -181,7 +181,7 @@ describe("HMR CLI Integration", () => {
     { timeout: 60000 },
     async () => {
       const initialContent = `
-      import { MCPServer, object } from "mcp-use/server";
+      import { MCPServer, object } from "mcp-use";
       
       const server = new MCPServer({
         name: "test-server",
@@ -211,7 +211,7 @@ describe("HMR CLI Integration", () => {
 
       // Modify file to add new tool
       const updatedContent = `
-      import { MCPServer, object } from "mcp-use/server";
+      import { MCPServer, object } from "mcp-use";
       
       const server = new MCPServer({
         name: "test-server",
@@ -256,7 +256,7 @@ describe("HMR CLI Integration", () => {
 
   it("should handle syntax errors gracefully", { timeout: 60000 }, async () => {
     const validContent = `
-      import { MCPServer, object } from "mcp-use/server";
+      import { MCPServer, object } from "mcp-use";
       
       const server = new MCPServer({
         name: "test-server",
@@ -282,7 +282,7 @@ describe("HMR CLI Integration", () => {
 
     // Introduce syntax error
     const brokenContent = `
-      import { MCPServer, object } from "mcp-use/server";
+      import { MCPServer, object } from "mcp-use";
       
       const server = new MCPServer({
         name: "test-server",
@@ -351,7 +351,7 @@ describe("HMR CLI Integration", () => {
     { timeout: 60000 },
     async () => {
       const initialContent = `
-      import { MCPServer, object } from "mcp-use/server";
+      import { MCPServer, object } from "mcp-use";
       
       const server = new MCPServer({
         name: "test-server",
@@ -376,7 +376,7 @@ describe("HMR CLI Integration", () => {
 
       // Update description
       const updatedContent = `
-      import { MCPServer, object } from "mcp-use/server";
+      import { MCPServer, object } from "mcp-use";
       
       const server = new MCPServer({
         name: "test-server",

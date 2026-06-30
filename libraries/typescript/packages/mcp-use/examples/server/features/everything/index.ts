@@ -18,7 +18,7 @@ import {
   widget,
   // Completion helper
   completable,
-} from "mcp-use/server";
+} from "mcp-use";
 import { z } from "zod";
 
 // Fetch a stable seeded image from picsum.photos and cache the base64 bytes

@@ -192,7 +192,7 @@ function defaultGetUserInfo(payload: Record<string, unknown>): UserInfo {
  *
  * @example Okta (JWT access tokens with JWKS)
  * ```typescript
- * import { MCPServer, oauthProxy, jwksVerifier } from "mcp-use/server";
+ * import { MCPServer, oauthProxy, jwksVerifier } from "mcp-use";
  *
  * const server = new MCPServer({
  *   name: "my-server",

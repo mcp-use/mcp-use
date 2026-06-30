@@ -194,7 +194,7 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { MCPServer, RedisSessionStore } from 'mcp-use/server';
+   * import { MCPServer, RedisSessionStore } from 'mcp-use';
    * import { createClient } from 'redis';
    *
    * const redis = createClient({ url: process.env.REDIS_URL });
@@ -221,7 +221,7 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { MCPServer, RedisStreamManager, RedisSessionStore } from 'mcp-use/server';
+   * import { MCPServer, RedisStreamManager, RedisSessionStore } from 'mcp-use';
    * import { createClient } from 'redis';
    *
    * // Create two Redis clients (Pub/Sub requires dedicated client)
@@ -262,7 +262,7 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server';
+   * import { MCPServer, oauthSupabaseProvider } from 'mcp-use';
    *
    * // Supabase OAuth
    * const server = new MCPServer({

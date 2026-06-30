@@ -17,7 +17,7 @@
  */
 
 // @ts-nocheck
-import { MCPServer, oauthBetterAuthProvider, object } from "mcp-use/server";
+import { MCPServer, oauthBetterAuthProvider, object } from "mcp-use";
 import { auth } from "./auth.js";
 import {
   oauthProviderAuthServerMetadata,

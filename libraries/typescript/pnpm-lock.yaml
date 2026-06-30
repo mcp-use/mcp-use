@@ -583,9 +583,6 @@ importers:
 
   packages/mcp-use:
     dependencies:
-      '@e2b/code-interpreter':
-        specifier: ^2.2.0
-        version: 2.3.3
       '@hono/node-server':
         specifier: '>=1.19.10'
         version: 1.19.13(hono@4.12.23)
@@ -595,9 +592,6 @@ importers:
       '@mcp-use/cli':
         specifier: workspace:*
         version: link:../cli
-      '@mcp-use/client':
-        specifier: workspace:*
-        version: link:../client
       '@mcp-use/inspector':
         specifier: workspace:*
         version: link:../inspector
@@ -632,6 +626,9 @@ importers:
         specifier: ^7.15.0
         version: 7.16.0(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
     devDependencies:
+      '@mcp-use/client':
+        specifier: workspace:*
+        version: link:../client
       '@types/morgan':
         specifier: ^1.9.10
         version: 1.9.10

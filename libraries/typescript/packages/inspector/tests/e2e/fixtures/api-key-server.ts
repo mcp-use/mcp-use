@@ -5,7 +5,7 @@
  * Valid API key: test-api-key-12345
  */
 
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 import { z } from "zod";
 
 const VALID_API_KEY = "test-api-key-12345";
