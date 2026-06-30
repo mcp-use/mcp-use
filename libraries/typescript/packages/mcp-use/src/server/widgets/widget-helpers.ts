@@ -12,7 +12,8 @@ import type {
   UIResourceDefinition,
   WidgetProps,
 } from "../types/index.js";
-import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import { resolveWorkspace } from "../config/paths.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -185,12 +186,8 @@ export async function readBuildManifest(): Promise<{
   buildId?: string;
 } | null> {
   try {
-    const manifestPath = pathHelpers.join(
-      isDeno ? "." : getCwd(),
-      "dist",
-      "mcp-use.json"
-    );
-    const content = await fsHelpers.readFileSync(manifestPath, "utf8");
+    const { paths } = await resolveWorkspace();
+    const content = await fsHelpers.readFileSync(paths.buildManifest, "utf8");
     return JSON.parse(content);
   } catch {
     return null;
@@ -699,7 +696,7 @@ async function readWidgetHtml(
  * ```typescript
  * await registerWidgetFromTemplate(
  *   'kanban-board',
- *   './dist/resources/widgets/kanban-board/index.html',
+ *   '.mcp-use/build/resources/widgets/kanban-board/index.html',
  *   { title: 'Kanban Board' },
  *   serverConfig,
  *   registerWidget,
@@ -746,7 +743,10 @@ export async function registerWidgetFromTemplate(
  * This function encapsulates the common pattern of serving static files.
  *
  * @param app - Hono app instance to mount routes on
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from the build output's public/
+ *   (production) or the project public/ (dev)
+ * @param buildDir - Absolute build output dir; required when useDistDirectory
+ *   is true (production serves from `<buildDir>/public`)
  *
  * @example
  * ```typescript
@@ -754,17 +754,22 @@ export async function registerWidgetFromTemplate(
  * setupPublicRoutes(app, false);
  *
  * // For production mode
- * setupPublicRoutes(app, true);
+ * setupPublicRoutes(app, true, buildDir);
  * ```
  */
 export function setupPublicRoutes(
   app: HonoType,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  buildDir?: string
 ): void {
   app.get("/mcp-use/public/*", async (c: Context) => {
     const filePath = c.req.path.replace("/mcp-use/public/", "");
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, filePath);
+    // Production: serve from the build output's public/ dir; dev: project public/.
+    const publicDir =
+      useDistDirectory && buildDir
+        ? pathHelpers.join(buildDir, "public")
+        : pathHelpers.join(getCwd(), "public");
+    const fullPath = pathHelpers.join(publicDir, filePath);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {
@@ -790,7 +795,10 @@ export function setupPublicRoutes(
  *
  * @param app - Hono app instance to mount routes on
  * @param faviconPath - Path to favicon file relative to public directory
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from the build output's public/
+ *   (production) or the project public/ (dev)
+ * @param buildDir - Absolute build output dir; required when useDistDirectory
+ *   is true (production serves from `<buildDir>/public`)
  *
  * @example
  * ```typescript
@@ -798,21 +806,25 @@ export function setupPublicRoutes(
  * setupFaviconRoute(app, 'favicon.ico', false);
  *
  * // For production mode
- * setupFaviconRoute(app, 'favicon.ico', true);
+ * setupFaviconRoute(app, 'favicon.ico', true, buildDir);
  * ```
  */
 export function setupFaviconRoute(
   app: HonoType,
   faviconPath: string | undefined,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  buildDir?: string
 ): void {
   if (!faviconPath) {
     return; // No favicon configured
   }
 
   app.get("/favicon.ico", async (c: Context) => {
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, faviconPath);
+    const publicDir =
+      useDistDirectory && buildDir
+        ? pathHelpers.join(buildDir, "public")
+        : pathHelpers.join(getCwd(), "public");
+    const fullPath = pathHelpers.join(publicDir, faviconPath);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {

@@ -8,6 +8,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { BUILD_MANIFEST_NAME, resolveWorkspace } from "mcp-use/config";
 import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
@@ -599,6 +600,10 @@ async function buildWidgets(
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
 
+  // Resolve the per-project `.mcp-use/` workspace so widget build output and
+  // scratch land under it (build/ and cache/) instead of a hardcoded dist/.
+  const { paths } = await resolveWorkspace({ cwd: projectPath });
+
   // Resolve the widgets directory. Callers pass a relative path via
   // `widgetsDir` (from config / --widgets-dir / --mcp-dir); default is "resources".
   const widgetsDirRelative = options.widgetsDir ?? "resources";
@@ -708,8 +713,8 @@ async function buildWidgets(
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
-    // Create temp directory for build artifacts
-    const tempDir = path.join(projectPath, ".mcp-use", widgetName);
+    // Create temp directory for build artifacts (disposable dev/build scratch)
+    const tempDir = path.join(paths.cache, widgetName);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Create CSS file with Tailwind directives
@@ -778,13 +783,7 @@ if (container && Component) {
     await fs.writeFile(path.join(tempDir, "index.html"), htmlContent, "utf8");
 
     // Build with Vite
-    const outDir = path.join(
-      projectPath,
-      "dist",
-      "resources",
-      "widgets",
-      widgetName
-    );
+    const outDir = path.join(paths.build, "resources", "widgets", widgetName);
 
     const baseUrl = getWidgetAssetBase(mcpUrl, widgetName);
 
@@ -792,11 +791,7 @@ if (container && Component) {
     let widgetMetadata: any = {};
     try {
       // Use a completely isolated temp directory for metadata extraction to avoid conflicts
-      const metadataTempDir = path.join(
-        projectPath,
-        ".mcp-use",
-        `${widgetName}-metadata`
-      );
+      const metadataTempDir = path.join(paths.cache, `${widgetName}-metadata`);
       await fs.mkdir(metadataTempDir, { recursive: true });
 
       const { createServer } = await import("vite");
@@ -1309,9 +1304,14 @@ async function collectTsFiles(
 /**
  * Transpile TypeScript files using esbuild instead of tsc.
  * esbuild strips types without analyzing them, so it cannot OOM on complex types.
- * Reads the project's tsconfig.json to determine source files, outDir, and compiler options.
+ * Reads the project's tsconfig.json to determine source files and compiler
+ * options; the output location is the workspace build dir (`buildDir`), NOT the
+ * tsconfig `outDir`.
  */
-async function transpileWithEsbuild(projectPath: string): Promise<void> {
+async function transpileWithEsbuild(
+  projectPath: string,
+  buildDir: string
+): Promise<void> {
   const esbuild = await import("esbuild");
   const { promises: fs } = await import("node:fs");
 
@@ -1325,7 +1325,6 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
   }
 
   const compilerOptions = tsconfig.compilerOptions || {};
-  const outDir = compilerOptions.outDir || "./dist";
   const includePatterns = tsconfig.include || ["**/*.ts", "**/*.tsx"];
   const excludePatterns = tsconfig.exclude || ["node_modules", "dist"];
 
@@ -1362,7 +1361,7 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
 
   await esbuild.build({
     entryPoints: files.map((f) => path.join(projectPath, f)),
-    outdir: path.join(projectPath, outDir),
+    outdir: buildDir,
     outbase,
     bundle: true,
     packages: "external",
@@ -1403,6 +1402,10 @@ program
     try {
       const projectPath = path.resolve(options.path);
       const { promises: fs } = await import("node:fs");
+
+      // Resolve the per-project `.mcp-use/` workspace. Build output, the build
+      // manifest, and tunnel state all root at the project being built.
+      const { paths } = await resolveWorkspace({ cwd: projectPath });
 
       displayPackageVersions(projectPath);
 
@@ -1482,7 +1485,7 @@ program
       // manifest written below still records the .ts source as the entry.
       if (!mcpDir) {
         console.log(chalk.gray("Building TypeScript..."));
-        await transpileWithEsbuild(projectPath);
+        await transpileWithEsbuild(projectPath, paths.build);
         console.log(chalk.green("✓ TypeScript build complete!"));
       } else {
         console.log(
@@ -1535,18 +1538,24 @@ program
         if (mcpDir) {
           entryPoint = sourceServerFile;
         } else {
-          // Check possible output locations based on common tsconfig patterns
-          // tsc may or may not preserve the src/ prefix depending on rootDir setting
+          // Check possible output locations under the workspace build dir.
+          // tsc/esbuild may or may not preserve the src/ prefix depending on
+          // the rootDir setting.
           const baseName = path.basename(sourceServerFile, ".ts") + ".js";
           const possibleOutputs = [
-            `dist/${baseName}`, // rootDir set to project root or src
-            `dist/src/${baseName}`, // no rootDir, source in src/
-            `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+            baseName, // rootDir set to project root or src
+            path.join("src", baseName), // no rootDir, source in src/
+            sourceServerFile.replace(/\.ts$/, ".js"), // exact path preserved
           ];
           for (const candidate of possibleOutputs) {
+            const absolute = path.join(paths.build, candidate);
             try {
-              await access(path.join(projectPath, candidate));
-              entryPoint = candidate;
+              await access(absolute);
+              // Store project-relative (forward slashes) — `mcp-use start`
+              // resolves it via path.join(projectPath, manifest.entryPoint).
+              entryPoint = path
+                .relative(projectPath, absolute)
+                .replace(/\\/g, "/");
               break;
             } catch {
               continue;
@@ -1560,7 +1569,7 @@ program
       try {
         await fs.access(publicDir);
         console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+        await fs.cp(publicDir, path.join(paths.build, "public"), {
           recursive: true,
         });
         console.log(chalk.green("✓ Public assets copied"));
@@ -1568,14 +1577,18 @@ program
         // Public folder doesn't exist, skip
       }
 
-      // Create build manifest
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      // Create build manifest. Tunnel state now lives in its own file
+      // (paths.tunnel) and is no longer persisted inside the manifest.
+      const manifestPath = paths.buildManifest;
 
-      // Read existing manifest to preserve tunnel subdomain and other fields
+      // Read existing manifest to preserve any third-party/forward-compat
+      // fields. (Tunnel subdomain is intentionally NOT preserved here — it
+      // lives in paths.tunnel.)
       let existingManifest: any = {};
       try {
         const existingContent = await fs.readFile(manifestPath, "utf-8");
         existingManifest = JSON.parse(existingContent);
+        delete existingManifest.tunnel;
       } catch {
         // File doesn't exist, that's okay
       }
@@ -1597,9 +1610,9 @@ program
         .digest("hex")
         .substring(0, 16); // Use first 16 chars for shorter IDs
 
-      // Merge with existing manifest, preserving tunnel and other fields
+      // Merge with existing manifest, preserving any forward-compat fields.
       const manifest = {
-        ...existingManifest, // Preserve existing fields like tunnel
+        ...existingManifest,
         includeInspector,
         buildTime,
         buildId,
@@ -1658,6 +1671,8 @@ program
     try {
       process.env.MCP_USE_CLI_DEV = "1";
       const projectPath = path.resolve(options.path);
+      // Resolve the per-project `.mcp-use/` workspace (tunnel state lives here).
+      const { paths } = await resolveWorkspace({ cwd: projectPath });
       let port = parseInt(options.port, 10);
       const host = options.host;
       const useHmr = options.hmr !== false;
@@ -1699,13 +1714,13 @@ program
 
       if (options.tunnel) {
         try {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const tunnelStatePath = paths.tunnel;
           let existingSubdomain: string | undefined;
 
           try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
+            const tunnelContent = await readFile(tunnelStatePath, "utf-8");
+            const tunnelState = JSON.parse(tunnelContent);
+            existingSubdomain = tunnelState.subdomain;
             if (existingSubdomain) {
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
@@ -1721,7 +1736,7 @@ program
               }
             }
           } catch {
-            // Manifest doesn't exist or is invalid, that's okay
+            // Tunnel state doesn't exist or is invalid, that's okay
           }
 
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
@@ -1745,29 +1760,16 @@ program
 
           // Persist subdomain for reuse across restarts
           try {
-            let manifest: any = {};
-            try {
-              const manifestContent = await readFile(manifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch {
-              // File doesn't exist, create new manifest
-            }
-
-            if (!manifest.tunnel) {
-              manifest.tunnel = {};
-            }
-            manifest.tunnel.subdomain = tunnelSubdomain;
-
-            await mkdir(path.dirname(manifestPath), { recursive: true });
+            await mkdir(path.dirname(tunnelStatePath), { recursive: true });
             await writeFile(
-              manifestPath,
-              JSON.stringify(manifest, null, 2),
+              tunnelStatePath,
+              JSON.stringify({ subdomain: tunnelSubdomain }, null, 2),
               "utf-8"
             );
           } catch (error) {
             console.warn(
               chalk.yellow(
-                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+                `⚠️  Failed to save subdomain to tunnel state file: ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -2436,12 +2438,12 @@ program
         // 2. Start tunnel if requested
         tunnelUrl = undefined;
         if (withTunnel) {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const tunnelStatePath = paths.tunnel;
           let existingSubdomain: string | undefined;
           try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
+            const tunnelContent = await readFile(tunnelStatePath, "utf-8");
+            const tunnelState = JSON.parse(tunnelContent);
+            existingSubdomain = tunnelState.subdomain;
             if (existingSubdomain) {
               const apiBase =
                 process.env.MCP_USE_API || "https://local.mcp-use.run";
@@ -2478,17 +2480,12 @@ program
 
           // Persist subdomain
           try {
-            const mPath = path.join(projectPath, "dist", "mcp-use.json");
-            let manifest: any = {};
-            try {
-              manifest = JSON.parse(await readFile(mPath, "utf-8"));
-            } catch {
-              /* ignore */
-            }
-            if (!manifest.tunnel) manifest.tunnel = {};
-            manifest.tunnel.subdomain = tunnelSubdomain;
-            await mkdir(path.dirname(mPath), { recursive: true });
-            await writeFile(mPath, JSON.stringify(manifest, null, 2), "utf-8");
+            await mkdir(path.dirname(tunnelStatePath), { recursive: true });
+            await writeFile(
+              tunnelStatePath,
+              JSON.stringify({ subdomain: tunnelSubdomain }, null, 2),
+              "utf-8"
+            );
           } catch {
             /* ignore */
           }
@@ -2626,6 +2623,9 @@ program
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
+      // Resolve the per-project `.mcp-use/` workspace (build output + manifest +
+      // tunnel state all root at the project being started).
+      const { paths } = await resolveWorkspace({ cwd: projectPath });
       // Priority: --port flag > process.env.PORT > default
       // Check if --port or -p was explicitly provided in command line
       const portFlagProvided =
@@ -2656,14 +2656,14 @@ program
       let tunnelSubdomain: string | undefined = undefined;
       if (options.tunnel) {
         try {
-          // Read existing subdomain from mcp-use.json if available
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          // Read existing subdomain from the tunnel state file if available
+          const tunnelStatePath = paths.tunnel;
           let existingSubdomain: string | undefined;
 
           try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
+            const tunnelContent = await readFile(tunnelStatePath, "utf-8");
+            const tunnelState = JSON.parse(tunnelContent);
+            existingSubdomain = tunnelState.subdomain;
             if (existingSubdomain) {
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
@@ -2680,10 +2680,10 @@ program
               }
             }
           } catch (error) {
-            // Manifest doesn't exist or is invalid, that's okay
+            // Tunnel state doesn't exist or is invalid, that's okay
             console.debug(
               chalk.gray(
-                `Debug: Failed to read or parse mcp-use.json: ${error instanceof Error ? error.message : String(error)}`
+                `Debug: Failed to read or parse tunnel state file: ${error instanceof Error ? error.message : String(error)}`
               )
             );
           }
@@ -2708,35 +2708,19 @@ program
           const subdomain = tunnelInfo.subdomain;
           tunnelSubdomain = subdomain;
 
-          // Update mcp-use.json with the subdomain
+          // Persist the subdomain to the tunnel state file for reuse
           try {
-            let manifest: any = {};
-            try {
-              const manifestContent = await readFile(manifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch {
-              // File doesn't exist, create new manifest
-            }
-
-            // Update or add tunnel subdomain
-            if (!manifest.tunnel) {
-              manifest.tunnel = {};
-            }
-            manifest.tunnel.subdomain = subdomain;
-
-            // Ensure dist directory exists
-            await mkdir(path.dirname(manifestPath), { recursive: true });
-
-            // Write updated manifest
+            // Ensure the state directory exists
+            await mkdir(path.dirname(tunnelStatePath), { recursive: true });
             await writeFile(
-              manifestPath,
-              JSON.stringify(manifest, null, 2),
+              tunnelStatePath,
+              JSON.stringify({ subdomain }, null, 2),
               "utf-8"
             );
           } catch (error) {
             console.warn(
               chalk.yellow(
-                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+                `⚠️  Failed to save subdomain to tunnel state file: ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -2749,7 +2733,7 @@ program
       // Find the built server file
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      const manifestPath = paths.buildManifest;
 
       try {
         const manifestContent = await readFile(manifestPath, "utf-8");
@@ -2763,10 +2747,17 @@ program
         // Manifest doesn't exist or entryPoint not set, fall back to searching
       }
 
+      // Project-relative path to a file under the workspace build dir (forward
+      // slashes; resolved below via path.join(projectPath, candidate)).
+      const buildRel = (...segments: string[]) =>
+        path
+          .relative(projectPath, path.join(paths.build, ...segments))
+          .replace(/\\/g, "/");
+
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
         // Resolve mcpDir from CLI flag so `--mcp-dir src/mcp` finds the
-        // entry at dist/src/mcp/index.js (legacy transpile mode) or the TS
+        // entry at <build>/src/mcp/index.js (legacy transpile mode) or the TS
         // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
         // and `start` runs the source via tsx).
         const startMcpDir = options.mcpDir as string | undefined;
@@ -2776,14 +2767,14 @@ program
             ? [
                 `${startMcpDir}/index.ts`,
                 `${startMcpDir}/index.tsx`,
-                `dist/${startMcpDir}/index.js`,
-                `dist/${startMcpDir}/server.js`,
+                buildRel(startMcpDir, "index.js"),
+                buildRel(startMcpDir, "server.js"),
               ]
             : []),
-          "dist/index.js",
-          "dist/server.js",
-          "dist/src/index.js",
-          "dist/src/server.js",
+          buildRel("index.js"),
+          buildRel("server.js"),
+          buildRel("src", "index.js"),
+          buildRel("src", "server.js"),
         ];
 
         for (const candidate of serverCandidates) {
@@ -2798,9 +2789,11 @@ program
       }
 
       if (!serverFile) {
+        const buildDirRel =
+          path.relative(projectPath, paths.build).replace(/\\/g, "/") || ".";
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - ${buildRel(BUILD_MANIFEST_NAME)} (manifest with entryPoint)\n  - ${buildRel("index.js")}\n  - ${buildRel("server.js")}\n  - ${buildRel("src", "index.js")}\n  - ${buildRel("src", "server.js")}\n\n(build output: ${buildDirRel}/)`
           )
         );
         process.exit(1);

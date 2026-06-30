@@ -7,7 +7,6 @@ import type { Readable } from "node:stream";
 const EXCLUDE_DIRS = new Set([
   ".git",
   "node_modules",
-  "dist",
   "build",
   ".next",
   ".turbo",

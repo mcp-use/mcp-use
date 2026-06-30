@@ -24,6 +24,14 @@ export const CONFIG_SCHEMA_URL = "https://schema.mcp-use.dev/mcp-use.v1.json";
 /** The config file name the loader walks up the directory tree to find. */
 export const CONFIG_FILE_NAME = "mcp-use.json";
 
+/**
+ * Default build output directory, project-relative. Lives inside the
+ * `.mcp-use/` workspace by default (the Next.js `.next` analog). Shared with
+ * the workspace path deriver (`./paths.ts`) so the schema and the filesystem
+ * layout never drift.
+ */
+export const DEFAULT_OUT_DIR = ".mcp-use/build";
+
 const devSchema = z
   .strictObject({
     port: z.number().int().default(3000),
@@ -86,7 +94,7 @@ export const configSchema = z.strictObject({
   entry: z.string().optional(),
   viewsDir: z.string().default("resources"),
   publicDir: z.string().default("public"),
-  outDir: z.string().default(".mcp-use/build"),
+  outDir: z.string().default(DEFAULT_OUT_DIR),
   basePath: z.string().default("/mcp"),
   assetPrefix: z.string().nullable().default(null),
   dev: devSchema,

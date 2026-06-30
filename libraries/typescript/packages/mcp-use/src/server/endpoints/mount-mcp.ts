@@ -6,7 +6,6 @@
  */
 
 import type { Context, Hono as HonoType } from "hono";
-import { join } from "node:path";
 import { Telemetry } from "../../telemetry/telemetry-node.js";
 import { generateLandingPage } from "../landing.js";
 import type { SessionData, StreamManager } from "../sessions/index.js";
@@ -167,9 +166,8 @@ export async function mountMcp(
     config.sessionStore ??
     (isProductionMode
       ? new InMemorySessionStore()
-      : new FileSystemSessionStore({
-          path: join(process.cwd(), ".mcp-use", "sessions.json"),
-        }));
+      : // Default path: .mcp-use/state/sessions.json (see FileSystemSessionStore).
+        new FileSystemSessionStore());
 
   // Initialize stream manager (pluggable - can be Redis Pub/Sub, Postgres NOTIFY, etc.)
   // Manages active SSE connections for notifications, sampling, resource subscriptions

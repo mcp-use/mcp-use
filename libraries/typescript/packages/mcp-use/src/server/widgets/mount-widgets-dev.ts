@@ -10,6 +10,7 @@ import type { Context, Hono as HonoType, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import { resolveWorkspace } from "../config/paths.js";
 import {
   registerWidgetFromTemplate,
   setupFaviconRoute,
@@ -22,8 +23,6 @@ import type {
   ServerConfig,
   UpdateWidgetToolCallback,
 } from "./widget-types.js";
-
-const TMP_MCP_USE_DIR = ".mcp-use";
 
 const DEFAULT_HMR_PORT = 24678;
 
@@ -160,18 +159,23 @@ export async function mountWidgetsDev(
     console.log("[WIDGETS] Mounting widgets in development mode");
   }
 
-  // Create a temp directory for widget entry files
-  const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
+  // Create a temp directory for widget entry files under the workspace cache
+  // (`.mcp-use/cache/`). This MUST be a dedicated subdir, not `.mcp-use/`
+  // itself: the stale-widget cleanup below removes every directory that isn't a
+  // current widget, which would otherwise destroy the sibling workspace dirs
+  // (build/, generated/, state/, cloud/).
+  const { paths } = await resolveWorkspace();
+  const tempDir = paths.cache;
 
-  // Clean up stale widget directories in .mcp-use
+  // Clean up stale widget directories in .mcp-use/cache
   try {
-    // Check if .mcp-use exists
+    // Check if the cache dir exists
     await fs.access(tempDir);
 
     // Get list of current widget names
     const currentWidgetNames = new Set(entries.map((e) => e.name));
 
-    // Read existing directories in .mcp-use
+    // Read existing directories in the cache dir
     const existingDirs = await fs.readdir(tempDir, { withFileTypes: true });
 
     // Remove directories that are not in current widgets
@@ -183,7 +187,7 @@ export async function mountWidgetsDev(
       }
     }
   } catch {
-    // .mcp-use doesn't exist yet, no cleanup needed
+    // Cache dir doesn't exist yet, no cleanup needed
   }
 
   await fs.mkdir(tempDir, { recursive: true }).catch(() => {});

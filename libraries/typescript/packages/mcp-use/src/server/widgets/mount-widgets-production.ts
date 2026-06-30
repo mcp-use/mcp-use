@@ -1,13 +1,16 @@
 /**
  * Production mode widget mounting
  *
- * This module handles serving pre-built widgets from the dist/resources/widgets/ directory.
- * Widgets are built using the 'mcp-use build' command and served as static files in production.
+ * This module handles serving pre-built widgets from the build output's
+ * `resources/widgets/` directory (`<outDir>/resources/widgets/`, default
+ * `.mcp-use/build/resources/widgets/`). Widgets are built using the
+ * 'mcp-use build' command and served as static files in production.
  */
 
 import type { Hono as HonoType } from "hono";
 import type { WidgetMetadata } from "../types/widget.js";
-import { isDeno, pathHelpers, fsHelpers, getCwd } from "../utils/runtime.js";
+import { pathHelpers, fsHelpers } from "../utils/runtime.js";
+import { BUILD_MANIFEST_NAME } from "../config/paths.js";
 import { registerWidgetFromTemplate } from "./widget-helpers.js";
 import type {
   ServerConfig,
@@ -41,16 +44,16 @@ export async function mountWidgetsProduction(
 ): Promise<void> {
   const baseRoute = options?.baseRoute || "/mcp-use/widgets";
   const widgetsDir = pathHelpers.join(
-    isDeno ? "." : getCwd(),
-    "dist",
+    serverConfig.buildDir,
     "resources",
     "widgets"
   );
 
-  console.log("widgetsDir", widgetsDir);
-
   // Discover built widgets from manifest
-  const manifestPath = "./dist/mcp-use.json";
+  const manifestPath = pathHelpers.join(
+    serverConfig.buildDir,
+    BUILD_MANIFEST_NAME
+  );
   let widgets: string[] = [];
   let widgetsMetadata: Record<string, any> = {};
 
@@ -109,7 +112,7 @@ export async function mountWidgetsProduction(
   }
 
   console.log(
-    `[WIDGETS] Serving ${widgets.length} pre-built widget(s) from dist/resources/widgets/`
+    `[WIDGETS] Serving ${widgets.length} pre-built widget(s) from ${widgetsDir}`
   );
 
   // Register tools and resources for each widget

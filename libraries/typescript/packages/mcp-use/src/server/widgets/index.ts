@@ -8,6 +8,7 @@
 import type { MCPServer } from "../mcp-server.js";
 import type { RegisterWidgetCallback } from "./widget-types.js";
 import { isDeno } from "../utils/runtime.js";
+import { resolveWorkspace } from "../config/paths.js";
 import { isProductionMode, getCSPUrls } from "../utils/index.js";
 import { mountWidgetsDev } from "./mount-widgets-dev.js";
 import { mountWidgetsProduction } from "./mount-widgets-production.js";
@@ -39,11 +40,17 @@ export async function mountWidgets(
     resourcesDir?: string;
   }
 ): Promise<void> {
+  // Resolve the project's `.mcp-use/` workspace once at mount time. The build
+  // output dir (`paths.build`, configurable via `outDir`) is threaded into
+  // every production serve path, replacing the legacy hardcoded `dist/`.
+  const { paths } = await resolveWorkspace();
+
   const serverConfig = {
     serverBaseUrl:
       (server as any).serverBaseUrl ||
       `http://${(server as any).serverHost}:${(server as any).serverPort || 3000}`,
     serverPort: (server as any).serverPort || 3000,
+    buildDir: paths.build,
     cspUrls: getCSPUrls(),
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,

@@ -16,6 +16,12 @@ export interface ServerConfig {
   serverBaseUrl: string;
   /** Server port (optional for production) */
   serverPort?: number | string;
+  /**
+   * Absolute path to the build output directory (the configurable `outDir`,
+   * default `.mcp-use/build`). Production widget/asset serving resolves all
+   * built files under here, replacing the legacy hardcoded `dist/`.
+   */
+  buildDir: string;
   /** Additional CSP URLs for widget security */
   cspUrls: string[];
   /** Build ID from manifest for cache busting (optional) */

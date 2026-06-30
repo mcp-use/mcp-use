@@ -10,6 +10,7 @@ export {
   CONFIG_FILE_NAME,
   CONFIG_SCHEMA_URL,
   configSchema,
+  DEFAULT_OUT_DIR,
   type McpUseConfig,
   type ResolvedConfig,
 } from "./schema.js";
@@ -20,3 +21,12 @@ export {
   type LoadConfigOptions,
   type LoadConfigResult,
 } from "./loader.js";
+
+export {
+  BUILD_MANIFEST_NAME,
+  resolveWorkspace,
+  resolveWorkspacePaths,
+  type ResolvedWorkspace,
+  type WorkspacePaths,
+  WORKSPACE_DIR_NAME,
+} from "./paths.js";
