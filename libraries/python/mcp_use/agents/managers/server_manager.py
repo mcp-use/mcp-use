@@ -1,3 +1,5 @@
+from asyncio import gather
+
 from langchain_core.tools import BaseTool
 
 from mcp_use.agents.adapters.base import BaseAdapter
@@ -62,9 +64,11 @@ class ServerManager(BaseServerManager):
                 # Fetch tools, resources, and prompts if session is available
                 if session:
                     connector = session.connector
-                    tools = await self.adapter._create_tools_from_connectors([connector])
-                    resources = await self.adapter._create_resources_from_connectors([connector])
-                    prompts = await self.adapter._create_prompts_from_connectors([connector])
+                    tools, resources, prompts = await gather(
+                        self.adapter._create_tools_from_connectors([connector]),
+                        self.adapter._create_resources_from_connectors([connector]),
+                        self.adapter._create_prompts_from_connectors([connector]),
+                    )
                     all_tools = tools + resources + prompts
 
                     # Check if this server's tools have changed
