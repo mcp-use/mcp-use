@@ -1,0 +1,138 @@
+name: Weekly SDK Evals
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: "Agent harness to run"
+        type: choice
+        default: claude
+        options:
+          - claude
+          - codex
+      variants:
+        description: "Comma-separated variants, or all"
+        type: string
+        default: "noskill+blank,noskill+scaffold,skill+blank,skill+scaffold"
+      task:
+        description: "Optional task id; empty runs all tasks"
+        type: string
+        required: false
+      trials:
+        description: "Trials per task x variant"
+        type: string
+        default: "3"
+      timeout_min:
+        description: "Per-trial timeout in minutes"
+        type: string
+        default: "20"
+      evals_ref:
+        description: "mcp-use-evals ref to check out"
+        type: string
+        default: main
+  schedule:
+    - cron: "0 15 * * 1"
+
+concurrency:
+  group: weekly-sdk-evals-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evals:
+    name: Run SDK evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout mcp-use
+        uses: actions/checkout@v4
+        with:
+          path: mcp-use
+
+      - name: Checkout mcp-use-evals
+        uses: actions/checkout@v4
+        with:
+          repository: mcp-use/mcp-use-evals
+          ref: ${{ github.event.inputs.evals_ref || 'main' }}
+          path: mcp-use-evals
+          token: ${{ secrets.EVALS_REPO_TOKEN }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: mcp-use-evals/pnpm-lock.yaml
+
+      - name: Install eval dependencies
+        working-directory: mcp-use-evals
+        run: pnpm install --frozen-lockfile
+
+      - name: Run evals
+        working-directory: mcp-use-evals
+        env:
+          INPUT_AGENT: ${{ github.event.inputs.agent || 'claude' }}
+          INPUT_VARIANTS: ${{ github.event.inputs.variants || 'noskill+blank,noskill+scaffold,skill+blank,skill+scaffold' }}
+          INPUT_TASK: ${{ github.event.inputs.task }}
+          INPUT_TRIALS: ${{ github.event.inputs.trials || '3' }}
+          INPUT_TIMEOUT_MIN: ${{ github.event.inputs.timeout_min || '20' }}
+          MCP_USE_SKILL_DIR: ${{ github.workspace }}/mcp-use/skills/mcp-apps-builder
+          MCP_USE_EVAL_SANDBOX: docker
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CODEX_API_KEY: ${{ secrets.CODEX_API_KEY }}
+          MCP_USE_EVAL_NEW_DOCS_URL: ${{ vars.MCP_USE_EVAL_NEW_DOCS_URL }}
+        run: |
+          set -euo pipefail
+
+          args=(
+            --agent "$INPUT_AGENT"
+            --trials "$INPUT_TRIALS"
+            --timeout-min "$INPUT_TIMEOUT_MIN"
+          )
+
+          if [ -n "$INPUT_TASK" ]; then
+            args+=(--task "$INPUT_TASK")
+          fi
+
+          IFS=',' read -ra variants <<< "$INPUT_VARIANTS"
+          for raw_variant in "${variants[@]}"; do
+            variant="$(echo "$raw_variant" | xargs)"
+            if [ -n "$variant" ]; then
+              args+=(--variant "$variant")
+            fi
+          done
+
+          pnpm eval "${args[@]}"
+
+      - name: Add report to job summary
+        if: always()
+        working-directory: mcp-use-evals
+        run: |
+          latest_report=""
+          if [ -d results ]; then
+            latest_report="$(find results -name report.md -type f | sort | tail -n 1)"
+          fi
+          if [ -n "$latest_report" ]; then
+            cat "$latest_report" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No eval report was generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-evals-${{ github.run_id }}
+          path: mcp-use-evals/results/
+          if-no-files-found: warn
+          retention-days: 90
