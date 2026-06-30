@@ -1,9 +1,10 @@
 import traceback
+from typing import Any
 
 from mcp_use.logging import logger
 
 
-def format_error(error: Exception, **context) -> dict:
+def format_error(error: Exception, **context: Any) -> dict[str, Any]:
     """
     Formats an exception into a structured format that can be understood by LLMs.
 

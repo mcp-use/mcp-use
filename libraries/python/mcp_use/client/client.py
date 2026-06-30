@@ -529,6 +529,10 @@ class MCPClient:
             Dictionary with:
             - meta: Dictionary containing total_tools, namespaces, and result_count
             - results: List of tool information dictionaries matching the query
+
+        Raises:
+            ValueError: If detail_level is not one of "names", "descriptions", or "full".
+
         Example:
             ```python
             # Search for GitHub-related tools
@@ -538,6 +542,13 @@ class MCPClient:
                 print(f"{tool['server']}.{tool['name']}: {tool['description']}")
             ```
         """
+        # Validate detail_level parameter
+        valid_detail_levels = {"names", "descriptions", "full"}
+        if detail_level not in valid_detail_levels:
+            raise ValueError(
+                f"Invalid detail_level '{detail_level}'. Must be one of: {', '.join(sorted(valid_detail_levels))}"
+            )
+
         # Ensure all servers are connected if in code mode (lazy connection)
         if self.code_mode:
             configured = set(self.get_server_names())

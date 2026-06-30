@@ -48,7 +48,19 @@ class CodeExecutor:
                 - logs: List of captured print statements
                 - error: Error message if execution failed (None on success)
                 - execution_time: Time taken to execute in seconds
+
+        Raises:
+            TypeError: If code is not a string or timeout is not a number.
+            ValueError: If timeout is not positive.
         """
+        # Validate input types
+        if not isinstance(code, str):
+            raise TypeError(f"code must be a string, got {type(code).__name__}")
+        if not isinstance(timeout, (int, float)):
+            raise TypeError(f"timeout must be a number, got {type(timeout).__name__}")
+        if timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {timeout}")
+
         # Ensure all servers are connected (lazy connection)
         # We check client.sessions directly to see internal state
         configured_servers = set(self.client.get_server_names())
@@ -112,6 +124,10 @@ class CodeExecutor:
 
         Returns:
             The return value from executing the code.
+
+        Raises:
+            SyntaxError: If the code has a syntax error.
+            RuntimeError: If the code cannot be executed.
         """
         # Always wrap code in an async function to support top-level await
         # and return statements
@@ -120,8 +136,17 @@ class CodeExecutor:
             wrapped_code += f"    {line}\n"
 
         # Compile and execute the wrapper function definition
-        compiled_wrapped = compile(wrapped_code, "<agent_code>", "exec")
-        exec(compiled_wrapped, namespace)
+        try:
+            compiled_wrapped = compile(wrapped_code, "<agent_code>", "exec")
+        except SyntaxError as e:
+            logger.error(f"Syntax error in code execution: {e}")
+            raise
+
+        try:
+            exec(compiled_wrapped, namespace)
+        except Exception as e:
+            logger.error(f"Error executing code: {e}")
+            raise RuntimeError(f"Failed to execute code: {e}") from e
 
         # Execute the wrapper and return its result
         return await namespace["__execute_wrapper__"]()

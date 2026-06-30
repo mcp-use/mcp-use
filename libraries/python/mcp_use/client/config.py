@@ -30,9 +30,20 @@ def load_config_file(filepath: str) -> dict[str, Any]:
 
     Returns:
         The parsed configuration
+
+    Raises:
+        FileNotFoundError: If the configuration file does not exist.
+        json.JSONDecodeError: If the configuration file is not valid JSON.
     """
-    with open(filepath) as f:
-        return json.load(f)
+    try:
+        with open(filepath) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found: {filepath}")
+        raise
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in configuration file {filepath}: {e}")
+        raise
 
 
 def create_connector_from_config(
