@@ -1,4 +1,4 @@
-import { onMcpAuthorization } from "mcp-use/auth";
+import { onMcpAuthorization } from "@mcp-use/client/auth";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 

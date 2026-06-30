@@ -2,7 +2,7 @@
  * Node-only OAuth utilities for MCP. This entry pulls `node:http`,
  * `node:fs`, and `node:os` — do not import from browser code.
  *
- * For browser OAuth, use `mcp-use/auth` instead.
+ * For browser OAuth, use `@mcp-use/client/auth` instead.
  */
 
 export {

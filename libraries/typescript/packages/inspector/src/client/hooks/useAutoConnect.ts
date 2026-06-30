@@ -1,4 +1,4 @@
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/client/react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";

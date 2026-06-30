@@ -1,7 +1,7 @@
 import { cn } from "@/client/lib/utils";
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { X } from "lucide-react";
-import { useMcpClient } from "mcp-use/react";
+import { useMcpClient } from "@mcp-use/client/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MCP_APPS_CONFIG } from "../constants/mcp-apps";

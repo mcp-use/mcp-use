@@ -37,16 +37,6 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./auth": {
-      "types": "./dist/src/auth/index.d.ts",
-      "import": "./dist/src/auth/index.js",
-      "require": "./dist/src/auth/index.cjs"
-    },
-    "./auth/node": {
-      "types": "./dist/src/auth/index-node.d.ts",
-      "import": "./dist/src/auth/index-node.js",
-      "require": "./dist/src/auth/index-node.cjs"
-    },
     "./browser": {
       "types": "./dist/src/browser.d.ts",
       "import": "./dist/src/browser.js",

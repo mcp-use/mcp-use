@@ -17,7 +17,7 @@ import type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BrowserMCPClient } from "@mcp-use/client";
+import { BrowserMCPClient } from "../client/browser.js";
 import { Logger, type LogLevel, logger } from "../logging.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
 import { assert } from "./assert.js";

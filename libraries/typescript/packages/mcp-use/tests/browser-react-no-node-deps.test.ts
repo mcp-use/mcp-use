@@ -466,12 +466,12 @@ globalThis.document = {};
 globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} };
 import('${modulePath}')
   .then(m => {
-    if (!m.useMcp) throw new Error('useMcp not exported');
-    if (typeof m.useMcp !== 'function') throw new Error('useMcp is not a function');
-    if (!m.Tel) throw new Error('Tel not exported');
-    const tel = m.Tel.getInstance();
-    if (!tel) throw new Error('Tel.getInstance() returned falsy');
-    m.setTelemetrySource('test-source');
+    // mcp-use/react is the view runtime; the useMcp console moved to
+    // @mcp-use/client/react.
+    if (!m.useWidget) throw new Error('useWidget not exported');
+    if (typeof m.useWidget !== 'function') throw new Error('useWidget is not a function');
+    if (!m.useCallTool) throw new Error('useCallTool not exported');
+    if (typeof m.useCallTool !== 'function') throw new Error('useCallTool is not a function');
     console.log('__TEST_SUCCESS__');
   })
   .catch(e => { console.error('FAIL:', e.message); process.exit(1); });

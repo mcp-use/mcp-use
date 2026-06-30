@@ -9,7 +9,7 @@ import {
   LocalStorageProvider,
   McpClientProvider,
   type McpServer,
-} from "mcp-use/react";
+} from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";

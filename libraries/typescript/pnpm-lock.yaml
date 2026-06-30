@@ -257,6 +257,18 @@ importers:
         specifier: 4.3.5
         version: 4.3.5
     devDependencies:
+      '@types/react':
+        specifier: ^19.2.7
+        version: 19.2.17
+      jsdom:
+        specifier: ^27.0.0
+        version: 27.4.0(@noble/hashes@2.2.0)
+      react:
+        specifier: ^19.2.0
+        version: 19.2.4
+      react-test-renderer:
+        specifier: ^19.2.4
+        version: 19.2.4(react@19.2.4)
       vitest:
         specifier: '>=4.1.0'
         version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@25.6.0)(@vitest/coverage-v8@4.1.8)(jsdom@27.4.0(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@25.6.0)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
@@ -411,6 +423,9 @@ importers:
       '@hono/node-server':
         specifier: '>=1.19.10'
         version: 1.19.13(hono@4.12.23)
+      '@mcp-use/client':
+        specifier: workspace:*
+        version: link:../client
       '@modelcontextprotocol/ext-apps':
         specifier: ^1.0.1
         version: 1.0.1(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.3.5))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.3.5)
@@ -11135,11 +11150,11 @@ snapshots:
 
   '@types/react-syntax-highlighter@15.5.13':
     dependencies:
-      '@types/react': 19.2.14
+      '@types/react': 19.2.17
 
   '@types/react-test-renderer@19.1.0':
     dependencies:
-      '@types/react': 19.2.14
+      '@types/react': 19.2.17
 
   '@types/react@19.2.10':
     dependencies:

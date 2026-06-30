@@ -1,4 +1,4 @@
-import type { McpNotification } from "mcp-use/react";
+import type { McpNotification } from "@mcp-use/client/react";
 
 // Type alias for backward compatibility
 type MCPNotification = McpNotification;

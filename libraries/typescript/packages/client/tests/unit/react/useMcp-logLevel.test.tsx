@@ -16,7 +16,7 @@ import { act, create } from "react-test-renderer";
 import { Logger } from "../../../src/logging.js";
 
 // Mock the BrowserMCPClient and dependencies
-vi.mock("@mcp-use/client", async (importOriginal) => ({
+vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserMCPClient: vi.fn().mockImplementation(() => ({
     addServer: vi.fn(),

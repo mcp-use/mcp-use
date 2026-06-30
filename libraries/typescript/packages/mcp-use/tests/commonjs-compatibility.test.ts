@@ -19,14 +19,6 @@ describe("CommonJS Compatibility", () => {
     expect(typeof mcpUse.MCPClient).toBe("function");
   });
 
-  it("should import auth subpath from CommonJS bundle", () => {
-    const authModule = require("../dist/src/auth/index.cjs");
-
-    expect(authModule).toBeDefined();
-    expect(authModule.BrowserOAuthClientProvider).toBeDefined();
-    expect(typeof authModule.BrowserOAuthClientProvider).toBe("function");
-  });
-
   it("should import server subpath from CommonJS bundle", () => {
     const serverModule = require("../dist/src/server/index.cjs");
 
@@ -39,8 +31,10 @@ describe("CommonJS Compatibility", () => {
     const reactModule = require("../dist/src/react/index.cjs");
 
     expect(reactModule).toBeDefined();
-    expect(reactModule.useMcp).toBeDefined();
-    expect(typeof reactModule.useMcp).toBe("function");
+    // mcp-use/react is the view runtime; the useMcp console moved to
+    // @mcp-use/client/react.
+    expect(reactModule.useWidget).toBeDefined();
+    expect(typeof reactModule.useWidget).toBe("function");
   });
 
   it("should import browser subpath from CommonJS bundle", () => {

@@ -42,16 +42,9 @@ export {
 // Export version information (global)
 export { getPackageVersion, VERSION } from "./src/version.js";
 
-// Export new SDK-integrated auth utilities (recommended for new projects)
-export {
-  BrowserOAuthClientProvider,
-  onMcpAuthorization,
-  probeAuthParams,
-} from "./src/auth/index.js";
-export type { ProbeAuthParamsResult } from "./src/auth/index.js";
-export type { StoredState } from "./src/auth/types.js";
-
-// Export React hooks
+// Export the MCP-UI view runtime hooks (useWidget, useCallTool, ...).
+// The useMcp connection console + browser OAuth now live in @mcp-use/client
+// (@mcp-use/client/react and @mcp-use/client/auth).
 export * from "./src/react/index.js";
 
 export {

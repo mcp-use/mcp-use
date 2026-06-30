@@ -26,6 +26,21 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.js",
+      "require": "./dist/auth/index.cjs"
+    },
+    "./auth/node": {
+      "types": "./dist/auth/index-node.d.ts",
+      "import": "./dist/auth/index-node.js",
+      "require": "./dist/auth/index-node.cjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -51,14 +66,22 @@
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",
+    "react": "^18.0.0 || ^19.0.0",
     "zod": "^4.0.0"
   },
   "peerDependenciesMeta": {
     "@e2b/code-interpreter": {
       "optional": true
+    },
+    "react": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@types/react": "^19.2.14",
+    "jsdom": "^27.0.0",
+    "react": "^19.2.3",
+    "react-test-renderer": "^19.2.4",
     "vitest": "^4.1.0"
   },
   "publishConfig": {

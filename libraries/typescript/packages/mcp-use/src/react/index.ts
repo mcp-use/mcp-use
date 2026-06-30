@@ -1,30 +1,13 @@
 /**
- * Entry point for the React integration.
- * Provides the useMcp hook and related types.
+ * Entry point for the MCP-UI view runtime.
+ *
+ * Provides the widget hooks (useWidget, useCallTool, useFiles), the view
+ * providers, and the generated type helpers used inside a rendered view. The
+ * `useMcp` connection console and its supporting hooks live in the client
+ * package at `@mcp-use/client/react`.
  */
 
-export type {
-  UseMcpOptions,
-  UseMcpResult,
-  ReconnectionOptions,
-} from "./types.js";
-export { useMcp } from "./useMcp.js";
-
-// Re-export auth callback handler for OAuth flow
-export { onMcpAuthorization } from "../auth/callback.js";
-
-// Re-export browser telemetry (browser-specific implementation)
-export {
-  Tel,
-  Telemetry,
-  setTelemetrySource,
-} from "../telemetry/telemetry-browser.js";
-
-// Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "../telemetry/telemetry-browser.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/telemetry-browser.js";
-
-// Re-export core types for convenience when using hook result
+// Re-export core MCP types for convenience inside views
 export type {
   Prompt,
   Resource,
@@ -32,10 +15,10 @@ export type {
   Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 
-// Export ModelContext component and module-level API
+// ModelContext component and module-level API
 export { ModelContext, modelContext } from "./model-context.js";
 
-// Export widget hooks and types
+// Widget hooks and types
 export { ErrorBoundary } from "./ErrorBoundary.js";
 export { Image } from "./Image.js";
 export { ThemeProvider } from "./ThemeProvider.js";
@@ -64,11 +47,11 @@ export type {
 export { WidgetControls } from "./WidgetControls.js";
 export { McpUseProvider } from "./McpUseProvider.js";
 
-// Export useFiles hook
+// useFiles hook
 export { useFiles } from "./useFiles.js";
 export type { UseFilesResult, UploadOptions } from "./useFiles.js";
 
-// Export useCallTool hook and related types
+// useCallTool hook and related types
 export { useCallTool } from "./useCallTool.js";
 export type {
   CallToolState,
@@ -78,7 +61,7 @@ export type {
   UseCallToolReturn,
 } from "./useCallTool.js";
 
-// Export generateHelpers factory and related types
+// generateHelpers factory and related types
 export { generateHelpers } from "./generateHelpers.js";
 export type {
   ToolMap,
@@ -89,38 +72,5 @@ export type {
   InferToolMapFromSchemas,
 } from "./generateHelpers.js";
 
-// Export multi-server client provider and hooks
-export {
-  McpClientProvider,
-  useMcpClient,
-  useMcpServer,
-} from "./McpClientProvider.js";
-export type {
-  McpServer,
-  McpServerOptions,
-  McpClientContextType,
-  McpClientProviderProps,
-  McpNotification,
-  PendingSamplingRequest,
-  PendingElicitationRequest,
-} from "./McpClientProvider.js";
-
-// Export storage providers
-export {
-  LocalStorageProvider,
-  MemoryStorageProvider,
-  type CachedServerMetadata,
-  type StorageProvider,
-} from "./storage/index.js";
-
-// Export RPC logger utilities
-export {
-  getRpcLogs,
-  getAllRpcLogs,
-  subscribeToRpcLogs,
-  clearRpcLogs,
-  type RpcLogEntry,
-} from "./rpc-logger.js";
-
-// Export WidgetMetadata type for widget developers
+// WidgetMetadata type for widget developers
 export type { WidgetMetadata } from "../server/types/widget.js";

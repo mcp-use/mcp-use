@@ -69,8 +69,6 @@ export default defineConfig([
     ...sharedConfig,
     entry: [
       "index.ts",
-      "src/auth/index.ts",
-      "src/auth/index-node.ts",
       "src/bin.ts",
       "src/server/index.ts",
       "src/telemetry/tel-fetch.ts",

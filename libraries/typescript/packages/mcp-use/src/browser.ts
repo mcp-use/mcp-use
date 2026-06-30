@@ -16,10 +16,9 @@ export { HttpConnector } from "@mcp-use/client";
 export { MCPSession } from "@mcp-use/client";
 export type { Notification, Root } from "@mcp-use/client";
 
-// Export OAuth utilities
-export { BrowserOAuthClientProvider } from "./auth/browser-provider.js";
-export { onMcpAuthorization } from "./auth/callback.js";
-export type { StoredState } from "./auth/types.js";
+// Export OAuth utilities (browser OAuth lives in @mcp-use/client)
+export { BrowserOAuthClientProvider, onMcpAuthorization } from "@mcp-use/client/auth";
+export type { StoredState } from "@mcp-use/client/auth";
 
 // Export logging (uses browser console in browser environments)
 export { Logger, logger } from "./logging.js";

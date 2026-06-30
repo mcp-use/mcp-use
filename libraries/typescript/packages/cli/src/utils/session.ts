@@ -1,6 +1,6 @@
 import type { MCPSession } from "@mcp-use/client";
 import { MCPClient } from "@mcp-use/client";
-import type { NodeOAuthClientProvider } from "mcp-use/auth/node";
+import type { NodeOAuthClientProvider } from "@mcp-use/client/auth/node";
 import { getPackageVersion } from "mcp-use/server";
 import { formatError, formatInfo } from "./format.js";
 import {
