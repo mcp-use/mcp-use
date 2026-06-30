@@ -44,6 +44,7 @@ export {
   useWidgetProps,
   useWidgetState,
   useWidgetTheme,
+  useStreamableProps,
 } from "./useWidget.js";
 export type {
   API,

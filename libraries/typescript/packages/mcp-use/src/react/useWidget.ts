@@ -922,3 +922,39 @@ export function useWidgetState<TState>(
 
   return [state, setState] as const;
 }
+
+/**
+ * Hook that resolves streaming tool inputs and partial props.
+ * @example
+ * ```tsx
+ * const { props, isStreaming, isPending } = useStreamableProps<{ progress: number }>();
+ * ```
+ */
+export function useStreamableProps<TProps = UnknownObject>(
+  defaultProps?: TProps
+): {
+  props: Partial<TProps>;
+  isStreaming: boolean;
+  isPending: boolean;
+} {
+  const { props, partialToolInput, isStreaming, isPending } = useWidget<TProps>(
+    defaultProps
+  );
+
+  const streamableProps = useMemo(() => {
+    if (isStreaming && partialToolInput) {
+      return {
+        ...props,
+        ...(partialToolInput as any),
+      };
+    }
+    return props;
+  }, [props, partialToolInput, isStreaming]);
+
+  return {
+    props: streamableProps,
+    isStreaming,
+    isPending,
+  };
+}
+
