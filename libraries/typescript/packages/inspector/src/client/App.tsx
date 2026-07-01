@@ -9,13 +9,14 @@ import {
   LocalStorageProvider,
   McpClientProvider,
   type McpServer,
-} from "mcp-use/react";
+} from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef } from "react";
 import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+import { getInspectorBase } from "./utils/basePath";
 import { getDefaultInspectorProxyAddress } from "./utils/connectionUpdates";
 
 /**
@@ -68,6 +69,11 @@ function App() {
   // falls back to the standard Inspector route; explicit null disables proxy.
   const proxyAddress = getDefaultInspectorProxyAddress();
 
+  // The inspector's own mount path, `${basePath}/inspector` (default
+  // `/mcp/inspector`; root-mount `/inspector`). Derived at runtime from
+  // `window.__MCP_BASE_PATH__` so a single prebuilt bundle serves any basePath.
+  const inspectorBase = getInspectorBase();
+
   // App-level so it fires regardless of route, and after <Toaster /> mounts.
   useEffect(() => {
     const authError = urlParams.get("auth_error");
@@ -95,7 +101,7 @@ function App() {
         <McpClientProvider
           storageProvider={storageProvider}
           enableRpcLogging={true}
-          defaultCallbackUrl={`${window.location.origin}/inspector/oauth/callback`}
+          defaultCallbackUrl={`${window.location.origin}${inspectorBase}/oauth/callback`}
           defaultAutoProxyFallback={
             proxyAddress ? { enabled: true, proxyAddress } : false
           }
@@ -204,7 +210,7 @@ function App() {
         >
           <InspectorProvider>
             <InspectorTabSync activeTabRef={activeTabRef} />
-            <Router basename="/inspector">
+            <Router basename={inspectorBase}>
               <Routes>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
                 <Route path="/preview/:view" element={<ViewPreview />} />

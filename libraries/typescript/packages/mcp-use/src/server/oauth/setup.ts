@@ -38,6 +38,13 @@ interface OAuthSetupState {
  */
 interface SetupOAuthForServerOptions {
   publicLandingPage?: boolean;
+  /**
+   * Normalized server-wide path prefix (see `config/base-path.ts`). The MCP
+   * transport, OAuth endpoints, and the landing-page exemption are all scoped
+   * under this prefix. `""` means root-mounted. Defaults to `/mcp` for
+   * backward compatibility when callers don't thread it.
+   */
+  basePath?: string;
 }
 
 export async function setupOAuthForServer(
@@ -51,6 +58,11 @@ export async function setupOAuthForServer(
     return state; // Already setup
   }
 
+  const basePath = options?.basePath ?? "/mcp";
+  // The transport mounts at the exact basePath (or "/" when root-mounted).
+  const transportPath = basePath === "" ? "/" : basePath;
+  const ssePath = `${basePath}/sse`;
+
   const proxyMode = isOAuthProxy(oauth);
   console.log(`[OAuth] OAuth ${proxyMode ? "proxy" : "provider"} initialized`);
 
@@ -58,7 +70,7 @@ export async function setupOAuthForServer(
   let middleware = createBearerAuthMiddleware(oauth, baseUrl);
 
   // Setup OAuth routes
-  setupOAuthRoutes(app, oauth, baseUrl);
+  setupOAuthRoutes(app, oauth, baseUrl, basePath);
 
   if (proxyMode) {
     console.log(
@@ -77,7 +89,7 @@ export async function setupOAuthForServer(
     middleware = (c: Context, next: Next) => {
       const acceptHeader = c.req.header("Accept") || "";
       if (
-        c.req.path === "/mcp" &&
+        c.req.path === transportPath &&
         isBrowserLandingRequest(c.req.method, acceptHeader)
       ) {
         return next();
@@ -87,13 +99,19 @@ export async function setupOAuthForServer(
     };
   }
 
-  // Apply bearer auth to all MCP transport routes. The MCP JSON-RPC handler is
-  // mounted on both /mcp and /sse (see endpoints/mount-mcp.ts), so both must be
-  // guarded. /sse covers the exact mounted path and /sse/* guards subpaths.
-  app.use("/mcp/*", middleware);
-  app.use("/sse", middleware);
-  app.use("/sse/*", middleware);
-  console.log("[OAuth] Bearer authentication enabled on /mcp and /sse routes");
+  // Apply bearer auth ONLY to the exact MCP transport paths. The Streamable-HTTP
+  // handler is a single endpoint per path (no deeper subpaths), mounted at the
+  // exact basePath and `${basePath}/sse` (see endpoints/mount-mcp.ts). We must
+  // NOT use `${basePath}/*` here: that wildcard would also trap the PUBLIC
+  // assets served under `${basePath}/mcp-use/*` and the OAuth endpoints under
+  // `${basePath}/oauth/*`, requiring a bearer token for resources that must
+  // stay open. Guarding the exact transport paths keeps assets/OAuth public
+  // while protecting the protocol traffic.
+  app.use(transportPath, middleware);
+  app.use(ssePath, middleware);
+  console.log(
+    `[OAuth] Bearer authentication enabled on ${transportPath} and ${ssePath} routes`
+  );
 
   return {
     provider: oauth,

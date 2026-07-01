@@ -26,6 +26,7 @@ import {
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
+import { inspectorApi } from "@/client/utils/basePath";
 import { isLocalhostServerUrl } from "@/client/utils/serverUrl";
 import {
   ArrowUpRight,
@@ -54,7 +55,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/client/react";
 import { useEffect, useState } from "react";
 
 import { toast } from "sonner";
@@ -241,7 +242,7 @@ function TunnelBadge({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/inspector/api/dev/info");
+        const res = await fetch(inspectorApi("dev/info"));
         if (!res.ok || cancelled) return;
         const info = (await res.json()) as {
           fromCli?: boolean;
@@ -271,7 +272,7 @@ function TunnelBadge({
    */
   const pollAndReconnect = async (expectTunnel: boolean) => {
     const port = window.location.port || "3000";
-    const infoUrl = `http://localhost:${port}/inspector/api/dev/info`;
+    const infoUrl = `http://localhost:${port}${inspectorApi("dev/info")}`;
     const deadline = Date.now() + 90_000;
 
     setTunnelPhaseMessage(
@@ -347,7 +348,7 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch("/inspector/api/dev/start-tunnel", {
+      const res = await fetch(inspectorApi("dev/start-tunnel"), {
         method: "POST",
       });
       if (!res.ok) {
@@ -377,7 +378,7 @@ function TunnelBadge({
     setIsTunnelStarting(true);
     let success = false;
     try {
-      const res = await fetch("/inspector/api/dev/stop-tunnel", {
+      const res = await fetch(inspectorApi("dev/stop-tunnel"), {
         method: "POST",
       });
       if (!res.ok) {

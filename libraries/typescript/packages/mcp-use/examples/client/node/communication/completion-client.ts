@@ -15,7 +15,7 @@
  *   2. Run: tsx examples/client/node/communication/completion-client.ts
  */
 
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
 

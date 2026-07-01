@@ -18,6 +18,7 @@ import type {
   UIResourceDefinition,
 } from "../types/resource.js";
 import { slugifyWidgetName } from "./widget-helpers.js";
+import { widgetAssetBase } from "../config/base-path.js";
 
 /**
  * Configuration for building widget URLs
@@ -26,6 +27,12 @@ export interface UrlConfig {
   baseUrl: string;
   port: number | string;
   buildId?: string;
+  /**
+   * Normalized server-wide path prefix (see `config/base-path.ts`). The widget
+   * iframe URL is built under `${basePath}/mcp-use/widgets/...`. Defaults to
+   * `/mcp` when not provided.
+   */
+  basePath?: string;
 }
 
 /**
@@ -48,7 +55,7 @@ export function buildWidgetUrl(
   const slugifiedWidget = slugifyWidgetName(widget);
 
   const url = new URL(
-    `/mcp-use/widgets/${slugifiedWidget}`,
+    `${widgetAssetBase(config.basePath ?? "/mcp")}/${slugifiedWidget}`,
     `${config.baseUrl}:${config.port}`
   );
 

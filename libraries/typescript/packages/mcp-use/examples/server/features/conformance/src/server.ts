@@ -26,7 +26,7 @@ import {
   untitledEnum,
   untitledMultiEnum,
   widget,
-} from "mcp-use/server";
+} from "mcp-use";
 import { z } from "zod";
 
 const SERVER_PORT = process.env.PORT || "3000";

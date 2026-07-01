@@ -1,4 +1,4 @@
-import { MCPServer } from "mcp-use/server";
+import { MCPServer } from "mcp-use";
 
 // Create MCP server instance
 const server = new MCPServer({
@@ -6,7 +6,6 @@ const server = new MCPServer({
   title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
   description: "Blank mcp-use server",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com", // Can be customized later
   icons: [
@@ -34,9 +33,9 @@ const server = new MCPServer({
  * Docs: https://mcp-use.com/docs/typescript/server/tools
  *
  * Response helpers (`text`, `object`, `image`, `markdown`, `html`, `error`,
- * `widget`, ...) are exported from `mcp-use/server`.
+ * `widget`, ...) are exported from `mcp-use`.
 
-import { text } from "mcp-use/server";
+import { text } from "mcp-use";
 import { z } from "zod";
 
 server.tool(
@@ -60,7 +59,7 @@ server.tool(
  * Define MCP resources
  * Docs: https://mcp-use.com/docs/typescript/server/resources
 
-import { object } from "mcp-use/server";
+import { object } from "mcp-use";
 
 server.resource({
   name: "config",
@@ -76,7 +75,7 @@ server.resource({
  * Define MCP prompts
  * Docs: https://mcp-use.com/docs/typescript/server/prompts
 
-import { text } from "mcp-use/server";
+import { text } from "mcp-use";
 import { z } from "zod";
 
 server.prompt(

@@ -1,4 +1,4 @@
-import { MCPServer, object, text, completable } from "mcp-use/server";
+import { MCPServer, object, text, completable } from "mcp-use";
 import { z } from "zod";
 
 // Create MCP server instance
@@ -9,7 +9,6 @@ const server = new MCPServer({
   description: "My first MCP server with all features",
   instructions:
     "Use fetch-weather for current conditions, read config://settings before assuming user preferences, and use review-code only when the user asks for code feedback.",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com", // Can be customized later
   icons: [

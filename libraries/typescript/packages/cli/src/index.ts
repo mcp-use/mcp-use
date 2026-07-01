@@ -8,6 +8,11 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  BUILD_MANIFEST_NAME,
+  DEFAULT_BASE_PATH,
+  resolveWorkspacePaths,
+} from "mcp-use/config";
 import open from "open";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { toJSONSchema } from "zod";
@@ -36,7 +41,12 @@ import {
   withNextShimsEnv,
 } from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
-import { getWidgetAssetBase } from "./utils/widget-paths.js";
+import {
+  getPublicAssetBase,
+  getWidgetAssetBase,
+  normalizeBasePathLocal,
+} from "./utils/widget-paths.js";
+import { tunnelApiBase } from "./utils/cloud-urls.js";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -113,8 +123,11 @@ function displayPackageVersions(projectPath?: string) {
         console.log(chalk.gray(`  ${paddedName} v${version}`));
       }
     } catch (error) {
-      // Log debug message when package is not found (aids troubleshooting)
-      if (process.env.DEBUG || process.env.VERBOSE) {
+      // Log debug message when package is not found (aids troubleshooting).
+      // Gated on the consolidated MCP_USE_LOG_LEVEL var (debug|trace); the old
+      // DEBUG/VERBOSE vars were removed in P4.
+      const logLevel = process.env.MCP_USE_LOG_LEVEL?.trim().toLowerCase();
+      if (logLevel === "debug" || logLevel === "trace") {
         console.log(chalk.dim(`  ${paddedName} (not found)`));
       }
     }
@@ -148,27 +161,36 @@ async function findAvailablePort(
 }
 
 // Helper to check if server is ready
+// Raw TCP connect-and-close check. All of a server's routes (widgets, MCP
+// transport, inspector) are registered on the Hono app before `listen()`
+// ever binds the port (see `MCPServerClass.listen()`), so "the port accepts
+// a connection" and "every route is live" are the same moment. This avoids
+// needing to know the server's basePath at all — no HTTP request, no route
+// path, nothing that could get out of sync with a runtime-configured
+// basePath — and is more robust than an HTTP health check, which would
+// otherwise depend on the inspector being bundled (it's dev-only by
+// default; production builds only include it with `--with-inspector`).
 async function waitForServer(
   port: number,
   host: string = "localhost",
   maxAttempts = 30
 ): Promise<boolean> {
+  const net = await import("node:net");
   for (let i = 0; i < maxAttempts; i++) {
-    const controller = new AbortController();
-    try {
-      // Use /inspector/health endpoint for cleaner health checks
-      // This avoids 400 errors from the MCP endpoint which requires session headers
-      const response = await fetch(`http://${host}:${port}/inspector/health`, {
-        signal: controller.signal,
+    const connected = await new Promise<boolean>((resolve) => {
+      const socket = net.connect({ port, host });
+      socket.once("connect", () => {
+        socket.end();
+        resolve(true);
       });
+      socket.once("error", () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
 
-      if (response.ok) {
-        return true;
-      }
-    } catch {
-      // Server not ready yet
-    } finally {
-      controller.abort();
+    if (connected) {
+      return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -282,7 +304,10 @@ async function startTunnel(
         }
         resolved = true;
         clearTimeout(setupTimeout);
-        console.log(chalk.green.bold(`✓ Tunnel established: ${url}/mcp`));
+        // Bare origin only — the authoritative, path-qualified URL is
+        // printed later once the actual basePath is known (tunnel setup
+        // happens before the server is imported/started).
+        console.log(chalk.green.bold(`✓ Tunnel established: ${url}`));
         resolve({ url, subdomain: extractedSubdomain, process: proc });
       }
     });
@@ -390,12 +415,17 @@ async function resolveEntryFile(
 
 /**
  * Resolve the widgets directory.
- * Priority: --widgets-dir flag > <mcpDir>/resources > "resources".
+ * Priority: --widgets-dir flag > <mcpDir>/resources > constructor `viewsDir`
+ * (introspected off the imported MCPServer instance) > "resources".
  */
-function resolveWidgetsDir(cliWidgetsDir?: string, mcpDir?: string): string {
+function resolveWidgetsDir(
+  cliWidgetsDir?: string,
+  mcpDir?: string,
+  viewsDir?: string
+): string {
   if (cliWidgetsDir) return cliWidgetsDir;
   if (mcpDir) return path.join(mcpDir, "resources");
-  return "resources";
+  return viewsDir || "resources";
 }
 
 /**
@@ -456,10 +486,23 @@ function isBunRuntime(): boolean {
   );
 }
 
-async function generateToolRegistryTypesForServer(
+/**
+ * Import the user's server entry with server-startup side effects suppressed
+ * (`__mcpUseHmrMode`) and return the `MCPServer` instance it constructs.
+ *
+ * This is the CLI's introspection channel: project options (`viewsDir`,
+ * `publicDir`, `assetPrefix`, `basePath`) live on the MCPServer constructor —
+ * there is no config file — so build/dev read them straight off the imported
+ * instance. Corollary of the contract: the entry module's top level must be
+ * side-effect-free beyond constructing the server (connections and other
+ * work belong in handlers or after `listen()`).
+ *
+ * Returns "skipped" under bun, which lacks the Node loader hooks tsx needs.
+ */
+async function importServerInstance(
   projectPath: string,
   serverFileRelative: string
-): Promise<"ok" | "failed" | "skipped"> {
+): Promise<{ server: any } | "skipped"> {
   const serverFile = path.join(projectPath, serverFileRelative);
   const serverFileExists = await access(serverFile)
     .then(() => true)
@@ -475,12 +518,12 @@ async function generateToolRegistryTypesForServer(
   if (isBunRuntime()) {
     console.log(
       chalk.yellow(
-        "⚠ Skipping tool registry type generation under bun runtime (requires Node.js loader hooks)."
+        "⚠ Skipping server-entry introspection under bun runtime (requires Node.js loader hooks)."
       )
     );
     console.log(
       chalk.gray(
-        "  Run `mcp-use generate-types` with node to refresh .mcp-use/tool-registry.d.ts."
+        "  Tool registry types won't be generated (run `mcp-use generate-types` with node), and constructor project options (viewsDir/publicDir/assetPrefix) fall back to defaults."
       )
     );
     return "skipped";
@@ -552,7 +595,7 @@ async function generateToolRegistryTypesForServer(
 
       // Native dynamic import with a cache-buster. With tsx registered
       // globally and without a namespace, the whole dependency tree (user
-      // entry + transitive `@/lib/...` imports + `mcp-use/server`) resolves
+      // entry + transitive `@/lib/...` imports + `mcp-use`) resolves
       // through tsx's tsconfig-aware resolver.
       await import(`${pathToFileURL(serverFile).href}?t=${Date.now()}`);
     } finally {
@@ -565,25 +608,48 @@ async function generateToolRegistryTypesForServer(
         "No MCPServer instance found. Make sure your server file creates an MCPServer instance."
       );
     }
-
-    const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
-    const { generateToolRegistryTypes } = await import(
-      pathToFileURL(path.join(mcpUsePath, "dist", "src", "server", "index.js"))
-        .href
-    ).then((mod) => mod);
-
-    if (!generateToolRegistryTypes) {
-      throw new Error("generateToolRegistryTypes not found in mcp-use package");
-    }
-
-    const success = await generateToolRegistryTypes(
-      server.registrations.tools,
-      projectPath
-    );
-    return success ? "ok" : "failed";
+    return { server };
   } finally {
     (globalThis as any).__mcpUseHmrMode = previousHmrMode ?? false;
   }
+}
+
+/**
+ * Write the generated tool-registry types for an already-imported server
+ * instance (see {@link importServerInstance}).
+ */
+async function generateTypesFromInstance(
+  projectPath: string,
+  server: any
+): Promise<"ok" | "failed"> {
+  const mcpUsePath = path.join(projectPath, "node_modules", "mcp-use");
+  // `generateToolRegistryTypes` is re-exported from the `mcp-use` main entry
+  // (the server surface). The old `dist/src/server/index.js` runtime bundle no
+  // longer exists — that path now holds only declaration files.
+  const { generateToolRegistryTypes } = await import(
+    pathToFileURL(path.join(mcpUsePath, "dist", "index.js")).href
+  ).then((mod) => mod);
+
+  if (!generateToolRegistryTypes) {
+    throw new Error("generateToolRegistryTypes not found in mcp-use package");
+  }
+
+  const success = await generateToolRegistryTypes(
+    server.registrations.tools,
+    projectPath
+  );
+  return success ? "ok" : "failed";
+}
+
+async function generateToolRegistryTypesForServer(
+  projectPath: string,
+  serverFileRelative: string
+): Promise<"ok" | "failed" | "skipped"> {
+  const loaded = await importServerInstance(projectPath, serverFileRelative);
+  if (loaded === "skipped") {
+    return "skipped";
+  }
+  return generateTypesFromInstance(projectPath, loaded.server);
 }
 
 async function buildWidgets(
@@ -591,19 +657,53 @@ async function buildWidgets(
   options: {
     inline?: boolean;
     widgetsDir?: string;
+    assetPrefix?: string;
+    basePath?: string;
   } = {}
 ): Promise<Array<{ name: string; metadata: any }>> {
   const { inline = true } = options; // Default to true for VS Code compatibility
   const { promises: fs } = await import("node:fs");
   const { build } = await import("vite");
 
+  // Resolve the per-project `.mcp-use/` workspace so widget build output and
+  // scratch land under it (build/ and cache/) instead of a hardcoded dist/.
+  //
+  // `basePath` lives on the `MCPServer` constructor (runtime); `build`
+  // introspects it off the imported entry and threads it through here. When
+  // the entry can't be imported (widget-only projects, import-time errors) we
+  // fall back to the default — the live server still corrects widget asset
+  // paths at mount/serve time (see `processWidgetHtml`), matching on the
+  // fixed `/mcp-use/widgets/` literal rather than this exact prefix. Public
+  // asset hrefs and `__MCP_BASE_PATH__` are NOT serve-time corrected, which
+  // is why the real value must be baked here when available.
+  const paths = resolveWorkspacePaths(projectPath);
+  const basePath = options.basePath ?? DEFAULT_BASE_PATH;
+
   // Resolve the widgets directory. Callers pass a relative path via
-  // `widgetsDir` (from config / --widgets-dir / --mcp-dir); default is "resources".
+  // `widgetsDir` (constructor `viewsDir` / --widgets-dir / --mcp-dir);
+  // default is "resources".
   const widgetsDirRelative = options.widgetsDir ?? "resources";
   const resourcesDir = path.resolve(projectPath, widgetsDirRelative);
 
-  // Get base URL from environment or use default
+  // Origin baked into widget asset URLs.
+  //
+  // `assetPrefix` (MCPServer constructor, introspected off the imported
+  // instance by `build`; default unset) is the explicit host/CDN prefix for
+  // serving built assets off-server (e.g. static hosts like Supabase Storage
+  // or a CDN). It replaces the former `MCP_SERVER_URL` env var (P4). When it
+  // is unset we fall back to `MCP_URL` (the live server origin) and finally
+  // to root-relative paths.
+  const assetPrefix = options.assetPrefix
+    ? options.assetPrefix.replace(/\/+$/, "")
+    : undefined;
   const mcpUrl = process.env.MCP_URL;
+  const assetOrigin = assetPrefix ?? mcpUrl;
+
+  // `basePath` only matters for routes mounted on the live MCP server. When
+  // assets are offloaded to `assetPrefix` (a CDN/bucket), there is no route
+  // collision to guard against, so drop `basePath` and keep assets at a flat
+  // `/mcp-use/widgets/*` + `/mcp-use/public/*` layout under the prefix.
+  const assetBasePath = assetPrefix ? "" : basePath;
 
   // Check if resources directory exists
   try {
@@ -706,8 +806,8 @@ async function buildWidgets(
 
     console.log(chalk.gray(`  - Building ${widgetName}...`));
 
-    // Create temp directory for build artifacts
-    const tempDir = path.join(projectPath, ".mcp-use", widgetName);
+    // Create temp directory for build artifacts (disposable dev/build scratch)
+    const tempDir = path.join(paths.cache, widgetName);
     await fs.mkdir(tempDir, { recursive: true });
 
     // Create CSS file with Tailwind directives
@@ -762,7 +862,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+    <link rel="icon" href="${getPublicAssetBase(assetBasePath)}/${favicon}" />`
         : ""
     }
   </head>
@@ -776,25 +876,15 @@ if (container && Component) {
     await fs.writeFile(path.join(tempDir, "index.html"), htmlContent, "utf8");
 
     // Build with Vite
-    const outDir = path.join(
-      projectPath,
-      "dist",
-      "resources",
-      "widgets",
-      widgetName
-    );
+    const outDir = path.join(paths.build, "resources", "widgets", widgetName);
 
-    const baseUrl = getWidgetAssetBase(mcpUrl, widgetName);
+    const baseUrl = getWidgetAssetBase(assetOrigin, widgetName, assetBasePath);
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
     try {
       // Use a completely isolated temp directory for metadata extraction to avoid conflicts
-      const metadataTempDir = path.join(
-        projectPath,
-        ".mcp-use",
-        `${widgetName}-metadata`
-      );
+      const metadataTempDir = path.join(paths.cache, `${widgetName}-metadata`);
       await fs.mkdir(metadataTempDir, { recursive: true });
 
       const { createServer } = await import("vite");
@@ -1154,20 +1244,35 @@ export default {
         }
       }
 
-      // Post-process HTML for static deployments (e.g., Supabase)
-      // If MCP_SERVER_URL is set, inject window globals at build time
-      const mcpServerUrl = process.env.MCP_SERVER_URL;
-      if (mcpServerUrl) {
+      // Post-process HTML for off-server/static hosting (e.g. Supabase, a CDN).
+      // When `assetPrefix` is configured, bake the runtime globals + <base href>
+      // pointing assets at that host. This replaces the former MCP_SERVER_URL
+      // env var (P4): `assetPrefix` is the host/CDN prefix. `basePath` is
+      // dropped here (see `assetBasePath` above) — it only matters for routes
+      // mounted on the live server; the bucket layout just mirrors the fixed
+      // `/mcp-use/widgets/*` + `/mcp-use/public/*` shape.
+      if (assetPrefix) {
         try {
           const htmlPath = path.join(outDir, "index.html");
           let html = await fs.readFile(htmlPath, "utf8");
 
-          // Inject window.__mcpPublicUrl and window.__getFile into <head>
-          // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
-          // __mcpPublicAssetsUrl points to where public files are actually stored
-          const widgetAssetBase = getWidgetAssetBase(mcpUrl, widgetName);
-          const mcpOrigin = mcpUrl ? mcpUrl.replace(/\/+$/, "") : mcpServerUrl;
-          const injectionScript = `<script>window.__getFile = (filename) => { return "${widgetAssetBase}"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpOrigin}/mcp-use/public";</script>`;
+          // Inject the runtime globals into <head>. useWidget reads
+          // __mcpServerUrl (the bare origin) for mcp_url, and we also bake
+          // __MCP_BASE_PATH__ (the basePath introspected off the entry, or
+          // the default when the entry couldn't be imported) so clients can
+          // derive live-server routes. __mcpPublicAssetsUrl points to where
+          // public files are actually stored.
+          const widgetAssetBase = getWidgetAssetBase(
+            assetPrefix,
+            widgetName,
+            assetBasePath
+          );
+          const publicBase = getPublicAssetBase(assetBasePath);
+          const serverOrigin = assetPrefix;
+          // The live MCP origin still comes from MCP_URL when set; otherwise
+          // public assets are also served from the asset host.
+          const mcpOrigin = mcpUrl ? mcpUrl.replace(/\/+$/, "") : serverOrigin;
+          const injectionScript = `<script>window.__getFile = (filename) => { return "${widgetAssetBase}"+filename }; window.__mcpServerUrl = "${serverOrigin}"; window.__MCP_BASE_PATH__ = "${normalizeBasePathLocal(basePath)}"; window.__mcpPublicUrl = "${serverOrigin}${publicBase}"; window.__mcpPublicAssetsUrl = "${mcpOrigin}${publicBase}";</script>`;
 
           // Check if script tag already exists in head
           if (!html.includes("window.__mcpPublicUrl")) {
@@ -1182,19 +1287,19 @@ export default {
             // Replace existing base tag
             html = html.replace(
               /<base\s+[^>]*\/?>/i,
-              `<base href="${mcpServerUrl}">`
+              `<base href="${assetPrefix}">`
             );
           } else {
             // Inject base tag after the injection script
             html = html.replace(
               injectionScript,
-              `${injectionScript}\n    <base href="${mcpServerUrl}">`
+              `${injectionScript}\n    <base href="${assetPrefix}">`
             );
           }
 
           await fs.writeFile(htmlPath, html, "utf8");
           console.log(
-            chalk.gray(`    → Injected MCP_SERVER_URL into ${widgetName}`)
+            chalk.gray(`    → Injected assetPrefix into ${widgetName}`)
           );
         } catch (error) {
           console.warn(
@@ -1307,9 +1412,14 @@ async function collectTsFiles(
 /**
  * Transpile TypeScript files using esbuild instead of tsc.
  * esbuild strips types without analyzing them, so it cannot OOM on complex types.
- * Reads the project's tsconfig.json to determine source files, outDir, and compiler options.
+ * Reads the project's tsconfig.json to determine source files and compiler
+ * options; the output location is the workspace build dir (`buildDir`), NOT the
+ * tsconfig `outDir`.
  */
-async function transpileWithEsbuild(projectPath: string): Promise<void> {
+async function transpileWithEsbuild(
+  projectPath: string,
+  buildDir: string
+): Promise<void> {
   const esbuild = await import("esbuild");
   const { promises: fs } = await import("node:fs");
 
@@ -1323,7 +1433,6 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
   }
 
   const compilerOptions = tsconfig.compilerOptions || {};
-  const outDir = compilerOptions.outDir || "./dist";
   const includePatterns = tsconfig.include || ["**/*.ts", "**/*.tsx"];
   const excludePatterns = tsconfig.exclude || ["node_modules", "dist"];
 
@@ -1360,7 +1469,7 @@ async function transpileWithEsbuild(projectPath: string): Promise<void> {
 
   await esbuild.build({
     entryPoints: files.map((f) => path.join(projectPath, f)),
-    outdir: path.join(projectPath, outDir),
+    outdir: buildDir,
     outbase,
     bundle: true,
     packages: "external",
@@ -1402,20 +1511,18 @@ program
       const projectPath = path.resolve(options.path);
       const { promises: fs } = await import("node:fs");
 
+      // Resolve the per-project `.mcp-use/` workspace. Build output, the build
+      // manifest, and tunnel state all root at the project being built.
+      const paths = resolveWorkspacePaths(projectPath);
+
       displayPackageVersions(projectPath);
 
       // Resolve mcpDir for widgets + server entry
       const mcpDir = options.mcpDir as string | undefined;
-      const widgetsDir = resolveWidgetsDir(options.widgetsDir, mcpDir);
 
-      // Build widgets first (this generates schemas)
-      // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
-      const builtWidgets = await buildWidgets(projectPath, {
-        inline: options.inline ?? false,
-        widgetsDir,
-      });
-
-      // Find the source server file before building
+      // Find the source server file before building: the build imports it to
+      // introspect the MCPServer instance for project options (there is no
+      // config file).
       let sourceServerFile: string | undefined;
       try {
         sourceServerFile = await findServerFile(
@@ -1435,17 +1542,64 @@ program
         );
       }
 
+      // Import the entry once (startup side effects suppressed) and read the
+      // project options off the MCPServer instance: `viewsDir`, `publicDir`,
+      // `assetPrefix` and `basePath` live on the constructor. Non-fatal — widget-only
+      // projects have no entry, bun can't host the tsx loader hooks, and an
+      // import-time error shouldn't block the Docker build — everything
+      // falls back to defaults. The instance is reused for type generation
+      // below so the entry is imported exactly once per build.
+      let serverInstance: any | undefined;
       if (sourceServerFile) {
-        console.log(chalk.gray("Generating tool registry types..."));
-        // Type generation is a dev convenience (regenerates
-        // .mcp-use/tool-registry.d.ts). Keep it non-fatal during build so
-        // a runtime without the right loader hooks (e.g. bun alpine) or
-        // an unrelated import-time error in the server file can't block
-        // the Docker build.
         try {
-          const typeGenResult = await generateToolRegistryTypesForServer(
+          const loaded = await importServerInstance(
             projectPath,
             sourceServerFile
+          );
+          if (loaded !== "skipped") {
+            serverInstance = loaded.server;
+          }
+        } catch (err) {
+          console.log(
+            chalk.yellow(
+              "⚠ Could not import the server entry to read project options (non-blocking): " +
+                (err instanceof Error ? err.message : String(err))
+            )
+          );
+        }
+      }
+
+      // Flags win over the constructor; the constructor wins over defaults.
+      const widgetsDir = resolveWidgetsDir(
+        options.widgetsDir,
+        mcpDir,
+        serverInstance?.serverViewsDir as string | undefined
+      );
+      const assetPrefix = serverInstance?.serverAssetPrefix as
+        | string
+        | undefined;
+      const publicDirName =
+        (serverInstance?.serverPublicDir as string | undefined) ?? "public";
+
+      // Build widgets first (this generates schemas)
+      // Use --inline flag for VS Code compatibility (VS Code's CSP blocks external scripts)
+      const builtWidgets = await buildWidgets(projectPath, {
+        inline: options.inline ?? false,
+        widgetsDir,
+        assetPrefix,
+        basePath: serverInstance?.serverBasePath as string | undefined,
+      });
+
+      if (serverInstance) {
+        console.log(chalk.gray("Generating tool registry types..."));
+        // Type generation is a dev convenience (regenerates the workspace's
+        // generated/tool-registry.d.ts). Keep it non-fatal during build so an
+        // unrelated error in the local mcp-use install can't block the
+        // Docker build.
+        try {
+          const typeGenResult = await generateTypesFromInstance(
+            projectPath,
+            serverInstance
           );
           if (typeGenResult === "ok") {
             console.log(chalk.green("✓ Tool registry types generated"));
@@ -1456,7 +1610,6 @@ program
               )
             );
           }
-          // "skipped" already logged its own warning inside the function.
         } catch (err) {
           console.log(
             chalk.yellow(
@@ -1480,7 +1633,7 @@ program
       // manifest written below still records the .ts source as the entry.
       if (!mcpDir) {
         console.log(chalk.gray("Building TypeScript..."));
-        await transpileWithEsbuild(projectPath);
+        await transpileWithEsbuild(projectPath, paths.build);
         console.log(chalk.green("✓ TypeScript build complete!"));
       } else {
         console.log(
@@ -1533,18 +1686,24 @@ program
         if (mcpDir) {
           entryPoint = sourceServerFile;
         } else {
-          // Check possible output locations based on common tsconfig patterns
-          // tsc may or may not preserve the src/ prefix depending on rootDir setting
+          // Check possible output locations under the workspace build dir.
+          // tsc/esbuild may or may not preserve the src/ prefix depending on
+          // the rootDir setting.
           const baseName = path.basename(sourceServerFile, ".ts") + ".js";
           const possibleOutputs = [
-            `dist/${baseName}`, // rootDir set to project root or src
-            `dist/src/${baseName}`, // no rootDir, source in src/
-            `dist/${sourceServerFile.replace(/\.ts$/, ".js")}`, // exact path preserved
+            baseName, // rootDir set to project root or src
+            path.join("src", baseName), // no rootDir, source in src/
+            sourceServerFile.replace(/\.ts$/, ".js"), // exact path preserved
           ];
           for (const candidate of possibleOutputs) {
+            const absolute = path.join(paths.build, candidate);
             try {
-              await access(path.join(projectPath, candidate));
-              entryPoint = candidate;
+              await access(absolute);
+              // Store project-relative (forward slashes) — `mcp-use start`
+              // resolves it via path.join(projectPath, manifest.entryPoint).
+              entryPoint = path
+                .relative(projectPath, absolute)
+                .replace(/\\/g, "/");
               break;
             } catch {
               continue;
@@ -1553,12 +1712,14 @@ program
         }
       }
 
-      // Copy public folder if it exists
-      const publicDir = path.join(projectPath, "public");
+      // Copy the project's public assets dir (constructor `publicDir`,
+      // default "public") if it exists. The build output always uses the
+      // normalized `public/` name regardless of the source dir.
+      const publicDir = path.join(projectPath, publicDirName);
       try {
         await fs.access(publicDir);
         console.log(chalk.gray("Copying public assets..."));
-        await fs.cp(publicDir, path.join(projectPath, "dist", "public"), {
+        await fs.cp(publicDir, path.join(paths.build, "public"), {
           recursive: true,
         });
         console.log(chalk.green("✓ Public assets copied"));
@@ -1566,14 +1727,18 @@ program
         // Public folder doesn't exist, skip
       }
 
-      // Create build manifest
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      // Create build manifest. Tunnel state now lives in its own file
+      // (paths.tunnel) and is no longer persisted inside the manifest.
+      const manifestPath = paths.buildManifest;
 
-      // Read existing manifest to preserve tunnel subdomain and other fields
+      // Read existing manifest to preserve any third-party/forward-compat
+      // fields. (Tunnel subdomain is intentionally NOT preserved here — it
+      // lives in paths.tunnel.)
       let existingManifest: any = {};
       try {
         const existingContent = await fs.readFile(manifestPath, "utf-8");
         existingManifest = JSON.parse(existingContent);
+        delete existingManifest.tunnel;
       } catch {
         // File doesn't exist, that's okay
       }
@@ -1595,9 +1760,9 @@ program
         .digest("hex")
         .substring(0, 16); // Use first 16 chars for shorter IDs
 
-      // Merge with existing manifest, preserving tunnel and other fields
+      // Merge with existing manifest, preserving any forward-compat fields.
       const manifest = {
-        ...existingManifest, // Preserve existing fields like tunnel
+        ...existingManifest,
         includeInspector,
         buildTime,
         buildId,
@@ -1656,6 +1821,17 @@ program
     try {
       process.env.MCP_USE_CLI_DEV = "1";
       const projectPath = path.resolve(options.path);
+      // Resolve the per-project `.mcp-use/` workspace (tunnel state lives here).
+      const paths = resolveWorkspacePaths(projectPath);
+      // `basePath` (the server-wide path prefix the framework HTTP surface
+      // relocates under) now lives only on the `MCPServer` constructor, not
+      // this config file — so the CLI parent process can't know its real
+      // value ahead of importing the server. In HMR mode we read the live
+      // value straight off the imported server instance once it exists
+      // (see `runningServer.serverBasePath` below); this default is used
+      // only as a display placeholder for the non-HMR (separate child
+      // process) path, where there's no live instance to read from.
+      const basePath = DEFAULT_BASE_PATH;
       let port = parseInt(options.port, 10);
       const host = options.host;
       const useHmr = options.hmr !== false;
@@ -1670,18 +1846,19 @@ program
         port = availablePort;
       }
 
-      // Find the main source file (honors --entry / --mcp-dir flags and mcp-use.config.json)
+      // Find the main source file (honors --entry / --mcp-dir flags, else the filesystem convention)
       const serverFile = await findServerFile(
         projectPath,
         options.entry,
         options.mcpDir
       );
 
-      // Resolve the widgets directory and expose it via an env var so the
-      // running MCPServer (which picks `resources/` by default) discovers
-      // widgets at `<mcpDir>/resources` when the developer used --mcp-dir.
-      // The env var is the contract: mcp-use/server reads it when no
-      // explicit `resourcesDir` is passed to mountWidgets.
+      // The views/widgets directory is normally the constructor `viewsDir`.
+      // The `--mcp-dir`/`--widgets-dir` dev flags are a per-run override, so
+      // we pass them to the in-process server via `MCP_USE_WIDGETS_DIR` — the
+      // server treats this env var as a flag override that takes precedence
+      // over the constructor (a flag is more specific). Only set it when the
+      // resolved dir actually differs from the default.
       {
         const devMcpDir = options.mcpDir as string | undefined;
         const devWidgetsDir = resolveWidgetsDir(options.widgetsDir, devMcpDir);
@@ -1697,19 +1874,18 @@ program
 
       if (options.tunnel) {
         try {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const tunnelStatePath = paths.tunnel;
           let existingSubdomain: string | undefined;
 
           try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
+            const tunnelContent = await readFile(tunnelStatePath, "utf-8");
+            const tunnelState = JSON.parse(tunnelContent);
+            existingSubdomain = tunnelState.subdomain;
             if (existingSubdomain) {
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
-              const apiBase =
-                process.env.MCP_USE_TUNNEL_API || "https://local.mcp-use.run";
+              const apiBase = tunnelApiBase();
               try {
                 await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
                   method: "DELETE",
@@ -1719,7 +1895,7 @@ program
               }
             }
           } catch {
-            // Manifest doesn't exist or is invalid, that's okay
+            // Tunnel state doesn't exist or is invalid, that's okay
           }
 
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
@@ -1732,7 +1908,7 @@ program
                   `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
                 )
               );
-              tunnelInfo = await startTunnel(port);
+              tunnelInfo = await startTunnel(port, undefined);
             } else {
               throw e;
             }
@@ -1743,29 +1919,16 @@ program
 
           // Persist subdomain for reuse across restarts
           try {
-            let manifest: any = {};
-            try {
-              const manifestContent = await readFile(manifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch {
-              // File doesn't exist, create new manifest
-            }
-
-            if (!manifest.tunnel) {
-              manifest.tunnel = {};
-            }
-            manifest.tunnel.subdomain = tunnelSubdomain;
-
-            await mkdir(path.dirname(manifestPath), { recursive: true });
+            await mkdir(path.dirname(tunnelStatePath), { recursive: true });
             await writeFile(
-              manifestPath,
-              JSON.stringify(manifest, null, 2),
+              tunnelStatePath,
+              JSON.stringify({ subdomain: tunnelSubdomain }, null, 2),
               "utf-8"
             );
           } catch (error) {
             console.warn(
               chalk.yellow(
-                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+                `⚠️  Failed to save subdomain to tunnel state file: ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -1776,15 +1939,16 @@ program
       }
 
       // Set environment variables for the server
-      const mcpUrl = `http://${host}:${port}`;
       process.env.PORT = String(port);
       process.env.HOST = host;
       process.env.NODE_ENV = "development";
-      // Tunnel URL takes priority; otherwise preserve user-provided MCP_URL (e.g., for reverse proxy setups)
+      // A tunnel URL is a genuine canonical override (no usable
+      // X-Forwarded-Host), so set MCP_URL for it. For local dev the server
+      // infers `http://host:port` from HOST/PORT on its own, and a
+      // user-provided MCP_URL (e.g. reverse-proxy setups) is read directly —
+      // so we no longer redundantly set it here (P4).
       if (tunnelUrl) {
         process.env.MCP_URL = tunnelUrl;
-      } else if (!process.env.MCP_URL) {
-        process.env.MCP_URL = mcpUrl;
       }
       // Detect Next.js projects so we can install shims for server-only /
       // next/cache / next/headers / next/navigation / next/server — all of
@@ -1813,8 +1977,9 @@ program
           PORT: String(port),
           HOST: host,
           NODE_ENV: "development",
-          // Preserve user-provided MCP_URL (e.g., for reverse proxy setups)
-          MCP_URL: process.env.MCP_URL || mcpUrl,
+          // MCP_URL is inherited from `...process.env` when a tunnel or the
+          // user set it; otherwise the child server infers `http://host:port`
+          // from HOST/PORT above (P4 — no redundant local set).
         };
         const env = isNextJsProject ? withNextShimsEnv(baseEnv) : baseEnv;
 
@@ -1860,13 +2025,16 @@ program
         if (options.open !== false) {
           const startTime = Date.now();
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
+          const ready = await waitForServer(port, browserHost, 30);
           if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            // `basePath` here is a display-only default: this server runs in
+            // a separate `tsx watch` process, so the CLI has no live value
+            // to read (see the `basePath` declaration above).
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1876,7 +2044,7 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`));
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
@@ -1900,8 +2068,7 @@ program
 
           if (tunnelSubdomain) {
             try {
-              const apiBase =
-                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              const apiBase = tunnelApiBase();
               await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
                 method: "DELETE",
               });
@@ -2131,31 +2298,51 @@ program
         await runningServer.listen(port);
         (globalThis as any).__mcpUseHmrMode = true;
 
+        // No readiness poll needed here: listen() runs in this same process
+        // and only resolves after every route (widgets, MCP transport,
+        // inspector) is already mounted on the Hono app — the port binding
+        // itself is the only remaining async step, and it's negligible next
+        // to the cost of spawning a browser below.
+        const liveBasePath: string = runningServer.serverBasePath ?? basePath;
+
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
-          if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
-            const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
-              : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+          const mcpEndpoint = `http://${browserHost}:${port}${liveBasePath}`;
+          const autoConnectEndpoint = tunnelUrl
+            ? `${tunnelUrl}${liveBasePath}`
+            : mcpEndpoint;
+          const inspectorUrl = `http://${browserHost}:${port}${liveBasePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
-            const readyTime = Date.now() - startTime;
-            console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
+          const readyTime = Date.now() - startTime;
+          console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
+          console.log(
+            chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+          );
+          console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
+          console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+          if (tunnelUrl) {
             console.log(
-              chalk.whiteBright(`Local:    http://${browserHost}:${port}`)
+              chalk.whiteBright(`Tunnel:   ${tunnelUrl}${liveBasePath}`)
             );
-            console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
-            console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
-            if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
-            }
-            console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
-            console.log(chalk.gray(`Watching for changes...\n`));
-            await open(inspectorUrl);
           }
+          console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
+          console.log(chalk.gray(`Watching for changes...\n`));
+          await open(inspectorUrl);
+        } else {
+          // Log success when --no-open is used
+          const mcpEndpoint = `http://${host}:${port}${liveBasePath}`;
+          const inspectorUrl = `http://${host}:${port}${liveBasePath}/inspector`;
+          console.log(chalk.green.bold(`✓ Server ready`));
+          console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
+          console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
+          if (tunnelUrl) {
+            console.log(
+              chalk.whiteBright(`Tunnel:   ${tunnelUrl}${liveBasePath}`)
+            );
+          }
+          console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
+          console.log(chalk.gray(`Watching for changes...\n`));
         }
       } catch (error: any) {
         console.error(
@@ -2166,18 +2353,6 @@ program
           console.error(chalk.gray(error.stack));
         }
         process.exit(1);
-      }
-
-      // Log success when --no-open is used
-      if (options.open === false) {
-        const mcpEndpoint = `http://${host}:${port}/mcp`;
-        console.log(chalk.green.bold(`✓ Server ready`));
-        console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
-        console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
-        if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
-        }
-        console.log(chalk.gray(`Watching for changes...\n`));
       }
 
       // Watch for file changes - watch .ts/.tsx files in project directory
@@ -2414,8 +2589,7 @@ program
           });
         }
         if (tunnelSubdomain) {
-          const apiBase =
-            process.env.MCP_USE_API || "https://local.mcp-use.run";
+          const apiBase = tunnelApiBase();
           try {
             await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
               method: "DELETE",
@@ -2434,15 +2608,14 @@ program
         // 2. Start tunnel if requested
         tunnelUrl = undefined;
         if (withTunnel) {
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          const tunnelStatePath = paths.tunnel;
           let existingSubdomain: string | undefined;
           try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
+            const tunnelContent = await readFile(tunnelStatePath, "utf-8");
+            const tunnelState = JSON.parse(tunnelContent);
+            existingSubdomain = tunnelState.subdomain;
             if (existingSubdomain) {
-              const apiBase =
-                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              const apiBase = tunnelApiBase();
               try {
                 await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
                   method: "DELETE",
@@ -2472,27 +2645,23 @@ program
           tunnelUrl = tunnelInfo.url;
           tunnelProcess = tunnelInfo.process;
           tunnelSubdomain = tunnelInfo.subdomain;
+          // A tunnel URL is a genuine canonical override — set it explicitly.
           process.env.MCP_URL = tunnelUrl;
 
           // Persist subdomain
           try {
-            const mPath = path.join(projectPath, "dist", "mcp-use.json");
-            let manifest: any = {};
-            try {
-              manifest = JSON.parse(await readFile(mPath, "utf-8"));
-            } catch {
-              /* ignore */
-            }
-            if (!manifest.tunnel) manifest.tunnel = {};
-            manifest.tunnel.subdomain = tunnelSubdomain;
-            await mkdir(path.dirname(mPath), { recursive: true });
-            await writeFile(mPath, JSON.stringify(manifest, null, 2), "utf-8");
+            await mkdir(path.dirname(tunnelStatePath), { recursive: true });
+            await writeFile(
+              tunnelStatePath,
+              JSON.stringify({ subdomain: tunnelSubdomain }, null, 2),
+              "utf-8"
+            );
           } catch {
             /* ignore */
           }
-        } else {
-          process.env.MCP_URL = `http://${host}:${port}`;
         }
+        // No local-dev MCP_URL set: the server infers `http://host:port` from
+        // the HOST/PORT env set at dev startup (P4).
 
         // 3. Re-import server module (HMR mode stays true so user's listen() is a no-op)
         console.log(chalk.gray(`Loading server from ${serverFile}...`));
@@ -2509,18 +2678,19 @@ program
         (globalThis as any).__mcpUseHmrMode = true;
 
         const browserHost = normalizeBrowserHost(host);
-        const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+        const liveBasePath: string = runningServer.serverBasePath ?? basePath;
+        const mcpEndpoint = `http://${browserHost}:${port}${liveBasePath}`;
         const autoConnectEndpoint = tunnelUrl
-          ? `${tunnelUrl}/mcp`
+          ? `${tunnelUrl}${liveBasePath}`
           : mcpEndpoint;
         console.log(chalk.green.bold(`✓ Restarted`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
         if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${liveBasePath}`));
         }
         console.log(
           chalk.whiteBright(
-            `Inspector: http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
+            `Inspector: http://${browserHost}:${port}${liveBasePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
           )
         );
         console.log(chalk.gray(`Watching for changes...\n`));
@@ -2578,8 +2748,7 @@ program
 
         if (tunnelSubdomain) {
           try {
-            const apiBase =
-              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            const apiBase = tunnelApiBase();
             await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
               method: "DELETE",
             });
@@ -2624,6 +2793,9 @@ program
   .action(async (options) => {
     try {
       const projectPath = path.resolve(options.path);
+      // Resolve the per-project `.mcp-use/` workspace (build output + manifest +
+      // tunnel state all root at the project being started).
+      const paths = resolveWorkspacePaths(projectPath);
       // Priority: --port flag > process.env.PORT > default
       // Check if --port or -p was explicitly provided in command line
       const portFlagProvided =
@@ -2654,21 +2826,20 @@ program
       let tunnelSubdomain: string | undefined = undefined;
       if (options.tunnel) {
         try {
-          // Read existing subdomain from mcp-use.json if available
-          const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+          // Read existing subdomain from the tunnel state file if available
+          const tunnelStatePath = paths.tunnel;
           let existingSubdomain: string | undefined;
 
           try {
-            const manifestContent = await readFile(manifestPath, "utf-8");
-            const manifest = JSON.parse(manifestContent);
-            existingSubdomain = manifest.tunnel?.subdomain;
+            const tunnelContent = await readFile(tunnelStatePath, "utf-8");
+            const tunnelState = JSON.parse(tunnelContent);
+            existingSubdomain = tunnelState.subdomain;
             if (existingSubdomain) {
               console.log(
                 chalk.gray(`Found existing subdomain: ${existingSubdomain}`)
               );
               // Release the stale subdomain so the first attempt can reclaim it
-              const apiBase =
-                process.env.MCP_USE_API || "https://local.mcp-use.run";
+              const apiBase = tunnelApiBase();
               try {
                 await fetch(`${apiBase}/api/tunnels/${existingSubdomain}`, {
                   method: "DELETE",
@@ -2678,10 +2849,10 @@ program
               }
             }
           } catch (error) {
-            // Manifest doesn't exist or is invalid, that's okay
+            // Tunnel state doesn't exist or is invalid, that's okay
             console.debug(
               chalk.gray(
-                `Debug: Failed to read or parse mcp-use.json: ${error instanceof Error ? error.message : String(error)}`
+                `Debug: Failed to read or parse tunnel state file: ${error instanceof Error ? error.message : String(error)}`
               )
             );
           }
@@ -2696,7 +2867,7 @@ program
                   `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
                 )
               );
-              tunnelInfo = await startTunnel(port);
+              tunnelInfo = await startTunnel(port, undefined);
             } else {
               throw e;
             }
@@ -2706,35 +2877,19 @@ program
           const subdomain = tunnelInfo.subdomain;
           tunnelSubdomain = subdomain;
 
-          // Update mcp-use.json with the subdomain
+          // Persist the subdomain to the tunnel state file for reuse
           try {
-            let manifest: any = {};
-            try {
-              const manifestContent = await readFile(manifestPath, "utf-8");
-              manifest = JSON.parse(manifestContent);
-            } catch {
-              // File doesn't exist, create new manifest
-            }
-
-            // Update or add tunnel subdomain
-            if (!manifest.tunnel) {
-              manifest.tunnel = {};
-            }
-            manifest.tunnel.subdomain = subdomain;
-
-            // Ensure dist directory exists
-            await mkdir(path.dirname(manifestPath), { recursive: true });
-
-            // Write updated manifest
+            // Ensure the state directory exists
+            await mkdir(path.dirname(tunnelStatePath), { recursive: true });
             await writeFile(
-              manifestPath,
-              JSON.stringify(manifest, null, 2),
+              tunnelStatePath,
+              JSON.stringify({ subdomain }, null, 2),
               "utf-8"
             );
           } catch (error) {
             console.warn(
               chalk.yellow(
-                `⚠️  Failed to save subdomain to mcp-use.json: ${error instanceof Error ? error.message : "Unknown error"}`
+                `⚠️  Failed to save subdomain to tunnel state file: ${error instanceof Error ? error.message : "Unknown error"}`
               )
             );
           }
@@ -2747,7 +2902,7 @@ program
       // Find the built server file
       // First try to read from manifest (set during build)
       let serverFile: string | undefined;
-      const manifestPath = path.join(projectPath, "dist", "mcp-use.json");
+      const manifestPath = paths.buildManifest;
 
       try {
         const manifestContent = await readFile(manifestPath, "utf-8");
@@ -2761,10 +2916,17 @@ program
         // Manifest doesn't exist or entryPoint not set, fall back to searching
       }
 
+      // Project-relative path to a file under the workspace build dir (forward
+      // slashes; resolved below via path.join(projectPath, candidate)).
+      const buildRel = (...segments: string[]) =>
+        path
+          .relative(projectPath, path.join(paths.build, ...segments))
+          .replace(/\\/g, "/");
+
       // Fall back to checking common locations if manifest didn't help
       if (!serverFile) {
         // Resolve mcpDir from CLI flag so `--mcp-dir src/mcp` finds the
-        // entry at dist/src/mcp/index.js (legacy transpile mode) or the TS
+        // entry at <build>/src/mcp/index.js (legacy transpile mode) or the TS
         // source at src/mcp/index.ts (drop-in mode — `build` skips transpile
         // and `start` runs the source via tsx).
         const startMcpDir = options.mcpDir as string | undefined;
@@ -2774,14 +2936,14 @@ program
             ? [
                 `${startMcpDir}/index.ts`,
                 `${startMcpDir}/index.tsx`,
-                `dist/${startMcpDir}/index.js`,
-                `dist/${startMcpDir}/server.js`,
+                buildRel(startMcpDir, "index.js"),
+                buildRel(startMcpDir, "server.js"),
               ]
             : []),
-          "dist/index.js",
-          "dist/server.js",
-          "dist/src/index.js",
-          "dist/src/server.js",
+          buildRel("index.js"),
+          buildRel("server.js"),
+          buildRel("src", "index.js"),
+          buildRel("src", "server.js"),
         ];
 
         for (const candidate of serverCandidates) {
@@ -2796,9 +2958,11 @@ program
       }
 
       if (!serverFile) {
+        const buildDirRel =
+          path.relative(projectPath, paths.build).replace(/\\/g, "/") || ".";
         console.error(
           chalk.red(
-            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - dist/mcp-use.json (manifest with entryPoint)\n  - dist/index.js\n  - dist/server.js\n  - dist/src/index.js\n  - dist/src/server.js`
+            `No built server file found. Run 'mcp-use build' first.\n\nLooked for:\n  - ${buildRel(BUILD_MANIFEST_NAME)} (manifest with entryPoint)\n  - ${buildRel("index.js")}\n  - ${buildRel("server.js")}\n  - ${buildRel("src", "index.js")}\n  - ${buildRel("src", "server.js")}\n\n(build output: ${buildDirRel}/)`
           )
         );
         process.exit(1);
@@ -2827,11 +2991,18 @@ program
         NODE_ENV: "production",
       };
 
+      // A tunnel URL is a genuine canonical override (no usable
+      // X-Forwarded-Host), so set MCP_URL for it. Otherwise we don't pin it:
+      // the server infers its own origin per-request (X-Forwarded-Host → Host
+      // → host:port), so a plain `start` behind a reverse proxy resolves the
+      // right public URL, and a user- or platform-provided MCP_URL still flows
+      // through via `...process.env` (P4).
       if (mcpUrl) {
         baseEnv.MCP_URL = mcpUrl;
-        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
-      } else if (!baseEnv.MCP_URL) {
-        baseEnv.MCP_URL = `http://localhost:${port}`;
+        // Bare origin only: basePath is resolved inside the (separate)
+        // production server process from its own constructor config, so
+        // the parent process has no live value to qualify this URL with.
+        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}`));
       }
       const env = isNextJsProject ? withNextShimsEnv(baseEnv) : baseEnv;
 
@@ -2894,8 +3065,7 @@ program
         // Clean up tunnel via API if subdomain is available
         if (tunnelSubdomain) {
           try {
-            const apiBase =
-              process.env.MCP_USE_API || "https://local.mcp-use.run";
+            const apiBase = tunnelApiBase();
             await fetch(`${apiBase}/api/tunnels/${tunnelSubdomain}`, {
               method: "DELETE",
             });

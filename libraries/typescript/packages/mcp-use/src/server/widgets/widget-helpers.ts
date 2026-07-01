@@ -12,7 +12,9 @@ import type {
   UIResourceDefinition,
   WidgetProps,
 } from "../types/index.js";
-import { fsHelpers, getCwd, isDeno, pathHelpers } from "../utils/runtime.js";
+import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import { resolveWorkspacePaths } from "../config/paths.js";
+import { publicAssetBase, widgetAssetBase } from "../config/base-path.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -185,12 +187,8 @@ export async function readBuildManifest(): Promise<{
   buildId?: string;
 } | null> {
   try {
-    const manifestPath = pathHelpers.join(
-      isDeno ? "." : getCwd(),
-      "dist",
-      "mcp-use.json"
-    );
-    const content = await fsHelpers.readFileSync(manifestPath, "utf8");
+    const paths = resolveWorkspacePaths(getCwd());
+    const content = await fsHelpers.readFileSync(paths.buildManifest, "utf8");
     return JSON.parse(content);
   } catch {
     return null;
@@ -209,6 +207,12 @@ export interface WidgetServerConfig {
   serverBaseUrl?: string;
   /** Build ID for cache busting */
   buildId?: string;
+  /**
+   * Normalized server-wide path prefix (see `config/base-path.ts`). The widget
+   * iframe URL is built under `${basePath}/mcp-use/widgets/...`. Defaults to
+   * `/mcp` when not threaded.
+   */
+  basePath?: string;
 }
 
 /**
@@ -299,20 +303,25 @@ export function getContentType(filename: string): string {
  * @param html - Original HTML content
  * @param widgetName - Widget identifier
  * @param baseUrl - Server base URL
+ * @param basePath - Normalized server-wide path prefix (see
+ *   `config/base-path.ts`). Defaults to `/mcp`. `""` means root-mounted.
  * @returns Processed HTML with injected base tag and absolute URLs
  *
  * @example
  * ```typescript
  * const html = '<html><head></head><body>...</body></html>';
- * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000');
+ * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000', '/mcp');
  * ```
  */
 export function processWidgetHtml(
   html: string,
   widgetName: string,
-  baseUrl: string
+  baseUrl: string,
+  basePath: string = "/mcp"
 ): string {
   let processedHtml = html;
+  const widgetsBase = widgetAssetBase(basePath); // `${basePath}/mcp-use/widgets`
+  const publicBase = publicAssetBase(basePath); // `${basePath}/mcp-use/public`
 
   // Inject or replace base tag with server base URL
   if (baseUrl && processedHtml) {
@@ -346,22 +355,34 @@ export function processWidgetHtml(
       }
     }
 
-    // Replace relative paths that start with /mcp-use for scripts and CSS with absolute URLs
+    // Rewrite the widget asset paths emitted by the build
+    // (`${someBasePath}/mcp-use/widgets/...`) to absolute URLs against
+    // baseUrl. Matches on the fixed `/mcp-use/widgets/` literal rather than
+    // the current live `widgetsBase`, so this still corrects the paths when
+    // the basePath baked in at build time differs from the live basePath
+    // (build time no longer needs to know the real basePath at all).
+    // Absolute (`scheme://`) and protocol-relative (`//`) URLs are excluded:
+    // those come from `assetPrefix` builds whose assets live off-server (CDN/
+    // bucket) on purpose and must not be pulled back to the server origin.
     processedHtml = processedHtml.replace(
-      /src="\/mcp-use\/widgets\/([^"]+)"/g,
-      `src="${baseUrl}/mcp-use/widgets/$1"`
+      /src="(?!(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/)[^"]*\/mcp-use\/widgets\/([^"]+)"/g,
+      `src="${baseUrl}${widgetsBase}/$1"`
     );
     processedHtml = processedHtml.replace(
-      /href="\/mcp-use\/widgets\/([^"]+)"/g,
-      `href="${baseUrl}/mcp-use/widgets/$1"`
+      /href="(?!(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/)[^"]*\/mcp-use\/widgets\/([^"]+)"/g,
+      `href="${baseUrl}${widgetsBase}/$1"`
     );
 
-    // Add window.__getFile and window.__mcpPublicUrl to head
-    // Use slugified name for URL routing
+    // Inject the runtime globals widgets read at load time. Use slugified name
+    // for URL routing.
+    // - __getFile: resolve an asset under this widget's basePath-aware dir
+    // - __mcpServerUrl: the bare server origin (read by useWidget for mcp_url)
+    // - __MCP_BASE_PATH__: the resolved basePath (so clients can derive routes)
+    // - __mcpPublicUrl: kept (Image.tsx reads it) — now basePath-aware
     const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}${widgetsBase}/${slugifiedName}/"+filename }; window.__mcpServerUrl = "${baseUrl}"; window.__MCP_BASE_PATH__ = "${basePath}"; window.__mcpPublicUrl = "${baseUrl}${publicBase}";</script>`
     );
   }
 
@@ -567,6 +588,7 @@ export async function createWidgetUIResource(
     baseUrl: configBaseUrl,
     port: configPort,
     buildId: serverConfig.buildId,
+    basePath: serverConfig.basePath,
   };
 
   const uiResource = await createUIResourceFromDefinition(
@@ -699,7 +721,7 @@ async function readWidgetHtml(
  * ```typescript
  * await registerWidgetFromTemplate(
  *   'kanban-board',
- *   './dist/resources/widgets/kanban-board/index.html',
+ *   '.mcp-use/build/resources/widgets/kanban-board/index.html',
  *   { title: 'Kanban Board' },
  *   serverConfig,
  *   registerWidget,
@@ -711,7 +733,7 @@ export async function registerWidgetFromTemplate(
   widgetName: string,
   htmlPath: string,
   metadata: Record<string, unknown>,
-  serverConfig: { serverBaseUrl: string; cspUrls: string[] },
+  serverConfig: { serverBaseUrl: string; cspUrls: string[]; basePath?: string },
   registerWidget: import("./widget-types.js").RegisterWidgetCallback,
   isDev: boolean = false
 ): Promise<void> {
@@ -722,7 +744,12 @@ export async function registerWidgetFromTemplate(
   }
 
   // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  html = processWidgetHtml(
+    html,
+    widgetName,
+    serverConfig.serverBaseUrl,
+    serverConfig.basePath
+  );
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
@@ -746,25 +773,42 @@ export async function registerWidgetFromTemplate(
  * This function encapsulates the common pattern of serving static files.
  *
  * @param app - Hono app instance to mount routes on
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from the build output's public/
+ *   (production) or the project public/ (dev)
+ * @param buildDir - Absolute build output dir; required when useDistDirectory
+ *   is true (production serves from `<buildDir>/public`)
+ * @param basePath - Normalized server-wide path prefix (see
+ *   `config/base-path.ts`). Public assets serve from
+ *   `${basePath}/mcp-use/public/*`. Defaults to `/mcp`.
+ * @param sourcePublicDir - Project-relative public directory to serve in dev
+ *   mode (`ServerConfig.publicDir`, default `public`). Ignored in production,
+ *   where the build already copied it to `<buildDir>/public`.
  *
  * @example
  * ```typescript
  * // For development mode
- * setupPublicRoutes(app, false);
+ * setupPublicRoutes(app, false, undefined, basePath, publicDir);
  *
  * // For production mode
- * setupPublicRoutes(app, true);
+ * setupPublicRoutes(app, true, buildDir, basePath);
  * ```
  */
 export function setupPublicRoutes(
   app: HonoType,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  buildDir?: string,
+  basePath: string = "/mcp",
+  sourcePublicDir: string = "public"
 ): void {
-  app.get("/mcp-use/public/*", async (c: Context) => {
-    const filePath = c.req.path.replace("/mcp-use/public/", "");
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, filePath);
+  const publicBase = publicAssetBase(basePath); // `${basePath}/mcp-use/public`
+  app.get(`${publicBase}/*`, async (c: Context) => {
+    const filePath = c.req.path.replace(`${publicBase}/`, "");
+    // Production: serve from the build output's public/ dir; dev: project public/.
+    const publicDir =
+      useDistDirectory && buildDir
+        ? pathHelpers.join(buildDir, "public")
+        : pathHelpers.join(getCwd(), sourcePublicDir);
+    const fullPath = pathHelpers.join(publicDir, filePath);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {
@@ -790,7 +834,12 @@ export function setupPublicRoutes(
  *
  * @param app - Hono app instance to mount routes on
  * @param faviconPath - Path to favicon file relative to public directory
- * @param useDistDirectory - Whether to serve from dist/public (production) or public (dev)
+ * @param useDistDirectory - Whether to serve from the build output's public/
+ *   (production) or the project public/ (dev)
+ * @param buildDir - Absolute build output dir; required when useDistDirectory
+ *   is true (production serves from `<buildDir>/public`)
+ * @param sourcePublicDir - Project-relative public directory to serve in dev
+ *   mode (`ServerConfig.publicDir`, default `public`). Ignored in production.
  *
  * @example
  * ```typescript
@@ -798,21 +847,26 @@ export function setupPublicRoutes(
  * setupFaviconRoute(app, 'favicon.ico', false);
  *
  * // For production mode
- * setupFaviconRoute(app, 'favicon.ico', true);
+ * setupFaviconRoute(app, 'favicon.ico', true, buildDir);
  * ```
  */
 export function setupFaviconRoute(
   app: HonoType,
   faviconPath: string | undefined,
-  useDistDirectory: boolean = false
+  useDistDirectory: boolean = false,
+  buildDir?: string,
+  sourcePublicDir: string = "public"
 ): void {
   if (!faviconPath) {
     return; // No favicon configured
   }
 
   app.get("/favicon.ico", async (c: Context) => {
-    const basePath = useDistDirectory ? "dist/public" : "public";
-    const fullPath = pathHelpers.join(getCwd(), basePath, faviconPath);
+    const publicDir =
+      useDistDirectory && buildDir
+        ? pathHelpers.join(buildDir, "public")
+        : pathHelpers.join(getCwd(), sourcePublicDir);
+    const fullPath = pathHelpers.join(publicDir, faviconPath);
 
     try {
       if (await fsHelpers.existsSync(fullPath)) {

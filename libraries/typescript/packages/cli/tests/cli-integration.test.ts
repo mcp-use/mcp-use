@@ -435,7 +435,12 @@ export const message = greet("mcp-1733");
       const result = await runCLI(["build", "-p", buildDir, "--no-typecheck"]);
       expect(result.exitCode).toBe(0);
 
-      const bundled = readFileSync(join(buildDir, "dist/main.js"), "utf8");
+      // Build output lands in the fixed `.mcp-use/build` workspace dir (the
+      // tsconfig `outDir` above only feeds tsc, which --no-typecheck skips).
+      const bundled = readFileSync(
+        join(buildDir, ".mcp-use/build/main.js"),
+        "utf8"
+      );
 
       // Bare package import must survive to runtime (packages: "external").
       expect(bundled).toMatch(/from\s+["']mcp-use["']/);

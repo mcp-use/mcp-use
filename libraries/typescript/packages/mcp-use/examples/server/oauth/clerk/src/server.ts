@@ -10,7 +10,7 @@
  * - MCP_USE_OAUTH_CLERK_FRONTEND_API_URL (required) — your Clerk Frontend API URL
  */
 
-import { MCPServer, oauthClerkProvider, error, object } from "mcp-use/server";
+import { MCPServer, oauthClerkProvider, error, object } from "mcp-use";
 
 declare const process: { env: Record<string, string> };
 

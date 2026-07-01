@@ -13,7 +13,7 @@ import { registerStaticRoutes } from "./shared-static.js";
  *
  * @example
  * ```typescript
- * import { MCPServer } from 'mcp-use/server'
+ * import { MCPServer } from 'mcp-use'
  * import { mountInspector } from '@mcp-use/inspector'
  *
  * const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
@@ -31,6 +31,14 @@ export function mountInspector(
     sandboxOrigin?: string | null;
     /** Port the host app listens on (embedded inspector); required for tunnel start */
     serverPort?: number;
+    /**
+     * Normalized server-wide path prefix the embedding server mounts its whole
+     * framework surface under (default `/mcp`; `""` = root). The inspector
+     * relocates to `${basePath}/inspector` and its proxy/API live under
+     * `${basePath}/inspector/api/*`. Injected into the client HTML as
+     * `window.__MCP_BASE_PATH__` so the client can derive its own URLs.
+     */
+    basePath?: string;
   }
 ): void {
   // Find the built client files
@@ -45,11 +53,18 @@ export function mountInspector(
     );
   }
 
+  // Normalize basePath: a single leading slash, no trailing slash; "" = root.
+  const basePath = normalizeInspectorBasePath(config?.basePath);
+
   // Build runtime config to inject into the HTML
   const runtimeConfig = {
     devMode: config?.devMode,
     sandboxOrigin: config?.sandboxOrigin,
     inspectorMode: "embedded" as const,
+    basePath,
+    // Make the proxy URL basePath-aware so the client targets the relocated
+    // proxy (the client reads window.__MCP_PROXY_URL__).
+    proxyUrl: `${basePath}/inspector/api/proxy`,
   };
 
   // If it's already a Hono app, register routes directly.
@@ -64,8 +79,8 @@ export function mountInspector(
   // Every Hono instance exposes `.fetch`, and Express apps don't, so the
   // duck-type check alone covers both shapes unambiguously.
   if (isHonoApp(app)) {
-    registerInspectorRoutes(app, config);
-    registerStaticRoutes(app, clientDistPath, runtimeConfig);
+    registerInspectorRoutes(app, config, basePath);
+    registerStaticRoutes(app, clientDistPath, runtimeConfig, basePath);
     return;
   }
 
@@ -73,8 +88,8 @@ export function mountInspector(
   const honoApp = new Hono();
 
   // Register routes on Hono app
-  registerInspectorRoutes(honoApp, config);
-  registerStaticRoutes(honoApp, clientDistPath, runtimeConfig);
+  registerInspectorRoutes(honoApp, config, basePath);
+  registerStaticRoutes(honoApp, clientDistPath, runtimeConfig, basePath);
 
   // Convert all Hono routes to Express middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -121,4 +136,18 @@ export function mountInspector(
 
 function isHonoApp(app: Express | Hono): app is Hono {
   return typeof (app as { fetch?: unknown }).fetch === "function";
+}
+
+/**
+ * Normalize the server-wide `basePath` the embedding server passes in: a single
+ * leading slash, no trailing slash; `""`/`"/"` collapse to `""` (root). Mirrors
+ * mcp-use's `normalizeBasePath` so the inspector and host agree on the prefix
+ * without taking a runtime dependency on the helper.
+ */
+function normalizeInspectorBasePath(raw: string | undefined): string {
+  if (raw === undefined) return "/mcp";
+  let value = raw.trim().replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+  if (value === "" || value === "/") return "";
+  if (!value.startsWith("/")) value = `/${value}`;
+  return value;
 }

@@ -75,13 +75,60 @@ export interface ServerConfig {
    */
   host?: string;
   /**
-   * Full base URL (overrides host:port for widget URLs).
-   * Use when deploying behind a reverse proxy or to a known public URL.
+   * Server-wide path prefix the entire HTTP surface mounts under, as one
+   * relocatable unit: transport (`${basePath}`), widget/public assets
+   * (`${basePath}/mcp-use/*`), the inspector, and OAuth endpoints. Only
+   * `/.well-known/*` and `/favicon.ico` stay at root regardless of this
+   * value. Use `""` or `"/"` to mount at the root. Mirrors Next.js `basePath`.
    *
-   * @example "https://myserver.com"
-   * @example "https://api.example.com/mcp"
+   * Resolved (normalized) at construction time onto `serverBasePath`, so
+   * tooling that imports the server entry can read it without booting.
+   *
+   * @default "/mcp"
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   basePath: '/api'
+   * });
+   * ```
    */
-  baseUrl?: string;
+  basePath?: string;
+  /**
+   * Project-relative directory scanned for views (the React components
+   * rendered inside the client iframe; also called widgets). The dev server
+   * watches it and `mcp-use build` bundles every view found in it. The CLI's
+   * `--mcp-dir`/`--widgets-dir` flags override this per run.
+   *
+   * @default "resources"
+   */
+  viewsDir?: string;
+  /**
+   * Project-relative directory of static public assets, served under
+   * `${basePath}/mcp-use/public/*`. In production `mcp-use build` copies it
+   * into the build output. Skipped silently if the directory doesn't exist.
+   *
+   * @default "public"
+   */
+  publicDir?: string;
+  /**
+   * Host/CDN origin prefix for serving built view assets OFF-server (e.g. a
+   * CDN or static bucket). `mcp-use build` reads this off the imported server
+   * instance and bakes `${assetPrefix}/mcp-use/widgets/...` URLs into the
+   * built HTML. Leave unset to serve assets root-relative from this server.
+   *
+   * @example
+   * ```typescript
+   * const server = new MCPServer({
+   *   name: 'my-server',
+   *   version: '1.0.0',
+   *   assetPrefix: process.env.CDN_URL
+   * });
+   * ```
+   */
+  assetPrefix?: string;
   /**
    * Custom CORS options for the server.
    *
@@ -194,7 +241,7 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { MCPServer, RedisSessionStore } from 'mcp-use/server';
+   * import { MCPServer, RedisSessionStore } from 'mcp-use';
    * import { createClient } from 'redis';
    *
    * const redis = createClient({ url: process.env.REDIS_URL });
@@ -221,7 +268,7 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { MCPServer, RedisStreamManager, RedisSessionStore } from 'mcp-use/server';
+   * import { MCPServer, RedisStreamManager, RedisSessionStore } from 'mcp-use';
    * import { createClient } from 'redis';
    *
    * // Create two Redis clients (Pub/Sub requires dedicated client)
@@ -262,7 +309,7 @@ export interface ServerConfig {
    *
    * @example
    * ```typescript
-   * import { MCPServer, oauthSupabaseProvider } from 'mcp-use/server';
+   * import { MCPServer, oauthSupabaseProvider } from 'mcp-use';
    *
    * // Supabase OAuth
    * const server = new MCPServer({

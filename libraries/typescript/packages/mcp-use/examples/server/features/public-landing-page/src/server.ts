@@ -1,4 +1,4 @@
-import { MCPServer, markdown, object, oauthProxy, text } from "mcp-use/server";
+import { MCPServer, markdown, object, oauthProxy, text } from "mcp-use";
 import { z } from "zod";
 
 const port = Number(process.env.PORT || 3000);

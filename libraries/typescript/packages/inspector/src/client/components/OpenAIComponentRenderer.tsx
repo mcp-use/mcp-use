@@ -1,7 +1,9 @@
 import { cn } from "@/client/lib/utils";
+import { inspectorApi } from "@/client/utils/basePath";
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { X } from "lucide-react";
-import { useMcpClient } from "mcp-use/react";
+import { useMcpClient } from "@mcp-use/client/react";
+import type { AppsSdkWindowOpenAi } from "mcp-use/react";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MCP_APPS_CONFIG } from "../constants/mcp-apps";
@@ -256,7 +258,7 @@ function OpenAIComponentRendererBase({
 
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
         const storeResponse = await fetch(
-          `${inspectorApiBase}/inspector/api/resources/widget/store`,
+          `${inspectorApiBase}${inspectorApi("resources/widget/store")}`,
           {
             method: "POST",
             headers: {
@@ -295,7 +297,7 @@ function OpenAIComponentRendererBase({
         // the store so that iframe fetch gets latest data. Changing URL would reload the iframe.
         if (!hasSetWidgetUrlRef.current) {
           hasSetWidgetUrlRef.current = true;
-          const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
+          const widgetUrl = `${inspectorApiBase}${inspectorApi(`resources/widget-content/${toolId}`)}?t=${Date.now()}`;
           setWidgetUrl(widgetUrl);
           // Register widget in debug context so CSP violations can be stored
           addWidget(toolId, { toolName, protocol: "chatgpt-app" });
@@ -391,6 +393,11 @@ function OpenAIComponentRendererBase({
           }
 
           if (iframeWindow.openai) {
+            // The iframe's `window.openai` is the Apps SDK host bridge. Type it
+            // with mcp-use's view-runtime shape (richer than @mcp-ui/server's
+            // ambient `AppsSdkBridge`, which omits safeArea/userAgent/etc.).
+            const openai =
+              iframeWindow.openai as unknown as AppsSdkWindowOpenAi;
             // Skip redundant dispatch only when updates are exclusively theme/displayMode
             // and those already match. Must NOT skip when locale, userAgent, safeArea,
             // maxHeight, or toolOutput need to be applied (debug toggles, etc.).
@@ -404,35 +411,31 @@ function OpenAIComponentRendererBase({
 
             if (!hasHostContextUpdates) {
               const themeMatch =
-                merged.theme === undefined ||
-                iframeWindow.openai.theme === merged.theme;
+                merged.theme === undefined || openai.theme === merged.theme;
               const displayModeMatch =
                 merged.displayMode === undefined ||
-                iframeWindow.openai.displayMode === merged.displayMode;
+                openai.displayMode === merged.displayMode;
               if (themeMatch && displayModeMatch) return;
             }
             if (merged.displayMode !== undefined)
-              iframeWindow.openai.displayMode = merged.displayMode;
-            if (merged.theme !== undefined)
-              iframeWindow.openai.theme = merged.theme;
+              openai.displayMode = merged.displayMode;
+            if (merged.theme !== undefined) openai.theme = merged.theme;
             if (merged.maxHeight !== undefined)
-              iframeWindow.openai.maxHeight = merged.maxHeight;
-            if (merged.locale !== undefined)
-              iframeWindow.openai.locale = merged.locale;
+              openai.maxHeight = merged.maxHeight;
+            if (merged.locale !== undefined) openai.locale = merged.locale;
             if (merged.safeArea !== undefined)
-              iframeWindow.openai.safeArea = merged.safeArea;
+              openai.safeArea = merged.safeArea;
             if (merged.userAgent !== undefined)
-              iframeWindow.openai.userAgent = merged.userAgent;
+              openai.userAgent = merged.userAgent;
             if (merged.toolOutput !== undefined)
-              iframeWindow.openai.toolOutput = merged.toolOutput;
+              openai.toolOutput = merged.toolOutput;
             if (merged.toolResponseMetadata !== undefined)
-              iframeWindow.openai.toolResponseMetadata =
-                merged.toolResponseMetadata;
+              openai.toolResponseMetadata = merged.toolResponseMetadata;
 
             try {
               const ev = new (iframeWindow as any).CustomEvent(
                 "openai:set_globals",
-                { detail: { globals: { ...iframeWindow.openai } } }
+                { detail: { globals: { ...openai } } }
               );
               iframeWindow.dispatchEvent(ev);
             } catch {

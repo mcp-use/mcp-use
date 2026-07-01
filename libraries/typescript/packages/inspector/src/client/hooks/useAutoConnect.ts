@@ -1,4 +1,4 @@
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/client/react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import {
   type ConnectionMode,
   type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
+import { getInspectorBase } from "@/client/utils/basePath";
 
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
@@ -552,7 +553,7 @@ export function useAutoConnect({
     }
 
     // Fallback to config.json
-    fetch("/inspector/config.json")
+    fetch(`${getInspectorBase()}/config.json`)
       .then((res) => res.json())
       .then((configData: { autoConnectUrl: string | null }) => {
         setConfigLoaded(true);

@@ -11,7 +11,7 @@
  */
 
 // @ts-nocheck
-import { MCPServer, oauthAuth0Provider, error, object } from "mcp-use/server";
+import { MCPServer, oauthAuth0Provider, error, object } from "mcp-use";
 
 declare const process: { env: Record<string, string> };
 

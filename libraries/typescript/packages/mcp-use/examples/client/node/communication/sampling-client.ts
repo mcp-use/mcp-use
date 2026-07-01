@@ -15,7 +15,7 @@
  *   2. Run: tsx examples/client/node/communication/sampling-client.ts
  */
 
-import { MCPClient, type OnSamplingCallback } from "mcp-use";
+import { MCPClient, type OnSamplingCallback } from "@mcp-use/client";
 
 const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
 

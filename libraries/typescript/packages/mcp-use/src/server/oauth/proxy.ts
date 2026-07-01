@@ -62,7 +62,7 @@ export interface OAuthProxyOptions {
  * @example
  * ```typescript
  * import { Hono } from "hono";
- * import { mountOAuthProxy } from "mcp-use/server";
+ * import { mountOAuthProxy } from "mcp-use";
  *
  * const app = new Hono();
  *

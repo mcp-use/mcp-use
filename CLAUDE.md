@@ -4,7 +4,7 @@ This is the root configuration for Claude Code in the mcp-use monorepo.
 
 ## Project Overview
 
-**mcp-use** is a full-stack MCP (Model Context Protocol) framework providing clients, agents, and servers in both Python and TypeScript. This is a widely-used open-source library.
+**mcp-use** is a full-stack MCP (Model Context Protocol) framework providing clients, agents, and servers in both Python and TypeScript.
 
 ## Repository Structure
 
@@ -21,53 +21,20 @@ See language-specific CLAUDE.md files in `libraries/python/` and `libraries/type
 
 ---
 
-## CRITICAL: Workflow for Non-Trivial Tasks
+## Current Context: v2 Migration
 
-**YOU MUST follow this workflow for any task beyond simple fixes:**
+**The TypeScript library is mid-migration to v2 (alpha).** This is an active, sanctioned breaking-change effort — not incidental churn. Two things are happening at once:
 
-### 1. Plan Before Implementing
+1. **Code quality cleanup** — untangling accumulated coupling, dead code, and inconsistent patterns across the TS packages.
+2. **Migrating to the v2 `@modelcontextprotocol/sdk` TypeScript SDK** — the current dependency is v1 (`1.26.0`); the goal is to move onto the official SDK's v2 line as it becomes the foundation.
 
-Before writing any code for a non-trivial task:
-- Use plan mode to reason through the approach
-- Identify files that need changes
-- Consider edge cases and potential issues
-- Get explicit user approval before proceeding
+**What this means for how you work here:**
 
-### 2. Context Management
-
-When exploring the codebase:
-- Read only files directly relevant to the task
-- Avoid loading entire directories or large numbers of files
-- Use targeted grep/glob searches first
-- Summarize findings rather than dumping file contents
-
-### 3. Breaking Changes & Backward Compatibility
-
-**This is a library used by many people. Breaking changes have real impact.**
-
-Before implementing ANY change that modifies public APIs:
-- Explicitly identify if it's a breaking change
-- Present options to the user in plan mode:
-  - Option A: Breaking change (cleaner, but requires user migration)
-  - Option B: Backward compatible (may add complexity)
-- **DO NOT** automatically add backward compatibility shims, re-exports, or deprecation wrappers
-- Let the user decide - often breaking changes are acceptable and preferred over code duplication
-
-### 4. Implementation Requirements
-
-After plan approval:
-- Write clean, minimal code that solves the problem
-- **Tests are MANDATORY** for new functions/methods/classes
-- Tests must verify actual behavior, not just mock everything
-- Avoid over-engineering - solve the current problem, not hypothetical future ones
-
-### 5. Post-Implementation Checklist
-
-After implementation is complete:
-1. Run the test suite and verify tests pass
-2. Check if documentation needs updates (`docs/`, README files, docstrings)
-3. Check if examples need updates (`examples/` directories)
-4. Prepare a PR description following `.github/pull_request_template.md`
+- **Breaking changes are the default, not the exception.** Don't stop to present "Option A: breaking / Option B: backward-compatible" for every API change during this migration — assume breaking is fine unless the user says otherwise. Do not add backward-compatibility shims, re-exports, or deprecation wrappers unless explicitly asked.
+- **Sweeping refactors are in scope.** Code-quality cleanup alongside migration work is the point of this phase, not scope creep to avoid.
+- **Branch target for v2 work is `v2` (remote `canary-v2`), not `canary`.** `canary` only receives v2 in one big merge at release time. If you're unsure which branch a v2-era change should target, ask.
+- Changesets are still required before a PR lands on `v2` — don't skip them just because the change is breaking.
+- For well-scoped, mechanical migration/cleanup work, a brief confirmation of the approach is enough — you don't need a full plan-mode cycle for every file. Reserve deeper up-front planning for genuinely ambiguous or architecturally significant changes (e.g. package boundaries, public API shape).
 
 ---
 
@@ -75,45 +42,11 @@ After implementation is complete:
 
 **Tests are not optional. Fake tests are worse than no tests.**
 
-- Unit tests: Test actual logic, not mocked implementations
-- Integration tests: Test real component interactions
-- If you're mocking everything, you're testing nothing
-- Cover happy paths AND edge cases
-
----
-
-## PR Description Format
-
-After completing work, provide a PR description following this format:
-
-```markdown
-## Changes
-[Concise description of what changed]
-
-## Implementation Details
-1. [Specific changes made]
-2. [Architectural decisions]
-3. [Dependencies added/modified]
-
-## Example Usage (Before)
-[If applicable]
-
-## Example Usage (After)
-[Show the new usage]
-
-## Documentation Updates
-- [List updated docs]
-
-## Testing
-- [Tests added/modified]
-- [How you verified the changes]
-
-## Backwards Compatibility
-[Is this breaking? What do users need to do?]
-
-## Related Issues
-Closes #[issue_number]
-```
+- Unit tests: test actual logic, not mocked implementations.
+- Integration tests: test real component interactions.
+- If you're mocking everything, you're testing nothing.
+- Cover happy paths AND edge cases.
+- When migration work removes or reshapes a public API, update or delete its tests in the same change rather than leaving them testing a shim.
 
 ---
 
@@ -136,9 +69,6 @@ pnpm changeset                      # Create changeset for PR
 
 ## What NOT to Do
 
-- Don't implement features without explicit approval
-- Don't add backward compatibility code without asking first
-- Don't create tests that only test mocks
-- Don't skip documentation updates
-- Don't make sweeping refactors alongside feature work
-- Don't guess at requirements - ask for clarification
+- Don't add backward-compatibility shims or deprecation wrappers during the v2 migration without being asked.
+- Don't create tests that only test mocks.
+- Don't guess at requirements when genuinely ambiguous — ask.

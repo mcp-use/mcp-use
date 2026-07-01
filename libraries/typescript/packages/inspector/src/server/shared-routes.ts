@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import { telFetch } from "mcp-use/telemetry/tel-fetch";
-import { mountMcpProxy, mountOAuthProxy } from "mcp-use/server";
+import { mountMcpProxy, mountOAuthProxy } from "mcp-use";
 import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
@@ -48,33 +48,39 @@ export type InspectorRoutesConfig = {
 
 export function registerInspectorRoutes(
   app: Hono,
-  config?: InspectorRoutesConfig
+  config?: InspectorRoutesConfig,
+  basePath: string = ""
 ) {
   if (typeof config?.serverPort === "number") {
     setServerPort(config.serverPort);
   }
 
-  app.get("/inspector/health", (c) => {
+  // All inspector routes relocate under the server-wide basePath, e.g.
+  // `${basePath}/inspector/...` (default `/mcp/inspector/...`). `basePath` is
+  // already normalized by the caller ("" = root, no trailing slash).
+  const p = (suffix: string) => `${basePath}${suffix}`;
+
+  app.get(p("/inspector/health"), (c) => {
     return c.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Mount MCP proxy middleware at the inspector's proxy path
+  // Mount MCP proxy middleware at the inspector's (relocated) proxy path
   mountMcpProxy(app, {
-    path: "/inspector/api/proxy",
+    path: p("/inspector/api/proxy"),
   });
 
-  // Mount OAuth proxy middleware at the inspector's OAuth path
+  // Mount OAuth proxy middleware at the inspector's (relocated) OAuth path
   mountOAuthProxy(app, {
-    basePath: "/inspector/api/oauth",
+    basePath: p("/inspector/api/oauth"),
     enableLogging: true,
   });
 
-  // Mount MCP Apps routes at /inspector/api/mcp-apps
-  // Note: registerMcpAppsRoutes handles the /inspector/api/mcp-apps prefix internally
-  registerMcpAppsRoutes(app);
+  // Mount MCP Apps routes at ${basePath}/inspector/api/mcp-apps
+  // registerMcpAppsRoutes handles the /inspector/api/mcp-apps suffix internally
+  registerMcpAppsRoutes(app, basePath);
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (streaming)
-  app.post("/inspector/api/chat/stream", async (c) => {
+  app.post(p("/inspector/api/chat/stream"), async (c) => {
     try {
       const requestBody = await c.req.json();
 
@@ -115,7 +121,7 @@ export function registerInspectorRoutes(
   });
 
   // Chat API endpoint - handles MCP agent chat with custom LLM key (non-streaming)
-  app.post("/inspector/api/chat", async (c) => {
+  app.post(p("/inspector/api/chat"), async (c) => {
     try {
       const requestBody = await c.req.json();
       const result = await handleChatRequest(requestBody);
@@ -126,7 +132,7 @@ export function registerInspectorRoutes(
   });
 
   // Widget storage endpoint - store widget data for rendering
-  app.post("/inspector/api/resources/widget/store", async (c) => {
+  app.post(p("/inspector/api/resources/widget/store"), async (c) => {
     try {
       const body = await c.req.json();
       const result = storeWidgetData(body);
@@ -147,8 +153,10 @@ export function registerInspectorRoutes(
   });
 
   // Widget container endpoint - serves container page that loads widget
-  app.get("/inspector/api/resources/widget/:toolId", async (c) => {
-    const toolId = c.req.param("toolId");
+  app.get(p("/inspector/api/resources/widget/:toolId"), async (c) => {
+    // Hono can't infer the :toolId param type from a computed (basePath-prefixed)
+    // route pattern, so coalesce the guaranteed param to a string.
+    const toolId = c.req.param("toolId") ?? "";
 
     // Check if data exists in storage
     const widgetData = getWidgetData(toolId);
@@ -159,14 +167,17 @@ export function registerInspectorRoutes(
       );
     }
 
-    // Return a container page that will fetch and load the actual widget
-    return c.html(generateWidgetContainerHtml("/inspector", toolId));
+    // Return a container page that will fetch and load the actual widget.
+    // Pass the relocated inspector base so its in-page fetch targets the
+    // basePath-prefixed widget-content route.
+    return c.html(generateWidgetContainerHtml(p("/inspector"), toolId));
   });
 
   // Widget content endpoint - serves pre-fetched resource with injected OpenAI API
-  app.get("/inspector/api/resources/widget-content/:toolId", async (c) => {
+  app.get(p("/inspector/api/resources/widget-content/:toolId"), async (c) => {
     try {
-      const toolId = c.req.param("toolId");
+      // Hono can't infer the :toolId param from a computed route pattern.
+      const toolId = c.req.param("toolId") ?? "";
 
       // Retrieve widget data from storage
       const widgetData = getWidgetData(toolId);
@@ -222,7 +233,7 @@ export function registerInspectorRoutes(
   });
 
   // Inspector config endpoint
-  app.get("/inspector/config.json", (c) => {
+  app.get(p("/inspector/config.json"), (c) => {
     return c.json({
       autoConnectUrl: config?.autoConnectUrl || null,
     });
@@ -234,7 +245,7 @@ export function registerInspectorRoutes(
     process.env.NODE_ENV === "test";
 
   // Telemetry proxy endpoint - forwards telemetry events to PostHog from server-side
-  app.post("/inspector/api/tel/posthog", async (c) => {
+  app.post(p("/inspector/api/tel/posthog"), async (c) => {
     // Skip telemetry in test environments
     if (isTelemetryDisabled()) {
       return c.json({ success: true });
@@ -279,7 +290,7 @@ export function registerInspectorRoutes(
   });
 
   // Telemetry proxy endpoint - forwards telemetry events to Scarf from server-side
-  app.post("/inspector/api/tel/scarf", async (c) => {
+  app.post(p("/inspector/api/tel/scarf"), async (c) => {
     // Skip telemetry in test environments
     if (isTelemetryDisabled()) {
       return c.json({ success: true });
@@ -316,7 +327,7 @@ export function registerInspectorRoutes(
   });
 
   // RPC Log endpoint - receives RPC events from browser
-  app.post("/inspector/api/rpc/log", async (c) => {
+  app.post(p("/inspector/api/rpc/log"), async (c) => {
     try {
       const event = (await c.req.json()) as RpcLogEvent;
       rpcLogBus.publish(event);
@@ -328,7 +339,7 @@ export function registerInspectorRoutes(
   });
 
   // Clear RPC log buffer endpoint
-  app.delete("/inspector/api/rpc/log", async (c) => {
+  app.delete(p("/inspector/api/rpc/log"), async (c) => {
     try {
       const url = new URL(c.req.url);
       const serverIdsParam = url.searchParams.get("serverIds");
@@ -344,7 +355,7 @@ export function registerInspectorRoutes(
   });
 
   // RPC Stream endpoint - streams RPC events via SSE
-  app.get("/inspector/api/rpc/stream", async (c) => {
+  app.get(p("/inspector/api/rpc/stream"), async (c) => {
     const url = new URL(c.req.url);
     const replay = parseInt(url.searchParams.get("replay") || "3", 10);
     const serverIdsParam = url.searchParams.get("serverIds");
@@ -424,12 +435,12 @@ export function registerInspectorRoutes(
   });
 
   // Tunnel management endpoints
-  app.get("/inspector/api/tunnel/status", (c) => {
+  app.get(p("/inspector/api/tunnel/status"), (c) => {
     const status = getTunnelStatus();
     return c.json(status);
   });
 
-  app.post("/inspector/api/tunnel/start", async (c) => {
+  app.post(p("/inspector/api/tunnel/start"), async (c) => {
     try {
       const result = await startTunnel();
       return c.json(result);
@@ -440,13 +451,13 @@ export function registerInspectorRoutes(
     }
   });
 
-  app.delete("/inspector/api/tunnel/stop", (c) => {
+  app.delete(p("/inspector/api/tunnel/stop"), (c) => {
     const stopped = stopTunnel();
     return c.json({ stopped });
   });
 
   /** Public MCP URL and CLI dev session (set by `mcp-use dev` / MCP_URL) */
-  app.get("/inspector/api/dev/info", (c) => {
+  app.get(p("/inspector/api/dev/info"), (c) => {
     const mcpUrl = process.env.MCP_URL ?? null;
     const portEnv = process.env.PORT;
     const fromCli = process.env.MCP_USE_CLI_DEV === "1";
@@ -478,7 +489,7 @@ export function registerInspectorRoutes(
    * Restart the dev server with the tunnel enabled.
    * Delegates to the CLI restart hook which re-spawns the process with --tunnel.
    */
-  app.post("/inspector/api/dev/start-tunnel", (c) => {
+  app.post(p("/inspector/api/dev/start-tunnel"), (c) => {
     const restart = (globalThis as any).__mcpUseDevRestart as
       | ((withTunnel: boolean) => void)
       | undefined;
@@ -493,7 +504,7 @@ export function registerInspectorRoutes(
   });
 
   /** Restart the dev server without the tunnel. */
-  app.post("/inspector/api/dev/stop-tunnel", (c) => {
+  app.post(p("/inspector/api/dev/stop-tunnel"), (c) => {
     const restart = (globalThis as any).__mcpUseDevRestart as
       | ((withTunnel: boolean) => void)
       | undefined;
@@ -508,7 +519,7 @@ export function registerInspectorRoutes(
   });
 
   // Legacy aliases
-  app.post("/inspector/api/dev/restart-with-tunnel", (c) => {
+  app.post(p("/inspector/api/dev/restart-with-tunnel"), (c) => {
     const restart = (globalThis as any).__mcpUseDevRestart as
       | ((withTunnel: boolean) => void)
       | undefined;
@@ -517,7 +528,7 @@ export function registerInspectorRoutes(
     return c.json({ ok: true, restarting: true });
   });
 
-  app.post("/inspector/api/dev/restart-without-tunnel", (c) => {
+  app.post(p("/inspector/api/dev/restart-without-tunnel"), (c) => {
     const restart = (globalThis as any).__mcpUseDevRestart as
       | ((withTunnel: boolean) => void)
       | undefined;

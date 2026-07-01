@@ -5,6 +5,7 @@
  */
 
 import type { Hono as HonoType } from "hono";
+import { isDebugEnabled } from "../../log-level.js";
 import { readBuildManifest } from "../widgets/index.js";
 
 /**
@@ -21,12 +22,15 @@ import { readBuildManifest } from "../widgets/index.js";
  * @param serverHost - Server hostname
  * @param serverPort - Server port
  * @param isProduction - Whether the server is running in production mode
+ * @param basePath - Normalized server-wide path prefix (see
+ *   `config/base-path.ts`). The inspector mounts at `${basePath}/inspector`
+ *   and auto-connects to the transport at `${basePath}`. Defaults to `/mcp`.
  * @returns Promise that resolves to true if inspector was mounted, false otherwise
  *
  * @example
  * If @mcp-use/inspector is installed:
- * - Inspector UI available at http://localhost:PORT/inspector
- * - Automatically connects to http://localhost:PORT/mcp (or /sse)
+ * - Inspector UI available at http://localhost:PORT/mcp/inspector
+ * - Automatically connects to http://localhost:PORT/mcp (or /mcp/sse)
  *
  * If not installed:
  * - Server continues to function normally
@@ -36,7 +40,8 @@ export async function mountInspectorUI(
   app: HonoType,
   serverHost: string,
   serverPort: number | undefined,
-  isProduction: boolean
+  isProduction: boolean,
+  basePath: string = "/mcp"
 ): Promise<boolean> {
   // In production, only mount if build manifest says so
   if (isProduction) {
@@ -64,8 +69,10 @@ export async function mountInspectorUI(
       serverHost === "0.0.0.0" || serverHost === "::"
         ? "localhost"
         : serverHost;
-    // Auto-connect to the local MCP server at /mcp using streamable HTTP.
-    const mcpUrl = `http://${hostForBrowser}:${serverPort}/mcp`;
+    // Auto-connect to the local MCP transport (now under basePath) via
+    // streamable HTTP. When root-mounted (basePath ""), the transport is at "/".
+    const transportPath = basePath === "" ? "/" : basePath;
+    const mcpUrl = `http://${hostForBrowser}:${serverPort}${transportPath}`;
     const autoConnectConfig = JSON.stringify({
       url: mcpUrl,
       name: "Local MCP Server",
@@ -79,13 +86,16 @@ export async function mountInspectorUI(
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
       serverPort: typeof serverPort === "number" ? serverPort : undefined,
+      // Relocate the inspector under the server-wide basePath so the whole
+      // framework surface (transport, assets, inspector) shares one prefix.
+      basePath,
     });
     console.log(
-      `[INSPECTOR] UI available at http://${hostForBrowser}:${serverPort}/inspector`
+      `[INSPECTOR] UI available at http://${hostForBrowser}:${serverPort}${basePath}/inspector`
     );
     return true;
   } catch (err) {
-    if (!isProduction || process.env.MCP_USE_DEBUG) {
+    if (!isProduction || isDebugEnabled()) {
       console.warn(
         "[INSPECTOR] Could not mount inspector UI:",
         err instanceof Error ? err.message : err

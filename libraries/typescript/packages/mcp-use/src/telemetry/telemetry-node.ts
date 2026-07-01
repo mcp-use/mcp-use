@@ -27,7 +27,7 @@ import {
   ClientRemoveServerEvent,
   createServerRunEventData,
 } from "./events.js";
-import { getPackageVersion } from "./utils.js";
+import { getPackageVersion } from "../version.js";
 import { telFetch } from "./tel-fetch.js";
 
 /**

@@ -20,7 +20,7 @@
  *     http://localhost:3000/mcp
  */
 
-import { MCPServer, text } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
 
 const resolvedAllowedOrigins = process.env.ALLOWED_ORIGINS?.split(",")
   .map((value) => value.trim())

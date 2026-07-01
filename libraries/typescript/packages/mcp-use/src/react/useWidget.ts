@@ -20,6 +20,7 @@ import {
   registerModelContextFlush,
 } from "./model-context.js";
 import type {
+  AppsSdkWindowOpenAi,
   CallToolResponse,
   DisplayMode,
   HostContext,
@@ -33,6 +34,18 @@ import type {
   UseWidgetResult,
 } from "./widget-types.js";
 import { SET_GLOBALS_EVENT_TYPE } from "./widget-types.js";
+
+/**
+ * Read the Apps SDK `window.openai` bridge with the view runtime's own
+ * (`API & OpenAiGlobals`) shape. We cast here instead of augmenting the global
+ * `Window.openai` type because `@mcp-ui/server` already claims that property with
+ * an incompatible `AppsSdkBridge` shape in the same TypeScript project — see
+ * `AppsSdkWindowOpenAi` in widget-types.ts.
+ */
+function getWindowOpenAi(): AppsSdkWindowOpenAi | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.openai as unknown as AppsSdkWindowOpenAi | undefined;
+}
 
 /**
  * Hook to subscribe to a single value from window.openai globals.
@@ -49,10 +62,8 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
   return useSyncExternalStore(
     (onChange) => {
       // Initialize from current snapshot so redundant events with same values are ignored
-      let lastValue: unknown =
-        typeof window !== "undefined" && window.openai
-          ? (window.openai as OpenAiGlobals)[key]
-          : undefined;
+      const initialOpenAi = getWindowOpenAi();
+      let lastValue: unknown = initialOpenAi ? initialOpenAi[key] : undefined;
       const handleSetGlobal = (event: SetGlobalsEvent) => {
         const value = event.detail.globals[key];
         if (value === undefined) {
@@ -73,10 +84,10 @@ function useOpenAiGlobal<K extends keyof OpenAiGlobals>(
         }
       };
     },
-    () =>
-      typeof window !== "undefined" && window.openai
-        ? window.openai[key]
-        : undefined
+    () => {
+      const oai = getWindowOpenAi();
+      return oai ? oai[key] : undefined;
+    }
   );
 }
 
@@ -565,11 +576,13 @@ export function useWidget<
     return undefined;
   }, [provider, mcpAppsHostContext]);
 
-  // Compute MCP server base URL from window.__mcpPublicUrl
+  // Read the MCP server base URL directly from the injected global. The server
+  // bakes `window.__mcpServerUrl` (the bare origin) alongside the basePath-aware
+  // `__mcpPublicUrl`, so we no longer reverse-engineer the origin by stripping
+  // an asset-path suffix (which broke once assets moved under a basePath).
   const mcp_url = useMemo(() => {
-    if (typeof window !== "undefined" && window.__mcpPublicUrl) {
-      // Remove the /mcp-use/public suffix to get the base server URL
-      return window.__mcpPublicUrl.replace(/\/mcp-use\/public$/, "");
+    if (typeof window !== "undefined" && window.__mcpServerUrl) {
+      return window.__mcpServerUrl;
     }
     return "";
   }, []);
@@ -605,16 +618,17 @@ export function useWidget<
         return;
       }
 
-      if (currentProvider === "openai" && window.openai?.setWidgetState) {
+      const oai = getWindowOpenAi();
+      if (currentProvider === "openai" && oai?.setWidgetState) {
         // Skip empty descriptions: avoids a spurious write during the brief
         // window before the MCP Apps bridge connects (ChatGPT exposes both).
         if (description === null || description.trim().length === 0) {
           return;
         }
-        const prev = (window.openai.widgetState ??
+        const prev = (oai.widgetState ??
           latestWidgetStateRef.current ??
           {}) as Record<string, unknown>;
-        window.openai
+        oai
           .setWidgetState({
             ...prev,
             [MODEL_CONTEXT_KEY]: description,
@@ -634,10 +648,11 @@ export function useWidget<
       args: Record<string, unknown>
     ): Promise<CallToolResponse> => {
       if (provider === "openai") {
-        if (!window.openai?.callTool) {
+        const oai = getWindowOpenAi();
+        if (!oai?.callTool) {
           throw new Error("window.openai.callTool is not available");
         }
-        const raw = await window.openai.callTool(name, args);
+        const raw = await oai.callTool(name, args);
         return normalizeCallToolResponse(raw);
       }
 
@@ -656,7 +671,8 @@ export function useWidget<
           : content;
 
       if (provider === "openai") {
-        if (!window.openai?.sendFollowUpMessage) {
+        const oai = getWindowOpenAi();
+        if (!oai?.sendFollowUpMessage) {
           throw new Error("window.openai.sendFollowUpMessage is not available");
         }
         // window.openai only supports plain text; extract and join text blocks
@@ -670,7 +686,7 @@ export function useWidget<
                 )
                 .map((c) => c.text)
                 .join("\n");
-        return window.openai.sendFollowUpMessage({ prompt });
+        return oai.sendFollowUpMessage({ prompt });
       }
 
       const bridge = getMcpAppsBridge();
@@ -682,10 +698,11 @@ export function useWidget<
   const openExternal = useCallback(
     (href: string): void => {
       if (provider === "openai") {
-        if (!window.openai?.openExternal) {
+        const oai = getWindowOpenAi();
+        if (!oai?.openExternal) {
           throw new Error("window.openai.openExternal is not available");
         }
-        window.openai.openExternal({ href });
+        oai.openExternal({ href });
         return;
       }
 
@@ -700,10 +717,11 @@ export function useWidget<
   const requestDisplayMode = useCallback(
     async (mode: DisplayMode): Promise<{ mode: DisplayMode }> => {
       if (provider === "openai") {
-        if (!window.openai?.requestDisplayMode) {
+        const oai = getWindowOpenAi();
+        if (!oai?.requestDisplayMode) {
           throw new Error("window.openai.requestDisplayMode is not available");
         }
-        return window.openai.requestDisplayMode({ mode });
+        return oai.requestDisplayMode({ mode });
       }
 
       const bridge = getMcpAppsBridge();
@@ -728,13 +746,14 @@ export function useWidget<
       // Apps SDK fallback: persist via window.openai.setWidgetState, preserving
       // any prior __model_context annotation.
       if (providerRef.current === "openai") {
-        if (!window.openai?.setWidgetState) {
+        const oai = getWindowOpenAi();
+        if (!oai?.setWidgetState) {
           throw new Error("window.openai.setWidgetState is not available");
         }
         const prevModelContext = (
-          (window.openai.widgetState ?? {}) as Record<string, unknown>
+          (oai.widgetState ?? {}) as Record<string, unknown>
         )[MODEL_CONTEXT_KEY];
-        return window.openai.setWidgetState(
+        return oai.setWidgetState(
           prevModelContext !== undefined
             ? ({
                 ...(newState as Record<string, unknown>),

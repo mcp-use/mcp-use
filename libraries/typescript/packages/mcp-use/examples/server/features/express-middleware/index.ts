@@ -10,7 +10,7 @@
  * - Custom POST route
  */
 
-import { MCPServer, text, object } from "mcp-use/server";
+import { MCPServer, text, object } from "mcp-use";
 import { z } from "zod";
 import morgan from "morgan";
 import rateLimit from "express-rate-limit";
@@ -23,7 +23,6 @@ const server = new MCPServer({
   name: "express-middleware-example",
   title: "Express Middleware Example Server",
   version: "1.0.0",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 
 // ============================================================================

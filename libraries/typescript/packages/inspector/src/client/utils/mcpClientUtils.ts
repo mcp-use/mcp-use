@@ -351,7 +351,7 @@ export function generateTypeScriptSDKCode(
     .map((line, i) => (i === 0 ? line : "    " + line))
     .join("\n");
 
-  return `import { MCPClient } from "mcp-use";
+  return `import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {

@@ -7,7 +7,9 @@
 
 import type { MCPServer } from "../mcp-server.js";
 import type { RegisterWidgetCallback } from "./widget-types.js";
-import { isDeno } from "../utils/runtime.js";
+import { getCwd, isDeno } from "../utils/runtime.js";
+import { resolveWorkspacePaths } from "../config/paths.js";
+import { normalizeBasePath } from "../config/base-path.js";
 import { isProductionMode, getCSPUrls } from "../utils/index.js";
 import { mountWidgetsDev } from "./mount-widgets-dev.js";
 import { mountWidgetsProduction } from "./mount-widgets-production.js";
@@ -28,7 +30,7 @@ export { uiResourceRegistration } from "./ui-resource-registration.js";
  * In production mode: serves pre-built static widgets
  *
  * @param options - Configuration options
- * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+ * @param options.baseRoute - Base route for widgets (defaults to `${basePath}/mcp-use/widgets`, e.g. '/mcp/mcp-use/widgets')
  * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
  * @returns Promise that resolves when all widgets are mounted
  */
@@ -39,12 +41,25 @@ export async function mountWidgets(
     resourcesDir?: string;
   }
 ): Promise<void> {
+  // Resolve the project's `.mcp-use/` workspace once at mount time. The build
+  // output dir (`paths.build`, fixed at `.mcp-use/build`) is threaded into
+  // every production serve path, replacing the legacy hardcoded `dist/`.
+  const paths = resolveWorkspacePaths(getCwd());
+
   const serverConfig = {
     serverBaseUrl:
       (server as any).serverBaseUrl ||
       `http://${(server as any).serverHost}:${(server as any).serverPort || 3000}`,
     serverPort: (server as any).serverPort || 3000,
+    buildDir: paths.build,
+    // Project-relative public assets dir (constructor `publicDir`), served in
+    // dev; production serves the build-time copy under `<buildDir>/public`.
+    publicDir: (server as any).serverPublicDir,
     cspUrls: getCSPUrls(),
+    // Server-wide path prefix resolved at boot (mcp-server.ts resolveBasePath).
+    // Threaded the same way buildDir is, so the production/dev serve paths and
+    // the HTML baked into widgets all live under the same prefix.
+    basePath: normalizeBasePath((server as any).serverBasePath),
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,
     publicRoutesMode: (server as any).publicRoutesMode,

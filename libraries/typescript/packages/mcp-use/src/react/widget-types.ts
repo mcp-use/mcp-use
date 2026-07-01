@@ -189,10 +189,25 @@ export interface API<WidgetState extends UnknownObject = UnknownObject> {
   getFileDownloadUrl?: (file: FileMetadata) => Promise<{ downloadUrl: string }>;
 }
 
+/**
+ * The Apps SDK `window.openai` bridge as modeled by the mcp-use view runtime.
+ *
+ * This is intentionally NOT installed as a global `Window.openai` augmentation:
+ * `@mcp-ui/server` (compiled in the same TypeScript project as the server code)
+ * already augments `window.openai` with its own, structurally-incompatible
+ * `AppsSdkBridge` shape, and two differing global declarations of the same
+ * property collide (TS2717). The view runtime reads `window.openai` through a
+ * locally-typed accessor instead — see `getWindowOpenAi` in `useWidget.ts`.
+ */
+export type AppsSdkWindowOpenAi = API<any> & OpenAiGlobals<any, any, any, any>;
+
 declare global {
   interface Window {
-    openai?: API<any> & OpenAiGlobals<any, any, any, any>;
     __getFile?: (filename: string) => string;
+    /** Bare server origin (e.g. "https://example.com"), baked by the server. */
+    __mcpServerUrl?: string;
+    /** Resolved server-wide path prefix (e.g. "/mcp"; "" when root-mounted). */
+    __MCP_BASE_PATH__?: string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
   }

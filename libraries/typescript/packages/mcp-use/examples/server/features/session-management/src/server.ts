@@ -16,8 +16,8 @@
  * Usage:
  *   REDIS_URL=redis://localhost:6379 npx tsx src/server.ts
  */
-import { MCPServer, text } from "mcp-use/server";
-import { RedisSessionStore } from "mcp-use/server";
+import { MCPServer, text } from "mcp-use";
+import { RedisSessionStore } from "mcp-use";
 import { createClient } from "redis";
 import z from "zod";
 

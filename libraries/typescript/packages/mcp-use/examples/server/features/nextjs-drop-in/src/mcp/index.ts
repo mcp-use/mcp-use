@@ -1,4 +1,4 @@
-import { MCPServer, text, widget } from "mcp-use/server";
+import { MCPServer, text, widget } from "mcp-use";
 import z from "zod";
 import { getGreeting, sampleItems } from "@/lib/server-data";
 

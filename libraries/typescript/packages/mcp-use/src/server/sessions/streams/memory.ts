@@ -27,7 +27,7 @@ import type { StreamManager } from "./index.js";
  *
  * @example
  * ```typescript
- * import { MCPServer, InMemoryStreamManager } from 'mcp-use/server';
+ * import { MCPServer, InMemoryStreamManager } from 'mcp-use';
  *
  * const server = new MCPServer({
  *   name: 'my-server',

@@ -11,7 +11,7 @@
  */
 
 import { createEmulator } from "emulate";
-import { MCPServer, oauthProxy, text } from "mcp-use/server";
+import { MCPServer, oauthProxy, text } from "mcp-use";
 
 const GOOGLE_EMULATOR_PORT = 4101;
 const MCP_SERVER_PORT = 4201;

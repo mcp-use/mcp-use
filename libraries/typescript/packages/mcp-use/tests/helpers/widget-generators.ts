@@ -5,7 +5,7 @@
  * They are not part of the core UIResource creation flow.
  */
 
-import type { UIResourceDefinition } from "mcp-use/server";
+import type { UIResourceDefinition } from "mcp-use";
 
 /**
  * Generate HTML content for a widget (utility function for tests)

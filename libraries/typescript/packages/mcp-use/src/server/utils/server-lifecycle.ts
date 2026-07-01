@@ -127,8 +127,18 @@ export async function startServer(
   options?: {
     onDenoRequest?: (req: Request) => Request | Promise<Request>;
     onDenoResponse?: (res: Response) => Response | Promise<Response>;
+    /**
+     * Normalized server-wide path prefix the MCP transport is mounted under
+     * (see `config/base-path.ts`). Used only to print accurate connect hints;
+     * `""` means root-mounted. Defaults to `/mcp` when not threaded.
+     */
+    basePath?: string;
   }
 ): Promise<HttpServerHandle> {
+  // The transport lives at `${basePath}` (or `/` when root-mounted). Build the
+  // public endpoint URL once so the startup hints match where it actually
+  // mounted, rather than the old hardcoded `/mcp`.
+  const mcpUrl = `http://${host}:${port}${options?.basePath ?? "/mcp"}`;
   if (isDeno) {
     // Deno runtime
     const corsHeaders = getDenoCorsHeaders();
@@ -164,7 +174,7 @@ export async function startServer(
     console.log(`[SERVER] Listening`);
     console.log(
       chalk.gray(
-        `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+        `[MCP] Tip: connect with the CLI → npx mcp-use client connect ${mcpUrl}`
       )
     );
     return {
@@ -182,10 +192,10 @@ export async function startServer(
       },
       (_info: any) => {
         console.log(`[SERVER] Listening on http://${host}:${port}`);
-        console.log(`[MCP] Endpoints: http://${host}:${port}/mcp`);
+        console.log(`[MCP] Endpoints: ${mcpUrl}`);
         console.log(
           chalk.gray(
-            `[MCP] Tip: connect with the CLI → npx mcp-use client connect http://${host}:${port}/mcp`
+            `[MCP] Tip: connect with the CLI → npx mcp-use client connect ${mcpUrl}`
           )
         );
       }

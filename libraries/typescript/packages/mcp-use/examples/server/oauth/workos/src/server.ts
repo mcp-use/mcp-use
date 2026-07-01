@@ -11,7 +11,7 @@
  * - WORKOS_API_KEY (optional, but needed for direct WorkOS API calls)
  */
 
-import { MCPServer, oauthWorkOSProvider, error, object } from "mcp-use/server";
+import { MCPServer, oauthWorkOSProvider, error, object } from "mcp-use";
 
 declare const process: { env: Record<string, string> };
 

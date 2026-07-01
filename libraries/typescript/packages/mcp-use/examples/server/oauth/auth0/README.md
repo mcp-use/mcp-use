@@ -106,12 +106,6 @@ export MCP_USE_OAUTH_AUTH0_AUDIENCE="http://localhost:3000/"
 
 # Optional: Server port (defaults to 3000)
 export PORT=3000
-
-# Optional: Base URL for OAuth redirects
-export BASE_URL="http://localhost:3000"
-
-# Optional: Enable/disable JWT verification (defaults to true)
-export VERIFY_JWT=true
 ```
 
 ### 5. Install Dependencies
@@ -323,16 +317,6 @@ server.tool(
   }
 );
 ```
-
-### Disabling JWT Verification (Development Only)
-
-For local development without Auth0 configuration:
-
-```bash
-export VERIFY_JWT=false
-```
-
-**Warning**: Never disable verification in production. This bypasses all security checks.
 
 ## Security Considerations
 

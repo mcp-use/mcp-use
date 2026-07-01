@@ -13,8 +13,8 @@ import {
   type OnElicitationCallback,
   type OnNotificationCallback,
   type OnSamplingCallback,
-} from "mcp-use";
-import { MCPClient as BrowserMCPClient } from "mcp-use/browser";
+} from "@mcp-use/client";
+import { BrowserMCPClient } from "@mcp-use/client";
 
 const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://localhost:3000/mcp";
 

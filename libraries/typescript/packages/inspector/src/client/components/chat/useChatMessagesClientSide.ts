@@ -1,7 +1,7 @@
 import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
 import { runToolLoop } from "@/llm/toolLoop";
 import type { ProviderTool } from "@/llm/types";
-import type { McpServer } from "mcp-use/react";
+import type { McpServer } from "@mcp-use/client/react";
 import { useCallback, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {

@@ -1,3 +1,5 @@
+import { inspectorApi } from "@/client/utils/basePath";
+
 export interface OAuthStaticConfig {
   clientId?: string;
   clientSecret?: string;
@@ -18,7 +20,7 @@ export function getDefaultInspectorProxyAddress(): string {
     return "";
   }
 
-  return `${window.location.origin}${injectedProxyPath || "/inspector/api/proxy"}`;
+  return `${window.location.origin}${injectedProxyPath || inspectorApi("proxy")}`;
 }
 
 export function normalizeConnectionMode(

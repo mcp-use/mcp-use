@@ -1,4 +1,4 @@
-import { MCPServer, text, object, markdown } from "mcp-use/server";
+import { MCPServer, text, object, markdown } from "mcp-use";
 import z from "zod";
 
 const server = new MCPServer({

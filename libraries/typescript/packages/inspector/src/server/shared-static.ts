@@ -63,6 +63,41 @@ interface RuntimeConfig {
    * network calls are made.
    */
   disableTelemetry?: boolean;
+  /**
+   * Server-wide path prefix the whole framework surface is mounted under
+   * (default `/mcp`; `""` = root). Injected as `window.__MCP_BASE_PATH__` so
+   * the inspector client can derive its own URL and the relocated MCP
+   * transport/proxy addresses from a single source.
+   */
+  basePath?: string;
+}
+
+/**
+ * Rewrite the inspector's absolute asset references so they resolve under the
+ * server-wide `basePath`.
+ *
+ * `@mcp-use/inspector` is a prebuilt bundle: its Vite `base` bakes
+ * `/inspector/assets/...` into `index.html` at INSPECTOR-build time, but the
+ * consuming server only knows its `basePath` at runtime. When embedded under a
+ * non-empty basePath (e.g. `/mcp` or `/app`) the document is served at
+ * `${basePath}/inspector`, so the baked `/inspector/assets/...` URLs would miss
+ * the static route registered at `${basePath}/inspector/assets/*`. Rewriting at
+ * serve time (mirroring the widget `processWidgetHtml` pattern) keeps the
+ * prebuilt bundle untouched and applies basePath purely on the way out.
+ *
+ * No-op when root-mounted (`basePath === ""`): the baked `/inspector/...` paths
+ * already match the root-registered routes.
+ */
+function rewriteAssetPaths(html: string, basePath: string): string {
+  if (!basePath) return html;
+  // Only the local asset references Vite emits are root-relative
+  // `/inspector/assets/...`; favicons and fonts are absolute CDN/Google URLs
+  // and must be left untouched. Pin the match to `"/inspector/assets/` (with
+  // the opening attribute quote) so unrelated strings aren't rewritten.
+  return html.replace(
+    /(["'(])\/inspector\/assets\//g,
+    `$1${basePath}/inspector/assets/`
+  );
 }
 
 /**
@@ -73,6 +108,12 @@ function injectRuntimeConfig(html: string, config?: RuntimeConfig): string {
   if (!config) return html;
 
   const scripts: string[] = [];
+
+  if (config.basePath !== undefined) {
+    scripts.push(
+      `<script>window.__MCP_BASE_PATH__ = ${JSON.stringify(config.basePath)};</script>`
+    );
+  }
 
   if (config.devMode) {
     scripts.push(`<script>window.__MCP_DEV_MODE__ = true;</script>`);
@@ -124,6 +165,11 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
   const runtimeScripts = (() => {
     if (!config) return "";
     const scripts: string[] = [];
+    if (config.basePath !== undefined) {
+      scripts.push(
+        `<script>window.__MCP_BASE_PATH__ = ${JSON.stringify(config.basePath)};</script>`
+      );
+    }
     if (config.devMode) {
       scripts.push(`<script>window.__MCP_DEV_MODE__ = true;</script>`);
     }
@@ -250,19 +296,24 @@ function generateCdnShellHtml(config?: RuntimeConfig): string {
 export function registerStaticRoutes(
   app: Hono,
   clientDistPath?: string,
-  runtimeConfig?: RuntimeConfig
+  runtimeConfig?: RuntimeConfig,
+  basePath: string = ""
 ) {
+  // All inspector static routes relocate under the server-wide basePath.
+  const p = (suffix: string) => `${basePath}${suffix}`;
   // When the inspector's own server serves, the proxy is always available.
-  // Default proxyUrl so the client can use it; callers may override with null to disable.
+  // Default proxyUrl (basePath-aware) so the client can use it; callers may
+  // override with null to disable.
   // disableTelemetry is auto-populated from MCP_USE_ANONYMIZED_TELEMETRY=false so
   // setting that single env var disables both the inspector's own telemetry and
   // the in-browser posthog-js init triggered by `useMcp` hooks rendered inside.
   const effectiveConfig: RuntimeConfig = {
     ...runtimeConfig,
+    basePath: runtimeConfig?.basePath ?? basePath,
     proxyUrl:
       runtimeConfig?.proxyUrl !== undefined
         ? runtimeConfig.proxyUrl
-        : "/inspector/api/proxy",
+        : p("/inspector/api/proxy"),
     disableTelemetry:
       runtimeConfig?.disableTelemetry ??
       process.env.MCP_USE_ANONYMIZED_TELEMETRY === "false",
@@ -272,15 +323,21 @@ export function registerStaticRoutes(
     const serveShell = (c: any) =>
       c.html(generateCdnShellHtml(effectiveConfig));
 
-    app.get("/", (c) => {
-      const url = new URL(c.req.url);
-      return c.redirect(`/inspector${url.search}`);
-    });
+    app.get(p("/inspector"), serveShell);
+    app.get(p("/inspector/*"), serveShell);
+    app.post(p("/inspector/*"), serveShell);
 
-    app.get("/inspector", serveShell);
-    app.get("/inspector/*", serveShell);
-    app.post("/inspector/*", serveShell);
-    app.get("*", serveShell);
+    // Root redirect + SPA catch-all only when root-mounted (basePath ""). When
+    // embedded under a basePath the host owns `/` and its transport owns
+    // `${basePath}`, so the inspector must NOT register anything at root — that
+    // would shadow the host and answer at a stray root `/inspector`.
+    if (basePath === "") {
+      app.get("/", (c) => {
+        const url = new URL(c.req.url);
+        return c.redirect(`${p("/inspector")}${url.search}`);
+      });
+      app.get("*", serveShell);
+    }
     return;
   }
 
@@ -295,8 +352,8 @@ export function registerStaticRoutes(
       `   Run 'yarn build' in the inspector package to build the UI`
     );
 
-    app.get("*", (c) => {
-      return c.html(`
+    const notFoundPage = (c: any) =>
+      c.html(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -308,13 +365,21 @@ export function registerStaticRoutes(
         </body>
       </html>
     `);
-    });
+
+    // Scope the "not built" page to the inspector's own prefix so it doesn't
+    // shadow the host under a non-empty basePath. A root catch-all is added
+    // only when root-mounted.
+    app.get(p("/inspector"), notFoundPage);
+    app.get(p("/inspector/*"), notFoundPage);
+    if (basePath === "") {
+      app.get("*", notFoundPage);
+    }
     return;
   }
 
-  // Serve static assets from /inspector/assets/*
-  app.get("/inspector/assets/*", (c) => {
-    const path = c.req.path.replace("/inspector/assets/", "assets/");
+  // Serve static assets from ${basePath}/inspector/assets/*
+  app.get(p("/inspector/assets/*"), (c) => {
+    const path = c.req.path.replace(p("/inspector/assets/"), "assets/");
     const fullPath = join(distPath, path);
     if (existsSync(fullPath)) {
       const content = readFileSync(fullPath);
@@ -325,20 +390,28 @@ export function registerStaticRoutes(
     return c.notFound();
   });
 
-  // Redirect root to /inspector preserving query parameters
-  app.get("/", (c) => {
-    const url = new URL(c.req.url);
-    const queryString = url.search;
-    return c.redirect(`/inspector${queryString}`);
-  });
+  // Redirect root to /inspector — ONLY when root-mounted (basePath ""). When
+  // embedded under a basePath the host owns `/` (and its transport owns
+  // `${basePath}`), so the inspector must not register a root route.
+  if (basePath === "") {
+    app.get("/", (c) => {
+      const url = new URL(c.req.url);
+      const queryString = url.search;
+      return c.redirect(`${p("/inspector")}${queryString}`);
+    });
+  }
 
   const serveIndex = (c: any) => {
     const indexPath = join(distPath, "index.html");
     if (existsSync(indexPath)) {
-      const content = injectRuntimeConfig(
+      // Rewrite baked `/inspector/assets/...` refs under basePath BEFORE
+      // injecting runtime config so the served document loads its JS/CSS from
+      // the basePath-prefixed static route.
+      const html = rewriteAssetPaths(
         readFileSync(indexPath, "utf-8"),
-        effectiveConfig
+        basePath
       );
+      const content = injectRuntimeConfig(html, effectiveConfig);
       return c.html(content);
     }
     return c.html(`
@@ -355,20 +428,30 @@ export function registerStaticRoutes(
     `);
   };
 
-  app.get("/inspector", serveIndex);
-  app.get("/inspector/*", serveIndex);
-  app.post("/inspector/*", serveIndex);
+  // The inspector SPA is reachable ONLY under `${basePath}/inspector`. The
+  // `/inspector/*` glob is the client-side-routing (React Router) fallback so
+  // deep links like `${basePath}/inspector/preview/:view` serve index.html.
+  app.get(p("/inspector"), serveIndex);
+  app.get(p("/inspector/*"), serveIndex);
+  app.post(p("/inspector/*"), serveIndex);
 
-  app.get("*", (c) => {
-    const indexPath = join(distPath, "index.html");
-    if (existsSync(indexPath)) {
-      const content = injectRuntimeConfig(
-        readFileSync(indexPath, "utf-8"),
-        effectiveConfig
-      );
-      return c.html(content);
-    }
-    return c.html(`
+  // Root SPA catch-all is ONLY registered when root-mounted (basePath ""), so a
+  // non-empty basePath never answers at root `/inspector` (which would break
+  // sub-mounted deployments, e.g. Next.js mounting mcp-use at `/api/mcp/*`, and
+  // mask the host's own transport). When basePath is set, unmatched GETs fall
+  // through to the host app instead of being shadowed by the inspector shell.
+  if (basePath === "") {
+    app.get("*", (c) => {
+      const indexPath = join(distPath, "index.html");
+      if (existsSync(indexPath)) {
+        const html = rewriteAssetPaths(
+          readFileSync(indexPath, "utf-8"),
+          basePath
+        );
+        const content = injectRuntimeConfig(html, effectiveConfig);
+        return c.html(content);
+      }
+      return c.html(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -380,7 +463,8 @@ export function registerStaticRoutes(
         </body>
       </html>
     `);
-  });
+    });
+  }
 }
 
 /**
