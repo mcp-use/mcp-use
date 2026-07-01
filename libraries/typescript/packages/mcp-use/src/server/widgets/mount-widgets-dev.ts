@@ -10,6 +10,8 @@ import type { Context, Hono as HonoType, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
+import { resolveWorkspacePaths } from "../config/paths.js";
+import { publicAssetBase, widgetAssetBase } from "../config/base-path.js";
 import {
   registerWidgetFromTemplate,
   setupFaviconRoute,
@@ -22,8 +24,6 @@ import type {
   ServerConfig,
   UpdateWidgetToolCallback,
 } from "./widget-types.js";
-
-const TMP_MCP_USE_DIR = ".mcp-use";
 
 const DEFAULT_HMR_PORT = 24678;
 
@@ -79,7 +79,7 @@ type MountWidgetsDevOptions = MountWidgetsOptions;
  * @param registerWidget - Callback invoked to register each discovered widget with the running server
  * @param updateWidgetTool - Callback invoked to update widget tool metadata during HMR
  * @param removeWidgetTool - Callback invoked to remove widget tool when widget is deleted/renamed
- * @param options - Optional overrides: `baseRoute` to change the mount path (default: `/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
+ * @param options - Optional overrides: `baseRoute` to change the mount path (default: `${basePath}/mcp-use/widgets`, e.g. `/mcp/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
  * @returns Nothing.
  */
 export async function mountWidgetsDev(
@@ -91,14 +91,14 @@ export async function mountWidgetsDev(
   options?: MountWidgetsDevOptions
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const baseRoute = options?.baseRoute || widgetAssetBase(serverConfig.basePath);
+  // Public-asset prefix for the favicon <link> baked into dev widget HTML.
+  const publicBase = publicAssetBase(serverConfig.basePath);
   // Resolution order for the widgets directory:
-  //   1. Caller-supplied `options.resourcesDir`
-  //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
-  //      or mcpUseConfig.mcpDir points at e.g. `src/mcp`)
-  //   3. Default `"resources"` at the project root
-  const resourcesDir =
-    options?.resourcesDir || process.env.MCP_USE_WIDGETS_DIR || "resources";
+  //   1. Caller-supplied `options.resourcesDir` (the constructor `viewsDir`,
+  //      threaded through the server's `mountWidgets` call)
+  //   2. Default `"resources"` at the project root
+  const resourcesDir = options?.resourcesDir || "resources";
   const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
   // Ensure resources directory exists - create it if missing.
@@ -160,18 +160,23 @@ export async function mountWidgetsDev(
     console.log("[WIDGETS] Mounting widgets in development mode");
   }
 
-  // Create a temp directory for widget entry files
-  const tempDir = pathHelpers.join(getCwd(), TMP_MCP_USE_DIR);
+  // Create a temp directory for widget entry files under the workspace cache
+  // (`.mcp-use/cache/`). This MUST be a dedicated subdir, not `.mcp-use/`
+  // itself: the stale-widget cleanup below removes every directory that isn't a
+  // current widget, which would otherwise destroy the sibling workspace dirs
+  // (build/, generated/, state/, cloud/).
+  const paths = resolveWorkspacePaths(getCwd());
+  const tempDir = paths.cache;
 
-  // Clean up stale widget directories in .mcp-use
+  // Clean up stale widget directories in .mcp-use/cache
   try {
-    // Check if .mcp-use exists
+    // Check if the cache dir exists
     await fs.access(tempDir);
 
     // Get list of current widget names
     const currentWidgetNames = new Set(entries.map((e) => e.name));
 
-    // Read existing directories in .mcp-use
+    // Read existing directories in the cache dir
     const existingDirs = await fs.readdir(tempDir, { withFileTypes: true });
 
     // Remove directories that are not in current widgets
@@ -183,7 +188,7 @@ export async function mountWidgetsDev(
       }
     }
   } catch {
-    // .mcp-use doesn't exist yet, no cleanup needed
+    // Cache dir doesn't exist yet, no cleanup needed
   }
 
   await fs.mkdir(tempDir, { recursive: true }).catch(() => {});
@@ -313,7 +318,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${publicBase}/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -560,7 +565,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${publicBase}/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -704,7 +709,8 @@ if (container && Component) {
             html = processWidgetHtml(
               html,
               widgetName,
-              serverConfig.serverBaseUrl
+              serverConfig.serverBaseUrl,
+              serverConfig.basePath
             );
           } catch (e) {
             console.warn(
@@ -1390,8 +1396,20 @@ export default PostHog;
   // Serve static files from public directory in dev mode
   // Only set up if not already configured (e.g., in constructor)
   if (!serverConfig.publicRoutesMode) {
-    setupPublicRoutes(app, false);
-    setupFaviconRoute(app, serverConfig.favicon, false);
+    setupPublicRoutes(
+      app,
+      false,
+      undefined,
+      serverConfig.basePath,
+      serverConfig.publicDir
+    );
+    setupFaviconRoute(
+      app,
+      serverConfig.favicon,
+      false,
+      undefined,
+      serverConfig.publicDir
+    );
   }
 
   // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware

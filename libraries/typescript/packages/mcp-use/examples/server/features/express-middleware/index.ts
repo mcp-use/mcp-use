@@ -23,7 +23,6 @@ const server = new MCPServer({
   name: "express-middleware-example",
   title: "Express Middleware Example Server",
   version: "1.0.0",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 
 // ============================================================================

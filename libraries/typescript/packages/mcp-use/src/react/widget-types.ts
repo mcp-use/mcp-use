@@ -204,6 +204,10 @@ export type AppsSdkWindowOpenAi = API<any> & OpenAiGlobals<any, any, any, any>;
 declare global {
   interface Window {
     __getFile?: (filename: string) => string;
+    /** Bare server origin (e.g. "https://example.com"), baked by the server. */
+    __mcpServerUrl?: string;
+    /** Resolved server-wide path prefix (e.g. "/mcp"; "" when root-mounted). */
+    __MCP_BASE_PATH__?: string;
     __mcpPublicUrl?: string;
     __mcpPublicAssetsUrl?: string;
   }

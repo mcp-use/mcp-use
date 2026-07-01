@@ -1,8 +1,6 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
-
-const MCP_USE_DIR = ".mcp-use";
-const MCP_USE_DIR_PROJECT = "project.json";
+import { resolveWorkspacePaths } from "mcp-use/config";
+import { ensureGitignore } from "./gitignore.js";
 
 interface ProjectLink {
   deploymentId: string;
@@ -12,16 +10,11 @@ interface ProjectLink {
   serverId?: string;
 }
 
-// Get .mcp-use directory path
-function getMcpUseDirectory(cwd: string): string {
-  return path.join(cwd, MCP_USE_DIR);
-}
-
-// Read project link
+// Read project link from the per-project workspace (`.mcp-use/cloud/link.json`).
 export async function getProjectLink(cwd: string): Promise<ProjectLink | null> {
   try {
-    const linkPath = path.join(getMcpUseDirectory(cwd), MCP_USE_DIR_PROJECT);
-    const content = await fs.readFile(linkPath, "utf-8");
+    const paths = resolveWorkspacePaths(cwd);
+    const content = await fs.readFile(paths.cloudLink, "utf-8");
     return JSON.parse(content);
   } catch (err: any) {
     if (err.code === "ENOENT") return null;
@@ -29,40 +22,16 @@ export async function getProjectLink(cwd: string): Promise<ProjectLink | null> {
   }
 }
 
-// Write project link
+// Write project link to the per-project workspace (`.mcp-use/cloud/link.json`).
 export async function saveProjectLink(
   cwd: string,
   link: ProjectLink
 ): Promise<void> {
-  const mcpUseDir = getMcpUseDirectory(cwd);
-  await fs.mkdir(mcpUseDir, { recursive: true });
+  const paths = resolveWorkspacePaths(cwd);
+  await fs.mkdir(paths.cloud, { recursive: true });
+  await fs.writeFile(paths.cloudLink, JSON.stringify(link, null, 2), "utf-8");
 
-  const linkPath = path.join(mcpUseDir, MCP_USE_DIR_PROJECT);
-  await fs.writeFile(linkPath, JSON.stringify(link, null, 2), "utf-8");
-
-  // Add to .gitignore
-  await addToGitIgnore(cwd);
-}
-
-// Add .mcp-use to .gitignore
-async function addToGitIgnore(cwd: string): Promise<void> {
-  const gitignorePath = path.join(cwd, ".gitignore");
-  try {
-    let content = "";
-    try {
-      content = await fs.readFile(gitignorePath, "utf-8");
-    } catch (err: any) {
-      if (err.code !== "ENOENT") throw err;
-    }
-
-    if (!content.includes(MCP_USE_DIR)) {
-      const newContent =
-        content +
-        (content.endsWith("\n") ? "" : "\n") +
-        `\n# mcp-use deployment\n${MCP_USE_DIR}\n`;
-      await fs.writeFile(gitignorePath, newContent, "utf-8");
-    }
-  } catch (err) {
-    // Ignore gitignore errors
-  }
+  // Keep `.mcp-use` (and secrets) ignored. Routed through the single shared
+  // writer so there is exactly one `.gitignore` implementation.
+  await ensureGitignore(cwd);
 }

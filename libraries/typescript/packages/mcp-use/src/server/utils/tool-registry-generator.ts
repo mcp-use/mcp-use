@@ -1,16 +1,16 @@
 /**
  * Auto-generates TypeScript type definitions for the ToolRegistry
- * Reads tool schemas from MCPServer registrations and writes .mcp-use/tool-registry.d.ts
+ * Reads tool schemas from MCPServer registrations and writes
+ * .mcp-use/generated/tool-registry.d.ts
  */
 
 import { writeFile, mkdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { resolveWorkspacePaths } from "../config/paths.js";
 import { zodToTypeString } from "./zod-to-ts.js";
 import type { ToolDefinition } from "../types/tool.js";
 import type { ToolCallback } from "../types/tool.js";
 
 const TOOL_REGISTRY_FILENAME = "tool-registry.d.ts";
-const MCP_USE_DIR = ".mcp-use";
 
 /**
  * Generate tool registry type definitions from registered tools
@@ -62,8 +62,10 @@ export async function generateToolRegistryTypes(
       `\n` +
       `export {};\n`;
 
-    const mcpUseDir = join(projectRoot, MCP_USE_DIR);
-    const outputPath = join(mcpUseDir, TOOL_REGISTRY_FILENAME);
+    // Generated types live under `.mcp-use/generated/` (fixed; independent of
+    // the fixed `.mcp-use/build` output).
+    const { generated: generatedDir, toolRegistry: outputPath } =
+      resolveWorkspacePaths(projectRoot);
 
     // Check if content changed to avoid unnecessary file writes
     let shouldWrite = true;
@@ -86,8 +88,8 @@ export async function generateToolRegistryTypes(
     }
 
     if (shouldWrite) {
-      // Ensure .mcp-use directory exists
-      await mkdir(mcpUseDir, { recursive: true });
+      // Ensure .mcp-use/generated directory exists
+      await mkdir(generatedDir, { recursive: true });
 
       // Write the file
       await writeFile(outputPath, content, "utf-8");

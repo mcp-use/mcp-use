@@ -97,60 +97,40 @@ describe("getDebugLevel", () => {
     process.env = { ...originalEnv };
   });
 
-  it("defaults to info when no env vars are set", () => {
-    delete process.env.MCP_DEBUG_LEVEL;
-    delete process.env.DEBUG;
+  it("defaults to info when MCP_USE_LOG_LEVEL is unset", () => {
+    delete process.env.MCP_USE_LOG_LEVEL;
     expect(getDebugLevel()).toBe("info");
   });
 
-  it("respects MCP_DEBUG_LEVEL=debug", () => {
-    process.env.MCP_DEBUG_LEVEL = "debug";
+  it("respects MCP_USE_LOG_LEVEL=debug", () => {
+    process.env.MCP_USE_LOG_LEVEL = "debug";
     expect(getDebugLevel()).toBe("debug");
   });
 
-  it("respects MCP_DEBUG_LEVEL=trace", () => {
-    process.env.MCP_DEBUG_LEVEL = "trace";
+  it("respects MCP_USE_LOG_LEVEL=trace", () => {
+    process.env.MCP_USE_LOG_LEVEL = "trace";
     expect(getDebugLevel()).toBe("trace");
   });
 
   it("normalizes case and whitespace", () => {
-    process.env.MCP_DEBUG_LEVEL = "  TRACE  ";
+    process.env.MCP_USE_LOG_LEVEL = "  TRACE  ";
     expect(getDebugLevel()).toBe("trace");
   });
 
-  it("falls back to info for unknown MCP_DEBUG_LEVEL values", () => {
-    process.env.MCP_DEBUG_LEVEL = "verbose";
-    delete process.env.DEBUG;
+  it("falls back to info for unknown MCP_USE_LOG_LEVEL values", () => {
+    process.env.MCP_USE_LOG_LEVEL = "verbose";
     expect(getDebugLevel()).toBe("info");
   });
 
-  it("maps legacy DEBUG=1 to trace", () => {
-    delete process.env.MCP_DEBUG_LEVEL;
+  it("ignores the removed legacy DEBUG variable (clean break)", () => {
+    delete process.env.MCP_USE_LOG_LEVEL;
     process.env.DEBUG = "1";
-    expect(getDebugLevel()).toBe("trace");
-  });
-
-  it("maps legacy DEBUG=true to trace", () => {
-    delete process.env.MCP_DEBUG_LEVEL;
-    process.env.DEBUG = "true";
-    expect(getDebugLevel()).toBe("trace");
-  });
-
-  it("treats DEBUG=0 as disabled", () => {
-    delete process.env.MCP_DEBUG_LEVEL;
-    process.env.DEBUG = "0";
     expect(getDebugLevel()).toBe("info");
   });
 
-  it("treats DEBUG=false as disabled", () => {
-    delete process.env.MCP_DEBUG_LEVEL;
-    process.env.DEBUG = "false";
-    expect(getDebugLevel()).toBe("info");
-  });
-
-  it("MCP_DEBUG_LEVEL takes precedence over DEBUG", () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
-    process.env.DEBUG = "1";
+  it("ignores the removed legacy MCP_DEBUG_LEVEL variable (clean break)", () => {
+    delete process.env.MCP_USE_LOG_LEVEL;
+    process.env.MCP_DEBUG_LEVEL = "trace";
     expect(getDebugLevel()).toBe("info");
   });
 });
@@ -177,7 +157,7 @@ describe("requestLogger", () => {
   }
 
   it("emits info-level line for initialize with client info and new session id", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const sid = "92c4e0b1-1234-5678-9abc-def012345678";
     const { ctx, next } = makeContext({
       method: "POST",
@@ -208,7 +188,7 @@ describe("requestLogger", () => {
   });
 
   it("prefixes non-initialize requests with sess=<short>", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const sid = "92c4e0b1-1234-5678-9abc-def012345678";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": sid },
@@ -227,7 +207,7 @@ describe("requestLogger", () => {
   });
 
   it("at info level, tools/call shows tool name but no args", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: {
@@ -249,7 +229,7 @@ describe("requestLogger", () => {
   });
 
   it("at debug level, tools/call appends args=<json>", async () => {
-    process.env.MCP_DEBUG_LEVEL = "debug";
+    process.env.MCP_USE_LOG_LEVEL = "debug";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: {
@@ -271,7 +251,7 @@ describe("requestLogger", () => {
   });
 
   it("resources/read shows the resource URI", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: {
@@ -295,7 +275,7 @@ describe("requestLogger", () => {
   });
 
   it("prompts/get shows the prompt name", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: {
@@ -317,7 +297,7 @@ describe("requestLogger", () => {
   });
 
   it("extracts JSON-RPC error message from response body", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: {
@@ -347,7 +327,7 @@ describe("requestLogger", () => {
   });
 
   it("extracts tool error text from result.isError responses", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: {
@@ -375,7 +355,7 @@ describe("requestLogger", () => {
   });
 
   it("parses errors from text/event-stream (SSE) responses", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const sseBody =
       `event: message\n` +
       `data: ${JSON.stringify({
@@ -399,7 +379,7 @@ describe("requestLogger", () => {
   });
 
   it("skips noisy paths (no log line emitted)", async () => {
-    process.env.MCP_DEBUG_LEVEL = "info";
+    process.env.MCP_USE_LOG_LEVEL = "info";
     const { ctx, next } = makeContext({
       method: "POST",
       url: "http://localhost:3000/inspector/api/tel/event",
@@ -411,7 +391,7 @@ describe("requestLogger", () => {
   });
 
   it("trace level emits the summary line plus a detailed dump", async () => {
-    process.env.MCP_DEBUG_LEVEL = "trace";
+    process.env.MCP_USE_LOG_LEVEL = "trace";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
       requestBody: { jsonrpc: "2.0", id: 8, method: "tools/list" },
@@ -430,8 +410,8 @@ describe("requestLogger", () => {
     expect(lines.some((l) => l.includes("Response Body"))).toBe(true);
   });
 
-  it("DEBUG=1 acts as trace (backward compatibility)", async () => {
-    delete process.env.MCP_DEBUG_LEVEL;
+  it("ignores the removed legacy DEBUG var — no trace dump (clean break)", async () => {
+    delete process.env.MCP_USE_LOG_LEVEL;
     process.env.DEBUG = "1";
     const { ctx, next } = makeContext({
       requestHeaders: { "mcp-session-id": "abcdefg" },
@@ -444,6 +424,7 @@ describe("requestLogger", () => {
     await requestLogger(ctx, next);
 
     const lines = logLines();
-    expect(lines.some((l) => l.includes("TRACE"))).toBe(true);
+    // DEBUG is no longer honored; only MCP_USE_LOG_LEVEL=trace produces a dump.
+    expect(lines.some((l) => l.includes("TRACE"))).toBe(false);
   });
 });

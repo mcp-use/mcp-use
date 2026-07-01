@@ -6,7 +6,6 @@ const server = new MCPServer({
   title: "{{PROJECT_NAME}}", // display name
   version: "1.0.0",
   description: "Blank mcp-use server",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000", // Full base URL (e.g., https://myserver.com)
   favicon: "favicon.ico",
   websiteUrl: "https://mcp-use.com", // Can be customized later
   icons: [

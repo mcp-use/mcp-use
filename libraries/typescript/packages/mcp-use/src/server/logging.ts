@@ -1,36 +1,18 @@
 import chalk from "chalk";
 import type { Context, Next } from "hono";
 
-import { getEnv } from "./utils/runtime.js";
+import { type LogLevelName, resolveLogLevel } from "../log-level.js";
 
 /**
- * Server-side debug verbosity for MCP request logging.
+ * Server-side debug verbosity for MCP request logging, controlled by the single
+ * `MCP_USE_LOG_LEVEL` variable (see {@link resolveLogLevel}):
  *
  * - `info`: one compact line per request (default)
  * - `debug`: adds `args=<json>` for `tools/call` requests
- * - `trace`: includes full request/response headers and bodies (legacy DEBUG=1)
+ * - `trace`: includes full request/response headers and bodies
  */
-type McpDebugLevel = "info" | "debug" | "trace";
-
-/**
- * Resolve the active debug level from environment variables.
- *
- * Precedence: `MCP_DEBUG_LEVEL` (info|debug|trace) > legacy `DEBUG` (any truthy → trace).
- */
-export function getDebugLevel(): McpDebugLevel {
-  const explicit = getEnv("MCP_DEBUG_LEVEL")?.trim().toLowerCase();
-  if (explicit === "info" || explicit === "debug" || explicit === "trace") {
-    return explicit;
-  }
-
-  // Backward compatibility: DEBUG=1 (or any non-falsy value) maps to `trace`.
-  const debugEnv = getEnv("DEBUG");
-  const debugEnabled =
-    debugEnv !== undefined &&
-    debugEnv !== "" &&
-    debugEnv !== "0" &&
-    debugEnv.toLowerCase() !== "false";
-  return debugEnabled ? "trace" : "info";
+export function getDebugLevel(): LogLevelName {
+  return resolveLogLevel();
 }
 
 /**
@@ -146,7 +128,7 @@ async function extractResponseError(res: Response): Promise<string | null> {
 
 /**
  * Middleware that logs incoming HTTP requests in a compact format controlled
- * by `MCP_DEBUG_LEVEL` (or legacy `DEBUG`). See {@link getDebugLevel}.
+ * by `MCP_USE_LOG_LEVEL`. See {@link getDebugLevel}.
  *
  * Skips logging for inspector telemetry/RPC endpoints, dev widget assets, and
  * polling GETs against `/mcp` and `/inspector/api/*`.
@@ -159,7 +141,11 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const level = getDebugLevel();
 
   const pathname = new URL(url).pathname;
-  const noisyPaths = [
+  // Cosmetic log-noise suppression. The framework surface now lives under a
+  // configurable basePath (default `/mcp`), so match the `/inspector` and
+  // `/mcp-use/...` segments anywhere in the path (via `includes`) rather than
+  // anchoring at the root — this middleware has no basePath in scope.
+  const noisySegments = [
     "/inspector/api/tel/",
     "/inspector/api/rpc/stream",
     "/inspector/api/rpc/log",
@@ -169,12 +155,10 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   ];
   const isNoisyGet =
     method === "GET" &&
-    (pathname === "/mcp" ||
-      pathname.startsWith("/inspector/api/") ||
-      pathname.startsWith("/mcp-use/"));
+    (pathname.includes("/inspector/api/") || pathname.includes("/mcp-use/"));
 
   if (
-    noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath)) ||
+    noisySegments.some((segment) => pathname.includes(segment)) ||
     isNoisyGet
   ) {
     await next();

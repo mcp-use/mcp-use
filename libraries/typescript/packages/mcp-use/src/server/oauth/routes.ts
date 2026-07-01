@@ -114,12 +114,13 @@ function isValidRedirectUri(value: string): boolean {
  * stays end-to-end between the MCP client and the upstream provider.
  *
  * @param oauth - The OAuth provider or proxy
- * @param baseUrl - The base URL of this server (for the brokered callback)
+ * @param callbackUrl - This server's brokered callback URL
+ *   (`${baseUrl}${basePath}/oauth/callback`)
  * @returns Hono handler that redirects to the upstream authorize endpoint
  */
 function createAuthorizeHandler(
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string
+  callbackUrl: string
 ): (c: Context) => Promise<Response> {
   return async (c: Context) => {
     const params =
@@ -176,8 +177,8 @@ function createAuthorizeHandler(
     if (isOAuthProxy(oauth)) {
       // Broker the callback: send upstream to the local /oauth/callback and
       // carry the client's redirect_uri + state inside the upstream state.
-      // Only `<baseUrl>/oauth/callback` needs to be registered upstream.
-      authUrl.searchParams.set("redirect_uri", `${baseUrl}/oauth/callback`);
+      // Only `<baseUrl><basePath>/oauth/callback` needs to be registered upstream.
+      authUrl.searchParams.set("redirect_uri", callbackUrl);
       authUrl.searchParams.set(
         "state",
         encodeCallbackTxn({
@@ -280,12 +281,13 @@ function createCallbackHandler(): (
  * the local callback rather than the client's).
  *
  * @param oauth - The OAuth provider or proxy
- * @param baseUrl - The base URL of this server (for the brokered callback)
+ * @param callbackUrl - This server's brokered callback URL
+ *   (`${baseUrl}${basePath}/oauth/callback`)
  * @returns Hono handler that forwards form-encoded token exchanges upstream
  */
 function createTokenHandler(
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string
+  callbackUrl: string
 ): (c: Context) => Promise<Response> {
   return async (c: Context) => {
     try {
@@ -311,7 +313,7 @@ function createTokenHandler(
         // token exchange must present the same redirect_uri — not the
         // client's own callback.
         if (requestBody.has("redirect_uri")) {
-          requestBody.set("redirect_uri", `${baseUrl}/oauth/callback`);
+          requestBody.set("redirect_uri", callbackUrl);
         }
       }
 
@@ -375,9 +377,19 @@ function createTokenHandler(
 export function setupOAuthRoutes(
   app: Hono,
   oauth: OAuthProvider | OAuthProxy,
-  baseUrl: string
+  baseUrl: string,
+  basePath: string = "/mcp"
 ): void {
   const proxyMode = isOAuthProxy(oauth);
+  // Operational OAuth endpoints relocate under the server-wide basePath
+  // alongside the MCP transport. The `.well-known/*` discovery routes STAY at
+  // the server root (RFC convention) but advertise these relocated URLs.
+  // `transportUrl` is the public URL of the protected MCP transport itself.
+  const transportUrl = `${baseUrl}${basePath}`;
+  const authorizeUrl = `${baseUrl}${basePath}/authorize`;
+  const tokenUrl = `${baseUrl}${basePath}/token`;
+  const registerUrl = `${baseUrl}${basePath}/register`;
+  const callbackUrl = `${baseUrl}${basePath}/oauth/callback`;
   // Enable CORS for all OAuth-related endpoints
   // This is required for browser-based MCP clients to discover OAuth metadata
   app.use(
@@ -391,11 +403,11 @@ export function setupOAuthRoutes(
     })
   );
 
-  // CORS for /authorize and /token routes
+  // CORS for the relocated /authorize and /token routes
   // In DCR-direct mode: dormant (clients reach upstream directly)
   // In proxy mode: active (handles OAuth flow through the proxy)
   app.use(
-    "/authorize",
+    `${basePath}/authorize`,
     cors({
       origin: "*",
       allowMethods: ["GET", "POST", "OPTIONS"],
@@ -404,7 +416,7 @@ export function setupOAuthRoutes(
     })
   );
   app.use(
-    "/token",
+    `${basePath}/token`,
     cors({
       origin: "*",
       allowMethods: ["POST", "OPTIONS"],
@@ -413,11 +425,13 @@ export function setupOAuthRoutes(
     })
   );
 
-  // Mount /authorize and /token handlers
-  const handleAuthorize = createAuthorizeHandler(oauth, baseUrl);
-  app.get("/authorize", handleAuthorize);
-  app.post("/authorize", handleAuthorize);
-  app.post("/token", createTokenHandler(oauth, baseUrl));
+  // Mount /authorize and /token handlers under basePath. The brokered callback
+  // URL is built from basePath so the proxy registers/forwards the relocated
+  // `${baseUrl}${basePath}/oauth/callback`.
+  const handleAuthorize = createAuthorizeHandler(oauth, callbackUrl);
+  app.get(`${basePath}/authorize`, handleAuthorize);
+  app.post(`${basePath}/authorize`, handleAuthorize);
+  app.post(`${basePath}/token`, createTokenHandler(oauth, callbackUrl));
 
   // In proxy mode, add /register endpoint that returns the configured clientId
   // This allows MCP clients to "register" even though the client is pre-registered
@@ -425,12 +439,12 @@ export function setupOAuthRoutes(
     const proxy = oauth as OAuthProxy;
 
     // Brokered upstream callback. This is a top-level browser navigation
-    // (no CORS needed) — register `<baseUrl>/oauth/callback` as the only
-    // redirect URI on the upstream provider.
-    app.get("/oauth/callback", createCallbackHandler());
+    // (no CORS needed) — register `<baseUrl>${basePath}/oauth/callback` as the
+    // only redirect URI on the upstream provider.
+    app.get(`${basePath}/oauth/callback`, createCallbackHandler());
 
     app.use(
-      "/register",
+      `${basePath}/register`,
       cors({
         origin: "*",
         allowMethods: ["POST", "OPTIONS"],
@@ -439,7 +453,7 @@ export function setupOAuthRoutes(
       })
     );
 
-    app.post("/register", async (c: Context) => {
+    app.post(`${basePath}/register`, async (c: Context) => {
       const body = await c.req.json().catch(() => ({}));
 
       // Return a fake registration response with the configured clientId
@@ -466,9 +480,9 @@ export function setupOAuthRoutes(
 
     return {
       issuer: baseUrl,
-      authorization_endpoint: `${baseUrl}/authorize`,
-      token_endpoint: `${baseUrl}/token`,
-      registration_endpoint: `${baseUrl}/register`,
+      authorization_endpoint: authorizeUrl,
+      token_endpoint: tokenUrl,
+      registration_endpoint: registerUrl,
       scopes_supported: oauth.getScopesSupported(),
       response_types_supported: ["code"],
       grant_types_supported: oauth.getGrantTypesSupported(),
@@ -616,29 +630,42 @@ export function setupOAuthRoutes(
     });
   });
 
-  // Path-scoped protected resource metadata per RFC 9728 — declares that the
-  // `/mcp` path specifically is the protected resource.
-  app.get("/.well-known/oauth-protected-resource/mcp", (c: Context) => {
-    const authServer = proxyMode ? baseUrl : oauth.getIssuer();
+  // Path-scoped protected resource metadata per RFC 9728. The well-known route
+  // stays at the server ROOT, with the resource path appended after the
+  // `/.well-known/oauth-protected-resource` prefix (e.g. for basePath `/mcp`
+  // the route is `/.well-known/oauth-protected-resource/mcp`). It declares the
+  // RELOCATED transport (`${baseUrl}${basePath}`) as the protected resource.
+  // When root-mounted (basePath `""`), the transport sits at `/` and only the
+  // root protected-resource route above applies, so we skip the suffixed form.
+  if (basePath !== "") {
+    app.get(
+      `/.well-known/oauth-protected-resource${basePath}`,
+      (c: Context) => {
+        const authServer = proxyMode ? baseUrl : oauth.getIssuer();
 
-    return c.json({
-      resource: `${baseUrl}/mcp`,
-      authorization_servers: [authServer],
-      scopes_supported: oauth.getScopesSupported(),
-      bearer_methods_supported: ["header"],
-    });
-  });
+        return c.json({
+          resource: transportUrl,
+          authorization_servers: [authServer],
+          scopes_supported: oauth.getScopesSupported(),
+          bearer_methods_supported: ["header"],
+        });
+      }
+    );
 
-  // Path-scoped protected resource metadata for the `/sse` transport, which is
-  // mounted alongside `/mcp` and is equally protected by the bearer middleware.
-  app.get("/.well-known/oauth-protected-resource/sse", (c: Context) => {
-    const authServer = proxyMode ? baseUrl : oauth.getIssuer();
+    // Path-scoped protected resource metadata for the relocated `/sse`
+    // transport, mounted alongside the main transport and equally protected.
+    app.get(
+      `/.well-known/oauth-protected-resource${basePath}/sse`,
+      (c: Context) => {
+        const authServer = proxyMode ? baseUrl : oauth.getIssuer();
 
-    return c.json({
-      resource: `${baseUrl}/sse`,
-      authorization_servers: [authServer],
-      scopes_supported: oauth.getScopesSupported(),
-      bearer_methods_supported: ["header"],
-    });
-  });
+        return c.json({
+          resource: `${baseUrl}${basePath}/sse`,
+          authorization_servers: [authServer],
+          scopes_supported: oauth.getScopesSupported(),
+          bearer_methods_supported: ["header"],
+        });
+      }
+    );
+  }
 }

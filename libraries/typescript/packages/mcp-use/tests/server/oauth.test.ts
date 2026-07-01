@@ -59,6 +59,8 @@ describe("server OAuth integration", () => {
     const svc = await listenOnRandomPort(app);
     closers.push(svc.close);
 
+    // Default basePath is /mcp, so operational OAuth endpoints relocate under
+    // it while .well-known discovery stays at the root.
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
     const response = await fetch(
@@ -67,9 +69,11 @@ describe("server OAuth integration", () => {
     const metadata = await response.json();
 
     expect(response.status).toBe(200);
-    expect(metadata.authorization_endpoint).toBe(`${svc.baseUrl}/authorize`);
-    expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/token`);
-    expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/register`);
+    expect(metadata.authorization_endpoint).toBe(
+      `${svc.baseUrl}/mcp/authorize`
+    );
+    expect(metadata.token_endpoint).toBe(`${svc.baseUrl}/mcp/token`);
+    expect(metadata.registration_endpoint).toBe(`${svc.baseUrl}/mcp/register`);
     // In proxy mode, the issuer is the local server URL
     expect(metadata.issuer).toBe(svc.baseUrl);
   });
@@ -117,7 +121,7 @@ describe("server OAuth integration", () => {
       redirect_uri: "http://localhost:3000/callback",
     });
 
-    const response = await fetch(`${svc.baseUrl}/token`, {
+    const response = await fetch(`${svc.baseUrl}/mcp/token`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -131,11 +135,12 @@ describe("server OAuth integration", () => {
     expect(data.access_token).toBe("abc");
     expect(tokenSpy).toHaveBeenCalledTimes(1);
     // Verify that client credentials were injected and redirect_uri was
-    // rewritten to the brokered callback (it must match the authorize request)
+    // rewritten to the brokered (basePath-relocated) callback (it must match
+    // the authorize request)
     expect(tokenSpy.mock.calls[0][0].body).toMatchObject({
       grant_type: "authorization_code",
       code: "code-123",
-      redirect_uri: `${svc.baseUrl}/oauth/callback`,
+      redirect_uri: `${svc.baseUrl}/mcp/oauth/callback`,
       client_id: "my-client-id",
       client_secret: "my-client-secret",
     });
@@ -157,7 +162,7 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
-    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    const authorizeUrl = new URL(`${svc.baseUrl}/mcp/authorize`);
     authorizeUrl.searchParams.set("client_id", "dcr-cached-client");
     authorizeUrl.searchParams.set(
       "redirect_uri",
@@ -172,10 +177,10 @@ describe("server OAuth integration", () => {
     expect(response.status).toBe(302);
 
     const upstream = new URL(response.headers.get("location")!);
-    // Upstream sees only the proxy's callback — clients never need their own
-    // redirect URIs registered on the provider
+    // Upstream sees only the proxy's (basePath-relocated) callback — clients
+    // never need their own redirect URIs registered on the provider
     expect(upstream.searchParams.get("redirect_uri")).toBe(
-      `${svc.baseUrl}/oauth/callback`
+      `${svc.baseUrl}/mcp/oauth/callback`
     );
     // PKCE passes through end-to-end
     expect(upstream.searchParams.get("code_challenge")).toBe("challenge-abc");
@@ -185,7 +190,7 @@ describe("server OAuth integration", () => {
     expect(upstreamState).not.toBe("client-state-xyz");
 
     // Simulate the upstream provider redirecting back to the broker
-    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    const callbackUrl = new URL(`${svc.baseUrl}/mcp/oauth/callback`);
     callbackUrl.searchParams.set("code", "upstream-code-123");
     callbackUrl.searchParams.set("state", upstreamState);
 
@@ -217,7 +222,7 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
-    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    const authorizeUrl = new URL(`${svc.baseUrl}/mcp/authorize`);
     authorizeUrl.searchParams.set("client_id", "client");
     authorizeUrl.searchParams.set(
       "redirect_uri",
@@ -232,7 +237,7 @@ describe("server OAuth integration", () => {
       response.headers.get("location")!
     ).searchParams.get("state")!;
 
-    const callbackUrl = new URL(`${svc.baseUrl}/oauth/callback`);
+    const callbackUrl = new URL(`${svc.baseUrl}/mcp/oauth/callback`);
     callbackUrl.searchParams.set("error", "access_denied");
     callbackUrl.searchParams.set("error_description", "User cancelled");
     callbackUrl.searchParams.set("state", upstreamState);
@@ -265,12 +270,12 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
-    // A same-origin frontend may serve its own callback page at this path
-    // (useMcp defaults to `<origin>/oauth/callback`)
-    app.get("/oauth/callback", (c) => c.text("frontend callback page"));
+    // A same-origin frontend may serve its own callback page at the brokered
+    // (basePath-relocated) path; an unrecognized state falls through to it.
+    app.get("/mcp/oauth/callback", (c) => c.text("frontend callback page"));
 
     const response = await fetch(
-      `${svc.baseUrl}/oauth/callback?code=abc&state=random-client-state`
+      `${svc.baseUrl}/mcp/oauth/callback?code=abc&state=random-client-state`
     );
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("frontend callback page");
@@ -282,7 +287,7 @@ describe("server OAuth integration", () => {
     setupOAuthRoutes(app2, proxy, svc2.baseUrl);
 
     const notFound = await fetch(
-      `${svc2.baseUrl}/oauth/callback?code=abc&state=garbage`
+      `${svc2.baseUrl}/mcp/oauth/callback?code=abc&state=garbage`
     );
     expect(notFound.status).toBe(404);
   });
@@ -321,7 +326,7 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
-    const authorizeUrl = new URL(`${svc.baseUrl}/authorize`);
+    const authorizeUrl = new URL(`${svc.baseUrl}/mcp/authorize`);
     authorizeUrl.searchParams.set("client_id", "client");
     authorizeUrl.searchParams.set("redirect_uri", "not-a-url");
     authorizeUrl.searchParams.set("response_type", "code");
@@ -492,6 +497,53 @@ describe("server OAuth integration", () => {
     errorSpy.mockRestore();
   });
 
+  it("guards the exact transport path but leaves basePath assets/OAuth public (MCP-2074 invariant)", async () => {
+    const app = new Hono();
+
+    const proxy = oauthProxy({
+      issuer: "https://issuer.example.com",
+      authEndpoint: "https://issuer.example.com/oauth/authorize",
+      tokenEndpoint: "https://issuer.example.com/oauth/token",
+      clientId: "test-client",
+      verifyToken: async () => ({
+        payload: { sub: "user-1", scope: "openid profile" },
+      }),
+    });
+
+    const svc = await listenOnRandomPort(app);
+    closers.push(svc.close);
+
+    // Real setup path; default basePath is /mcp.
+    await setupOAuthForServer(app, proxy, svc.baseUrl, { complete: false });
+
+    // Stand in for the public asset + landing routes mounted under basePath.
+    app.get("/mcp/mcp-use/public/logo.png", (c) => c.text("png-bytes"));
+    app.get("/mcp/mcp-use/widgets/foo", (c) => c.text("widget-html"));
+    app.on(["GET", "POST"], "/mcp", (c) => c.json({ ok: true }));
+
+    // The exact transport path requires a bearer token.
+    expect((await fetch(`${svc.baseUrl}/mcp`)).status).toBe(401);
+
+    // Public assets under basePath must NOT be trapped by the guard. The whole
+    // point of this phase: the guard is on the exact transport path, not
+    // `${basePath}/*`, so `${basePath}/mcp-use/*` stays open.
+    const asset = await fetch(`${svc.baseUrl}/mcp/mcp-use/public/logo.png`);
+    expect(asset.status).toBe(200);
+    expect(await asset.text()).toBe("png-bytes");
+
+    const widget = await fetch(`${svc.baseUrl}/mcp/mcp-use/widgets/foo`);
+    expect(widget.status).toBe(200);
+
+    // OAuth endpoints under basePath are reachable without a bearer token
+    // (the /register endpoint returns 201 in proxy mode).
+    const register = await fetch(`${svc.baseUrl}/mcp/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_name: "C" }),
+    });
+    expect(register.status).toBe(201);
+  });
+
   it("protects the /sse transport with bearer auth (regression: /sse bypass)", async () => {
     const app = new Hono();
 
@@ -509,38 +561,40 @@ describe("server OAuth integration", () => {
     closers.push(svc.close);
 
     // Register OAuth via the real setup path (mirrors MCPServer.listen()).
+    // Default basePath is /mcp, so the transport is at /mcp and /mcp/sse.
     await setupOAuthForServer(app, proxy, svc.baseUrl, { complete: false });
 
     // Stub handlers standing in for the mounted MCP JSON-RPC handler. These are
     // registered after the middleware, matching mountMcp() ordering.
-    for (const endpoint of ["/mcp", "/sse"]) {
+    for (const endpoint of ["/mcp", "/mcp/sse"]) {
       app.on(["GET", "POST"], endpoint, (c) => c.json({ ok: true }));
     }
 
-    // Unauthenticated requests to /sse must be rejected (the bypass).
-    const sseGet = await fetch(`${svc.baseUrl}/sse`);
+    // Unauthenticated requests to the SSE transport must be rejected (the bypass).
+    const sseGet = await fetch(`${svc.baseUrl}/mcp/sse`);
     expect(sseGet.status).toBe(401);
 
-    const ssePost = await fetch(`${svc.baseUrl}/sse`, { method: "POST" });
+    const ssePost = await fetch(`${svc.baseUrl}/mcp/sse`, { method: "POST" });
     expect(ssePost.status).toBe(401);
 
-    // Authenticated requests to /sse reach the handler.
-    const sseAuthorized = await fetch(`${svc.baseUrl}/sse`, {
+    // Authenticated requests to the SSE transport reach the handler.
+    const sseAuthorized = await fetch(`${svc.baseUrl}/mcp/sse`, {
       headers: { Authorization: "Bearer token-123" },
     });
     expect(sseAuthorized.status).toBe(200);
 
-    // /mcp remains protected too.
+    // The main transport remains protected too.
     const mcpUnauthorized = await fetch(`${svc.baseUrl}/mcp`);
     expect(mcpUnauthorized.status).toBe(401);
 
-    // Path-scoped protected-resource metadata is advertised for /sse.
+    // Path-scoped protected-resource metadata is advertised for the relocated
+    // SSE transport (well-known route stays at root, resource points at /mcp/sse).
     const metaResponse = await fetch(
-      `${svc.baseUrl}/.well-known/oauth-protected-resource/sse`
+      `${svc.baseUrl}/.well-known/oauth-protected-resource/mcp/sse`
     );
     expect(metaResponse.status).toBe(200);
     const metadata = await metaResponse.json();
-    expect(metadata.resource).toBe(`${svc.baseUrl}/sse`);
+    expect(metadata.resource).toBe(`${svc.baseUrl}/mcp/sse`);
   });
 
   it("proxies OAuth metadata for path-suffix issuers at canonical well-known paths", async () => {
@@ -621,7 +675,7 @@ describe("server OAuth integration", () => {
 
     setupOAuthRoutes(app, proxy, svc.baseUrl);
 
-    const response = await fetch(`${svc.baseUrl}/register`, {
+    const response = await fetch(`${svc.baseUrl}/mcp/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

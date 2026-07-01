@@ -80,7 +80,7 @@ Key flow:
    - Converts Zod schema (if present) to JSON Schema via `toJSONSchema()`
    - Creates temporary build directory with entry file + Tailwind CSS
    - Builds with Vite (React + Tailwind plugins)
-   - Post-processes HTML if `MCP_SERVER_URL` is set (for static deployments)
+   - Post-processes HTML if `assetPrefix` is set on the project's MCPServer constructor (introspected off the imported entry; for off-server/static deployments)
 3. Returns array of `{ name, metadata }` for manifest
 
 **Node.js Package Stubbing:**
@@ -94,8 +94,8 @@ Key flow:
 - API client (`src/utils/api.ts`) handles all backend communication
 
 **Environment Variable Configuration:**
-- `MCP_API_URL`: Backend API URL (e.g., `http://localhost:8000` or `https://cloud.manufact.com/api/v1`)
-- `MCP_WEB_URL`: Frontend URL for auth pages (e.g., `http://localhost:3000` or `https://mcp-use.com`)
+- `MCP_USE_CLOUD_API_URL`: Backend API URL (e.g., `http://localhost:8000` or `https://cloud.manufact.com/api/v1`)
+- `MCP_USE_CLOUD_WEB_URL`: Frontend URL for auth pages (e.g., `http://localhost:3000` or `https://mcp-use.com`)
 - For local development: Set both environment variables to match your local setup
 
 ### Deployment System (`src/commands/deploy.ts`)
@@ -155,13 +155,18 @@ The CLI:
 
 ### Static Deployment Support
 
-When `MCP_SERVER_URL` env var is set during build:
-- Widget HTML is post-processed to inject:
+When `assetPrefix` is set on the MCPServer constructor (the host/CDN prefix for
+assets), widget HTML is post-processed during build to inject assets at a flat
+`${assetPrefix}/mcp-use/widgets/*` + `${assetPrefix}/mcp-use/public/*` layout —
+`basePath` is dropped, since it only matters for routes mounted on the live
+server, not for a static bucket:
   - `window.__getFile(filename)` helper for asset paths
   - `window.__mcpPublicUrl` for public asset base URL
-  - `<base href="${MCP_SERVER_URL}">` tag
+  - `<base href="${assetPrefix}">` tag
 
-This enables deploying widgets to static hosts (e.g., Supabase Storage) that don't support dynamic asset paths.
+This enables deploying widgets to static hosts (e.g., Supabase Storage) that
+don't support dynamic asset paths. (Replaced the former `MCP_SERVER_URL` env
+var in v2.)
 
 ## Common Patterns
 

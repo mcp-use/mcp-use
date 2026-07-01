@@ -17,7 +17,9 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
+import { resolveWorkspacePaths } from "../../config/paths.js";
+import { getCwd } from "../../utils/runtime.js";
 import type { SessionMetadata } from "../session-manager.js";
 import type { SessionStore } from "./index.js";
 
@@ -26,7 +28,8 @@ import type { SessionStore } from "./index.js";
  */
 export interface FileSystemSessionStoreConfig {
   /**
-   * Path to the session file (default: .mcp-use/sessions.json in project root)
+   * Path to the session file
+   * (default: .mcp-use/state/sessions.json in project root)
    */
   path?: string;
 
@@ -57,7 +60,7 @@ export interface FileSystemSessionStoreConfig {
  *   name: 'dev-server',
  *   version: '1.0.0',
  *   sessionStore: new FileSystemSessionStore({
- *     path: '.mcp-use/sessions.json'
+ *     path: '.mcp-use/state/sessions.json'
  *   })
  * });
  * ```
@@ -72,8 +75,7 @@ export class FileSystemSessionStore implements SessionStore {
   private pendingSave = false;
 
   constructor(config: FileSystemSessionStoreConfig = {}) {
-    this.filePath =
-      config.path ?? join(process.cwd(), ".mcp-use", "sessions.json");
+    this.filePath = config.path ?? resolveWorkspacePaths(getCwd()).sessions;
     this.debounceMs = config.debounceMs ?? 100;
     this.maxAgeMs = config.maxAgeMs ?? 24 * 60 * 60 * 1000; // 24 hours
 

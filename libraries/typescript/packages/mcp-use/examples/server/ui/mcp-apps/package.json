@@ -37,6 +37,7 @@
     "zod": "4.3.5"
   },
   "devDependencies": {
+    "@mcp-use/inspector": "workspace:*",
     "@tailwindcss/vite": "^4.2.0",
     "@types/node": "^25.0.2",
     "@vitejs/plugin-react": "^6.0.0",

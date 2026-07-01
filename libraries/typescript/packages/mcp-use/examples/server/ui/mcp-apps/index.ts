@@ -7,6 +7,11 @@ const server = new MCPServer({
   version: "1.0.0",
   description:
     "Example MCP server demonstrating dual-protocol widget support (works with both ChatGPT and MCP Apps clients)",
+  // Deliberately non-default, to verify basePath is fully runtime-resolved:
+  // the CLI bakes a placeholder into widget HTML at build time (it no longer
+  // reads basePath from mcp-use.config.json at all), and the live server
+  // corrects asset references to whatever is configured here at mount time.
+  basePath: "/custom",
 });
 
 /**

@@ -7,6 +7,7 @@
 import { Hono, type Hono as HonoType } from "hono";
 import { cors } from "hono/cors";
 import { hostHeaderValidation } from "../middleware/host-validation.js";
+import { canonicalOrigin } from "./resolve-url.js";
 import { getEnv } from "./runtime.js";
 
 /**
@@ -113,60 +114,37 @@ export function createHonoApp(
 }
 
 /**
- * Normalize a URL by replacing 0.0.0.0 with localhost.
- * 0.0.0.0 is valid for server binding (listen on all interfaces)
- * but browsers cannot connect to it as a destination address.
+ * Get the server's canonical base URL, falling back to `host:port`.
  *
- * @param url - URL that may contain 0.0.0.0
- * @returns URL with 0.0.0.0 replaced by localhost
- */
-function normalizeUrlHost(url: string): string {
-  return url.replace(/\/\/0\.0\.0\.0(:|\/|$)/, "//localhost$1");
-}
-
-/**
- * Get the server base URL with fallback to host:port if not configured
+ * This is the boot-time canonical origin (no request in scope). Precedence:
+ * `MCP_URL` env var → `http://host:port`. The former `config.baseUrl` branch
+ * was removed in P4 — a canonical public origin is now expressed only via
+ * `MCP_URL` (operator-provided) or inferred per-request from proxy headers via
+ * {@link canonicalOrigin}.
  *
- * @param serverBaseUrl - Explicitly configured base URL
  * @param serverHost - Server hostname
  * @param serverPort - Server port
  * @returns The complete base URL for the server
  */
 export function getServerBaseUrl(
-  serverBaseUrl: string | undefined,
   serverHost: string,
   serverPort: number | undefined
 ): string {
-  let url: string;
-
-  // First check if baseUrl was explicitly set in config
-  if (serverBaseUrl) {
-    url = serverBaseUrl;
-  } else {
-    // Then check MCP_URL environment variable
-    const mcpUrl = getEnv("MCP_URL");
-    if (mcpUrl) {
-      url = mcpUrl;
-    } else {
-      // Finally fall back to host:port
-      url = `http://${serverHost}:${serverPort}`;
-    }
-  }
-
-  // Normalize 0.0.0.0 to localhost for browser-accessible URLs
-  return normalizeUrlHost(url);
+  return canonicalOrigin({
+    fallback: `http://${serverHost}:${serverPort}`,
+  });
 }
 
 /**
- * Get additional CSP URLs from environment variable
- * Supports comma-separated list or single URL
+ * Get additional CSP URLs from the `MCP_USE_CSP_URLS` environment variable.
+ * Supports a comma-separated list or a single URL.
  *
  * @returns Array of URLs to add to CSP resource_domains
  */
 export function getCSPUrls(): string[] {
-  const cspUrlsEnv = getEnv("CSP_URLS");
+  const cspUrlsEnv = getEnv("MCP_USE_CSP_URLS");
   if (!cspUrlsEnv) {
-    console.log("[CSP] No CSP_URLS environment variable found");
+    console.log("[CSP] No MCP_USE_CSP_URLS environment variable found");
     return [];
   }
 

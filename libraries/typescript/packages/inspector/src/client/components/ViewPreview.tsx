@@ -22,6 +22,7 @@
 import { useMcpClient } from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { getBasePath } from "@/client/utils/basePath";
 import { MCPAppsRenderer } from "./MCPAppsRenderer";
 
 const PREVIEW_SERVER_ID = "preview-default";
@@ -271,7 +272,8 @@ function ViewPreviewLive({ view }: { view: string }) {
   const serverUrl = useMemo(() => {
     const fromQuery = search.get("server");
     if (fromQuery) return fromQuery;
-    return `${window.location.origin}/mcp`;
+    // The MCP transport lives at `${basePath}` (default `/mcp`; root-mount `/`).
+    return `${window.location.origin}${getBasePath() || "/"}`;
   }, [search]);
 
   // Forwarded headers for live-mode interactive use. Not used by the

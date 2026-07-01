@@ -42,6 +42,11 @@
       "import": "./dist/src/react/index.js",
       "require": "./dist/src/react/index.cjs"
     },
+    "./config": {
+      "types": "./dist/src/server/config/index.d.ts",
+      "import": "./dist/src/server/config/index.js",
+      "require": "./dist/src/server/config/index.cjs"
+    },
     "./telemetry/tel-fetch": {
       "types": "./dist/src/telemetry/tel-fetch.d.ts",
       "import": "./dist/src/telemetry/tel-fetch.js",

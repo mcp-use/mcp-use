@@ -576,11 +576,13 @@ export function useWidget<
     return undefined;
   }, [provider, mcpAppsHostContext]);
 
-  // Compute MCP server base URL from window.__mcpPublicUrl
+  // Read the MCP server base URL directly from the injected global. The server
+  // bakes `window.__mcpServerUrl` (the bare origin) alongside the basePath-aware
+  // `__mcpPublicUrl`, so we no longer reverse-engineer the origin by stripping
+  // an asset-path suffix (which broke once assets moved under a basePath).
   const mcp_url = useMemo(() => {
-    if (typeof window !== "undefined" && window.__mcpPublicUrl) {
-      // Remove the /mcp-use/public suffix to get the base server URL
-      return window.__mcpPublicUrl.replace(/\/mcp-use\/public$/, "");
+    if (typeof window !== "undefined" && window.__mcpServerUrl) {
+      return window.__mcpServerUrl;
     }
     return "";
   }, []);

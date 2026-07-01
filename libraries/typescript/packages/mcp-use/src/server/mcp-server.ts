@@ -56,6 +56,11 @@ import {
 } from "./notifications/index.js";
 import type { OAuthProvider } from "./oauth/providers/types.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
+import {
+  normalizeBasePath,
+  publicAssetBase,
+  widgetAssetBase,
+} from "./config/base-path.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
 import {
@@ -336,6 +341,48 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * Used for generating widget URLs and OAuth callbacks.
    */
   public serverBaseUrl?: string;
+
+  /**
+   * Normalized server-wide path prefix under which the entire framework HTTP
+   * surface is mounted (MCP transport, widget/public assets, OAuth endpoints,
+   * inspector). Resolved in the constructor from `ServerConfig.basePath`,
+   * else `/mcp`. `""` means root-mounted.
+   *
+   * Widget HTML built by the CLI no longer needs to bake in the "real"
+   * basePath: `processWidgetHtml` rewrites asset references at mount/serve
+   * time against whatever basePath is live here, matching on the fixed
+   * `/mcp-use/widgets/` literal rather than the build-time prefix. This
+   * mirrors Next.js `basePath`.
+   *
+   * Because it is set at construction time, tooling that imports the server
+   * entry (CLI dev/build) can read it off the instance without booting.
+   */
+  public serverBasePath: string = normalizeBasePath();
+
+  /**
+   * Resolved views/widgets directory (project-relative), from
+   * `ServerConfig.viewsDir` (default `resources`). The `MCP_USE_WIDGETS_DIR`
+   * env var — set by the CLI for its `--mcp-dir`/`--widgets-dir` flags, a
+   * per-run override the constructor cannot express — takes precedence.
+   * `undefined` means the default; `mountWidgets` falls back to `resources`.
+   */
+  public serverViewsDir?: string;
+
+  /**
+   * Static public assets directory (project-relative), from
+   * `ServerConfig.publicDir` (default `public`). Served under
+   * `${basePath}/mcp-use/public` in dev; the CLI copies it into the build
+   * output for production.
+   */
+  public serverPublicDir: string = "public";
+
+  /**
+   * Host/CDN prefix for serving built widget assets off-server, from
+   * `ServerConfig.assetPrefix`. Consumed by the CLI at build time (read off
+   * the imported instance) to bake absolute asset URLs into widget HTML.
+   * `undefined` means assets are served root-relative by this server.
+   */
+  public serverAssetPrefix?: string;
 
   /**
    * Optional favicon URL to display in inspector and documentation.
@@ -2294,8 +2341,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @param config.name - Server name (displayed to clients)
    * @param config.version - Server version string (default: "1.0.0")
    * @param config.description - Optional server description
-   * @param config.host - Hostname for URLs (default: "localhost")
-   * @param config.baseUrl - Full base URL (overrides host:port for public URLs)
+   * @param config.host - Hostname for URLs (default: "localhost"). The public
+   *   origin is otherwise resolved from the `MCP_URL` env var or inferred from
+   *   proxy headers per request.
+   * @param config.basePath - Path prefix the whole HTTP surface mounts under
+   *   (default: "/mcp"). See {@link ServerConfig.basePath}.
+   * @param config.viewsDir - Directory scanned for views/widgets (default: "resources")
+   * @param config.publicDir - Static public assets directory (default: "public")
+   * @param config.assetPrefix - CDN/host prefix for serving built view assets
+   *   off-server (default: unset — assets served by this server)
    * @param config.favicon - Optional favicon URL
    * @param config.oauth - Optional OAuth provider configuration
    * @param config.stateless - Whether to use stateless mode (auto-detected for Deno)
@@ -2322,8 +2376,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *   name: 'api-server',
    *   version: '2.0.0',
    *   description: 'API integration server',
-   *   host: '0.0.0.0', // Listen on all interfaces
-   *   baseUrl: 'https://api.example.com' // Public URL
+   *   host: '0.0.0.0' // Listen on all interfaces
    * });
    * ```
    *
@@ -2371,7 +2424,20 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     }
 
     this.serverHost = config.host || "localhost";
-    this.serverBaseUrl = config.baseUrl;
+    // The canonical public origin is resolved at listen()/getHandler() time
+    // from `MCP_URL` (or inferred per-request), falling back to host:port.
+    // There is no longer a `config.baseUrl` override (removed in P4).
+    this.serverBaseUrl = undefined;
+
+    // Resolve the static server-shape options at construction time so tooling
+    // that imports the entry (CLI dev/build) can introspect them off the
+    // instance without booting the server. `MCP_USE_WIDGETS_DIR` is the CLI's
+    // per-run flag bridge (`--mcp-dir`/`--widgets-dir`); a flag is more
+    // specific than the constructor, so it wins.
+    this.serverBasePath = normalizeBasePath(config.basePath);
+    this.serverViewsDir = getEnv("MCP_USE_WIDGETS_DIR") || config.viewsDir;
+    this.serverPublicDir = config.publicDir || "public";
+    this.serverAssetPrefix = config.assetPrefix;
 
     // Auto-select favicon from icons array if not explicitly provided
     if (config.favicon) {
@@ -2387,11 +2453,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       baseUrl?: string
     ) => {
       if (!icons || !baseUrl) return icons;
+      const assetBase = publicAssetBase(this.serverBasePath);
       return icons.map((icon) => ({
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}${assetBase}/${icon.src}`,
       }));
     };
 
@@ -2403,7 +2470,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         description: config.description,
         title: config.title,
         websiteUrl: config.websiteUrl,
-        icons: processIconUrls(config.icons, config.baseUrl),
+        // No canonical origin is known at construction time; per-session
+        // servers re-run this with the resolved `serverBaseUrl` so icons
+        // become absolute once the server is listening.
+        icons: processIconUrls(config.icons, this.serverBaseUrl),
       },
       {
         instructions: config.instructions,
@@ -2445,8 +2515,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       !isProductionModeHelper() &&
       !isDeno
     ) {
-      setupPublicRoutes(this.app, false); // Dev mode (public/)
-      setupFaviconRoute(this.app, this.favicon, false);
+      // Dev mode: serve straight from the project's `publicDir`.
+      setupPublicRoutes(
+        this.app,
+        false,
+        undefined,
+        this.serverBasePath,
+        this.serverPublicDir
+      );
+      setupFaviconRoute(
+        this.app,
+        this.favicon,
+        false,
+        undefined,
+        this.serverPublicDir
+      );
       this.publicRoutesMode = "dev";
     }
 
@@ -2660,11 +2743,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       baseUrl?: string
     ) => {
       if (!icons || !baseUrl) return icons;
+      const assetBase = publicAssetBase(this.serverBasePath);
       return icons.map((icon) => ({
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}${assetBase}/${icon.src}`,
       }));
     };
 
@@ -3306,11 +3390,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * @returns The complete base URL for the server
    */
   private getServerBaseUrl(): string {
-    return getServerBaseUrlHelper(
-      this.serverBaseUrl,
-      this.serverHost,
-      this.serverPort
-    );
+    return getServerBaseUrlHelper(this.serverHost, this.serverPort);
   }
 
   /**
@@ -3727,7 +3807,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this, // Pass the MCPServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.serverBasePath
     );
 
     this.mcpMounted = result.mcpMounted;
@@ -3755,7 +3836,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * - Defaults to "localhost"
    *
    * Base URL:
-   * - Uses `config.baseUrl` or `MCP_URL` environment variable
+   * - Uses the `MCP_URL` environment variable (canonical public origin)
+   * - Otherwise inferred per-request from proxy headers
    * - Falls back to `http://${host}:${port}`
    *
    * @param port - Optional port number to listen on
@@ -3783,12 +3865,10 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    *
    * @example
    * ```typescript
-   * // With custom base URL (e.g., behind reverse proxy)
-   * const server = new MCPServer({
-   *   name: 'my-server',
-   *   version: '1.0.0',
-   *   baseUrl: 'https://api.example.com'
-   * });
+   * // With a custom canonical origin (e.g., behind a reverse proxy), set the
+   * // MCP_URL environment variable:
+   * // MCP_URL=https://api.example.com node server.js
+   * const server = new MCPServer({ name: 'my-server', version: '1.0.0' });
    * await server.listen(3000);
    * // Server listens on port 3000 but generates URLs with https://api.example.com
    * ```
@@ -3898,13 +3978,15 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverHost = hostEnv;
     }
 
-    // Update baseUrl using the helper that checks MCP_URL env var
-    // This ensures widgets/assets use the correct public URL instead of 0.0.0.0
+    // Resolve the canonical base URL via the helper (MCP_URL env → host:port).
+    // This ensures widgets/assets use the correct public URL instead of 0.0.0.0.
     this.serverBaseUrl = getServerBaseUrlHelper(
-      this.serverBaseUrl,
       this.serverHost,
       this.serverPort
     );
+
+    // The server-wide basePath was resolved at construction time.
+    const basePath = this.serverBasePath;
 
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
@@ -3913,24 +3995,23 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
-        { publicLandingPage: this.config.publicLandingPage }
+        { publicLandingPage: this.config.publicLandingPage, basePath }
       );
     }
 
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
-      // Only forward `resourcesDir` when the env var is set. That lets
-      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
-      // (via `--mcp-dir src/mcp`) without forcing the user to configure
-      // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
-      ...(process.env.MCP_USE_WIDGETS_DIR
-        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
+      baseRoute: widgetAssetBase(basePath),
+      // Only forward `resourcesDir` when it differs from the default. It is
+      // resolved from the constructor `viewsDir` (or the CLI's
+      // `MCP_USE_WIDGETS_DIR` flag bridge); when unset/default, `mountWidgets`
+      // applies its own default (`"resources"`).
+      ...(this.serverViewsDir && this.serverViewsDir !== "resources"
+        ? { resourcesDir: this.serverViewsDir }
         : {}),
     });
     await this.mountMcp();
 
-    // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
+    // Mount inspector BEFORE Vite middleware to ensure it handles inspector routes
     await this.mountInspector();
 
     // Log registered items before starting server
@@ -3961,6 +4042,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverHost,
       {
         onDenoRequest: rewriteSupabaseRequest,
+        basePath: this.serverBasePath,
       }
     );
     this._httpServerClose = httpHandle.close;
@@ -4036,27 +4118,39 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
+    // The server-wide basePath was resolved at construction time.
+    const basePath = this.serverBasePath;
+
+    // Resolve the canonical base URL (MCP_URL env → host:port fallback), as
+    // listen() does. listen() never runs on this path, so `serverPort` has no
+    // assigned value — default the fallback port to 3000. Serverless deploys
+    // express their public origin via MCP_URL.
+    const serverBaseUrl = getServerBaseUrlHelper(
+      this.serverHost,
+      this.serverPort ?? 3000
+    );
+    this.serverBaseUrl = serverBaseUrl;
+
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
         this.app,
         this.oauthProvider,
-        this.getServerBaseUrl(),
+        serverBaseUrl,
         this.oauthSetupState,
-        { publicLandingPage: this.config.publicLandingPage }
+        { publicLandingPage: this.config.publicLandingPage, basePath }
       );
     }
 
     console.log("[MCP] Mounting widgets");
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
-      // Only forward `resourcesDir` when the env var is set. That lets
-      // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
-      // (via `--mcp-dir src/mcp`) without forcing the user to configure
-      // anything in their server file. When the env var is unset,
-      // `mountWidgets` applies its own default (`"resources"`).
-      ...(process.env.MCP_USE_WIDGETS_DIR
-        ? { resourcesDir: process.env.MCP_USE_WIDGETS_DIR }
+      baseRoute: widgetAssetBase(basePath),
+      // Only forward `resourcesDir` when it differs from the default. It is
+      // resolved from the constructor `viewsDir` (or the CLI's
+      // `MCP_USE_WIDGETS_DIR` flag bridge); when unset/default, `mountWidgets`
+      // applies its own default (`"resources"`).
+      ...(this.serverViewsDir && this.serverViewsDir !== "resources"
+        ? { resourcesDir: this.serverViewsDir }
         : {}),
     });
     console.log("[MCP] Mounted widgets");
@@ -4157,7 +4251,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.app,
       this.serverHost,
       this.serverPort,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.serverBasePath
     );
 
     if (mounted) {
@@ -4200,7 +4295,6 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  * @param config.version - Server version (defaults to '1.0.0')
  * @param config.description - Server description
  * @param config.host - Hostname for widget URLs and server endpoints (defaults to 'localhost')
- * @param config.baseUrl - Full base URL (e.g., 'https://myserver.com') - overrides host:port for widget URLs
  * @param config.allowedOrigins - Allowed origins for DNS rebinding host validation (global when configured)
  *   - If not set: host validation is disabled
  *   - If set: host validation is enabled for all routes
@@ -4240,12 +4334,10 @@ export const MCPServer: MCPServerConstructor = MCPServerClass as any;
  *   host: '0.0.0.0' // or 'myserver.com'
  * })
  *
- * // With full base URL (e.g., behind a proxy or custom domain)
- * const server = new MCPServer({
- *   name: 'my-server',
- *   version: '1.0.0',
- *   baseUrl: 'https://myserver.com' // or process.env.MCP_URL
- * })
+ * // Behind a proxy or custom domain, set the canonical origin via the
+ * // MCP_URL environment variable:
+ * // MCP_URL=https://myserver.com node server.js
+ * const server = new MCPServer({ name: 'my-server', version: '1.0.0' })
  * ```
  */
 
@@ -4289,7 +4381,6 @@ export function createMCPServer(
     websiteUrl: config.websiteUrl,
     icons: config.icons,
     host: config.host,
-    baseUrl: config.baseUrl,
     allowedOrigins: config.allowedOrigins,
     sessionIdleTimeoutMs: config.sessionIdleTimeoutMs,
     autoCreateSessionOnInvalidId: config.autoCreateSessionOnInvalidId,

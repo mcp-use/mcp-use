@@ -1,4 +1,5 @@
 import { cn } from "@/client/lib/utils";
+import { inspectorApi } from "@/client/utils/basePath";
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import { X } from "lucide-react";
 import { useMcpClient } from "@mcp-use/client/react";
@@ -257,7 +258,7 @@ function OpenAIComponentRendererBase({
 
         // Store widget data on server (including the fetched HTML and dev URLs if applicable)
         const storeResponse = await fetch(
-          `${inspectorApiBase}/inspector/api/resources/widget/store`,
+          `${inspectorApiBase}${inspectorApi("resources/widget/store")}`,
           {
             method: "POST",
             headers: {
@@ -296,7 +297,7 @@ function OpenAIComponentRendererBase({
         // the store so that iframe fetch gets latest data. Changing URL would reload the iframe.
         if (!hasSetWidgetUrlRef.current) {
           hasSetWidgetUrlRef.current = true;
-          const widgetUrl = `${inspectorApiBase}/inspector/api/resources/widget-content/${toolId}?t=${Date.now()}`;
+          const widgetUrl = `${inspectorApiBase}${inspectorApi(`resources/widget-content/${toolId}`)}?t=${Date.now()}`;
           setWidgetUrl(widgetUrl);
           // Register widget in debug context so CSP violations can be stored
           addWidget(toolId, { toolName, protocol: "chatgpt-app" });

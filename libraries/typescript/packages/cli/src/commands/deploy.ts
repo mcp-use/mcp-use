@@ -28,6 +28,7 @@ import {
   isGitHubUrl,
 } from "../utils/git.js";
 import { getMcpServerUrl } from "../utils/cloud-urls.js";
+import { ensureGitignore } from "../utils/gitignore.js";
 import { getProjectLink, saveProjectLink } from "../utils/project-link.js";
 import { packProjectTarball, sanitizeRepoName } from "../utils/tarball.js";
 import {
@@ -331,35 +332,6 @@ async function promptText(
       resolve(answer.trim() || defaultValue || "");
     });
   });
-}
-
-// ---------------------------------------------------------------------------
-// .gitignore management
-// ---------------------------------------------------------------------------
-
-const REQUIRED_IGNORES = [
-  "node_modules",
-  "dist",
-  ".env",
-  ".env.local",
-  ".mcp-use",
-];
-
-async function ensureGitignore(cwd: string): Promise<void> {
-  const gitignorePath = path.join(cwd, ".gitignore");
-  let content = "";
-  try {
-    content = await fs.readFile(gitignorePath, "utf-8");
-  } catch {
-    // file doesn't exist yet
-  }
-  const missing = REQUIRED_IGNORES.filter((entry) => !content.includes(entry));
-  if (missing.length > 0) {
-    const additions = missing.join("\n");
-    const newContent =
-      content + (content.endsWith("\n") ? "" : "\n") + additions + "\n";
-    await fs.writeFile(gitignorePath, newContent, "utf-8");
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1694,7 +1666,9 @@ export async function deployCommand(options: DeployOptions): Promise<void> {
         serverId: serverResult.server.id,
       });
       console.log(
-        chalk.gray(`  Linked to this project (stored in .mcp-use/project.json)`)
+        chalk.gray(
+          `  Linked to this project (stored in .mcp-use/cloud/link.json)`
+        )
       );
       console.log(chalk.gray(`  Future deploys will reuse the same URL\n`));
     }

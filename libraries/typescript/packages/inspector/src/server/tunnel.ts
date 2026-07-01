@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { resolveWorkspacePaths } from "mcp-use/config";
 
 const TUNNEL_URL_REGEX = /https?:\/\/([a-z0-9-]+\.[a-z0-9.-]+)/i;
 const SETUP_TIMEOUT_MS = 30_000;
@@ -28,15 +28,15 @@ export function getTunnelStatus(): {
   return { url: activeTunnel.url, subdomain: activeTunnel.subdomain };
 }
 
-function readSubdomainFromManifest(): string | undefined {
+function readSubdomainFromTunnelState(): string | undefined {
   const projectPath = process.env.MCP_USE_PROJECT_PATH || process.cwd();
   try {
-    const raw = readFileSync(
-      join(projectPath, "dist", "mcp-use.json"),
-      "utf-8"
-    );
-    const manifest = JSON.parse(raw);
-    return manifest?.tunnel?.subdomain || undefined;
+    // Tunnel state moved out of the build manifest into the workspace
+    // (`.mcp-use/state/tunnel.json`) in the P2 rework, and the subdomain now
+    // lives at the top level rather than nested under `.tunnel`.
+    const raw = readFileSync(resolveWorkspacePaths(projectPath).tunnel, "utf-8");
+    const state = JSON.parse(raw);
+    return state?.subdomain || undefined;
   } catch {
     return undefined;
   }
@@ -53,7 +53,7 @@ export async function startTunnel(
     throw new Error("Server port not set. Cannot start tunnel.");
   }
 
-  const resolvedSubdomain = subdomain ?? readSubdomainFromManifest();
+  const resolvedSubdomain = subdomain ?? readSubdomainFromTunnelState();
   const port = serverPort;
 
   return new Promise((resolve, reject) => {

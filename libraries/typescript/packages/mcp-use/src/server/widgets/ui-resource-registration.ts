@@ -47,6 +47,8 @@ interface UIResourceServer {
   readonly serverHost: string;
   readonly serverPort?: number;
   readonly serverBaseUrl?: string;
+  /** Normalized server-wide path prefix (see `config/base-path.ts`). */
+  readonly serverBasePath?: string;
   /** Storage for widget definitions, used to inject metadata into tool responses */
   widgetDefinitions: Map<string, Record<string, unknown>>;
   /** Registrations storage for checking existing registrations (for HMR updates) */
@@ -279,6 +281,7 @@ export function uiResourceRegistration<T extends UIResourceServer>(
     serverPort: server.serverPort || 3000,
     serverBaseUrl: server.serverBaseUrl,
     buildId: server.buildId,
+    basePath: server.serverBasePath,
   };
 
   // Per MCP Apps spec (SEP-1865): resource _meta.ui should contain CSP,
