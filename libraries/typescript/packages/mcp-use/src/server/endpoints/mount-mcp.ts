@@ -23,6 +23,7 @@ import {
 import { runWithContext } from "../context-storage.js";
 import { getDebugLevel } from "../logging.js";
 import { generateUUID } from "../utils/runtime.js";
+import { publicAssetBase } from "../config/base-path.js";
 
 // ---------------------------------------------------------------------------
 // Helpers for distributed SSE stream routing via StreamManager
@@ -151,7 +152,8 @@ export async function mountMcp(
   }, // The McpServer instance with getServerForSession() method
   sessions: Map<string, SessionData>,
   config: ServerConfig,
-  isProductionMode: boolean
+  isProductionMode: boolean,
+  basePath: string
 ): Promise<{ mcpMounted: boolean; idleCleanupInterval?: NodeJS.Timeout }> {
   const { WebStandardStreamableHTTPServerTransport } =
     await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
@@ -261,7 +263,7 @@ export async function mountMcp(
         if (iconSrc) {
           iconUrl = iconSrc.startsWith("http")
             ? iconSrc
-            : `${origin}/mcp-use/public/${iconSrc.replace(/^\//, "")}`;
+            : `${origin}${publicAssetBase(basePath)}/${iconSrc.replace(/^\//, "")}`;
         }
         const regs = instance.registrations;
         const landingTools =
@@ -622,13 +624,18 @@ export async function mountMcp(
     }
   };
 
-  // Mount the handler for all HTTP methods on both /mcp and /sse
-  for (const endpoint of ["/mcp", "/sse"]) {
+  // Mount the handler for all HTTP methods on the transport paths. The
+  // Streamable-HTTP transport sits at the exact basePath (or root when
+  // basePath is "") and at `${basePath}/sse`. When basePath is "" the root
+  // transport path collapses to "/".
+  const transportPath = basePath === "" ? "/" : basePath;
+  const ssePath = `${basePath}/sse`;
+  for (const endpoint of [transportPath, ssePath]) {
     app.on(["GET", "POST", "DELETE", "HEAD"], endpoint, handleRequest);
   }
 
   console.log(
-    `[MCP] Server mounted at /mcp and /sse (${config.stateless ? "stateless" : "stateful"} mode)`
+    `[MCP] Server mounted at ${transportPath} and ${ssePath} (${config.stateless ? "stateless" : "stateful"} mode)`
   );
 
   return { mcpMounted: true, idleCleanupInterval };

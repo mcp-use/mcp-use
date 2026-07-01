@@ -11,6 +11,7 @@ import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
 import { resolveWorkspace } from "../config/paths.js";
+import { publicAssetBase, widgetAssetBase } from "../config/base-path.js";
 import {
   registerWidgetFromTemplate,
   setupFaviconRoute,
@@ -78,7 +79,7 @@ type MountWidgetsDevOptions = MountWidgetsOptions;
  * @param registerWidget - Callback invoked to register each discovered widget with the running server
  * @param updateWidgetTool - Callback invoked to update widget tool metadata during HMR
  * @param removeWidgetTool - Callback invoked to remove widget tool when widget is deleted/renamed
- * @param options - Optional overrides: `baseRoute` to change the mount path (default: `/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
+ * @param options - Optional overrides: `baseRoute` to change the mount path (default: `${basePath}/mcp-use/widgets`, e.g. `/mcp/mcp-use/widgets`) and `resourcesDir` to change the scanned resources directory (default: `resources`)
  * @returns Nothing.
  */
 export async function mountWidgetsDev(
@@ -90,7 +91,9 @@ export async function mountWidgetsDev(
   options?: MountWidgetsDevOptions
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const baseRoute = options?.baseRoute || widgetAssetBase(serverConfig.basePath);
+  // Public-asset prefix for the favicon <link> baked into dev widget HTML.
+  const publicBase = publicAssetBase(serverConfig.basePath);
   // Resolution order for the widgets directory:
   //   1. Caller-supplied `options.resourcesDir`
   //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
@@ -317,7 +320,7 @@ if (container && Component) {
     <title>${widget.name} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${publicBase}/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -564,7 +567,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       serverConfig.favicon
         ? `
-    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}/mcp-use/public/${serverConfig.favicon}" />`
+    <link rel="icon" href="${serverConfig.serverBaseUrl.replace(/\/$/, "")}${publicBase}/${serverConfig.favicon}" />`
         : ""
     }
     <script type="module" src="${fullBaseUrl}/@vite/client"></script>
@@ -708,7 +711,8 @@ if (container && Component) {
             html = processWidgetHtml(
               html,
               widgetName,
-              serverConfig.serverBaseUrl
+              serverConfig.serverBaseUrl,
+              serverConfig.basePath
             );
           } catch (e) {
             console.warn(
@@ -1394,7 +1398,7 @@ export default PostHog;
   // Serve static files from public directory in dev mode
   // Only set up if not already configured (e.g., in constructor)
   if (!serverConfig.publicRoutesMode) {
-    setupPublicRoutes(app, false);
+    setupPublicRoutes(app, false, undefined, serverConfig.basePath);
     setupFaviconRoute(app, serverConfig.favicon, false);
   }
 

@@ -3,7 +3,7 @@ import React from "react";
 /**
  * Image component that automatically handles absolute paths using the MCP public URL.
  *
- * If the src starts with /, it will be prefixed with the MCP public URL (e.g. http://localhost:3000/mcp-use/public).
+ * If the src starts with /, it will be prefixed with the MCP public URL (e.g. http://localhost:3000/mcp/mcp-use/public).
  * If the src is already absolute (starts with http or data:), it will be used as is.
  *
  * @param props Standard img props

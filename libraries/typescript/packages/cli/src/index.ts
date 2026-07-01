@@ -37,7 +37,11 @@ import {
   withNextShimsEnv,
 } from "./utils/next-shims.js";
 import { notifyIfUpdateAvailable } from "./utils/update-check.js";
-import { getWidgetAssetBase } from "./utils/widget-paths.js";
+import {
+  getPublicAssetBase,
+  getWidgetAssetBase,
+  normalizeBasePathLocal,
+} from "./utils/widget-paths.js";
 const program = new Command();
 
 const packageContent = readFileSync(
@@ -152,16 +156,21 @@ async function findAvailablePort(
 async function waitForServer(
   port: number,
   host: string = "localhost",
-  maxAttempts = 30
+  maxAttempts = 30,
+  basePath = "/mcp"
 ): Promise<boolean> {
   for (let i = 0; i < maxAttempts; i++) {
     const controller = new AbortController();
     try {
-      // Use /inspector/health endpoint for cleaner health checks
-      // This avoids 400 errors from the MCP endpoint which requires session headers
-      const response = await fetch(`http://${host}:${port}/inspector/health`, {
-        signal: controller.signal,
-      });
+      // Use ${basePath}/inspector/health endpoint for cleaner health checks.
+      // This avoids 400 errors from the MCP endpoint which requires session
+      // headers. The inspector relocates under the server-wide basePath.
+      const response = await fetch(
+        `http://${host}:${port}${basePath}/inspector/health`,
+        {
+          signal: controller.signal,
+        }
+      );
 
       if (response.ok) {
         return true;
@@ -229,7 +238,8 @@ function runCommand(
 // Helper to start tunnel and get the URL
 async function startTunnel(
   port: number,
-  subdomain?: string
+  subdomain?: string,
+  basePath = "/mcp"
 ): Promise<{ url: string; subdomain: string; process: any }> {
   return new Promise((resolve, reject) => {
     console.log(chalk.gray(`Starting tunnel for port ${port}...`));
@@ -283,7 +293,7 @@ async function startTunnel(
         }
         resolved = true;
         clearTimeout(setupTimeout);
-        console.log(chalk.green.bold(`✓ Tunnel established: ${url}/mcp`));
+        console.log(chalk.green.bold(`✓ Tunnel established: ${url}${basePath}`));
         resolve({ url, subdomain: extractedSubdomain, process: proc });
       }
     });
@@ -602,7 +612,10 @@ async function buildWidgets(
 
   // Resolve the per-project `.mcp-use/` workspace so widget build output and
   // scratch land under it (build/ and cache/) instead of a hardcoded dist/.
-  const { paths } = await resolveWorkspace({ cwd: projectPath });
+  // `config.basePath` is the server-wide path prefix the built widget HTML must
+  // bake into its asset references (default `/mcp`).
+  const { paths, config } = await resolveWorkspace({ cwd: projectPath });
+  const basePath = config.basePath;
 
   // Resolve the widgets directory. Callers pass a relative path via
   // `widgetsDir` (from config / --widgets-dir / --mcp-dir); default is "resources".
@@ -769,7 +782,7 @@ if (container && Component) {
     <title>${widgetName} Widget</title>${
       favicon
         ? `
-    <link rel="icon" href="/mcp-use/public/${favicon}" />`
+    <link rel="icon" href="${getPublicAssetBase(basePath)}/${favicon}" />`
         : ""
     }
   </head>
@@ -785,7 +798,7 @@ if (container && Component) {
     // Build with Vite
     const outDir = path.join(paths.build, "resources", "widgets", widgetName);
 
-    const baseUrl = getWidgetAssetBase(mcpUrl, widgetName);
+    const baseUrl = getWidgetAssetBase(mcpUrl, widgetName, basePath);
 
     // Extract metadata from widget before building
     let widgetMetadata: any = {};
@@ -1159,12 +1172,20 @@ export default {
           const htmlPath = path.join(outDir, "index.html");
           let html = await fs.readFile(htmlPath, "utf8");
 
-          // Inject window.__mcpPublicUrl and window.__getFile into <head>
-          // Note: __mcpPublicUrl uses standard format for useWidget to derive mcp_url
-          // __mcpPublicAssetsUrl points to where public files are actually stored
-          const widgetAssetBase = getWidgetAssetBase(mcpUrl, widgetName);
-          const mcpOrigin = mcpUrl ? mcpUrl.replace(/\/+$/, "") : mcpServerUrl;
-          const injectionScript = `<script>window.__getFile = (filename) => { return "${widgetAssetBase}"+filename }; window.__mcpPublicUrl = "${mcpServerUrl}/mcp-use/public"; window.__mcpPublicAssetsUrl = "${mcpOrigin}/mcp-use/public";</script>`;
+          // Inject the runtime globals into <head>. All asset paths are
+          // basePath-aware (default `/mcp`). useWidget now reads
+          // __mcpServerUrl (the bare origin) for mcp_url, and we also bake
+          // __MCP_BASE_PATH__ so clients can derive routes.
+          // __mcpPublicAssetsUrl points to where public files are actually stored.
+          const widgetAssetBase = getWidgetAssetBase(
+            mcpUrl,
+            widgetName,
+            basePath
+          );
+          const publicBase = getPublicAssetBase(basePath);
+          const serverOrigin = mcpServerUrl.replace(/\/+$/, "");
+          const mcpOrigin = mcpUrl ? mcpUrl.replace(/\/+$/, "") : serverOrigin;
+          const injectionScript = `<script>window.__getFile = (filename) => { return "${widgetAssetBase}"+filename }; window.__mcpServerUrl = "${serverOrigin}"; window.__MCP_BASE_PATH__ = "${normalizeBasePathLocal(basePath)}"; window.__mcpPublicUrl = "${serverOrigin}${publicBase}"; window.__mcpPublicAssetsUrl = "${mcpOrigin}${publicBase}";</script>`;
 
           // Check if script tag already exists in head
           if (!html.includes("window.__mcpPublicUrl")) {
@@ -1672,7 +1693,12 @@ program
       process.env.MCP_USE_CLI_DEV = "1";
       const projectPath = path.resolve(options.path);
       // Resolve the per-project `.mcp-use/` workspace (tunnel state lives here).
-      const { paths } = await resolveWorkspace({ cwd: projectPath });
+      // `config.basePath` is the server-wide path prefix the whole framework
+      // HTTP surface (MCP transport, inspector) relocates under (default
+      // `/mcp`). The inspector lives at `${basePath}/inspector`, the transport
+      // at `${basePath}`. Normalize so `""` (root-mount) is handled uniformly.
+      const { paths, config } = await resolveWorkspace({ cwd: projectPath });
+      const basePath = normalizeBasePathLocal(config.basePath);
       let port = parseInt(options.port, 10);
       const host = options.host;
       const useHmr = options.hmr !== false;
@@ -1741,7 +1767,7 @@ program
 
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
           try {
-            tunnelInfo = await startTunnel(port, existingSubdomain);
+            tunnelInfo = await startTunnel(port, existingSubdomain, basePath);
           } catch (e) {
             if (existingSubdomain) {
               console.log(
@@ -1749,7 +1775,7 @@ program
                   `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
                 )
               );
-              tunnelInfo = await startTunnel(port);
+              tunnelInfo = await startTunnel(port, undefined, basePath);
             } else {
               throw e;
             }
@@ -1864,13 +1890,13 @@ program
         if (options.open !== false) {
           const startTime = Date.now();
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
+          const ready = await waitForServer(port, browserHost, 30, basePath);
           if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -1880,7 +1906,7 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`));
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
@@ -2138,13 +2164,13 @@ program
         // Auto-open inspector if enabled
         if (options.open !== false) {
           const browserHost = normalizeBrowserHost(host);
-          const ready = await waitForServer(port, browserHost);
+          const ready = await waitForServer(port, browserHost, 30, basePath);
           if (ready) {
-            const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+            const mcpEndpoint = `http://${browserHost}:${port}${basePath}`;
             const autoConnectEndpoint = tunnelUrl
-              ? `${tunnelUrl}/mcp`
+              ? `${tunnelUrl}${basePath}`
               : mcpEndpoint;
-            const inspectorUrl = `http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
+            const inspectorUrl = `http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`;
 
             const readyTime = Date.now() - startTime;
             console.log(chalk.green.bold(`✓ Ready in ${readyTime}ms`));
@@ -2154,7 +2180,7 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`));
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
             console.log(chalk.gray(`Watching for changes...\n`));
@@ -2174,13 +2200,15 @@ program
 
       // Log success when --no-open is used
       if (options.open === false) {
-        const mcpEndpoint = `http://${host}:${port}/mcp`;
+        const mcpEndpoint = `http://${host}:${port}${basePath}`;
+        const inspectorUrl = `http://${host}:${port}${basePath}/inspector`;
         console.log(chalk.green.bold(`✓ Server ready`));
         console.log(chalk.whiteBright(`Local:    http://${host}:${port}`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
         if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`));
         }
+        console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}`));
         console.log(chalk.gray(`Watching for changes...\n`));
       }
 
@@ -2508,18 +2536,18 @@ program
         (globalThis as any).__mcpUseHmrMode = true;
 
         const browserHost = normalizeBrowserHost(host);
-        const mcpEndpoint = `http://${browserHost}:${port}/mcp`;
+        const mcpEndpoint = `http://${browserHost}:${port}${basePath}`;
         const autoConnectEndpoint = tunnelUrl
-          ? `${tunnelUrl}/mcp`
+          ? `${tunnelUrl}${basePath}`
           : mcpEndpoint;
         console.log(chalk.green.bold(`✓ Restarted`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
         if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}/mcp`));
+          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`));
         }
         console.log(
           chalk.whiteBright(
-            `Inspector: http://${browserHost}:${port}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
+            `Inspector: http://${browserHost}:${port}${basePath}/inspector?autoConnect=${encodeURIComponent(autoConnectEndpoint)}`
           )
         );
         console.log(chalk.gray(`Watching for changes...\n`));
@@ -2624,8 +2652,11 @@ program
     try {
       const projectPath = path.resolve(options.path);
       // Resolve the per-project `.mcp-use/` workspace (build output + manifest +
-      // tunnel state all root at the project being started).
-      const { paths } = await resolveWorkspace({ cwd: projectPath });
+      // tunnel state all root at the project being started). `config.basePath`
+      // is the server-wide prefix the transport + inspector relocate under
+      // (default `/mcp`); normalized so `""` (root-mount) is handled uniformly.
+      const { paths, config } = await resolveWorkspace({ cwd: projectPath });
+      const basePath = normalizeBasePathLocal(config.basePath);
       // Priority: --port flag > process.env.PORT > default
       // Check if --port or -p was explicitly provided in command line
       const portFlagProvided =
@@ -2690,7 +2721,7 @@ program
 
           let tunnelInfo: Awaited<ReturnType<typeof startTunnel>>;
           try {
-            tunnelInfo = await startTunnel(port, existingSubdomain);
+            tunnelInfo = await startTunnel(port, existingSubdomain, basePath);
           } catch (e) {
             if (existingSubdomain) {
               console.log(
@@ -2698,7 +2729,7 @@ program
                   `Subdomain "${existingSubdomain}" unavailable, requesting a new one…`
                 )
               );
-              tunnelInfo = await startTunnel(port);
+              tunnelInfo = await startTunnel(port, undefined, basePath);
             } else {
               throw e;
             }
@@ -2824,7 +2855,7 @@ program
 
       if (mcpUrl) {
         baseEnv.MCP_URL = mcpUrl;
-        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}/mcp`));
+        console.log(chalk.whiteBright(`Tunnel:   ${mcpUrl}${basePath}`));
       } else if (!baseEnv.MCP_URL) {
         baseEnv.MCP_URL = `http://localhost:${port}`;
       }

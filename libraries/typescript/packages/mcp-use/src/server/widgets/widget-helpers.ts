@@ -14,6 +14,7 @@ import type {
 } from "../types/index.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
 import { resolveWorkspace } from "../config/paths.js";
+import { publicAssetBase, widgetAssetBase } from "../config/base-path.js";
 import {
   createUIResourceFromDefinition,
   type UrlConfig,
@@ -206,6 +207,12 @@ export interface WidgetServerConfig {
   serverBaseUrl?: string;
   /** Build ID for cache busting */
   buildId?: string;
+  /**
+   * Normalized server-wide path prefix (see `config/base-path.ts`). The widget
+   * iframe URL is built under `${basePath}/mcp-use/widgets/...`. Defaults to
+   * `/mcp` when not threaded.
+   */
+  basePath?: string;
 }
 
 /**
@@ -296,20 +303,25 @@ export function getContentType(filename: string): string {
  * @param html - Original HTML content
  * @param widgetName - Widget identifier
  * @param baseUrl - Server base URL
+ * @param basePath - Normalized server-wide path prefix (see
+ *   `config/base-path.ts`). Defaults to `/mcp`. `""` means root-mounted.
  * @returns Processed HTML with injected base tag and absolute URLs
  *
  * @example
  * ```typescript
  * const html = '<html><head></head><body>...</body></html>';
- * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000');
+ * const processed = processWidgetHtml(html, 'kanban-board', 'http://localhost:3000', '/mcp');
  * ```
  */
 export function processWidgetHtml(
   html: string,
   widgetName: string,
-  baseUrl: string
+  baseUrl: string,
+  basePath: string = "/mcp"
 ): string {
   let processedHtml = html;
+  const widgetsBase = widgetAssetBase(basePath); // `${basePath}/mcp-use/widgets`
+  const publicBase = publicAssetBase(basePath); // `${basePath}/mcp-use/public`
 
   // Inject or replace base tag with server base URL
   if (baseUrl && processedHtml) {
@@ -343,26 +355,39 @@ export function processWidgetHtml(
       }
     }
 
-    // Replace relative paths that start with /mcp-use for scripts and CSS with absolute URLs
+    // Rewrite the basePath-relative widget asset paths emitted by the build
+    // (`${basePath}/mcp-use/widgets/...`) to absolute URLs against baseUrl.
+    // `escapeRegExp(widgetsBase)` keeps the match pinned to the configured
+    // prefix so unrelated `/mcp-use/...` strings aren't touched.
+    const widgetsBaseRe = escapeRegExp(widgetsBase);
     processedHtml = processedHtml.replace(
-      /src="\/mcp-use\/widgets\/([^"]+)"/g,
-      `src="${baseUrl}/mcp-use/widgets/$1"`
+      new RegExp(`src="${widgetsBaseRe}/([^"]+)"`, "g"),
+      `src="${baseUrl}${widgetsBase}/$1"`
     );
     processedHtml = processedHtml.replace(
-      /href="\/mcp-use\/widgets\/([^"]+)"/g,
-      `href="${baseUrl}/mcp-use/widgets/$1"`
+      new RegExp(`href="${widgetsBaseRe}/([^"]+)"`, "g"),
+      `href="${baseUrl}${widgetsBase}/$1"`
     );
 
-    // Add window.__getFile and window.__mcpPublicUrl to head
-    // Use slugified name for URL routing
+    // Inject the runtime globals widgets read at load time. Use slugified name
+    // for URL routing.
+    // - __getFile: resolve an asset under this widget's basePath-aware dir
+    // - __mcpServerUrl: the bare server origin (read by useWidget for mcp_url)
+    // - __MCP_BASE_PATH__: the resolved basePath (so clients can derive routes)
+    // - __mcpPublicUrl: kept (Image.tsx reads it) — now basePath-aware
     const slugifiedName = slugifyWidgetName(widgetName);
     processedHtml = processedHtml.replace(
       /<head[^>]*>/i,
-      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}/mcp-use/widgets/${slugifiedName}/"+filename }; window.__mcpPublicUrl = "${baseUrl}/mcp-use/public";</script>`
+      `<head>\n    <script>window.__getFile = (filename) => { return "${baseUrl}${widgetsBase}/${slugifiedName}/"+filename }; window.__mcpServerUrl = "${baseUrl}"; window.__MCP_BASE_PATH__ = "${basePath}"; window.__mcpPublicUrl = "${baseUrl}${publicBase}";</script>`
     );
   }
 
   return processedHtml;
+}
+
+/** Escape a string for safe interpolation into a RegExp source. */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -564,6 +589,7 @@ export async function createWidgetUIResource(
     baseUrl: configBaseUrl,
     port: configPort,
     buildId: serverConfig.buildId,
+    basePath: serverConfig.basePath,
   };
 
   const uiResource = await createUIResourceFromDefinition(
@@ -708,7 +734,7 @@ export async function registerWidgetFromTemplate(
   widgetName: string,
   htmlPath: string,
   metadata: Record<string, unknown>,
-  serverConfig: { serverBaseUrl: string; cspUrls: string[] },
+  serverConfig: { serverBaseUrl: string; cspUrls: string[]; basePath?: string },
   registerWidget: import("./widget-types.js").RegisterWidgetCallback,
   isDev: boolean = false
 ): Promise<void> {
@@ -719,7 +745,12 @@ export async function registerWidgetFromTemplate(
   }
 
   // Process HTML with base URL injection and path conversion
-  html = processWidgetHtml(html, widgetName, serverConfig.serverBaseUrl);
+  html = processWidgetHtml(
+    html,
+    widgetName,
+    serverConfig.serverBaseUrl,
+    serverConfig.basePath
+  );
 
   // Ensure metadata has proper fallbacks
   const processedMetadata = ensureWidgetMetadata(metadata, widgetName);
@@ -747,23 +778,28 @@ export async function registerWidgetFromTemplate(
  *   (production) or the project public/ (dev)
  * @param buildDir - Absolute build output dir; required when useDistDirectory
  *   is true (production serves from `<buildDir>/public`)
+ * @param basePath - Normalized server-wide path prefix (see
+ *   `config/base-path.ts`). Public assets serve from
+ *   `${basePath}/mcp-use/public/*`. Defaults to `/mcp`.
  *
  * @example
  * ```typescript
  * // For development mode
- * setupPublicRoutes(app, false);
+ * setupPublicRoutes(app, false, undefined, basePath);
  *
  * // For production mode
- * setupPublicRoutes(app, true, buildDir);
+ * setupPublicRoutes(app, true, buildDir, basePath);
  * ```
  */
 export function setupPublicRoutes(
   app: HonoType,
   useDistDirectory: boolean = false,
-  buildDir?: string
+  buildDir?: string,
+  basePath: string = "/mcp"
 ): void {
-  app.get("/mcp-use/public/*", async (c: Context) => {
-    const filePath = c.req.path.replace("/mcp-use/public/", "");
+  const publicBase = publicAssetBase(basePath); // `${basePath}/mcp-use/public`
+  app.get(`${publicBase}/*`, async (c: Context) => {
+    const filePath = c.req.path.replace(`${publicBase}/`, "");
     // Production: serve from the build output's public/ dir; dev: project public/.
     const publicDir =
       useDistDirectory && buildDir

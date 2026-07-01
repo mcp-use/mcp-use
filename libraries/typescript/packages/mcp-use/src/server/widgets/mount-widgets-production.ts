@@ -11,6 +11,7 @@ import type { Hono as HonoType } from "hono";
 import type { WidgetMetadata } from "../types/widget.js";
 import { pathHelpers, fsHelpers } from "../utils/runtime.js";
 import { BUILD_MANIFEST_NAME } from "../config/paths.js";
+import { widgetAssetBase } from "../config/base-path.js";
 import { registerWidgetFromTemplate } from "./widget-helpers.js";
 import type {
   ServerConfig,
@@ -42,7 +43,7 @@ export async function mountWidgetsProduction(
   registerWidget: RegisterWidgetCallback,
   options?: MountWidgetsProductionOptions
 ): Promise<void> {
-  const baseRoute = options?.baseRoute || "/mcp-use/widgets";
+  const baseRoute = options?.baseRoute || widgetAssetBase(serverConfig.basePath);
   const widgetsDir = pathHelpers.join(
     serverConfig.buildDir,
     "resources",

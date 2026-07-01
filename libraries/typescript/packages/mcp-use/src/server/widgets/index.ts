@@ -9,6 +9,7 @@ import type { MCPServer } from "../mcp-server.js";
 import type { RegisterWidgetCallback } from "./widget-types.js";
 import { isDeno } from "../utils/runtime.js";
 import { resolveWorkspace } from "../config/paths.js";
+import { normalizeBasePath } from "../config/base-path.js";
 import { isProductionMode, getCSPUrls } from "../utils/index.js";
 import { mountWidgetsDev } from "./mount-widgets-dev.js";
 import { mountWidgetsProduction } from "./mount-widgets-production.js";
@@ -29,7 +30,7 @@ export { uiResourceRegistration } from "./ui-resource-registration.js";
  * In production mode: serves pre-built static widgets
  *
  * @param options - Configuration options
- * @param options.baseRoute - Base route for widgets (defaults to '/mcp-use/widgets')
+ * @param options.baseRoute - Base route for widgets (defaults to `${basePath}/mcp-use/widgets`, e.g. '/mcp/mcp-use/widgets')
  * @param options.resourcesDir - Directory containing widget files (defaults to 'resources')
  * @returns Promise that resolves when all widgets are mounted
  */
@@ -52,6 +53,10 @@ export async function mountWidgets(
     serverPort: (server as any).serverPort || 3000,
     buildDir: paths.build,
     cspUrls: getCSPUrls(),
+    // Server-wide path prefix resolved at boot (mcp-server.ts resolveBasePath).
+    // Threaded the same way buildDir is, so the production/dev serve paths and
+    // the HTML baked into widgets all live under the same prefix.
+    basePath: normalizeBasePath((server as any).serverBasePath),
     buildId: (server as any).buildId,
     favicon: (server as any).favicon,
     publicRoutesMode: (server as any).publicRoutesMode,

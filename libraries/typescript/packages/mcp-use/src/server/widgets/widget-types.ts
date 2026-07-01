@@ -17,6 +17,13 @@ export interface ServerConfig {
   /** Server port (optional for production) */
   serverPort?: number | string;
   /**
+   * Normalized server-wide path prefix under which the framework HTTP surface
+   * is mounted (see `config/base-path.ts`). Widget/public asset routes and the
+   * HTML baked into widgets are all prefixed with this. `""` means
+   * root-mounted; defaults to `/mcp` when not threaded.
+   */
+  basePath: string;
+  /**
    * Absolute path to the build output directory (the configurable `outDir`,
    * default `.mcp-use/build`). Production widget/asset serving resolves all
    * built files under here, replacing the legacy hardcoded `dist/`.
@@ -41,7 +48,7 @@ export interface ServerConfig {
  * Common options used for both development and production widget mounting.
  */
 export interface MountWidgetsOptions {
-  /** Base route for widgets (defaults to '/mcp-use/widgets') */
+  /** Base route for widgets (defaults to `${basePath}/mcp-use/widgets`, e.g. '/mcp/mcp-use/widgets') */
   baseRoute?: string;
   /** Resources directory path (defaults to 'resources') */
   resourcesDir?: string;

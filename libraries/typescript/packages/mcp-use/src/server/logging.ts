@@ -159,7 +159,11 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   const level = getDebugLevel();
 
   const pathname = new URL(url).pathname;
-  const noisyPaths = [
+  // Cosmetic log-noise suppression. The framework surface now lives under a
+  // configurable basePath (default `/mcp`), so match the `/inspector` and
+  // `/mcp-use/...` segments anywhere in the path (via `includes`) rather than
+  // anchoring at the root — this middleware has no basePath in scope.
+  const noisySegments = [
     "/inspector/api/tel/",
     "/inspector/api/rpc/stream",
     "/inspector/api/rpc/log",
@@ -169,12 +173,10 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   ];
   const isNoisyGet =
     method === "GET" &&
-    (pathname === "/mcp" ||
-      pathname.startsWith("/inspector/api/") ||
-      pathname.startsWith("/mcp-use/"));
+    (pathname.includes("/inspector/api/") || pathname.includes("/mcp-use/"));
 
   if (
-    noisyPaths.some((noisyPath) => pathname.startsWith(noisyPath)) ||
+    noisySegments.some((segment) => pathname.includes(segment)) ||
     isNoisyGet
   ) {
     await next();

@@ -56,6 +56,12 @@ import {
 } from "./notifications/index.js";
 import type { OAuthProvider } from "./oauth/providers/types.js";
 import { setupOAuthForServer } from "./oauth/setup.js";
+import {
+  normalizeBasePath,
+  publicAssetBase,
+  widgetAssetBase,
+} from "./config/base-path.js";
+import { resolveWorkspace } from "./config/paths.js";
 import { listRoots, onRootsChanged } from "./roots/index.js";
 import type { SessionData } from "./sessions/index.js";
 import {
@@ -336,6 +342,21 @@ class MCPServerClass<HasOAuth extends boolean = false> {
    * Used for generating widget URLs and OAuth callbacks.
    */
   public serverBaseUrl?: string;
+
+  /**
+   * Normalized server-wide path prefix under which the entire framework HTTP
+   * surface is mounted (MCP transport, widget/public assets, OAuth endpoints,
+   * inspector). Resolved ONCE at boot from `basePath` in `mcp-use.config.json`,
+   * else `/mcp`. `""` means root-mounted.
+   *
+   * basePath is build-time-baked config (the CLI stamps it into widget HTML at
+   * build time), so it lives ONLY in `mcp-use.config.json` — read by both the
+   * build and the server — never as a runtime constructor field, which could
+   * diverge from what the build baked. This mirrors Next.js `basePath`.
+   *
+   * @internal Set in {@link resolveBasePath} during the boot path.
+   */
+  public serverBasePath: string = normalizeBasePath();
 
   /**
    * Optional favicon URL to display in inspector and documentation.
@@ -2387,11 +2408,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       baseUrl?: string
     ) => {
       if (!icons || !baseUrl) return icons;
+      const assetBase = publicAssetBase(this.serverBasePath);
       return icons.map((icon) => ({
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}${assetBase}/${icon.src}`,
       }));
     };
 
@@ -2660,11 +2682,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       baseUrl?: string
     ) => {
       if (!icons || !baseUrl) return icons;
+      const assetBase = publicAssetBase(this.serverBasePath);
       return icons.map((icon) => ({
         ...icon,
         src: icon.src.startsWith("http")
           ? icon.src
-          : `${baseUrl}/mcp-use/public/${icon.src}`,
+          : `${baseUrl}${assetBase}/${icon.src}`,
       }));
     };
 
@@ -3314,6 +3337,37 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   }
 
   /**
+   * Resolve the server-wide {@link serverBasePath} exactly once at boot.
+   *
+   * Source: `basePath` from the nearest `mcp-use.config.json` (read via
+   * {@link resolveWorkspace}, like P2 reads `outDir`) → the schema default
+   * (`/mcp`). There is deliberately NO constructor override: basePath is
+   * build-time-baked into widget HTML by the CLI (which reads only the config
+   * file), so a runtime-only override would mount routes where no assets were
+   * baked. The result is normalized and memoized; both boot paths
+   * ({@link listen} and {@link getHandler}) call this and stay in sync via the
+   * `_basePathResolved` guard.
+   */
+  private _basePathResolved = false;
+  private async resolveBasePath(): Promise<string> {
+    if (this._basePathResolved) {
+      return this.serverBasePath;
+    }
+
+    let raw: string | undefined;
+    try {
+      const { config } = await resolveWorkspace();
+      raw = config.basePath;
+    } catch {
+      // Malformed/missing mcp-use.config.json — fall back to the default below.
+    }
+
+    this.serverBasePath = normalizeBasePath(raw);
+    this._basePathResolved = true;
+    return this.serverBasePath;
+  }
+
+  /**
    * Registers a tool that can be called by MCP clients.
    *
    * Tools are executable functions that clients can invoke to perform actions
@@ -3727,7 +3781,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this, // Pass the MCPServer instance so mountMcp can call getServerForSession()
       this.sessions,
       this.config,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.serverBasePath
     );
 
     this.mcpMounted = result.mcpMounted;
@@ -3906,6 +3961,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverPort
     );
 
+    // Resolve the server-wide basePath once, before any routes are mounted.
+    const basePath = await this.resolveBasePath();
+
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
@@ -3913,12 +3971,12 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
-        { publicLandingPage: this.config.publicLandingPage }
+        { publicLandingPage: this.config.publicLandingPage, basePath }
       );
     }
 
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
+      baseRoute: widgetAssetBase(basePath),
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
@@ -3930,7 +3988,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
     });
     await this.mountMcp();
 
-    // Mount inspector BEFORE Vite middleware to ensure it handles /inspector routes
+    // Mount inspector BEFORE Vite middleware to ensure it handles inspector routes
     await this.mountInspector();
 
     // Log registered items before starting server
@@ -3961,6 +4019,7 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.serverHost,
       {
         onDenoRequest: rewriteSupabaseRequest,
+        basePath: this.serverBasePath,
       }
     );
     this._httpServerClose = httpHandle.close;
@@ -4036,6 +4095,9 @@ class MCPServerClass<HasOAuth extends boolean = false> {
   async getHandler(options?: {
     provider?: "supabase" | "cloudflare" | "deno-deploy";
   }): Promise<(req: Request) => Promise<Response>> {
+    // Resolve the server-wide basePath once, before any routes are mounted.
+    const basePath = await this.resolveBasePath();
+
     // Setup OAuth before mounting widgets/MCP (if configured)
     if (this.oauthProvider && !this.oauthSetupState.complete) {
       await setupOAuthForServer(
@@ -4043,13 +4105,13 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         this.oauthProvider,
         this.getServerBaseUrl(),
         this.oauthSetupState,
-        { publicLandingPage: this.config.publicLandingPage }
+        { publicLandingPage: this.config.publicLandingPage, basePath }
       );
     }
 
     console.log("[MCP] Mounting widgets");
     await mountWidgets(this as any, {
-      baseRoute: "/mcp-use/widgets",
+      baseRoute: widgetAssetBase(basePath),
       // Only forward `resourcesDir` when the env var is set. That lets
       // @mcp-use/cli steer widget discovery to e.g. `src/mcp/resources`
       // (via `--mcp-dir src/mcp`) without forcing the user to configure
@@ -4157,7 +4219,8 @@ class MCPServerClass<HasOAuth extends boolean = false> {
       this.app,
       this.serverHost,
       this.serverPort,
-      isProductionModeHelper()
+      isProductionModeHelper(),
+      this.serverBasePath
     );
 
     if (mounted) {
