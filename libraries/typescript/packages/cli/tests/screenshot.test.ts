@@ -6,6 +6,7 @@ import {
   parseDimension,
   parseHeaderArg,
   parseHeaderArgs,
+  parseScreenshotTimeout,
   requiresArguments,
   timestampSuffix,
 } from "../src/commands/screenshot.js";
@@ -93,6 +94,16 @@ describe("parseDeviceScaleFactor", () => {
   it("rejects values above 4", () => {
     expect(() => parseDeviceScaleFactor("5")).toThrow(/<= 4/);
     expect(() => parseDeviceScaleFactor("100")).toThrow(/<= 4/);
+  });
+});
+
+describe("parseScreenshotTimeout", () => {
+  it("preserves an explicit zero timeout", () => {
+    expect(parseScreenshotTimeout("0")).toBe(0);
+  });
+
+  it("uses the default timeout when parsing fails", () => {
+    expect(parseScreenshotTimeout("abc")).toBe(30000);
   });
 });
 

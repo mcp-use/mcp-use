@@ -452,6 +452,14 @@ export function parseDeviceScaleFactor(raw: string): number {
   return n;
 }
 
+export function parseScreenshotTimeout(
+  raw: string,
+  defaultTimeout = 30000
+): number {
+  const n = parseInt(raw, 10);
+  return Number.isNaN(n) ? defaultTimeout : n;
+}
+
 export function requiresArguments(inputSchema: unknown): boolean {
   if (!inputSchema || typeof inputSchema !== "object") return false;
   const required = (inputSchema as { required?: unknown }).required;
@@ -562,7 +570,7 @@ async function screenshotCommand(
       options.height !== undefined
         ? parseDimension(options.height, "height")
         : undefined;
-    const navTimeout = parseInt(options.timeout, 10) || 30000;
+    const navTimeout = parseScreenshotTimeout(options.timeout);
     const delayMs = options.delay ? parseInt(options.delay, 10) : 0;
     const deviceScaleFactor = options.deviceScaleFactor
       ? parseDeviceScaleFactor(options.deviceScaleFactor)
