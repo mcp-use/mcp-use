@@ -59,7 +59,7 @@ The tool definition in `index.ts` chooses the widget with `widget: { name }`. Th
 
 The widget file uses `useWidget()` to read `props`, pending state, host context, widget state, and host actions.
 
-## What the model sees
+## What the model sees {#server-returning-data}
 
 MCP tool results separate model-visible output from widget-only data.
 
@@ -75,9 +75,9 @@ For a deeper explanation of widget state, model-visible context, and the `useWid
 
 ## Compatibility
 
-`mcp-use` uses the normal widget APIs to emit the metadata and bridge behavior ChatGPT needs, so the same widget code can run in ChatGPT and MCP Apps hosts.
+Build with the standard MCP Apps APIs. The same widget code runs in MCP Apps hosts and in ChatGPT.
 
-Apps SDK APIs remain useful for ChatGPT-specific host extensions that are not part of the shared MCP Apps spec yet. Use [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) when you need to understand that boundary.
+For ChatGPT-specific host behavior or legacy `appsSdk` registrations, see [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) and [Migrate from Apps SDK](/typescript/mcp-apps/migrating-from-apps-sdk).
 
 ## Start here
 
@@ -116,6 +116,13 @@ Apps SDK APIs remain useful for ChatGPT-specific host extensions that are not pa
     href="/typescript/mcp-apps/apps-sdk-compatibility"
   >
     Understand how MCP Apps run in ChatGPT and when Apps SDK extensions matter.
+  </Card>
+  <Card
+    title="Migrate from Apps SDK"
+    icon="arrow-right-arrow-left"
+    href="/typescript/mcp-apps/migrating-from-apps-sdk"
+  >
+    Move legacy ChatGPT Apps SDK registrations to the MCP Apps workflow.
   </Card>
   <Card
     title="Content Security Policy"

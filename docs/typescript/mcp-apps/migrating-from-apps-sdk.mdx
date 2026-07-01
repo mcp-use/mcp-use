@@ -1,0 +1,114 @@
+---
+title: "Migrate from Apps SDK"
+description: "Move existing ChatGPT Apps SDK widgets to the MCP Apps workflow in mcp-use."
+icon: "arrow-right-arrow-left"
+---
+
+If you have widgets registered with `type: "appsSdk"` and `appsSdkMetadata`, migrate to the standard MCP Apps workflow. Widget React code does not need to change — only server registration and metadata format.
+
+New projects should use [Build widgets](/typescript/mcp-apps/widgets) from the start.
+
+## Before (ChatGPT only)
+
+```typescript
+server.uiResource({
+  type: "appsSdk",
+  name: "my-widget",
+  htmlTemplate: `...`,
+  appsSdkMetadata: {
+    "openai/widgetCSP": {
+      connect_domains: ["https://api.example.com"],
+      resource_domains: ["https://cdn.example.com"],
+    },
+    "openai/widgetPrefersBorder": true,
+    "openai/widgetDescription": "My widget description",
+  },
+});
+```
+
+## After (MCP Apps)
+
+```typescript
+server.uiResource({
+  type: "mcpApps",
+  name: "my-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: {
+      connectDomains: ["https://api.example.com"],
+      resourceDomains: ["https://cdn.example.com"],
+    },
+    prefersBorder: true,
+    widgetDescription: "My widget description",
+  },
+});
+```
+
+For file-based widgets, move the same fields into `widgetMetadata.metadata` in `resources/<name>/widget.tsx`.
+
+## Key changes
+
+- `type: "appsSdk"` → `type: "mcpApps"`
+- `appsSdkMetadata` → `metadata`
+- `"openai/widgetCSP"` → `csp` (remove the `openai/` prefix)
+- `connect_domains` → `connectDomains` (snake_case → camelCase)
+- `resource_domains` → `resourceDomains`
+- `"openai/widgetPrefersBorder"` → `prefersBorder`
+
+## Field mapping
+
+| Apps SDK (`appsSdkMetadata`) | MCP Apps (`metadata`) | Notes |
+| --- | --- | --- |
+| `"openai/widgetCSP"` | `csp` | CSP configuration object |
+| `connect_domains` | `connectDomains` | Connection domains |
+| `resource_domains` | `resourceDomains` | Resource domains |
+| `frame_domains` | `frameDomains` | Frame domains |
+| `redirect_domains` | `redirectDomains` | Redirect domains (ChatGPT-specific) |
+| `script_directives` | `scriptDirectives` | Script CSP directives |
+| `style_directives` | `styleDirectives` | Style CSP directives |
+| `"openai/widgetPrefersBorder"` | `prefersBorder` | Boolean |
+| `"openai/widgetDomain"` | `domain` | Custom domain string |
+| `"openai/widgetDescription"` | `widgetDescription` | Widget description |
+| `"openai/widgetAccessible"` | `widgetAccessible` | Can stay in `appsSdkMetadata` for ChatGPT overrides |
+| `"openai/locale"` | `locale` | Can stay in `appsSdkMetadata` for ChatGPT overrides |
+| `"openai/toolInvocation/invoking"` | `invoking` | Status text while the tool runs |
+| `"openai/toolInvocation/invoked"` | `invoked` | Status text after the tool completes |
+
+See [Content Security Policy](/typescript/mcp-apps/content-security-policy) for full CSP configuration.
+
+## Migration checklist
+
+1. Change `type: "appsSdk"` to `type: "mcpApps"`.
+2. Rename `appsSdkMetadata` to `metadata`.
+3. Transform CSP keys from snake_case `openai/widgetCSP` to camelCase `csp`.
+4. Remove the `openai/` prefix from remaining metadata keys.
+5. Test in the [Inspector](/inspector) and in ChatGPT.
+6. Verify props, theme, tool calls, and CSP still work.
+
+## ChatGPT-specific overrides (optional)
+
+If you need ChatGPT-only metadata after migrating, keep `appsSdkMetadata` alongside `metadata`:
+
+```typescript
+server.uiResource({
+  type: "mcpApps",
+  name: "my-widget",
+  htmlTemplate: `...`,
+  metadata: {
+    csp: { connectDomains: ["https://api.example.com"] },
+    prefersBorder: true,
+  },
+  appsSdkMetadata: {
+    "openai/widgetDescription": "ChatGPT-specific description",
+  },
+});
+```
+
+## Stay on Apps SDK (legacy)
+
+`type: "appsSdk"` still works if you only target ChatGPT and cannot migrate yet. Prefer `type: "mcpApps"` for new work.
+
+## Next steps
+
+- [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) — how MCP Apps run in ChatGPT
+- [Build widgets](/typescript/mcp-apps/widgets) — the standard widget workflow
