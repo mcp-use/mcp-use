@@ -5,6 +5,7 @@
  */
 
 import type { Hono as HonoType } from "hono";
+import { isDebugEnabled } from "../../log-level.js";
 import { readBuildManifest } from "../widgets/index.js";
 
 /**
@@ -94,7 +95,7 @@ export async function mountInspectorUI(
     );
     return true;
   } catch (err) {
-    if (!isProduction || process.env.MCP_USE_DEBUG) {
+    if (!isProduction || isDebugEnabled()) {
       console.warn(
         "[INSPECTOR] Could not mount inspector UI:",
         err instanceof Error ? err.message : err

@@ -13,7 +13,7 @@ import type {
   WidgetProps,
 } from "../types/index.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
-import { resolveWorkspace } from "../config/paths.js";
+import { resolveWorkspacePaths } from "../config/paths.js";
 import { publicAssetBase, widgetAssetBase } from "../config/base-path.js";
 import {
   createUIResourceFromDefinition,
@@ -187,7 +187,7 @@ export async function readBuildManifest(): Promise<{
   buildId?: string;
 } | null> {
   try {
-    const { paths } = await resolveWorkspace();
+    const paths = resolveWorkspacePaths(getCwd());
     const content = await fsHelpers.readFileSync(paths.buildManifest, "utf8");
     return JSON.parse(content);
   } catch {
@@ -355,17 +355,21 @@ export function processWidgetHtml(
       }
     }
 
-    // Rewrite the basePath-relative widget asset paths emitted by the build
-    // (`${basePath}/mcp-use/widgets/...`) to absolute URLs against baseUrl.
-    // `escapeRegExp(widgetsBase)` keeps the match pinned to the configured
-    // prefix so unrelated `/mcp-use/...` strings aren't touched.
-    const widgetsBaseRe = escapeRegExp(widgetsBase);
+    // Rewrite the widget asset paths emitted by the build
+    // (`${someBasePath}/mcp-use/widgets/...`) to absolute URLs against
+    // baseUrl. Matches on the fixed `/mcp-use/widgets/` literal rather than
+    // the current live `widgetsBase`, so this still corrects the paths when
+    // the basePath baked in at build time differs from the live basePath
+    // (build time no longer needs to know the real basePath at all).
+    // Absolute (`scheme://`) and protocol-relative (`//`) URLs are excluded:
+    // those come from `assetPrefix` builds whose assets live off-server (CDN/
+    // bucket) on purpose and must not be pulled back to the server origin.
     processedHtml = processedHtml.replace(
-      new RegExp(`src="${widgetsBaseRe}/([^"]+)"`, "g"),
+      /src="(?!(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/)[^"]*\/mcp-use\/widgets\/([^"]+)"/g,
       `src="${baseUrl}${widgetsBase}/$1"`
     );
     processedHtml = processedHtml.replace(
-      new RegExp(`href="${widgetsBaseRe}/([^"]+)"`, "g"),
+      /href="(?!(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/)[^"]*\/mcp-use\/widgets\/([^"]+)"/g,
       `href="${baseUrl}${widgetsBase}/$1"`
     );
 
@@ -383,11 +387,6 @@ export function processWidgetHtml(
   }
 
   return processedHtml;
-}
-
-/** Escape a string for safe interpolation into a RegExp source. */
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -781,11 +780,14 @@ export async function registerWidgetFromTemplate(
  * @param basePath - Normalized server-wide path prefix (see
  *   `config/base-path.ts`). Public assets serve from
  *   `${basePath}/mcp-use/public/*`. Defaults to `/mcp`.
+ * @param sourcePublicDir - Project-relative public directory to serve in dev
+ *   mode (`ServerConfig.publicDir`, default `public`). Ignored in production,
+ *   where the build already copied it to `<buildDir>/public`.
  *
  * @example
  * ```typescript
  * // For development mode
- * setupPublicRoutes(app, false, undefined, basePath);
+ * setupPublicRoutes(app, false, undefined, basePath, publicDir);
  *
  * // For production mode
  * setupPublicRoutes(app, true, buildDir, basePath);
@@ -795,7 +797,8 @@ export function setupPublicRoutes(
   app: HonoType,
   useDistDirectory: boolean = false,
   buildDir?: string,
-  basePath: string = "/mcp"
+  basePath: string = "/mcp",
+  sourcePublicDir: string = "public"
 ): void {
   const publicBase = publicAssetBase(basePath); // `${basePath}/mcp-use/public`
   app.get(`${publicBase}/*`, async (c: Context) => {
@@ -804,7 +807,7 @@ export function setupPublicRoutes(
     const publicDir =
       useDistDirectory && buildDir
         ? pathHelpers.join(buildDir, "public")
-        : pathHelpers.join(getCwd(), "public");
+        : pathHelpers.join(getCwd(), sourcePublicDir);
     const fullPath = pathHelpers.join(publicDir, filePath);
 
     try {
@@ -835,6 +838,8 @@ export function setupPublicRoutes(
  *   (production) or the project public/ (dev)
  * @param buildDir - Absolute build output dir; required when useDistDirectory
  *   is true (production serves from `<buildDir>/public`)
+ * @param sourcePublicDir - Project-relative public directory to serve in dev
+ *   mode (`ServerConfig.publicDir`, default `public`). Ignored in production.
  *
  * @example
  * ```typescript
@@ -849,7 +854,8 @@ export function setupFaviconRoute(
   app: HonoType,
   faviconPath: string | undefined,
   useDistDirectory: boolean = false,
-  buildDir?: string
+  buildDir?: string,
+  sourcePublicDir: string = "public"
 ): void {
   if (!faviconPath) {
     return; // No favicon configured
@@ -859,7 +865,7 @@ export function setupFaviconRoute(
     const publicDir =
       useDistDirectory && buildDir
         ? pathHelpers.join(buildDir, "public")
-        : pathHelpers.join(getCwd(), "public");
+        : pathHelpers.join(getCwd(), sourcePublicDir);
     const fullPath = pathHelpers.join(publicDir, faviconPath);
 
     try {

@@ -3,8 +3,8 @@
  *
  * The framework HTTP surface (including widget assets) lives under a
  * server-wide `basePath` (default `/mcp`), so the built HTML must reference
- * `${basePath}/mcp-use/widgets/${name}/`. Pass the project's resolved
- * `config.basePath` (from `mcp-use.config.json` via `resolveWorkspace`).
+ * `${basePath}/mcp-use/widgets/${name}/`. `basePath` lives on the MCPServer
+ * constructor; the build bakes the default and the live server rewrites it.
  *
  * @param mcpUrl - Public server origin, or undefined for a root-relative path
  * @param widgetName - Built widget directory name

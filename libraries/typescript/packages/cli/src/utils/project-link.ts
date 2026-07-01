@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import { resolveWorkspace } from "mcp-use/config";
+import { resolveWorkspacePaths } from "mcp-use/config";
 import { ensureGitignore } from "./gitignore.js";
 
 interface ProjectLink {
@@ -13,7 +13,7 @@ interface ProjectLink {
 // Read project link from the per-project workspace (`.mcp-use/cloud/link.json`).
 export async function getProjectLink(cwd: string): Promise<ProjectLink | null> {
   try {
-    const { paths } = await resolveWorkspace({ cwd });
+    const paths = resolveWorkspacePaths(cwd);
     const content = await fs.readFile(paths.cloudLink, "utf-8");
     return JSON.parse(content);
   } catch (err: any) {
@@ -27,7 +27,7 @@ export async function saveProjectLink(
   cwd: string,
   link: ProjectLink
 ): Promise<void> {
-  const { paths } = await resolveWorkspace({ cwd });
+  const paths = resolveWorkspacePaths(cwd);
   await fs.mkdir(paths.cloud, { recursive: true });
   await fs.writeFile(paths.cloudLink, JSON.stringify(link, null, 2), "utf-8");
 

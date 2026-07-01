@@ -2,7 +2,7 @@
  * Runtime basePath resolution for the inspector client.
  *
  * `@mcp-use/inspector` ships as a prebuilt bundle. The consuming server's
- * `basePath` (from its `mcp-use.config.json`; default `/mcp`, `""` = root) is
+ * `basePath` (from its MCPServer constructor; default `/mcp`, `""` = root) is
  * only known at the consumer's runtime, so it CANNOT be baked into the Vite
  * build. The server injects it into the served HTML as `window.__MCP_BASE_PATH__`
  * (see `packages/inspector/src/server/shared-static.ts`); this module reads that

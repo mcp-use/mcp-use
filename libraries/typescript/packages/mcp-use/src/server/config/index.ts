@@ -1,32 +1,17 @@
 /**
- * Public entry point for the `mcp-use.config.json` project config, exposed via the
- * `mcp-use/config` subpath.
+ * Public entry point for project/workspace path + base-path helpers, exposed
+ * via the `mcp-use/config` subpath.
  *
- * Phase 1 (MCP-2613): types, schema, and a zero-execution loader only. No CLI
- * or server runtime consumes this yet.
+ * There is deliberately NO config file: project configuration lives on the
+ * `MCPServer` constructor (`viewsDir`, `publicDir`, `basePath`,
+ * `assetPrefix`, …) — tooling reads it by importing the server entry and
+ * introspecting the instance — and the `.mcp-use/` workspace layout is a
+ * fixed convention derived here.
  */
 
 export {
-  CONFIG_FILE_NAME,
-  CONFIG_SCHEMA_URL,
-  configSchema,
-  DEFAULT_OUT_DIR,
-  type McpUseConfig,
-  type ResolvedConfig,
-} from "./schema.js";
-
-export {
-  ConfigError,
-  loadConfig,
-  type LoadConfigOptions,
-  type LoadConfigResult,
-} from "./loader.js";
-
-export {
   BUILD_MANIFEST_NAME,
-  resolveWorkspace,
   resolveWorkspacePaths,
-  type ResolvedWorkspace,
   type WorkspacePaths,
   WORKSPACE_DIR_NAME,
 } from "./paths.js";

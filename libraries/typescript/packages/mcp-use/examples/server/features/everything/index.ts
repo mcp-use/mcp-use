@@ -117,7 +117,6 @@ const server = new MCPServer({
   name: "everything-server",
   title: "Everything Server",
   version: "1.0.0",
-  baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 
 // ============================================================================

@@ -10,7 +10,7 @@ import type { Context, Hono as HonoType, Next } from "hono";
 import { adaptConnectMiddleware } from "../connect-adapter.js";
 import type { WidgetMetadata } from "../types/widget.js";
 import { fsHelpers, getCwd, pathHelpers } from "../utils/runtime.js";
-import { resolveWorkspace } from "../config/paths.js";
+import { resolveWorkspacePaths } from "../config/paths.js";
 import { publicAssetBase, widgetAssetBase } from "../config/base-path.js";
 import {
   registerWidgetFromTemplate,
@@ -95,12 +95,10 @@ export async function mountWidgetsDev(
   // Public-asset prefix for the favicon <link> baked into dev widget HTML.
   const publicBase = publicAssetBase(serverConfig.basePath);
   // Resolution order for the widgets directory:
-  //   1. Caller-supplied `options.resourcesDir`
-  //   2. `MCP_USE_WIDGETS_DIR` env var (set by @mcp-use/cli when --mcp-dir
-  //      or mcpUseConfig.mcpDir points at e.g. `src/mcp`)
-  //   3. Default `"resources"` at the project root
-  const resourcesDir =
-    options?.resourcesDir || process.env.MCP_USE_WIDGETS_DIR || "resources";
+  //   1. Caller-supplied `options.resourcesDir` (the constructor `viewsDir`,
+  //      threaded through the server's `mountWidgets` call)
+  //   2. Default `"resources"` at the project root
+  const resourcesDir = options?.resourcesDir || "resources";
   const srcDir = pathHelpers.join(getCwd(), resourcesDir);
 
   // Ensure resources directory exists - create it if missing.
@@ -167,7 +165,7 @@ export async function mountWidgetsDev(
   // itself: the stale-widget cleanup below removes every directory that isn't a
   // current widget, which would otherwise destroy the sibling workspace dirs
   // (build/, generated/, state/, cloud/).
-  const { paths } = await resolveWorkspace();
+  const paths = resolveWorkspacePaths(getCwd());
   const tempDir = paths.cache;
 
   // Clean up stale widget directories in .mcp-use/cache
@@ -1398,8 +1396,20 @@ export default PostHog;
   // Serve static files from public directory in dev mode
   // Only set up if not already configured (e.g., in constructor)
   if (!serverConfig.publicRoutesMode) {
-    setupPublicRoutes(app, false, undefined, serverConfig.basePath);
-    setupFaviconRoute(app, serverConfig.favicon, false);
+    setupPublicRoutes(
+      app,
+      false,
+      undefined,
+      serverConfig.basePath,
+      serverConfig.publicDir
+    );
+    setupFaviconRoute(
+      app,
+      serverConfig.favicon,
+      false,
+      undefined,
+      serverConfig.publicDir
+    );
   }
 
   // Add a catch-all 404 handler for widget routes to prevent falling through to other middleware

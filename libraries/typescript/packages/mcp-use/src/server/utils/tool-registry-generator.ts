@@ -63,7 +63,7 @@ export async function generateToolRegistryTypes(
       `export {};\n`;
 
     // Generated types live under `.mcp-use/generated/` (fixed; independent of
-    // the configurable build `outDir`).
+    // the fixed `.mcp-use/build` output).
     const { generated: generatedDir, toolRegistry: outputPath } =
       resolveWorkspacePaths(projectRoot);
 

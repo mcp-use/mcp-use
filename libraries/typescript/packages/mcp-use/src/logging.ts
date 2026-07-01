@@ -1,3 +1,5 @@
+import { resolveLogLevel } from "./log-level.js";
+
 export type LogLevel =
   | "silent"
   | "error"
@@ -16,24 +18,12 @@ interface LoggerOptions {
 const DEFAULT_LOGGER_NAME = "mcp-use";
 
 /**
- * Map an environment-provided debug value to a LogLevel.
- *
- * @param env - The raw environment string to interpret (typically the DEBUG value)
- * @returns `"debug"` if `env` trimmed equals `"2"`, `"info"` if it equals `"1"`, otherwise `"info"`
+ * Resolve the Logger's default level from the single `MCP_USE_LOG_LEVEL` env
+ * variable. `debug`/`trace` both map to the `"debug"` Logger level; everything
+ * else (including unset) maps to `"info"`.
  */
-function resolveLevel(env: string | undefined): LogLevel {
-  // Safely access environment variables
-  const envValue =
-    typeof process !== "undefined" && process.env ? env : undefined;
-
-  switch (envValue?.trim()) {
-    case "2":
-      return "debug";
-    case "1":
-      return "info";
-    default:
-      return "info";
-  }
+function resolveDefaultLevel(): LogLevel {
+  return resolveLogLevel() === "info" ? "info" : "debug";
 }
 
 /**
@@ -181,11 +171,9 @@ export class Logger {
 
   public static get(name: string = DEFAULT_LOGGER_NAME): SimpleConsoleLogger {
     if (!this.instances[name]) {
-      const debugEnv =
-        (typeof process !== "undefined" && process.env?.DEBUG) || undefined;
       this.instances[name] = new SimpleConsoleLogger(
         name,
-        resolveLevel(debugEnv),
+        resolveDefaultLevel(),
         this.currentFormat
       );
     }
@@ -194,9 +182,7 @@ export class Logger {
 
   public static configure(options: LoggerOptions = {}): void {
     const { level, format = "minimal" } = options;
-    const debugEnv =
-      (typeof process !== "undefined" && process.env?.DEBUG) || undefined;
-    const resolvedLevel = level ?? resolveLevel(debugEnv);
+    const resolvedLevel = level ?? resolveDefaultLevel();
 
     this.currentFormat = format;
 
@@ -208,24 +194,15 @@ export class Logger {
   }
 
   public static setDebug(enabled: boolean | 0 | 1 | 2): void {
-    let level: LogLevel;
-    if (enabled === 2 || enabled === true) level = "debug";
-    else if (enabled === 1) level = "info";
-    else level = "info";
+    const level: LogLevel =
+      enabled === 2 || enabled === true ? "debug" : "info";
 
-    // Update all loggers
+    // Update all loggers in-process. This intentionally does NOT mutate
+    // `process.env` — a library must not write global environment state
+    // (that footgun leaked verbosity into unrelated child processes).
     Object.values(this.instances).forEach((logger) => {
       logger.level = level;
     });
-
-    // Safely set environment variable
-    if (typeof process !== "undefined" && process.env) {
-      process.env.DEBUG = enabled
-        ? enabled === true
-          ? "2"
-          : String(enabled)
-        : "0";
-    }
   }
 
   public static setFormat(format: "minimal" | "detailed" | "emoji"): void {

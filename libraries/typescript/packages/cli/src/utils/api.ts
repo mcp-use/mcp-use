@@ -791,7 +791,8 @@ export class McpUseAPI {
   }
 
   async getGitHubAppName(): Promise<string> {
-    if (process.env.MCP_GITHUB_APP_NAME) return process.env.MCP_GITHUB_APP_NAME;
+    if (process.env.MCP_USE_GITHUB_APP_NAME)
+      return process.env.MCP_USE_GITHUB_APP_NAME;
     if (this.baseUrl.includes("localhost")) return "mcp-use-local";
     if (this.baseUrl.includes(".dev.")) return "mcp-use-dev";
     return "mcp-use";

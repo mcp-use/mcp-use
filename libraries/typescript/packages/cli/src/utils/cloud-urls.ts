@@ -2,6 +2,21 @@ import type { Deployment } from "./api.js";
 
 const GATEWAY_DOMAIN = "run.mcp-use.com";
 
+/** Default base URL for the tunnel-release API. */
+const DEFAULT_TUNNEL_API = "https://local.mcp-use.run";
+
+/**
+ * Base URL of the tunnel API (subdomain reservation/release for `dev --tunnel`
+ * and `start --tunnel`). Overridable via the `MCP_USE_TUNNEL_API` env var.
+ *
+ * P4 folded the former duplicate `MCP_USE_API` variable into this one — they
+ * shared the same default and endpoints — so there is now a single name and a
+ * single resolver.
+ */
+export function tunnelApiBase(): string {
+  return process.env.MCP_USE_TUNNEL_API || DEFAULT_TUNNEL_API;
+}
+
 function buildGatewayUrl(slugOrId: string): string {
   return `https://${slugOrId}.${GATEWAY_DOMAIN}/mcp`;
 }

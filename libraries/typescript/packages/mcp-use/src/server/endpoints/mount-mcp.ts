@@ -23,6 +23,7 @@ import {
 import { runWithContext } from "../context-storage.js";
 import { getDebugLevel } from "../logging.js";
 import { generateUUID } from "../utils/runtime.js";
+import { requestOrigin } from "../utils/resolve-url.js";
 import { publicAssetBase } from "../config/base-path.js";
 
 // ---------------------------------------------------------------------------
@@ -212,22 +213,13 @@ export async function mountMcp(
     );
   }
 
-  // Helper function to construct the full URL considering proxy headers
+  // Helper to construct the full URL for this request, honoring proxy headers.
+  // The origin is inferred via the shared `requestOrigin` resolver
+  // (X-Forwarded-Host/-Proto → Host → request URL); the request path is
+  // appended verbatim.
   const getFullUrl = (c: Context): string => {
-    // Check for proxy headers (common in production deployments)
-    const proto =
-      c.req.header("X-Forwarded-Proto") ||
-      c.req.header("X-Forwarded-Protocol") ||
-      new URL(c.req.url).protocol.replace(":", "");
-
-    const host =
-      c.req.header("X-Forwarded-Host") ||
-      c.req.header("Host") ||
-      new URL(c.req.url).host;
-
-    const path = c.req.path;
-
-    return `${proto}://${host}${path}`;
+    const origin = requestOrigin((name) => c.req.header(name), c.req.url);
+    return `${origin}${c.req.path}`;
   };
 
   // Universal request handler - using Web Standard APIs (no Express adapters needed!)

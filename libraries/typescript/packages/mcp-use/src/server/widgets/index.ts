@@ -7,8 +7,8 @@
 
 import type { MCPServer } from "../mcp-server.js";
 import type { RegisterWidgetCallback } from "./widget-types.js";
-import { isDeno } from "../utils/runtime.js";
-import { resolveWorkspace } from "../config/paths.js";
+import { getCwd, isDeno } from "../utils/runtime.js";
+import { resolveWorkspacePaths } from "../config/paths.js";
 import { normalizeBasePath } from "../config/base-path.js";
 import { isProductionMode, getCSPUrls } from "../utils/index.js";
 import { mountWidgetsDev } from "./mount-widgets-dev.js";
@@ -42,9 +42,9 @@ export async function mountWidgets(
   }
 ): Promise<void> {
   // Resolve the project's `.mcp-use/` workspace once at mount time. The build
-  // output dir (`paths.build`, configurable via `outDir`) is threaded into
+  // output dir (`paths.build`, fixed at `.mcp-use/build`) is threaded into
   // every production serve path, replacing the legacy hardcoded `dist/`.
-  const { paths } = await resolveWorkspace();
+  const paths = resolveWorkspacePaths(getCwd());
 
   const serverConfig = {
     serverBaseUrl:
@@ -52,6 +52,9 @@ export async function mountWidgets(
       `http://${(server as any).serverHost}:${(server as any).serverPort || 3000}`,
     serverPort: (server as any).serverPort || 3000,
     buildDir: paths.build,
+    // Project-relative public assets dir (constructor `publicDir`), served in
+    // dev; production serves the build-time copy under `<buildDir>/public`.
+    publicDir: (server as any).serverPublicDir,
     cspUrls: getCSPUrls(),
     // Server-wide path prefix resolved at boot (mcp-server.ts resolveBasePath).
     // Threaded the same way buildDir is, so the production/dev serve paths and

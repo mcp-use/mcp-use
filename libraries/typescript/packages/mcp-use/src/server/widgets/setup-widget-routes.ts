@@ -34,7 +34,7 @@ export function setupWidgetRoutes(
   serverConfig: ServerConfig
 ): void {
   // All built widgets live under `<buildDir>/resources/widgets/` (buildDir is
-  // the configurable `outDir`, default `.mcp-use/build`).
+  // the fixed `.mcp-use/build` output).
   const widgetsDir = pathHelpers.join(
     serverConfig.buildDir,
     "resources",

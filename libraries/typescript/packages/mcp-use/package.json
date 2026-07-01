@@ -71,7 +71,6 @@
   },
   "scripts": {
     "generate:version": "node scripts/generate-version.mjs",
-    "generate:config-schema": "tsx scripts/generate-config-schema.mjs",
     "build": "npm run generate:version && rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",

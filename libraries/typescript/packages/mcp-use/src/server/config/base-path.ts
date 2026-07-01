@@ -5,9 +5,9 @@
  * endpoints, inspector) relocates under a single, server-wide `basePath`
  * (default `/mcp`). Only `/.well-known/*` and `/favicon.ico` stay at root.
  *
- * `basePath` is resolved ONCE at boot (constructor field → `mcp-use.config.json`
- * `config.basePath` → default `/mcp`) and threaded through the mount layer.
- * This module is PURE (no I/O): it just normalizes the string and derives the
+ * `basePath` is resolved ONCE at boot (the `MCPServer` constructor's
+ * `basePath` → default `/mcp`) and threaded through the mount layer. This
+ * module is PURE (no I/O): it just normalizes the string and derives the
  * asset route prefixes so the `/mcp-use` literal lives in exactly one place.
  */
 

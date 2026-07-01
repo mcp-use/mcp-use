@@ -24,11 +24,17 @@ export interface ServerConfig {
    */
   basePath: string;
   /**
-   * Absolute path to the build output directory (the configurable `outDir`,
-   * default `.mcp-use/build`). Production widget/asset serving resolves all
-   * built files under here, replacing the legacy hardcoded `dist/`.
+   * Absolute path to the build output directory (`.mcp-use/build`). Production
+   * widget/asset serving resolves all built files under here, replacing the
+   * legacy hardcoded `dist/`.
    */
   buildDir: string;
+  /**
+   * Project-relative static public assets directory served in dev mode
+   * (`MCPServer` constructor `publicDir`, default `public`). Production serves
+   * the build-time copy at `<buildDir>/public` instead.
+   */
+  publicDir?: string;
   /** Additional CSP URLs for widget security */
   cspUrls: string[];
   /** Build ID from manifest for cache busting (optional) */
