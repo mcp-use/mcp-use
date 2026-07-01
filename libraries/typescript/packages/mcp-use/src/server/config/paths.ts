@@ -40,7 +40,7 @@ export const BUILD_MANIFEST_NAME = "manifest.json";
 
 /** Every resolved path for a project's `.mcp-use/` workspace. */
 export interface WorkspacePaths {
-  /** The project root (directory containing `mcp-use.json`, or the cwd). */
+  /** The project root (directory containing `mcp-use.config.json`, or the cwd). */
   projectRoot: string;
   /** The `.mcp-use/` workspace directory. */
   workspace: string;
@@ -121,7 +121,7 @@ export function resolveWorkspacePaths(
 export interface ResolvedWorkspace {
   /** The validated, fully-defaulted config. */
   config: ResolvedConfig;
-  /** Absolute path to the loaded `mcp-use.json`, or `null` for defaults-only. */
+  /** Absolute path to the loaded `mcp-use.config.json`, or `null` for defaults-only. */
   configPath: string | null;
   /** The project root. */
   projectRoot: string;
@@ -130,7 +130,7 @@ export interface ResolvedWorkspace {
 }
 
 /**
- * Load the nearest `mcp-use.json` (or defaults) and derive the workspace paths
+ * Load the nearest `mcp-use.config.json` (or defaults) and derive the workspace paths
  * in one call. This is the common entry point for the CLI and for the server at
  * boot: a single read of config + the full path layout.
  *

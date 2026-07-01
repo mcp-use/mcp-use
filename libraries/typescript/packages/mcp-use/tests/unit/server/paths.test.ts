@@ -97,9 +97,9 @@ describe("resolveWorkspace", () => {
     );
   });
 
-  it("derives the build dir from a custom outDir in mcp-use.json", async () => {
+  it("derives the build dir from a custom outDir in mcp-use.config.json", async () => {
     writeFileSync(
-      join(root, "mcp-use.json"),
+      join(root, "mcp-use.config.json"),
       JSON.stringify({ outDir: "dist" })
     );
 
@@ -112,8 +112,11 @@ describe("resolveWorkspace", () => {
     expect(ws.paths.state).toBe(join(root, ".mcp-use", "state"));
   });
 
-  it("roots the workspace at the directory containing mcp-use.json", async () => {
-    writeFileSync(join(root, "mcp-use.json"), JSON.stringify({ name: "x" }));
+  it("roots the workspace at the directory containing mcp-use.config.json", async () => {
+    writeFileSync(
+      join(root, "mcp-use.config.json"),
+      JSON.stringify({ name: "x" })
+    );
     const deep = join(root, "packages", "app", "src");
     mkdirSync(deep, { recursive: true });
 

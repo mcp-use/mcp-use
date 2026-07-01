@@ -1,5 +1,5 @@
 /**
- * Tests for the mcp-use.json project config: Zod schema defaults/validation and
+ * Tests for the mcp-use.config.json project config: Zod schema defaults/validation and
  * the zero-execution loader (walk-up resolution, missing-file defaults, error
  * paths). These exercise real files on disk in temp directories — no mocks.
  */
@@ -27,7 +27,7 @@ afterEach(() => {
 
 function writeConfig(dir: string, contents: unknown | string): string {
   mkdirSync(dir, { recursive: true });
-  const filePath = join(dir, "mcp-use.json");
+  const filePath = join(dir, "mcp-use.config.json");
   const raw =
     typeof contents === "string" ? contents : JSON.stringify(contents, null, 2);
   writeFileSync(filePath, raw);
@@ -229,7 +229,7 @@ describe("loadConfig", () => {
 
   it("loads without an explicit cwd (defaults to process cwd)", async () => {
     // Just verify it resolves and never throws when run from the repo, which
-    // has no mcp-use.json above it inside the worktree boundary we control.
+    // has no mcp-use.config.json above it inside the worktree boundary we control.
     const result = await loadConfig();
     expect(result.config.version).toBe(1);
     expect(typeof result.projectRoot).toBe("string");

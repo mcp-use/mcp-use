@@ -1,13 +1,13 @@
 /**
- * Loader for the `mcp-use.json` project config.
+ * Loader for the `mcp-use.config.json` project config.
  *
  * Resolution walks UP from a starting directory to the filesystem root,
- * returning the nearest `mcp-use.json`. The file is read and parsed with
+ * returning the nearest `mcp-use.config.json`. The file is read and parsed with
  * `JSON.parse` ONLY — there is no code execution (no import/eval/tsx), so a
  * config file can never run arbitrary code at load time.
  *
  * The SDK must work without a config file (gradual adoption): when no
- * `mcp-use.json` is found, a fully-defaulted config is returned with
+ * `mcp-use.config.json` is found, a fully-defaulted config is returned with
  * `configPath: null` and `projectRoot` set to the starting directory.
  *
  * File reads are async + dynamically imported from `node:` modules to match
@@ -27,12 +27,12 @@ export interface LoadConfigResult {
   /** The validated, fully-defaulted config. */
   config: ResolvedConfig;
   /**
-   * Absolute path to the `mcp-use.json` that was loaded, or `null` when no
+   * Absolute path to the `mcp-use.config.json` that was loaded, or `null` when no
    * config file was found (defaults-only result).
    */
   configPath: string | null;
   /**
-   * The project root: the directory containing the resolved `mcp-use.json`,
+   * The project root: the directory containing the resolved `mcp-use.config.json`,
    * or the starting `cwd` when no config file was found.
    */
   projectRoot: string;
@@ -45,7 +45,7 @@ export interface LoadConfigOptions {
 }
 
 /**
- * Error thrown when a discovered `mcp-use.json` is malformed or fails schema
+ * Error thrown when a discovered `mcp-use.config.json` is malformed or fails schema
  * validation. Always names the offending file path.
  */
 export class ConfigError extends Error {
@@ -61,7 +61,7 @@ export class ConfigError extends Error {
 
 /**
  * Walk up from `startDir` to the filesystem root, returning the first
- * directory that contains a `mcp-use.json`, or `null` if none is found.
+ * directory that contains a `mcp-use.config.json`, or `null` if none is found.
  */
 async function findConfigDir(startDir: string): Promise<string | null> {
   const { existsSync } = await import("node:fs");
@@ -96,7 +96,7 @@ function formatZodError(error: z.ZodError): string {
 }
 
 /**
- * Load and validate the nearest `mcp-use.json`, applying schema defaults.
+ * Load and validate the nearest `mcp-use.config.json`, applying schema defaults.
  *
  * @throws {ConfigError} if a config file is found but contains invalid JSON or
  *   fails schema validation (e.g. wrong field type, unknown top-level key).

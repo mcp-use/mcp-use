@@ -1,5 +1,5 @@
 /**
- * Zod schema and TypeScript types for the `mcp-use.json` project config.
+ * Zod schema and TypeScript types for the `mcp-use.config.json` project config.
  *
  * This is the single source of truth for the on-disk config shape and its
  * defaults. The committed JSON Schema (`schema/mcp-use.v1.json`) is generated
@@ -22,7 +22,7 @@ import { z } from "zod";
 export const CONFIG_SCHEMA_URL = "https://schema.mcp-use.dev/mcp-use.v1.json";
 
 /** The config file name the loader walks up the directory tree to find. */
-export const CONFIG_FILE_NAME = "mcp-use.json";
+export const CONFIG_FILE_NAME = "mcp-use.config.json";
 
 /**
  * Default build output directory, project-relative. Lives inside the
@@ -106,7 +106,7 @@ export const configSchema = z.strictObject({
 
 /**
  * The on-disk config shape: everything optional except as the user chooses to
- * specify. This is what authors of `mcp-use.json` write.
+ * specify. This is what authors of `mcp-use.config.json` write.
  */
 export type McpUseConfig = z.input<typeof configSchema>;
 
