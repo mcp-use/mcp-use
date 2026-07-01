@@ -41,7 +41,11 @@ export async function callOpenAPIOperation(
     contentType.includes("application/json") ||
     contentType.includes("+json")
   ) {
-    return objectResponse(await response.json());
+    const responseBody = await response.text();
+    if (!responseBody.trim()) {
+      return objectResponse({});
+    }
+    return objectResponse(JSON.parse(responseBody));
   }
 
   return text(await response.text());
