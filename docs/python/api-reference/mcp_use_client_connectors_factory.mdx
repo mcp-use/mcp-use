@@ -1,0 +1,56 @@
+---
+title: "Factory"
+description: "Connector auto-infer factory API Documentation"
+icon: "code"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/factory.py"
+---
+
+import {RandomGradientBackground} from "/snippets/gradient.jsx"
+
+<Callout type="info" title="Source Code">
+View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/factory.py' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/python/mcp_use/client/connectors/factory.py</a>
+</Callout>
+
+Connector auto-infer factory.
+
+Provides a convenience factory that creates the appropriate connector type
+based on the provided arguments, enabling ergonomic usage:
+
+    from mcp_use import Connector
+
+    http = Connector(url="https://api.example.com/mcp")
+    stdio = Connector(command="npx", args=["@playwright/mcp"])
+
+
+## Connector
+<Card type="info">
+### `function` Connector
+
+Create the appropriate connector based on the provided arguments.
+
+This factory auto-infers the connector type:
+- If ``url`` is provided, returns an :class:`HttpConnector`.
+- If ``command`` is provided, returns a :class:`StdioConnector`.
+
+
+```python
+from mcp_use.client.connectors.factory import Connector
+```
+
+**Parameters**
+><ParamField body="url" type="str | None" default="None" >   The URL for an HTTP-based MCP server. </ParamField>
+><ParamField body="command" type="str | None" default="None" >   The command for a stdio-based MCP server. </ParamField>
+><ParamField body="kwargs" type="Any" required="True" >   Parameter value </ParamField>
+
+**Returns**
+><ResponseField name="returns" type="BaseConnector" >An instance of the inferred connector type.</ResponseField>
+
+**Raises**
+><Danger></Danger>
+
+**Signature**
+```python wrap
+def Connector(url: str | None = None, command: str | None = None, kwargs: Any):
+```
+
+</Card>

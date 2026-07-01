@@ -1,21 +1,19 @@
-# mcp_use/auth/__init__.py
-import warnings
+"""Authentication support for MCP clients.
 
-from typing_extensions import deprecated
+Re-exports from ``mcp_use.client.auth`` for ergonomic top-level access::
 
-from mcp_use.client.auth import BearerAuth as _BearerAuth
-from mcp_use.client.auth import OAuth as _OAuth
+    from mcp_use.auth import BearerAuth, OAuthAuth
+"""
 
-warnings.warn(
-    "mcp_use.auth is deprecated. Use mcp_use.client.auth. This import will be removed in version 2.0.0",
-    DeprecationWarning,
-    stacklevel=2,
-)
+from mcp_use.client.auth.bearer import BearerAuth
+from mcp_use.client.auth.oauth import OAuth
 
+# Forward-compatible alias so users can write ``from mcp_use.auth import OAuthAuth``
+# even before a dedicated OAuthAuth wrapper class lands (see issue #944).
+OAuthAuth = OAuth
 
-@deprecated("Use mcp_use.client.auth.BearerAuth")
-class BearerAuth(_BearerAuth): ...
-
-
-@deprecated("Use mcp_use.client.auth.OAuth")
-class OAuth(_OAuth): ...
+__all__ = [
+    "BearerAuth",
+    "OAuth",
+    "OAuthAuth",
+]
