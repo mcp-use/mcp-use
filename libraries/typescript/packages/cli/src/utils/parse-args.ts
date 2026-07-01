@@ -17,6 +17,8 @@ type JsonSchemaLike = {
   type?: string | string[];
   properties?: Record<string, JsonSchemaLike>;
   required?: string[];
+  anyOf?: JsonSchemaLike[];
+  oneOf?: JsonSchemaLike[];
 };
 
 export function parseToolArgs(
@@ -98,11 +100,7 @@ function coerceArgValue(
     }
   }
 
-  const types = Array.isArray(propSchema?.type)
-    ? propSchema!.type
-    : propSchema?.type
-      ? [propSchema.type as string]
-      : [];
+  const types = collectSchemaTypes(propSchema);
 
   if (types.includes("null") && (value === "null" || value === "")) {
     return null;
@@ -144,6 +142,45 @@ function coerceArgValue(
   }
 
   return value;
+}
+
+function collectSchemaTypes(schema: JsonSchemaLike | undefined): string[] {
+  if (!schema) return [];
+
+  const directTypes = normalizeSchemaTypes(schema.type);
+  if (directTypes.length > 0) return directTypes;
+
+  return (
+    nullableUnionTypes(schema.anyOf) ?? nullableUnionTypes(schema.oneOf) ?? []
+  );
+}
+
+function normalizeSchemaTypes(type: string | string[] | undefined): string[] {
+  if (Array.isArray(type)) return [...new Set(type)];
+  return type ? [type] : [];
+}
+
+function nullableUnionTypes(
+  variants: JsonSchemaLike[] | undefined
+): string[] | undefined {
+  if (!variants) return undefined;
+
+  const variantTypes = variants.map((variant) =>
+    normalizeSchemaTypes(variant.type)
+  );
+  const types = [...new Set(variantTypes.flat())];
+  if (!types.includes("null")) return undefined;
+
+  if (variantTypes.some((type) => type.length === 0)) {
+    return ["null"];
+  }
+
+  const nonNullTypes = types.filter((type) => type !== "null");
+  if (nonNullTypes.length === 1) {
+    return [nonNullTypes[0], "null"];
+  }
+
+  return ["null"];
 }
 
 /**
