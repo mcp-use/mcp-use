@@ -162,6 +162,7 @@
                   "typescript/mcp-apps/model-context",
                   "typescript/mcp-apps/interactivity",
                   "typescript/mcp-apps/apps-sdk-compatibility",
+                  "typescript/mcp-apps/migrating-from-apps-sdk",
                   "typescript/mcp-apps/content-security-policy"
                 ]
               },
@@ -752,6 +753,10 @@
     {
       "source": "/typescript/server/apps-sdk-compatibility",
       "destination": "/typescript/mcp-apps/apps-sdk-compatibility"
+    },
+    {
+      "source": "/typescript/server/migrating-from-apps-sdk",
+      "destination": "/typescript/mcp-apps/migrating-from-apps-sdk"
     },
     {
       "source": "/typescript/server/content-security-policy",
