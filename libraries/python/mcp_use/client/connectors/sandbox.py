@@ -331,9 +331,13 @@ class SandboxConnector(BaseConnector):
             logger.debug("Not connected to MCP implementation")
             return
 
+        # Mark as disconnected before awaiting cleanup so any re-entrant call
+        # (e.g. AsyncExitStack teardown firing while _cleanup_resources is
+        # suspended) sees _connected == False and returns early.
+        self._connected = False
+
         logger.debug("Disconnecting from MCP implementation")
         await self._cleanup_resources()
-        self._connected = False
         logger.debug("Disconnected from MCP implementation")
 
     @property
