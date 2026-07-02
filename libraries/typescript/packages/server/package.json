@@ -1,0 +1,59 @@
+{
+  "name": "@mcp-use/server",
+  "type": "module",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "description": "MCP server framework built on the official v2 SDK (2026-07-28 stateless protocol) and Hono. Greenfield rebuild of the mcp-use server package; renamed to `mcp-use` at v2 cutover.",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/server"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "server",
+    "hono",
+    "typescript"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "npm run typecheck && vitest run",
+    "typecheck": "tsc -p tsconfig.test.json"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.0.6",
+    "@modelcontextprotocol/hono": "2.0.0-beta.1",
+    "@modelcontextprotocol/server": "2.0.0-beta.1",
+    "hono": "^4.12.27"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0-beta.1",
+    "@types/node": "^24.13.2",
+    "typescript": "7.0.1-rc",
+    "vitest": "^4.1.9",
+    "zod": "^4.4.3"
+  }
+}

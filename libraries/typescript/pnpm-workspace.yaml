@@ -2,6 +2,7 @@ packages:
   - packages/*
   # examples
   - packages/mcp-use/examples/**/*
+  - packages/server/examples/*
   - packages/create-mcp-use-app/src/templates/**/*
   # tests
   - test_app
@@ -17,3 +18,7 @@ minimumReleaseAgeExclude:
   - mcp-use
   - "@mcp-use/*"
   - create-mcp-use-app
+  # v2 SDK betas are tracked closely during the v2 migration and are pinned to
+  # exact versions in package.json, so bumps are always an explicit, reviewed
+  # change rather than an automatic resolution.
+  - "@modelcontextprotocol/*"

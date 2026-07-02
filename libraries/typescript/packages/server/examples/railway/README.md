@@ -1,0 +1,82 @@
+# Railway example
+
+`@mcp-use/server` deployed as a long-lived Node process, the way Railway (or
+any container/VM host without a serverless invocation model) runs an app.
+
+## What this demonstrates
+
+- **`await server.listen(port)`** — a persistent `node:http` listener via
+  `@hono/node-server`, as opposed to the per-invocation `getHandler()` handler
+  used on serverless platforms (see the `vercel` example).
+- **A long-lived process is still stateless MCP.** `MCPServer` builds a fresh
+  SDK server from its tool/resource/prompt registry on *every* request (see
+  `../../SPEC.md`) — the Node process living across requests is a deployment
+  convenience, not a place MCP session state accumulates. Any replica behind a
+  load balancer can serve any request; there is no session affinity to worry
+  about. `railway.json` here sets `numReplicas: 2` specifically to make that
+  point concrete — scaling out requires no sticky sessions, no shared store.
+  The one thing that *does* persist across requests is ordinary Node
+  module-scope state (a counter, a connection pool) local to a single
+  replica's process — `server-status` reads one to make the distinction
+  visible: process uptime and a request counter that survive across calls,
+  while the protocol handshake underneath carries none of it.
+- **Binding for public traffic.** `listen()` binds `127.0.0.1` by default,
+  with Host-header validation (DNS-rebinding protection) restricted to
+  localhost — requests carrying any other `Host` get `403`. Serving publicly
+  is an explicit opt-in: pass `host: "0.0.0.0"` together with `allowedHosts`
+  naming the exact public hostname(s) that should be accepted. See
+  `src/index.ts` for how this example derives that config from Railway's
+  environment.
+
+## The tools
+
+- `roll-dice({ sides?, count? })` — rolls dice, returns `structuredContent`
+  checked against an `outputSchema` (`{ rolls, total }`).
+- `server-status()` — no input; returns the process's uptime, PID, and a
+  request counter, illustrating the process-vs-protocol statelessness split
+  above.
+- Resource `config://about` — static JSON metadata about the server.
+
+## Run locally
+
+```sh
+pnpm start
+```
+
+This runs `node src/index.ts` directly — Node 24 executes erasable-syntax
+TypeScript natively, no build step. It binds `127.0.0.1:3000` (no
+`RAILWAY_PUBLIC_DOMAIN` is set locally) and logs the MCP endpoint URL.
+
+Talk to it with any MCP client pointed at `http://localhost:3000/mcp`, or by
+hand with curl (responses are SSE-framed; the JSON-RPC payload is on the
+`data: ` line):
+
+```sh
+curl http://localhost:3000/mcp \
+  -H "content-type: application/json" \
+  -H "accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+## Deploy on Railway
+
+1. Point a Railway service at this directory (or the monorepo, with this as
+   the service's root). Railway's Nixpacks/Railpack builder detects the
+   `start` script in `package.json` (`node src/index.ts`) with zero
+   configuration — `railway.json` here only makes the replica count and
+   restart policy explicit, it isn't required to build or run.
+2. Railway injects `PORT` (the port your process must bind and listen on) and
+   `RAILWAY_PUBLIC_DOMAIN` (the service's public hostname, e.g.
+   `your-app.up.railway.app` — bare hostname, no scheme or port). `src/index.ts`
+   reads both: when `RAILWAY_PUBLIC_DOMAIN` is present it binds `0.0.0.0` and
+   sets `allowedHosts` to that exact domain so DNS-rebinding protection stays
+   on for any other `Host` header; otherwise it falls back to the local
+   `127.0.0.1` dev config.
+3. Deploy. Point your MCP client at
+   `https://<your-service>.up.railway.app/mcp`.
+
+## Typecheck
+
+```sh
+pnpm typecheck
+```

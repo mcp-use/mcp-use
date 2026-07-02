@@ -2,6 +2,8 @@ import eslint from "@eslint/js";
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
 import importPlugin from "eslint-plugin-import";
+import tsdocPlugin from "eslint-plugin-tsdoc";
+import jsdocPlugin from "eslint-plugin-jsdoc";
 import prettierConfig from "eslint-config-prettier";
 
 export default [
@@ -283,6 +285,65 @@ export default [
   {
     files: ["packages/mcp-use/src/**/*.ts", "packages/mcp-use/index.ts"],
     rules: {
+      "import/no-extraneous-dependencies": [
+        "error",
+        { devDependencies: false },
+      ],
+    },
+  },
+  // @mcp-use/server (v2 greenfield) — strictest type safety, no escape hatches.
+  // `any` is banned outright; `unknown` is allowed only at real boundaries and
+  // must be narrowed before use (the no-unsafe-* rules enforce this).
+  // Doc comments must be valid TSDoc (see packages/server/CLAUDE.md).
+  {
+    files: ["packages/server/src/**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "module",
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    plugins: {
+      tsdoc: tsdocPlugin,
+      jsdoc: jsdocPlugin,
+    },
+    settings: {
+      jsdoc: {
+        mode: "typescript",
+      },
+    },
+    rules: {
+      "tsdoc/syntax": "error",
+      // Coverage only — tag style/content is tsdoc/syntax + review territory.
+      "jsdoc/require-jsdoc": [
+        "error",
+        {
+          publicOnly: true,
+          enableFixer: false,
+          require: {
+            ClassDeclaration: true,
+            FunctionDeclaration: true,
+            MethodDefinition: true,
+          },
+          contexts: [
+            "TSInterfaceDeclaration",
+            "TSTypeAliasDeclaration",
+            "TSEnumDeclaration",
+          ],
+          exemptEmptyConstructors: true,
+        },
+      ],
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-misused-promises": "error",
       "import/no-extraneous-dependencies": [
         "error",
         { devDependencies: false },
