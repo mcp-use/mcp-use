@@ -2,7 +2,7 @@
  * `@mcp-use/server` — MCP server framework on the official v2 SDK and Hono.
  *
  * Greenfield rebuild of the mcp-use server package against the stateless
- * 2026-07-28 MCP protocol. See SPEC.md for the phase plan and API contract.
+ * 2026-07-28 MCP protocol. See specs/SPEC.md for the phase plan and API contract.
  */
 
 export { MCPServer } from "./server.js";

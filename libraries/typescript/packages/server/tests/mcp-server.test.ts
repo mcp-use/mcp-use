@@ -7,11 +7,11 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MCPServer, completable } from "../src/index.js";
-import type { StandardSchemaWithJSON } from "../src/index.js";
+import type { ServerConfig, StandardSchemaWithJSON } from "../src/index.js";
 
 /**
  * Hand-rolled Standard Schema (validate + JSON Schema converter, no zod):
@@ -514,9 +514,6 @@ describe("MCPServer getHandler (no network)", () => {
       new Request("http://localhost/api/mcp", {
         method: "POST",
         headers: {
-          // Synthetic Requests carry no Host header (real HTTP always sends
-          // one) — set it explicitly so Host validation can pass.
-          host: "localhost",
           "content-type": "application/json",
           accept: "application/json, text/event-stream",
           "mcp-protocol-version": "2026-07-28",
@@ -551,6 +548,146 @@ describe("MCPServer getHandler (no network)", () => {
     expect(body).toMatchObject({
       result: { content: [{ type: "text", text: "pong" }] },
     });
+    await server.close();
+  });
+});
+
+/*
+ * Host/Origin validation policy: listen() on a localhost bind validates by
+ * default (DNS-rebinding protection), getHandler() applies no validation
+ * unless configured (a fetch handler never binds — a platform edge in front
+ * only routes hostnames assigned to the deployment), and configured lists
+ * are additive to the localhost allowlists.
+ */
+describe("MCPServer validation policy", () => {
+  function minimalServer(config: Partial<ServerConfig> = {}): MCPServer {
+    const server = new MCPServer({
+      name: "policy-test",
+      version: "1.0.0",
+      ...config,
+    });
+    server.tool({ name: "ping" }, async () => ({
+      content: [{ type: "text", text: "pong" }],
+    }));
+    return server;
+  }
+
+  /** Synthetic tools/list Request for driving a getHandler() directly. */
+  function toolsListRequest(headers: Record<string, string> = {}): Request {
+    return new Request("http://placeholder.test/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "tools/list",
+        ...headers,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {
+              name: "raw-request",
+              version: "0.0.0",
+            },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      }),
+    });
+  }
+
+  it("getHandler serves foreign Hosts when nothing is configured", async () => {
+    const server = minimalServer();
+    const response = await server
+      .getHandler()(toolsListRequest({ host: "my-app.vercel.app" }));
+    expect(response.status).toBe(200);
+    await server.close();
+  });
+
+  it("getHandler with allowedHosts validates additively", async () => {
+    const server = minimalServer({ allowedHosts: ["api.example.com"] });
+    const handler = server.getHandler();
+    const status = async (host: string) =>
+      (await handler(toolsListRequest({ host }))).status;
+    expect(await status("api.example.com")).toBe(200);
+    expect(await status("evil.example.com")).toBe(403);
+    // Additive: the localhost allowlist survives, so local runs keep working.
+    expect(await status("localhost")).toBe(200);
+    await server.close();
+  });
+
+  it("mirrors allowedHosts into Origin validation when allowedOrigins is unset", async () => {
+    const server = minimalServer({ allowedHosts: ["api.example.com"] });
+    const handler = server.getHandler();
+    const status = async (origin: string) =>
+      (
+        await handler(
+          toolsListRequest({ host: "api.example.com", origin })
+        )
+      ).status;
+    expect(await status("https://api.example.com")).toBe(200);
+    expect(await status("https://evil.example.com")).toBe(403);
+    expect(await status("http://localhost:5173")).toBe(200);
+    await server.close();
+  });
+
+  it("getHandler with only allowedOrigins validates Origin but not Host", async () => {
+    const server = minimalServer({ allowedOrigins: ["app.example.com"] });
+    const handler = server.getHandler();
+    const ok = await handler(
+      toolsListRequest({
+        host: "anything.example.com",
+        origin: "https://app.example.com",
+      })
+    );
+    expect(ok.status).toBe(200);
+    const rejected = await handler(
+      toolsListRequest({
+        host: "anything.example.com",
+        origin: "https://evil.example.com",
+      })
+    );
+    expect(rejected.status).toBe(403);
+    await server.close();
+  });
+
+  it("listen with allowedHosts keeps accepting localhost (additive)", async () => {
+    const server = minimalServer({ allowedHosts: ["api.example.com"] });
+    const { url } = await server.listen(0);
+    try {
+      // node:http fills in Host as localhost:<port> when not overridden.
+      expect(await rawStatus(url, {})).not.toBe(403);
+      expect(await rawStatus(url, { host: "api.example.com" })).not.toBe(403);
+      expect(await rawStatus(url, { host: "evil.example.com" })).toBe(403);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("listen on 0.0.0.0 without allowedHosts serves unvalidated, with a warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const server = minimalServer({ host: "0.0.0.0" });
+    try {
+      const { url } = await server.listen(0);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining("without Host validation")
+      );
+      expect(await rawStatus(url, { host: "any.example.com" })).not.toBe(403);
+    } finally {
+      warn.mockRestore();
+      await server.close();
+    }
+  });
+
+  it("rejects a localhost listen() after getHandler() mounted without validation", async () => {
+    const server = minimalServer();
+    server.getHandler();
+    await expect(server.listen(0)).rejects.toThrow(/after getHandler/);
     await server.close();
   });
 });

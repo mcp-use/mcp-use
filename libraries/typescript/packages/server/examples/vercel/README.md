@@ -17,13 +17,13 @@ the framework's stateless design end to end.
 - **One resource**, `vercel://deployment`, that reports the env/region/URL of
   the function instance actually serving the request — a live look at the
   serverless environment.
-- **Correct Host/Origin allowlisting for a real deployment domain.** The
-  framework's Hono shell enables DNS-rebinding protection by default; with no
-  config, only localhost-class `Host` headers pass, so a deployed Vercel URL
-  would get a blanket `403`. `mcp-server.ts` derives `allowedHosts` /
-  `allowedOrigins` from Vercel's system environment variables
-  (`VERCEL_URL`, `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_BRANCH_URL`) with a
-  localhost fallback, so the same code works locally and once deployed.
+- **Zero Host/Origin configuration.** DNS-rebinding protection exists to
+  guard locally bound servers; `getHandler()` never binds a socket, so it
+  applies no Host validation by default. That's safe on Vercel because the
+  platform edge only routes hostnames assigned to the deployment — a
+  DNS-rebinding-style `Host` never reaches the function. To opt into strict
+  validation anyway, set `allowedHosts` (additive: localhost-class hosts
+  stay allowed, so local runs keep working).
 
 ## Why serverless works here
 
@@ -39,7 +39,7 @@ requires.
 ## Project layout
 
 ```
-mcp-server.ts    module-scope MCPServer: tools, resource, allowedHosts derivation
+mcp-server.ts    module-scope MCPServer: tool and resource registrations
 api/mcp.ts       Vercel Function entry — exports server.getHandler() as `fetch`
 smoke.ts         local, no-network test of the exported handler
 ```
@@ -78,11 +78,8 @@ Then point an MCP client at `http://localhost:3000/api/mcp`.
 npx vercel deploy
 ```
 
-Vercel injects `VERCEL_URL` (and, on the production alias, also
-`VERCEL_PROJECT_PRODUCTION_URL`; on branch deployments, also
-`VERCEL_BRANCH_URL`) into the function at runtime — `mcp-server.ts` picks
-these up automatically, no extra configuration needed. Once deployed, point
-an MCP client at:
+No environment configuration is needed. Once deployed, point an MCP client
+at:
 
 ```
 https://<your-deployment>.vercel.app/api/mcp

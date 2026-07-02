@@ -1,6 +1,6 @@
 # @mcp-use/server
 
-Greenfield v2 server SDK rebuild. `SPEC.md` in this directory is the working contract — read it before changing anything. API-shape decisions, per-phase deltas, and dependency ground rules live there, not here.
+Greenfield v2 server SDK rebuild. `specs/SPEC.md` in this directory is the working contract — read it before changing anything. API-shape decisions, per-phase deltas, and dependency ground rules live there, not here.
 
 ## Doc comments: TSDoc, everywhere
 

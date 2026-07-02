@@ -3,7 +3,7 @@
  *
  * `MCPServer.listen()` starts a persistent `node:http` listener, but the MCP
  * protocol layer underneath stays stateless: every request builds a fresh SDK
- * server from the tool/resource registry (see ../../../SPEC.md). The process
+ * server from the tool/resource registry (see ../../../specs/SPEC.md). The process
  * living across requests is purely a deployment convenience — no MCP session
  * state lives in it, so any replica behind a load balancer can serve any
  * request with no session affinity.
@@ -15,14 +15,16 @@ const BASE_PATH = "/mcp";
 
 // Railway injects RAILWAY_PUBLIC_DOMAIN — a bare hostname, e.g.
 // "my-app.up.railway.app" (no scheme, no port) — for the service's public
-// route, and PORT for the port to bind. The framework binds 127.0.0.1 with
-// Host validation locked to localhost by default (DNS-rebinding protection);
-// serving publicly is an explicit `host: "0.0.0.0"` + `allowedHosts` opt-in.
-// Locally (no Railway env), fall back to that secure-by-default localhost bind.
+// route, and PORT for the port to bind. Containers must bind 0.0.0.0 to
+// receive traffic; locally (no Railway env) the framework's 127.0.0.1
+// default keeps DNS-rebinding protection on.
+//
+// No allowedHosts needed on Railway: its edge only routes the domains
+// assigned to the service, so foreign Hosts never reach this process (the
+// framework logs a one-line reminder on unvalidated public binds). Add
+// `allowedHosts: [publicDomain]` (additive — localhost stays allowed) if the
+// process is ever exposed directly.
 const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
-const networking = publicDomain
-  ? { host: "0.0.0.0", allowedHosts: [publicDomain] }
-  : {};
 
 const server = new MCPServer({
   name: "railway-example",
@@ -31,7 +33,7 @@ const server = new MCPServer({
   description:
     "Demonstrates @mcp-use/server deployed as a long-lived Node process.",
   basePath: BASE_PATH,
-  ...networking,
+  ...(publicDomain !== undefined && { host: "0.0.0.0" }),
 });
 
 // Module-scope state: survives across requests because the Node process is

@@ -10,34 +10,6 @@
 import { MCPServer } from "@mcp-use/server";
 import { z } from "zod";
 
-/**
- * DNS-rebinding protection (from `@modelcontextprotocol/hono`) checks the
- * `Host` header's hostname — port-stripped, exact string match, no wildcards
- * — against this list. With no config, only localhost-class hosts pass, so a
- * real Vercel domain would get 403. Vercel exposes the deployment's own
- * hostname(s) via system env vars at runtime (no protocol, no port):
- *   - VERCEL_URL: this exact deployment, e.g. "my-app-<hash>.vercel.app"
- *   - VERCEL_PROJECT_PRODUCTION_URL: the production domain (custom or
- *     *.vercel.app), always set even on preview deployments
- *   - VERCEL_BRANCH_URL: the stable per-branch domain, e.g. "my-app-git-
- *     main-team.vercel.app"
- * None of these exist locally (plain `node` or before `vercel dev` injects
- * them), so the localhost fallback keeps local runs working unmodified.
- */
-function deriveAllowedHosts(): string[] {
-  const hosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
-  for (const host of [
-    process.env["VERCEL_URL"],
-    process.env["VERCEL_PROJECT_PRODUCTION_URL"],
-    process.env["VERCEL_BRANCH_URL"],
-  ]) {
-    if (host) hosts.add(host);
-  }
-  return [...hosts];
-}
-
-const allowedHosts = deriveAllowedHosts();
-
 export const server = new MCPServer({
   name: "vercel-example",
   version: "1.0.0",
@@ -48,12 +20,12 @@ export const server = new MCPServer({
   // basePath with the function's file location (api/mcp.ts) means the
   // mounted route is exactly what Vercel routes to it. Getting this out of
   // sync (e.g. leaving the "/mcp" default) is a silent 404 trap.
+  //
+  // No allowedHosts needed: `getHandler()` applies no Host validation, and
+  // Vercel's edge only routes hostnames assigned to this deployment, so
+  // DNS-rebinding-style Hosts never reach the function. Set `allowedHosts`
+  // (additive — localhost stays allowed) to opt into stricter validation.
   basePath: "/api/mcp",
-  // Origin validation uses the same port-agnostic hostname allowlist
-  // convention as Host validation; reusing the derived list covers browser-
-  // based clients hitting the deployed domain directly.
-  allowedHosts,
-  allowedOrigins: allowedHosts,
 });
 
 const temperatureUnit = z.enum(["celsius", "fahrenheit"]);

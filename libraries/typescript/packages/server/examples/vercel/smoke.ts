@@ -123,13 +123,14 @@ async function main(): Promise<void> {
   assert.match(rollBody.result.content[0]?.text ?? "", /^Rolled 2d6: /);
   console.log("tools/call (roll-dice) ok:", rollBody.result.content[0]?.text);
 
-  // 4. Disallowed Host is rejected — proves the production allowedHosts
-  // config path actually works, not just the localhost fallback.
-  const rejected = await handler(
-    jsonRpcRequest("evil.example.com", 4, "tools/list", {})
+  // 4. A foreign Host is served: getHandler() applies no Host validation
+  // (Vercel's edge only routes hostnames assigned to the deployment, so a
+  // DNS-rebinding-style Host never reaches the function).
+  const foreignHost = await handler(
+    jsonRpcRequest("some-other.example.com", 4, "tools/list", {})
   );
-  assert.equal(rejected.status, 403);
-  console.log("disallowed Host rejected: 403 ok");
+  assert.equal(foreignHost.status, 200);
+  console.log("foreign Host served (validation is the edge's job): ok");
 
   await server.close();
   console.log("\nAll smoke checks passed.");

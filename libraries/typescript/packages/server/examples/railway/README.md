@@ -10,7 +10,7 @@ any container/VM host without a serverless invocation model) runs an app.
   used on serverless platforms (see the `vercel` example).
 - **A long-lived process is still stateless MCP.** `MCPServer` builds a fresh
   SDK server from its tool/resource/prompt registry on *every* request (see
-  `../../SPEC.md`) — the Node process living across requests is a deployment
+  `../../specs/SPEC.md`) — the Node process living across requests is a deployment
   convenience, not a place MCP session state accumulates. Any replica behind a
   load balancer can serve any request; there is no session affinity to worry
   about. `railway.json` here sets `numReplicas: 2` specifically to make that
@@ -23,10 +23,12 @@ any container/VM host without a serverless invocation model) runs an app.
 - **Binding for public traffic.** `listen()` binds `127.0.0.1` by default,
   with Host-header validation (DNS-rebinding protection) restricted to
   localhost — requests carrying any other `Host` get `403`. Serving publicly
-  is an explicit opt-in: pass `host: "0.0.0.0"` together with `allowedHosts`
-  naming the exact public hostname(s) that should be accepted. See
-  `src/index.ts` for how this example derives that config from Railway's
-  environment.
+  is an explicit `host: "0.0.0.0"` opt-in, and that's all Railway needs: its
+  edge only routes the domains assigned to the service, so foreign `Host`
+  headers never reach the process (the framework logs a one-line reminder on
+  unvalidated public binds). If the process is ever exposed directly, add
+  `allowedHosts` naming the public hostname(s) — additive, so
+  localhost-class hosts keep working.
 
 ## The tools
 
@@ -67,11 +69,11 @@ curl http://localhost:3000/mcp \
    restart policy explicit, it isn't required to build or run.
 2. Railway injects `PORT` (the port your process must bind and listen on) and
    `RAILWAY_PUBLIC_DOMAIN` (the service's public hostname, e.g.
-   `your-app.up.railway.app` — bare hostname, no scheme or port). `src/index.ts`
-   reads both: when `RAILWAY_PUBLIC_DOMAIN` is present it binds `0.0.0.0` and
-   sets `allowedHosts` to that exact domain so DNS-rebinding protection stays
-   on for any other `Host` header; otherwise it falls back to the local
-   `127.0.0.1` dev config.
+   `your-app.up.railway.app` — bare hostname, no scheme or port).
+   `src/index.ts` reads both: when `RAILWAY_PUBLIC_DOMAIN` is present it
+   binds `0.0.0.0` so the container can receive edge traffic; otherwise it
+   falls back to the local `127.0.0.1` dev config with DNS-rebinding
+   protection on.
 3. Deploy. Point your MCP client at
    `https://<your-service>.up.railway.app/mcp`.
 

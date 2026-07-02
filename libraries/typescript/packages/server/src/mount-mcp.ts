@@ -32,11 +32,12 @@ export interface MountMcpOptions {
  * shutdown to abort in-flight exchanges, and use `notify`/`bus` for
  * list-changed notifications.
  *
- * Prefer apps created with `createMcpHonoApp` (used by `MCPServer`
- * internally): it installs JSON body parsing and Host/Origin validation
- * (DNS-rebinding protection). On a bare Hono app this mount performs no such
- * validation itself — compose the `@modelcontextprotocol/hono` middleware in
- * front, or only bind to localhost.
+ * Prefer apps created with `createMcpHonoApp` (what `MCPServer` uses when
+ * Host validation applies): it installs JSON body parsing and Host/Origin
+ * validation (DNS-rebinding protection). On a bare Hono app this mount
+ * performs no such validation itself — compose the
+ * `@modelcontextprotocol/hono` middleware in front, only bind to localhost,
+ * or serve behind a platform edge that routes by hostname.
  */
 export function mountMcp<E extends Env>(
   app: Hono<E>,

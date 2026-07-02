@@ -1,6 +1,8 @@
 import { serve, type ServerType } from "@hono/node-server";
-import { createMcpHonoApp } from "@modelcontextprotocol/hono";
+import { createMcpHonoApp, originValidation } from "@modelcontextprotocol/hono";
 import {
+  localhostAllowedHostnames,
+  localhostAllowedOrigins,
   McpServer as SdkMcpServer,
   ResourceTemplate,
   type McpHttpHandler,
@@ -8,7 +10,7 @@ import {
   type ServerContext,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
-import type { Hono } from "hono";
+import { Hono } from "hono";
 
 import type { ServerConfig } from "./config.js";
 import { toRequestContext } from "./context.js";
@@ -90,11 +92,13 @@ export class MCPServer {
   #app: Hono | undefined;
   #handler: McpHttpHandler | undefined;
   #httpServer: ServerType | undefined;
+  /** Whether the mounted app validates Host headers (fixed at first mount). */
+  #hostValidated = false;
 
   /**
    * Create a server. `config.name` and `config.version` identify the server
    * to clients during initialization; nothing binds or listens until
-   * {@link MCPServer.listen} or {@link MCPServer.getApp} is called.
+   * {@link MCPServer.listen} or {@link MCPServer.getHandler} is called.
    */
   constructor(config: ServerConfig) {
     this.#config = config;
@@ -163,10 +167,16 @@ export class MCPServer {
 
   /**
    * Web-standard request handler for the whole app (MCP endpoint included) —
-   * usable directly on edge runtimes or in tests.
+   * usable directly on serverless/edge runtimes or in tests.
+   *
+   * The handler never binds a socket, so no Host/Origin validation applies
+   * by default: DNS rebinding targets locally bound servers, and platform
+   * edges (Vercel, Cloudflare, …) only route hostnames assigned to the
+   * deployment. Set `allowedHosts`/`allowedOrigins` to opt into validation
+   * (additive — localhost-class values stay allowed).
    */
   getHandler(): (request: Request) => Promise<Response> {
-    const { app } = this.#ensureMounted();
+    const { app } = this.#ensureMounted("handler");
     return async (request) => app.fetch(request);
   }
 
@@ -174,11 +184,16 @@ export class MCPServer {
    * Serve over HTTP on Node. Pass port `0` for an ephemeral port.
    *
    * Binds `config.host` (default `127.0.0.1`). Localhost-class binds get
-   * DNS-rebinding protection automatically; to serve publicly set
-   * `host: "0.0.0.0"` together with `allowedHosts`.
+   * DNS-rebinding protection automatically. To serve publicly set
+   * `host: "0.0.0.0"`; behind a platform edge that is all that's needed,
+   * and `allowedHosts` restricts direct exposure (additive — localhost-class
+   * values stay allowed).
+   *
+   * @throws If called on a localhost-class bind after {@link MCPServer.getHandler}
+   * already mounted the app without Host validation.
    */
   async listen(port = 3000): Promise<{ port: number; url: string }> {
-    const { app } = this.#ensureMounted();
+    const { app } = this.#ensureMounted("listen");
     return new Promise((resolve, reject) => {
       const server = serve(
         { fetch: app.fetch, port, hostname: this.#config.host ?? "127.0.0.1" },
@@ -226,21 +241,85 @@ export class MCPServer {
     }
   }
 
-  #ensureMounted(): { app: Hono; handler: McpHttpHandler } {
+  /**
+   * Effective Host/Origin allowlists for a mount mode; `undefined` means the
+   * corresponding validation is off.
+   *
+   * Configured lists are additive to the localhost-class allowlists, so local
+   * runs keep working when a deployment hostname is added. With nothing
+   * configured, `listen()` on a localhost-class bind validates against the
+   * localhost lists (the DNS-rebinding threat model), while `getHandler()` —
+   * which never binds — applies no validation. `allowedOrigins` defaults to
+   * mirroring the effective Host allowlist.
+   */
+  #validationPolicy(mode: "listen" | "handler"): {
+    hosts: string[] | undefined;
+    origins: string[] | undefined;
+  } {
+    const { host = "127.0.0.1", allowedHosts, allowedOrigins } = this.#config;
+    const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
+    const hosts =
+      allowedHosts !== undefined
+        ? [...new Set([...localhostAllowedHostnames(), ...allowedHosts])]
+        : mode === "listen" && localhostBind
+          ? localhostAllowedHostnames()
+          : undefined;
+    const origins =
+      allowedOrigins !== undefined
+        ? [...new Set([...localhostAllowedOrigins(), ...allowedOrigins])]
+        : hosts;
+    return { hosts, origins };
+  }
+
+  #ensureMounted(mode: "listen" | "handler"): {
+    app: Hono;
+    handler: McpHttpHandler;
+  } {
     if (this.#app === undefined || this.#handler === undefined) {
-      const { host, allowedHosts, allowedOrigins } = this.#config;
-      // Official Hono adapter: JSON body parsing plus Host/Origin validation
-      // (DNS-rebinding protection is automatic for localhost-class binds).
-      const app = createMcpHonoApp({
-        ...(host !== undefined && { host }),
-        ...(allowedHosts !== undefined && { allowedHosts }),
-        ...(allowedOrigins !== undefined && { allowedOrigins }),
-      });
+      const { hosts, origins } = this.#validationPolicy(mode);
+      let app: Hono;
+      if (hosts !== undefined) {
+        // Official Hono adapter: JSON body parsing plus Host/Origin
+        // validation against exactly the computed lists (passing explicit
+        // lists bypasses the adapter's own host-keyed defaulting).
+        app = createMcpHonoApp({
+          allowedHosts: hosts,
+          allowedOrigins: origins ?? hosts,
+        });
+      } else {
+        // Host validation off: mount on a bare app (the SDK handler parses
+        // the JSON body itself; see mountMcp).
+        app = new Hono();
+        if (origins !== undefined) {
+          app.use("*", originValidation(origins));
+        }
+        if (mode === "listen") {
+          console.warn(
+            `[mcp-use] listen() is serving on ${this.#config.host} without ` +
+              `Host validation. Behind a platform edge that only routes your ` +
+              `own domains this is expected; if this process is reachable ` +
+              `directly, set allowedHosts to restrict it.`
+          );
+        }
+      }
       const handler = mountMcp(app, () => this.#buildSdkServer(), {
         path: this.#basePath(),
       });
       this.#app = app;
       this.#handler = handler;
+      this.#hostValidated = hosts !== undefined;
+    } else if (
+      mode === "listen" &&
+      !this.#hostValidated &&
+      this.#validationPolicy("listen").hosts !== undefined
+    ) {
+      // getHandler() mounted without Host validation; a localhost listen()
+      // on that app would silently lose DNS-rebinding protection.
+      throw new Error(
+        "Cannot listen() on a localhost bind after getHandler(): the app is " +
+          "already mounted without Host validation (getHandler() expects a " +
+          "platform edge in front). Call listen() first, or set allowedHosts."
+      );
     }
     return { app: this.#app, handler: this.#handler };
   }

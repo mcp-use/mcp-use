@@ -19,20 +19,27 @@ export interface ServerConfig {
   /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
   basePath?: string;
   /**
-   * Hostname `listen()` binds and Host validation keys off. Defaults to
-   * `127.0.0.1`; localhost-class hosts get DNS-rebinding protection
-   * automatically. Set `"0.0.0.0"` together with `allowedHosts` to serve
-   * publicly.
+   * Hostname `listen()` binds. Defaults to `127.0.0.1`; localhost-class
+   * binds get DNS-rebinding protection (Host/Origin validation)
+   * automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
+   * edge (Railway, Fly, …) nothing more is needed, since the edge only
+   * routes hostnames assigned to the deployment. Ignored by `getHandler()`,
+   * which never binds.
    */
   host?: string;
   /**
-   * Allowed hostnames for Host-header validation (DNS-rebinding protection)
-   * when binding non-localhost, e.g. `["api.example.com"]`. Port-agnostic.
+   * Extra allowed hostnames for Host-header validation (DNS-rebinding
+   * protection), e.g. `["api.example.com"]`. Port-agnostic and additive:
+   * localhost-class hostnames stay allowed, so local runs keep working
+   * unmodified. Setting this also turns Host validation on for
+   * `getHandler()`, which otherwise applies none.
    */
   allowedHosts?: string[];
   /**
-   * Allowed origin hostnames for Origin-header validation. Requests without
-   * an `Origin` header always pass (non-browser MCP clients don't send one).
+   * Extra allowed origin hostnames for Origin-header validation
+   * (port-agnostic, additive to the localhost-class origins). When unset,
+   * mirrors the effective Host allowlist. Requests without an `Origin`
+   * header always pass (non-browser MCP clients don't send one).
    */
   allowedOrigins?: string[];
 }
