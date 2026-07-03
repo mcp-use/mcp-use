@@ -5,9 +5,13 @@ any container/VM host without a serverless invocation model) runs an app.
 
 ## What this demonstrates
 
-- **`await server.listen(port)`** — a persistent `node:http` listener via
-  `@hono/node-server`, as opposed to the per-invocation `getHandler()` handler
-  used on serverless platforms (see the `vercel` example).
+- **The CLI entry contract** (`specs/CLI_SPEC.md`): `src/index.ts` registers
+  tools and `export default server` — it never calls `listen()` itself.
+  `mcp-use dev` (local reload), `mcp-use build` (compile to
+  `.mcp-use/build/`), and `mcp-use start` (serve the build) own the socket
+  and shutdown signals. This is the node-deployment door, as opposed to the
+  per-invocation `getHandler()` handler used on serverless platforms (see the
+  `vercel` example).
 - **A long-lived process is still stateless MCP.** `MCPServer` builds a fresh
   SDK server from its tool/resource/prompt registry on *every* request (see
   `../../specs/SPEC.md`) — the Node process living across requests is a deployment
@@ -42,12 +46,21 @@ any container/VM host without a serverless invocation model) runs an app.
 ## Run locally
 
 ```sh
-pnpm start
+pnpm dev
 ```
 
-This runs `node src/index.ts` directly — Node 24 executes erasable-syntax
-TypeScript natively, no build step. It binds `127.0.0.1:3000` (no
-`RAILWAY_PUBLIC_DOMAIN` is set locally) and logs the MCP endpoint URL.
+This runs `mcp-use dev` (the dev/build toolchain built into `@mcp-use/server`,
+on top of `vite` as a devDependency): it imports `src/index.ts`,
+serves the exported server on `127.0.0.1:3000` (no `RAILWAY_PUBLIC_DOMAIN` is
+set locally), and reloads the entry on file change. Or exercise the
+production path locally:
+
+```sh
+pnpm build && pnpm start
+```
+
+`mcp-use build` compiles the server to `.mcp-use/build/` (gitignored);
+`mcp-use start` serves that build and logs the MCP endpoint URL.
 
 Talk to it with any MCP client pointed at `http://localhost:3000/mcp`, or by
 hand with curl (responses are SSE-framed; the JSON-RPC payload is on the
@@ -63,17 +76,17 @@ curl http://localhost:3000/mcp \
 ## Deploy on Railway
 
 1. Point a Railway service at this directory (or the monorepo, with this as
-   the service's root). Railway's Nixpacks/Railpack builder detects the
-   `start` script in `package.json` (`node src/index.ts`) with zero
-   configuration — `railway.json` here only makes the replica count and
-   restart policy explicit, it isn't required to build or run.
-2. Railway injects `PORT` (the port your process must bind and listen on) and
-   `RAILWAY_PUBLIC_DOMAIN` (the service's public hostname, e.g.
-   `your-app.up.railway.app` — bare hostname, no scheme or port).
-   `src/index.ts` reads both: when `RAILWAY_PUBLIC_DOMAIN` is present it
-   binds `0.0.0.0` so the container can receive edge traffic; otherwise it
-   falls back to the local `127.0.0.1` dev config with DNS-rebinding
-   protection on.
+   the service's root). `railway.json` sets the build command (`npm run
+   build`, i.e. `mcp-use build`) and start command (`npm run start`, i.e.
+   `mcp-use start` serving `.mcp-use/build/`), plus the replica count and
+   restart policy.
+2. Railway injects `PORT` (the port your process must bind and listen on —
+   `mcp-use start` reads it) and `RAILWAY_PUBLIC_DOMAIN` (the service's
+   public hostname, e.g. `your-app.up.railway.app` — bare hostname, no scheme
+   or port). `src/index.ts` reads the latter: when `RAILWAY_PUBLIC_DOMAIN` is
+   present it sets `host: "0.0.0.0"` on the server so the container can
+   receive edge traffic; otherwise it falls back to the local `127.0.0.1`
+   dev config with DNS-rebinding protection on.
 3. Deploy. Point your MCP client at
    `https://<your-service>.up.railway.app/mcp`.
 
