@@ -86,6 +86,8 @@ Target user `package.json` shape:
 }
 ```
 
+**Self-referencing devDependency (in-repo testing only).** `packages/server/package.json` lists `"@mcp-use/server": "workspace:*"` in its own `devDependencies`. The CLI tests run the real `build`/`dev` pipeline against `tests/cli/fixtures/basic`, whose entry imports `@mcp-use/server` by its public name — the fixture stands in for a real user project, so it must exercise the same resolution path users hit. Node's own resolver would handle that via package self-reference (a package may import its own name through its `exports` map), but Vite/Rolldown's resolver and tsc's bundler mode don't implement self-reference, so inside this repo the name must physically exist in `node_modules` for the toolchain to resolve it. The self-dep makes pnpm create exactly that link (`node_modules/@mcp-use/server → ..`; pnpm accepts self-deps without complaint). It is invisible to consumers — installers ignore a dependency's `devDependencies` — and creates no build-graph cycle. Do not "fix" it by switching the fixture to a relative import (stops testing the user-facing path) or by adding a Vite `resolve.alias` in the test harness (bypasses the exact resolver behavior under test).
+
 ## Workspace layout (`.mcp-use/`)
 
 The build system keeps v1's reworked workspace convention **exactly** — it was deliberately redesigned just before this greenfield rewrite (see `packages/mcp-use/src/server/config/paths.ts`, `resolveWorkspacePaths`); do not invent a new layout. `.mcp-use/` is the per-project, fixed-convention, gitignored workspace — the `.next` analog. Everything tooling writes for a project lives under it, a checkout stays clean, and `rm -rf .mcp-use` is always safe:
