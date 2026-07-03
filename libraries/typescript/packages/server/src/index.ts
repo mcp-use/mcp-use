@@ -37,7 +37,7 @@ export type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 
-export type { ServerConfig } from "./config.js";
+export type { InspectorOptions, ServerConfig } from "./config.js";
 export type { RequestContext } from "./context.js";
 export type {
   InferToolInput,

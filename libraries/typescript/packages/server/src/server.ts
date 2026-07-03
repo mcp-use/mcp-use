@@ -14,6 +14,7 @@ import { Hono } from "hono";
 
 import type { ServerConfig } from "./config.js";
 import { toRequestContext } from "./context.js";
+import { mountInspectorShell } from "./inspector-shell.js";
 import { mountMcp } from "./mount-mcp.js";
 import type {
   InferPromptInput,
@@ -102,6 +103,17 @@ export class MCPServer {
    */
   constructor(config: ServerConfig) {
     this.#config = config;
+  }
+
+  /**
+   * The URL path prefix the MCP endpoint is mounted at.
+   *
+   * Reflects `config.basePath` (default `"/mcp"`). Exposed so tooling that
+   * imports the entry module — `mcp-use dev`'s startup log, for example —
+   * can build the endpoint and inspector URLs without assuming the default.
+   */
+  get basePath(): string {
+    return this.#basePath();
   }
 
   /**
@@ -304,6 +316,12 @@ export class MCPServer {
       }
       const handler = mountMcp(app, () => this.#buildSdkServer(), {
         path: this.#basePath(),
+      });
+      // Inspector shell (default enabled, FastAPI /docs style) rides the
+      // same app, so the validation middleware above covers it too.
+      mountInspectorShell(app, this.#config.inspector, {
+        serverName: this.#config.name,
+        basePath: this.#basePath(),
       });
       this.#app = app;
       this.#handler = handler;

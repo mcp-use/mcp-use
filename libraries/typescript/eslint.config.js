@@ -291,9 +291,10 @@ export default [
       ],
     },
   },
-  // @mcp-use/server (v2 greenfield) — strictest type safety, no escape hatches.
-  // `any` is banned outright; `unknown` is allowed only at real boundaries and
-  // must be narrowed before use (the no-unsafe-* rules enforce this).
+  // @mcp-use/server (v2 greenfield, includes the folded-in dev/build
+  // toolchain under src/cli/) — strictest type safety, no escape hatches.
+  // `any` is banned outright; `unknown` is allowed only at real boundaries
+  // and must be narrowed before use (the no-unsafe-* rules enforce this).
   // Doc comments must be valid TSDoc (see packages/server/CLAUDE.md).
   {
     files: ["packages/server/src/**/*.ts"],

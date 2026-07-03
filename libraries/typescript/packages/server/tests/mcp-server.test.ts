@@ -498,6 +498,22 @@ async function rawStatus(
   });
 }
 
+describe("MCPServer basePath accessor", () => {
+  it("defaults to /mcp", () => {
+    const server = new MCPServer({ name: "bp-test", version: "1.0.0" });
+    expect(server.basePath).toBe("/mcp");
+  });
+
+  it("reflects config.basePath", () => {
+    const server = new MCPServer({
+      name: "bp-test",
+      version: "1.0.0",
+      basePath: "/api/mcp",
+    });
+    expect(server.basePath).toBe("/api/mcp");
+  });
+});
+
 describe("MCPServer getHandler (no network)", () => {
   it("serves MCP through the web-standard handler on a custom basePath", async () => {
     const server = new MCPServer({

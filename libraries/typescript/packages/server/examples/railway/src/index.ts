@@ -1,12 +1,14 @@
 /**
  * @mcp-use/server on a long-lived Node server (Railway-style).
  *
- * `MCPServer.listen()` starts a persistent `node:http` listener, but the MCP
- * protocol layer underneath stays stateless: every request builds a fresh SDK
- * server from the tool/resource registry (see ../../../specs/SPEC.md). The process
- * living across requests is purely a deployment convenience — no MCP session
- * state lives in it, so any replica behind a load balancer can serve any
- * request with no session affinity.
+ * This module follows the CLI entry contract (../../../specs/CLI_SPEC.md): it
+ * default-exports the `MCPServer` instance and never calls `listen()` itself
+ * — `mcp-use dev` and `mcp-use start` own the socket (and shutdown signals).
+ * The MCP protocol layer underneath stays stateless: every request builds a
+ * fresh SDK server from the tool/resource registry (see ../../../specs/SPEC.md).
+ * The process living across requests is purely a deployment convenience — no
+ * MCP session state lives in it, so any replica behind a load balancer can
+ * serve any request with no session affinity.
  */
 import { MCPServer } from "@mcp-use/server";
 import { z } from "zod";
@@ -122,24 +124,14 @@ server.resource(
   })
 );
 
-const port = Number(process.env.PORT ?? 3000);
-const started = await server.listen(port);
-
-// `listen()`'s returned url is always a localhost label, even when bound to
-// 0.0.0.0 for public serving — reconstruct the real public URL ourselves.
-const publicUrl = publicDomain ? `https://${publicDomain}${BASE_PATH}` : started.url;
-console.log(`MCP server listening on port ${started.port}`);
-console.log(`MCP endpoint: ${publicUrl}`);
-
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    console.log(`Received ${signal}, closing server...`);
-    server
-      .close()
-      .then(() => process.exit(0))
-      .catch((err: unknown) => {
-        console.error("Error during shutdown:", err);
-        process.exit(1);
-      });
-  });
+// On Railway, the service's public MCP endpoint is
+// `https://${RAILWAY_PUBLIC_DOMAIN}${BASE_PATH}` — `mcp-use start` logs the
+// local bind URL, and the edge terminates TLS in front of it.
+if (publicDomain !== undefined) {
+  console.log(`Public MCP endpoint: https://${publicDomain}${BASE_PATH}`);
 }
+
+// Entry contract (CLI_SPEC.md): export the server; never call listen() here.
+// `mcp-use dev`/`mcp-use start` bind the socket using this instance's config
+// (host, basePath) and handle SIGINT/SIGTERM shutdown.
+export default server;

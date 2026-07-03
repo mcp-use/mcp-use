@@ -30,6 +30,9 @@
   },
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "mcp-use": "./dist/bin.js"
+  },
   "files": [
     "dist"
   ],
@@ -49,10 +52,20 @@
     "@modelcontextprotocol/server": "2.0.0-beta.2",
     "hono": "^4.12.27"
   },
+  "peerDependencies": {
+    "vite": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@mcp-use/server": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0-beta.2",
     "@types/node": "^24.13.2",
     "typescript": "7.0.1-rc",
+    "vite": "^8.0.16",
     "vitest": "^4.1.9",
     "zod": "^4.4.3"
   }
