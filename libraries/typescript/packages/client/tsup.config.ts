@@ -10,7 +10,9 @@ export default defineConfig({
     "auth/index-node": "src/auth/index-node.ts",
     "react/index": "src/react/index.ts",
   },
-  format: ["esm", "cjs"],
+  // ESM-only: @modelcontextprotocol/client v2 is ESM-only, so @mcp-use/client
+  // follows suit (Node 20+).
+  format: ["esm"],
   dts: false,
   splitting: false,
   sourcemap: true,

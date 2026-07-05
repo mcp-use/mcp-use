@@ -28,7 +28,7 @@ import {
   createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "../version.js";
-import { telFetch } from "./tel-fetch.js";
+import { capturePostHog } from "./tel-fetch.js";
 
 /**
  * Produce a random identifier suitable for session or user IDs.
@@ -171,22 +171,12 @@ class ScarfEventLogger {
   }
 }
 
-// PostHog types for Node
-type PostHogNodeClient = {
-  capture: (params: {
-    distinctId: string;
-    event: string;
-    properties?: Record<string, any>;
-  }) => void;
-  flush: () => void;
-  shutdown: () => Promise<void>;
-};
-
 /**
  * Node.js Telemetry class that works in Node.js environments only.
  *
- * Uses posthog-node for telemetry, require("crypto") for secure random strings,
- * and filesystem for user ID persistence.
+ * Sends anonymized events to PostHog via `fetch` only (no `posthog-node`
+ * SDK), uses `require("crypto")` for secure random strings, and the filesystem
+ * for user ID persistence.
  *
  * Usage: Tel.getInstance().trackMCPClientInit(...)
  */
@@ -201,8 +191,9 @@ export class Telemetry {
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;
-  private _posthogNodeClient: PostHogNodeClient | null = null;
-  private _posthogLoading: Promise<void> | null = null;
+  private _telemetryEnabled = false;
+  // In-flight fetch captures, awaited by flush()/shutdown().
+  private _pending = new Set<Promise<void>>();
   private _scarfClient: ScarfEventLogger | null = null;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
@@ -230,11 +221,11 @@ export class Telemetry {
     const canSupportTelemetry = this._runtimeEnvironment !== "unknown";
 
     if (telemetryDisabled) {
-      this._posthogNodeClient = null;
+      this._telemetryEnabled = false;
       this._scarfClient = null;
       logger.debug("Telemetry disabled via environment variable");
     } else if (!canSupportTelemetry) {
-      this._posthogNodeClient = null;
+      this._telemetryEnabled = false;
       this._scarfClient = null;
       logger.debug(
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
@@ -244,8 +235,8 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
 
-      // Initialize PostHog
-      this._posthogLoading = this._initPostHogNode();
+      // PostHog events are sent directly via fetch (no SDK); nothing to init.
+      this._telemetryEnabled = true;
 
       // Initialize Scarf (server-side only)
       try {
@@ -278,47 +269,6 @@ export class Telemetry {
     }
 
     return false;
-  }
-
-  private async _initPostHogNode(): Promise<void> {
-    try {
-      // Dynamic import of posthog-node
-      const { PostHog } = await import("posthog-node");
-
-      // Serverless/edge environments need immediate flushing
-      const isServerlessEnvironment = [
-        "cloudflare-workers",
-        "edge",
-        "deno",
-      ].includes(this._runtimeEnvironment);
-
-      const posthogOptions: {
-        host: string;
-        disableGeoip: boolean;
-        fetch: typeof telFetch;
-        flushAt?: number;
-        flushInterval?: number;
-      } = {
-        host: this.HOST,
-        disableGeoip: false,
-        fetch: telFetch,
-      };
-
-      if (isServerlessEnvironment) {
-        posthogOptions.flushAt = 1; // Send events immediately
-        posthogOptions.flushInterval = 0; // Don't wait for interval
-      }
-
-      this._posthogNodeClient = new PostHog(
-        this.PROJECT_API_KEY,
-        posthogOptions
-      );
-
-      logger.debug("PostHog Node.js client initialized");
-    } catch (e) {
-      logger.warn(`Failed to initialize PostHog Node.js telemetry: ${e}`);
-      this._posthogNodeClient = null;
-    }
   }
 
   /**
@@ -363,7 +313,7 @@ export class Telemetry {
    * Check if telemetry is enabled.
    */
   get isEnabled(): boolean {
-    return this._posthogNodeClient !== null || this._scarfClient !== null;
+    return this._telemetryEnabled || this._scarfClient !== null;
   }
 
   get userId(): string {
@@ -481,12 +431,7 @@ export class Telemetry {
   }
 
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    // Wait for PostHog to load if it's still initializing
-    if (this._posthogLoading) {
-      await this._posthogLoading;
-    }
-
-    if (!this._posthogNodeClient && !this._scarfClient) {
+    if (!this._telemetryEnabled && !this._scarfClient) {
       return;
     }
 
@@ -500,17 +445,17 @@ export class Telemetry {
     properties.source = this._source;
     properties.runtime = this._runtimeEnvironment;
 
-    // Send to PostHog (Node.js)
-    if (this._posthogNodeClient) {
-      try {
-        this._posthogNodeClient.capture({
-          distinctId: currentUserId,
-          event: event.name,
-          properties,
-        });
-      } catch (e) {
-        logger.debug(`Failed to track PostHog Node event ${event.name}: ${e}`);
-      }
+    // Send to PostHog via fetch (fire-and-forget; tracked for flush/shutdown)
+    if (this._telemetryEnabled) {
+      const p = capturePostHog({
+        host: this.HOST,
+        apiKey: this.PROJECT_API_KEY,
+        event: event.name,
+        distinctId: currentUserId,
+        properties,
+      });
+      this._pending.add(p);
+      void p.finally(() => this._pending.delete(p));
     }
 
     // Send to Scarf
@@ -767,30 +712,23 @@ export class Telemetry {
   // ============================================================================
 
   /**
-   * Flush the telemetry queue (Node.js only)
+   * Flush the telemetry queue (Node.js only). Events are sent immediately via
+   * fetch, so this only kicks off awaiting any in-flight requests.
    */
   flush(): void {
-    if (this._posthogNodeClient) {
-      try {
-        this._posthogNodeClient.flush();
-        logger.debug("PostHog client telemetry queue flushed");
-      } catch (e) {
-        logger.debug(`Failed to flush PostHog client: ${e}`);
-      }
-    }
+    void Promise.allSettled([...this._pending]);
   }
 
   /**
-   * Shutdown the telemetry client (Node.js only)
+   * Shutdown the telemetry client (Node.js only). Awaits any in-flight fetch
+   * captures so short-lived processes don't drop their final events.
    */
   async shutdown(): Promise<void> {
-    if (this._posthogNodeClient) {
-      try {
-        await this._posthogNodeClient.shutdown();
-        logger.debug("PostHog client shutdown successfully");
-      } catch (e) {
-        logger.debug(`Error shutting down PostHog client: ${e}`);
-      }
+    try {
+      await Promise.allSettled([...this._pending]);
+      logger.debug("Telemetry fetch captures flushed");
+    } catch (e) {
+      logger.debug(`Error flushing telemetry captures: ${e}`);
     }
   }
 }

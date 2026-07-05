@@ -19,7 +19,7 @@ import type { MessageAttachment } from "./types";
 import { detectWidgetProtocol } from "@/client/utils/widget-detection";
 import { InlineElicitationCard } from "./InlineElicitationCard";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ElicitResult } from "@modelcontextprotocol/client";
 
 interface Message {
   id: string;

@@ -1,6 +1,14 @@
 // useMcp.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, SdkError } from "@modelcontextprotocol/client";
+import type {
+  CompleteRequestParams,
+  CompleteResult,
+  OAuthClientProvider,
+  Prompt,
+  Resource,
+  ResourceTemplateType as ResourceTemplate,
+  Tool,
+} from "@modelcontextprotocol/client";
 import { probeAuthParams } from "../auth/probe-www-auth.js";
 import {
   runAuthPopup,
@@ -8,14 +16,6 @@ import {
   MCP_AUTH_CALLBACK_MESSAGE_TYPE,
   type McpAuthCallbackMessage,
 } from "../auth/popup-runner.js";
-import type {
-  CompleteRequestParams,
-  CompleteResult,
-  Prompt,
-  Resource,
-  ResourceTemplate,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
 import { Logger, type LogLevel, logger } from "../logging.js";
@@ -348,6 +348,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       : undefined
   );
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
+  const [protocolEra, setProtocolEra] = useState<
+    "legacy" | "modern" | undefined
+  >(undefined);
+  const [protocolVersion, setProtocolVersion] = useState<string | undefined>(
+    undefined
+  );
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
@@ -985,6 +991,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Get serverInfo and capabilities from the connector (populated during initialize)
         const serverInfo = session.connector.serverInfo;
         const capabilities = session.connector.serverCapabilities;
+
+        // Surface the negotiated protocol era/version (v1 "legacy" vs v2
+        // "modern" 2026-07-28) so consumers (e.g. the inspector) can display it.
+        if (isMountedRef.current) {
+          setProtocolEra(session.connector.protocolEra);
+          setProtocolVersion(session.connector.negotiatedProtocolVersion);
+        }
 
         if (serverInfo) {
           addLog("debug", "Server info:", serverInfo);
@@ -2440,6 +2453,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     prompts,
     serverInfo,
     capabilities,
+    protocolEra,
+    protocolVersion,
     error,
     log,
     authUrl,

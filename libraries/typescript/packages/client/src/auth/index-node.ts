@@ -14,8 +14,5 @@ export { FileKVStore } from "./file-kv-store.js";
 export type { KVStore } from "./kv-store.js";
 
 // Re-export the SDK pieces an orchestrator needs to drive the two-call flow,
-// so callers don't need a direct dependency on @modelcontextprotocol/sdk.
-export {
-  auth,
-  UnauthorizedError,
-} from "@modelcontextprotocol/sdk/client/auth.js";
+// so callers don't need a direct dependency on the MCP SDK.
+export { auth, UnauthorizedError } from "@modelcontextprotocol/client";

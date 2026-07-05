@@ -1,6 +1,6 @@
 import { chat } from "@/llm/providers";
 import type { ProviderMessage } from "@/llm/types";
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import type { Resource } from "@modelcontextprotocol/client";
 import { useCallback } from "react";
 import type { LLMConfig } from "../components/chat/types";
 

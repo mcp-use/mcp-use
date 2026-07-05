@@ -7,12 +7,14 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
+  OAuthClientProvider,
   Prompt,
   Resource,
-  ResourceTemplate,
+  // v2 exports the resource-template type as `ResourceTemplateType` (the bare
+  // `ResourceTemplate` name is the server package's class).
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 /**
@@ -392,6 +394,15 @@ export type UseMcpResult = {
   };
   /** Server capabilities from the initialize response */
   capabilities?: Record<string, any>;
+  /**
+   * Negotiated MCP protocol era for the active connection:
+   * - 'legacy': 2025-era server (v1), sessionful `initialize` handshake.
+   * - 'modern': 2026-07-28-era server (v2), stateless per-request.
+   * `undefined` until a connection has negotiated.
+   */
+  protocolEra?: "legacy" | "modern";
+  /** Negotiated MCP protocol version string (e.g. '2025-06-18', '2026-07-28'). */
+  protocolVersion?: string;
   /**
    * The current state of the MCP connection:
    * - 'discovering': Checking server existence and capabilities (including auth requirements).

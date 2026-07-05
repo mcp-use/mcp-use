@@ -1,10 +1,11 @@
 // browser-provider.ts
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
+  OAuthClientProvider,
+  OAuthDiscoveryState,
   OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 import { sanitizeUrl } from "./url-sanitize.js";
 import { LocalStorageKVStore } from "./kv-store.js";
 import { OAuthSessionStore } from "./oauth-session-store.js";
@@ -335,9 +336,23 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   invalidateCredentials(
-    scope: "all" | "client" | "tokens" | "verifier"
+    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
   ): Promise<void> {
     return this.session.invalidateCredentials(scope);
+  }
+
+  /**
+   * Persist OAuth discovery state (SEP-2352). Delegated to the session store;
+   * implementing this silences the SDK's per-callback warning and enables the
+   * authorization-server mix-up defense on the callback leg.
+   */
+  saveDiscoveryState(state: OAuthDiscoveryState): Promise<void> {
+    return this.session.saveDiscoveryState(state);
+  }
+
+  /** Return previously saved OAuth discovery state, or `undefined`. */
+  discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    return this.session.discoveryState();
   }
 
   /**

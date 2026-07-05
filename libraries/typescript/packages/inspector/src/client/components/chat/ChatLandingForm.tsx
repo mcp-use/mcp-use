@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@modelcontextprotocol/client";
 import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";

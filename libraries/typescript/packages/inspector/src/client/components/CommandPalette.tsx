@@ -2,7 +2,7 @@ import type {
   Prompt,
   Resource,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { Command } from "cmdk";
 import {
   BrushCleaning,

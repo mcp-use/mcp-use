@@ -1,9 +1,10 @@
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
+  OAuthClientProvider,
+  OAuthDiscoveryState,
   OAuthTokens,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 import { createServer as createNetServer } from "node:net";
 import { createServer as createHttpServer, type Server } from "node:http";
 import { FileKVStore } from "./file-kv-store.js";
@@ -236,9 +237,19 @@ export class NodeOAuthClientProvider implements OAuthClientProvider {
   }
 
   invalidateCredentials(
-    scope: "all" | "client" | "tokens" | "verifier"
+    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
   ): Promise<void> {
     return this.session.invalidateCredentials(scope);
+  }
+
+  /** Persist OAuth discovery state (SEP-2352). Delegated to the session store. */
+  saveDiscoveryState(state: OAuthDiscoveryState): Promise<void> {
+    return this.session.saveDiscoveryState(state);
+  }
+
+  /** Return previously saved OAuth discovery state, or `undefined`. */
+  discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    return this.session.discoveryState();
   }
 
   /**

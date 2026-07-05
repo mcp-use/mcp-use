@@ -1,10 +1,7 @@
 import type {
+  CallToolResult,
   Client,
   ClientOptions,
-} from "@modelcontextprotocol/sdk/client/index.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import type {
-  CallToolResult,
   CompleteRequestParams,
   CompleteResult,
   CreateMessageRequest,
@@ -13,15 +10,25 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
+  RequestOptions,
   Root,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import {
-  CreateMessageRequestSchema,
-  ElicitRequestSchema,
-  ListRootsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { logger } from "../logging.js";
+
+/**
+ * Accept-anything Standard Schema used for raw passthrough requests whose
+ * method string is arbitrary (possibly non-spec). v2's `Protocol.request()`
+ * requires a result schema for non-spec methods; this preserves the v1
+ * "return whatever the server sent" behavior without importing Zod here.
+ */
+const passthroughResultSchema = {
+  "~standard": {
+    version: 1 as const,
+    vendor: "mcp-use",
+    validate: (value: unknown) => ({ value }),
+  },
+};
 import type { ConnectionManager } from "../task_managers/base.js";
 import type { ConnectorInitEventData } from "../telemetry/events.js";
 import { Telemetry } from "../telemetry/telemetry-node.js";
@@ -328,15 +335,12 @@ export abstract class BaseConnector {
     if (!this.client) return;
 
     // Handle roots/list requests from the server
-    this.client.setRequestHandler(
-      ListRootsRequestSchema,
-      async (_request: unknown, _extra: unknown) => {
-        logger.debug(
-          `Server requested roots list, returning ${this.rootsCache.length} root(s)`
-        );
-        return { roots: this.rootsCache };
-      }
-    );
+    this.client.setRequestHandler("roots/list", async () => {
+      logger.debug(
+        `Server requested roots list, returning ${this.rootsCache.length} root(s)`
+      );
+      return { roots: this.rootsCache };
+    });
   }
 
   /**
@@ -357,8 +361,8 @@ export abstract class BaseConnector {
     logger.debug("setupSamplingHandler: Setting up sampling request handler");
     // Handle sampling/createMessage requests from the server
     this.client.setRequestHandler(
-      CreateMessageRequestSchema,
-      async (request: CreateMessageRequest, _extra: unknown) => {
+      "sampling/createMessage",
+      async (request) => {
         logger.debug("Server requested sampling, forwarding to callback");
         return await samplingCallback(request.params);
       }
@@ -388,16 +392,12 @@ export abstract class BaseConnector {
       "setupElicitationHandler: Setting up elicitation request handler"
     );
     // Handle elicitation/create requests from the server
-    this.client.setRequestHandler(
-      ElicitRequestSchema,
-      async (
-        request: { params: ElicitRequestFormParams | ElicitRequestURLParams },
-        _extra: unknown
-      ) => {
-        logger.debug("Server requested elicitation, forwarding to callback");
-        return await elicitationCallback(request.params);
-      }
-    );
+    this.client.setRequestHandler("elicitation/create", async (request) => {
+      logger.debug("Server requested elicitation, forwarding to callback");
+      return await elicitationCallback(
+        request.params as ElicitRequestFormParams | ElicitRequestURLParams
+      );
+    });
     logger.debug(
       "setupElicitationHandler: Elicitation handler registered successfully"
     );
@@ -496,6 +496,21 @@ export abstract class BaseConnector {
     return this.serverInfoCache;
   }
 
+  /**
+   * The negotiated protocol era for the active connection.
+   * - `"legacy"` — 2025-era server (v1), sessionful `initialize` handshake.
+   * - `"modern"` — 2026-07-28-era server (v2), stateless per-request.
+   * `undefined` before the connection has negotiated.
+   */
+  get protocolEra(): "legacy" | "modern" | undefined {
+    return this.client?.getProtocolEra?.();
+  }
+
+  /** The protocol version string negotiated for the active connection. */
+  get negotiatedProtocolVersion(): string | undefined {
+    return this.client?.getNegotiatedProtocolVersion?.();
+  }
+
   /** Call a tool on the server. */
   async callTool(
     name: string,
@@ -527,7 +542,6 @@ export abstract class BaseConnector {
     logger.debug(`Calling tool '${name}' with args`, args);
     const res = await this.client.callTool(
       { name, arguments: args },
-      undefined,
       enhancedOptions
     );
     logger.debug(`Tool '${name}' returned`, res);
@@ -736,9 +750,12 @@ export abstract class BaseConnector {
     }
 
     logger.debug(`Sending raw request '${method}' with params`, params);
+    // v2 requires a result schema for non-spec methods; a passthrough schema
+    // preserves the v1 behavior of returning the raw server result for any
+    // method string.
     return await this.client.request(
       { method, params: params ?? {} },
-      undefined as any,
+      passthroughResultSchema,
       options
     );
   }

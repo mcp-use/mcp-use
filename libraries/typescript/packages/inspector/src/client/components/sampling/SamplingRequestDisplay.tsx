@@ -16,8 +16,10 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
-import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { CreateMessageResult } from "@modelcontextprotocol/client";
+// v2 no longer re-exports Zod `*Schema` constants; use the Standard Schema
+// validators keyed by spec type name instead.
+import { specTypeSchemas } from "@modelcontextprotocol/client";
 import {
   Check,
   Copy,
@@ -204,15 +206,18 @@ export function SamplingRequestDisplay({
   const handleApprove = () => {
     if (!request) return;
 
-    const validationResult = CreateMessageResultSchema.safeParse(messageResult);
-    if (!validationResult.success) {
+    const validationResult =
+      specTypeSchemas.CreateMessageResult["~standard"].validate(messageResult);
+    if (validationResult.issues) {
       toast.error("Invalid response", {
-        description: `Validation failed: ${validationResult.error.message}`,
+        description: `Validation failed: ${validationResult.issues
+          .map((issue) => issue.message)
+          .join(", ")}`,
       });
       return;
     }
 
-    onApprove(request.id, validationResult.data);
+    onApprove(request.id, validationResult.value as CreateMessageResult);
     onClose();
 
     // Show success toast with navigation back to tools tab
