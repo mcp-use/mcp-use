@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
  * and exited 0 — so CI would happily ship a manifest with zero widgets.
  */
 
-const CLI_PATH = join(__dirname, "../dist/index.cjs");
+const CLI_PATH = join(__dirname, "../dist/index.js");
 
 function runCLI(
   args: string[],
