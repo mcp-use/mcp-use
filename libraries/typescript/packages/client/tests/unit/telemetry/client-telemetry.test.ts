@@ -8,21 +8,27 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
+// Telemetry now posts events to PostHog via `fetch` (no posthog-node SDK).
+// Mock global fetch and inspect the posted event bodies.
+const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
 
-// Mock PostHog before importing Telemetry
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+/**
+ * Find the PostHog capture whose posted body has the given event name and
+ * return the parsed `{ event, properties, distinct_id }` body.
+ */
+function findCapturedEvent(eventName: string): any {
+  for (const call of fetchMock.mock.calls) {
+    const init = call[1] as RequestInit | undefined;
+    if (!init?.body || typeof init.body !== "string") continue;
+    try {
+      const parsed = JSON.parse(init.body);
+      if (parsed?.event === eventName) return parsed;
+    } catch {
+      // not a JSON telemetry body
+    }
+  }
+  return undefined;
+}
 
 // Mock fs module for config loading
 vi.mock("node:fs", () => ({
@@ -56,18 +62,23 @@ vi.mock("node:path", () => ({
 describe("MCPClient Telemetry Integration", () => {
   let originalEnv: NodeJS.ProcessEnv;
 
+  let originalFetch: typeof globalThis.fetch;
+
   beforeEach(() => {
     // Save original environment
     originalEnv = { ...process.env };
     delete process.env.MCP_USE_ANONYMIZED_TELEMETRY; // Ensure telemetry is enabled
     vi.resetModules();
     vi.clearAllMocks();
-    mockCapture.mockClear();
+    fetchMock.mockClear();
+    originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
   });
 
   afterEach(() => {
     // Restore original environment
     process.env = originalEnv;
+    globalThis.fetch = originalFetch;
     vi.clearAllMocks();
   });
 
@@ -78,13 +89,11 @@ describe("MCPClient Telemetry Integration", () => {
       new MCPClient();
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Verify telemetry was tracked via PostHog capture
-      expect(mockCapture).toHaveBeenCalled();
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      // Verify telemetry was tracked via a PostHog fetch capture
+      expect(fetchMock).toHaveBeenCalled();
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         code_mode: false,
         sandbox: false,
         all_callbacks: false,
@@ -100,11 +109,9 @@ describe("MCPClient Telemetry Integration", () => {
       new MCPClient(undefined, { codeMode: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         code_mode: true,
       });
     });
@@ -120,11 +127,9 @@ describe("MCPClient Telemetry Integration", () => {
       });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         code_mode: true,
       });
     });
@@ -142,11 +147,9 @@ describe("MCPClient Telemetry Integration", () => {
       new MCPClient(config);
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         code_mode: false,
         sandbox: false,
         all_callbacks: false,
@@ -163,11 +166,9 @@ describe("MCPClient Telemetry Integration", () => {
       new MCPClient(undefined, { samplingCallback });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         all_callbacks: false, // Only sampling, not elicitation
       });
     });
@@ -179,11 +180,9 @@ describe("MCPClient Telemetry Integration", () => {
       new MCPClient(undefined, { elicitationCallback });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         all_callbacks: false, // Only elicitation, not sampling
       });
     });
@@ -196,11 +195,9 @@ describe("MCPClient Telemetry Integration", () => {
       new MCPClient(undefined, { samplingCallback, elicitationCallback });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         all_callbacks: true,
       });
     });
@@ -217,11 +214,9 @@ describe("MCPClient Telemetry Integration", () => {
       MCPClient.fromDict(config);
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      const captureCall = mockCapture.mock.calls.find(
-        (call) => call[0]?.event === "mcpclient_init"
-      );
+      const captureCall = findCapturedEvent("mcpclient_init");
       expect(captureCall).toBeDefined();
-      expect(captureCall[0].properties).toMatchObject({
+      expect(captureCall.properties).toMatchObject({
         code_mode: false,
         sandbox: false,
         all_callbacks: false,

@@ -1,4 +1,8 @@
-import { RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps";
+// ponytail: inlined from @modelcontextprotocol/ext-apps' RESOURCE_MIME_TYPE to
+// avoid a dependency (which transitively pulls the v1 SDK) just for one MIME
+// string used in telemetry resource classification. Keep in sync with ext-apps
+// if the MCP Apps MIME type ever changes.
+const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
 export abstract class BaseTelemetryEvent {
   abstract get name(): string;

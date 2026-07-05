@@ -10,15 +10,20 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser-provider.js";
+import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
 const SERVER_URL = "https://mcp.example.com";
 
 describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
+  let restoreLocalStorage: () => void;
+
   beforeEach(() => {
+    restoreLocalStorage = installMemoryLocalStorage();
     localStorage.clear();
   });
   afterEach(() => {
     localStorage.clear();
+    restoreLocalStorage();
   });
 
   it("returns staticClientInfo from clientInformation() when no DCR client info is stored", async () => {

@@ -2,13 +2,14 @@ import {
   discoverOAuthProtectedResourceMetadata,
   discoverAuthorizationServerMetadata,
   refreshAuthorization,
-} from "@modelcontextprotocol/sdk/client/auth.js";
+} from "@modelcontextprotocol/client";
 import type {
+  AuthorizationServerMetadata,
   OAuthClientInformation,
   OAuthClientMetadata,
+  OAuthDiscoveryState,
   OAuthTokens,
-  AuthorizationServerMetadata,
-} from "@modelcontextprotocol/sdk/shared/auth.js";
+} from "@modelcontextprotocol/client";
 import { sanitizeUrl } from "./url-sanitize.js";
 import type { KVStore } from "./kv-store.js";
 import type { StoredState } from "./types.js";
@@ -221,7 +222,7 @@ export class OAuthSessionStore {
   }
 
   async invalidateCredentials(
-    scope: "all" | "client" | "tokens" | "verifier"
+    scope: "all" | "client" | "tokens" | "verifier" | "discovery"
   ): Promise<void> {
     switch (scope) {
       case "all":
@@ -229,6 +230,7 @@ export class OAuthSessionStore {
         await this.store.remove(this.getKey("client_info"));
         await this.store.remove(this.getKey("code_verifier"));
         await this.store.remove(this.getKey("last_auth_url"));
+        await this.store.remove(this.getKey("discovery_state"));
         break;
       case "client":
         await this.store.remove(this.getKey("client_info"));
@@ -239,8 +241,36 @@ export class OAuthSessionStore {
       case "verifier":
         await this.store.remove(this.getKey("code_verifier"));
         break;
+      case "discovery":
+        await this.store.remove(this.getKey("discovery_state"));
+        break;
       default:
         break;
+    }
+  }
+
+  /**
+   * Persist the OAuth discovery state (authorization-server metadata resolved
+   * during the auth flow). Stored with the same durability as the code
+   * verifier so the callback leg can verify it is exchanging the code at the
+   * same authorization server the redirect targeted (SEP-2352 mix-up defense).
+   */
+  async saveDiscoveryState(state: OAuthDiscoveryState): Promise<void> {
+    await this.store.set(
+      this.getKey("discovery_state"),
+      JSON.stringify(state)
+    );
+  }
+
+  /** Return the previously saved discovery state, or `undefined`. */
+  async discoveryState(): Promise<OAuthDiscoveryState | undefined> {
+    const data = await this.store.get(this.getKey("discovery_state"));
+    if (!data) return undefined;
+    try {
+      return JSON.parse(data) as OAuthDiscoveryState;
+    } catch {
+      await this.store.remove(this.getKey("discovery_state"));
+      return undefined;
     }
   }
 

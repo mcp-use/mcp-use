@@ -4,8 +4,9 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { Notification } from "@modelcontextprotocol/sdk/types.js";
+  Notification,
+  VersionNegotiationMode,
+} from "@modelcontextprotocol/client";
 import type { BaseConnector, ConnectorInitOptions } from "./connectors/base.js";
 import type { ClientInfo } from "./connectors/http.js";
 import { HttpConnector } from "./connectors/http.js";
@@ -95,6 +96,12 @@ export interface StdioServerConfig extends BaseServerConfig {
   args: string[];
   env?: Record<string, string>;
   cwd?: string;
+  /**
+   * Protocol version negotiation mode. Defaults to `"legacy"` for stdio (the
+   * SDK advises against probing for spawn-per-invocation tools). See
+   * {@link StdioConnector}.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
 }
 
 /**
@@ -111,6 +118,11 @@ export interface HttpServerConfig extends BaseServerConfig {
   transport?: "http" | "sse";
   preferSse?: boolean;
   disableSseFallback?: boolean;
+  /**
+   * Protocol version negotiation mode. Defaults to `"auto"` for HTTP (detect
+   * v1/legacy vs v2/modern servers). See {@link HttpConnector}.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
 }
 
 /**
@@ -187,6 +199,7 @@ export function createConnectorFromConfig(
       preferSse: serverConfig.preferSse || transport === "sse",
       // Disable SSE fallback if explicitly disabled in config
       disableSseFallback: serverConfig.disableSseFallback,
+      protocolNegotiation: serverConfig.protocolNegotiation,
       clientInfo,
       ...connectorOptions,
     });

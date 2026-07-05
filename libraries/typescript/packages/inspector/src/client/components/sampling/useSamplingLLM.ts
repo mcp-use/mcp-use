@@ -3,7 +3,7 @@ import type { ProviderMessage } from "@/llm/types";
 import type {
   CreateMessageRequest,
   CreateMessageResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { useCallback } from "react";
 import type { LLMConfig } from "../chat/types";
 

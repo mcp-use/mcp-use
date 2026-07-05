@@ -1,4 +1,4 @@
-import { extractWWWAuthenticateParams } from "@modelcontextprotocol/sdk/client/auth.js";
+import { extractWWWAuthenticateParams } from "@modelcontextprotocol/client";
 
 export type ProbeAuthParamsResult = {
   resourceMetadataUrl?: URL;

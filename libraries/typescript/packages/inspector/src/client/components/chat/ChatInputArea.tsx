@@ -1,6 +1,6 @@
 import { Button } from "@/client/components/ui/button";
 import { cn } from "@/client/lib/utils";
-import type { Prompt } from "@modelcontextprotocol/sdk/types.js";
+import type { Prompt } from "@modelcontextprotocol/client";
 import { Send, Square } from "lucide-react";
 import React from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";

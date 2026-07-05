@@ -24,26 +24,21 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.js"
     },
     "./auth": {
       "types": "./dist/auth/index.d.ts",
-      "import": "./dist/auth/index.js",
-      "require": "./dist/auth/index.cjs"
+      "import": "./dist/auth/index.js"
     },
     "./auth/node": {
       "types": "./dist/auth/index-node.d.ts",
-      "import": "./dist/auth/index-node.js",
-      "require": "./dist/auth/index-node.cjs"
+      "import": "./dist/auth/index-node.js"
     },
     "./react": {
       "types": "./dist/react/index.d.ts",
-      "import": "./dist/react/index.js",
-      "require": "./dist/react/index.cjs"
+      "import": "./dist/react/index.js"
     }
   },
-  "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
@@ -59,10 +54,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "1.0.1",
-    "@modelcontextprotocol/sdk": "1.26.0",
-    "posthog-js": "1.351.3",
-    "posthog-node": "5.24.17"
+    "@modelcontextprotocol/client": "2.0.0-beta.2"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.2.0",

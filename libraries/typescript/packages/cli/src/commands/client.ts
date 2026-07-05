@@ -90,6 +90,7 @@ async function connectCommand(
     auth?: string;
     oauth?: boolean;
     authTimeout?: string;
+    negotiate?: string;
   }
 ): Promise<void> {
   // `connect` requires both <name> and <url>. Commander's default missing-arg
@@ -145,6 +146,18 @@ async function connectCommand(
   const sessionName: string = name as string;
   const target: string = urlOrCommand as string;
 
+  // Map --negotiate to the SDK's versionNegotiation mode. Defaults are applied
+  // by the connectors (HTTP: "auto", stdio: "legacy") when left undefined.
+  const protocolNegotiation:
+    | "auto"
+    | "legacy"
+    | { pin: string }
+    | undefined = options.negotiate
+    ? options.negotiate === "auto" || options.negotiate === "legacy"
+      ? options.negotiate
+      : { pin: options.negotiate }
+    : undefined;
+
   // Reject names that collide with per-server scope tokens. If someone saved a
   // server as `tools`, every `mcp-use client tools ...` invocation would be
   // intercepted by the "missing server name" routing in index.ts and the
@@ -183,6 +196,7 @@ async function connectCommand(
         command,
         args,
         clientInfo: cliClientInfo,
+        ...(protocolNegotiation ? { protocolNegotiation } : {}),
       });
 
       session = await client.createSession(sessionName);
@@ -217,6 +231,7 @@ async function connectCommand(
             ? { headers: { Authorization: `Bearer ${options.auth}` } }
             : {}),
         clientInfo: cliClientInfo,
+        ...(protocolNegotiation ? { protocolNegotiation } : {}),
       });
 
       try {
@@ -1179,6 +1194,10 @@ export function createClientCommand(): Command {
     .option(
       "--auth-timeout <ms>",
       "OAuth loopback wait timeout in ms (default 300000)"
+    )
+    .option(
+      "--negotiate <mode>",
+      "Protocol version negotiation: 'auto' (probe v1/v2), 'legacy', or a pinned revision like '2026-07-28'. Defaults: HTTP=auto, stdio=legacy."
     )
     .action(connectCommand);
 

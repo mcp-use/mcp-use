@@ -1,5 +1,5 @@
 import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
-import type { OAuthClientInformation } from "@modelcontextprotocol/sdk/shared/auth.js";
+import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
 

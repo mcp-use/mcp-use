@@ -13,7 +13,7 @@ import { MCPSession } from "../../../src/session.js";
 import type {
   CompleteRequestParams,
   CompleteResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 describe("Completion Support", () => {
   describe("BaseConnector.complete()", () => {

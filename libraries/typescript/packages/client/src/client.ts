@@ -4,7 +4,7 @@ import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import fs from "node:fs";
 import path from "node:path";
 import { BaseMCPClient } from "./client/base.js";
@@ -157,7 +157,7 @@ export interface MCPClientOptions {
    * Applied as default when per-server config does not specify one.
    */
   onNotification?: (
-    notification: import("@modelcontextprotocol/sdk/types.js").Notification
+    notification: import("@modelcontextprotocol/client").Notification
   ) => void | Promise<void>;
 }
 
@@ -529,12 +529,14 @@ export class MCPClient extends BaseMCPClient {
         args: string[];
         env?: Record<string, string>;
         cwd?: string;
+        protocolNegotiation?: import("@modelcontextprotocol/client").VersionNegotiationMode;
       };
       return new StdioConnector({
         command: stdioConfig.command,
         args: stdioConfig.args,
         env: stdioConfig.env,
         cwd: stdioConfig.cwd,
+        protocolNegotiation: stdioConfig.protocolNegotiation,
         clientInfo: normalizeClientInfo(merged.clientInfo),
         onSampling: resolved.onSampling,
         onElicitation: resolved.onElicitation,

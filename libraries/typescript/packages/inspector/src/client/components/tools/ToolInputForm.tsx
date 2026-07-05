@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/client/components/ui/select";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import { extractEnumValues, resolveToolPropertySchema } from "./schema-utils";
 
 interface ToolInputFormProps {

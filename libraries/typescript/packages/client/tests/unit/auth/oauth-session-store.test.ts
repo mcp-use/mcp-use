@@ -19,13 +19,13 @@ import type { StoredState } from "../../../src/auth/types.js";
 //   discoverOAuthProtectedResourceMetadata
 //   discoverAuthorizationServerMetadata
 //   refreshAuthorization
-// from `@modelcontextprotocol/sdk/client/auth.js`. These are real network
+// from `@modelcontextprotocol/client`. These are real network
 // calls in production — mock them here per CLAUDE.md guidance.
 const discoverOAuthProtectedResourceMetadata = vi.fn();
 const discoverAuthorizationServerMetadata = vi.fn();
 const refreshAuthorization = vi.fn();
 
-vi.mock("@modelcontextprotocol/sdk/client/auth.js", () => ({
+vi.mock("@modelcontextprotocol/client", () => ({
   discoverOAuthProtectedResourceMetadata: (...args: unknown[]) =>
     discoverOAuthProtectedResourceMetadata(...args),
   discoverAuthorizationServerMetadata: (...args: unknown[]) =>
@@ -516,6 +516,65 @@ describe("OAuthSessionStore", () => {
       expect(stored.providerOptions.connectionUrl).toBe(
         "https://gateway.example.com/proxy/123"
       );
+    });
+  });
+
+  // v2 (SDK @modelcontextprotocol/client) additions: the SDK stamps an
+  // `issuer` field onto stored tokens/client info (SEP-2352) and persists
+  // OAuth discovery state; the store must round-trip both verbatim.
+  describe("v2 issuer stamp + discovery state", () => {
+    it("round-trips the issuer stamp on saved tokens verbatim", async () => {
+      const { session } = createStore();
+      await session.saveTokens({
+        access_token: "at",
+        token_type: "Bearer",
+        refresh_token: "rt",
+        issuer: "https://issuer.example.com",
+      } as never);
+      const tokens = (await session.tokens()) as {
+        issuer?: string;
+      };
+      expect(tokens?.issuer).toBe("https://issuer.example.com");
+    });
+
+    it("round-trips the issuer stamp on saved client information verbatim", async () => {
+      const { session } = createStore();
+      await session.saveClientInformation({
+        client_id: "cid",
+        issuer: "https://issuer.example.com",
+      } as never);
+      const info = (await session.clientInformation()) as {
+        issuer?: string;
+      };
+      expect(info?.issuer).toBe("https://issuer.example.com");
+    });
+
+    it("persists and returns OAuth discovery state", async () => {
+      const { session } = createStore();
+      expect(await session.discoveryState()).toBeUndefined();
+      const discovery = {
+        authorizationServerUrl: "https://auth.example.com",
+        resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth",
+      };
+      await session.saveDiscoveryState(discovery as never);
+      expect(await session.discoveryState()).toEqual(discovery);
+    });
+
+    it("clears only discovery state on invalidateCredentials('discovery')", async () => {
+      const { session, kv } = createStore();
+      await session.saveTokens({
+        access_token: "at",
+        token_type: "Bearer",
+      } as never);
+      await session.saveDiscoveryState({
+        authorizationServerUrl: "https://auth.example.com",
+      } as never);
+
+      await session.invalidateCredentials("discovery");
+
+      expect(await session.discoveryState()).toBeUndefined();
+      // tokens survive a discovery-only invalidation
+      expect(kv.get(session.getKey("tokens"))).not.toBeNull();
     });
   });
 });

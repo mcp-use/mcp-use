@@ -15,11 +15,11 @@
  */
 
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Transport } from "@modelcontextprotocol/client";
 import type {
   CallToolResult,
   JSONRPCMessage,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { X } from "lucide-react";
 import { useMcpClient } from "@mcp-use/client/react";
 import type { MessageContentBlock } from "mcp-use/react";
@@ -596,7 +596,12 @@ function MCPAppsRendererBase({
           bridge.sendToolInput({ arguments: mergedArgs });
           const output = toolOutputRef.current;
           if (output) {
-            bridge.sendToolResult(output as CallToolResult);
+            // ponytail: @modelcontextprotocol/ext-apps' app-bridge is typed
+            // against v1 SDK CallToolResult; the v2 result is runtime-identical,
+            // so cast to the bridge's own parameter type at this boundary.
+            bridge.sendToolResult(
+              output as unknown as Parameters<typeof bridge.sendToolResult>[0]
+            );
           }
         }, 300);
         return;
@@ -622,7 +627,10 @@ function MCPAppsRendererBase({
       return {};
     };
 
-    bridge.oncalltool = async ({ name, arguments: args }) => {
+    // ponytail: the bridge handler is typed against v1 SDK CallToolResult;
+    // @mcp-use/client returns the runtime-identical v2 result. Cast the handler
+    // assignment to the bridge's own handler type at this interop boundary.
+    bridge.oncalltool = (async ({ name, arguments: args }) => {
       const currentServer = serverRef.current;
       if (!currentServer) {
         throw new Error("Server connection not available");
@@ -633,14 +641,14 @@ function MCPAppsRendererBase({
           timeout: MCP_APPS_CONFIG.TIMEOUTS.TOOL_CALL,
           resetTimeoutOnProgress: true,
         });
-        return result as CallToolResult;
+        return result;
       } catch (error) {
         bridge.sendToolCancelled({
           reason: error instanceof Error ? error.message : String(error),
         });
         throw error;
       }
-    };
+    }) as typeof bridge.oncalltool;
 
     bridge.onreadresource = async ({ uri }) => {
       const result = await readResourceRef.current(uri);
@@ -978,9 +986,11 @@ function MCPAppsRendererBase({
         bridge.sendToolResult({
           ...result,
           structuredContent: parsed,
-        } as CallToolResult);
+        } as unknown as Parameters<typeof bridge.sendToolResult>[0]);
       } else {
-        bridge.sendToolResult(result);
+        bridge.sendToolResult(
+          result as unknown as Parameters<typeof bridge.sendToolResult>[0]
+        );
       }
     }
     // Note: When toolOutput is null, widget stays in pending state (isPending=true)

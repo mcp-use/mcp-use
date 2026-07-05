@@ -1,7 +1,8 @@
-import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { VersionNegotiationMode } from "@modelcontextprotocol/client";
+import { Client } from "@modelcontextprotocol/client";
+import type { StdioServerParameters } from "@modelcontextprotocol/client/stdio";
 import type { Writable } from "node:stream";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import process from "node:process";
 import type { ConnectorInitOptions } from "./base.js";
 
@@ -12,6 +13,14 @@ import type { ClientInfo } from "./http.js";
 
 interface StdioConnectorOptions extends ConnectorInitOptions {
   clientInfo?: ClientInfo;
+  /**
+   * Protocol version negotiation mode. Defaults to `"legacy"` for stdio: the
+   * SDK docs advise against `"auto"` for spawn-per-invocation CLI/debug tools
+   * (a legacy server that never answers unknown pre-`initialize` requests
+   * stalls the probe, and the probe round trip perturbs byte-stable
+   * transcripts). Opt into `"auto"` or a pin explicitly.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
 }
 
 export class StdioConnector extends BaseConnector {
@@ -21,6 +30,7 @@ export class StdioConnector extends BaseConnector {
   private readonly cwd?: string;
   private readonly errlog: Writable;
   private readonly clientInfo: ClientInfo;
+  private readonly protocolNegotiation: VersionNegotiationMode;
 
   constructor({
     command = "npx",
@@ -46,6 +56,7 @@ export class StdioConnector extends BaseConnector {
       version: "1.0.0",
     };
     this.cwd = rest.cwd;
+    this.protocolNegotiation = rest.protocolNegotiation ?? "legacy";
   }
 
   /** Establish connection to the MCP implementation. */
@@ -91,6 +102,10 @@ export class StdioConnector extends BaseConnector {
       // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = {
         ...(this.opts.clientOptions || {}),
+        versionNegotiation: {
+          mode: this.protocolNegotiation,
+          ...(this.opts.clientOptions?.versionNegotiation ?? {}),
+        },
         capabilities: {
           ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
