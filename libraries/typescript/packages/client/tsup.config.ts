@@ -6,6 +6,7 @@ export default defineConfig({
   // .js and .d.ts line up and match the package.json "exports" map.
   entry: {
     index: "src/index.ts",
+    browser: "src/browser.ts",
     "auth/index": "src/auth/index.ts",
     "auth/index-node": "src/auth/index-node.ts",
     "react/index": "src/react/index.ts",
