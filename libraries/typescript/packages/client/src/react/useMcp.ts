@@ -112,6 +112,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     headers: headersOption,
     customHeaders: customHeadersOption,
     proxyConfig,
+    oauthProxyUrl: oauthProxyUrlOption,
     autoProxyFallback = true,
     debug: _debug = false,
     logLevel: logLevelOption,
@@ -691,6 +692,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         preventAutoAuth,
         useRedirectFlow,
         gatewayUrl,
+        oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
@@ -1383,6 +1385,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     mergedClientInfo,
     // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
     gatewayUrl,
+    oauthProxyUrlOption,
     allHeaders,
     effectiveOAuthUrl,
   ]);
@@ -1577,7 +1580,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           onPopupWindow?.(popupUrl, features, popupWin);
         };
 
-        // Recreate the auth provider WITHOUT preventAutoAuth
+        // Recreate the auth provider WITHOUT preventAutoAuth.
+        // proxyOAuthRequests is always true: the scoped OAuth proxy fetch is
+        // the sole browser-CORS mechanism (the gateway no longer fronts OAuth
+        // metadata — it broke RFC 8414 §3.3 issuer validation for strict
+        // clients). It is a no-op when no OAuth proxy URL is configured.
         const { provider: freshAuthProvider, oauthProxyUrl } =
           createBrowserOAuthProvider({
             effectiveOAuthUrl,
@@ -1587,19 +1594,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false,
             useRedirectFlow,
             gatewayUrl,
+            oauthProxyUrl: oauthProxyUrlOption,
             onPopupWindow: captureOnPopupWindow,
-            proxyOAuthRequests: !gatewayUrl,
+            proxyOAuthRequests: true,
             staticClientInfo,
             scope: oauthScope,
           });
 
-        if (oauthProxyUrl && !gatewayUrl) {
+        if (oauthProxyUrl) {
           addLog("info", "Scoped OAuth proxy fetch enabled for manual auth");
-        } else if (oauthProxyUrl && gatewayUrl) {
-          addLog(
-            "info",
-            "Using MCP gateway proxy for OAuth (no scoped OAuth fetch needed)"
-          );
         }
 
         // Replace the auth provider
@@ -2313,6 +2316,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         preventAutoAuth,
         useRedirectFlow,
         gatewayUrl,
+        oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
@@ -2320,10 +2324,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
-        addLog(
-          "debug",
-          `OAuth proxy URL derived from gateway: ${oauthProxyUrl}`
-        );
+        addLog("debug", `OAuth proxy URL in effect: ${oauthProxyUrl}`);
       }
       addLog(
         "debug",
