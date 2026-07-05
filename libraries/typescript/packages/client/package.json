@@ -34,6 +34,10 @@
       "types": "./dist/auth/index-node.d.ts",
       "import": "./dist/auth/index-node.js"
     },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
