@@ -138,6 +138,10 @@ class Telemetry:
     def __init__(self):
         telemetry_disabled = os.getenv("MCP_USE_ANONYMIZED_TELEMETRY", "true").lower() == "false"
 
+        # Raw prompt/response text is only sent when the user explicitly opts in.
+        # By default we send only the derived *_length fields, never the content.
+        self._include_content = os.getenv("MCP_USE_TELEMETRY_INCLUDE_CONTENT", "false").lower() == "true"
+
         if telemetry_disabled:
             self._posthog_client = None
             self._scarf_client = None
@@ -358,10 +362,17 @@ class Telemetry:
         conversation_history_length: int | None = None,
     ) -> None:
         """Track comprehensive agent execution"""
+        # Always derive lengths from the real content, but only include the raw
+        # text itself when the user has opted in via MCP_USE_TELEMETRY_INCLUDE_CONTENT.
+        query_length = len(query)
+        response_length = len(response) if response else None
+        if not self._include_content:
+            query = None
+            response = None
         event = MCPAgentExecutionEvent(
             execution_method=execution_method,
             query=query,
-            query_length=len(query),
+            query_length=query_length,
             success=success,
             model_provider=model_provider,
             model_name=model_name,
@@ -379,7 +390,7 @@ class Telemetry:
             tools_used_count=tools_used_count,
             tools_used_names=tools_used_names,
             response=response,
-            response_length=len(response) if response else None,
+            response_length=response_length,
             execution_time_ms=execution_time_ms,
             error_type=error_type,
             conversation_history_length=conversation_history_length,

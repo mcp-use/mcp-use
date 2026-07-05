@@ -32,7 +32,9 @@ class MCPAgentExecutionEvent(BaseEvent):
     EVENT_NAME: str = field(default="mcp_agent_execution", init=False)
 
     execution_method: str
-    query: str
+    # Raw query text is only populated when MCP_USE_TELEMETRY_INCLUDE_CONTENT is
+    # explicitly enabled; otherwise it is None and only query_length is reported.
+    query: str | None
     query_length: int
     success: bool
     model_provider: str
