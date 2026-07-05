@@ -72,6 +72,12 @@ export function createBrowserOAuthProvider(params: {
   preventAutoAuth: boolean;
   useRedirectFlow: boolean;
   gatewayUrl?: string;
+  /**
+   * Explicit OAuth proxy base URL. Takes precedence over the URL derived from
+   * `gatewayUrl`. Lets consumers proxy OAuth traffic (CORS bypass) while
+   * keeping MCP traffic direct.
+   */
+  oauthProxyUrl?: string;
   onPopupWindow?: (
     url: string,
     features: string,
@@ -89,7 +95,8 @@ export function createBrowserOAuthProvider(params: {
   provider: BrowserOAuthClientProvider;
   oauthProxyUrl?: string;
 } {
-  const oauthProxyUrl = deriveOAuthProxyUrl(params.gatewayUrl);
+  const oauthProxyUrl =
+    params.oauthProxyUrl ?? deriveOAuthProxyUrl(params.gatewayUrl);
   const provider = new BrowserOAuthClientProvider(params.effectiveOAuthUrl, {
     storageKeyPrefix: params.storageKeyPrefix,
     clientName: params.oauthClientConfig.name,
