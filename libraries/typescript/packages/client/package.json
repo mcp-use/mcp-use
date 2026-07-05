@@ -52,7 +52,8 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
-    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "generate:version": "node scripts/generate-version.mjs",
+    "build": "npm run generate:version && rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run"
