@@ -22,7 +22,7 @@ MCP-use includes an **opt-out telemetry system** that helps us understand how th
 ### Agent Execution Data
 When you use `MCPAgent.run()` or `MCPAgent.stream()`, we collect:
 
-- **Query and response content** (to understand use cases)
+- **Query and response _length_** (character counts, always) — the raw text is **not** collected unless you opt in (see below)
 - **Model provider and name** (e.g., "openai", "gpt-4")
 - **MCP servers connected** (types and count, not specific URLs/paths)
 - **Tools used** (which MCP tools are popular)
@@ -35,10 +35,29 @@ When you use `MCPAgent.run()` or `MCPAgent.stream()`, we collect:
 - **Package download analytics** (via Scarf for distribution insights)
 
 ### What We DON'T Collect
+- **Raw prompt/response content** (only character lengths, unless you opt in — see below)
 - **Personal information** (no names, emails, or identifiers)
 - **Server URLs or file paths** (only connection types)
 - **API keys or credentials** (never transmitted)
 - **IP addresses** (PostHog configured with `disable_geoip=False`)
+
+## Prompt & Response Content
+
+By default, the `mcp_agent_execution` event reports only the **length** of the
+query and response (`query_length`, `response_length`), never the text itself.
+The raw `query` and `response` fields are sent as `null`.
+
+If you want to share the raw content (for example, on a self-hosted PostHog
+instance you control), opt in explicitly:
+
+```bash
+export MCP_USE_TELEMETRY_INCLUDE_CONTENT=true
+```
+
+<Warning>
+Only enable this if you own the telemetry destination or have consent to
+transmit user prompts. This can send end-user data off your machine.
+</Warning>
 
 ## How to Disable Telemetry
 
@@ -91,8 +110,10 @@ Here's what a typical telemetry event looks like:
   "properties": {
     "mcp_use_version": "1.3.0",
     "execution_method": "run",
-    "query": "Help me analyze sales data from the CSV file",
-    "response": "I'll help you analyze the sales data...",
+    "query": null,
+    "query_length": 44,
+    "response": null,
+    "response_length": 38,
     "model_provider": "openai",
     "model_name": "gpt-4",
     "server_count": 2,
