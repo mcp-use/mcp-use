@@ -3,7 +3,9 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["src/index.ts"],
-  format: ["cjs", "esm"],
+  // ESM-only: the CLI consumes @mcp-use/client / mcp-use, which are ESM-only in
+  // v2. Node 20+ only.
+  format: ["esm"],
   dts: false,
   splitting: false,
   sourcemap: true,
