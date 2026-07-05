@@ -58,9 +58,14 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
   disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
   /**
    * Protocol version negotiation mode passed to the SDK `Client`.
-   * - `"auto"` (default for HTTP): probe with `server/discover`, falling back
-   *   to the 2025 `initialize` handshake against legacy servers.
-   * - `"legacy"`: classic 2025 handshake only, no probe.
+   * - `"legacy"` (default): classic 2025 `initialize` handshake, no probe —
+   *   matches the SDK's own default. Still connects to both v1 and v2 servers
+   *   (v2 servers serve 2025-era traffic).
+   * - `"auto"`: probe with `server/discover`, falling back to the 2025
+   *   handshake against legacy servers. Opt-in: the probe performs OAuth
+   *   discovery on auth-required servers and can fail on servers whose
+   *   authorization-server issuer differs from the server URL (RFC 8414 §3.3),
+   *   which would otherwise mask the normal 401 → auth flow.
    * - `{ pin: "2026-07-28" }`: modern era only, no fallback.
    */
   protocolNegotiation?: VersionNegotiationMode;
@@ -137,10 +142,14 @@ export class HttpConnector extends BaseConnector {
     };
     this.preferSse = opts.preferSse ?? false;
     this.disableSseFallback = opts.disableSseFallback ?? false;
-    // Default to "auto" so we transparently detect v1 (legacy) vs v2 (modern,
-    // 2026-07-28) servers and speak the right protocol era. The SDK falls back
-    // to the legacy handshake on the same connection against 2025-only servers.
-    this.protocolNegotiation = opts.protocolNegotiation ?? "auto";
+    // Default to "legacy" (the SDK's own default): the classic 2025 handshake,
+    // no server/discover probe. The probe performs OAuth discovery on
+    // auth-required servers and can hard-fail (e.g. RFC 8414 §3.3 issuer
+    // mismatch when the authorization server lives on a different domain than
+    // the MCP server), which masks the normal 401 → pending_auth flow. Legacy
+    // still connects to both v1 and v2 servers (v2 serves 2025-era traffic);
+    // opt into "auto" per connection when modern-era detection is wanted.
+    this.protocolNegotiation = opts.protocolNegotiation ?? "legacy";
     this.reconnectionOptions = opts.reconnectionOptions;
   }
 

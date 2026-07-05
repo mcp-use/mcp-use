@@ -119,8 +119,9 @@ export interface HttpServerConfig extends BaseServerConfig {
   preferSse?: boolean;
   disableSseFallback?: boolean;
   /**
-   * Protocol version negotiation mode. Defaults to `"auto"` for HTTP (detect
-   * v1/legacy vs v2/modern servers). See {@link HttpConnector}.
+   * Protocol version negotiation mode. Defaults to `"legacy"` (the SDK's own
+   * default); opt into `"auto"` for v1/v2 modern-era detection. See
+   * {@link HttpConnector}.
    */
   protocolNegotiation?: VersionNegotiationMode;
 }
