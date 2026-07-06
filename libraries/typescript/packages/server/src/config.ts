@@ -109,12 +109,15 @@ export interface ServerConfig {
   /**
    * HTTP/MCP request logging: one summary line per request plus an indented
    * detail line naming the MCP method, its subject (tool name, resource URI,
-   * prompt name), compact input/output, and the calling client.
+   * prompt name), and the calling client.
    *
-   * Enabled at the `info` level by default; set `{ enabled: false }` to
-   * disable, or `{ level: "debug" }` to add full request/response header and
-   * body dumps. The `MCP_USE_LOG_LEVEL` environment variable
-   * (`info` | `debug`) overrides the configured level.
+   * Enabled at the `info` level by default, which prints no request or
+   * response payloads. Set `{ enabled: false }` to disable,
+   * `{ level: "debug" }` to echo compact truncated tool/prompt input and
+   * tool output on the detail line, or `{ level: "trace" }` for debug plus
+   * full request/response header and body dumps. The `MCP_USE_LOG_LEVEL`
+   * environment variable (`info` | `debug` | `trace`) overrides the
+   * configured level.
    */
   logging?: LoggingOptions;
 }

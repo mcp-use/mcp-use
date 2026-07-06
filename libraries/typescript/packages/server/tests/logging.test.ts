@@ -115,14 +115,32 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     const lines = loggedLines();
     expect(lines).toHaveLength(2);
     expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} POST \/mcp 200 in \d+ms$/);
+    // info level: no request/response payloads on the detail line.
+    expect(lines[1]).toBe("  tools/call greet raw-request/0.0.0");
+    await server.close();
+  });
+
+  it("echoes inline input/output at debug level", async () => {
+    const server = buildServer({ logging: { level: "debug" } });
+    await server
+      .getHandler()(
+        mcpRequest(
+          "tools/call",
+          { name: "greet", arguments: { who: "world" } },
+          { "mcp-name": "greet" }
+        )
+      );
+    const lines = loggedLines();
+    // debug adds inline payloads but no trace dump.
+    expect(lines).toHaveLength(2);
     expect(lines[1]).toBe(
       '  tools/call greet {"who":"world"} -> "hi world" raw-request/0.0.0'
     );
     await server.close();
   });
 
-  it("truncates long inline input", async () => {
-    const server = buildServer();
+  it("truncates long inline input at debug level", async () => {
+    const server = buildServer({ logging: { level: "debug" } });
     await server
       .getHandler()(
         mcpRequest(
@@ -166,9 +184,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
           { "mcp-name": "standup" }
         )
       );
-    expect(loggedLines()[1]).toBe(
-      '  prompts/get standup {"team":"core"} raw-request/0.0.0'
-    );
+    expect(loggedLines()[1]).toBe("  prompts/get standup raw-request/0.0.0");
     await server.close();
   });
 
@@ -216,8 +232,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
         )
       );
     expect(loggedLines()[1]).toBe(
-      '  tools/call fail {"reason":"on purpose"} raw-request/0.0.0 ' +
-        "ERROR failed: on purpose"
+      "  tools/call fail raw-request/0.0.0 ERROR failed: on purpose"
     );
     await server.close();
   });
@@ -270,8 +285,8 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     await server.close();
   });
 
-  it("emits the full request/response dump at debug level", async () => {
-    const server = buildServer({ logging: { level: "debug" } });
+  it("emits the full request/response dump at trace level", async () => {
+    const server = buildServer({ logging: { level: "trace" } });
     await server
       .getHandler()(
         mcpRequest(
@@ -281,20 +296,56 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
         )
       );
     const output = loggedLines().join("\n");
-    expect(output).toContain("[DEBUG] Request Details");
+    expect(output).toContain("[TRACE] Request Details");
     expect(output).toContain("Request Headers:");
     expect(output).toContain("Request Body:");
     expect(output).toContain("Response Body:");
-    // The dump carries the tool arguments (what v1's mid-tier args= showed).
     expect(output).toContain('"who": "dump"');
+    // Trace includes debug's inline echo too.
+    expect(output).toContain('  tools/call greet {"who":"dump"}');
+    await server.close();
+  });
+
+  it("redacts credential headers in the trace dump", async () => {
+    const server = buildServer({ logging: { level: "trace" } });
+    await server
+      .getHandler()(
+        mcpRequest(
+          "tools/call",
+          { name: "greet", arguments: { who: "auth" } },
+          { "mcp-name": "greet", authorization: "Bearer super-secret-token" }
+        )
+      );
+    const output = loggedLines().join("\n");
+    expect(output).toContain('"authorization": "[REDACTED]"');
+    expect(output).not.toContain("super-secret-token");
+    await server.close();
+  });
+
+  it("sanitizes control characters out of request-derived log text", async () => {
+    const server = buildServer();
+    await server
+      .getHandler()(
+        mcpRequest(
+          "tools/call",
+          { name: "fail", arguments: { reason: "line1\nFORGED 200 OK" } },
+          { "mcp-name": "fail" }
+        )
+      );
+    const lines = loggedLines();
+    // The injected newline must not produce a third log line.
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toBe(
+      "  tools/call fail raw-request/0.0.0 ERROR failed: line1 FORGED 200 OK"
+    );
     await server.close();
   });
 
   it("MCP_USE_LOG_LEVEL overrides the configured level", async () => {
-    vi.stubEnv("MCP_USE_LOG_LEVEL", "debug");
+    vi.stubEnv("MCP_USE_LOG_LEVEL", "trace");
     const server = buildServer();
     await server.getHandler()(mcpRequest("tools/list", {}));
-    expect(loggedLines().join("\n")).toContain("[DEBUG] Request Details");
+    expect(loggedLines().join("\n")).toContain("[TRACE] Request Details");
     await server.close();
   });
 
@@ -310,9 +361,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
           { "mcp-name": "greet", host: "api.example.com" }
         )
       );
-    expect(loggedLines()[1]).toBe(
-      '  tools/call greet {"who":"hono"} -> "hi hono" raw-request/0.0.0'
-    );
+    expect(loggedLines()[1]).toBe("  tools/call greet raw-request/0.0.0");
     await server.close();
   });
 });

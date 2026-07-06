@@ -3,24 +3,27 @@
  *
  * One summary line per HTTP request, plus an indented detail line for MCP
  * (JSON-RPC) requests naming the protocol method, its subject (tool name,
- * resource URI, prompt name), compact truncated input/output, and the
- * calling client:
+ * resource URI, prompt name), and the calling client:
  *
  * ```text
  * 12:45:01 POST /mcp 200 in 12ms
- *   tools/call greet {"who":"world"} -> "hi world" raw-request/0.0.0
+ *   tools/call greet raw-request/0.0.0
  * ```
  *
  * Detail lines are plain two-space-indented ASCII (no box-drawing glyphs) so
  * log parsers and agents can tell the two apart mechanically: summary lines
  * start with a timestamp, detail lines start with whitespace.
  *
- * Two verbosity levels, resolved per request from the `MCP_USE_LOG_LEVEL`
+ * Three verbosity levels, resolved per request from the `MCP_USE_LOG_LEVEL`
  * environment variable (overriding any configured level):
  *
- * - `info` (default): the compact summary + detail lines only.
- * - `debug`: adds a full request/response dump (headers and bodies) after the
- *   summary. `trace` is accepted as an alias for `debug` (the v1 name).
+ * - `info` (default): the compact summary + detail lines only — no request
+ *   or response payloads, so secrets in tool arguments/results stay out of
+ *   production logs.
+ * - `debug`: echoes compact truncated input/output on the detail line:
+ *   `tools/call greet {"who":"world"} -> "hi world" raw-request/0.0.0`.
+ * - `trace`: debug plus a full request/response dump (headers and bodies)
+ *   after the summary.
  */
 import {
   CLIENT_INFO_META_KEY,
@@ -33,7 +36,7 @@ import {
 import type { Context, MiddlewareHandler } from "hono";
 
 /** Verbosity of the request logger. */
-export type LogLevel = "info" | "debug";
+export type LogLevel = "info" | "debug" | "trace";
 
 /** Options for {@link requestLogger} — the shape of `config.logging`. */
 export interface LoggingOptions {
@@ -44,9 +47,10 @@ export interface LoggingOptions {
    */
   enabled?: boolean;
   /**
-   * Verbosity: `info` (compact lines, default) or `debug` (adds full
-   * request/response header and body dumps). The `MCP_USE_LOG_LEVEL`
-   * environment variable overrides this when set.
+   * Verbosity: `info` (compact lines without payloads, default), `debug`
+   * (adds compact truncated input/output on the detail line), or `trace`
+   * (debug plus full request/response header and body dumps). The
+   * `MCP_USE_LOG_LEVEL` environment variable overrides this when set.
    */
   level?: LogLevel;
 }
@@ -88,17 +92,15 @@ const gray = ansi(90, 39);
  * ------------------------------------------------------------------------ */
 
 /**
- * Effective log level: `MCP_USE_LOG_LEVEL` when it names a known level
- * (`trace` — the v1 name for the dump tier — maps to `debug`), otherwise the
- * configured level, otherwise `info`.
+ * Effective log level: `MCP_USE_LOG_LEVEL` when it names a known level,
+ * otherwise the configured level, otherwise `info`.
  */
 export function resolveLogLevel(configured?: LogLevel): LogLevel {
   const raw =
     typeof process === "undefined"
       ? undefined
       : process.env?.["MCP_USE_LOG_LEVEL"]?.toLowerCase();
-  if (raw === "debug" || raw === "trace") return "debug";
-  if (raw === "info") return "info";
+  if (raw === "info" || raw === "debug" || raw === "trace") return raw;
   return configured ?? "info";
 }
 
@@ -225,6 +227,16 @@ function formatClientIdentity(message: JSONRPCRequest): string | undefined {
   return formatClientInfo(info as Implementation);
 }
 
+/**
+ * Strip control characters (newlines, ANSI escapes, …) from request-derived
+ * strings so a hostile method/subject/error value cannot forge extra log
+ * lines or terminal escape sequences.
+ */
+function sanitize(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u0000-\u001F\u007F]+/g, " ");
+}
+
 /** Namespace color for the detail line's method segment. */
 function methodStyle(method: string): Style {
   if (method.startsWith("tools/")) return cyan;
@@ -237,6 +249,27 @@ function methodStyle(method: string): Style {
 /* ------------------------------------------------------------------------ *
  * Response outcome
  * ------------------------------------------------------------------------ */
+
+/** Header names whose values are credentials and never worth dumping. */
+const REDACTED_HEADERS = new Set([
+  "authorization",
+  "proxy-authorization",
+  "cookie",
+  "set-cookie",
+  "x-api-key",
+]);
+
+/** Replace credential-bearing header values with a `[REDACTED]` marker. */
+function redactHeaders(
+  headers: Record<string, string>
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers).map(([name, value]) => [
+      name,
+      REDACTED_HEADERS.has(name.toLowerCase()) ? "[REDACTED]" : value,
+    ])
+  );
+}
 
 /** The JSON-RPC-level outcome parsed from a response body. */
 interface ResponseOutcome {
@@ -332,10 +365,10 @@ function compactToolResult(result: unknown): unknown {
 }
 
 /* ------------------------------------------------------------------------ *
- * Debug dump
+ * Trace dump
  * ------------------------------------------------------------------------ */
 
-/** Pretty-print a value for the debug dump, truncating long strings. */
+/** Pretty-print a value for the trace dump, truncating long strings. */
 function formatForDump(value: unknown): string {
   function truncate(val: unknown): unknown {
     if (typeof val === "string" && val.length > 100) {
@@ -361,19 +394,19 @@ function formatForDump(value: unknown): string {
 
 const DUMP_BODY_MAX_LENGTH = 10_000;
 
-async function printDebugDump(
+async function printTraceDump(
   c: Context,
   requestHeaders: Record<string, string>,
   requestBody: unknown,
   readResponseBody: boolean
 ): Promise<void> {
   console.log(`\n${cyan("=".repeat(80))}`);
-  console.log(bold(cyan("[DEBUG] Request Details")));
+  console.log(bold(cyan("[TRACE] Request Details")));
   console.log(cyan("-".repeat(80)));
 
   if (Object.keys(requestHeaders).length > 0) {
     console.log(yellow("Request Headers:"));
-    console.log(formatForDump(requestHeaders));
+    console.log(formatForDump(redactHeaders(requestHeaders)));
   }
   if (requestBody !== undefined) {
     console.log(yellow("Request Body:"));
@@ -388,7 +421,7 @@ async function printDebugDump(
   });
   if (Object.keys(responseHeaders).length > 0) {
     console.log(yellow("Response Headers:"));
-    console.log(formatForDump(responseHeaders));
+    console.log(formatForDump(redactHeaders(responseHeaders)));
   }
 
   if (!readResponseBody) {
@@ -466,7 +499,7 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
     }
 
     const requestHeaders: Record<string, string> =
-      level === "debug" ? c.req.header() : {};
+      level === "trace" ? c.req.header() : {};
 
     // Body: prefer the parsed body createMcpHonoApp's JSON middleware stashed
     // in context vars (a request body is only readable once); fall back to
@@ -507,19 +540,29 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
     ];
 
     if (mcpRequest !== undefined) {
-      const parts: string[] = [
-        `  ${methodStyle(mcpRequest.method)(mcpRequest.method)}`,
-      ];
+      // Request-derived strings are sanitized: a hostile method/subject/
+      // error value must not forge log lines or emit terminal escapes.
+      const method = sanitize(mcpRequest.method);
+      const parts: string[] = [`  ${methodStyle(method)(method)}`];
       const detail = formatDetail(mcpRequest);
-      if (detail.subject !== undefined) parts.push(bold(detail.subject));
-      if (detail.input !== undefined) parts.push(inlineJson(detail.input));
+      if (detail.subject !== undefined) {
+        parts.push(bold(sanitize(detail.subject)));
+      }
+      // Inline input/output echoing is debug+ only: tool arguments and
+      // results can carry secrets, so the default info level never prints
+      // request or response payloads.
+      const echoPayloads = level !== "info";
+      if (echoPayloads && detail.input !== undefined) {
+        parts.push(inlineJson(detail.input));
+      }
       const outcome: ResponseOutcome = isStreamingMethod
         ? { errorMessage: null }
         : await extractResponseOutcome(c.res);
       // Echo tool output inline (truncated): the one result callers reliably
       // want to glance at. Resource/prompt payloads are bulk content — the
-      // debug dump covers those.
+      // trace dump covers those.
       if (
+        echoPayloads &&
         mcpRequest.method === "tools/call" &&
         outcome.errorMessage === null &&
         outcome.result !== undefined
@@ -529,10 +572,10 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
       // The initialize subject *is* the client identity — don't repeat it.
       if (mcpRequest.method !== "initialize") {
         const client = formatClientIdentity(mcpRequest);
-        if (client !== undefined) parts.push(dim(client));
+        if (client !== undefined) parts.push(dim(sanitize(client)));
       }
       if (outcome.errorMessage !== null) {
-        parts.push(red(`ERROR ${outcome.errorMessage}`));
+        parts.push(red(`ERROR ${sanitize(outcome.errorMessage)}`));
       } else if (c.res.status >= 400) {
         parts.push(red(`ERROR (HTTP ${c.res.status})`));
       }
@@ -542,8 +585,8 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
     // One console.log per request keeps the pair atomic under concurrency.
     console.log(lines.join("\n"));
 
-    if (level === "debug") {
-      await printDebugDump(c, requestHeaders, requestBody, !isStreamingMethod);
+    if (level === "trace") {
+      await printTraceDump(c, requestHeaders, requestBody, !isStreamingMethod);
     }
   };
 }
