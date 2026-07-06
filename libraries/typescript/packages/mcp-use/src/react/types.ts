@@ -45,6 +45,19 @@ export type UseMcpOptions = {
     customHeaders?: Record<string, string>;
   };
   /**
+   * OAuth proxy base URL (e.g. `https://inspector.example.com/inspector/api/oauth`)
+   * used to route OAuth requests (`.well-known` discovery, DCR, token exchange)
+   * through a transparent server-side proxy — bypassing browser CORS against
+   * third-party identity providers — WITHOUT proxying MCP traffic itself.
+   *
+   * The proxy is transparent: it forwards requests and responses unmodified, so
+   * the SDK's authorization-server issuer validation (RFC 8414 §3.3) still
+   * passes. When omitted, the OAuth proxy URL is derived from
+   * `proxyConfig.proxyAddress` (replacing a trailing `/proxy` with `/oauth`),
+   * preserving the existing behavior for fully-proxied connections.
+   */
+  oauthProxyUrl?: string;
+  /**
    * Connection policy used by higher-level clients such as the Inspector.
    * Behavior is controlled by `proxyConfig` and `autoProxyFallback`; this field
    * is persisted so editors can distinguish Auto, forced Direct, and forced Proxy.

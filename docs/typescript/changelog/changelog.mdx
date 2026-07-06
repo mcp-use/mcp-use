@@ -6,6 +6,20 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v1.34.0" description="July 2026">
+  <Frame>
+    <img src="https://mcp-use.com/api/og/release?v=1.34.0&title=OAuth%20proxy%20URL%20%26%20hosted%20auth%20reliability&date=2026-07&lang=typescript" alt="Release 1.34.0" />
+  </Frame>
+  ## OAuth proxy URL & hosted auth reliability
+  Minor release wiring `oauthProxyUrl` for transparent OAuth-only proxying and fixing false "Server does not support OAuth" failures on gateway-hosted servers.
+
+- **New** (react): `UseMcpOptions.oauthProxyUrl` routes OAuth discovery, DCR, and token exchange through a transparent server-side proxy while MCP traffic stays direct — takes precedence over the URL derived from `proxyConfig.proxyAddress`, preserves RFC 8414 issuer validation, and fixes gateway-fronted servers where proxying MCP anchored OAuth discovery on the wrong origin (`#1840`)
+- **Fix** (react): when OAuth discovery already succeeded and `preventAutoAuth` is set, a later failure (token refresh, SSE fallback, metadata probe on transport origin) surfaces `pending_auth` with the Authenticate button instead of `failed` / "Server does not support OAuth" (`#1840`)
+- **Enhancement** (@mcp-use/inspector): picks up mcp-use v1.34.0 OAuth fixes — see inspector changelog
+- **Update**: Updated @mcp-use/cli to v3.6.1
+- **Update**: Updated @mcp-use/inspector to v12.0.0
+</Update>
+
 <Update label="v1.33.0" description="June 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.33.0&title=MCP%20Apps%20primary%20widget%20runtime&date=2026-06&lang=typescript" alt="Release 1.33.0" />
