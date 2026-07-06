@@ -234,7 +234,7 @@ function formatClientIdentity(message: JSONRPCRequest): string | undefined {
  */
 function sanitize(text: string): string {
   // eslint-disable-next-line no-control-regex
-  return text.replace(/[\u0000-\u001F\u007F]+/g, " ");
+  return text.replace(/[\u0000-\u001F\u007F-\u009F]+/g, " ");
 }
 
 /** Namespace color for the detail line's method segment. */
