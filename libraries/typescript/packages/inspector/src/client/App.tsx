@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
+import { getPackageVersion } from "@/client/telemetry";
 import { getDefaultInspectorProxyAddress } from "./utils/connectionUpdates";
 
 /**
@@ -101,7 +102,7 @@ function App() {
           }
           clientInfo={{
             name: "mcp-use Inspector",
-            version: (window as any).__INSPECTOR_VERSION__,
+            version: getPackageVersion(),
             websiteUrl: "https://mcp-use.com",
             icons: [{ src: "https://mcp-use.com/logo.png" }],
             capabilities: {
