@@ -15,6 +15,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import {
+  getPackageVersion,
   MCPServerAddedEvent,
   MCPServerConnectionEvent,
   MCPServerRemovedEvent,
@@ -797,10 +798,7 @@ export function InspectorDashboard() {
                   variant="secondary"
                   className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
                 >
-                  v
-                  {(typeof window !== "undefined" &&
-                    (window as any).__INSPECTOR_VERSION__) ||
-                    "1.0.0"}
+                  v{getPackageVersion()}
                 </Badge>
               </a>
             </TooltipTrigger>
