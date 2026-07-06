@@ -1,6 +1,11 @@
 export function getPackageVersion(): string {
   try {
-    // Use global variable injected at build time
+    if (typeof window !== "undefined") {
+      const runtimeVersion = (window as any).__INSPECTOR_VERSION__;
+      if (runtimeVersion !== undefined) {
+        return runtimeVersion;
+      }
+    }
     if (typeof __INSPECTOR_VERSION__ !== "undefined") {
       return __INSPECTOR_VERSION__;
     }
