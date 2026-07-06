@@ -170,10 +170,10 @@ The inspector UI is **not a package dependency anywhere**. `@mcp-use/server` its
 `ServerConfig` gains:
 
 ```ts
-inspector?: boolean | { assetsUrl?: string }; // default: enabled
+inspector?: { enabled?: boolean; assetsUrl?: string }; // default: enabled
 ```
 
-Default **enabled**, mounted in both dev and production — like FastAPI's `/docs`; users set `inspector: false` to disable. Because the shell is just an HTML string with a CDN script tag, this does not violate the no-inspector-dependency rule.
+Default **enabled**, mounted in both dev and production — like FastAPI's `/docs`; users set `inspector: { enabled: false }` to disable. (Originally shipped as `boolean | { assetsUrl }`; changed to the object-only `{ enabled }` shape when `logging` landed so all on/off-with-options config reads the same way — no boolean unions.) Because the shell is just an HTML string with a CDN script tag, this does not violate the no-inspector-dependency rule.
 
 **Known limitation, recorded honestly** (Linear MCP-2075): the full v1 inspector also expects a backend proxy route; the CDN shell in this phase is browser-only and connects directly to the same-origin MCP endpoint. Acceptable for now — the current inspector may not fully support the v2 client protocol yet; "renders and connects" is the bar.
 
