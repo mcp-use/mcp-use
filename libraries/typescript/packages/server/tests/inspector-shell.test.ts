@@ -10,7 +10,7 @@ import { MCPServer } from "../src/index.js";
 import type { ServerConfig } from "../src/index.js";
 
 const DEFAULT_CDN_URL =
-  "https://cdn.jsdelivr.net/npm/@mcp-use/inspector@11/dist/cdn/inspector.js";
+  "https://pub-5337e54ad50f432cab3e646138da1efc.r2.dev/inspector@11.0.0.js";
 
 function makeServer(config: Partial<ServerConfig> = {}): MCPServer {
   const server = new MCPServer({
@@ -74,13 +74,19 @@ describe("inspector shell route", () => {
 
     const html = await response.text();
     expect(html).toContain("<!doctype html>");
-    // The bundle loads from the version-pinned public CDN.
+    // The bundle loads from the version-pinned public CDN, together with its
+    // companion stylesheet (same basename, .css suffix).
     expect(html).toContain(`<script type="module" src="${DEFAULT_CDN_URL}">`);
+    expect(html).toContain(
+      `<link rel="stylesheet" href="${DEFAULT_CDN_URL.replace(/\.js$/, ".css")}" />`
+    );
     // Serialized runtime config: basePath from the server, autoConnectUrl
     // derived client-side from the page's own origin (no host guessing).
     expect(html).toContain("window.__MCP_USE_INSPECTOR__");
     expect(html).toContain('var basePath = "/mcp";');
     expect(html).toContain("window.location.origin + basePath");
+    // Browser polyfill for the bundle's Node-flavored module-scope code.
+    expect(html).toContain("window.process = {");
     // Root node for the bundle to mount into, and a dark background so the
     // page doesn't flash white before the UI paints.
     expect(html).toContain('<div id="root">');
@@ -139,8 +145,12 @@ describe("inspector shell route", () => {
     const server = makeServer({ inspector: { assetsUrl } });
     const html = await (await get(server, "/mcp/inspector")).text();
     expect(html).toContain(`<script type="module" src="${assetsUrl}">`);
+    // The stylesheet follows the custom bundle URL too.
+    expect(html).toContain(
+      '<link rel="stylesheet" href="https://intranet.example.com/vendor/inspector.css" />'
+    );
     // The default CDN URL is fully replaced, not merely preferred.
-    expect(html).not.toContain("cdn.jsdelivr.net");
+    expect(html).not.toContain("r2.dev");
     await server.close();
   });
 
