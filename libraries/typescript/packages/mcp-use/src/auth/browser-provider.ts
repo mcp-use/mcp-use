@@ -132,6 +132,47 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   }
 
   /**
+   * Re-anchor an SDK-derived OAuth discovery URL from the MCP connection
+   * (proxy) origin onto the actual MCP server.
+   *
+   * When MCP traffic is tunneled through a gateway/inspector proxy, the SDK
+   * transport derives `/.well-known/*` URLs from the URL it connected to (the
+   * proxy) whenever no `resource_metadata` hint is available — the SSE
+   * transport's EventSource cannot read `WWW-Authenticate`, and token refresh
+   * runs without a 401 response at hand. The proxy origin serves no OAuth
+   * metadata, so discovery would fail and the server would be misclassified
+   * as "does not support OAuth". Rewriting reproduces what a direct
+   * connection would have requested: the same well-known document, anchored
+   * on the server origin, with the RFC 8414 §3.1 / RFC 9728 §3.1 path
+   * insertion using the server's path instead of the proxy's.
+   */
+  private reanchorWellKnownUrl(url: string): string {
+    if (!this.connectionUrl) return url;
+    try {
+      const requested = new URL(url);
+      const connection = new URL(this.connectionUrl);
+      if (requested.origin !== connection.origin) return url;
+      if (!requested.pathname.startsWith("/.well-known/")) return url;
+
+      const target = new URL(this.serverUrl);
+      const rest = requested.pathname.slice("/.well-known/".length);
+      const [doc, ...suffixParts] = rest.split("/");
+      if (!doc) return url;
+
+      const suffix = suffixParts.length ? `/${suffixParts.join("/")}` : "";
+      const connectionPath = connection.pathname.replace(/\/+$/, "");
+      const targetPath = target.pathname.replace(/\/+$/, "");
+      // Path-insertion form: swap the proxy's inserted path for the server's.
+      // Root form (no suffix) stays root. Unrelated suffixes are preserved.
+      const newSuffix = suffix && suffix === connectionPath ? targetPath : suffix;
+
+      return `${target.origin}/.well-known/${doc}${newSuffix}${requested.search}`;
+    } catch {
+      return url;
+    }
+  }
+
+  /**
    * Returns a `fetch` function, scoped to this provider, that routes OAuth
    * requests (`.well-known` metadata, token, register, authorize) through the
    * configured `oauthProxyUrl` to bypass CORS. All other requests are passed
@@ -167,12 +208,17 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       input: RequestInfo | URL,
       init?: RequestInit
     ): Promise<Response> => {
-      const url =
+      const requestedUrl =
         typeof input === "string"
           ? input
           : input instanceof URL
             ? input.toString()
             : input.url;
+
+      // SDK discovery derives .well-known URLs from the transport URL; when MCP
+      // is tunneled through a proxy that is the proxy origin. Re-anchor those
+      // onto the real MCP server before deciding how to route the request.
+      const url = this.reanchorWellKnownUrl(requestedUrl);
 
       // Check if this is an OAuth-related request that needs CORS bypass
       const isOAuthRequest =
@@ -285,7 +331,11 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
           "[OAuth Proxy] Request failed, falling back to direct fetch:",
           error
         );
-        return await base(input, init);
+        // Fall back to the re-anchored URL — a direct fetch to the proxy
+        // origin would never serve OAuth metadata.
+        return url !== requestedUrl
+          ? await base(url, init)
+          : await base(input, init);
       }
     };
   }
