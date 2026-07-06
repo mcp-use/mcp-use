@@ -201,7 +201,9 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     });
 
     it("does not rewrite anything when no connectionUrl is configured (direct)", async () => {
-      const scoped = makeProvider({ oauthProxyUrl: PROXY_URL }).getProxyFetch()!;
+      const scoped = makeProvider({
+        oauthProxyUrl: PROXY_URL,
+      }).getProxyFetch()!;
 
       await scoped(
         "https://server-a.example.com/.well-known/oauth-protected-resource/mcp"

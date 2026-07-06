@@ -164,7 +164,8 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
       const targetPath = target.pathname.replace(/\/+$/, "");
       // Path-insertion form: swap the proxy's inserted path for the server's.
       // Root form (no suffix) stays root. Unrelated suffixes are preserved.
-      const newSuffix = suffix && suffix === connectionPath ? targetPath : suffix;
+      const newSuffix =
+        suffix && suffix === connectionPath ? targetPath : suffix;
 
       return `${target.origin}/.well-known/${doc}${newSuffix}${requested.search}`;
     } catch {
