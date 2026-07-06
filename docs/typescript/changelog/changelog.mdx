@@ -6,6 +6,13 @@ tag: "New"
 rss: true
 ---
 
+<Update label="v1.34.1" description="July 2026">
+  ## Hosted OAuth discovery through the proxy
+  Patch release fixing the Authenticate button on gateway-hosted OAuth servers when MCP traffic is proxied for CORS.
+
+- **Fix** (auth): `BrowserOAuthClientProvider` re-anchors proxy-origin `.well-known` OAuth discovery onto the actual MCP server. When MCP is tunneled through the inspector/gateway proxy, the SDK derived discovery URLs from the proxy origin whenever no `WWW-Authenticate` hint was available (SSE transport, token refresh) — discovery failed on the proxy origin and the server was misclassified as "does not support OAuth". Lookups are now rewritten to the server origin (including the RFC 8414 §3.1 / RFC 9728 §3.1 path-insertion form), so MCP traffic can stay behind the proxy while OAuth still resolves (`#1843`)
+</Update>
+
 <Update label="v1.34.0" description="July 2026">
   <Frame>
     <img src="https://mcp-use.com/api/og/release?v=1.34.0&title=OAuth%20proxy%20URL%20%26%20hosted%20auth%20reliability&date=2026-07&lang=typescript" alt="Release 1.34.0" />

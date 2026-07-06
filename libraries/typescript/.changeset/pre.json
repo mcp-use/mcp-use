@@ -1,0 +1,13 @@
+{
+  "mode": "pre",
+  "tag": "canary",
+  "initialVersions": {
+    "@mcp-use/cli": "3.6.1",
+    "create-mcp-use-app": "0.14.17",
+    "@mcp-use/inspector": "12.0.0",
+    "mcp-use": "1.34.0"
+  },
+  "changesets": [
+    "reanchor-wellknown-discovery"
+  ]
+}

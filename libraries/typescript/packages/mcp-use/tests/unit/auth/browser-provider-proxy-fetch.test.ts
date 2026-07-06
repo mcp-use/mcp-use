@@ -143,4 +143,75 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     expect(customFetch).toHaveBeenCalledTimes(1);
     expect(globalFetchSpy).not.toHaveBeenCalled();
   });
+
+  describe("re-anchoring proxy-origin .well-known discovery onto the MCP server", () => {
+    // MCP traffic tunneled through a gateway proxy: the SDK transport derives
+    // .well-known URLs from the proxy URL whenever no resource_metadata hint is
+    // available (SSE EventSource can't read WWW-Authenticate; token refresh has
+    // no 401 response). Those must be re-anchored onto the real server or
+    // discovery lands on the proxy origin and fails.
+    const CONNECTION_URL = "https://inspector.local/inspector/api/proxy";
+
+    function makeProxiedProvider() {
+      return makeProvider({
+        oauthProxyUrl: PROXY_URL,
+        connectionUrl: CONNECTION_URL,
+      });
+    }
+
+    function proxiedMetadataTarget(callIndex: number): string {
+      const proxied = new URL(String(globalFetchSpy.mock.calls[callIndex][0]));
+      return proxied.searchParams.get("url")!;
+    }
+
+    it("rewrites the path-insertion PRM lookup to the server origin + path", async () => {
+      const scoped = makeProxiedProvider().getProxyFetch()!;
+
+      await scoped(
+        "https://inspector.local/.well-known/oauth-protected-resource/inspector/api/proxy"
+      );
+
+      expect(proxiedMetadataTarget(0)).toBe(
+        "https://server-a.example.com/.well-known/oauth-protected-resource/mcp"
+      );
+    });
+
+    it("rewrites the root-form AS metadata lookup to the server origin", async () => {
+      const scoped = makeProxiedProvider().getProxyFetch()!;
+
+      await scoped(
+        "https://inspector.local/.well-known/oauth-authorization-server"
+      );
+
+      expect(proxiedMetadataTarget(0)).toBe(
+        "https://server-a.example.com/.well-known/oauth-authorization-server"
+      );
+    });
+
+    it("leaves .well-known lookups on unrelated origins untouched", async () => {
+      const scoped = makeProxiedProvider().getProxyFetch()!;
+
+      await scoped(
+        "https://idp.example.org/.well-known/oauth-authorization-server"
+      );
+
+      expect(proxiedMetadataTarget(0)).toBe(
+        "https://idp.example.org/.well-known/oauth-authorization-server"
+      );
+    });
+
+    it("does not rewrite anything when no connectionUrl is configured (direct)", async () => {
+      const scoped = makeProvider({
+        oauthProxyUrl: PROXY_URL,
+      }).getProxyFetch()!;
+
+      await scoped(
+        "https://server-a.example.com/.well-known/oauth-protected-resource/mcp"
+      );
+
+      expect(proxiedMetadataTarget(0)).toBe(
+        "https://server-a.example.com/.well-known/oauth-protected-resource/mcp"
+      );
+    });
+  });
 });
