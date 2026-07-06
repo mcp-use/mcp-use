@@ -135,7 +135,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     expect(detail).toContain('{"who":"xxx');
     expect(detail).toContain("...");
     // 80-char cap plus the ellipsis.
-    const inputSegment = detail.split(" ")[3] ?? "";
+    const inputSegment = detail.split(" ")[4] ?? "";
     expect(inputSegment.length).toBeLessThanOrEqual(83);
     await server.close();
   });
