@@ -10,8 +10,8 @@ export interface InspectorOptions {
    * `@mcp-use/inspector` CDN bundle (`dist/cdn/inspector.js`) — self-host it
    * for air-gapped environments where the public CDN is unreachable.
    *
-   * @defaultValue The jsDelivr URL for `@mcp-use/inspector`, pinned to the
-   * current major version.
+   * @defaultValue The mcp-use CDN URL for the `@mcp-use/inspector` bundle,
+   * pinned to the current version.
    */
   assetsUrl?: string;
 }
@@ -67,8 +67,8 @@ export interface ServerConfig {
    * @remarks
    * Follows the FastAPI `/docs` model: the server itself ships only a tiny
    * dependency-free HTML page whose `<script type="module">` loads the
-   * `@mcp-use/inspector` bundle from a CDN (jsDelivr, pinned to the current
-   * major version), so the UI updates independently of SDK releases and adds
+   * `@mcp-use/inspector` bundle from a CDN (pinned to the current inspector
+   * version), so the UI updates independently of SDK releases and adds
    * nothing to the install. The page tells the inspector to connect to this
    * server's MCP endpoint at `basePath`, deriving the URL from the browser's
    * own origin.

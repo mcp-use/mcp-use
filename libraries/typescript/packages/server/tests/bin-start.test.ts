@@ -97,6 +97,16 @@ describe("parseArgs", () => {
     expect(args.host).toBe("::1");
   });
 
+  it("parses --tunnel", () => {
+    expect(parseArgs(["dev", "--tunnel"]).tunnel).toBe(true);
+    expect(parseArgs(["dev"]).tunnel).toBe(false);
+  });
+
+  it("parses --no-open (auto-open defaults to on)", () => {
+    expect(parseArgs(["dev", "--no-open"]).open).toBe(false);
+    expect(parseArgs(["dev"]).open).toBe(true);
+  });
+
   it("parses help and version flags", () => {
     expect(parseArgs(["--help"]).help).toBe(true);
     expect(parseArgs(["-h"]).help).toBe(true);

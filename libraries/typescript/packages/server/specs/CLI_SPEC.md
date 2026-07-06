@@ -17,7 +17,7 @@
 - React/views and any client-side Vite environment (view bundling) — Phase 5 territory.
 - HMR of any kind, including server-side `list_changed` notification sync (see "Why no HMR" below). Dev reload here is **reload, not HMR**.
 - Typegen (watch-mode type generation is part of the Phase 5 dev contract, not this one).
-- Tunnel, deploy/cloud commands, project scaffolding.
+- Deploy/cloud commands, project scaffolding.
 - Auth (`AUTH_SPEC.md` owns that; these commands neither add nor bypass it).
 
 ## Entry contract
@@ -97,11 +97,11 @@ The build system keeps v1's reworked workspace convention **exactly** — it was
 ├─ build/        ← compiled server + manifest.json (this spec)
 ├─ generated/    ← typegen output (.d.ts) — reserved; Phase 5
 ├─ cache/        ← disposable dev/build scratch (vite entries, metadata)
-├─ state/        ← mutable runtime state (e.g. tunnel state) — reserved; future
+├─ state/        ← mutable runtime state (e.g. tunnel.json)
 └─ cloud/        ← cloud linkage (link.json) — reserved; future
 ```
 
-This phase writes only `build/` (and may use `cache/`); `generated/`, `state/`, and `cloud/` are **reserved by convention now** so no tool squats on them before their phases land. v1's invariant carries over: `build/` contains no mutable runtime state (that is `state/`'s job), so build output stays reproducible and disposable.
+This phase writes `build/` (and may use `cache/` and `state/tunnel.json` during dev); `generated/` and `cloud/` are **reserved by convention now** so no tool squats on them before their phases land. v1's invariant carries over: `build/` contains no mutable runtime state (that is `state/`'s job), so build output stays reproducible and disposable.
 
 Rules, all inherited from v1 and locked:
 
@@ -135,8 +135,22 @@ On file change: Vite invalidates, dev re-imports the entry through the runner, a
 
 - **Port:** `--port`, else `PORT` env, else `3000`; if taken, probe upward.
 - **Host:** `127.0.0.1` by default; `--host` to override (matching the server's own localhost-first posture, SPEC.md delta 5).
+- **Tunnel:** `--tunnel` starts a public tunnel as soon as the HTTP listener is bound (via `npx @mcp-use/tunnel`). The inspector UI can also start/stop the tunnel at runtime through dev-only API routes (below) without restarting the dev process.
+- **Auto-open:** once the listener is bound, the inspector URL is opened in the default browser (dependency-free `open`/`start`/`xdg-open` spawn, best-effort). `--no-open` disables it, and it is skipped automatically when stdout is not a TTY, so agents/CI never trigger a browser launch or see a "failed to open" error.
 - **Env:** `.env` loaded via Node's native `process.loadEnvFile()` (guarded by an `existsSync` check, since `loadEnvFile` throws on a missing file) before the entry is imported.
 - **Errors:** a throwing entry module keeps the *previous* handler alive and prints the error — the dev process never crashes on a bad save.
+
+#### Dev-only inspector API routes (tunnel)
+
+Intercepted by the dev HTTP listener before the MCP handler (exact path match on the introspected `basePath`, default `/mcp`):
+
+| Method | Path | Response |
+|--------|------|----------|
+| `GET` | `{basePath}/inspector/api/dev/info` | `{ mcpUrl, port, fromCli: true, tunnelUrl }` — `mcpUrl` is `{tunnelUrl}{basePath}` when a tunnel is active, else `null`; `tunnelUrl` is the public origin or `null`. |
+| `POST` | `{basePath}/inspector/api/dev/start-tunnel` | `{ ok: true, restarting: false }` on success; `{ error }` with status 500 on failure. |
+| `POST` | `{basePath}/inspector/api/dev/stop-tunnel` | `{ ok: true }`. |
+
+Tunnel subdomain persistence lives at `.mcp-use/state/tunnel.json` (v1-compatible `{ subdomain }` shape). The tunnel release API base URL defaults to `https://local.mcp-use.run` and is overridable via `MCP_USE_TUNNEL_API`.
 
 ### `mcp-use start` (inline in `@mcp-use/server` bin)
 
@@ -150,7 +164,7 @@ Requires zero cli-chunk/vite/toolchain code — a production image needs only `m
 
 The inspector UI is **not a package dependency anywhere**. `@mcp-use/server` itself owns a tiny dependency-free HTML shell route — the exact analog of FastAPI's `get_swagger_ui_html` for `/docs`:
 
-- `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` loads the inspector bundle from a CDN: a jsDelivr/unpkg URL for `@mcp-use/inspector`'s CDN bundle (`build:cdn` output, `dist/cdn/inspector.js` — a single self-contained ESM file), **pinned to a major version** so users get inspector updates without SDK bumps.
+- `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` loads the inspector bundle from a CDN: currently the mcp-use R2 bucket serving this branch's `build:cdn` output (the `inspector@{version}.js` + `.css` pair), **pinned to an exact version**. Moves to the jsDelivr npm copy once an inspector release ships the v2 branch's basePath-aware client (published bundles up to 12.x hardcode `/inspector` as the router basename and cannot run under `${basePath}/inspector`).
 - Config (autoConnect URL = the MCP endpoint at `basePath`, plus `basePath` itself) is passed via a serialized `window` global read by the bundle.
 
 `ServerConfig` gains:
@@ -184,7 +198,7 @@ Dev reload (the handler swap above) is reload, not HMR: no state is preserved ac
 - Views + the client Vite environment (view bundling) — Phase 5.
 - Typegen (watch-mode regeneration in `dev`) — Phase 5 dev contract.
 - Local-inspector serving from `node_modules` for offline dev.
-- Tunnel; deploy/cloud commands.
+- Deploy/cloud commands.
 
 ## Open questions
 

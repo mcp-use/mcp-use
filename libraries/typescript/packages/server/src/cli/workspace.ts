@@ -20,7 +20,7 @@
  * ├─ build/        ← compiled server + manifest.json (this package)
  * ├─ generated/    ← typegen output (.d.ts) — reserved; Phase 5
  * ├─ cache/        ← disposable dev/build scratch
- * ├─ state/        ← mutable runtime state — reserved; future
+ * ├─ state/        ← mutable runtime state (e.g. tunnel.json)
  * └─ cloud/        ← cloud linkage (link.json) — reserved; future
  * ```
  *
@@ -83,12 +83,14 @@ export interface WorkspacePaths {
   generated: string;
   /** Disposable dev/build scratch directory. */
   cache: string;
-  /** Mutable runtime state directory — reserved. */
+  /** Mutable runtime state directory. */
   state: string;
   /** Cloud linkage directory — reserved. */
   cloud: string;
   /** Build manifest: `<build>/manifest.json`. */
   buildManifest: string;
+  /** Tunnel subdomain persistence: `<state>/tunnel.json`. */
+  tunnel: string;
 }
 
 /**
@@ -117,5 +119,6 @@ export function resolveWorkspacePaths(projectRoot: string): WorkspacePaths {
     state: join(workspace, "state"),
     cloud: join(workspace, "cloud"),
     buildManifest: join(build, BUILD_MANIFEST_NAME),
+    tunnel: join(workspace, "state", "tunnel.json"),
   };
 }

@@ -34,6 +34,10 @@ export interface CliCommandOptions {
   port?: number;
   /** Host override (`--host`). */
   host?: string;
+  /** Start a public tunnel at dev startup (`--tunnel`). */
+  tunnel?: boolean;
+  /** Auto-open the inspector in a browser at dev startup (`--no-open` disables). */
+  open?: boolean;
 }
 
 /** The subset of the cli chunk's exports this bin calls. */
@@ -55,6 +59,8 @@ Options:
   -p, --port <n>     Port to serve on (default: $PORT or 3000)
   --host <host>      Host to bind (dev only)
   --entry <path>     Server entry module (dev/build only)
+  --tunnel           Expose the dev server through a public tunnel (dev only)
+  --no-open          Do not auto-open the inspector in a browser (dev only)
   -h, --help         Show this help
   -v, --version      Print the version`;
 
@@ -136,6 +142,8 @@ async function cliCommand(
     ...(args.entry !== undefined && { entry: args.entry }),
     ...(args.port !== undefined && { port: args.port }),
     ...(args.host !== undefined && { host: args.host }),
+    ...(args.tunnel && { tunnel: true }),
+    ...(!args.open && { open: false }),
   };
 
   try {
