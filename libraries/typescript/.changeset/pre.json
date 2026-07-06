@@ -7,5 +7,7 @@
     "@mcp-use/inspector": "11.0.0",
     "mcp-use": "1.33.0"
   },
-  "changesets": []
+  "changesets": [
+    "oauth-proxy-url-and-pending-auth"
+  ]
 }
