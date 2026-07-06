@@ -1,6 +1,6 @@
 /**
  * Tests for the inspector CDN shell route: default-enabled mounting at
- * `${basePath}/inspector`, the `inspector` config forms (`false`,
+ * `${basePath}/inspector`, the `inspector` config forms (`{ enabled: false }`,
  * `{ assetsUrl }`), script-injection escaping, and coexistence with the MCP
  * endpoint — driven through `getHandler()`, no network.
  */
@@ -110,8 +110,8 @@ describe("inspector shell route", () => {
     await server.close();
   });
 
-  it("treats true and {} the same as the default (enabled)", async () => {
-    for (const inspector of [true, {}] as const) {
+  it("treats {} and { enabled: true } the same as the default (enabled)", async () => {
+    for (const inspector of [{}, { enabled: true }] as const) {
       const server = makeServer({ inspector });
       const response = await get(server, "/mcp/inspector");
       expect(response.status).toBe(200);
@@ -120,8 +120,8 @@ describe("inspector shell route", () => {
     }
   });
 
-  it("returns 404 when inspector is false", async () => {
-    const server = makeServer({ inspector: false });
+  it("returns 404 when the inspector is disabled", async () => {
+    const server = makeServer({ inspector: { enabled: false } });
     expect((await get(server, "/mcp/inspector")).status).toBe(404);
     expect((await get(server, "/mcp/inspector/")).status).toBe(404);
     // The MCP endpoint itself is unaffected.

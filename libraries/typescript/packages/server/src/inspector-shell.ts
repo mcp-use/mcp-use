@@ -157,8 +157,8 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
  *
  * Registers GET for both the bare and trailing-slash paths (Hono answers
  * HEAD from GET handlers automatically) and serves the pre-rendered shell as
- * `text/html; charset=utf-8`. No-op when `inspector` is `false`;
- * `undefined`, `true`, and `{}` all mean enabled.
+ * `text/html; charset=utf-8`. No-op when `inspector.enabled` is `false`;
+ * `undefined` and `{}` mean enabled.
  *
  * @internal Wiring for `MCPServer` — mounted on the same app as the MCP
  * endpoint, so any configured Host/Origin validation middleware applies to
@@ -166,13 +166,13 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
  */
 export function mountInspectorShell<E extends Env>(
   app: Hono<E>,
-  inspector: boolean | InspectorOptions | undefined,
+  inspector: InspectorOptions | undefined,
   options: { serverName: string; basePath: string }
 ): void {
-  if (inspector === false) {
+  if (inspector?.enabled === false) {
     return;
   }
-  const { assetsUrl } = typeof inspector === "object" ? inspector : {};
+  const { assetsUrl } = inspector ?? {};
   // Config is fixed at mount time, so the page renders once, not per request.
   const html = renderInspectorShell({
     serverName: options.serverName,

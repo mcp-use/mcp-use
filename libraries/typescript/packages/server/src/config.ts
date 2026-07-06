@@ -1,8 +1,16 @@
+import type { LoggingOptions } from "./logging.js";
+
 /**
- * Options for the inspector shell route — the object form of
+ * Options for the inspector shell route — the shape of
  * {@link ServerConfig.inspector}.
  */
 export interface InspectorOptions {
+  /**
+   * Whether the inspector shell route is mounted.
+   *
+   * @defaultValue `true`
+   */
+  enabled?: boolean;
   /**
    * Full replacement URL for the inspector bundle script (FastAPI's
    * `swagger_js_url` analog). The shell's `<script type="module">` loads
@@ -73,11 +81,9 @@ export interface ServerConfig {
    * server's MCP endpoint at `basePath`, deriving the URL from the browser's
    * own origin.
    *
-   * `true`, `{}`, and leaving the field unset all mean enabled; set `false`
-   * to disable the route, or pass `{ assetsUrl }` to load the bundle from a
-   * self-hosted copy instead of the public CDN (air-gapped environments).
-   *
-   * @defaultValue `true`
+   * Enabled by default; set `{ enabled: false }` to disable the route, or
+   * pass `{ assetsUrl }` to load the bundle from a self-hosted copy instead
+   * of the public CDN (air-gapped environments).
    *
    * @example
    * ```ts
@@ -85,7 +91,11 @@ export interface ServerConfig {
    * new MCPServer({ name: "my-server", version: "1.0.0" });
    *
    * // Disabled:
-   * new MCPServer({ name: "my-server", version: "1.0.0", inspector: false });
+   * new MCPServer({
+   *   name: "my-server",
+   *   version: "1.0.0",
+   *   inspector: { enabled: false },
+   * });
    *
    * // Air-gapped: load a self-hosted copy of the inspector bundle.
    * new MCPServer({
@@ -95,5 +105,16 @@ export interface ServerConfig {
    * });
    * ```
    */
-  inspector?: boolean | InspectorOptions;
+  inspector?: InspectorOptions;
+  /**
+   * HTTP/MCP request logging: one summary line per request plus an indented
+   * detail line naming the MCP method, its subject (tool name, resource URI,
+   * prompt name), compact input/output, and the calling client.
+   *
+   * Enabled at the `info` level by default; set `{ enabled: false }` to
+   * disable, or `{ level: "debug" }` to add full request/response header and
+   * body dumps. The `MCP_USE_LOG_LEVEL` environment variable
+   * (`info` | `debug`) overrides the configured level.
+   */
+  logging?: LoggingOptions;
 }
