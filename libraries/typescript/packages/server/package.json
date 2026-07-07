@@ -26,6 +26,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
     }
   },
   "module": "./dist/index.js",
@@ -53,9 +57,21 @@
     "hono": "^4.12.27"
   },
   "peerDependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "vite": "^8.0.0"
   },
   "peerDependenciesMeta": {
+    "@modelcontextprotocol/ext-apps": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
     "vite": {
       "optional": true
     }
@@ -63,7 +79,14 @@
   "devDependencies": {
     "@mcp-use/server": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0-beta.2",
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "happy-dom": "^20.10.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "typescript": "7.0.1-rc",
     "vite": "^8.0.16",
     "vitest": "^4.1.9",

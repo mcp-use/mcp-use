@@ -1,6 +1,7 @@
 import { defineConfig } from "tsup";
 
-export default defineConfig({
+export default defineConfig([
+  {
   entry: {
     index: "src/index.ts",
     // The `mcp-use` bin (package.json "bin"). Its source shebang is
@@ -28,4 +29,26 @@ export default defineConfig({
   splitting: true,
   sourcemap: true,
   clean: true,
-});
+  },
+  // Browser-only view runtime (`@mcp-use/server/react`). Must not be reachable
+  // from the `.` export or `bin` graphs — same invariant as the cli chunk above.
+  {
+    entry: {
+      "react/index": "src/react/index.ts",
+    },
+    format: ["esm"],
+    target: "es2022",
+    platform: "browser",
+    dts: false,
+    splitting: false,
+    sourcemap: true,
+    clean: false,
+    external: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "@modelcontextprotocol/ext-apps",
+    ],
+  },
+]);
