@@ -9,6 +9,8 @@ export { MCPServer } from "./server.js";
 export { mountMcp } from "./mount-mcp.js";
 export type { MountMcpOptions } from "./mount-mcp.js";
 export { view, registerViews } from "./views/index.js";
+export { requestLogger } from "./logging.js";
+export type { LoggingOptions, LogLevel } from "./logging.js";
 
 /**
  * Wire result shapes (re-exported from the SDK): callbacks return these raw

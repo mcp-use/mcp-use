@@ -19,6 +19,10 @@ export interface ParsedArgs {
   entry: string | undefined;
   /** Value of `--host`, or `undefined` if the flag was not passed. */
   host: string | undefined;
+  /** Whether `--tunnel` was passed (dev only). */
+  tunnel: boolean;
+  /** `false` when `--no-open` was passed (dev only); `true` otherwise. */
+  open: boolean;
   /** Whether `--help`/`-h` was passed. */
   help: boolean;
   /** Whether `--version`/`-v` was passed. */
@@ -43,6 +47,8 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
     port: undefined,
     entry: undefined,
     host: undefined,
+    tunnel: false,
+    open: true,
     help: false,
     version: false,
   };
@@ -90,6 +96,12 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
         break;
       case "--host":
         args.host = takeValue();
+        break;
+      case "--tunnel":
+        args.tunnel = true;
+        break;
+      case "--no-open":
+        args.open = false;
         break;
       default:
         if (flag.startsWith("-")) {

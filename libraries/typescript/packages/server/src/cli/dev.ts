@@ -19,6 +19,7 @@
  * package load time.
  */
 
+import { spawn } from "node:child_process";
 import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
@@ -28,6 +29,8 @@ import { getRequestListener } from "@hono/node-server";
 
 import { discoverEntry } from "./entry.js";
 import { resolvePort } from "./port.js";
+import { createDevApiHandler } from "./dev-api.js";
+import { createTunnelManager } from "./tunnel.js";
 import { resolveWorkspacePaths } from "./workspace.js";
 import { mcpUseViewsPlugin } from "./views-plugin.js";
 import {
@@ -89,6 +92,48 @@ export interface DevOptions {
    * pass this.
    */
   signal?: AbortSignal;
+  /**
+   * When `true`, start a public tunnel as soon as the HTTP listener is bound
+   * (same as the inspector "Start Tunnel" control, but at startup).
+   *
+   * @defaultValue `false`
+   */
+  tunnel?: boolean;
+  /**
+   * Auto-open the inspector in the default browser once the listener is
+   * bound (`--no-open` sets this to `false`). Opening is additionally
+   * skipped when stdout is not a TTY — agents and CI never get a spurious
+   * browser launch or a "failed to open" error.
+   *
+   * @defaultValue `true`
+   */
+  open?: boolean;
+}
+
+/**
+ * Best-effort open of `url` in the platform's default browser.
+ *
+ * Dependency-free (`open`/`start`/`xdg-open` via spawn), detached, and
+ * error-swallowing: a missing opener (headless Linux, containers) must never
+ * crash or log noise into the dev process.
+ */
+function openInBrowser(url: string): void {
+  const [command, args]: [string, string[]] =
+    process.platform === "darwin"
+      ? ["open", [url]]
+      : process.platform === "win32"
+        ? // `start` is a cmd built-in; the empty string is the window title.
+          ["cmd", ["/c", "start", "", url]]
+        : ["xdg-open", [url]];
+  try {
+    const child = spawn(command, args, { stdio: "ignore", detached: true });
+    child.on("error", () => {
+      // Swallow: auto-open is a convenience, never a failure.
+    });
+    child.unref();
+  } catch {
+    // Synchronous spawn failures are equally non-fatal.
+  }
 }
 
 const VITE_CONFIG_CANDIDATES = [
@@ -358,11 +403,23 @@ export async function runDev(options: DevOptions): Promise<void> {
   if (port !== requested) {
     console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
   }
+  process.env["PORT"] = String(port);
 
-  // Same adapter serve() uses internally — the Hono handler sees identical
-  // requests (see the comment where httpServer is created).
+  const tunnelManager = createTunnelManager(paths.tunnel);
+  const devFetch = createDevApiHandler(
+    {
+      getBasePath: () => basePath,
+      port,
+      tunnel: tunnelManager,
+    },
+    (request) => currentHandler(request)
+  );
+
+  // Same adapter serve() uses internally — the handler sees identical
+  // requests (see the comment where httpServer is created). devFetch wraps
+  // the swappable Hono handler with the dev API (tunnel control) routes.
   const honoListener = getRequestListener((request: Request) =>
-    currentHandler(request)
+    devFetch(request)
   );
 
   const onRequest = (req: IncomingMessage, res: ServerResponse): void => {
@@ -408,6 +465,26 @@ export async function runDev(options: DevOptions): Promise<void> {
   console.log(`  ➜ MCP endpoint:  http://localhost:${port}${basePath}`);
   console.log(`  ➜ Inspector:     http://localhost:${port}${basePath}/inspector`);
 
+  if (options.tunnel === true) {
+    try {
+      const { url } = await tunnelManager.start(port);
+      console.log(`  ➜ Tunnel:        ${url}${basePath}`);
+    } catch (error) {
+      await tunnelManager.stop();
+      await new Promise<void>((done) => httpServer.close(() => done()));
+      await runner.close();
+      await vite.close();
+      throw error;
+    }
+  }
+
+  // Auto-open the inspector — unless disabled (`--no-open`) or stdout is not
+  // a TTY (agents/CI: no browser to open, and no error to fail on).
+  if (options.open !== false && process.stdout.isTTY === true) {
+    openInBrowser(`http://localhost:${port}${basePath}/inspector`);
+  }
+
+  // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------
   await new Promise<void>((resolve) => {
     let closing = false;
     const shutdown = (): void => {
@@ -419,6 +496,7 @@ export async function runDev(options: DevOptions): Promise<void> {
         vite.watcher.off("change", onFileEvent);
         vite.watcher.off("add", onFileEvent);
         vite.watcher.off("unlink", onFileEvent);
+        await tunnelManager.stop();
         await new Promise<void>((done) => httpServer.close(() => done()));
         await runner.close();
         await vite.close();

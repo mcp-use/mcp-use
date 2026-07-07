@@ -16,6 +16,7 @@ import { Hono } from "hono";
 import type { ServerConfig } from "./config.js";
 import { toRequestContext } from "./context.js";
 import { mountInspectorShell } from "./inspector-shell.js";
+import { requestLogger } from "./logging.js";
 import { mountMcp } from "./mount-mcp.js";
 import type {
   InferPromptInput,
@@ -374,6 +375,8 @@ export class MCPServer {
           );
         }
       }
+      // Logging first so view document/asset routes are observed too.
+      app.use("*", requestLogger(this.#config.logging));
       this.#validateViewBindingsAtMount();
       mountViewRoutes(app, this.#basePath(), this.#views);
       const handler = mountMcp(app, (ctx) => this.#buildSdkServer(ctx), {

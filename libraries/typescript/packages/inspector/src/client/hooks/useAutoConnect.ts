@@ -552,6 +552,24 @@ export function useAutoConnect({
       return;
     }
 
+    // Serialized runtime config injected by the SDK v2 CDN shell
+    // (window.__MCP_USE_INSPECTOR__) — the shell has no inspector backend, so
+    // this replaces the config.json fetch below.
+    const shellAutoConnectUrl = (
+      window as Window & {
+        __MCP_USE_INSPECTOR__?: { autoConnectUrl?: string };
+      }
+    ).__MCP_USE_INSPECTOR__?.autoConnectUrl;
+    if (shellAutoConnectUrl) {
+      const config = parseAutoConnectParam(shellAutoConnectUrl);
+      if (config) {
+        handleAutoConnectConfig(config);
+      }
+
+      setConfigLoaded(true);
+      return;
+    }
+
     // Fallback to config.json
     fetch(`${getInspectorBase()}/config.json`)
       .then((res) => res.json())

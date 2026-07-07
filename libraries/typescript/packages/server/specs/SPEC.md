@@ -1,6 +1,6 @@
 # @mcp-use/server — v2 server rebuild
 
-**Status:** Phase 1 (basic MCP pieces) and the build/dev/start CLI (`CLI_SPEC.md`) are implemented. This document is the working contract; it is updated as each phase lands. Companion contracts: `CLI_SPEC.md` (implemented), `VIEWS_SPEC.md` (views, pre-implementation), `AUTH_SPEC.md` (deferred until the official SDK ships auth support).
+**Status:** Phase 1 (basic MCP pieces), the build/dev/start CLI (`CLI_SPEC.md`), and built-in request logging (§ Request logging) are implemented. This document is the working contract; it is updated as each phase lands. Companion contracts: `CLI_SPEC.md` (implemented), `VIEWS_SPEC.md` (views, pre-implementation), `AUTH_SPEC.md` (deferred until the official SDK ships auth support).
 **Package:** `@mcp-use/server` (private during development; renamed/published as `mcp-use@2.x` at cutover, replacing `packages/mcp-use`).
 **Branch target:** `v2`.
 
@@ -46,6 +46,8 @@ const server = new MCPServer({
   allowedHosts: undefined,     // optional, e.g. ["api.example.com"]; additive to localhost
   allowedOrigins: undefined,   // optional origin hostnames; defaults to the Host allowlist
   legacy: "stateless",         // optional; "reject" for modern-only strict (see ground rules)
+  inspector: { enabled: true, assetsUrl: undefined }, // optional; see CLI_SPEC.md
+  logging: { enabled: true, level: "info" },          // optional; see § Request logging
 });
 
 server.tool(
@@ -121,6 +123,28 @@ Callback context (`ctx`, second parameter): `{ signal, request? }` — request-s
 **Intentionally absent from Phase 1** (land with their phase — see "Later phases"): `ctx.sample`/`ctx.elicit`/`ctx.auth`/`ctx.req` (Hono context), OAuth, middleware (`server.use`), notifications/subscriptions, views, landing page, OpenAPI import, telemetry, typegen, stdio serving.
 
 **Examples** (`examples/vercel`, `examples/railway`): the two deployment doors, each verified end-to-end. Vercel = serverless via `getHandler()` exported as `export default { fetch }` from an `api/` function — zero host config (delta 5). Railway = the CLI entry contract (`CLI_SPEC.md`): the entry default-exports the server and never calls `listen()` itself; `mcp-use build` + `mcp-use start` own the socket (host selection via `RAILWAY_PUBLIC_DOMAIN` stays constructor config, which `start`'s `listen()` honors), and the bin handles SIGINT/SIGTERM → `close()`.
+
+## Request logging (landed 2026-07-06)
+
+Built-in HTTP/MCP request logging (`src/logging.ts`), on by default. One summary line per HTTP request plus an indented detail line for MCP requests:
+
+```text
+12:45:01 POST /mcp 200 in 12ms
+  tools/call greet cursor/1.2.0
+```
+
+Contract:
+
+- **Format.** Summary line: `HH:MM:SS` UTC timestamp, HTTP verb, pathname, status (colored by class), duration. Detail line: plain two-space-indented ASCII (no box-drawing glyphs) carrying the MCP method (colored by namespace), its subject (tool name / resource URI / prompt name / `clientName/version` for initialize), and the calling client from the 2026-07-28 per-request `_meta` envelope (`io.modelcontextprotocol/clientInfo` — the stateless replacement for v1's session-id prefix; omitted on initialize, whose subject already is the client). Machine-parseable by construction: summary lines start with a timestamp, detail lines with whitespace. Tool `isError` results and JSON-RPC errors append `ERROR <message>`; the pair is emitted as one `console.log` so it stays atomic under concurrency.
+- **Levels** (`logging.level`, overridden by the `MCP_USE_LOG_LEVEL` env var; `info` | `debug` | `trace`):
+  - `info` (default): summary + detail only — **no request or response payloads**, so secrets in tool arguments/results stay out of production logs.
+  - `debug`: echoes compact single-line input/output on the detail line, truncated at 80 chars — tool/prompt arguments, and `-> <result>` for `tools/call` (`structuredContent` when present, else a lone text block). Resource/prompt result payloads are never echoed (bulk content).
+  - `trace`: debug plus a full request/response header+body dump after the pair (v1's `DEBUG=1` behavior).
+- **Typed against the SDK, exhaustively.** Detail formatting is a table mapped over the SDK's `RequestMethod` union with params typed per method via `RequestTypeMap`; a new protocol method in an SDK bump is a **compile error** here until a formatter is chosen (the v1 logger's silent `[unknown-method]` fallback is the anti-pattern this replaces). Bodies are narrowed with `isJSONRPCRequest`, and the parsed body comes from `c.var.parsedBody` when `createMcpHonoApp` mounted the app (no re-parse; cloned+parsed only on bare apps).
+- **Safety.** Credential headers (`authorization`, `proxy-authorization`, `cookie`, `set-cookie`, `x-api-key`) are `[REDACTED]` in trace dumps; request-derived strings (method/subject/client/error) are stripped of control characters so hostile values cannot forge log lines or emit terminal escapes; `subscriptions/listen` responses are never awaited for an outcome (unbounded SSE stream — reading it would block the middleware chain).
+- **Colors** via a ~10-line internal ANSI helper — **no chalk/picocolors dependency** (dependency-budget ground rule). Honors `NO_COLOR`; plain text when stdout is not a TTY or absent (edge runtimes).
+- **Noise.** Inspector shell page loads and favicon probes (GET/HEAD) are skipped; non-MCP requests log the summary line only.
+- **Config & exports.** `logging?: { enabled?: boolean; level?: "info" | "debug" | "trace" }` on `ServerConfig` (default enabled at `info`). The convention set here: on/off-with-options config fields are object-only with an `enabled` flag — no `boolean | object` unions (`inspector` was migrated to match). `requestLogger(options)`, `LoggingOptions`, and `LogLevel` are exported from the package root for hand-composed `mountMcp` apps.
 
 ## Later phases (each gets its own scope + delta notes before work starts)
 
