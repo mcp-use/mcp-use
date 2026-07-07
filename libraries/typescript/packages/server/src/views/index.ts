@@ -1,0 +1,31 @@
+export { registerViews } from "./register.js";
+export type { RegisterViews } from "./register.js";
+export { view } from "./view.js";
+export {
+  UI_EXTENSION_ID,
+  UI_META_KEY,
+  UI_MIME_TYPE,
+  UI_RESOURCE_URI_META_KEY,
+  UI_RESOURCE_URI_PREFIX,
+  viewResourceUri,
+} from "./constants.js";
+export type {
+  UiPermissions,
+  ViewManifestEntry,
+  ViewMetadata,
+  ViewsManifest,
+} from "./types.js";
+export { synthesizeViewDocument, resolveAssetUrl } from "./document.js";
+export { resolveRequestOrigin } from "./origin.js";
+export { mountViewRoutes } from "./routes.js";
+export {
+  extractClientCapabilitiesFromBody,
+  getStashedClientCapabilities,
+  stashClientCapabilities,
+  supportsViews,
+} from "./capabilities.js";
+export {
+  buildResourceUiMeta,
+  buildToolUiMeta,
+  viewResourceConfig,
+} from "./wire.js";

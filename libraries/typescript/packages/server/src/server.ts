@@ -6,6 +6,7 @@ import {
   McpServer as SdkMcpServer,
   ResourceTemplate,
   type McpHttpHandler,
+  type McpRequestContext,
   type PromptCallback as SdkPromptCallback,
   type ServerContext,
   type StandardSchemaWithJSON,
@@ -31,10 +32,25 @@ import type {
 } from "./resources.js";
 import type {
   InferToolInput,
+  InferToolName,
   InferToolOutput,
   ToolCallback,
   ToolDefinition,
+  ToolRef,
 } from "./tools.js";
+import {
+  getStashedClientCapabilities,
+  mountViewRoutes,
+  registerViews,
+  resolveRequestOrigin,
+  supportsViews,
+  synthesizeViewDocument,
+  viewResourceConfig,
+  viewResourceUri,
+  buildToolUiMeta,
+  type ViewManifestEntry,
+  type ViewsManifest,
+} from "./views/index.js";
 
 /*
  * Registry entries hold callbacks type-erased to their widest signature; the
@@ -89,6 +105,9 @@ export class MCPServer {
   readonly #resources = new Map<string, ResourceEntry>();
   readonly #resourceTemplates = new Map<string, ResourceTemplateEntry>();
   readonly #prompts = new Map<string, PromptEntry>();
+  readonly #views = new Map<string, ViewManifestEntry>();
+  readonly #viewBindings = new Map<string, string>();
+  #viewsPrimed = false;
 
   #app: Hono | undefined;
   #handler: McpHttpHandler | undefined;
@@ -120,17 +139,44 @@ export class MCPServer {
    * Register a tool. Input is validated against `schema` before the callback
    * runs; results carrying `structuredContent` are type-checked against
    * `outputSchema` at the callback's return position.
+   *
+   * @returns A {@link ToolRef} carrying the tool name and phantom types for
+   * inference-based view typing.
    */
-  tool<T extends ToolDefinition>(
+  tool<const T extends ToolDefinition>(
     definition: T,
     callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>>
-  ): this {
+  ): ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>> {
     this.#assertNotStarted("tool", definition.name);
+    this.#validateToolViewBinding(definition);
     this.#tools.set(definition.name, {
       definition,
       callback: callback as ToolCallback,
     });
-    return this;
+    return Object.freeze({
+      name: definition.name,
+    }) as ToolRef<InferToolName<T>, InferToolInput<T>, InferToolOutput<T>>;
+  }
+
+  /**
+   * Prime the views registry from a build/dev manifest.
+   *
+   * @param views - Manifest map keyed by view directory name.
+   * @throws If views are already primed, or after the server has started.
+   *
+   * @internal
+   */
+  [registerViews](views: ViewsManifest): void {
+    if (this.#viewsPrimed) {
+      throw new Error(
+        "Cannot prime views: the views registry is already primed on this server instance."
+      );
+    }
+    this.#assertNotStarted("views", "manifest");
+    for (const [name, entry] of Object.entries(views)) {
+      this.#views.set(name, entry);
+    }
+    this.#viewsPrimed = true;
   }
 
   /** Register a static resource readable at `definition.uri`. */
@@ -314,7 +360,9 @@ export class MCPServer {
           );
         }
       }
-      const handler = mountMcp(app, () => this.#buildSdkServer(), {
+      this.#validateViewBindingsAtMount();
+      mountViewRoutes(app, this.#basePath(), this.#views);
+      const handler = mountMcp(app, (ctx) => this.#buildSdkServer(ctx), {
         path: this.#basePath(),
         ...(this.#config.legacy !== undefined && {
           handler: { legacy: this.#config.legacy },
@@ -345,8 +393,63 @@ export class MCPServer {
     return { app: this.#app, handler: this.#handler };
   }
 
+  #validateToolViewBinding(definition: ToolDefinition): void {
+    const view = definition.view;
+    if (view === undefined) {
+      return;
+    }
+    if (definition.outputSchema === undefined) {
+      throw new Error(
+        `Tool "${definition.name}" declares view "${view.name}" but has no outputSchema. ` +
+          `View-bound tools require an outputSchema — props are typed from it. ` +
+          `Use outputSchema: z.object({}) for a view that takes no props.`
+      );
+    }
+    const existingTool = this.#viewBindings.get(view.name);
+    if (existingTool !== undefined) {
+      throw new Error(
+        `View "${view.name}" is already bound to tool "${existingTool}"; ` +
+          `cannot bind a second tool "${definition.name}".`
+      );
+    }
+    this.#viewBindings.set(view.name, definition.name);
+  }
+
+  #validateViewBindingsAtMount(): void {
+    if (this.#viewBindings.size > 0 && !this.#viewsPrimed) {
+      const first = [...this.#tools.values()].find(
+        (entry) => entry.definition.view !== undefined
+      );
+      const viewName = first?.definition.view?.name ?? "unknown";
+      throw new Error(
+        `Tool "${first?.definition.name ?? "unknown"}" is bound to view "${viewName}" ` +
+          `but no views were primed. Run \`mcp-use build\` and deploy the built entry, ` +
+          `or in dev let the CLI prime views automatically.`
+      );
+    }
+
+    for (const entry of this.#tools.values()) {
+      const viewName = entry.definition.view?.name;
+      if (viewName !== undefined && !this.#views.has(viewName)) {
+        throw new Error(
+          `Tool "${entry.definition.name}" is bound to view "${viewName}" ` +
+            `which is not in the primed views registry. Run \`mcp-use build\` ` +
+            `and deploy the built entry, or in dev let the CLI prime views automatically.`
+        );
+      }
+    }
+
+    for (const viewName of this.#views.keys()) {
+      if (!this.#viewBindings.has(viewName)) {
+        console.warn(
+          `[mcp-use] View "${viewName}" is registered but no tool binds it.`
+        );
+      }
+    }
+  }
+
   /** Build a fresh SDK server from the registry (runs once per request). */
-  #buildSdkServer(): SdkMcpServer {
+  #buildSdkServer(ctx: McpRequestContext): SdkMcpServer {
     const { name, version, title, description, instructions } = this.#config;
     const server = new SdkMcpServer(
       {
@@ -358,8 +461,15 @@ export class MCPServer {
       instructions !== undefined ? { instructions } : undefined
     );
 
+    const request = ctx.requestInfo;
+    const clientCapabilities = getStashedClientCapabilities(request);
+    const uiCapable = supportsViews(clientCapabilities);
+    const servingOrigin =
+      request !== undefined ? resolveRequestOrigin(request) : "";
+    const basePath = this.#basePath();
+
     for (const entry of this.#tools.values()) {
-      this.#registerTool(server, entry);
+      this.#registerTool(server, entry, uiCapable);
     }
     for (const entry of this.#resources.values()) {
       this.#registerResource(server, entry);
@@ -370,13 +480,33 @@ export class MCPServer {
     for (const entry of this.#prompts.values()) {
       this.#registerPrompt(server, entry);
     }
+    for (const [viewName, viewEntry] of this.#views.entries()) {
+      this.#registerViewResource(
+        server,
+        viewName,
+        viewEntry,
+        uiCapable,
+        servingOrigin,
+        basePath
+      );
+    }
     return server;
   }
 
   #registerTool(
     server: SdkMcpServer,
-    { definition, callback }: ToolEntry
+    { definition, callback }: ToolEntry,
+    uiCapable: boolean
   ): void {
+    const view = definition.view;
+    if (
+      view !== undefined &&
+      view.visibility === "app" &&
+      !uiCapable
+    ) {
+      return;
+    }
+
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
@@ -388,6 +518,10 @@ export class MCPServer {
       ...(definition.outputSchema !== undefined && {
         outputSchema: definition.outputSchema,
       }),
+      ...(view !== undefined &&
+        uiCapable && {
+          _meta: buildToolUiMeta(view.name, view.visibility),
+        }),
     };
     if (definition.schema !== undefined) {
       server.registerTool(
@@ -404,6 +538,43 @@ export class MCPServer {
         callback({}, toRequestContext(ctx))
       );
     }
+  }
+
+  #registerViewResource(
+    server: SdkMcpServer,
+    viewName: string,
+    entry: ViewManifestEntry,
+    uiCapable: boolean,
+    servingOrigin: string,
+    basePath: string
+  ): void {
+    const uri = viewResourceUri(viewName);
+    const resourceConfig = viewResourceConfig(
+      viewName,
+      entry,
+      servingOrigin,
+      uiCapable
+    );
+    server.registerResource(
+      viewName,
+      uri,
+      resourceConfig,
+      async (readUri, ctx) => {
+        const req = ctx.http?.req;
+        const origin =
+          req !== undefined ? resolveRequestOrigin(req) : servingOrigin;
+        const html = synthesizeViewDocument(entry, origin, basePath);
+        return {
+          contents: [
+            {
+              uri: readUri.href,
+              mimeType: resourceConfig.mimeType,
+              text: html,
+            },
+          ],
+        };
+      }
+    );
   }
 
   #registerResource(

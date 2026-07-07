@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
 import type { CallToolResult, ToolResult } from "../src/index.js";
+import { view } from "../src/index.js";
 
 const outputSchema = z.object({ answer: z.number() });
 
@@ -121,5 +122,51 @@ describe("template variable inference", () => {
       }
     );
     expect(true).toBe(true); // assertions above are compile-time
+  });
+});
+
+describe("ToolRef inference", () => {
+  it("carries literal name and inferred input/output from zod schemas", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    const ref = server.tool(
+      {
+        name: "search-fruits",
+        schema: z.object({ query: z.string().optional() }),
+        outputSchema: z.object({
+          query: z.string(),
+          items: z.array(z.object({ id: z.string() })),
+        }),
+      },
+      async () => ({
+        content: [{ type: "text", text: "ok" }],
+        structuredContent: { query: "", items: [] },
+      })
+    );
+    expectTypeOf(ref.name).toEqualTypeOf<"search-fruits">();
+    expect(ref.name).toBe("search-fruits");
+  });
+});
+
+describe("view() return-position checks", () => {
+  const outputSchema = z.object({ answer: z.number() });
+
+  it("accepts matching props and is assignable to ToolResult", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.tool({ name: "with-view", outputSchema }, async () =>
+      view({ props: { answer: 42 }, content: "forty-two" })
+    );
+    const result = view({ props: { answer: 1 } });
+    const typed: ToolResult<{ answer: number }> = result;
+    expect(typed.structuredContent).toEqual({ answer: 1 });
+  });
+
+  it("rejects props that disagree with the tool outputSchema", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.tool(
+      { name: "mismatch", outputSchema },
+      // @ts-expect-error — props must match outputSchema at the return position
+      async () => view({ props: { answer: "not a number" } })
+    );
+    expect(true).toBe(true);
   });
 });

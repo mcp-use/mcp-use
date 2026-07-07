@@ -6,6 +6,22 @@ import type {
 
 import type { RequestContext } from "./context.js";
 
+/**
+ * Binds a tool to a view directory for MCP Apps rendering.
+ *
+ * Relationship facts only — CSP, permissions, and description live in the
+ * view file's `metadata` export and ship on the resource.
+ */
+export interface ToolViewConfig {
+  /** View directory / manifest name, e.g. `"product-search-result"`. */
+  name: string;
+  /**
+   * Narrows who may call or see the tool on the wire (`_meta.ui.visibility`).
+   * Omitted = host default (callable by the model, visible to the app).
+   */
+  visibility?: "model" | "app";
+}
+
 /** Declares a tool's identity, LLM-facing description, and schemas. First argument to {@link MCPServer.tool}. */
 export interface ToolDefinition {
   /** Unique tool identifier, e.g. `"fetch-weather"`. */
@@ -31,6 +47,31 @@ export interface ToolDefinition {
   outputSchema?: StandardSchemaWithJSON;
   /** Behavioral hints for clients (readOnlyHint, destructiveHint, …). */
   annotations?: ToolAnnotations;
+  /**
+   * Bind this tool to a view for MCP Apps rendering. Requires
+   * {@link ToolDefinition.outputSchema} — props are typed from it.
+   */
+  view?: ToolViewConfig;
+}
+
+/**
+ * Handle returned by {@link MCPServer.tool} — carries the tool name at runtime
+ * and phantom input/output types for inference (e.g. `Register` / `useCallTool`).
+ */
+export interface ToolRef<
+  Name extends string = string,
+  Input = Record<string, unknown>,
+  Output = never,
+> {
+  /** The tool's registered name. */
+  readonly name: Name;
+  /**
+   * Phantom carrier for the tool's inferred input/output types. Never set at
+   * runtime.
+   *
+   * @internal
+   */
+  readonly "~types"?: { input: Input; output: Output };
 }
 
 /**
@@ -81,6 +122,11 @@ export type InferToolOutput<T> = T extends {
 }
   ? StandardSchemaWithJSON.InferOutput<S>
   : never;
+
+/** Infer the literal tool name from a definition's `name` field. */
+export type InferToolName<T> = T extends { name: infer N extends string }
+  ? N
+  : string;
 
 /**
  * Tool execution callback. The return type is {@link ToolResult}: tools with

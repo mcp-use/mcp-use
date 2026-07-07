@@ -6,6 +6,11 @@ import {
 } from "@modelcontextprotocol/server";
 import type { Env, Hono } from "hono";
 
+import {
+  extractClientCapabilitiesFromBody,
+  stashClientCapabilities,
+} from "./views/capabilities.js";
+
 /** Options for {@link mountMcp}. */
 export interface MountMcpOptions {
   /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
@@ -49,11 +54,22 @@ export function mountMcp<E extends Env>(
     legacy: "stateless",
     ...handlerOptions,
   });
-  app.all(path, (c) => {
+  app.all(path, async (c) => {
     // createMcpHonoApp's JSON middleware stashes the parsed body in context
     // vars (a request body is only readable once); on bare apps it is absent
     // and the SDK handler parses the body itself.
-    const parsedBody = (c.var as Record<string, unknown>)["parsedBody"];
+    let parsedBody = (c.var as Record<string, unknown>)["parsedBody"];
+    if (parsedBody === undefined) {
+      try {
+        parsedBody = await c.req.raw.clone().json();
+      } catch {
+        // Non-JSON or empty body — the SDK handler will surface the error.
+      }
+    }
+    const capabilities = extractClientCapabilitiesFromBody(parsedBody);
+    if (capabilities !== undefined) {
+      stashClientCapabilities(c.req.raw, capabilities);
+    }
     return handler.fetch(
       c.req.raw,
       parsedBody === undefined ? undefined : { parsedBody }

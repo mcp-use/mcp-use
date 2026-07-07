@@ -8,6 +8,7 @@
 export { MCPServer } from "./server.js";
 export { mountMcp } from "./mount-mcp.js";
 export type { MountMcpOptions } from "./mount-mcp.js";
+export { view, registerViews } from "./views/index.js";
 
 /**
  * Wire result shapes (re-exported from the SDK): callbacks return these raw
@@ -38,14 +39,23 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export type { InspectorOptions, ServerConfig } from "./config.js";
-export type { RequestContext } from "./context.js";
+export type { RequestClientContext, RequestContext } from "./context.js";
 export type {
   InferToolInput,
+  InferToolName,
   InferToolOutput,
   ToolCallback,
   ToolDefinition,
+  ToolRef,
   ToolResult,
+  ToolViewConfig,
 } from "./tools.js";
+export type {
+  UiPermissions,
+  ViewManifestEntry,
+  ViewMetadata,
+  ViewsManifest,
+} from "./views/index.js";
 export type {
   InferTemplateParams,
   ResourceCallback,
