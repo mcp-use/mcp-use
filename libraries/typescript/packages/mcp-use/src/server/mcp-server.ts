@@ -124,6 +124,51 @@ function isSafePropertyKey(key: string): boolean {
 }
 
 /**
+ * v1 SDK Zod→JSON Schema conversion stamps draft-07 `$schema`; v2 MCP clients
+ * reject non-2020-12 dialects. Omitting `$schema` is accepted by both (issue #1839).
+ */
+function stripSchemaDialect(
+  schema: Record<string, unknown>
+): Record<string, unknown> {
+  const { $schema, ...rest } = schema;
+  return rest;
+}
+
+function stripToolsListSchemaDialects(tools: unknown[]): unknown[] {
+  return tools.map((tool) => {
+    if (!tool || typeof tool !== "object") return tool;
+
+    const record = tool as Record<string, unknown>;
+    const inputSchema = record.inputSchema;
+    const outputSchema = record.outputSchema;
+
+    return {
+      ...record,
+      ...(inputSchema &&
+      typeof inputSchema === "object" &&
+      inputSchema !== null &&
+      "$schema" in inputSchema
+        ? {
+            inputSchema: stripSchemaDialect(
+              inputSchema as Record<string, unknown>
+            ),
+          }
+        : {}),
+      ...(outputSchema &&
+      typeof outputSchema === "object" &&
+      outputSchema !== null &&
+      "$schema" in outputSchema
+        ? {
+            outputSchema: stripSchemaDialect(
+              outputSchema as Record<string, unknown>
+            ),
+          }
+        : {}),
+    };
+  });
+}
+
+/**
  * Auto-selects a favicon from the icons array based on priority.
  *
  * Priority order:
@@ -3363,7 +3408,11 @@ class MCPServerClass<HasOAuth extends boolean = false> {
         };
         const innerFn = async () => {
           const result = await original(req, extra);
-          return result[resultKey] ?? result;
+          let items = result[resultKey] ?? result;
+          if (method === "tools/list" && Array.isArray(items)) {
+            items = stripToolsListSchemaDialects(items);
+          }
+          return items;
         };
         const filtered = await composeMiddleware(
           mcpMiddlewares(),

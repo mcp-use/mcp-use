@@ -31,6 +31,7 @@ function detectUnauthorized(err: unknown, depth = 0): boolean {
   return false;
 }
 import { SseConnectionManager } from "../task_managers/sse.js";
+import { DialectJsonSchemaValidator } from "../validators/dialect-json-schema-validator.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
@@ -156,6 +157,9 @@ export class HttpConnector extends BaseConnector {
   private buildClientOptions(): ClientOptions {
     return {
       ...(this.opts.clientOptions || {}),
+      jsonSchemaValidator:
+        this.opts.clientOptions?.jsonSchemaValidator ??
+        new DialectJsonSchemaValidator(),
       versionNegotiation: {
         // Allow a caller-supplied versionNegotiation in clientOptions to win.
         mode: this.protocolNegotiation,
