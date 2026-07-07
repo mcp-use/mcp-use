@@ -1,5 +1,9 @@
 // browser-provider.ts
 import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import {
+  checkResourceAllowed,
+  resourceUrlFromServerUrl,
+} from "@modelcontextprotocol/sdk/shared/auth-utils.js";
 import type {
   OAuthClientInformation,
   OAuthClientMetadata,
@@ -389,6 +393,61 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
     scope: "all" | "client" | "tokens" | "verifier"
   ): Promise<void> {
     return this.session.invalidateCredentials(scope);
+  }
+
+  /**
+   * SDK resource-validation hook (replaces the strict check in the SDK's
+   * `selectResourceURL`).
+   *
+   * When MCP traffic is tunneled through a gateway/inspector proxy, the OAuth
+   * proxy rewrites the protected-resource-metadata `resource` field to the
+   * connection (proxy) URL so that transport-anchored auth runs validate. But
+   * manual auth runs (`auth({ serverUrl: <real MCP URL> })`) validate against
+   * the real server URL, and the rewritten resource then fails the SDK's
+   * strict check with "Protected resource ... does not match expected ...".
+   *
+   * Accept both anchors: the requested server URL (SDK default behavior) and
+   * the proxy connection URL (the rewrite case). In the rewrite case, return
+   * the real upstream resource — the proxy stashes it in `_original_resource`
+   * (cached as `_lastOriginalResource` by {@link getProxyFetch}) — so the
+   * authorization request carries the resource the OAuth server actually
+   * protects, not the proxy URL.
+   */
+  async validateResourceURL(
+    serverUrl: string | URL,
+    resource?: string
+  ): Promise<URL | undefined> {
+    // Mirror SDK behavior: no resource in metadata -> omit the resource param.
+    if (!resource) return undefined;
+
+    const requestedResource = resourceUrlFromServerUrl(serverUrl);
+    if (
+      checkResourceAllowed({
+        requestedResource,
+        configuredResource: resource,
+      })
+    ) {
+      return new URL(resource);
+    }
+
+    // OAuth-proxy rewrite case: the resource is valid for the MCP connection
+    // (proxy) URL — exactly the check the SDK would have run had this auth
+    // pass been anchored on the transport URL.
+    if (
+      this.connectionUrl &&
+      checkResourceAllowed({
+        requestedResource: resourceUrlFromServerUrl(this.connectionUrl),
+        configuredResource: resource,
+      })
+    ) {
+      return resourceUrlFromServerUrl(
+        this._lastOriginalResource ?? this.serverUrl
+      );
+    }
+
+    throw new Error(
+      `Protected resource ${resource} does not match expected ${requestedResource} (or origin)`
+    );
   }
 
   /**
