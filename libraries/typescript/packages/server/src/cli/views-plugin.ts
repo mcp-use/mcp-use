@@ -19,6 +19,24 @@ import {
 export interface McpUseViewsPluginOptions {
   /** Static list or live getter (dev rediscovery). */
   getViews: () => DiscoveredView[];
+  /**
+   * Dev-mode entry shape. When present, every virtual entry self-accepts HMR
+   * updates (`import.meta.hot.accept()`) so an update that propagates past the
+   * view module re-runs the bootstrap instead of full-reloading the iframe
+   * document (which would wipe bridge state). Absent for builds — entries stay
+   * byte-identical to the production contract.
+   */
+  dev?: {
+    /**
+     * Whether React Fast Refresh is active (`@vitejs/plugin-react` resolved).
+     * When `true`, entries import the plugin's virtual refresh preamble
+     * (`@vitejs/plugin-react/preamble`) before any component module so the
+     * refresh runtime hooks the document — the role `transformIndexHtml`
+     * plays for Vite-served HTML, which synthesized srcdoc documents never
+     * pass through.
+     */
+    reactRefresh: boolean;
+  };
 }
 
 /**
@@ -49,12 +67,27 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
       if (view === undefined) {
         return undefined;
       }
-      return [
+      const lines: string[] = [];
+      if (options.dev?.reactRefresh === true) {
+        // Must be the first import: the preamble hooks the refresh runtime
+        // into the window before react-dom (via the bootstrap import below)
+        // or any refresh-wrapped view module evaluates.
+        lines.push(`import "@vitejs/plugin-react/preamble";`);
+      }
+      lines.push(
         `import { bootstrapView } from "@mcp-use/server/react";`,
         `import * as viewModule from ${JSON.stringify(view.entryPath)};`,
-        `bootstrapView(viewModule);`,
-        "",
-      ].join("\n");
+        `bootstrapView(viewModule);`
+      );
+      if (options.dev !== undefined) {
+        lines.push(
+          `if (import.meta.hot) {`,
+          `  import.meta.hot.accept();`,
+          `}`
+        );
+      }
+      lines.push("");
+      return lines.join("\n");
     },
   };
 }

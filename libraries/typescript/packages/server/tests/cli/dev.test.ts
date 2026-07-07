@@ -260,6 +260,98 @@ describe("runDev (views)", () => {
     });
   }, 60_000);
 
+  it("hot-updates a view.tsx edit without a full document reload", async () => {
+    // Regression: without React Fast Refresh (auto-injected
+    // @vitejs/plugin-react + the refresh preamble in the virtual entry),
+    // every view.tsx edit fell back to Vite `full-reload` — reloading the
+    // srcdoc iframe document and wiping all view state.
+    const cwd = copyFixture("dev-views-hmr", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+    const base = dev.url.replace(/\/mcp$/, "");
+
+    // The virtual entry pins the Fast Refresh contract: preamble first,
+    // self-accept last.
+    const entryResponse = await fetch(
+      `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
+    );
+    expect(entryResponse.status).toBe(200);
+    const entryJs = await entryResponse.text();
+    expect(entryJs).toContain("@vitejs/plugin-react/preamble");
+    expect(entryJs).toContain("import.meta.hot.accept()");
+
+    // Populate the client module graph the way a browser loading the view
+    // document would: fetch each module and, recursively, its static
+    // imports. A 504 is Vite's "outdated optimize dep" — retry like a
+    // browser reload of the request would.
+    const seen = new Set<string>();
+    const loadModule = async (url: string): Promise<void> => {
+      const abs = url.startsWith("http") ? url : `${base}${url}`;
+      if (seen.has(abs) || seen.size > 60) return;
+      seen.add(abs);
+      let response = await fetch(abs);
+      if (response.status === 504) {
+        response = await fetch(abs);
+      }
+      if (!response.ok) return;
+      const js = await response.text();
+      const imports = [...js.matchAll(/from\s+"([^"]+)"|import\s+"([^"]+)"/g)]
+        .map((m) => m[1] ?? m[2])
+        .filter((s): s is string => s !== undefined && s.startsWith("/"));
+      for (const specifier of imports) {
+        await loadModule(specifier);
+      }
+    };
+    await loadModule("/@id/__x00__virtual:mcp-use/views/product-search-result");
+    const viewModule = await fetch(
+      `${base}/resources/product-search-result/view.tsx`
+    );
+    // Fast Refresh wrapped the view component module.
+    expect(await viewModule.text()).toContain("RefreshRuntime");
+
+    const messages: { type: string; updates?: { path: string }[] }[] = [];
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    ws.addEventListener("message", (event) => {
+      messages.push(
+        JSON.parse(String(event.data)) as (typeof messages)[number]
+      );
+    });
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve());
+      ws.addEventListener("error", () =>
+        reject(new Error("HMR websocket failed to connect"))
+      );
+    });
+    cleanups.push(() => ws.close());
+
+    // Let any dep-optimizer churn from the initial module loads settle so
+    // the assertion window only contains the edit's own messages.
+    await new Promise((r) => setTimeout(r, 1000));
+    messages.length = 0;
+
+    const viewPath = join(
+      cwd,
+      "resources",
+      "product-search-result",
+      "view.tsx"
+    );
+    const viewSource = readFileSync(viewPath, "utf8");
+    writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
+
+    const update = await waitFor(async () =>
+      messages.find(
+        (m) =>
+          m.type === "update" &&
+          m.updates?.some((u) => u.path.endsWith("/view.tsx"))
+      )
+    );
+    expect(update).toBeDefined();
+    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+  }, 60_000);
+
   it("runs two dev servers concurrently with HMR on each main port", async () => {
     // Regression: the HMR websocket must ride the main HTTP listener
     // (server.hmr.server), not a fixed side port — a hardcoded HMR port made

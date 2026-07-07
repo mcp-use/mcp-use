@@ -23,8 +23,15 @@ import { spawn } from "node:child_process";
 import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
-import { createServer, createServerModuleRunner } from "vite";
+import { pathToFileURL } from "node:url";
+import {
+  createServer,
+  createServerModuleRunner,
+  loadConfigFromFile,
+  type PluginOption,
+} from "vite";
 import { getRequestListener } from "@hono/node-server";
 
 import { discoverEntry } from "./entry.js";
@@ -151,6 +158,91 @@ function resolveUserViteConfig(cwd: string): string | false {
   return false;
 }
 
+/** Collect resolved plugin names from a Vite `plugins` config value. */
+async function collectPluginNames(
+  option: unknown,
+  out: string[]
+): Promise<void> {
+  const value = await option;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      await collectPluginNames(item, out);
+    }
+    return;
+  }
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { name?: unknown }).name === "string"
+  ) {
+    out.push((value as { name: string }).name);
+  }
+}
+
+/** Outcome of {@link resolveReactRefresh}. */
+interface ReactRefreshResolution {
+  /**
+   * Plugins to add to the dev server — `[@vitejs/plugin-react]` when the
+   * framework injects it, empty when the user config already registers it (a
+   * second instance would double-wrap every component module).
+   */
+  plugins: PluginOption[];
+  /** Whether Fast Refresh (and its virtual preamble module) is available. */
+  active: boolean;
+}
+
+/**
+ * Make React Fast Refresh available for view modules.
+ *
+ * Views are React components inside sandboxed srcdoc iframes: without Fast
+ * Refresh every `view.tsx` edit falls back to Vite's `full-reload`, which
+ * reloads the iframe document and wipes all component and bridge state. The
+ * user's Vite config wins when it already registers `@vitejs/plugin-react`;
+ * otherwise the plugin is resolved from the project (it is an optional peer
+ * of this package, exactly like `vite` itself) and injected. A project
+ * without it degrades to full-reload behavior with a one-line warning.
+ */
+async function resolveReactRefresh(
+  cwd: string,
+  userViteConfig: string | false
+): Promise<ReactRefreshResolution> {
+  if (userViteConfig !== false) {
+    try {
+      const loaded = await loadConfigFromFile(
+        { command: "serve", mode: "development" },
+        userViteConfig,
+        cwd
+      );
+      const names: string[] = [];
+      await collectPluginNames(loaded?.config.plugins, names);
+      // "vite:react-refresh" is @vitejs/plugin-react's stable inner plugin
+      // name — present iff the user config already provides Fast Refresh.
+      if (names.includes("vite:react-refresh")) {
+        return { plugins: [], active: true };
+      }
+    } catch {
+      // A broken config file fails loudly in createServer below; here it
+      // only means we could not inspect the plugin list.
+    }
+  }
+
+  try {
+    const projectRequire = createRequire(join(cwd, "package.json"));
+    const resolved = projectRequire.resolve("@vitejs/plugin-react");
+    const mod = (await import(pathToFileURL(resolved).href)) as {
+      default: () => PluginOption;
+    };
+    return { plugins: [mod.default()], active: true };
+  } catch {
+    console.warn(
+      "[mcp-use] @vitejs/plugin-react is not installed — view edits will " +
+        "reload the whole view instead of hot-updating in place. Add it to " +
+        "devDependencies to enable React Fast Refresh."
+    );
+    return { plugins: [], active: false };
+  }
+}
+
 /**
  * Validate the entry module's default export and return it as a
  * {@link ServerLike}.
@@ -236,6 +328,10 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const devOrigin = `http://${host}:${port}`;
 
+  const reactRefresh = hasViews()
+    ? await resolveReactRefresh(options.cwd, userViteConfig)
+    : { plugins: [], active: false };
+
   const vite = await createServer({
     root: options.cwd,
     configFile: hasViews() ? userViteConfig : false,
@@ -243,7 +339,13 @@ export async function runDev(options: DevOptions): Promise<void> {
     logLevel: "warn",
     cacheDir: paths.cache,
     plugins: hasViews()
-      ? [mcpUseViewsPlugin({ getViews: () => currentViews })]
+      ? [
+          mcpUseViewsPlugin({
+            getViews: () => currentViews,
+            dev: { reactRefresh: reactRefresh.active },
+          }),
+          ...reactRefresh.plugins,
+        ]
       : [],
     server: {
       middlewareMode: true,
