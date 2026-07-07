@@ -10,6 +10,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** Absolute path to the committed basic fixture project. */
 export const FIXTURE_BASIC = join(here, "fixtures", "basic");
 
+/** Absolute path to the views fixture project. */
+export const FIXTURE_VIEWS = join(here, "fixtures", "views");
+
 /**
  * Scratch root for mutable fixture copies. Lives inside the package (not the
  * OS tmpdir) so node resolution of externalized bare imports still walks up
@@ -24,11 +27,15 @@ export const FIXTURE_BASIC = join(here, "fixtures", "basic");
  */
 export const TMP_ROOT = join(here, ".tmp");
 
-/** Copy the basic fixture into a fresh scratch dir; returns its path. */
-export function copyFixture(label: string): string {
+/** Copy a committed fixture into a fresh scratch dir; returns its path. */
+export function copyFixture(
+  label: string,
+  fixture: "basic" | "views" = "basic"
+): string {
+  const source = fixture === "views" ? FIXTURE_VIEWS : FIXTURE_BASIC;
   const dest = join(TMP_ROOT, `${label}-${randomBytes(4).toString("hex")}`);
   mkdirSync(dest, { recursive: true });
-  cpSync(FIXTURE_BASIC, dest, { recursive: true });
+  cpSync(source, dest, { recursive: true });
   return dest;
 }
 
@@ -44,6 +51,18 @@ const META = {
   "io.modelcontextprotocol/clientCapabilities": {},
 };
 
+/** `_meta` envelope with MCP Apps UI extension advertised. */
+const META_UI = {
+  ...META,
+  "io.modelcontextprotocol/clientCapabilities": {
+    extensions: {
+      "io.modelcontextprotocol/ui": {
+        mimeTypes: ["text/html;profile=mcp-app"],
+      },
+    },
+  },
+};
+
 /**
  * Issue a raw 2026-07-28 MCP request against a dev/built server and return
  * the parsed JSON-RPC response body.
@@ -51,8 +70,10 @@ const META = {
 export async function mcpRequest(
   baseUrl: string,
   method: string,
-  params: Record<string, unknown> = {}
+  params: Record<string, unknown> = {},
+  options?: { ui?: boolean }
 ): Promise<Record<string, unknown>> {
+  const meta = options?.ui === true ? META_UI : META;
   const headers: Record<string, string> = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
@@ -61,6 +82,8 @@ export async function mcpRequest(
   };
   if (typeof params["name"] === "string") {
     headers["mcp-name"] = params["name"];
+  } else if (typeof params["uri"] === "string") {
+    headers["mcp-name"] = params["uri"];
   }
   const response = await fetch(baseUrl, {
     method: "POST",
@@ -69,7 +92,7 @@ export async function mcpRequest(
       jsonrpc: "2.0",
       id: 1,
       method,
-      params: { ...params, _meta: META },
+      params: { ...params, _meta: meta },
     }),
   });
   if (!response.ok) {

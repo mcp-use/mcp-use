@@ -32,6 +32,8 @@
 
 import { join } from "node:path";
 
+import type { ViewsManifest } from "../views/types.js";
+
 /**
  * Fixed name of the per-project workspace directory.
  *
@@ -70,6 +72,11 @@ export interface BuildManifest {
    * the route at runtime. Recorded as a known gap in CLI_SPEC.md § build.
    */
   inspector: boolean;
+  /**
+   * Built views map (VIEWS_SPEC.md § Manifest). Present only when the project
+   * has view entries under `resources/<name>/view.tsx`.
+   */
+  views?: ViewsManifest;
 }
 
 /**

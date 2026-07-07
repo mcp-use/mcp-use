@@ -4,6 +4,10 @@
  * the entry through the module runner; one HTTP listener delegates every
  * request to an atomically swappable handler reference.
  *
+ * When views exist, the same Vite server gains a client environment with real
+ * HMR for view files; the CLI primes views on each entry reload via the
+ * internal {@link registerViews} API (VIEWS_SPEC.md § Dev).
+ *
  * Reload, not HMR: on file change the entry is re-imported and the handler
  * reference swapped — no registration diffing, no MCP notifications. Under
  * the stateless model the next request simply hits the new handler.
@@ -15,14 +19,26 @@
  * package load time.
  */
 
+import { createServer as createNodeServer } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { createServer, createServerModuleRunner } from "vite";
-import { serve } from "@hono/node-server";
+import { getRequestListener } from "@hono/node-server";
 
 import { discoverEntry } from "./entry.js";
 import { resolvePort } from "./port.js";
 import { resolveWorkspacePaths } from "./workspace.js";
+import { mcpUseViewsPlugin } from "./views-plugin.js";
+import {
+  buildDevViewsManifest,
+  discoverViews,
+  extractViewMetadata,
+  isViewEntryPath,
+  isViewPath,
+  type DiscoveredView,
+} from "./views.js";
+import type { ViewMetadata, ViewsManifest } from "../views/types.js";
 
 /** Web-standard request handler, as returned by `MCPServer.getHandler()`. */
 type FetchHandler = (request: Request) => Promise<Response>;
@@ -36,6 +52,7 @@ interface ServerLike {
   getHandler(): FetchHandler;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
+  __primeViews(views: ViewsManifest): void;
 }
 
 /**
@@ -72,6 +89,30 @@ export interface DevOptions {
    * pass this.
    */
   signal?: AbortSignal;
+}
+
+const VITE_CONFIG_CANDIDATES = [
+  "vite.config.ts",
+  "vite.config.js",
+  "vite.config.mts",
+  "vite.config.cjs",
+] as const;
+
+function resolveUserViteConfig(cwd: string): string | false {
+  for (const name of VITE_CONFIG_CANDIDATES) {
+    const path = join(cwd, name);
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+  return false;
+}
+
+function metadataEquals(
+  a: Record<string, ViewMetadata>,
+  b: Record<string, ViewMetadata>
+): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**
@@ -123,45 +164,89 @@ export async function runDev(options: DevOptions): Promise<void> {
   const host = options.host ?? "127.0.0.1";
   const paths = resolveWorkspacePaths(options.cwd);
 
-  // Load .env before the entry is imported so module-scope code sees it.
-  // `loadEnvFile` throws ENOENT when the file is missing, unlike dotenv's
-  // silent no-op — guard explicitly to preserve that behavior.
   const envPath = join(options.cwd, ".env");
   if (existsSync(envPath)) {
     process.loadEnvFile(envPath);
   }
 
   const entry = discoverEntry(options.cwd, options.entry);
+  let currentViews: DiscoveredView[] = discoverViews(options.cwd);
+  const hasViews = () => currentViews.length > 0;
+  const userViteConfig = resolveUserViteConfig(options.cwd);
+
+  // The HTTP listener is a raw node:http server rather than
+  // @hono/node-server's serve() wrapper — deliberately, and only one level
+  // lower: serve() is itself createServer(getRequestListener(fetch)), and we
+  // use the same getRequestListener below, so MCP traffic behaves
+  // identically. Unwrapping is required because Vite's dev middleware is
+  // Connect-style ((req, res, next)) with no fetch-shaped equivalent, so
+  // splicing it in front of the swappable Hono handler needs the raw Node
+  // request boundary. Creating the (not-yet-listening) server up front also
+  // lets Vite attach its HMR websocket to this same socket (`hmr.server`
+  // below) — one port total, so several `mcp-use dev` processes coexist
+  // without websocket port collisions.
+  const httpServer = createNodeServer();
 
   const vite = await createServer({
     root: options.cwd,
-    configFile: false,
+    configFile: hasViews() ? userViteConfig : false,
     envFile: false,
     logLevel: "warn",
     cacheDir: paths.cache,
+    plugins: hasViews()
+      ? [mcpUseViewsPlugin({ getViews: () => currentViews })]
+      : [],
     server: {
-      // We never use Vite's HTTP server; middleware mode keeps it unbound.
       middlewareMode: true,
-      // Reload, not HMR for the server entry (CLI_SPEC.md § Why the server
-      // entry reloads instead of HMR).
-      hmr: false,
+      // View HMR rides the one HTTP listener: Vite attaches its websocket
+      // upgrade handler to our server, so no dedicated HMR port exists to
+      // collide when several dev processes run side by side.
+      hmr: hasViews() ? { server: httpServer } : false,
     },
     ssr: {
-      // Match the build: every bare import resolves from node_modules.
       external: true,
     },
   });
 
-  const environment = vite.environments.ssr;
-  const runner = createServerModuleRunner(environment, {
+  const ssrEnvironment = vite.environments.ssr;
+  const runner = createServerModuleRunner(ssrEnvironment, {
     hmr: false,
     sourcemapInterceptor: "node",
   });
 
-  const importServer = async (): Promise<ServerLike> =>
-    serverFrom(await runner.import(entry));
+  let lastMetadata: Record<string, ViewMetadata> = {};
 
-  // Initial import must succeed — fail loudly before binding the socket.
+  const extractMetadata = async (
+    views: DiscoveredView[]
+  ): Promise<Record<string, ViewMetadata>> => {
+    if (views.length === 0) {
+      return {};
+    }
+    return extractViewMetadata(ssrEnvironment, views);
+  };
+
+  const importServer = async (): Promise<ServerLike> => {
+    const moduleExports = (await runner.import(entry)) as Record<
+      string,
+      unknown
+    >;
+    const server = serverFrom(moduleExports);
+
+    if (currentViews.length > 0) {
+      const metadataByView = await extractMetadata(currentViews);
+      lastMetadata = metadataByView;
+      const viewsManifest = buildDevViewsManifest(currentViews, metadataByView);
+      if (typeof server.__primeViews !== "function") {
+        throw new Error(
+          "Loaded MCPServer instance does not support __primeViews."
+        );
+      }
+      server.__primeViews(viewsManifest);
+    }
+
+    return server;
+  };
+
   let currentHandler: FetchHandler;
   let basePath: string;
   try {
@@ -174,8 +259,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     throw error;
   }
 
-  // --- Reload on file change (serialized; a failed reload keeps the old
-  // handler; changes during a reload trigger one follow-up pass). -----------
   let reloading = false;
   let dirty = false;
   const reload = (): void => {
@@ -188,9 +271,6 @@ export async function runDev(options: DevOptions): Promise<void> {
       do {
         dirty = false;
         try {
-          // Drop every evaluated module so the re-import sees current code
-          // (the server-side transform cache was already invalidated by the
-          // watcher); then swap the handler reference atomically.
           runner.evaluatedModules.clear();
           const server = await importServer();
           currentHandler = server.getHandler();
@@ -207,23 +287,68 @@ export async function runDev(options: DevOptions): Promise<void> {
     })();
   };
 
-  const onFileEvent = (file: string): void => {
-    // Only files in the entry's module graph matter (the watcher also sees
-    // unrelated project files).
-    const modules = environment.moduleGraph.getModulesByFile(file);
+  const onSsrFileEvent = (file: string): void => {
+    if (isViewPath(file, options.cwd)) {
+      return;
+    }
+    const modules = ssrEnvironment.moduleGraph.getModulesByFile(file);
     if (modules === undefined || modules.size === 0) {
       return;
     }
     for (const mod of modules) {
-      environment.moduleGraph.invalidateModule(mod);
+      ssrEnvironment.moduleGraph.invalidateModule(mod);
     }
     reload();
   };
+
+  const onViewFilesystemEvent = (file: string): void => {
+    if (!isViewPath(file, options.cwd)) {
+      return;
+    }
+
+    const previousViews = currentViews;
+    currentViews = discoverViews(options.cwd);
+
+    const viewsChanged =
+      previousViews.length !== currentViews.length ||
+      previousViews.some(
+        (v, i) =>
+          v.name !== currentViews[i]?.name ||
+          v.entryPath !== currentViews[i]?.entryPath
+      );
+
+    if (viewsChanged) {
+      reload();
+      return;
+    }
+
+    if (isViewEntryPath(file, options.cwd)) {
+      void (async () => {
+        try {
+          const nextMetadata = await extractMetadata(currentViews);
+          if (!metadataEquals(lastMetadata, nextMetadata)) {
+            reload();
+          }
+        } catch (error) {
+          console.error(
+            "[mcp-use] view metadata extraction failed — reloading:\n",
+            error
+          );
+          reload();
+        }
+      })();
+    }
+  };
+
+  const onFileEvent = (file: string): void => {
+    onViewFilesystemEvent(file);
+    onSsrFileEvent(file);
+  };
+
   vite.watcher.on("change", onFileEvent);
   vite.watcher.on("add", onFileEvent);
   vite.watcher.on("unlink", onFileEvent);
 
-  // --- One long-lived HTTP listener delegating to the current handler. -----
   const requestedPort =
     options.port ??
     (process.env["PORT"] !== undefined
@@ -234,26 +359,51 @@ export async function runDev(options: DevOptions): Promise<void> {
     console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
   }
 
-  const httpServer = await new Promise<ReturnType<typeof serve>>(
-    (resolve, reject) => {
-      const server = serve(
-        {
-          fetch: (request: Request) => currentHandler(request),
-          port,
-          hostname: host,
-        },
-        () => resolve(server)
-      );
-      server.once("error", reject);
-    }
+  // Same adapter serve() uses internally — the Hono handler sees identical
+  // requests (see the comment where httpServer is created).
+  const honoListener = getRequestListener((request: Request) =>
+    currentHandler(request)
   );
 
-  // basePath was introspected from the loaded MCPServer instance above.
+  const onRequest = (req: IncomingMessage, res: ServerResponse): void => {
+    const url = req.url ?? "/";
+    const pathname = new URL(url, "http://127.0.0.1").pathname;
+    // View documents must come from the server's own route (per-request
+    // origin resolution, no-store) — never from Vite, which would try to
+    // serve/transform the .html itself.
+    const isViewDocument =
+      pathname.includes("/_mcp-use/views/") && pathname.endsWith(".html");
+    // Vite only sees module-graph URLs (/@vite/client, /@id/virtual:…,
+    // /node_modules/.vite/deps/…); everything else — the MCP endpoint
+    // included — goes straight to the Hono handler.
+    const isViteRequest =
+      req.method === "GET" &&
+      (pathname.startsWith("/@") || pathname.startsWith("/node_modules/"));
+
+    if (hasViews() && !isViewDocument && isViteRequest) {
+      vite.middlewares(req, res, () => {
+        void honoListener(req, res);
+      });
+    } else {
+      void honoListener(req, res);
+    }
+  };
+  httpServer.on("request", onRequest);
+
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(port, host, () => resolve());
+  });
+
   console.log(`[mcp-use] dev server ready`);
+  if (currentViews.length > 0) {
+    console.log(
+      `  ➜ Views:         ${currentViews.map((v) => v.name).join(", ")}`
+    );
+  }
   console.log(`  ➜ MCP endpoint:  http://localhost:${port}${basePath}`);
   console.log(`  ➜ Inspector:     http://localhost:${port}${basePath}/inspector`);
 
-  // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------
   await new Promise<void>((resolve) => {
     let closing = false;
     const shutdown = (): void => {

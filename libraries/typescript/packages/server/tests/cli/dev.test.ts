@@ -2,7 +2,7 @@
  * e2e tests for runDev: a real Vite dev server + module runner serving the
  * fixture over HTTP, including edit-triggered reload and error resilience.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ import {
   copyFixture,
   getFreePort,
   listToolNames,
+  mcpRequest,
   occupyPort,
   removeDir,
   waitFor,
@@ -139,4 +140,118 @@ export default server;`
       /export default server/
     );
   });
+});
+
+describe("runDev (views)", () => {
+  it("serves view documents, virtual entries, and reloads on view add", async () => {
+    const cwd = copyFixture("dev-views", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const base = dev.url.replace(/\/mcp$/, "");
+
+    const docResponse = await fetch(
+      `${base}/mcp/_mcp-use/views/product-search-result.html`
+    );
+    expect(docResponse.status).toBe(200);
+    expect(docResponse.headers.get("cache-control")).toBe("no-store");
+    const docHtml = await docResponse.text();
+    expect(docHtml).toContain('id="root"');
+    expect(docHtml).toContain("/@vite/client");
+    expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
+
+    const readBody = await mcpRequest(dev.url, "resources/read", {
+      uri: "ui://views/product-search-result.html",
+    }, { ui: true });
+    const readText = (
+      readBody["result"] as { contents: { text: string }[] }
+    ).contents[0]!.text;
+    expect(readText).toContain("/@vite/client");
+
+    const virtualMatch = /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
+      docHtml
+    );
+    expect(virtualMatch).not.toBeNull();
+    const virtualUrl = new URL(virtualMatch![1]!, base).href;
+    const virtualResponse = await fetch(virtualUrl);
+    expect(virtualResponse.status).toBe(200);
+    const virtualJs = await virtualResponse.text();
+    expect(virtualJs).toMatch(/bootstrapView/);
+
+    const toolsBody = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+    const searchTool = (
+      toolsBody["result"] as {
+        tools: { name: string; _meta?: Record<string, unknown> }[];
+      }
+    ).tools.find((t) => t.name === "search-products");
+    expect(searchTool?._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/product-search-result.html",
+    });
+
+    mkdirSync(join(cwd, "resources", "extra-view"), { recursive: true });
+    writeFileSync(
+      join(cwd, "resources", "extra-view", "view.tsx"),
+      `export const metadata = { description: "Extra" };\nexport default function Extra() { return <div>extra</div>; }\n`
+    );
+
+    await waitFor(async () => {
+      const list = await mcpRequest(dev.url, "resources/list", {}, { ui: true });
+      const uris = (list["result"] as { resources: { uri: string }[] }).resources.map(
+        (r) => r.uri
+      );
+      return uris.includes("ui://views/extra-view.html") ? true : undefined;
+    });
+  }, 60_000);
+
+  it("runs two dev servers concurrently with HMR on each main port", async () => {
+    // Regression: the HMR websocket must ride the main HTTP listener
+    // (server.hmr.server), not a fixed side port — a hardcoded HMR port made
+    // the second concurrent `mcp-use dev` process fail to bind.
+    const cwdA = copyFixture("dev-views-a", "views");
+    const cwdB = copyFixture("dev-views-b", "views");
+    cleanups.push(() => removeDir(cwdA), () => removeDir(cwdB));
+
+    const portA = await getFreePort();
+    const devA = await startDev(cwdA, portA);
+    cleanups.push(devA.stop);
+    const portB = await getFreePort();
+    const devB = await startDev(cwdB, portB);
+    cleanups.push(devB.stop);
+
+    // Vite's HMR client speaks the `vite-hmr` subprotocol and greets with a
+    // `connected` message; an upgrade succeeding on the MAIN port proves the
+    // websocket shares the one listener.
+    const probeHmr = async (port: number): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+        const timer = setTimeout(() => {
+          ws.close();
+          reject(new Error(`no HMR greeting on port ${port}`));
+        }, 10_000);
+        ws.addEventListener("message", (event) => {
+          clearTimeout(timer);
+          ws.close();
+          resolve(String(event.data));
+        });
+        ws.addEventListener("error", () => {
+          clearTimeout(timer);
+          reject(new Error(`websocket upgrade failed on port ${port}`));
+        });
+      });
+
+    expect(await probeHmr(portA)).toContain("connected");
+    expect(await probeHmr(portB)).toContain("connected");
+
+    // Both servers keep serving MCP + view documents side by side.
+    for (const dev of [devA, devB]) {
+      const base = dev.url.replace(/\/mcp$/, "");
+      const doc = await fetch(
+        `${base}/mcp/_mcp-use/views/product-search-result.html`
+      );
+      expect(doc.status).toBe(200);
+    }
+  }, 90_000);
 });

@@ -179,6 +179,20 @@ export class MCPServer {
     this.#viewsPrimed = true;
   }
 
+  /**
+   * Prime the views registry — string-keyed alias for {@link registerViews}
+   * used by the CLI when the symbol export cannot be shared across duplicate
+   * module copies (dev module runner with an externalized package).
+   *
+   * @param views - Manifest map keyed by view directory name.
+   * @throws If views are already primed, or after the server has started.
+   *
+   * @internal
+   */
+  __primeViews(views: ViewsManifest): void {
+    this[registerViews](views);
+  }
+
   /** Register a static resource readable at `definition.uri`. */
   resource(definition: ResourceDefinition, callback: ResourceCallback): this {
     this.#assertNotStarted("resource", definition.name);
