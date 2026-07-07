@@ -134,6 +134,19 @@ function stripSchemaDialect(
   return rest;
 }
 
+/**
+ * Removes `$schema` fields from tool input and output schemas in `tools/list`
+ * responses for cross-version compatibility.
+ *
+ * The v2 SDK's default validator rejects schemas with older `$schema` dialects
+ * (draft-04, draft-07) that v1-era servers may emit. By omitting `$schema`,
+ * schemas validate against the client's default dialect, allowing v2 clients
+ * to consume tools from v1 servers without strict dialect enforcement.
+ *
+ * Clients using `DialectJsonSchemaValidator` (HTTP connector default) already
+ * accept common dialects, but this stripping ensures broader client
+ * compatibility where the validator may be stricter.
+ */
 function stripToolsListSchemaDialects(tools: unknown[]): unknown[] {
   return tools.map((tool) => {
     if (!tool || typeof tool !== "object") return tool;
