@@ -373,12 +373,16 @@ export async function runDev(options: DevOptions): Promise<void> {
     // serve/transform the .html itself.
     const isViewDocument =
       pathname.includes("/_mcp-use/views/") && pathname.endsWith(".html");
-    // Vite only sees module-graph URLs (/@vite/client, /@id/virtual:…,
-    // /node_modules/.vite/deps/…); everything else — the MCP endpoint
-    // included — goes straight to the Hono handler.
+    // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
+    // /.mcp-use/cache/deps/…, view files under /resources/…) plus standard
+    // node_modules pre-bundles; everything else — the MCP endpoint included —
+    // goes straight to the Hono handler.
     const isViteRequest =
       req.method === "GET" &&
-      (pathname.startsWith("/@") || pathname.startsWith("/node_modules/"));
+      (pathname.startsWith("/@") ||
+        pathname.startsWith("/node_modules/") ||
+        pathname.startsWith("/.mcp-use/") ||
+        (hasViews() && pathname.startsWith("/resources/")));
 
     if (hasViews() && !isViewDocument && isViteRequest) {
       vite.middlewares(req, res, () => {

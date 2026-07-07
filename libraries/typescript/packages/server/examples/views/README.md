@@ -18,6 +18,11 @@ runtime surface (`useView`, `useCallTool`, `useViewTool`, `ModelContext`, and
   the client does not advertise MCP Apps support.
 - **Props flow** — the handler echoes `query` into `structuredContent`; the view
   receives it as React props (not merged from tool input).
+- **Tailwind CSS v4** — styling is the project's own declaration via
+  `vite.config.ts` (`@tailwindcss/vite`) and `@import "tailwindcss"` in
+  `resources/product-search-result/view.css`. The CLI's client build picks up
+  the project Vite config automatically (see
+  [Views spec — User Vite config](../../specs/VIEWS_SPEC.md#one-client-build-n-entries)).
 
 ## Run locally
 
