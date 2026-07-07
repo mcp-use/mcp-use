@@ -42,10 +42,11 @@ export interface BuildOptions {
 
 /**
  * Build the project's server for production: a Vite build of the SSR/node
- * environment only (no client environment exists in this phase), emitted as
- * ESM to `.mcp-use/build/` with a `manifest.json` alongside it.
+ * environment only (the client environment for views arrives with
+ * VIEWS_SPEC.md), emitted as ESM to `.mcp-use/build/` with a `manifest.json`
+ * alongside it.
  *
- * Dependencies stay external (`packages: "external"` semantics): only the
+ * Dependencies stay external (`ssr: { external: true }`): only the
  * user's own source is bundled; every bare import resolves from
  * `node_modules` at runtime. The built entry preserves the default export
  * (the `MCPServer` instance) so `mcp-use start` can import and serve it.

@@ -1,6 +1,6 @@
 # @mcp-use/server — authorization spec
 
-**Status:** Design (nothing implemented). Companion to `SPEC.md`; this document *is* the Phase 2 "auth seam" item, expanded to a full contract. It folds in review feedback on PR #1832 (context parity with v1, auth adapters as a first-class seam).
+**Status:** **Deferred — blocked on official SDK auth support.** The design below is complete and stands as the contract for when the SDK catches up (its web-standard `requireBearerAuth` gate and related exports have not reached a published beta); nothing auth-shaped is implemented or should be started before then. Companion to `SPEC.md` (see its "Later phases" list).
 **Protocol basis:** MCP 2026-07-28 authorization (OAuth 2.1 resource server), SDK `@modelcontextprotocol/server@2.0.0-beta.2` (always the latest beta — see the SPEC.md ground rule).
 **SDK reference:** <https://ts.sdk.modelcontextprotocol.io/v2/serving/authorization.html> — the SDK's own authorization guide. Caveat: the site tracks the SDK's main branch and currently documents exports (web-standard `requireBearerAuth`) that have not reached a published beta; check the installed package before assuming an export exists.
 **v1 reference:** `packages/mcp-use/src/server/oauth/*` defines *what* must be possible, never what the API looks like.
@@ -25,11 +25,11 @@ Reused as-is from `@modelcontextprotocol/server`:
 - **`checkResourceAllowed` / `resourceUrlFromServerUrl`** — RFC 8707 resource-binding validation (token `resource` vs our canonical URL).
 - **`OAuthTokens` / `OAuthClientInformation*` / `AuthorizationServerMetadata` / OpenID discovery types** — used by proxy mode (below); we don't redeclare any OAuth wire shapes.
 
-**Landing in the SDK — wait for it, don't build it** (verified 2026-07-02): a runtime-neutral `requireBearerAuth` for web-standard `fetch(request)` hosts is merged on the SDK's main branch as a pending changeset (minor bump for `@modelcontextprotocol/server`, shipping `requireBearerAuth`, `verifyBearerToken`, `bearerAuthChallengeResponse`, with `OAuthTokenVerifier` moving into core). It is **not** in any published beta yet — beta.2 ships none of it, and `@modelcontextprotocol/hono` still has only host/origin validation — but it covers exactly what we'd otherwise hand-roll (extract bearer → verify → `401`/`403` with `WWW-Authenticate` → produce `AuthInfo`). Usage shape per the SDK guide: `const auth = await gate(request); if (auth instanceof Response) return auth; return handler.fetch(request, { authInfo: auth })`. One behavior to design around: the SDK gate **rejects any verifier result without `expiresAt`** with an automatic `401`.
+**Landing in the SDK — wait for it, don't build it** (the deferral in the status line): a runtime-neutral `requireBearerAuth` for web-standard `fetch(request)` hosts is merged on the SDK's main branch as a pending changeset (minor bump for `@modelcontextprotocol/server`, shipping `requireBearerAuth`, `verifyBearerToken`, `bearerAuthChallengeResponse`, with `OAuthTokenVerifier` moving into core). It is **not** in any published beta yet — beta.2 ships none of it, and `@modelcontextprotocol/hono` still has only host/origin validation — but it covers exactly what we'd otherwise hand-roll (extract bearer → verify → `401`/`403` with `WWW-Authenticate` → produce `AuthInfo`). Usage shape per the SDK guide: `const auth = await gate(request); if (auth instanceof Response) return auth; return handler.fetch(request, { authInfo: auth })`. One behavior to design around: the SDK gate **rejects any verifier result without `expiresAt`** with an automatic `401`.
 
 Built by us:
 
-- `bearerAuth(config)` — thin Hono middleware wrapping the SDK's web-standard `requireBearerAuth` gate (adapt Hono context ↔ `Request`/`Response`, stash `AuthInfo`); challenge/error semantics stay the SDK's. If Phase 2 starts before the export ships in a beta, mirror the semantics behind the same function and swap the internals when it lands.
+- `bearerAuth(config)` — thin Hono middleware wrapping the SDK's web-standard `requireBearerAuth` gate (adapt Hono context ↔ `Request`/`Response`, stash `AuthInfo`); challenge/error semantics stay the SDK's. The gate shipping in a published beta is the trigger that un-defers this spec.
 - `authMetadata(config)` — Hono routes mirroring `mcpAuthMetadataRouter`, which remains Express-only (RFC 9728 metadata; RFC 8414 / OIDC discovery passthrough where the provider needs it).
 - The provider adapters (below).
 
@@ -230,7 +230,7 @@ Rules (the point of owning the adapters):
 
 ### Validation posture (no internal zod)
 
-Decided 2026-07-02, superseding a same-day relaxation that briefly made zod a declared internal dependency (SPEC.md ground rule updated in step): auth needs **no zod of our own**. The public invariant is unchanged and absolute — user-facing schema inputs (`schema`/`outputSchema`) are Standard Schema only, and the auth API takes no schemas from users at all.
+Auth needs **no zod of our own** (the SPEC.md zod-as-devDependency-only ground rule holds here too). The public invariant is absolute — user-facing schema inputs (`schema`/`outputSchema`) are Standard Schema only, and the auth API takes no schemas from users at all.
 
 Three validation jobs, none of which needs a validator dependency:
 
@@ -238,7 +238,7 @@ Three validation jobs, none of which needs a validator dependency:
 2. **Our RFC 9728 metadata document** — conformance-checked once at server construction with the SDK's exported `OAuthProtectedResourceMetadataSchema`, used as an imported value (`.parse()` on the SDK's own object; zod stays the SDK's internal concern, not our dependency). Never per request.
 3. **Claims → `user` mapping and `fetchUser` responses** — hand-declared public interfaces (`ClerkUser` etc.) constructed field-by-field through a small set of internal narrowing helpers (`asString`, `asStringArray`, …) that null out wrongly-typed claims instead of trusting them. The interfaces are hand-written deliberately, not as a fallback: they're the documentation surface (per-field TSDoc, which inferred types can't carry) and they keep validator types out of the public `.d.ts`. Strict TS (`exactOptionalPropertyTypes`, no-`any` lint) forces every interface field to be handled at the construction site, and adapter tests pin against recorded provider fixtures so upstream claim drift breaks in our CI, not in user code. `fetchUser` provider-API responses — the drift-prone external boundary — go through the same helpers and fixtures.
 
-Reversal note: an internal validator would be invisible to users (nothing zod-shaped may appear in a public signature regardless), so if the `fetchUser` mappers prove unwieldy in practice, adopting zod internally later is a zero-migration change. What was rejected is carrying the dependency — and its version-coupling watch items — for six flat claim-mapping objects that narrowing helpers cover.
+Flexibility note: an internal validator would be invisible to users (nothing zod-shaped may appear in a public signature regardless), so if the `fetchUser` mappers prove unwieldy in practice, adopting zod internally later is a zero-migration change. Carrying the dependency now — with its version-coupling watch items — isn't justified for six flat claim-mapping objects that narrowing helpers cover.
 
 ### Security defaults (all adapters)
 
@@ -258,7 +258,7 @@ Explicitly deferred, not dropped: v1's CORS-proxy layer for browser clients (`oa
 
 ## Instrumentation note
 
-Not auth, but the same review thread: the observability seam is **not** `ctx.log` (deprecated in 2026-07-28). It is SEP-414 trace context (`traceparent`/`tracestate`/`baggage` in `_meta`, key constants exported by the SDK) + the SDK's `ServerEventBus`/`onerror` hooks. An instrumentation adapter starts an OTel span per request with `mcpReq.method`, tool name, and `ctx.auth.clientId` as attributes. Specced separately when Phase 2 lands; called out here so `AuthInfo` fields stay stable for it.
+Not auth, but the same review thread: the observability seam is **not** `ctx.log` (deprecated in the 2026-07-28 protocol). It is SEP-414 trace context (`traceparent`/`tracestate`/`baggage` in `_meta`, key constants exported by the SDK) + the SDK's `ServerEventBus`/`onerror` hooks. An instrumentation adapter starts an OTel span per request with `mcpReq.method`, tool name, and `ctx.auth.clientId` as attributes. Specced separately when auth lands; called out here so `AuthInfo` fields stay stable for it.
 
 ## Phasing
 

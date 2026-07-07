@@ -13,10 +13,10 @@ export interface MountMcpOptions {
   /**
    * Options forwarded to the SDK's `createMcpHandler`.
    *
-   * `legacy` defaults to `"reject"`: this package supports only the
-   * stateless 2026-07-28 protocol revision, so 2025-era requests are
-   * refused with an unsupported-protocol-version error. Pass
-   * `legacy: "stateless"` to also serve old-revision clients.
+   * `legacy` defaults to `"stateless"`: 2025-era (non-envelope) requests are
+   * served by a fresh instance over a session-less streamable HTTP transport.
+   * Pass `legacy: "reject"` for modern-only strict serving, where
+   * legacy-classified requests get the unsupported-protocol-version error.
    */
   handler?: CreateMcpHandlerOptions;
 }

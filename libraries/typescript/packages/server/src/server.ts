@@ -316,6 +316,9 @@ export class MCPServer {
       }
       const handler = mountMcp(app, () => this.#buildSdkServer(), {
         path: this.#basePath(),
+        ...(this.#config.legacy !== undefined && {
+          handler: { legacy: this.#config.legacy },
+        }),
       });
       // Inspector shell (default enabled, FastAPI /docs style) rides the
       // same app, so the validation middleware above covers it too.
@@ -344,9 +347,14 @@ export class MCPServer {
 
   /** Build a fresh SDK server from the registry (runs once per request). */
   #buildSdkServer(): SdkMcpServer {
-    const { name, version, title, instructions } = this.#config;
+    const { name, version, title, description, instructions } = this.#config;
     const server = new SdkMcpServer(
-      { name, version, ...(title !== undefined && { title }) },
+      {
+        name,
+        version,
+        ...(title !== undefined && { title }),
+        ...(description !== undefined && { description }),
+      },
       instructions !== undefined ? { instructions } : undefined
     );
 

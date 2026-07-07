@@ -30,7 +30,10 @@ export interface ServerConfig {
   version: string;
   /** Human-readable display name (falls back to `name`). */
   title?: string;
-  /** Human-readable description of the server. */
+  /**
+   * Human-readable description of the server, reported to clients as
+   * implementation metadata during negotiation.
+   */
   description?: string;
   /** Usage instructions surfaced to the model by clients. */
   instructions?: string;
@@ -60,6 +63,18 @@ export interface ServerConfig {
    * header always pass (non-browser MCP clients don't send one).
    */
   allowedOrigins?: string[];
+  /**
+   * How 2025-era (non-envelope) requests are served.
+   *
+   * `"stateless"` answers each legacy request with a fresh instance over a
+   * session-less streamable HTTP transport (2025 session operations — GET and
+   * DELETE — get `405`). `"reject"` is modern-only strict: legacy-classified
+   * requests are refused with the unsupported-protocol-version error naming
+   * the supported revisions.
+   *
+   * @defaultValue `"stateless"`
+   */
+  legacy?: "stateless" | "reject";
   /**
    * Inspector shell route at `${basePath}/inspector` — a browser UI for
    * exploring and calling the server's tools, resources, and prompts.

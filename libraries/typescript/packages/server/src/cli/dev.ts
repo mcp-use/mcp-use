@@ -142,7 +142,8 @@ export async function runDev(options: DevOptions): Promise<void> {
     server: {
       // We never use Vite's HTTP server; middleware mode keeps it unbound.
       middlewareMode: true,
-      // Reload, not HMR (CLI_SPEC.md § Why no HMR).
+      // Reload, not HMR for the server entry (CLI_SPEC.md § Why the server
+      // entry reloads instead of HMR).
       hmr: false,
     },
     ssr: {

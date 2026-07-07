@@ -221,8 +221,8 @@ describe("MCPServer (phase 1, e2e over HTTP)", () => {
     url = started.url;
     client = new Client(
       { name: "phase1-test-client", version: "1.0.0" },
-      // The client's default posture is the legacy 2025 handshake, which the
-      // server rejects (2026-07-28 only) — pin the modern revision.
+      // The client's default posture is the legacy 2025 handshake — pin the
+      // modern revision to exercise the 2026-07-28 wire.
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
     );
     await client.connect(new StreamableHTTPClientTransport(new URL(url)));
@@ -497,6 +497,84 @@ async function rawStatus(
     req.end(body);
   });
 }
+
+/*
+ * Legacy (2025-era) serving posture: `legacy: "stateless"` is the default —
+ * non-envelope requests are answered by a fresh instance over a session-less
+ * transport; `legacy: "reject"` refuses them with the
+ * unsupported-protocol-version error.
+ */
+describe("MCPServer legacy posture", () => {
+  /** A 2025-era initialize request: no per-request _meta envelope. */
+  function legacyInitializeRequest(): Request {
+    return new Request("http://localhost/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-11-25",
+          capabilities: {},
+          clientInfo: { name: "legacy-client", version: "0.0.0" },
+        },
+      }),
+    });
+  }
+
+  function minimalServer(config: Partial<ServerConfig> = {}): MCPServer {
+    const server = new MCPServer({
+      name: "legacy-test",
+      version: "1.0.0",
+      description: "Legacy posture fixture",
+      ...config,
+    });
+    server.tool({ name: "ping" }, async () => ({
+      content: [{ type: "text", text: "pong" }],
+    }));
+    return server;
+  }
+
+  it("serves 2025-era clients statelessly by default", async () => {
+    const server = minimalServer();
+    const response = await server.getHandler()(legacyInitializeRequest());
+    expect(response.status).toBe(200);
+    await server.close();
+  });
+
+  it("rejects 2025-era clients under legacy: 'reject'", async () => {
+    const server = minimalServer({ legacy: "reject" });
+    const response = await server.getHandler()(legacyInitializeRequest());
+    expect(response.ok).toBe(false);
+    await server.close();
+  });
+
+  it("reports config.description as implementation metadata", async () => {
+    const server = minimalServer();
+    const response = await server.getHandler()(legacyInitializeRequest());
+    // Legacy serving answers over streamable-HTTP SSE framing; the initialize
+    // result is the first `data:` line.
+    const text = await response.text();
+    const dataLine = text
+      .split("\n")
+      .find((line) => line.startsWith("data:"));
+    expect(dataLine).toBeDefined();
+    const body: unknown = JSON.parse((dataLine as string).slice("data:".length));
+    expect(body).toMatchObject({
+      result: {
+        serverInfo: {
+          name: "legacy-test",
+          description: "Legacy posture fixture",
+        },
+      },
+    });
+    await server.close();
+  });
+});
 
 describe("MCPServer basePath accessor", () => {
   it("defaults to /mcp", () => {
