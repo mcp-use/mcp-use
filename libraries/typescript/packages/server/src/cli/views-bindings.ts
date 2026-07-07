@@ -13,7 +13,7 @@ import type { ViewsManifest } from "../views/types.js";
  */
 interface ServerLike {
   getHandler(): unknown;
-  __primeViews(views: ViewsManifest): void;
+  __primeViews(views: ViewsManifest, options?: { dev?: boolean }): void;
 }
 
 /**

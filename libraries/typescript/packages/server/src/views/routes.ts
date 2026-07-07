@@ -7,8 +7,14 @@ import type { Hono } from "hono";
 import type { ViewManifestEntry } from "./types.js";
 import { synthesizeViewDocument } from "./document.js";
 import { resolveRequestOrigin } from "./origin.js";
+import {
+  resolvePublicFilePath,
+  servePublicFile,
+} from "./public-route.js";
 
 const ASSETS_DIR = ".mcp-use/build/views/assets";
+const PUBLIC_BUILD_DIR = ".mcp-use/build/views/public";
+const PUBLIC_DEV_DIR = "public";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".js": "application/javascript",
@@ -21,12 +27,17 @@ const CONTENT_TYPES: Record<string, string> = {
  *
  * Routes exist only when views are primed; a tool-only server is unchanged.
  *
+ * @param options - When `dev` is true, the public route reads from
+ *   `<projectRoot>/public` instead of `.mcp-use/build/views/public/`.
+ *   `projectRoot` defaults to `process.cwd()`.
+ *
  * @internal
  */
 export function mountViewRoutes(
   app: Hono,
   basePath: string,
-  views: ReadonlyMap<string, ViewManifestEntry>
+  views: ReadonlyMap<string, ViewManifestEntry>,
+  options?: { dev?: boolean; projectRoot?: string }
 ): void {
   if (views.size === 0) {
     return;
@@ -34,6 +45,11 @@ export function mountViewRoutes(
 
   const viewsPrefix = `${basePath}/_mcp-use/views`;
   const assetsPrefix = `${basePath}/_mcp-use/assets`;
+  const publicPrefix = `${basePath}/_mcp-use/public`;
+  const publicRoot = join(
+    options?.projectRoot ?? process.cwd(),
+    options?.dev === true ? PUBLIC_DEV_DIR : PUBLIC_BUILD_DIR
+  );
 
   app.get(`${viewsPrefix}/:name`, (c) => {
     const rawName = c.req.param("name");
@@ -73,5 +89,14 @@ export function mountViewRoutes(
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
+  });
+
+  app.get(`${publicPrefix}/:path{.+}`, (c) => {
+    const subpath = c.req.param("path") ?? "";
+    const diskPath = resolvePublicFilePath(publicRoot, subpath);
+    if (diskPath === null) {
+      return c.text("Not Found", 404);
+    }
+    return servePublicFile(diskPath);
   });
 }

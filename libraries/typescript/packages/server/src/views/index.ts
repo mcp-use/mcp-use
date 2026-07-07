@@ -1,6 +1,5 @@
 export { registerViews } from "./register.js";
 export type { RegisterViews } from "./register.js";
-export { view } from "./view.js";
 export {
   UI_EXTENSION_ID,
   UI_META_KEY,
@@ -12,7 +11,7 @@ export {
 export type {
   UiPermissions,
   ViewManifestEntry,
-  ViewMetadata,
+  ViewResourceFacts,
   ViewsManifest,
 } from "./types.js";
 export { synthesizeViewDocument, resolveAssetUrl } from "./document.js";
@@ -26,6 +25,7 @@ export {
 } from "./capabilities.js";
 export {
   buildResourceUiMeta,
+  buildToolResultUiMeta,
   buildToolUiMeta,
   viewResourceConfig,
 } from "./wire.js";

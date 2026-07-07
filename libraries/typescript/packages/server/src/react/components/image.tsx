@@ -1,37 +1,21 @@
 import React from "react";
 
-declare global {
-  interface Window {
-    __mcpPublicAssetsUrl?: string;
-    __mcpPublicUrl?: string;
-  }
-}
+import { publicAsset } from "../public-assets.js";
 
 /**
- * Image element that resolves root-relative `src` paths against the MCP public
- * asset URL injected by the server at build time.
+ * Image element that resolves root-relative `src` paths against the project's
+ * `public/` directory via the request-scoped config injected into the
+ * synthesized view document.
+ *
+ * Root-relative paths (starting with `/`) resolve to absolute URLs under
+ * `${basePath}/_mcp-use/public/`. Absolute `http(s):` and `data:` URLs pass
+ * through unchanged. Fully-relative paths are left as-is.
  */
 export const Image: React.FC<
   React.ImgHTMLAttributes<HTMLImageElement>
 > = ({ src, ...props }) => {
-  const publicUrl =
-    typeof window !== "undefined"
-      ? (window.__mcpPublicAssetsUrl ?? window.__mcpPublicUrl ?? "")
-      : "";
-
-  const finalSrc = (() => {
-    if (!src) return src;
-    if (
-      src.startsWith("http://") ||
-      src.startsWith("https://") ||
-      src.startsWith("data:")
-    ) {
-      return src;
-    }
-    if (!publicUrl) return src;
-    const cleanSrc = src.startsWith("/") ? src.slice(1) : src;
-    return `${publicUrl}/${cleanSrc}`;
-  })();
+  const finalSrc =
+    typeof src === "string" ? publicAsset(src) : src;
 
   return <img src={finalSrc} {...props} />;
 };

@@ -2,22 +2,24 @@
 
 Reference MCP Apps views server for `@mcp-use/server`. It follows the
 [Views spec](../../specs/VIEWS_SPEC.md) fruit-store shape: one view-bound tool,
-one view component, typed props via exported tool refs, and the full React
-runtime surface (`useView`, `useCallTool`, `useViewTool`, `ModelContext`, and
-`Loading`).
+one view component, typed tool output via exported tool refs, and the full React
+runtime surface (`useViewContext`, `useCallTool`, `useViewTool`, `ModelContext`,
+and the per-action hooks).
 
 ## What this demonstrates
 
 - **File-based views** under `resources/<name>/view.tsx`, discovered by
   `mcp-use dev` / `build` / `start`.
-- **Tool ↔ view binding** via `view: { name: "product-search-result" }` on
-  `search-fruits`, with props typed from the tool's `outputSchema`.
+- **Tool ↔ view binding** via `view: { name, description, prefersBorder, … }` on
+  `search-fruits`, with output typed from the tool's `outputSchema`. Resource facts
+  (description, CSP, permissions, domain, prefersBorder) are declared here and emitted
+  on the view resource.
 - **Zero-codegen typing** via `src/register.d.ts` and exported tool refs
   (`searchFruits`, `getFruitDetails`).
 - **Capability gating** — `search-fruits` returns a markdown table fallback when
   the client does not advertise MCP Apps support.
-- **Props flow** — the handler echoes `query` into `structuredContent`; the view
-  receives it as React props (not merged from tool input).
+- **Hook-first data flow** — the default export takes no props; tool output
+  arrives via `useViewContext<"search-fruits">()` once `status === "ready"`.
 - **Tailwind CSS v4** — styling is the project's own declaration via
   `vite.config.ts` (`@tailwindcss/vite`) and `@import "tailwindcss"` in
   `resources/product-search-result/view.css`. The CLI's client build picks up
@@ -63,23 +65,59 @@ export {};
 ```
 
 Export tool refs from `src/index.ts` (`export const searchFruits = …`). Then
-`ViewProps<"search-fruits">`, `LoadingProps<"search-fruits">`, and
-`useCallTool("get-fruit-details")` infer input/output types from those refs.
+`useViewContext<"search-fruits">()`, `useCallTool("get-fruit-details")`, and
+related hooks infer input/output types from those refs.
 
 See [Views spec — Typing](../../specs/VIEWS_SPEC.md#typing-toolref--register-zero-codegen)
 for the full contract.
 
-## Props model
+## Result channels
 
-1. The server handler calls `view({ props, content })` (or returns
-   `structuredContent` directly).
-2. `props` must match the bound tool's `outputSchema`.
-3. The React runtime spreads that payload onto the default export —
-   `ViewProps<"search-fruits">` is exactly the output type.
+View-bound tool handlers return a plain `CallToolResult` — no response helpers:
 
-Tool input is available separately via `useView().toolInput` (and streamed
-partials feed the optional `Loading` export). See
-[Views spec — Props model](../../specs/VIEWS_SPEC.md#props-model).
+1. **`structuredContent`** — model-visible and view-visible structured payload,
+   typed by the bound tool's `outputSchema`. In the view it surfaces as
+   `toolOutput` when `status === "ready"`.
+2. **`content`** — model/text-host narrative blocks; also surfaced to the view.
+3. **`_meta`** — view-only channel (never model context). The handler passes it
+   directly on the returned object; the framework auto-stamps
+   `_meta.ui.resourceUri` on every non-error view-bound tool result.
+
+While waiting for a result, branch on `view.status`:
+
+- `"pending"` — before the first result; render a static skeleton.
+- `"streaming"` — tool arguments are streaming; use
+  `view.partialToolInput` (a `DeepPartial` of the tool input) to drive a
+  pulsing skeleton.
+- `"ready"` — render from `view.toolOutput` (and optionally `view.content`,
+  `view.meta`).
+
+Complete tool arguments are always available on `view.toolInput`. Host
+environment comes from `useHostContext()` / `useViewTheme()`; actions from
+`useCallTool`, `useSendFollowUp()`, `useOpenExternal()`, and
+`useDisplayMode()`. See
+[Views spec — Channel visibility](../../specs/VIEWS_SPEC.md#channel-visibility-what-the-model-sees-vs-what-the-view-sees).
+
+## Images and CSP
+
+Static files in the project-root `public/` folder are served under
+`${basePath}/_mcp-use/public/` (e.g. `/fruits/apple.png` in a view resolves to
+`http://127.0.0.1:3000/mcp/_mcp-use/public/fruits/apple.png`). Use the
+`<Image>` component for root-relative paths — the
+synthesized view document injects the request-resolved public base so URLs stay
+absolute inside `srcdoc` iframes (which have no document base URL).
+
+This example keeps fruit PNGs in `public/fruits/` and references them as
+`<Image src={`/fruits/${id}.png`} …>`. Same-origin public assets are
+automatically covered by the framework's serving-origin CSP entry on view
+resources. This example does not declare `view.csp` because it has no external
+image or fetch domains. To load assets from another origin, add
+`view.csp.resourceDomains` (and `connectDomains` for API calls) on the bound
+tool's `view:` config.
+
+Imported assets (Vite `import url from "./file.png"`) are an alternative for
+view-local files; production resolves them via `import.meta.url`, and dev
+requires the Vite `server.origin` setting so emitted URLs are absolute.
 
 ## Tools
 

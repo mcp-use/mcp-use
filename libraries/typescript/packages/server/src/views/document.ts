@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 
+import type { McpUseViewConfig } from "../react/public-assets.js";
 import type { ViewManifestEntry } from "./types.js";
 
 /**
@@ -21,6 +22,17 @@ export function resolveAssetUrl(
   }
   const file = basename(assetPath);
   return `${origin}${basePath}/_mcp-use/assets/${file}`;
+}
+
+/**
+ * Resolve the absolute URL prefix for the project's `public/` directory.
+ *
+ * @param origin - Request-resolved public origin.
+ * @param basePath - MCP mount prefix (e.g. `/mcp`).
+ * @returns Absolute prefix with trailing slash.
+ */
+export function resolvePublicBase(origin: string, basePath: string): string {
+  return `${origin}${basePath}/_mcp-use/public/`;
 }
 
 /**
@@ -51,10 +63,16 @@ export function synthesizeViewDocument(
 
   const entryUrl = resolveAssetUrl(entry.entry, origin, basePath);
 
+  const viewConfig: McpUseViewConfig = {
+    publicBase: resolvePublicBase(origin, basePath),
+  };
+  const configScript = `<script>globalThis.__mcpUseViewConfig=${JSON.stringify(viewConfig)};</script>`;
+
   return `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
+${configScript}
 ${cssLinks}
 </head>
 <body>

@@ -27,3 +27,8 @@ export type HostCapabilities = McpUiHostCapabilities;
  * Rich host environment context (theme, locale, display mode, …).
  */
 export type HostContext = McpUiHostContext;
+
+/**
+ * How the host surfaces the view iframe.
+ */
+export type DisplayMode = "inline" | "fullscreen" | "pip";

@@ -1,6 +1,6 @@
 /**
  * End-to-end tests for the views server core: wire metadata, capability
- * gating, binding validation, document/asset routes, and the view() helper.
+ * queries, binding validation, document/asset routes, and plain tool results.
  */
 import {
   Client,
@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { MCPServer, registerViews, view } from "../src/index.js";
+import { MCPServer, registerViews } from "../src/index.js";
 
 const UI_CAPABILITIES = {
   extensions: {
@@ -31,24 +31,14 @@ function primeViews(server: MCPServer): void {
     "product-search-result": {
       entry: "views/assets/product-search-result-D2f9a1Kc.js",
       css: ["views/assets/product-search-result-B99z1bQd.css"],
-      metadata: {
-        description: "Product search results grid",
-        csp: {
-          connectDomains: [],
-          resourceDomains: ["https://images.example.com"],
-        },
-        prefersBorder: true,
-      },
     },
     "orphan-view": {
       entry: "views/assets/orphan-D2f9a1Kc.js",
       css: [],
-      metadata: { description: "No tool binds this view" },
     },
     "app-only-view": {
       entry: "views/assets/app-only-D2f9a1Kc.js",
       css: [],
-      metadata: { description: "App-visible tool view" },
     },
   });
 }
@@ -65,16 +55,33 @@ function buildViewsServer(): MCPServer {
   server.tool(
     {
       name: "search-fruits",
-      schema: z.object({ query: z.string().optional() }),
+      schema: z.object({
+        query: z.string().optional(),
+        fail: z.boolean().optional(),
+      }),
       outputSchema: resultsSchema,
-      view: { name: "product-search-result" },
+      view: {
+        name: "product-search-result",
+        description: "Product search results grid",
+        csp: { resourceDomains: ["https://images.example.com"] },
+        permissions: { clipboardWrite: {} },
+        domain: "https://views.example.com",
+        prefersBorder: true,
+      },
     },
-    async ({ query = "" }) =>
-      view({
-        props: { query, items: [{ id: "1", name: "apple" }] },
-        content: "Found 1 fruit",
-        meta: { viewOnly: true },
-      })
+    async ({ query = "", fail = false }) => {
+      if (fail) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: "search failed" }],
+        };
+      }
+      return {
+        structuredContent: { query, items: [{ id: "1", name: "apple" }] },
+        content: [{ type: "text", text: "Found 1 fruit" }],
+        _meta: { viewOnly: true },
+      };
+    }
   );
 
   server.tool(
@@ -83,7 +90,10 @@ function buildViewsServer(): MCPServer {
       outputSchema: z.object({ ok: z.boolean() }),
       view: { name: "app-only-view", visibility: "app" },
     },
-    async () => view({ props: { ok: true } })
+    async () => ({
+      structuredContent: { ok: true },
+      content: [{ type: "text", text: "ok" }],
+    })
   );
 
   server.tool(
@@ -91,8 +101,10 @@ function buildViewsServer(): MCPServer {
       name: "supports-views-probe",
       outputSchema: z.object({ ui: z.boolean() }),
     },
-    async (_params, ctx) =>
-      view({ props: { ui: ctx.client.supportsViews() } })
+    async (_params, ctx) => ({
+      structuredContent: { ui: ctx.client.supportsViews() },
+      content: [{ type: "text", text: String(ctx.client.supportsViews()) }],
+    })
   );
 
   server.tool({ name: "plain-tool" }, async () => ({
@@ -134,7 +146,7 @@ describe("views server core (e2e over HTTP)", () => {
     await server.close();
   });
 
-  it("emits ui meta on tools/list for UI-capable clients", async () => {
+  it("emits ui meta on tools/list for view-bound tools", async () => {
     const { tools } = await uiClient.listTools();
     const search = tools.find((t) => t.name === "search-fruits");
     expect(search?._meta).toMatchObject({
@@ -144,19 +156,26 @@ describe("views server core (e2e over HTTP)", () => {
     expect(search?._meta?.["ui"]).not.toHaveProperty("visibility");
   });
 
-  it("omits ui meta on tools/list for plain clients", async () => {
+  it("emits ui meta on tools/list for plain clients too", async () => {
     const { tools } = await plainClient.listTools();
     const search = tools.find((t) => t.name === "search-fruits");
-    expect(search?._meta?.["ui"]).toBeUndefined();
-    expect(search?._meta?.["ui/resourceUri"]).toBeUndefined();
+    expect(search?._meta).toMatchObject({
+      ui: { resourceUri: "ui://views/product-search-result.html" },
+      "ui/resourceUri": "ui://views/product-search-result.html",
+    });
   });
 
-  it("hides visibility:app tools from plain clients", async () => {
+  it("lists visibility:app tools for plain clients with ui.visibility", async () => {
     const { tools } = await plainClient.listTools();
-    expect(tools.map((t) => t.name)).not.toContain("app-only-action");
+    const appOnly = tools.find((t) => t.name === "app-only-action");
+    expect(appOnly).toBeDefined();
+    expect(appOnly?._meta?.["ui"]).toMatchObject({
+      visibility: ["app"],
+      resourceUri: "ui://views/app-only-view.html",
+    });
   });
 
-  it("lists view resources with mimetype and gated ui meta for UI clients", async () => {
+  it("lists view resources with mimetype, description, and author _meta.ui", async () => {
     const { resources } = await uiClient.listResources();
     const view = resources.find(
       (r) => r.uri === "ui://views/product-search-result.html"
@@ -166,22 +185,36 @@ describe("views server core (e2e over HTTP)", () => {
     expect(view?._meta?.["ui"]).toMatchObject({
       csp: {
         connectDomains: [],
-        resourceDomains: expect.arrayContaining([
+        resourceDomains: [
           "https://images.example.com",
           expect.stringMatching(/^https?:\/\//),
-        ]),
+        ],
       },
+      permissions: { clipboardWrite: {} },
+      domain: "https://views.example.com",
       prefersBorder: true,
     });
   });
 
-  it("omits ui meta on resources/list for plain clients", async () => {
+  it("emits ui meta on resources/list for plain clients too", async () => {
     const { resources } = await plainClient.listResources();
     const view = resources.find(
       (r) => r.uri === "ui://views/product-search-result.html"
     );
     expect(view?.mimeType).toBe("text/html;profile=mcp-app");
-    expect(view?._meta?.["ui"]).toBeUndefined();
+    expect(view?.description).toBe("Product search results grid");
+    expect(view?._meta?.["ui"]).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [
+          "https://images.example.com",
+          expect.stringMatching(/^https?:\/\//),
+        ],
+      },
+      permissions: { clipboardWrite: {} },
+      domain: "https://views.example.com",
+      prefersBorder: true,
+    });
   });
 
   it("reads a view resource as synthesized HTML via resources/read", async () => {
@@ -197,6 +230,86 @@ describe("views server core (e2e over HTTP)", () => {
     expect(content.text).toContain('id="root"');
     expect(content.text).toContain("/mcp/_mcp-use/assets/product-search-result-D2f9a1Kc.js");
     expect(content.text).toContain("/mcp/_mcp-use/assets/product-search-result-B99z1bQd.css");
+    expect(content._meta?.["ui"]).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [
+          "https://images.example.com",
+          expect.stringMatching(/^https?:\/\//),
+        ],
+      },
+      permissions: { clipboardWrite: {} },
+      domain: "https://views.example.com",
+      prefersBorder: true,
+    });
+  });
+
+  it("emits ui meta on resources/read content items for plain clients too", async () => {
+    const read = await plainClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const content = read.contents[0];
+    expect(content?._meta?.["ui"]).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [
+          "https://images.example.com",
+          expect.stringMatching(/^https?:\/\//),
+        ],
+      },
+      permissions: { clipboardWrite: {} },
+      domain: "https://views.example.com",
+      prefersBorder: true,
+    });
+  });
+
+  it("auto-appends the serving origin to csp.resourceDomains on resources/read", async () => {
+    const read = await uiClient.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const domains = (
+      read.contents[0]?._meta?.["ui"] as
+        | { csp?: { resourceDomains?: string[] } }
+        | undefined
+    )?.csp?.resourceDomains;
+    expect(domains).toContain("https://images.example.com");
+    expect(domains?.some((d) => d.includes("localhost"))).toBe(true);
+  });
+
+  it("omits unset resource facts from resources/read content _meta.ui", async () => {
+    const read = await plainClient.readResource({
+      uri: "ui://views/app-only-view.html",
+    });
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [expect.stringMatching(/^https?:\/\//)],
+      },
+    });
+    expect(ui).not.toHaveProperty("permissions");
+    expect(ui).not.toHaveProperty("domain");
+    expect(ui).not.toHaveProperty("prefersBorder");
+  });
+
+  it("emits auto CSP only for unbound views on resources/read", async () => {
+    const read = await uiClient.readResource({
+      uri: "ui://views/orphan-view.html",
+    });
+    expect(read.contents[0]?._meta?.["ui"]).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [expect.stringMatching(/^https?:\/\//)],
+      },
+    });
+    const ui = read.contents[0]?._meta?.["ui"] as
+      | Record<string, unknown>
+      | undefined;
+    expect(ui).not.toHaveProperty("permissions");
+    expect(ui).not.toHaveProperty("domain");
+    expect(ui).not.toHaveProperty("prefersBorder");
   });
 
   it("auto-appends the serving origin to csp.resourceDomains", async () => {
@@ -211,7 +324,43 @@ describe("views server core (e2e over HTTP)", () => {
     expect(domains?.some((d) => d.includes("localhost"))).toBe(true);
   });
 
-  it("separates view() channels into structuredContent, content, and _meta", async () => {
+  it("omits unset resource facts from _meta.ui", async () => {
+    const { resources } = await uiClient.listResources();
+    const appOnly = resources.find(
+      (r) => r.uri === "ui://views/app-only-view.html"
+    );
+    expect(appOnly?.description).toBeUndefined();
+    const ui = appOnly?._meta?.["ui"] as Record<string, unknown> | undefined;
+    expect(ui).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [expect.stringMatching(/^https?:\/\//)],
+      },
+    });
+    expect(ui).not.toHaveProperty("permissions");
+    expect(ui).not.toHaveProperty("domain");
+    expect(ui).not.toHaveProperty("prefersBorder");
+  });
+
+  it("emits auto CSP only for unbound views", async () => {
+    const { resources } = await uiClient.listResources();
+    const orphan = resources.find(
+      (r) => r.uri === "ui://views/orphan-view.html"
+    );
+    expect(orphan?.description).toBeUndefined();
+    expect(orphan?._meta?.["ui"]).toMatchObject({
+      csp: {
+        connectDomains: [],
+        resourceDomains: [expect.stringMatching(/^https?:\/\//)],
+      },
+    });
+    const ui = orphan?._meta?.["ui"] as Record<string, unknown> | undefined;
+    expect(ui).not.toHaveProperty("permissions");
+    expect(ui).not.toHaveProperty("domain");
+    expect(ui).not.toHaveProperty("prefersBorder");
+  });
+
+  it("separates structuredContent, content, and handler _meta on tool results", async () => {
     const result = await uiClient.callTool({
       name: "search-fruits",
       arguments: { query: "apple" },
@@ -221,7 +370,60 @@ describe("views server core (e2e over HTTP)", () => {
       items: [{ id: "1", name: "apple" }],
     });
     expect(result.content).toEqual([{ type: "text", text: "Found 1 fruit" }]);
-    expect(result._meta).toEqual({ viewOnly: true });
+    expect(result._meta).toEqual({
+      viewOnly: true,
+      ui: { resourceUri: "ui://views/product-search-result.html" },
+      "ui/resourceUri": "ui://views/product-search-result.html",
+    });
+  });
+
+  it("stamps ui resourceUri wire keys on view-bound tool results", async () => {
+    const result = await uiClient.callTool({
+      name: "search-fruits",
+      arguments: { query: "pear" },
+    });
+    expect(result._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/product-search-result.html",
+    });
+    expect(result._meta?.["ui/resourceUri"]).toBe(
+      "ui://views/product-search-result.html"
+    );
+    expect(result._meta).toMatchObject({ viewOnly: true });
+  });
+
+  it("stamps ui wire keys on view-bound tool results for plain clients too", async () => {
+    const result = await plainClient.callTool({
+      name: "search-fruits",
+      arguments: { query: "pear" },
+    });
+    expect(result._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/product-search-result.html",
+    });
+    expect(result._meta?.["ui/resourceUri"]).toBe(
+      "ui://views/product-search-result.html"
+    );
+    expect(result._meta).toMatchObject({ viewOnly: true });
+  });
+
+  it("does not stamp ui wire keys on error results from view-bound tools", async () => {
+    const result = await uiClient.callTool({
+      name: "search-fruits",
+      arguments: { fail: true },
+    });
+    expect(result.isError).toBe(true);
+    expect(result._meta?.["ui"]).toBeUndefined();
+    expect(result._meta?.["ui/resourceUri"]).toBeUndefined();
+  });
+
+  it("omits ui.visibility on view-bound tool results", async () => {
+    const result = await uiClient.callTool({
+      name: "app-only-action",
+      arguments: {},
+    });
+    expect(result._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/app-only-view.html",
+    });
+    expect(result._meta?.["ui"]).not.toHaveProperty("visibility");
   });
 
   it("reports ctx.client.supportsViews() per request", async () => {
@@ -345,12 +547,18 @@ describe("views binding validation", () => {
     const schema = z.object({ ok: z.boolean() });
     server.tool(
       { name: "first", outputSchema: schema, view: { name: "shared-view" } },
-      async () => view({ props: { ok: true } })
+      async () => ({
+        structuredContent: { ok: true },
+        content: [{ type: "text", text: "ok" }],
+      })
     );
     expect(() =>
       server.tool(
         { name: "second", outputSchema: schema, view: { name: "shared-view" } },
-        async () => view({ props: { ok: true } })
+        async () => ({
+          structuredContent: { ok: true },
+          content: [{ type: "text", text: "ok" }],
+        })
       )
     ).toThrow(/already bound/);
   });
@@ -358,7 +566,7 @@ describe("views binding validation", () => {
   it("throws at mount when a tool binds a missing primed view", async () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     server[registerViews]({
-      other: { entry: "views/assets/other.js", css: [], metadata: {} },
+      other: { entry: "views/assets/other.js", css: [] },
     });
     server.tool(
       {
@@ -366,7 +574,10 @@ describe("views binding validation", () => {
         outputSchema: z.object({}),
         view: { name: "missing-view" },
       },
-      async () => view({ props: {} })
+      async () => ({
+        structuredContent: {},
+        content: [{ type: "text", text: "ok" }],
+      })
     );
     await expect(server.listen(0)).rejects.toThrow(
       /not in the primed views registry/
@@ -381,7 +592,10 @@ describe("views binding validation", () => {
         outputSchema: z.object({}),
         view: { name: "any-view" },
       },
-      async () => view({ props: {} })
+      async () => ({
+        structuredContent: {},
+        content: [{ type: "text", text: "ok" }],
+      })
     );
     await expect(server.listen(0)).rejects.toThrow(/no views were primed/);
   });
@@ -393,7 +607,6 @@ describe("views binding validation", () => {
       "lonely-view": {
         entry: "views/assets/lonely.js",
         css: [],
-        metadata: {},
       },
     });
     const { port } = await server.listen(0);
@@ -408,12 +621,155 @@ describe("views binding validation", () => {
   it("throws when priming views twice", () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     server[registerViews]({
-      a: { entry: "views/assets/a.js", css: [], metadata: {} },
+      a: { entry: "views/assets/a.js", css: [] },
     });
     expect(() =>
       server[registerViews]({
-        b: { entry: "views/assets/b.js", css: [], metadata: {} },
+        b: { entry: "views/assets/b.js", css: [] },
       })
     ).toThrow(/already primed/);
+  });
+});
+
+describe("views dev CSP (e2e over HTTP)", () => {
+  const server = new MCPServer({
+    name: "views-dev-csp-test",
+    version: "1.0.0",
+    basePath: "/mcp",
+  });
+
+  server[registerViews](
+    {
+      "product-search-result": {
+        entry: "views/assets/product-search-result-D2f9a1Kc.js",
+        css: ["views/assets/product-search-result-B99z1bQd.css"],
+      },
+    },
+    { dev: true }
+  );
+
+  server.tool(
+    {
+      name: "search-fruits",
+      schema: z.object({ query: z.string().optional() }),
+      outputSchema: resultsSchema,
+      view: {
+        name: "product-search-result",
+        csp: {
+          resourceDomains: ["https://images.example.com"],
+          connectDomains: ["https://api.example.com"],
+        },
+      },
+    },
+    async ({ query = "" }) => ({
+      structuredContent: { query, items: [{ id: "1", name: "apple" }] },
+      content: [{ type: "text", text: "Found 1 fruit" }],
+    })
+  );
+
+  let url: string;
+  let client: Client;
+
+  beforeAll(async () => {
+    const started = await server.listen(0);
+    url = started.url;
+
+    client = new Client(
+      { name: "dev-csp-client", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        capabilities: UI_CAPABILITIES,
+      }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+  });
+
+  afterAll(async () => {
+    await client.close();
+    await server.close();
+  });
+
+  it("appends the HMR websocket origin to csp.connectDomains on resources/list", async () => {
+    const { resources } = await client.listResources();
+    const view = resources.find(
+      (r) => r.uri === "ui://views/product-search-result.html"
+    );
+    const connectDomains = (
+      view?._meta?.["ui"] as { csp?: { connectDomains?: string[] } } | undefined
+    )?.csp?.connectDomains;
+    expect(connectDomains).toContain("https://api.example.com");
+    expect(connectDomains?.some((d) => d.startsWith("ws://"))).toBe(true);
+    expect(connectDomains?.some((d) => d.includes("localhost"))).toBe(true);
+  });
+
+  it("appends the HMR websocket origin to csp.connectDomains on resources/read", async () => {
+    const read = await client.readResource({
+      uri: "ui://views/product-search-result.html",
+    });
+    const connectDomains = (
+      read.contents[0]?._meta?.["ui"] as
+        | { csp?: { connectDomains?: string[] } }
+        | undefined
+    )?.csp?.connectDomains;
+    expect(connectDomains).toContain("https://api.example.com");
+    expect(connectDomains?.some((d) => d.startsWith("ws://"))).toBe(true);
+    expect(connectDomains?.some((d) => d.includes("localhost"))).toBe(true);
+  });
+});
+
+describe("views prod CSP (e2e over HTTP)", () => {
+  it("does not append an HMR websocket origin when not dev-primed", async () => {
+    const server = new MCPServer({
+      name: "views-prod-csp-test",
+      version: "1.0.0",
+      basePath: "/mcp",
+    });
+
+    server[registerViews]({
+      "product-search-result": {
+        entry: "views/assets/product-search-result-D2f9a1Kc.js",
+        css: [],
+      },
+    });
+
+    server.tool(
+      {
+        name: "search-fruits",
+        schema: z.object({ query: z.string().optional() }),
+        outputSchema: resultsSchema,
+        view: {
+          name: "product-search-result",
+          csp: { connectDomains: ["https://api.example.com"] },
+        },
+      },
+      async ({ query = "" }) => ({
+        structuredContent: { query, items: [] },
+        content: [{ type: "text", text: "ok" }],
+      })
+    );
+
+    const started = await server.listen(0);
+    const client = new Client(
+      { name: "prod-csp-client", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        capabilities: UI_CAPABILITIES,
+      }
+    );
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(started.url))
+    );
+
+    const { resources } = await client.listResources();
+    const view = resources.find(
+      (r) => r.uri === "ui://views/product-search-result.html"
+    );
+    const connectDomains = (
+      view?._meta?.["ui"] as { csp?: { connectDomains?: string[] } } | undefined
+    )?.csp?.connectDomains;
+    expect(connectDomains).toEqual(["https://api.example.com"]);
+
+    await client.close();
+    await server.close();
   });
 });

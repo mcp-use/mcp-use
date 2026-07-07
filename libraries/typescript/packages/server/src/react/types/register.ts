@@ -1,5 +1,4 @@
 import type { ToolRef } from "../../tools.js";
-import type { UiPermissions, ViewMetadata } from "../../views/types.js";
 
 /** Augmented by the project's `register.d.ts`; empty by default. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentional augmentation target
@@ -28,20 +27,6 @@ type ToolsFromModule<M> = {
 export type RegisteredTools = ToolsFromModule<RegisteredToolsModule>;
 
 /**
- * Props of the component bound to tool `Name`: the tool's inferred output type.
- */
-export type ViewProps<Name extends keyof RegisteredTools> =
-  RegisteredTools[Name]["output"];
-
-/**
- * Props of the optional `Loading` export: the streaming pre-result window.
- */
-export type LoadingProps<Name extends keyof RegisteredTools> = {
-  partialInput?: DeepPartial<RegisteredTools[Name]["input"]>;
-  isStreaming: boolean;
-};
-
-/**
  * Recursive partial for streamed JSON: every field optional at every depth.
  *
  * Arrays may be shorter than final; string values may be truncated mid-token.
@@ -52,5 +37,3 @@ export type DeepPartial<T> = T extends (infer E)[]
   : T extends object
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : T;
-
-export type { UiPermissions, ViewMetadata };

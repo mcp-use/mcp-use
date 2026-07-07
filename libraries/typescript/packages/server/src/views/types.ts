@@ -1,35 +1,30 @@
+import type {
+  McpUiResourceCsp,
+  McpUiResourcePermissions,
+} from "@modelcontextprotocol/ext-apps";
+
 /**
  * Sandbox permissions a view may request from the host.
  *
- * Vendored from the MCP Apps extension spec (`ext-apps` `spec.types.ts`);
- * kept server-side without importing ext-apps.
+ * Alias of the canonical MCP Apps spec type
+ * {@link McpUiResourcePermissions} from `@modelcontextprotocol/ext-apps`.
+ * Type-only — no runtime import of ext-apps enters the server bundle.
  */
-export interface UiPermissions {
-  /** Request camera access inside the view iframe. */
-  camera?: Record<string, never>;
-  /** Request microphone access inside the view iframe. */
-  microphone?: Record<string, never>;
-  /** Request geolocation access inside the view iframe. */
-  geolocation?: Record<string, never>;
-  /** Request clipboard-write access inside the view iframe. */
-  clipboardWrite?: Record<string, never>;
-}
+export type UiPermissions = McpUiResourcePermissions;
 
 /**
- * Resource-level facts about a view; named-exported as `metadata` from
- * `view.tsx`.
+ * Resource-level facts declared on a bound tool's `view:` config and emitted
+ * on the view resource at registration time.
  */
-export interface ViewMetadata {
+export interface ViewResourceFacts {
   /** Human-readable description → the resource's `description`. */
   description?: string;
   /**
    * CSP domains the host must allow → resource `_meta.ui.csp`. The framework
-   * auto-appends its own serving origin to `resourceDomains` at emission time.
+   * auto-appends its serving origin to `resourceDomains` at emission time;
+   * other author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
    */
-  csp?: {
-    connectDomains?: string[];
-    resourceDomains?: string[];
-  };
+  csp?: McpUiResourceCsp;
   /** Sandbox permissions the view needs → `_meta.ui.permissions`. */
   permissions?: UiPermissions;
   /**
@@ -51,8 +46,6 @@ export interface ViewManifestEntry {
   entry: string;
   /** Stylesheet paths, using the same path rules as {@link ViewManifestEntry.entry}. */
   css: string[];
-  /** Resource-level metadata extracted at build/dev time from the view module. */
-  metadata: ViewMetadata;
   /**
    * Optional extra module-script URL paths prepended to the synthesized
    * document (dev uses this for `/@vite/client`).

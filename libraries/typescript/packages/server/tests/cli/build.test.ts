@@ -179,10 +179,8 @@ describe("runBuild (views)", () => {
     expect(manifest.views).toBeDefined();
     const views = manifest.views!;
     expect(views["product-search-result"]).toMatchObject({
-      metadata: {
-        description: "Product search results grid",
-        prefersBorder: true,
-      },
+      entry: expect.stringMatching(/^views\/assets\/product-search-result-[^/]+\.js$/),
+      css: expect.any(Array),
     });
     expect(views["product-search-result"]!.entry).toMatch(
       /^views\/assets\/product-search-result-[^/]+\.js$/
@@ -195,6 +193,10 @@ describe("runBuild (views)", () => {
     const assetFiles = readdirSync(assetsDir);
     expect(assetFiles.some((f) => f.endsWith(".js"))).toBe(true);
     expect(assetFiles.some((f) => f.endsWith(".html"))).toBe(false);
+
+    const publicFile = join(buildDir, "views", "public", "test.txt");
+    expect(existsSync(publicFile)).toBe(true);
+    expect(readFileSync(publicFile, "utf8")).toBe("public-fixture\n");
 
     const entryCode = readFileSync(join(buildDir, "index.js"), "utf8");
     expect(entryCode).toMatch(/registerViews/);
@@ -247,6 +249,20 @@ describe("runBuild (views)", () => {
       expect(assetOk.status).toBe(200);
       expect(assetOk.headers.get("cache-control")).toContain("immutable");
 
+      const publicOk = await handler(
+        new Request("http://localhost/mcp/_mcp-use/public/test.txt")
+      );
+      expect(publicOk.status).toBe(200);
+      expect(publicOk.headers.get("cache-control")).toBe(
+        "public, max-age=0, must-revalidate"
+      );
+      expect(await publicOk.text()).toBe("public-fixture\n");
+
+      const publicTraversal = await handler(
+        new Request("http://localhost/mcp/_mcp-use/public/../index.js")
+      );
+      expect(publicTraversal.status).toBe(404);
+
       const proxied = await handler(
         new Request(
           "http://localhost/mcp/_mcp-use/views/product-search-result.html",
@@ -272,17 +288,30 @@ describe("runBuild (views)", () => {
           "x-forwarded-host": "fruit.example.com",
         }
       );
-      const proxiedRead = (
-        readProxied["result"] as { contents: { text: string }[] }
-      ).contents[0]!.text;
-      expect(proxiedRead).toContain(
+      const proxiedReadContent = (
+        readProxied["result"] as {
+          contents: {
+            text: string;
+            _meta?: { ui?: { csp?: { resourceDomains?: string[] } } };
+          }[];
+        }
+      ).contents[0]!;
+      expect(proxiedReadContent.text).toContain(
         "https://fruit.example.com/mcp/_mcp-use/assets/"
       );
+      const readResourceDomains =
+        proxiedReadContent._meta?.ui?.csp?.resourceDomains;
+      expect(readResourceDomains).toContain("https://images.example.com");
+      expect(readResourceDomains).toContain("https://fruit.example.com");
 
       const listMeta = await handlerMcp(handler, "resources/list");
       const viewResource = (
         listMeta["result"] as {
-          resources: { uri: string; _meta?: { ui?: { csp?: unknown } } }[];
+          resources: {
+            uri: string;
+            description?: string;
+            _meta?: { ui?: { csp?: unknown } };
+          }[];
         }
       ).resources.find((r) => r.uri === "ui://views/product-search-result.html");
       const resourceDomains = (
@@ -290,20 +319,21 @@ describe("runBuild (views)", () => {
       )?.csp?.resourceDomains;
       expect(resourceDomains).toContain("https://images.example.com");
       expect(resourceDomains?.some((d) => d.includes("localhost"))).toBe(true);
+      expect(viewResource?.description).toBe("Product search results grid");
     } finally {
       process.chdir(previousCwd);
     }
   }, 60_000);
 
-  it("fails the build when a view module is node-incompatible", async () => {
-    const cwd = copyFixture("build-views-bad", "views");
+  it("builds a view module that uses browser globals at module scope", async () => {
+    const cwd = copyFixture("build-views-browser", "views");
     dirs.push(cwd);
-    mkdirSync(join(cwd, "resources", "broken-view"), { recursive: true });
+    mkdirSync(join(cwd, "resources", "browser-view"), { recursive: true });
     writeFileSync(
-      join(cwd, "resources", "broken-view", "view.tsx"),
+      join(cwd, "resources", "browser-view", "view.tsx"),
       `const x = window.location.href;\nexport default function B() { return null; }\n`
     );
-    await expect(runBuild({ cwd })).rejects.toThrow(/view "broken-view"/i);
+    await expect(runBuild({ cwd })).resolves.toBeUndefined();
   }, 60_000);
 
   it("fails when a tool binds a missing view", async () => {
@@ -314,8 +344,8 @@ describe("runBuild (views)", () => {
     writeFileSync(
       entry,
       source.replace(
-        'view: { name: "product-search-result" }',
-        'view: { name: "does-not-exist" }'
+        'name: "product-search-result"',
+        'name: "does-not-exist"'
       )
     );
     await expect(runBuild({ cwd })).rejects.toThrow(/does-not-exist/);

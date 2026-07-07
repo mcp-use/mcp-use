@@ -3,7 +3,7 @@
  * `.mcp-use/build/` workspace directory (CLI_SPEC.md § Commands → build).
  *
  * When views exist (under `resources/<name>/view.tsx`), also runs a client-environment
- * build, extracts metadata, validates bindings, and emits a wrapper entry that
+ * build, validates bindings, and emits a wrapper entry that
  * primes views before re-exporting the server (VIEWS_SPEC.md § Build system).
  *
  * `vite` is an optional peer dependency of `@mcp-use/server` (never a regular
@@ -15,7 +15,7 @@
 
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { build } from "vite";
 
@@ -27,9 +27,8 @@ import {
 import { validateViewBindingsAtBuild } from "./views-bindings.js";
 import {
   buildProductionViewsManifest,
-  createMetadataExtractionServer,
+  createBindingValidationServer,
   discoverViews,
-  extractViewMetadata,
   type BuildOutputBundle,
   type BuildOutputChunk,
 } from "./views.js";
@@ -183,21 +182,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   // Views build: wipe output, client build into views/, then SSR wrapper.
   await rm(paths.build, { recursive: true, force: true });
 
-  const metadataServer = await createMetadataExtractionServer(
-    options.cwd,
-    paths.cache,
-    userViteConfig
-  );
-  let metadataByView: Record<string, import("../views/types.js").ViewMetadata>;
-  try {
-    metadataByView = await extractViewMetadata(
-      metadataServer.environments.ssr,
-      views
-    );
-  } finally {
-    await metadataServer.close();
-  }
-
   const viewsOutDir = join(paths.build, "views");
   const clientResult = await build({
     root: options.cwd,
@@ -230,6 +214,12 @@ export async function runBuild(options: BuildOptions): Promise<void> {
   if (clientOutput === undefined || !("output" in clientOutput)) {
     throw new Error("Client views build produced no output.");
   }
+
+  const publicSrc = join(options.cwd, "public");
+  if (existsSync(publicSrc)) {
+    await cp(publicSrc, join(viewsOutDir, "public"), { recursive: true });
+  }
+
   const rawOutput = clientOutput.output;
   const bundle: BuildOutputBundle = {};
   if (Array.isArray(rawOutput)) {
@@ -242,13 +232,9 @@ export async function runBuild(options: BuildOptions): Promise<void> {
     Object.assign(bundle, rawOutput);
   }
 
-  const viewsManifest = buildProductionViewsManifest(
-    views,
-    metadataByView,
-    bundle
-  );
+  const viewsManifest = buildProductionViewsManifest(views, bundle);
 
-  const bindingServer = await createMetadataExtractionServer(
+  const bindingServer = await createBindingValidationServer(
     options.cwd,
     paths.cache,
     false

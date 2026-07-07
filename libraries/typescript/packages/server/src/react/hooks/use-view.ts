@@ -1,34 +1,37 @@
+import type { ContentBlock } from "@modelcontextprotocol/server";
+
 import type { CallToolResult } from "../types/result-types.js";
 import type { RegisteredTools } from "../types/register.js";
 import type { DeepPartial } from "../types/register.js";
+import {
+  useHostContextSubscription,
+  useViewActions,
+} from "../bridge/view-bridge.js";
 import type {
+  DisplayMode,
   HostCapabilities,
   HostContext,
   HostInfo,
   SafeAreaInsets,
 } from "../types/host-types.js";
-import {
-  useHostContextSubscription,
-  useViewActions,
-  useViewBridgeSnapshot,
-  useViewBridgeStore,
-} from "../bridge/view-bridge.js";
-
-type DisplayMode = "inline" | "fullscreen" | "pip";
+import { useHostContext } from "./use-host-context.js";
+import { useViewContext } from "./use-view-context.js";
 
 /**
  * Ambient view handle: tool-call data channels, host context, and actions.
  */
 export interface ViewHandle<Name extends keyof RegisteredTools = never> {
-  /** Last result's `structuredContent` — same payload the component receives as props. */
-  props: (Name extends keyof RegisteredTools
+  /** Model-visible tool output from the last result's `structuredContent`. */
+  toolOutput: (Name extends keyof RegisteredTools
     ? RegisteredTools[Name]["output"]
     : unknown) | undefined;
+  /** Model-visible content blocks from the last tool result. */
+  content: ContentBlock[] | undefined;
   /** Complete tool arguments from the host. */
   toolInput: (Name extends keyof RegisteredTools
     ? RegisteredTools[Name]["input"]
     : unknown) | undefined;
-  /** Progressive argument stream (feeds the `Loading` export). */
+  /** Progressive argument stream while waiting for a result. */
   partialToolInput: (Name extends keyof RegisteredTools
     ? DeepPartial<RegisteredTools[Name]["input"]>
     : unknown) | undefined;
@@ -72,37 +75,13 @@ export interface ViewHandle<Name extends keyof RegisteredTools = never> {
   requestDisplayMode: (args: { mode: DisplayMode }) => Promise<void>;
 }
 
-const DEFAULT_SAFE_AREA: SafeAreaInsets = {
-  top: 0,
-  right: 0,
-  bottom: 0,
-  left: 0,
-};
-
-function readMaxHeight(
-  hostContext: HostContext | undefined
-): number | undefined {
-  const dims = hostContext?.containerDimensions;
-  if (!dims) return undefined;
-  if ("height" in dims && typeof dims.height === "number") return dims.height;
-  if ("maxHeight" in dims && typeof dims.maxHeight === "number") {
-    return dims.maxHeight;
-  }
-  return undefined;
-}
-
-function readMaxWidth(hostContext: HostContext | undefined): number | undefined {
-  const dims = hostContext?.containerDimensions;
-  if (!dims) return undefined;
-  if ("width" in dims && typeof dims.width === "number") return dims.width;
-  if ("maxWidth" in dims && typeof dims.maxWidth === "number") {
-    return dims.maxWidth;
-  }
-  return undefined;
-}
-
 /**
- * Ambient hook for the current tool call, host context, and bridge actions.
+ * Migration aggregate for v1 `useWidget` callers: tool-call data, host context,
+ * and bridge actions in one handle.
+ *
+ * New views should prefer {@link useViewContext}, {@link useHostContext}, and the
+ * per-action hooks ({@link useSendFollowUp}, {@link useOpenExternal},
+ * {@link useDisplayMode}, {@link useCallTool}).
  *
  * @example
  * ```tsx
@@ -115,49 +94,23 @@ function readMaxWidth(hostContext: HostContext | undefined): number | undefined 
 export function useView<
   Name extends keyof RegisteredTools = never,
 >(): ViewHandle<Name> {
-  const snap = useViewBridgeSnapshot();
-  const hostContext = snap.hostContext;
+  const contextHandle = useViewContext<Name>();
+  const host = useHostContext();
   const actions = useViewActions();
-  const store = useViewBridgeStore();
-  const app = store.getApp();
-
-  const theme: "light" | "dark" =
-    hostContext?.theme === "dark" ? "dark" : "light";
-  const displayMode: DisplayMode =
-    hostContext?.displayMode === "fullscreen" ||
-    hostContext?.displayMode === "pip"
-      ? hostContext.displayMode
-      : "inline";
 
   return {
-    props: snap.props as ViewHandle<Name>["props"],
-    toolInput: snap.toolInput as ViewHandle<Name>["toolInput"],
-    partialToolInput: snap.partialToolInput as ViewHandle<Name>["partialToolInput"],
-    isStreaming: snap.isStreaming,
-    isPending: snap.isPending,
-    meta: snap.meta,
-    theme,
-    locale: typeof hostContext?.locale === "string" ? hostContext.locale : "en-US",
-    timeZone:
-      typeof hostContext?.timeZone === "string"
-        ? hostContext.timeZone
-        : typeof Intl !== "undefined"
-          ? Intl.DateTimeFormat().resolvedOptions().timeZone
-          : "UTC",
-    userAgent:
-      typeof hostContext?.userAgent === "string"
-        ? hostContext.userAgent
-        : typeof navigator !== "undefined"
-          ? navigator.userAgent
-          : "",
-    displayMode,
-    safeArea: hostContext?.safeAreaInsets ?? DEFAULT_SAFE_AREA,
-    maxHeight: readMaxHeight(hostContext),
-    maxWidth: readMaxWidth(hostContext),
-    hostInfo: app?.getHostVersion(),
-    hostCapabilities: app?.getHostCapabilities(),
-    hostContext,
-    isAvailable: snap.isConnected,
+    toolOutput:
+      contextHandle.status === "ready" ? contextHandle.toolOutput : undefined,
+    content: contextHandle.status === "ready" ? contextHandle.content : undefined,
+    toolInput: contextHandle.toolInput,
+    partialToolInput:
+      contextHandle.status === "ready"
+        ? undefined
+        : contextHandle.partialToolInput,
+    isStreaming: contextHandle.status === "streaming",
+    isPending: contextHandle.status === "pending",
+    meta: contextHandle.status === "ready" ? contextHandle.meta : undefined,
+    ...host,
     ...actions,
   };
 }

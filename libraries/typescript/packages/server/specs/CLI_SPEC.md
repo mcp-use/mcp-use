@@ -95,7 +95,7 @@ The build system keeps v1's reworked workspace convention **exactly** — it was
 
 ```
 .mcp-use/
-├─ build/        ← compiled server + manifest.json (this spec); views add build/views/ (VIEWS_SPEC.md)
+├─ build/        ← compiled server + manifest.json (this spec); views add build/views/ (assets + public/, VIEWS_SPEC.md)
 ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md § Typegen, demoted)
 ├─ cache/        ← disposable dev/build scratch (vite cacheDir)
 ├─ state/        ← mutable runtime state (e.g. tunnel.json)
@@ -122,7 +122,7 @@ Writes `.mcp-use/build/manifest.json` (v1's `BUILD_MANIFEST_NAME`, shape compati
 { "buildId": "…", "entryPoint": "index.js", "createdAt": "…", "inspector": true }
 ```
 
-`buildId` is a random hex id, `createdAt` an ISO timestamp — introspection data for tooling. `start` consumes only `entryPoint` today. Known gap, recorded honestly: `inspector` is currently written as a hardcoded `true` rather than introspected from the built server's config, and nothing consumes it yet (the built server's own `MCPServer` config governs the inspector route at runtime). Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest).
+`buildId` is a random hex id, `createdAt` an ISO timestamp — introspection data for tooling. `start` consumes only `entryPoint` today. Known gap, recorded honestly: `inspector` is currently written as a hardcoded `true` rather than introspected from the built server's config, and nothing consumes it yet (the built server's own `MCPServer` config governs the inspector route at runtime). Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest) and copy the project-root `public/` directory into `build/views/public/` when present.
 
 **No typecheck step in v0** — deliberate. Users run `tsc --noEmit` via their own script; the build is transpile-only and fast.
 

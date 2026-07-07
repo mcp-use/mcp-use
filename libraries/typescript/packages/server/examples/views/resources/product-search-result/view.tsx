@@ -1,28 +1,19 @@
 import { useState } from "react";
 import { z } from "zod";
 import {
+  Image,
   ModelContext,
   useCallTool,
-  useView,
+  useDisplayMode,
+  useOpenExternal,
+  useSendFollowUp,
+  useViewContext,
   useViewState,
+  useViewTheme,
   useViewTool,
-} from "@mcp-use/server/react";
-import type {
-  LoadingProps,
-  ViewMetadata,
-  ViewProps,
 } from "@mcp-use/server/react";
 
 import "./view.css";
-
-export const metadata: ViewMetadata = {
-  description: "Product search results grid",
-  csp: {
-    connectDomains: [],
-    resourceDomains: ["https://images.example.com"],
-  },
-  prefersBorder: true,
-};
 
 const rootClass =
   "p-4 font-sans bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100";
@@ -67,7 +58,7 @@ function ResultsGrid({
   onDetails,
   onOpenProducer,
 }: {
-  items: { id: string; name: string; imageUrl: string }[];
+  items: { id: string; name: string }[];
   selected: string | null;
   favorites: string[];
   onFavorite: (id: string) => void;
@@ -83,8 +74,8 @@ function ResultsGrid({
             selected === item.id ? " ring-2 ring-blue-600" : ""
           }`}
         >
-          <img
-            src={item.imageUrl}
+          <Image
+            src={`/fruits/${item.id}.png`}
             alt={item.name}
             className="aspect-square w-full rounded-md bg-neutral-100 object-cover dark:bg-neutral-800"
           />
@@ -155,26 +146,12 @@ function Spinner() {
   );
 }
 
-export function Loading({ partialInput, isStreaming }: LoadingProps<"search-fruits">) {
-  return (
-    <SearchSkeleton
-      {...(partialInput?.query !== undefined && { query: partialInput.query })}
-      pulsing={isStreaming}
-    />
-  );
-}
-
-export default function ProductSearchResult({
-  query,
-  items,
-}: ViewProps<"search-fruits">) {
-  const {
-    theme,
-    displayMode,
-    requestDisplayMode,
-    sendFollowUpMessage,
-    openExternal,
-  } = useView();
+export default function ProductSearchResult() {
+  const view = useViewContext<"search-fruits">();
+  const theme = useViewTheme();
+  const { displayMode, requestDisplayMode } = useDisplayMode();
+  const sendFollowUpMessage = useSendFollowUp();
+  const openExternal = useOpenExternal();
 
   const [favorites, setFavorites] = useViewState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -192,6 +169,19 @@ export default function ProductSearchResult({
       return { content: [{ type: "text", text: `Highlighted ${id}` }] };
     }
   );
+
+  if (view.status !== "ready") {
+    return (
+      <SearchSkeleton
+        {...(view.partialToolInput?.query !== undefined && {
+          query: view.partialToolInput.query,
+        })}
+        pulsing={view.status === "streaming"}
+      />
+    );
+  }
+
+  const { query, items } = view.toolOutput;
 
   return (
     <div className={theme === "dark" ? `dark ${rootClass}` : rootClass}>

@@ -4,22 +4,52 @@ import type {
   ToolAnnotations,
 } from "@modelcontextprotocol/server";
 
+import type { McpUiResourceCsp } from "@modelcontextprotocol/ext-apps";
+
 import type { RequestContext } from "./context.js";
+import type { UiPermissions } from "./views/types.js";
 
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
  *
- * Relationship facts only — CSP, permissions, and description live in the
- * view file's `metadata` export and ship on the resource.
+ * The single authoring point for the tool↔view binding and for the view
+ * resource's wire facts. The view file exports only the component; the
+ * framework reads these fields at registration and emits them on the bound
+ * view's MCP resource (hosts read resource `_meta.ui`, not tool-level copies).
  */
 export interface ToolViewConfig {
   /** View directory / manifest name, e.g. `"product-search-result"`. */
   name: string;
   /**
-   * Narrows who may call or see the tool on the wire (`_meta.ui.visibility`).
-   * Omitted = host default (callable by the model, visible to the app).
+   * Declares who may call or see the tool (`_meta.ui.visibility` on
+   * `tools/list`). Omitted = host default (callable by the model, visible to
+   * the app). The server always lists every registered tool; hosts filter by
+   * this declaration — it does not omit tools from `tools/list`.
    */
   visibility?: "model" | "app";
+  /**
+   * Human-readable description of the view resource → the resource's
+   * `description` on `resources/list` and `resources/read`.
+   */
+  description?: string;
+  /**
+   * CSP domains the host must allow → resource `_meta.ui.csp`. The framework
+   * auto-appends its serving origin to `resourceDomains` at emission time;
+   * other author-set fields (`frameDomains`, `baseUriDomains`, …) pass through.
+   */
+  csp?: McpUiResourceCsp;
+  /** Sandbox permissions the view needs → resource `_meta.ui.permissions`. */
+  permissions?: UiPermissions;
+  /**
+   * Dedicated origin hint for hosts that render views on a separate domain →
+   * resource `_meta.ui.domain`.
+   */
+  domain?: string;
+  /**
+   * Ask the host to draw a border around the view → resource
+   * `_meta.ui.prefersBorder`.
+   */
+  prefersBorder?: boolean;
 }
 
 /** Declares a tool's identity, LLM-facing description, and schemas. First argument to {@link MCPServer.tool}. */
@@ -49,7 +79,8 @@ export interface ToolDefinition {
   annotations?: ToolAnnotations;
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
-   * {@link ToolDefinition.outputSchema} — props are typed from it.
+   * {@link ToolDefinition.outputSchema} — the view reads the result's
+   * `structuredContent` typed by this schema.
    */
   view?: ToolViewConfig;
 }

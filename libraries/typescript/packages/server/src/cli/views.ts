@@ -1,18 +1,14 @@
 /**
- * View discovery and metadata extraction for `mcp-use build` / `mcp-use dev`.
+ * View discovery for `mcp-use build` / `mcp-use dev`.
  *
  * Views live under `resources/<name>/view.tsx` (VIEWS_SPEC.md § File-based views).
  */
 
 import { existsSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import {
-  createServerModuleRunner,
-  type DevEnvironment,
-  type ViteDevServer,
-} from "vite";
+import type { ViteDevServer } from "vite";
 
-import type { ViewMetadata, ViewsManifest } from "../views/types.js";
+import type { ViewsManifest } from "../views/types.js";
 
 /** Minimal Rollup chunk shape used to map client build output to manifest paths. */
 export interface BuildOutputChunk {
@@ -119,73 +115,16 @@ export function isViewEntryPath(file: string, cwd: string): boolean {
 }
 
 /**
- * Evaluate each view module through the module runner and read its `metadata`
- * export. Only module scope runs — the component is never rendered.
- *
- * @param environment - Vite SSR dev environment (same runner machinery as the
- *   server entry).
- * @param views - Discovered views to evaluate.
- * @returns Metadata keyed by view name (missing export → `{}`).
- * @throws When a view module throws under evaluation, naming the view.
- *
- * @internal
- */
-export async function extractViewMetadata(
-  environment: DevEnvironment,
-  views: DiscoveredView[]
-): Promise<Record<string, ViewMetadata>> {
-  if (views.length === 0) {
-    return {};
-  }
-
-  const runner = createServerModuleRunner(environment, {
-    hmr: false,
-    sourcemapInterceptor: "node",
-  });
-
-  const metadataByView: Record<string, ViewMetadata> = {};
-  try {
-    for (const view of views) {
-      try {
-        const mod = (await runner.import(view.entryPath)) as Record<
-          string,
-          unknown
-        >;
-        const metadata = mod["metadata"];
-        metadataByView[view.name] =
-          metadata !== null &&
-          typeof metadata === "object" &&
-          !Array.isArray(metadata)
-            ? (metadata as ViewMetadata)
-            : {};
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `Failed to evaluate view "${view.name}" for metadata extraction: ${message}`
-        );
-      }
-    }
-  } finally {
-    await runner.close();
-  }
-  return metadataByView;
-}
-
-/**
  * Build a dev-shaped views manifest (Vite URLs, `/@vite/client` script hook).
  *
  * @internal
  */
-export function buildDevViewsManifest(
-  views: DiscoveredView[],
-  metadataByView: Record<string, ViewMetadata>
-): ViewsManifest {
+export function buildDevViewsManifest(views: DiscoveredView[]): ViewsManifest {
   const manifest: ViewsManifest = {};
   for (const view of views) {
     manifest[view.name] = {
       entry: devVirtualEntryPath(view.name),
       css: [],
-      metadata: metadataByView[view.name] ?? {},
       scripts: ["/@vite/client"],
     };
   }
@@ -218,7 +157,6 @@ function collectChunkCss(
  * Map a client build's Rollup output to production manifest entries.
  *
  * @param views - Built views (for ordering and names).
- * @param metadataByView - Metadata extracted before the client build.
  * @param bundle - Rollup output bundle from the client build.
  * @returns Manifest paths relative to `.mcp-use/build/`.
  * @throws When an entry chunk cannot be matched to a view.
@@ -227,7 +165,6 @@ function collectChunkCss(
  */
 export function buildProductionViewsManifest(
   views: DiscoveredView[],
-  metadataByView: Record<string, ViewMetadata>,
   bundle: BuildOutputBundle
 ): ViewsManifest {
   const manifest: ViewsManifest = {};
@@ -263,7 +200,6 @@ export function buildProductionViewsManifest(
     manifest[view.name] = {
       entry: `views/assets/${basename(entryChunk.fileName)}`,
       css: [...cssFiles].map((file) => `views/assets/${basename(file)}`),
-      metadata: metadataByView[view.name] ?? {},
     };
   }
 
@@ -271,11 +207,11 @@ export function buildProductionViewsManifest(
 }
 
 /**
- * Create a temporary Vite dev server for build-time metadata extraction.
+ * Create a temporary Vite dev server for build-time binding validation.
  *
  * @internal
  */
-export async function createMetadataExtractionServer(
+export async function createBindingValidationServer(
   cwd: string,
   cacheDir: string,
   configFile: string | false

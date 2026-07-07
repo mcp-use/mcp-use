@@ -1,4 +1,4 @@
-import { MCPServer, view } from "@mcp-use/server";
+import { MCPServer } from "@mcp-use/server";
 import { z } from "zod";
 
 const server = new MCPServer({ name: "fixture-views", version: "1.0.0" });
@@ -14,16 +14,20 @@ export const searchProducts = server.tool(
     description: "Search products",
     schema: z.object({ query: z.string().optional() }),
     outputSchema: resultsSchema,
-    view: { name: "product-search-result" },
+    view: {
+      name: "product-search-result",
+      description: "Product search results grid",
+      csp: { resourceDomains: ["https://images.example.com"] },
+      prefersBorder: true,
+    },
   },
-  async ({ query = "" }) =>
-    view({
-      props: {
-        query,
-        items: [{ id: "1", name: "widget" }],
-      },
-      content: `Found 1 product for "${query}"`,
-    })
+  async ({ query = "" }) => ({
+    structuredContent: {
+      query,
+      items: [{ id: "1", name: "widget" }],
+    },
+    content: [{ type: "text", text: `Found 1 product for "${query}"` }],
+  })
 );
 
 export default server;

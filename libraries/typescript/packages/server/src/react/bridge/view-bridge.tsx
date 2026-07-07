@@ -3,6 +3,7 @@ import {
   PostMessageTransport,
   type McpUiHostContext,
 } from "@modelcontextprotocol/ext-apps";
+import type { ContentBlock } from "@modelcontextprotocol/server";
 
 type ViewBridgeTransport = NonNullable<Parameters<App["connect"]>[0]>;
 import {
@@ -20,8 +21,12 @@ import { registerModelContextFlush } from "./model-context-store.js";
 
 /** Snapshot of view data channels and host context delivered over the bridge. */
 export interface ViewBridgeSnapshot {
-  /** Last tool result `structuredContent` — same payload spread onto the component. */
-  props: Record<string, unknown> | undefined;
+  /** Model-visible tool output from the last result's `structuredContent`. */
+  toolOutput: unknown;
+  /** Model-visible content blocks from the last tool result. */
+  content: ContentBlock[] | undefined;
+  /** Whether a tool result notification has arrived. */
+  hasToolResult: boolean;
   /** Complete tool arguments from the host. */
   toolInput: Record<string, unknown> | undefined;
   /** Progressive argument stream while the model is still generating the call. */
@@ -39,7 +44,9 @@ export interface ViewBridgeSnapshot {
 }
 
 const defaultSnapshot: ViewBridgeSnapshot = {
-  props: undefined,
+  toolOutput: undefined,
+  content: undefined,
+  hasToolResult: false,
   toolInput: undefined,
   partialToolInput: undefined,
   isStreaming: false,
@@ -91,7 +98,7 @@ function wireAppEvents(app: App): void {
     const toolInput = params.arguments ?? {};
     setSnapshot({
       toolInput,
-      isPending: snapshot.props === undefined,
+      isPending: !snapshot.hasToolResult,
     });
   };
 
@@ -99,25 +106,23 @@ function wireAppEvents(app: App): void {
     setSnapshot({
       partialToolInput: params.arguments ?? {},
       isStreaming: true,
-      isPending: snapshot.props === undefined,
+      isPending: !snapshot.hasToolResult,
     });
   };
 
   app.ontoolresult = (params) => {
-    const structured =
-      params.structuredContent !== undefined &&
-      typeof params.structuredContent === "object" &&
-      params.structuredContent !== null
-        ? (params.structuredContent as Record<string, unknown>)
-        : undefined;
     setSnapshot({
-      props: structured,
+      toolOutput: params.structuredContent,
+      content: Array.isArray(params.content)
+        ? (params.content as ContentBlock[])
+        : undefined,
       meta:
         params._meta !== undefined &&
         typeof params._meta === "object" &&
         params._meta !== null
           ? (params._meta as Record<string, unknown>)
           : undefined,
+      hasToolResult: true,
       partialToolInput: undefined,
       isStreaming: false,
       isPending: false,

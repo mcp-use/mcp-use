@@ -181,6 +181,37 @@ describe("runDev (views)", () => {
     const virtualJs = await virtualResponse.text();
     expect(virtualJs).toMatch(/bootstrapView/);
 
+    const viewModuleResponse = await fetch(
+      `${base}/resources/product-search-result/view.tsx`
+    );
+    expect(viewModuleResponse.status).toBe(200);
+
+    const assetImportResponse = await fetch(
+      `${base}/resources/product-search-result/badge.png?import`
+    );
+    expect(assetImportResponse.status).toBe(200);
+    const assetImportJs = await assetImportResponse.text();
+    expect(assetImportJs).toMatch(
+      new RegExp(`http://127\\.0\\.0\\.1:${port}/resources/product-search-result/badge\\.png`)
+    );
+
+    const publicResponse = await fetch(
+      `${base}/mcp/_mcp-use/public/test.txt`
+    );
+    expect(publicResponse.status).toBe(200);
+    expect(publicResponse.headers.get("cache-control")).toBe(
+      "public, max-age=0, must-revalidate"
+    );
+    expect(await publicResponse.text()).toBe("public-fixture\n");
+
+    const docConfigMatch = /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(
+      docHtml
+    );
+    expect(docConfigMatch).not.toBeNull();
+    expect(docConfigMatch![1]).toBe(
+      `http://localhost:${port}/mcp/_mcp-use/public/`
+    );
+
     const toolsBody = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
     const searchTool = (
       toolsBody["result"] as {
@@ -191,10 +222,33 @@ describe("runDev (views)", () => {
       resourceUri: "ui://views/product-search-result.html",
     });
 
+    const resourcesBody = await mcpRequest(
+      dev.url,
+      "resources/list",
+      {},
+      { ui: true }
+    );
+    const viewResource = (
+      resourcesBody["result"] as {
+        resources: {
+          uri: string;
+          _meta?: Record<string, unknown>;
+        }[];
+      }
+    ).resources.find((r) => r.uri === "ui://views/product-search-result.html");
+    const connectDomains = (
+      viewResource?._meta?.["ui"] as
+        | { csp?: { connectDomains?: string[] } }
+        | undefined
+    )?.csp?.connectDomains;
+    expect(connectDomains).toEqual(
+      expect.arrayContaining([`ws://localhost:${port}`])
+    );
+
     mkdirSync(join(cwd, "resources", "extra-view"), { recursive: true });
     writeFileSync(
       join(cwd, "resources", "extra-view", "view.tsx"),
-      `export const metadata = { description: "Extra" };\nexport default function Extra() { return <div>extra</div>; }\n`
+      `export default function Extra() { return <div>extra</div>; }\n`
     );
 
     await waitFor(async () => {

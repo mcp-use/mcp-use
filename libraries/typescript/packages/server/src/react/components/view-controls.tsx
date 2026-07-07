@@ -89,7 +89,8 @@ export function ViewControls({
         >
           {JSON.stringify(
             {
-              props: view.props,
+              toolOutput: view.toolOutput,
+              content: view.content,
               toolInput: view.toolInput,
               meta: view.meta,
               theme: view.theme,

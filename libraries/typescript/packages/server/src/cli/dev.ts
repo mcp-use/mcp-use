@@ -36,12 +36,10 @@ import { mcpUseViewsPlugin } from "./views-plugin.js";
 import {
   buildDevViewsManifest,
   discoverViews,
-  extractViewMetadata,
-  isViewEntryPath,
   isViewPath,
   type DiscoveredView,
 } from "./views.js";
-import type { ViewMetadata, ViewsManifest } from "../views/types.js";
+import type { ViewsManifest } from "../views/types.js";
 
 /** Web-standard request handler, as returned by `MCPServer.getHandler()`. */
 type FetchHandler = (request: Request) => Promise<Response>;
@@ -55,7 +53,7 @@ interface ServerLike {
   getHandler(): FetchHandler;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
-  __primeViews(views: ViewsManifest): void;
+  __primeViews(views: ViewsManifest, options?: { dev?: boolean; projectRoot?: string }): void;
 }
 
 /**
@@ -153,13 +151,6 @@ function resolveUserViteConfig(cwd: string): string | false {
   return false;
 }
 
-function metadataEquals(
-  a: Record<string, ViewMetadata>,
-  b: Record<string, ViewMetadata>
-): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
 /**
  * Validate the entry module's default export and return it as a
  * {@link ServerLike}.
@@ -232,6 +223,19 @@ export async function runDev(options: DevOptions): Promise<void> {
   // without websocket port collisions.
   const httpServer = createNodeServer();
 
+  const requestedPort =
+    options.port ??
+    (process.env["PORT"] !== undefined
+      ? Number.parseInt(process.env["PORT"], 10)
+      : 3000);
+  const { port, requested } = await resolvePort(requestedPort, host);
+  if (port !== requested) {
+    console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
+  }
+  process.env["PORT"] = String(port);
+
+  const devOrigin = `http://${host}:${port}`;
+
   const vite = await createServer({
     root: options.cwd,
     configFile: hasViews() ? userViteConfig : false,
@@ -243,6 +247,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       : [],
     server: {
       middlewareMode: true,
+      // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
+      // paths that resolve against the host page inside srcdoc iframes.
+      ...(hasViews() && { origin: devOrigin }),
       // View HMR rides the one HTTP listener: Vite attaches its websocket
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
@@ -259,17 +266,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     sourcemapInterceptor: "node",
   });
 
-  let lastMetadata: Record<string, ViewMetadata> = {};
-
-  const extractMetadata = async (
-    views: DiscoveredView[]
-  ): Promise<Record<string, ViewMetadata>> => {
-    if (views.length === 0) {
-      return {};
-    }
-    return extractViewMetadata(ssrEnvironment, views);
-  };
-
   const importServer = async (): Promise<ServerLike> => {
     const moduleExports = (await runner.import(entry)) as Record<
       string,
@@ -278,15 +274,16 @@ export async function runDev(options: DevOptions): Promise<void> {
     const server = serverFrom(moduleExports);
 
     if (currentViews.length > 0) {
-      const metadataByView = await extractMetadata(currentViews);
-      lastMetadata = metadataByView;
-      const viewsManifest = buildDevViewsManifest(currentViews, metadataByView);
+      const viewsManifest = buildDevViewsManifest(currentViews);
       if (typeof server.__primeViews !== "function") {
         throw new Error(
           "Loaded MCPServer instance does not support __primeViews."
         );
       }
-      server.__primeViews(viewsManifest);
+      server.__primeViews(viewsManifest, {
+        dev: true,
+        projectRoot: options.cwd,
+      });
     }
 
     return server;
@@ -364,24 +361,6 @@ export async function runDev(options: DevOptions): Promise<void> {
 
     if (viewsChanged) {
       reload();
-      return;
-    }
-
-    if (isViewEntryPath(file, options.cwd)) {
-      void (async () => {
-        try {
-          const nextMetadata = await extractMetadata(currentViews);
-          if (!metadataEquals(lastMetadata, nextMetadata)) {
-            reload();
-          }
-        } catch (error) {
-          console.error(
-            "[mcp-use] view metadata extraction failed — reloading:\n",
-            error
-          );
-          reload();
-        }
-      })();
     }
   };
 
@@ -393,17 +372,6 @@ export async function runDev(options: DevOptions): Promise<void> {
   vite.watcher.on("change", onFileEvent);
   vite.watcher.on("add", onFileEvent);
   vite.watcher.on("unlink", onFileEvent);
-
-  const requestedPort =
-    options.port ??
-    (process.env["PORT"] !== undefined
-      ? Number.parseInt(process.env["PORT"], 10)
-      : 3000);
-  const { port, requested } = await resolvePort(requestedPort, host);
-  if (port !== requested) {
-    console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
-  }
-  process.env["PORT"] = String(port);
 
   const tunnelManager = createTunnelManager(paths.tunnel);
   const devFetch = createDevApiHandler(

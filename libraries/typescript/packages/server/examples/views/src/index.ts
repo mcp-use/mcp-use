@@ -4,32 +4,28 @@
  * Follows the CLI entry contract: default-export the MCPServer instance;
  * `mcp-use dev` / `build` / `start` own the socket and view priming.
  */
-import { MCPServer, view } from "@mcp-use/server";
+import { MCPServer } from "@mcp-use/server";
 import { z } from "zod";
 
 const BASE_PATH = "/mcp";
 
 const FRUITS = [
-  {
-    id: "apple",
-    name: "Apple",
-    imageUrl: "https://images.example.com/fruits/apple.jpg",
-  },
-  {
-    id: "banana",
-    name: "Banana",
-    imageUrl: "https://images.example.com/fruits/banana.jpg",
-  },
-  {
-    id: "cherry",
-    name: "Cherry",
-    imageUrl: "https://images.example.com/fruits/cherry.jpg",
-  },
-  {
-    id: "dragonfruit",
-    name: "Dragonfruit",
-    imageUrl: "https://images.example.com/fruits/dragonfruit.jpg",
-  },
+  { id: "apple", name: "Apple" },
+  { id: "apricot", name: "Apricot" },
+  { id: "avocado", name: "Avocado" },
+  { id: "banana", name: "Banana" },
+  { id: "blueberry", name: "Blueberry" },
+  { id: "cherries", name: "Cherries" },
+  { id: "coconut", name: "Coconut" },
+  { id: "grapes", name: "Grapes" },
+  { id: "lemon", name: "Lemon" },
+  { id: "mango", name: "Mango" },
+  { id: "orange", name: "Orange" },
+  { id: "pear", name: "Pear" },
+  { id: "pineapple", name: "Pineapple" },
+  { id: "plum", name: "Plum" },
+  { id: "strawberry", name: "Strawberry" },
+  { id: "watermelon", name: "Watermelon" },
 ] as const;
 
 type FruitItem = (typeof FRUITS)[number];
@@ -43,20 +39,80 @@ const FRUIT_DETAILS: Record<
     producer: "Orchard Hills Co-op",
     nutrition: { calories: 52, fiber: "2.4g" },
   },
+  apricot: {
+    name: "Apricot",
+    producer: "Suncrest Orchards",
+    nutrition: { calories: 48, fiber: "2.0g" },
+  },
+  avocado: {
+    name: "Avocado",
+    producer: "Green Valley Growers",
+    nutrition: { calories: 160, fiber: "6.7g" },
+  },
   banana: {
     name: "Banana",
     producer: "Tropical Harvest Ltd.",
     nutrition: { calories: 89, fiber: "2.6g" },
   },
-  cherry: {
-    name: "Cherry",
+  blueberry: {
+    name: "Blueberry",
+    producer: "Northern Berry Farms",
+    nutrition: { calories: 57, fiber: "2.4g" },
+  },
+  cherries: {
+    name: "Cherries",
     producer: "Pacific Northwest Growers",
     nutrition: { calories: 50, fiber: "1.6g" },
   },
-  dragonfruit: {
-    name: "Dragonfruit",
+  coconut: {
+    name: "Coconut",
+    producer: "Island Harvest Co.",
+    nutrition: { calories: 354, fiber: "9.0g" },
+  },
+  grapes: {
+    name: "Grapes",
+    producer: "Vineyard Ridge Estates",
+    nutrition: { calories: 69, fiber: "0.9g" },
+  },
+  lemon: {
+    name: "Lemon",
+    producer: "Citrus Coast Collective",
+    nutrition: { calories: 29, fiber: "2.8g" },
+  },
+  mango: {
+    name: "Mango",
+    producer: "Tropical Harvest Ltd.",
+    nutrition: { calories: 60, fiber: "1.6g" },
+  },
+  orange: {
+    name: "Orange",
+    producer: "Citrus Coast Collective",
+    nutrition: { calories: 47, fiber: "2.4g" },
+  },
+  pear: {
+    name: "Pear",
+    producer: "Orchard Hills Co-op",
+    nutrition: { calories: 57, fiber: "3.1g" },
+  },
+  pineapple: {
+    name: "Pineapple",
+    producer: "Island Harvest Co.",
+    nutrition: { calories: 50, fiber: "1.4g" },
+  },
+  plum: {
+    name: "Plum",
+    producer: "Suncrest Orchards",
+    nutrition: { calories: 46, fiber: "1.4g" },
+  },
+  strawberry: {
+    name: "Strawberry",
+    producer: "Northern Berry Farms",
+    nutrition: { calories: 32, fiber: "2.0g" },
+  },
+  watermelon: {
+    name: "Watermelon",
     producer: "Sunbelt Exotics",
-    nutrition: { calories: 60, fiber: "3.0g" },
+    nutrition: { calories: 30, fiber: "0.4g" },
   },
 };
 
@@ -80,16 +136,15 @@ const server = new MCPServer({
   name: "fruit-store",
   version: "1.0.0",
   title: "Fruit Store",
-  legacy: "reject",
+  legacy: "stateless",
+  logging: { level: "debug" },
   description: "Search fruits and browse details with an MCP Apps view.",
   basePath: BASE_PATH,
 });
 
 const resultsSchema = z.object({
   query: z.string(),
-  items: z.array(
-    z.object({ id: z.string(), name: z.string(), imageUrl: z.string() })
-  ),
+  items: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 
 const detailsSchema = z.object({
@@ -108,7 +163,11 @@ export const searchFruits = server.tool(
     description: "Search the fruit catalog and render results in a view.",
     schema: z.object({ query: z.string().optional() }),
     outputSchema: resultsSchema,
-    view: { name: "product-search-result" },
+    view: {
+      name: "product-search-result",
+      description: "Product search results grid",
+      prefersBorder: true,
+    },
   },
   async ({ query = "" }, ctx) => {
     const items = searchFruitItems(query);
@@ -125,10 +184,18 @@ export const searchFruits = server.tool(
       };
     }
 
-    return view({
-      props: { query, items },
-      content: `Found ${items.length} fruits`,
-    });
+    return {
+      content: [{ type: "text", text: `Found ${items.length} fruits` }],
+      structuredContent: { query, items },
+      _meta: {
+        imageVariants: Object.fromEntries(
+          items.map((item) => [
+            item.id,
+            { thumb: `${item.id}-thumb`, full: item.id },
+          ])
+        ),
+      },
+    };
   }
 );
 

@@ -7,12 +7,11 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import type {
   DeepPartial,
-  LoadingProps,
   RegisteredTools,
-  ViewProps,
 } from "../src/react/types/register.js";
 import type { CallToolResult } from "../src/react/types/result-types.js";
 import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
+import type { ViewContextHandle } from "../src/react/hooks/use-view-context.js";
 
 declare module "../src/react/types/register.js" {
   interface Register {
@@ -34,18 +33,21 @@ describe("ToolsFromModule / Register", () => {
     expect(true).toBe(true);
   });
 
-  it("resolves ViewProps from output and LoadingProps from deep-partial input", () => {
-    type Props = ViewProps<"search-fruits">;
-    type Loading = LoadingProps<"search-fruits">;
+  it("narrows useViewContext toolOutput after status === ready", () => {
+    type Handle = ViewContextHandle<"search-fruits">;
+    type Ready = Extract<Handle, { status: "ready" }>;
 
-    expectTypeOf<Props>().toEqualTypeOf<{
+    expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<{
       query: string;
       items: { id: string }[];
     }>();
-    expectTypeOf<Loading["partialInput"]>().toEqualTypeOf<
+    expectTypeOf<Ready["partialToolInput"]>().toEqualTypeOf<undefined>();
+
+    type Streaming = Extract<Handle, { status: "streaming" }>;
+    expectTypeOf<Streaming["partialToolInput"]>().toEqualTypeOf<
       DeepPartial<{ query?: string | undefined }> | undefined
     >();
-    expectTypeOf<Loading["isStreaming"]>().toEqualTypeOf<boolean>();
+    expectTypeOf<Streaming["toolOutput"]>().toEqualTypeOf<undefined>();
     expect(true).toBe(true);
   });
 });

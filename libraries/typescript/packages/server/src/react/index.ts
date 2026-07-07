@@ -16,20 +16,27 @@ export { McpUseProvider } from "./components/mcp-use-provider.js";
 export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
 export { useCallTool, type CallToolHandle } from "./hooks/use-call-tool.js";
+export { useDisplayMode } from "./hooks/use-display-mode.js";
+export {
+  useHostContext,
+  type HostContextHandle,
+} from "./hooks/use-host-context.js";
+export { useOpenExternal } from "./hooks/use-open-external.js";
+export { useSendFollowUp } from "./hooks/use-send-follow-up.js";
 export { useView, useViewTheme, type ViewHandle } from "./hooks/use-view.js";
-export { useViewProps } from "./hooks/use-view-props.js";
+export {
+  useViewContext,
+  type ViewContextHandle,
+} from "./hooks/use-view-context.js";
 export { useViewState } from "./hooks/use-view-state.js";
 export { useViewTool, type ViewToolDefinition } from "./hooks/use-view-tool.js";
 export {
   type DeepPartial,
-  type LoadingProps,
   type Register,
   type RegisteredTools,
-  type UiPermissions,
-  type ViewMetadata,
-  type ViewProps,
 } from "./types/register.js";
 export type {
+  DisplayMode,
   HostCapabilities,
   HostContext,
   HostInfo,

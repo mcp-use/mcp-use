@@ -38,16 +38,18 @@ import type {
   ToolCallback,
   ToolDefinition,
   ToolRef,
+  ToolViewConfig,
 } from "./tools.js";
+import type { ViewResourceFacts } from "./views/types.js";
 import {
-  getStashedClientCapabilities,
   mountViewRoutes,
   registerViews,
   resolveRequestOrigin,
-  supportsViews,
   synthesizeViewDocument,
   viewResourceConfig,
   viewResourceUri,
+  buildResourceUiMeta,
+  buildToolResultUiMeta,
   buildToolUiMeta,
   type ViewManifestEntry,
   type ViewsManifest,
@@ -107,8 +109,15 @@ export class MCPServer {
   readonly #resourceTemplates = new Map<string, ResourceTemplateEntry>();
   readonly #prompts = new Map<string, PromptEntry>();
   readonly #views = new Map<string, ViewManifestEntry>();
-  readonly #viewBindings = new Map<string, string>();
+  readonly #viewBindings = new Map<
+    string,
+    { toolName: string; config: NonNullable<ToolDefinition["view"]> }
+  >();
   #viewsPrimed = false;
+  /** When true, resource CSP emission includes the HMR websocket origin. */
+  #viewsDevMode = false;
+  /** Project root for filesystem-backed view routes (dev `public/`). */
+  #viewsProjectRoot = process.cwd();
 
   #app: Hono | undefined;
   #handler: McpHttpHandler | undefined;
@@ -163,17 +172,29 @@ export class MCPServer {
    * Prime the views registry from a build/dev manifest.
    *
    * @param views - Manifest map keyed by view directory name.
+   * @param options - Priming options. When `dev` is true, resource CSP
+   * emission appends the serving origin's websocket variant to
+   * `connectDomains` so Vite HMR passes host-enforced CSP. Pass
+   * `projectRoot` in dev so the `public/` route resolves against the user's
+   * project directory rather than the CLI process cwd.
    * @throws If views are already primed, or after the server has started.
    *
    * @internal
    */
-  [registerViews](views: ViewsManifest): void {
+  [registerViews](
+    views: ViewsManifest,
+    options?: { dev?: boolean; projectRoot?: string }
+  ): void {
     if (this.#viewsPrimed) {
       throw new Error(
         "Cannot prime views: the views registry is already primed on this server instance."
       );
     }
     this.#assertNotStarted("views", "manifest");
+    this.#viewsDevMode = options?.dev === true;
+    if (options?.projectRoot !== undefined) {
+      this.#viewsProjectRoot = options.projectRoot;
+    }
     for (const [name, entry] of Object.entries(views)) {
       this.#views.set(name, entry);
     }
@@ -186,12 +207,13 @@ export class MCPServer {
    * module copies (dev module runner with an externalized package).
    *
    * @param views - Manifest map keyed by view directory name.
+   * @param options - Priming options forwarded to {@link registerViews}.
    * @throws If views are already primed, or after the server has started.
    *
    * @internal
    */
-  __primeViews(views: ViewsManifest): void {
-    this[registerViews](views);
+  __primeViews(views: ViewsManifest, options?: { dev?: boolean; projectRoot?: string }): void {
+    this[registerViews](views, options);
   }
 
   /** Register a static resource readable at `definition.uri`. */
@@ -378,7 +400,10 @@ export class MCPServer {
       // Logging first so view document/asset routes are observed too.
       app.use("*", requestLogger(this.#config.logging));
       this.#validateViewBindingsAtMount();
-      mountViewRoutes(app, this.#basePath(), this.#views);
+      mountViewRoutes(app, this.#basePath(), this.#views, {
+        dev: this.#viewsDevMode,
+        projectRoot: this.#viewsProjectRoot,
+      });
       const handler = mountMcp(app, (ctx) => this.#buildSdkServer(ctx), {
         path: this.#basePath(),
         ...(this.#config.legacy !== undefined && {
@@ -418,18 +443,18 @@ export class MCPServer {
     if (definition.outputSchema === undefined) {
       throw new Error(
         `Tool "${definition.name}" declares view "${view.name}" but has no outputSchema. ` +
-          `View-bound tools require an outputSchema — props are typed from it. ` +
-          `Use outputSchema: z.object({}) for a view that takes no props.`
+          `View-bound tools require an outputSchema — the view reads structuredContent typed from it. ` +
+          `Use outputSchema: z.object({}) for a view that takes no structured output.`
       );
     }
-    const existingTool = this.#viewBindings.get(view.name);
-    if (existingTool !== undefined) {
+    const existingBinding = this.#viewBindings.get(view.name);
+    if (existingBinding !== undefined) {
       throw new Error(
-        `View "${view.name}" is already bound to tool "${existingTool}"; ` +
+        `View "${view.name}" is already bound to tool "${existingBinding.toolName}"; ` +
           `cannot bind a second tool "${definition.name}".`
       );
     }
-    this.#viewBindings.set(view.name, definition.name);
+    this.#viewBindings.set(view.name, { toolName: definition.name, config: view });
   }
 
   #validateViewBindingsAtMount(): void {
@@ -479,14 +504,12 @@ export class MCPServer {
     );
 
     const request = ctx.requestInfo;
-    const clientCapabilities = getStashedClientCapabilities(request);
-    const uiCapable = supportsViews(clientCapabilities);
     const servingOrigin =
       request !== undefined ? resolveRequestOrigin(request) : "";
     const basePath = this.#basePath();
 
     for (const entry of this.#tools.values()) {
-      this.#registerTool(server, entry, uiCapable);
+      this.#registerTool(server, entry);
     }
     for (const entry of this.#resources.values()) {
       this.#registerResource(server, entry);
@@ -502,7 +525,6 @@ export class MCPServer {
         server,
         viewName,
         viewEntry,
-        uiCapable,
         servingOrigin,
         basePath
       );
@@ -512,17 +534,9 @@ export class MCPServer {
 
   #registerTool(
     server: SdkMcpServer,
-    { definition, callback }: ToolEntry,
-    uiCapable: boolean
+    { definition, callback }: ToolEntry
   ): void {
     const view = definition.view;
-    if (
-      view !== undefined &&
-      view.visibility === "app" &&
-      !uiCapable
-    ) {
-      return;
-    }
 
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
@@ -535,11 +549,13 @@ export class MCPServer {
       ...(definition.outputSchema !== undefined && {
         outputSchema: definition.outputSchema,
       }),
-      ...(view !== undefined &&
-        uiCapable && {
-          _meta: buildToolUiMeta(view.name, view.visibility),
-        }),
+      ...(view !== undefined && {
+        _meta: buildToolUiMeta(view.name, view.visibility),
+      }),
     };
+    const wireResultMeta =
+      view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
+
     if (definition.schema !== undefined) {
       server.registerTool(
         definition.name,
@@ -547,13 +563,27 @@ export class MCPServer {
         async (args, ctx) => {
           // The SDK has already validated `args` against `definition.schema`.
           const params = args as Record<string, unknown>;
-          return callback(params, toRequestContext(ctx));
+          const result = await callback(params, toRequestContext(ctx));
+          if (wireResultMeta === undefined || result.isError === true) {
+            return result;
+          }
+          return {
+            ...result,
+            _meta: { ...result._meta, ...wireResultMeta },
+          };
         }
       );
     } else {
-      server.registerTool(definition.name, config, async (ctx) =>
-        callback({}, toRequestContext(ctx))
-      );
+      server.registerTool(definition.name, config, async (ctx) => {
+        const result = await callback({}, toRequestContext(ctx));
+        if (wireResultMeta === undefined || result.isError === true) {
+          return result;
+        }
+        return {
+          ...result,
+          _meta: { ...result._meta, ...wireResultMeta },
+        };
+      });
     }
   }
 
@@ -561,16 +591,20 @@ export class MCPServer {
     server: SdkMcpServer,
     viewName: string,
     entry: ViewManifestEntry,
-    uiCapable: boolean,
     servingOrigin: string,
     basePath: string
   ): void {
     const uri = viewResourceUri(viewName);
+    const authorFacts = this.#viewResourceFacts(
+      this.#viewBindings.get(viewName)?.config
+    );
+    const hmrWs = this.#viewsDevMode;
     const resourceConfig = viewResourceConfig(
       viewName,
       entry,
+      authorFacts,
       servingOrigin,
-      uiCapable
+      { hmrWs }
     );
     server.registerResource(
       viewName,
@@ -587,6 +621,7 @@ export class MCPServer {
               uri: readUri.href,
               mimeType: resourceConfig.mimeType,
               text: html,
+              _meta: buildResourceUiMeta(authorFacts, origin, { hmrWs }),
             },
           ],
         };
@@ -640,6 +675,27 @@ export class MCPServer {
           toRequestContext(ctx)
         )
     );
+  }
+
+  #viewResourceFacts(
+    viewConfig: ToolViewConfig | undefined
+  ): ViewResourceFacts | undefined {
+    if (viewConfig === undefined) {
+      return undefined;
+    }
+    return {
+      ...(viewConfig.description !== undefined && {
+        description: viewConfig.description,
+      }),
+      ...(viewConfig.csp !== undefined && { csp: viewConfig.csp }),
+      ...(viewConfig.permissions !== undefined && {
+        permissions: viewConfig.permissions,
+      }),
+      ...(viewConfig.domain !== undefined && { domain: viewConfig.domain }),
+      ...(viewConfig.prefersBorder !== undefined && {
+        prefersBorder: viewConfig.prefersBorder,
+      }),
+    };
   }
 
   #registerPrompt(

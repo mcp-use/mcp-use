@@ -1,17 +1,4 @@
-import type { ViewMetadata } from "@mcp-use/server/react";
-
-export const metadata: ViewMetadata = {
-  description: "Product search results grid",
-  csp: {
-    connectDomains: [],
-    resourceDomains: ["https://images.example.com"],
-  },
-  prefersBorder: true,
-};
-
-export function Loading() {
-  return <div data-testid="loading">Loading…</div>;
-}
+import badgeUrl from "./badge.png";
 
 export default function ProductSearchResult({
   query,
@@ -22,6 +9,7 @@ export default function ProductSearchResult({
 }) {
   return (
     <div data-testid="results">
+      <img src={badgeUrl} alt="" data-testid="badge" />
       <p>{query}</p>
       <ul>
         {items.map((item: { id: string; name: string }) => (

@@ -68,6 +68,12 @@ export function extractClientCapabilitiesFromBody(
  *
  * True when `capabilities.extensions["io.modelcontextprotocol/ui"]` exists
  * and its `mimeTypes` array includes `text/html;profile=mcp-app`.
+ *
+ * @remarks
+ * Used only for {@link RequestContext.client} queries (e.g.
+ * `ctx.client.supportsViews()`). Capability negotiation does not affect the
+ * wire surface — `tools/list` always includes every registered tool regardless
+ * of this result.
  */
 export function supportsViews(
   capabilities: ClientCapabilities | undefined
