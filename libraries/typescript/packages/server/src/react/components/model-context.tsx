@@ -16,7 +16,7 @@ import {
   _resetModelContextForTesting,
   buildDescriptionString,
   modelContextNodes,
-} from "./model-context-store.js";
+} from "../bridge/model-context-store.js";
 
 const ParentIdContext = createContext<string | null>(null);
 

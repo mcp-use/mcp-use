@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { useView } from "./use-view.js";
+import { useView } from "../hooks/use-view.js";
 
 interface ViewControlsProps {
   children: React.ReactNode;

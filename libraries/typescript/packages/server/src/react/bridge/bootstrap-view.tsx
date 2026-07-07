@@ -1,8 +1,8 @@
 import { createRoot, type Root } from "react-dom/client";
 import { useMemo, type ComponentType } from "react";
 
-import { ErrorBoundary } from "./ErrorBoundary.js";
-import type { ViewMetadata } from "./register.js";
+import { ErrorBoundary } from "../components/error-boundary.js";
+import type { ViewMetadata } from "../types/register.js";
 import {
   ViewBridgeProvider,
   useViewBridgeSnapshot,

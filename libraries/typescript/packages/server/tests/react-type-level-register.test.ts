@@ -10,11 +10,11 @@ import type {
   LoadingProps,
   RegisteredTools,
   ViewProps,
-} from "../src/react/register.js";
-import type { CallToolResult } from "../src/react/result-types.js";
-import type { CallToolHandle } from "../src/react/use-call-tool.js";
+} from "../src/react/types/register.js";
+import type { CallToolResult } from "../src/react/types/result-types.js";
+import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
 
-declare module "../src/react/register.js" {
+declare module "../src/react/types/register.js" {
   interface Register {
     tools: typeof import("./fixtures/react-register-tools.js");
   }

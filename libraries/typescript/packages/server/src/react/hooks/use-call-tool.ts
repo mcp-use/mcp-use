@@ -1,9 +1,9 @@
-import type { CallToolResult } from "./result-types.js";
+import type { CallToolResult } from "../types/result-types.js";
 import { useCallback, useRef, useState } from "react";
 
-import type { ToolRef } from "../tools.js";
-import type { RegisteredTools } from "./register.js";
-import { useViewBridgeStore } from "./view-bridge.js";
+import type { ToolRef } from "../../tools.js";
+import type { RegisteredTools } from "../types/register.js";
+import { useViewBridgeStore } from "../bridge/view-bridge.js";
 
 /**
  * Typed server-tool call handle returned by {@link useCallTool}.

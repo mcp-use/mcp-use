@@ -6,9 +6,9 @@ import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
 import type { ToolRef } from "../src/index.js";
-import type { DeepPartial } from "../src/react/register.js";
-import type { CallToolHandle } from "../src/react/use-call-tool.js";
-import type { useCallTool } from "../src/react/use-call-tool.js";
+import type { DeepPartial } from "../src/react/types/register.js";
+import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
+import type { useCallTool } from "../src/react/hooks/use-call-tool.js";
 
 describe("DeepPartial", () => {
   it("recurses over arrays, nested objects, and preserves primitives", () => {

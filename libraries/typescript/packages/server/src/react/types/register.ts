@@ -1,5 +1,5 @@
-import type { ToolRef } from "../tools.js";
-import type { UiPermissions, ViewMetadata } from "../views/types.js";
+import type { ToolRef } from "../../tools.js";
+import type { UiPermissions, ViewMetadata } from "../../views/types.js";
 
 /** Augmented by the project's `register.d.ts`; empty by default. */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- intentional augmentation target

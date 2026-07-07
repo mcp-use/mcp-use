@@ -1,8 +1,8 @@
 import React, { StrictMode } from "react";
 
-import { ErrorBoundary } from "./ErrorBoundary.js";
-import { ThemeProvider } from "./ThemeProvider.js";
-import { ViewControls } from "./ViewControls.js";
+import { ErrorBoundary } from "./error-boundary.js";
+import { ThemeProvider } from "./theme-provider.js";
+import { ViewControls } from "./view-controls.js";
 
 interface McpUseProviderProps {
   children: React.ReactNode;

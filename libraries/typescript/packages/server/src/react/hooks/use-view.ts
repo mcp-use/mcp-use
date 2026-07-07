@@ -1,18 +1,18 @@
-import type { CallToolResult } from "./result-types.js";
-import type { RegisteredTools } from "./register.js";
-import type { DeepPartial } from "./register.js";
+import type { CallToolResult } from "../types/result-types.js";
+import type { RegisteredTools } from "../types/register.js";
+import type { DeepPartial } from "../types/register.js";
 import type {
   HostCapabilities,
   HostContext,
   HostInfo,
   SafeAreaInsets,
-} from "./host-types.js";
+} from "../types/host-types.js";
 import {
   useHostContextSubscription,
   useViewActions,
   useViewBridgeSnapshot,
   useViewBridgeStore,
-} from "./view-bridge.js";
+} from "../bridge/view-bridge.js";
 
 type DisplayMode = "inline" | "fullscreen" | "pip";
 

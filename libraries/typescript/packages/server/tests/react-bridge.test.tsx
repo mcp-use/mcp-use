@@ -11,12 +11,12 @@ import {
   useView,
   useViewTool,
 } from "../src/react/index.js";
-import { _resetModelContextForTesting } from "../src/react/model-context-store.js";
-import { _resetBootstrapRootsForTesting } from "../src/react/bootstrap-view.js";
+import { _resetModelContextForTesting } from "../src/react/bridge/model-context-store.js";
+import { _resetBootstrapRootsForTesting } from "../src/react/bridge/bootstrap-view.js";
 import {
   _resetViewBridgeForTesting,
   _setTransportForTesting,
-} from "../src/react/view-bridge.js";
+} from "../src/react/bridge/view-bridge.js";
 import { createPairedTransports } from "./helpers/paired-transport.js";
 
 function resetRuntime(): void {

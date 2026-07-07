@@ -6,9 +6,9 @@ import type {
   InferToolOutput,
   ToolDefinition,
   ToolResult,
-} from "../tools.js";
-import type { CallToolResult } from "./result-types.js";
-import { useViewBridgeStore } from "./view-bridge.js";
+} from "../../tools.js";
+import type { CallToolResult } from "../types/result-types.js";
+import { useViewBridgeStore } from "../bridge/view-bridge.js";
 
 /** View-tool definition — mirrors {@link ToolDefinition} plus `enabled`. */
 export type ViewToolDefinition = Pick<
