@@ -28,7 +28,6 @@ export {
   useToolContext,
   type ToolContextHandle,
 } from "./hooks/use-tool-context.js";
-export { useViewState } from "./hooks/use-view-state.js";
 export { useViewTool, type ViewToolDefinition } from "./hooks/use-view-tool.js";
 export {
   type DeepPartial,

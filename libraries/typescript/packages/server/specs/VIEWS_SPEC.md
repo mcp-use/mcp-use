@@ -609,10 +609,12 @@ TypeScript narrowing on `status === "ready"` guarantees complete `toolOutput` �
 
 **Status transitions.** `status` is derived from the bridge notifications, checked in order:
 
-- `"ready"` iff a tool result has arrived (`ui/notifications/tool-result`; `hasToolResult`). Later results keep it `"ready"` with updated `toolOutput`, `content`, and `meta`.
-- Otherwise `"cancelled"` iff the host sent `ui/notifications/tool-cancelled`.
+- `"ready"` iff a tool result has arrived for the current call cycle (`ui/notifications/tool-result`; `hasToolResult`). A result also clears any prior cancellation. Later results keep it `"ready"` with updated `toolOutput`, `content`, and `meta`.
+- Otherwise `"cancelled"` iff the host sent `ui/notifications/tool-cancelled` for the current call cycle.
 - Otherwise `"streaming"` iff arguments are streaming — set by `ui/notifications/tool-input-partial`. A complete `ui/notifications/tool-input` ends the streaming phase (status returns to `"pending"` while awaiting the result). A call whose host sends no partial notifications stays `"pending"` until `"ready"` (or `"cancelled"`).
 - Otherwise `"pending"`.
+
+A new call cycle resets cancellation and stale result state so a reused iframe can leave `"cancelled"` / `"ready"`: every `tool-input-partial` clears `cancelled` and result state (status becomes `"streaming"`); a complete `tool-input` always clears `cancelled`, and clears result state only when a prior result already exists (that input belongs to a subsequent call — within a single call, `tool-input` precedes `tool-result`, so the mid-cycle pending path is unchanged). A `tool-cancelled` after a second call's input surfaces `"cancelled"` again.
 
 Canonical authoring pattern:
 
@@ -825,7 +827,7 @@ function useDisplayMode(): {
 
 **`useViewTool(definition, handler)`** — view-registered tools (contract above). `definition` mirrors `ToolDefinition` plus `enabled?: boolean`; the handler's params/return are inferred exactly like a server tool's.
 
-**`useViewState<T>(initial: T): [T, (next: T) => void]`** — local UI state, **iframe lifetime only**. Not persisted by the host, not model-visible (see "Dropped from v1" for the deliberate split from v1's `setWidgetState`).
+**Local UI state is plain React `useState`** — there is deliberately no `useViewState` wrapper. MCP Apps has no host-persisted view store (see "Dropped from v1"), so a dedicated hook would only restate `useState` while implying persistence that does not exist. State the model should see is an explicit act via `ModelContext`.
 
 **`useViewTheme(): "light" | "dark"`** — narrow theme-only subscription; rerenders only on host theme changes.
 
@@ -869,7 +871,6 @@ import {
   useOpenExternal,
   useSendFollowUp,
   useToolContext,
-  useViewState,
   useViewTool,
 } from "@mcp-use/server/react";
 
@@ -881,7 +882,7 @@ export default function ProductSearchResult() {
   const openExternal = useOpenExternal();
 
   // local UI state (iframe lifetime; not model-visible, not host-persisted)
-  const [favorites, setFavorites] = useViewState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
 
   // server tool call from the view — name union + args/result typed via Register
@@ -953,7 +954,7 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 | — `openExternal`                                                                                        | `useOpenExternal()`                                                                       | `App.openLink`                                                               |
 | — `requestDisplayMode` / `displayMode`                                                                  | `useDisplayMode()` → `{ displayMode, requestDisplayMode }`                                | `App.requestDisplayMode` + `hostContext`                                     |
 | `useWidgetProps()`                                                                                      | `useToolContext()` — primary data API                                                       | bridge notifications → discriminated union                                   |
-| `useWidgetState()`                                                                                      | `useViewState()`                                                                          | local state only — see semantics change below                                |
+| `useWidgetState()`                                                                                      | dropped — plain `useState` for local UI state; `ModelContext` for model visibility        | no host store in MCP Apps — see "Dropped from v1"                            |
 | `useWidgetTheme()`                                                                                      | `useViewTheme()`                                                                          | dedicated `hostcontextchanged` subscription                                  |
 | `useCallTool(name \| ref)`                                                                              | kept, typed via `Register`/`ToolRef`                                                      | `App.callServerTool`                                                         |
 | *(no v1 equivalent)*                                                                                    | `useViewTool()` — view-registered tools the host/model calls (see View tools)             | `App.registerTool` + `tools/list_changed`                                    |
@@ -968,7 +969,7 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 ### Dropped from v1 (spec gaps)
 
 - **`useFiles()` (upload):** file upload does not exist in MCP Apps (upstream: "not yet implemented"); it is a ChatGPT-only `window.openai` extension. Dropped from the alpha; host-mediated *download* (`ui/download-file`, draft) may land later.
-- **Cross-session view state:** `window.openai.setWidgetState`'s host-persisted-and-restored state has no spec equivalent. `useViewState` becomes honest **local state** (lives for the iframe's lifetime). Model visibility is a separate, explicit act via `ModelContext`/`updateModelContext` — v1's conflation of "UI state" and "model context" in one `setState` is deliberately split.
+- **Cross-session view state:** `window.openai.setWidgetState`'s host-persisted-and-restored state has no spec equivalent, so there is no state hook at all — local UI state is plain React `useState` (iframe lifetime), and a `useViewState` wrapper would only restate it while implying a host store that does not exist. Model visibility is a separate, explicit act via `ModelContext`/`updateModelContext` — v1's conflation of "UI state" and "model context" in one `setState` is deliberately split.
 - **`_meta.openai/*` emission** (`outputTemplate`, `widgetCSP`, invocation strings, …): overlay territory, out of the alpha (see Protocol posture).
 
 ---
@@ -986,7 +987,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 - **Type-level** (`tests/type-level.test.ts` pattern): `ToolRef` name/input/output inference incl. non-zod Standard Schema libs; `ToolsFromModule` filtering and re-export composition; `useCallTool` name union + arg/result types; empty-`Register` fallback; `structuredContent` vs `outputSchema` agreement at the return position; `useToolContext` discriminated union narrowing (`status === "ready"` → typed `toolOutput`; `"streaming"` / `"cancelled"` → `DeepPartial` `toolInput`; `"cancelled"` → `reason`); input-schema vs output-schema type-source split (`toolInput` vs `toolOutput`); `DeepPartial` over arrays/nested objects.
 - **e2e over HTTP** (official client): view resource listing/reading with correct mimetype and framework auto-CSP in `_meta.ui.*` on both `resources/list` entries and `resources/read` content items for all clients; `tools/list` includes every registered tool for all clients (including `visibility: "app"` tools with `_meta.ui.visibility: ["app"]`); `ui.visibility` emitted only when `view.visibility` is set; **channel separation** — handler `{ structuredContent, content, _meta }` lands on the wire as `structuredContent` / `content` / `_meta` respectively, with handler `_meta` absent from everything model-facing; `_meta.ui.resourceUri` auto-stamped on every non-error view-bound tool result.
 - **Build/serve** (CLI-test pattern from `tests/cli/`, real `build` against a views fixture): manifest `views` map shape (`entry`, `css` only); the built wrapper entry primes registration with zero `fs` on the MCP path (list/read succeed with the built assets dir absent; only asset routes 404); document + asset routes under `${basePath}/_mcp-use/` with correct cache headers; the manifest→URL→disk basename mapping; per-request origin resolution (proxy headers, override) reflected in both the HTTP document and the `resources/read` body and content-item `_meta.ui.csp.resourceDomains`; asset origin auto-appended to `csp.resourceDomains`; the binding checks — `view.name` naming a missing view, a `view:` tool without `outputSchema`, and two tools binding one view fail loudly naming the view/tool, a view directory no tool binds warns (build still succeeds, view still registered).
-- **Bridge-level:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted on connect before any notification; `tool-input-partial` sequence driving `useToolContext().status === "streaming"` with progressive `toolInput` on the same mounted component; complete `tool-input` returning to `"pending"` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); mid-stream `tool-cancelled` → `"cancelled"` with optional `reason` and last partial still in `toolInput`; `tools/call` round-trip through `useCallTool` (`data`/`error`/`isPending` transitions); handler `meta` surfaced on `useToolContext()` when ready; split-hook channel isolation (environment/action subscriptions rerender independently of data); **view tools** — `bridge.listTools()` reflects mounted `useViewTool`s, call round-trip mutates component state, unmount/`enabled: false` emits `list_changed` and removes/disables, re-renders with inline schema literals emit no re-registration or `list_changed` churn; **model context** — a view that never registers `ModelContext` sends no `ui/update-model-context`, content pushes the serialized tree, removal after content pushes an explicit clear, siblings serialize in document order (12+ nodes: `useId` sort order would shuffle them), `structuredContent` (component prop) and imperative `ContentBlock[]` entries ride the same push alongside the text tree, a host without the `updateModelContext` capability receives no requests.
+- **Bridge-level:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted on connect before any notification; `tool-input-partial` sequence driving `useToolContext().status === "streaming"` with progressive `toolInput` on the same mounted component; complete `tool-input` returning to `"pending"` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); mid-stream `tool-cancelled` → `"cancelled"` with optional `reason` and last partial still in `toolInput`; post-cancel retry — a new `tool-input-partial` after cancel returns to `"streaming"` (not stuck `"cancelled"`), then result → `"ready"`; post-ready second call — a new `tool-input` (or partial) after a delivered result leaves `"ready"` into `"pending"`/`"streaming"`, a subsequent result lands `"ready"` with the new payload, and a `tool-cancelled` after the second call's input surfaces `"cancelled"`; `tools/call` round-trip through `useCallTool` (`data`/`error`/`isPending` transitions); handler `meta` surfaced on `useToolContext()` when ready; split-hook channel isolation (environment/action subscriptions rerender independently of data — `useHostContext` / `useDisplayMode` do not re-render on `tool-input-partial`, still re-render on host-context change and when `isConnected` flips); **view tools** — `bridge.listTools()` reflects mounted `useViewTool`s, call round-trip mutates component state, unmount/`enabled: false` emits `list_changed` and removes/disables, re-renders with inline schema literals emit no re-registration or `list_changed` churn; **model context** — a view that never registers `ModelContext` sends no `ui/update-model-context`, content pushes the serialized tree, removal after content pushes an explicit clear, siblings serialize in document order (12+ nodes: `useId` sort order would shuffle them), `structuredContent` (component prop) and imperative `ContentBlock[]` entries ride the same push alongside the text tree, a host without the `updateModelContext` capability receives no requests.
 
 ## Deltas vs v1 (for the migration guide)
 
@@ -995,7 +996,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 3. `widgetMetadata` export dropped — view files default-export the component only. Result types come from `outputSchema` via `useToolContext<Name>()` (required on view-bound tools). Resource facts (description, CSP, permissions, domain, prefersBorder) are declared on the bound tool's `view:` config and emitted on the resource.
 4. In-component `isPending` skeleton branching → `useToolContext()` status branching (`pending` / `streaming` / `cancelled` / `ready`) inside the always-mounted default export.
 5. `useCallTool` types come from exporting tool refs, not from generated `.mcp-use/generated/tool-registry.d.ts`; template `postinstall`/dev-loop typegen is gone.
-6. `useViewState` no longer persists across sessions nor implicitly feeds the model; use `ModelContext` for model visibility.
+6. `useWidgetState` has no replacement hook — hold local UI state with React's `useState` (iframe lifetime only) and feed the model explicitly via `ModelContext`.
 7. `useFiles` removed (ChatGPT-only capability).
 8. `window.openai` is never consumed by the runtime; ChatGPT works through its native MCP Apps support.
 9. Tool config `invoking`/`invoked`/`widgetAccessible` removed (openai overlay, no spec equivalent; `visibility` covers app/model narrowing).

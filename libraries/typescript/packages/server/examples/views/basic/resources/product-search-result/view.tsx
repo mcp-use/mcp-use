@@ -8,7 +8,6 @@ import {
   useOpenExternal,
   useSendFollowUp,
   useToolContext,
-  useViewState,
   useViewTheme,
   useViewTool,
 } from "@mcp-use/server/react";
@@ -153,7 +152,7 @@ export default function ProductSearchResult() {
   const sendFollowUpMessage = useSendFollowUp();
   const openExternal = useOpenExternal();
 
-  const [favorites, setFavorites] = useViewState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
 
   const details = useCallTool("get-fruit-details");

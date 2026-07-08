@@ -13,7 +13,7 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -79,6 +79,11 @@ function emit(): void {
   }
 }
 
+/**
+ * Immutably replace the snapshot. Fields omitted from `patch` keep their prior
+ * references (notably `hostContext`), so narrow `useSyncExternalStore`
+ * selectors stay stable across unrelated channel updates.
+ */
 function setSnapshot(patch: Partial<ViewBridgeSnapshot>): void {
   snapshot = { ...snapshot, ...patch };
   emit();
@@ -97,10 +102,24 @@ function getOrCreateApp(): App {
 }
 
 function wireAppEvents(app: App): void {
+  // Both tool-input and tool-input-partial clear `cancelled` (a new/continuing
+  // call cycle). Result state is cleared on every partial (new stream = new
+  // call). On complete tool-input, result state is cleared only when a prior
+  // result already exists — that input belongs to a subsequent call; within a
+  // single call, tool-input always precedes tool-result so hasToolResult is
+  // still false and the mid-cycle pending→ready path is unchanged.
   app.ontoolinput = (params) => {
+    const clearResult = snapshot.hasToolResult;
     setSnapshot({
       toolInput: params.arguments ?? {},
       isStreaming: false,
+      cancelled: undefined,
+      ...(clearResult && {
+        hasToolResult: false,
+        toolOutput: undefined,
+        content: undefined,
+        meta: undefined,
+      }),
     });
   };
 
@@ -108,6 +127,11 @@ function wireAppEvents(app: App): void {
     setSnapshot({
       toolInput: params.arguments ?? {},
       isStreaming: true,
+      cancelled: undefined,
+      hasToolResult: false,
+      toolOutput: undefined,
+      content: undefined,
+      meta: undefined,
     });
   };
 
@@ -125,6 +149,7 @@ function wireAppEvents(app: App): void {
           : undefined,
       hasToolResult: true,
       isStreaming: false,
+      cancelled: undefined,
     });
   };
 
@@ -202,14 +227,7 @@ const ViewBridgeContext = createContext<ViewBridgeStore>(viewBridgeStore);
  * @internal
  */
 export function ViewBridgeProvider({ children }: { children: ReactNode }) {
-  const [, setTick] = useState(0);
   const store = useMemo(() => viewBridgeStore, []);
-
-  useEffect(() => {
-    return store.subscribe(() => {
-      setTick((n) => n + 1);
-    });
-  }, [store]);
 
   useEffect(() => {
     void store.connect().catch((error: unknown) => {
@@ -256,37 +274,27 @@ export function useViewBridgeStore(): ViewBridgeStore {
   return useContext(ViewBridgeContext);
 }
 
-/** Subscribe to view bridge snapshot updates. */
+/**
+ * Subscribe to the full view bridge snapshot via {@link useSyncExternalStore}.
+ *
+ * Re-renders on any snapshot change. Prefer narrow subscriptions
+ * ({@link useHostContextSubscription}) when only one channel is needed.
+ */
 export function useViewBridgeSnapshot(): ViewBridgeSnapshot {
   const store = useViewBridgeStore();
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    return store.subscribe(() => {
-      setTick((n) => n + 1);
-    });
-  }, [store]);
-
-  return store.getSnapshot();
+  return useSyncExternalStore(store.subscribe, store.getSnapshot);
 }
 
-/** Subscribe to host context changes without re-rendering on other channels. */
+/**
+ * Subscribe to host context only — re-renders when `hostContext` identity
+ * changes, not on tool-input / result / cancel updates.
+ */
 export function useHostContextSubscription(): McpUiHostContext | undefined {
   const store = useViewBridgeStore();
-  const hostContextRef = useRef(store.getSnapshot().hostContext);
-  const [, setTick] = useState(0);
-
-  useEffect(() => {
-    return store.subscribe(() => {
-      const next = store.getSnapshot().hostContext;
-      if (next !== hostContextRef.current) {
-        hostContextRef.current = next;
-        setTick((n) => n + 1);
-      }
-    });
-  }, [store]);
-
-  return hostContextRef.current;
+  return useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().hostContext
+  );
 }
 
 /** Stable action callbacks backed by the shared {@link App} instance. */

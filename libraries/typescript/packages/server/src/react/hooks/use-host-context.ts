@@ -1,6 +1,7 @@
+import { useSyncExternalStore } from "react";
+
 import {
   useHostContextSubscription,
-  useViewBridgeSnapshot,
   useViewBridgeStore,
 } from "../bridge/view-bridge.js";
 import type {
@@ -80,6 +81,9 @@ export interface HostContextHandle {
 /**
  * Subscribe to host environment context (theme, locale, display mode, layout).
  *
+ * Re-renders only when host context or bridge connection status changes — not
+ * on tool-input / result / cancel snapshot updates.
+ *
  * @example
  * ```tsx
  * function Layout() {
@@ -94,8 +98,11 @@ export interface HostContextHandle {
  */
 export function useHostContext(): HostContextHandle {
   const hostContext = useHostContextSubscription();
-  const snap = useViewBridgeSnapshot();
   const store = useViewBridgeStore();
+  const isConnected = useSyncExternalStore(
+    store.subscribe,
+    () => store.getSnapshot().isConnected
+  );
   const app = store.getApp();
 
   return {
@@ -121,6 +128,6 @@ export function useHostContext(): HostContextHandle {
     hostInfo: app?.getHostVersion(),
     hostCapabilities: app?.getHostCapabilities(),
     hostContext,
-    isAvailable: snap.isConnected,
+    isAvailable: isConnected,
   };
 }

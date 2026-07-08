@@ -250,6 +250,192 @@ describe("react bridge runtime", () => {
     });
   });
 
+  it("post-cancel retry: new tool-input-partial returns to streaming then ready", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      if (handle.status === "ready") {
+        const { query } = handle.toolOutput as { query: string };
+        return <div data-testid="lifecycle">ready|{query}</div>;
+      }
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|
+          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ap");
+    });
+
+    await bridge.sendToolCancelled({ reason: "user action" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("cancelled|ap");
+    });
+
+    await bridge.sendToolInputPartial({ arguments: { query: "or" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|or");
+    });
+
+    await bridge.sendToolInput({ arguments: { query: "orange" } });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { query: "orange", items: ["o"] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|orange");
+    });
+  });
+
+  it("post-ready second call: tool-input clears ready, cancel surfaces, then new result", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      if (handle.status === "ready") {
+        const { query } = handle.toolOutput as { query: string };
+        return <div data-testid="lifecycle">ready|{query}</div>;
+      }
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|
+          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}|
+          {handle.status === "cancelled" ? (handle.reason ?? "") : ""}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolInput({ arguments: { query: "apple" } });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { query: "apple", items: ["a"] },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|apple");
+    });
+
+    // Second call without partials: tool-input after a delivered result clears
+    // result state → pending.
+    await bridge.sendToolInput({ arguments: { query: "banana" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|banana|");
+    });
+
+    await bridge.sendToolCancelled({ reason: "retry aborted" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "cancelled|banana|retry aborted"
+      );
+    });
+
+    await bridge.sendToolInputPartial({ arguments: { query: "ch" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ch|");
+    });
+
+    await bridge.sendToolInput({ arguments: { query: "cherry" } });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { query: "cherry", items: ["c"] },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|cherry");
+    });
+  });
+
+  it("useHostContext and useDisplayMode do not re-render on tool-input-partial", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let hostRenders = 0;
+    let displayRenders = 0;
+
+    function HostProbe() {
+      hostRenders += 1;
+      const { theme, isAvailable } = useHostContext();
+      return (
+        <div data-testid="host">
+          {theme}|{String(isAvailable)}|{hostRenders}
+        </div>
+      );
+    }
+
+    function DisplayProbe() {
+      displayRenders += 1;
+      const { displayMode } = useDisplayMode();
+      return (
+        <div data-testid="display">
+          {displayMode}|{displayRenders}
+        </div>
+      );
+    }
+
+    // The tool-context consumer is a sibling leaf: the parent never
+    // re-renders, so any probe re-render comes from its own subscription.
+    function LifecycleProbe() {
+      const handle = useToolContext();
+      return <div data-testid="lifecycle">{handle.status}</div>;
+    }
+
+    function View() {
+      return (
+        <div>
+          <HostProbe />
+          <DisplayProbe />
+          <LifecycleProbe />
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host").textContent).toContain("true");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending");
+    });
+
+    const hostRendersAfterConnect = hostRenders;
+    const displayRendersAfterConnect = displayRenders;
+
+    await bridge.sendToolInputPartial({ arguments: { query: "a" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming");
+    });
+    await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming");
+    });
+
+    expect(hostRenders).toBe(hostRendersAfterConnect);
+    expect(displayRenders).toBe(displayRendersAfterConnect);
+
+    await bridge.sendHostContextChange({
+      theme: "dark",
+      displayMode: "fullscreen",
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("host").textContent).toContain("dark");
+      expect(screen.getByTestId("display").textContent).toContain("fullscreen");
+    });
+    expect(hostRenders).toBeGreaterThan(hostRendersAfterConnect);
+    expect(displayRenders).toBeGreaterThan(displayRendersAfterConnect);
+  });
+
   it("surfaces meta on useToolContext and useCallTool round-trips with state transitions", async () => {
     resetRuntime();
     const { bridge, init } = await startHost(async (name, args) => {
