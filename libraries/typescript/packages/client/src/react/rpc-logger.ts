@@ -1,9 +1,9 @@
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type {
   JSONRPCMessage,
   MessageExtraInfo,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { TransportSendOptions } from "@modelcontextprotocol/sdk/shared/transport.js";
+  Transport,
+  TransportSendOptions,
+} from "@modelcontextprotocol/client";
 import { Logger } from "../logging.js";
 
 const logger = Logger.get("RpcLogger");

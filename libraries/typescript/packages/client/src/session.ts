@@ -3,10 +3,10 @@ import type {
   CompleteRequestParams,
   CompleteResult,
   Notification,
+  RequestOptions,
   Root,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { RequestOptions } from "@modelcontextprotocol/sdk/shared/protocol.js";
+} from "@modelcontextprotocol/client";
 import type { BaseConnector, NotificationHandler } from "./connectors/base.js";
 
 /**
@@ -289,6 +289,20 @@ export class MCPSession {
    */
   get serverInfo(): { name: string; version?: string } | null {
     return this.connector.serverInfo;
+  }
+
+  /**
+   * The negotiated protocol era for this session's connection:
+   * `"legacy"` (2025-era / v1) or `"modern"` (2026-07-28-era / v2).
+   * `undefined` before the connection has negotiated.
+   */
+  get protocolEra(): "legacy" | "modern" | undefined {
+    return this.connector.protocolEra;
+  }
+
+  /** The negotiated protocol version string for this session's connection. */
+  get negotiatedProtocolVersion(): string | undefined {
+    return this.connector.negotiatedProtocolVersion;
   }
 
   /**

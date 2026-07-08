@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import type {
   Prompt,
   GetPromptResult,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
 
 export interface PromptResult {

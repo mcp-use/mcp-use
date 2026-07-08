@@ -1,5 +1,5 @@
 // callback.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
 import { BrowserOAuthClientProvider } from "./browser-provider.js"; // Adjust path
 import {
   MCP_AUTH_BROADCAST_CHANNEL,
@@ -190,6 +190,10 @@ async function doOnMcpAuthorization() {
   const queryParams = new URLSearchParams(window.location.search);
   const code = queryParams.get("code");
   const state = queryParams.get("state");
+  // RFC 9207 issuer identifier from the authorization response. Passed to the
+  // SDK's auth() so it can validate the issuer against the recorded AS before
+  // redeeming the code (authorization-server mix-up defense).
+  const iss = queryParams.get("iss") ?? undefined;
   const error = queryParams.get("error");
   const errorDescription = queryParams.get("error_description");
 
@@ -495,6 +499,7 @@ async function doOnMcpAuthorization() {
     const authResult = await auth(provider, {
       serverUrl: sdkServerUrl,
       authorizationCode: code,
+      iss,
       fetchFn: scopedFetch,
     });
 

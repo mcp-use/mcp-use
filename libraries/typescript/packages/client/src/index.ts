@@ -16,6 +16,9 @@ export * from "./connectors/base.js";
 export * from "./connectors/http.js";
 export * from "./connectors/stdio.js";
 
+// JSON Schema validation
+export * from "./validators/dialect-json-schema-validator.js";
+
 // Browser client, code mode, code executors, schema conversion
 export * from "./client/browser.js";
 export * from "./client/connectors/codeMode.js";

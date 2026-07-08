@@ -64,6 +64,12 @@ export default defineConfig({
         stubDir,
         "stdio-transport.js"
       ),
+      // v2: @mcp-use/client's stdio connector imports from
+      // @modelcontextprotocol/client/stdio — stub it out of the browser bundle.
+      "@modelcontextprotocol/client/stdio": path.join(
+        stubDir,
+        "stdio-transport.js"
+      ),
     };
   },
 });

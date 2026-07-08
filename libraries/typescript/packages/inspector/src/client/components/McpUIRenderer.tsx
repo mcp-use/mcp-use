@@ -1,4 +1,4 @@
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import type { Resource } from "@modelcontextprotocol/client";
 import { useMemo } from "react";
 
 interface McpUIRendererProps {

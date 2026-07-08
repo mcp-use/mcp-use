@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/client";
 import { Wrench } from "lucide-react";
 import { ListItem } from "@/client/components/shared";
 import { McpIcon, OpenAIIcon } from "@/client/components/ui/client-icons";

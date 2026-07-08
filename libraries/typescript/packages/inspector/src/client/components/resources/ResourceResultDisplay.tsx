@@ -3,7 +3,7 @@ import { Button } from "@/client/components/ui/button";
 import type {
   ReadResourceResult,
   Resource,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 import {
   Brush,
   Check,

@@ -27,7 +27,7 @@
     "typescript"
   ],
   "bin": {
-    "mcp-use": "./dist/index.cjs"
+    "mcp-use": "./dist/index.js"
   },
   "files": [
     "dist"

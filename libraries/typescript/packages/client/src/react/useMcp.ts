@@ -1,6 +1,14 @@
 // useMcp.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, SdkError } from "@modelcontextprotocol/client";
+import type {
+  CompleteRequestParams,
+  CompleteResult,
+  OAuthClientProvider,
+  Prompt,
+  Resource,
+  ResourceTemplateType as ResourceTemplate,
+  Tool,
+} from "@modelcontextprotocol/client";
 import { probeAuthParams } from "../auth/probe-www-auth.js";
 import {
   runAuthPopup,
@@ -8,14 +16,6 @@ import {
   MCP_AUTH_CALLBACK_MESSAGE_TYPE,
   type McpAuthCallbackMessage,
 } from "../auth/popup-runner.js";
-import type {
-  CompleteRequestParams,
-  CompleteResult,
-  Prompt,
-  Resource,
-  ResourceTemplate,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
 import { Logger, type LogLevel, logger } from "../logging.js";
@@ -112,6 +112,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     headers: headersOption,
     customHeaders: customHeadersOption,
     proxyConfig,
+    oauthProxyUrl: oauthProxyUrlOption,
     autoProxyFallback = true,
     debug: _debug = false,
     logLevel: logLevelOption,
@@ -348,6 +349,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       : undefined
   );
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
+  const [protocolEra, setProtocolEra] = useState<
+    "legacy" | "modern" | undefined
+  >(undefined);
+  const [protocolVersion, setProtocolVersion] = useState<string | undefined>(
+    undefined
+  );
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
@@ -685,6 +692,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         preventAutoAuth,
         useRedirectFlow,
         gatewayUrl,
+        oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
@@ -985,6 +993,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Get serverInfo and capabilities from the connector (populated during initialize)
         const serverInfo = session.connector.serverInfo;
         const capabilities = session.connector.serverCapabilities;
+
+        // Surface the negotiated protocol era/version (v1 "legacy" vs v2
+        // "modern" 2026-07-28) so consumers (e.g. the inspector) can display it.
+        if (isMountedRef.current) {
+          setProtocolEra(session.connector.protocolEra);
+          setProtocolVersion(session.connector.negotiatedProtocolVersion);
+        }
 
         if (serverInfo) {
           addLog("debug", "Server info:", serverInfo);
@@ -1370,6 +1385,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     mergedClientInfo,
     // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
     gatewayUrl,
+    oauthProxyUrlOption,
     allHeaders,
     effectiveOAuthUrl,
   ]);
@@ -1564,7 +1580,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           onPopupWindow?.(popupUrl, features, popupWin);
         };
 
-        // Recreate the auth provider WITHOUT preventAutoAuth
+        // Recreate the auth provider WITHOUT preventAutoAuth.
+        // proxyOAuthRequests is always true: the scoped OAuth proxy fetch is
+        // the sole browser-CORS mechanism (the gateway no longer fronts OAuth
+        // metadata — it broke RFC 8414 §3.3 issuer validation for strict
+        // clients). It is a no-op when no OAuth proxy URL is configured.
         const { provider: freshAuthProvider, oauthProxyUrl } =
           createBrowserOAuthProvider({
             effectiveOAuthUrl,
@@ -1574,19 +1594,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false,
             useRedirectFlow,
             gatewayUrl,
+            oauthProxyUrl: oauthProxyUrlOption,
             onPopupWindow: captureOnPopupWindow,
-            proxyOAuthRequests: !gatewayUrl,
+            proxyOAuthRequests: true,
             staticClientInfo,
             scope: oauthScope,
           });
 
-        if (oauthProxyUrl && !gatewayUrl) {
+        if (oauthProxyUrl) {
           addLog("info", "Scoped OAuth proxy fetch enabled for manual auth");
-        } else if (oauthProxyUrl && gatewayUrl) {
-          addLog(
-            "info",
-            "Using MCP gateway proxy for OAuth (no scoped OAuth fetch needed)"
-          );
         }
 
         // Replace the auth provider
@@ -2300,6 +2316,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         preventAutoAuth,
         useRedirectFlow,
         gatewayUrl,
+        oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
@@ -2307,10 +2324,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
-        addLog(
-          "debug",
-          `OAuth proxy URL derived from gateway: ${oauthProxyUrl}`
-        );
+        addLog("debug", `OAuth proxy URL in effect: ${oauthProxyUrl}`);
       }
       addLog(
         "debug",
@@ -2440,6 +2454,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     prompts,
     serverInfo,
     capabilities,
+    protocolEra,
+    protocolVersion,
     error,
     log,
     authUrl,

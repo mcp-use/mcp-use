@@ -94,6 +94,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.13",
     "@mcp-use/client": "workspace:*",
+    "@modelcontextprotocol/client": "2.0.0-beta.2",
     "@modelcontextprotocol/ext-apps": "^1.0.1",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@paper-design/shaders-react": "^0.0.72",

@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
  * These tests spawn the actual CLI and verify command behavior
  */
 
-const CLI_PATH = join(__dirname, "../dist/index.cjs");
+const CLI_PATH = join(__dirname, "../dist/index.js");
 const TEST_TIMEOUT = 30000;
 
 // Isolated HOME so spawned CLI subprocesses never read or write the real
