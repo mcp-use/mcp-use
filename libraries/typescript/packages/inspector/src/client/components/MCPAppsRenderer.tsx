@@ -643,6 +643,7 @@ function MCPAppsRendererBase({
   // We intentionally omit SandboxConfig.csp so AppFrame's buildSandboxUrl does
   // not add a competing `csp` param; the proxy reads our query params and the
   // resource-ready message (csp undefined from AppFrame is fine).
+  // Backend-less CDN shell may return a blob: URL — revoke on replace/unmount.
   const sandboxUrl = useMemo(() => {
     if (!widgetHtml) return null;
     return buildMcpAppsSandboxUrl({
@@ -652,14 +653,26 @@ function MCPAppsRendererBase({
     });
   }, [widgetHtml, cspMode, widgetPermissions, declaredCsp]);
 
+  useEffect(() => {
+    const url = sandboxUrl;
+    return () => {
+      if (url?.protocol === "blob:") {
+        URL.revokeObjectURL(url.href);
+      }
+    };
+  }, [sandboxUrl]);
+
+  const isBlobSandbox = sandboxUrl?.protocol === "blob:";
+
   const sandboxOrigin = useMemo(() => {
     if (!sandboxUrl) return null;
+    if (isBlobSandbox) return null;
     try {
       return sandboxUrl.origin;
     } catch {
       return null;
     }
-  }, [sandboxUrl]);
+  }, [sandboxUrl, isBlobSandbox]);
 
   // Show spinner when portal remount recreates the bridge
   const prevPipFsRef = useRef({ isPip, isFullscreen });
@@ -673,16 +686,24 @@ function MCPAppsRendererBase({
     }
   }, [isPip, isFullscreen]);
 
-  // CSP violations + iframe console error forwarding (AppFrame gives no iframe ref)
+  // CSP violations + iframe console error forwarding (AppFrame gives no iframe ref).
+  // Blob sandbox origins are opaque ("null") or page-origin depending on browser —
+  // trust event.source === iframe.contentWindow instead of the origin string.
   useEffect(() => {
-    if (!sandboxOrigin) return;
+    if (!sandboxOrigin && !isBlobSandbox) return;
 
     const handleMessage = (event: MessageEvent) => {
       const iframe =
         frameContainerRef.current?.querySelector("iframe") ?? null;
       if (!iframe?.contentWindow) return;
       if (event.source !== iframe.contentWindow) return;
-      if (event.origin !== sandboxOrigin && sandboxOrigin !== "*") return;
+      if (
+        !isBlobSandbox &&
+        event.origin !== sandboxOrigin &&
+        sandboxOrigin !== "*"
+      ) {
+        return;
+      }
 
       if (event.data?.type === "mcp-apps:csp-violation") {
         const {
@@ -755,7 +776,7 @@ function MCPAppsRendererBase({
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [sandboxOrigin, toolCallId, addCspViolation, resourceUri]);
+  }, [sandboxOrigin, isBlobSandbox, toolCallId, addCspViolation, resourceUri]);
 
   const handleInitialized = useCallback(() => {
     const now = Date.now();
