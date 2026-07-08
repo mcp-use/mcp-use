@@ -8,6 +8,7 @@ import type { ConnectorInitOptions } from "./base.js";
 
 import { logger } from "../logging.js";
 import { StdioConnectionManager } from "../task_managers/stdio.js";
+import { DialectJsonSchemaValidator } from "../validators/dialect-json-schema-validator.js";
 import { BaseConnector } from "./base.js";
 import type { ClientInfo } from "./http.js";
 
@@ -102,6 +103,9 @@ export class StdioConnector extends BaseConnector {
       // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = {
         ...(this.opts.clientOptions || {}),
+        jsonSchemaValidator:
+          this.opts.clientOptions?.jsonSchemaValidator ??
+          new DialectJsonSchemaValidator(),
         versionNegotiation: {
           mode: this.protocolNegotiation,
           ...(this.opts.clientOptions?.versionNegotiation ?? {}),

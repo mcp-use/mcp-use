@@ -43,6 +43,11 @@ export type NotificationHandler = (
 export interface ConnectorInitOptions {
   /**
    * Options forwarded to the underlying MCP `Client` instance.
+   *
+   * By default, all connectors (HTTP and stdio) use `DialectJsonSchemaValidator`
+   * to support common `$schema` dialects (draft-04, draft-07, 2019-09, 2020-12)
+   * for cross-version compatibility with v1-era servers. Override with
+   * `clientOptions.jsonSchemaValidator` if stricter validation is needed.
    */
   clientOptions?: ClientOptions;
   /**
