@@ -31,6 +31,15 @@ exclude = [
 
 ]
 
+# Skip generated changelogs - historical release notes reference docs URLs
+# that were valid at release time; rewriting them is misleading
+exclude_path = [
+  "libraries/typescript/packages/cli/CHANGELOG.md",
+  "libraries/typescript/packages/create-mcp-use-app/CHANGELOG.md",
+  "libraries/typescript/packages/inspector/CHANGELOG.md",
+  "libraries/typescript/packages/mcp-use/CHANGELOG.md",
+]
+
 exclude_loopback = true
 exclude_link_local = true
 # Maximum number of redirects to follow
