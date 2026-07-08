@@ -10,9 +10,16 @@
  * let the proxy read `csp_mode`, `permissions`, and optional `widget_csp` from
  * the URL; AppFrame still sends `{ html, csp }` in sandbox-resource-ready
  * (csp will be undefined without SandboxConfig.csp).
+ *
+ * Backend-less CDN shell (`window.__MCP_USE_INSPECTOR__`): there is no
+ * `/inspector/api/*` backend, so we serve the proxy from a Blob URL instead.
+ * That matches localhost/dev same-origin isolation semantics (outer iframe
+ * still has the sandbox attribute). Hosted deployments with a real backend
+ * keep the cross-origin `sandbox-inspector.*` route.
  */
 
 import { inspectorApi } from "@/client/utils/basePath";
+import { buildSandboxProxyBlobHtml } from "@/shared/sandbox-proxy-html";
 
 export type McpAppsSandboxUrlOptions = {
   cspMode: "permissive" | "widget-declared";
@@ -32,13 +39,41 @@ export type McpAppsSandboxUrlOptions = {
   };
 };
 
+function applySandboxSearchParams(
+  url: URL,
+  options: McpAppsSandboxUrlOptions
+): void {
+  const { cspMode, permissions, widgetCsp } = options;
+  url.searchParams.set("v", String(Date.now()));
+  url.searchParams.set("csp_mode", cspMode);
+  if (permissions && Object.keys(permissions).length > 0) {
+    url.searchParams.set("permissions", JSON.stringify(permissions));
+  }
+  if (widgetCsp && Object.keys(widgetCsp).length > 0) {
+    url.searchParams.set("widget_csp", JSON.stringify(widgetCsp));
+  }
+}
+
 /**
  * Returns a URL pointing at our sandbox-proxy with cache-buster + CSP query params.
+ * Callers that receive a `blob:` URL must revoke it when replaced or on unmount.
  */
 export function buildMcpAppsSandboxUrl(
   options: McpAppsSandboxUrlOptions
 ): URL {
-  const { cspMode, permissions, widgetCsp } = options;
+  // Backend-less CDN shell: no inspector API routes — use a Blob URL proxy.
+  if (
+    typeof window !== "undefined" &&
+    (window as Window & { __MCP_USE_INSPECTOR__?: unknown }).__MCP_USE_INSPECTOR__
+  ) {
+    const searchUrl = new URL("https://sandbox.invalid/");
+    applySandboxSearchParams(searchUrl, options);
+    const html = buildSandboxProxyBlobHtml(searchUrl.search);
+    return new URL(
+      URL.createObjectURL(new Blob([html], { type: "text/html" }))
+    );
+  }
+
   const currentHost = window.location.hostname;
   const currentPort = window.location.port;
   const protocol = window.location.protocol;
@@ -80,13 +115,6 @@ export function buildMcpAppsSandboxUrl(
   }
 
   const url = new URL(base);
-  url.searchParams.set("v", String(Date.now()));
-  url.searchParams.set("csp_mode", cspMode);
-  if (permissions && Object.keys(permissions).length > 0) {
-    url.searchParams.set("permissions", JSON.stringify(permissions));
-  }
-  if (widgetCsp && Object.keys(widgetCsp).length > 0) {
-    url.searchParams.set("widget_csp", JSON.stringify(widgetCsp));
-  }
+  applySandboxSearchParams(url, options);
   return url;
 }
