@@ -1,5 +1,14 @@
 # mcp-use
 
+## 1.34.4-canary.0
+
+### Patch Changes
+
+- 199365c: Fix dead documentation links flagged by the link checker: the CLI client example and inspector README pointed at docs pages that no longer exist.
+- Updated dependencies [199365c]
+  - @mcp-use/inspector@12.0.4-canary.0
+  - @mcp-use/cli@3.6.5-canary.0
+
 ## 1.34.3
 
 ### Patch Changes
