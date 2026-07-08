@@ -34,14 +34,36 @@ function normalize(raw: string | undefined): string {
 }
 
 /**
+ * Infer basePath from the current URL when `window.__MCP_BASE_PATH__` was not
+ * injected (pure Vite standalone inspector at `/inspector`, or SSR).
+ *
+ * Standalone inspector Vite uses `base: "/inspector"`, so the document URL is
+ * `/inspector` (or `/inspector/...`) with an empty server basePath. Builtin /
+ * embedded mounts live at `${basePath}/inspector` (default `/mcp/inspector`).
+ */
+function inferBasePathFromLocation(): string {
+  if (typeof window === "undefined") return "";
+  const pathname = window.location.pathname || "";
+  const marker = "/inspector";
+  const idx = pathname.indexOf(marker);
+  if (idx <= 0) return "";
+  return normalize(pathname.slice(0, idx));
+}
+
+/**
  * Resolve the server-wide basePath from `window.__MCP_BASE_PATH__`.
  *
- * Returns `/mcp` (the default) when the global is absent — e.g. pure-Vite dev
- * mode where the inspector backend's HTML injection never runs.
+ * When the global is absent (pure-Vite standalone inspector), infer from the
+ * current pathname so Router basename matches `/inspector` rather than the
+ * embedded default `/mcp/inspector`.
  */
 export function getBasePath(): string {
-  if (typeof window === "undefined") return "/mcp";
-  return normalize((window as InspectorWindow).__MCP_BASE_PATH__);
+  if (typeof window === "undefined") return "";
+  const injected = (window as InspectorWindow).__MCP_BASE_PATH__;
+  if (injected !== undefined && injected !== null) {
+    return normalize(injected);
+  }
+  return inferBasePathFromLocation();
 }
 
 /**

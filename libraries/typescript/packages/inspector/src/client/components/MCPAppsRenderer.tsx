@@ -1,25 +1,18 @@
 /**
  * MCPAppsRenderer - SEP-1865 MCP Apps Renderer
  *
- * Renders MCP Apps widgets using the SEP-1865 protocol:
- * - JSON-RPC 2.0 over postMessage
- * - Double-iframe sandbox architecture
- * - AppBridge SDK for communication
- * - tools/call, resources/read, ui/message, ui/open-link support
- *
- * Reuses existing inspector infrastructure:
- * - Widget storage (WidgetData)
- * - RPC logging (rpcLogBus)
- * - Console capture (useIframeConsole)
- * - Theme context (useTheme)
+ * Renders MCP Apps widgets via @mcp-ui/client AppFrame + a self-constructed
+ * AppBridge (ext-apps). Guest HTML is resolved client-side; the sandbox proxy
+ * remains ours. RPC logging wraps AppFrame's transport via InspectorAppBridge.
  */
 
-import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Transport } from "@modelcontextprotocol/client";
-import type {
-  CallToolResult,
-  JSONRPCMessage,
-} from "@modelcontextprotocol/client";
+import { AppFrame } from "@mcp-ui/client";
+import {
+  AppBridge,
+  type McpUiHostCapabilities,
+} from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { X } from "lucide-react";
 import { useMcpClient } from "@mcp-use/client/react";
 import type { MessageContentBlock } from "mcp-use/react";
@@ -33,20 +26,22 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import { rpcLogBus } from "../../server/rpc-log-bus.js";
 import { consoleLogBus } from "../console-log-bus";
-import { IFRAME_SANDBOX_PERMISSIONS, MCP_APPS_CONFIG } from "../constants";
+import { MCP_APPS_CONFIG } from "../constants";
 import { useTheme } from "../context/ThemeContext";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
+import type { WidgetDeclaredCsp } from "../context/WidgetDebugContext";
 import { useDeviceViewport } from "../hooks/useDeviceViewport";
 import { useMcpAppsHostContext } from "../hooks/useMcpAppsHostContext";
+import { wrapTransportWithLogging } from "../lib/mcp-apps-logging-transport";
 import { cn } from "../lib/utils";
-import { useSandboxRemountGeneration } from "../lib/use-sandbox-remount-generation";
 import { useWidgetDisplayModeControls } from "../lib/widget-fullscreen";
-import type { WidgetDeclaredCsp } from "../context/WidgetDebugContext";
+import { buildMcpAppsSandboxUrl } from "../utils/mcp-apps-sandbox-url";
+import { resolveMcpAppsWidgetHtml } from "../utils/mcp-apps-widget-html";
 import { FullscreenNavbar } from "./FullscreenNavbar";
-import type { SandboxedIframeHandle } from "./ui/SandboxedIframe";
-import { SandboxedIframe } from "./ui/SandboxedIframe";
+import { Spinner } from "./ui/spinner";
+import { WidgetWrapper } from "./ui/WidgetWrapper";
+import { TextShimmer } from "./ui/text-shimmer.js";
 
 /**
  * Build CSP policy string from declared domains (matches sandbox-proxy buildCSP).
@@ -88,9 +83,6 @@ function buildCSPString(csp: WidgetDeclaredCsp): string {
     `base-uri ${baseUri}`,
   ].join("; ");
 }
-import { Spinner } from "./ui/spinner";
-import { WidgetWrapper } from "./ui/WidgetWrapper";
-import { TextShimmer } from "./ui/text-shimmer.js";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";
 
@@ -119,12 +111,59 @@ interface MCPAppsRendererProps {
   cancelled?: boolean;
   /** Called when the CSP mode changes after the widget is already loaded, requesting the tool to be re-executed. */
   onRerun?: () => void;
-  /** Called once when the iframe has loaded and the AppBridge handshake completes. Used by the preview/screenshot route. */
+  /** Called once when the AppBridge handshake completes. Used by the preview/screenshot route. */
   onReady?: () => void;
   /** When true in fullscreen mode, suppresses the fullscreen navbar + top padding so the iframe fills the viewport edge-to-edge. Used by the preview/screenshot route. */
   chromeless?: boolean;
   /** Override the inline-mode max-width cap (default: 768 on desktop, device width on mobile). Used by the preview/screenshot route to render widgets wider than the chat-column width. */
   inlineWidthOverride?: number;
+}
+
+const HOST_INFO = { name: "mcp-use-inspector", version: "0.16.2" } as const;
+
+/**
+ * AppBridge subclass that wraps AppFrame's PostMessageTransport with RPC logging.
+ * AppFrame owns transport construction; we intercept in connect().
+ */
+class InspectorAppBridge extends AppBridge {
+  private readonly toolCallId: string;
+
+  constructor(
+    toolCallId: string,
+    hostCapabilities: McpUiHostCapabilities,
+    options?: ConstructorParameters<typeof AppBridge>[3]
+  ) {
+    super(null, HOST_INFO, hostCapabilities, options);
+    this.toolCallId = toolCallId;
+  }
+
+  override connect(transport: Transport): Promise<void> {
+    return super.connect(
+      wrapTransportWithLogging(transport, this.toolCallId)
+    );
+  }
+}
+
+function parseCustomProps(
+  customProps?: Record<string, string>
+): Record<string, unknown> {
+  const parsed: Record<string, unknown> = {};
+  if (!customProps) return parsed;
+  for (const [k, v] of Object.entries(customProps)) {
+    if (
+      typeof v === "string" &&
+      (v.trim().startsWith("[") || v.trim().startsWith("{"))
+    ) {
+      try {
+        parsed[k] = JSON.parse(v);
+      } catch {
+        parsed[k] = v;
+      }
+    } else {
+      parsed[k] = v;
+    }
+  }
+  return parsed;
 }
 
 function MCPAppsRendererBase({
@@ -151,12 +190,11 @@ function MCPAppsRendererBase({
   chromeless,
   inlineWidthOverride,
 }: MCPAppsRendererProps) {
-  const sandboxRef = useRef<SandboxedIframeHandle>(null);
-  const bridgeRef = useRef<AppBridge | null>(null);
+  const bridgeRef = useRef<InspectorAppBridge | null>(null);
+  const frameContainerRef = useRef<HTMLDivElement | null>(null);
   const { resolvedTheme } = useTheme();
   const { servers } = useMcpClient();
-  const serverFromContext = servers.find((s) => s.id === serverId);
-  const server = serverFromContext;
+  const server = servers.find((s) => s.id === serverId);
 
   const {
     playground,
@@ -170,7 +208,6 @@ function MCPAppsRendererBase({
   const [initCount, setInitCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [widgetHtml, setWidgetHtml] = useState<string | null>(null);
-  const [isReady, setIsReady] = useState(false);
   const [showSpinner, setShowSpinner] = useState(true);
   const hasLoadedOnceRef = useRef(false);
   const toolInputSentRef = useRef<string | null>(null);
@@ -186,17 +223,46 @@ function MCPAppsRendererBase({
   const readResourceRef = useRef(readResource);
   const serverRef = useRef(server);
   const lastHostContextRef = useRef<string | null>(null);
+  const onSendFollowUpRef = useRef(onSendFollowUp);
+  const resourceUriRef = useRef(resourceUri);
   toolInputRef.current = toolInput;
   toolOutputRef.current = toolOutput;
   customPropsRef.current = customProps;
   readResourceRef.current = readResource;
   serverRef.current = server;
-  const [widgetCsp, setWidgetCsp] = useState<any>(undefined);
-  const [widgetPermissions, setWidgetPermissions] = useState<any>(undefined);
+  onSendFollowUpRef.current = onSendFollowUp;
+  resourceUriRef.current = resourceUri;
+
+  const [widgetCsp, setWidgetCsp] = useState<
+    | {
+        connectDomains?: string[];
+        resourceDomains?: string[];
+        frameDomains?: string[];
+        baseUriDomains?: string[];
+      }
+    | undefined
+  >(undefined);
+  const [declaredCsp, setDeclaredCsp] = useState<
+    | {
+        connectDomains?: string[];
+        resourceDomains?: string[];
+        frameDomains?: string[];
+        baseUriDomains?: string[];
+      }
+    | undefined
+  >(undefined);
+  const [widgetPermissions, setWidgetPermissions] = useState<
+    | {
+        camera?: object;
+        microphone?: object;
+        geolocation?: object;
+        clipboardWrite?: object;
+      }
+    | undefined
+  >(undefined);
   const [prefersBorder, setPrefersBorder] = useState<boolean>(false);
   const [internalDisplayMode, setInternalDisplayMode] =
     useState<DisplayMode>("inline");
-  // Use controlled displayMode if provided, otherwise use internal state
   const displayMode = displayModeProp ?? internalDisplayMode;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -213,17 +279,6 @@ function MCPAppsRendererBase({
     [onDisplayModeChange, displayModeProp]
   );
 
-  const { sandboxGeneration, onSandboxMount } = useSandboxRemountGeneration();
-
-  const handleSandboxMount = useCallback(() => {
-    if (onSandboxMount()) {
-      if (hasLoadedOnceRef.current) {
-        setShowSpinner(true);
-        setIsReady(false);
-      }
-    }
-  }, [onSandboxMount]);
-
   const {
     handleDisplayModeChange,
     fullscreenShellClassName,
@@ -239,12 +294,9 @@ function MCPAppsRendererBase({
   const handleDisplayModeChangeRef = useRef(handleDisplayModeChange);
   handleDisplayModeChangeRef.current = handleDisplayModeChange;
 
-  // Keep a ref so the onsizechange closure (captured at bridge creation) always
-  // reads the current displayMode without needing to recreate the bridge.
   const displayModeRef = useRef(displayMode);
   displayModeRef.current = displayMode;
 
-  // Controlled displayMode (e.g. MCPAppsDebugControls): sync native fullscreen without remounting.
   useEffect(() => {
     if (displayModeProp === undefined) return;
     if (prevControlledDisplayModeRef.current === displayModeProp) return;
@@ -252,36 +304,24 @@ function MCPAppsRendererBase({
     void handleDisplayModeChangeRef.current(displayModeProp);
   }, [displayModeProp]);
 
-  // Track the last height requested by the widget in inline mode.
-  // This persists across fullscreen/PiP transitions so the iframe is
-  // restored to the correct height when returning to inline (rather than
-  // always snapping back to DEFAULT_HEIGHT).
   const [inlineHeight, setInlineHeight] = useState<number>(
     MCP_APPS_CONFIG.DIMENSIONS.DEFAULT_HEIGHT
   );
 
-  // Use playground settings when available
   const cspMode = playground.cspMode;
   const deviceType = playground.deviceType;
   const customViewport = playground.customViewport;
 
-  // Calculate dimensions based on device type
   const { maxWidth, maxHeight } = useDeviceViewport(deviceType, customViewport);
 
-  // Calculate inline max-width: desktop/tablet use 768px (ChatGPT chat width), mobile uses device width.
-  // inlineWidthOverride (set by the preview/screenshot route) bypasses the cap so widgets can render
-  // at arbitrary widths for capture.
   const inlineMaxWidth =
     inlineWidthOverride ?? (deviceType === "mobile" ? maxWidth : 768);
 
-  // Get the tool definition from the server's tool list (memoized to prevent infinite re-renders)
-  // Stringify toolName to ensure stable reference if it's passed as an object
   const tool = useMemo(() => {
     if (!server?.tools) return undefined;
     return server.tools.find((t) => t.name === toolName);
   }, [server, toolName]);
 
-  // Build host context per SEP-1865
   const hostContext = useMcpAppsHostContext({
     theme: resolvedTheme,
     displayMode,
@@ -296,141 +336,57 @@ function MCPAppsRendererBase({
     toolMetadata,
     tool,
   });
+  const hostContextRef = useRef(hostContext);
+  hostContextRef.current = hostContext;
 
-  // Reset load flags when the widget identity changes (not on display-mode toggles).
   useEffect(() => {
     hasLoadedOnceRef.current = false;
     readyFiredRef.current = false;
   }, [toolCallId, resourceUri]);
 
-  // Fetch widget HTML when component mounts
+  // Fetch + resolve widget HTML client-side (no store/content HTTP round-trip)
   useEffect(() => {
     const fetchWidgetHtml = async () => {
       try {
-        // Fetch resource to get MIME type and CSP metadata
         const resourceResult = await readResource(resourceUri);
-        const resourceContent = resourceResult?.contents?.[0];
-        const resourceMimeType = resourceContent?.mimeType;
-        const contentMeta = resourceContent?._meta;
-
-        // Per SEP-1865: _meta.ui may appear on both resources/list entries
-        // and resources/read content items, with content-item taking precedence.
         const listingResource = server?.resources?.find(
           (r) => r.uri === resourceUri
         );
-        const listingUiMeta = (listingResource as any)?._meta?.ui;
-        const contentUiMeta = contentMeta?.ui;
-        const mergedUiMeta =
-          listingUiMeta || contentUiMeta
-            ? { ...listingUiMeta, ...contentUiMeta }
-            : undefined;
-        // const resourceMeta = {
-        //   ...contentMeta,
-        //   ...(mergedUiMeta ? { ui: mergedUiMeta } : {}),
-        // };
 
-        // MCP Apps: Use ui.csp from resource per SEP-1865. Fallback to openai/widgetCSP
-        // from tool metadata (transformed to camelCase) when resource lacks it.
-        let mcpAppsCsp = mergedUiMeta?.csp;
-        if (!mcpAppsCsp && (toolMetadata as any)?.["openai/widgetCSP"]) {
-          const wcsp = (toolMetadata as any)["openai/widgetCSP"] as Record<
-            string,
-            unknown
-          >;
-          const fallback: Record<string, unknown> = {};
-          if (Array.isArray(wcsp.connect_domains))
-            fallback.connectDomains = wcsp.connect_domains;
-          if (Array.isArray(wcsp.resource_domains))
-            fallback.resourceDomains = wcsp.resource_domains;
-          if (Array.isArray(wcsp.frame_domains))
-            fallback.frameDomains = wcsp.frame_domains;
-          if (Array.isArray(wcsp.base_uri_domains))
-            fallback.baseUriDomains = wcsp.base_uri_domains;
-          if (Array.isArray(wcsp.script_directives))
-            fallback.scriptDirectives = wcsp.script_directives;
-          if (Object.keys(fallback).length > 0) mcpAppsCsp = fallback as any;
-        }
-        const mcpAppsPermissions = mergedUiMeta?.permissions;
-        // MCP Apps only: prefersBorder is in resource _meta.ui per spec
-        const mcpAppsPrefersBorder = mergedUiMeta?.prefersBorder ?? false;
+        const resolved = resolveMcpAppsWidgetHtml({
+          resourceResult,
+          listingResource: listingResource as
+            | { _meta?: { ui?: any } }
+            | undefined,
+          cspMode,
+          resourceUri,
+        });
 
-        // Store widget data
-        const storeResponse = await fetch(
-          MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_STORE,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              serverId,
-              uri: resourceUri,
-              toolInput,
-              toolOutput,
-              toolId: toolCallId,
-              toolName,
-              theme: resolvedTheme,
-              protocol: "mcp-apps",
-              cspMode,
-              resourceData: resourceResult,
-              mimeType: resourceMimeType,
-              mcpAppsCsp,
-              mcpAppsPermissions,
-            }),
-          }
-        );
-
-        if (!storeResponse.ok) {
-          throw new Error(
-            `Failed to store widget: ${storeResponse.statusText}`
-          );
-        }
-
-        // Fetch widget content with CSP metadata
-        const contentEndpoint =
-          MCP_APPS_CONFIG.API_ENDPOINTS.WIDGET_CONTENT(toolCallId);
-        const contentResponse = await fetch(
-          `${contentEndpoint}?csp_mode=${cspMode}`
-        );
-
-        if (!contentResponse.ok) {
-          const errorData = await contentResponse.json().catch(() => ({}));
-          throw new Error(
-            errorData.error ||
-              `Failed to fetch widget: ${contentResponse.statusText}`
-          );
-        }
-
-        const contentJson = await contentResponse.json();
-        const { html, csp, permissions, mimeTypeWarning, mimeTypeValid } =
-          contentJson;
-
-        if (!mimeTypeValid) {
+        if (!resolved.mimeTypeValid) {
           setLoadError(
-            mimeTypeWarning ||
+            resolved.mimeTypeWarning ||
               'Invalid MIME type - SEP-1865 requires "text/html;profile=mcp-app"'
           );
           return;
         }
 
-        setWidgetHtml(html);
-        setIsReady(false);
+        setWidgetHtml(resolved.html);
         if (!hasLoadedOnceRef.current) {
           setShowSpinner(true);
         }
-        setWidgetCsp(csp);
-        setWidgetPermissions(permissions);
-        setPrefersBorder(mcpAppsPrefersBorder);
+        setWidgetCsp(resolved.csp);
+        setDeclaredCsp(resolved.declaredCsp);
+        setWidgetPermissions(resolved.permissions);
+        setPrefersBorder(resolved.prefersBorder);
 
-        // Register widget in debug context
         addWidget(toolCallId, {
           toolName,
           protocol: "mcp-apps",
           hostContext,
         });
 
-        // Populate CSP dialog data: declared CSP and effective policy.
-        // Use mcpAppsCsp when csp is undefined (permissive mode) so dialog shows widget-declared domains.
-        const cspForDeclared = csp ?? mcpAppsCsp;
-        const declaredCsp =
+        const cspForDeclared = resolved.csp ?? resolved.declaredCsp;
+        const declared =
           cspForDeclared && typeof cspForDeclared === "object"
             ? {
                 connectDomains: cspForDeclared.connectDomains,
@@ -454,10 +410,10 @@ function MCPAppsRendererBase({
             "base-uri *",
             "form-action *",
           ].join("; ");
-        } else if (declaredCsp) {
-          effectivePolicy = buildCSPString(declaredCsp);
+        } else if (declared) {
+          effectivePolicy = buildCSPString(declared);
         }
-        setWidgetDeclaredCsp(toolCallId, declaredCsp, effectivePolicy);
+        setWidgetDeclaredCsp(toolCallId, declared, effectivePolicy);
       } catch (err) {
         setLoadError(
           err instanceof Error ? err.message : "Failed to prepare widget"
@@ -466,15 +422,9 @@ function MCPAppsRendererBase({
     };
 
     fetchWidgetHtml();
-    // Only re-fetch when the widget identity changes, not on every render.
-    // hostContext, addWidget, toolInput, toolOutput, resolvedTheme are intentionally
-    // excluded to prevent infinite re-render loops — they are captured by closure
-    // at the time of the fetch and don't warrant refetching the widget HTML.
-    // cspMode is intentionally excluded — changes are handled by the effect below.
+    // cspMode excluded — changes handled by onRerun effect below.
   }, [serverId, resourceUri, toolCallId, toolName]);
 
-  // When CSP mode changes after the widget has already loaded, request a
-  // full tool re-execution so the fresh result is rendered with the new CSP.
   const prevCspModeRef = useRef(cspMode);
   useEffect(() => {
     if (prevCspModeRef.current === cspMode) return;
@@ -484,17 +434,14 @@ function MCPAppsRendererBase({
     }
   }, [cspMode, onRerun]);
 
-  // Re-read prefersBorder from the server when the widget re-initializes
-  // (HMR support). When initCount > 1, it means the widget iframe reloaded
-  // (e.g. Vite HMR page reload) and the server may have updated metadata.
   useEffect(() => {
     if (initCount <= 1) return;
 
-    let cancelled = false;
+    let cancelledFetch = false;
     (async () => {
       try {
         const resourceResult = await readResource(resourceUri);
-        if (cancelled) return;
+        if (cancelledFetch) return;
         const contentUiMeta = resourceResult?.contents?.[0]?._meta?.ui;
         if (contentUiMeta && "prefersBorder" in contentUiMeta) {
           setPrefersBorder(contentUiMeta.prefersBorder ?? false);
@@ -504,133 +451,50 @@ function MCPAppsRendererBase({
       }
     })();
     return () => {
-      cancelled = true;
+      cancelledFetch = true;
     };
   }, [initCount, resourceUri, readResource]);
 
-  // Initialize AppBridge when HTML is ready (re-run when sandbox iframe remounts)
-  useEffect(() => {
-    if (!widgetHtml || !sandboxRef.current) return;
+  /**
+   * Recreate the bridge when the AppFrame host remounts (PiP portal /
+   * fullscreen). A connected Protocol cannot cleanly reconnect; AppFrame will
+   * call connect() again on the new iframe, so we must hand it a fresh bridge.
+   * `isPip`/`isFullscreen` recreate in the same render as the portal move
+   * (sandboxGeneration alone would bump one effect-tick too late).
+   */
+  const bridge = useMemo(() => {
+    if (!widgetHtml) return null;
 
-    const iframe = sandboxRef.current.getIframeElement();
-    if (!iframe?.contentWindow) return;
-
-    lastInitTimeRef.current = 0;
-    toolInputSentRef.current = null;
-    lastSentPropsRef.current = null;
-    lastSentToolOutputKeyRef.current = null;
-    setInitCount(0);
-
-    // Create a custom transport that posts messages through the SandboxedIframe
-    // The SandboxedIframe will relay them to the correct nested iframe
-    const customTransport: Transport = {
-      sessionId: undefined,
-      async start() {
-        // Transport starts immediately, messages are handled by the message listener
+    const hostCapabilities: McpUiHostCapabilities = {
+      openLinks: {},
+      serverTools: {},
+      serverResources: {},
+      logging: {},
+      sandbox: {
+        csp: cspMode === "permissive" ? undefined : widgetCsp,
+        permissions: widgetPermissions,
       },
-      async send(message: JSONRPCMessage) {
-        // Send through SandboxedIframe which will relay to the proxy and then to guest
-        sandboxRef.current?.postMessage(message);
-
-        // Log sent message
-        rpcLogBus.publish({
-          serverId: `widget-${toolCallId}`,
-          direction: "send",
-          timestamp: new Date().toISOString(),
-          message,
-        });
-      },
-      async close() {
-        // Cleanup handled by component unmount
-      },
-      onmessage: undefined,
-      onerror: undefined,
-      onclose: undefined,
     };
 
-    const bridge = new AppBridge(
-      null,
-      { name: "mcp-use-inspector", version: "0.16.2" },
-      {
-        openLinks: {},
-        serverTools: {},
-        serverResources: {},
-        logging: {},
-        sandbox: {
-          csp: cspMode === "permissive" ? undefined : widgetCsp,
-          permissions: widgetPermissions,
-        },
-      },
-      { hostContext }
-    );
+    const instance = new InspectorAppBridge(toolCallId, hostCapabilities, {
+      hostContext: hostContextRef.current,
+    });
 
-    // Register bridge handlers.
-    // Debounce: only accept the first init per bridge lifecycle; subsequent
-    // rapid re-inits (widget re-mounting after receiving data) are suppressed
-    // to prevent a feedback loop. A deferred resend ensures the latest widget
-    // instance still receives tool data after it settles.
-    bridge.oninitialized = () => {
-      const now = Date.now();
-      if (lastInitTimeRef.current > 0 && now - lastInitTimeRef.current < 2000) {
-        clearTimeout(resendTimerRef.current);
-        resendTimerRef.current = setTimeout(() => {
-          const cp = customPropsRef.current;
-          const parsed: Record<string, unknown> = {};
-          if (cp) {
-            for (const [k, v] of Object.entries(cp)) {
-              if (
-                typeof v === "string" &&
-                (v.trim().startsWith("[") || v.trim().startsWith("{"))
-              ) {
-                try {
-                  parsed[k] = JSON.parse(v);
-                } catch {
-                  parsed[k] = v;
-                }
-              } else {
-                parsed[k] = v;
-              }
-            }
-          }
-          const mergedArgs = { ...toolInputRef.current, ...parsed };
-          bridge.sendToolInput({ arguments: mergedArgs });
-          const output = toolOutputRef.current;
-          if (output) {
-            // ponytail: @modelcontextprotocol/ext-apps' app-bridge is typed
-            // against v1 SDK CallToolResult; the v2 result is runtime-identical,
-            // so cast to the bridge's own parameter type at this boundary.
-            bridge.sendToolResult(
-              output as unknown as Parameters<typeof bridge.sendToolResult>[0]
-            );
-          }
-        }, 300);
-        return;
-      }
-      lastInitTimeRef.current = now;
-      setInitCount((c) => {
-        const next = c + 1;
-        return next;
-      });
-    };
-
-    bridge.onmessage = async ({ content }) => {
-      if (content.length > 0 && onSendFollowUp) {
-        onSendFollowUp(content as MessageContentBlock[]);
+    instance.onmessage = async ({ content }) => {
+      if (content.length > 0 && onSendFollowUpRef.current) {
+        onSendFollowUpRef.current(content as MessageContentBlock[]);
       }
       return {};
     };
 
-    bridge.onopenlink = async ({ url }) => {
+    instance.onopenlink = async ({ url }) => {
       if (url) {
         window.open(url, "_blank", "noopener,noreferrer");
       }
       return {};
     };
 
-    // ponytail: the bridge handler is typed against v1 SDK CallToolResult;
-    // @mcp-use/client returns the runtime-identical v2 result. Cast the handler
-    // assignment to the bridge's own handler type at this interop boundary.
-    bridge.oncalltool = (async ({ name, arguments: args }) => {
+    instance.oncalltool = (async ({ name, arguments: args }) => {
       const currentServer = serverRef.current;
       if (!currentServer) {
         throw new Error("Server connection not available");
@@ -643,19 +507,19 @@ function MCPAppsRendererBase({
         });
         return result;
       } catch (error) {
-        bridge.sendToolCancelled({
+        instance.sendToolCancelled({
           reason: error instanceof Error ? error.message : String(error),
         });
         throw error;
       }
-    }) as typeof bridge.oncalltool;
+    }) as typeof instance.oncalltool;
 
-    bridge.onreadresource = async ({ uri }) => {
+    instance.onreadresource = async ({ uri }) => {
       const result = await readResourceRef.current(uri);
       return result.contents || [];
     };
 
-    bridge.onlistresources = async () => {
+    instance.onlistresources = async () => {
       const currentServer = serverRef.current;
       if (!currentServer) {
         throw new Error("Server connection not available");
@@ -663,13 +527,13 @@ function MCPAppsRendererBase({
       return { resources: currentServer.resources };
     };
 
-    bridge.onrequestdisplaymode = async ({ mode }) => {
+    instance.onrequestdisplaymode = async ({ mode }) => {
       const requestedMode = (mode ?? "inline") as DisplayMode;
       await handleDisplayModeChangeRef.current(requestedMode);
       return { mode: requestedMode };
     };
 
-    bridge.onupdatemodelcontext = async ({ content, structuredContent }) => {
+    instance.onupdatemodelcontext = async ({ content, structuredContent }) => {
       setWidgetModelContext(toolCallId, { content, structuredContent });
       try {
         localStorage.setItem(
@@ -677,21 +541,17 @@ function MCPAppsRendererBase({
           JSON.stringify(structuredContent)
         );
       } catch (_) {
-        // localStorage may be unavailable (e.g., private browsing); ignore
         void _;
       }
       return {};
     };
 
-    bridge.onloggingmessage = async ({ level, logger: _logger, data }) => {
-      // Publish to console log bus (avoids postMessage issues with browser extensions)
-      // When data is an array it means the original console call had multiple args
-      // (bridge packs them as an array), so spread them rather than double-wrapping.
+    instance.onloggingmessage = async ({ level, data }) => {
       consoleLogBus.publish({
         level: level as any,
         args: Array.isArray(data) ? data : [data],
         timestamp: new Date().toISOString(),
-        url: resourceUri,
+        url: resourceUriRef.current,
       });
       if (
         level === "error" &&
@@ -716,7 +576,7 @@ function MCPAppsRendererBase({
             stack,
             timestamp: Date.now(),
             toolId: toolCallId,
-            url: resourceUri,
+            url: resourceUriRef.current,
           },
           "*"
         );
@@ -724,51 +584,135 @@ function MCPAppsRendererBase({
       return {};
     };
 
-    bridge.onsizechange = ({ height }) => {
-      // Use ref so this closure always reads the current displayMode even
-      // though it was captured when the bridge was first created.
-      if (displayModeRef.current !== "inline") return;
-      const iframeEl = iframe;
-      if (!iframeEl || height === undefined) return;
+    return instance;
+    // Handlers use refs; recreate only on remount/identity/CSP metadata.
+  }, [
+    widgetHtml,
+    toolCallId,
+    isPip,
+    isFullscreen,
+    cspMode,
+    widgetCsp,
+    widgetPermissions,
+  ]);
 
-      const style = getComputedStyle(iframeEl);
-      const isBorderBox = style.boxSizing === "border-box";
-
-      let adjustedHeight = height;
-      if (isBorderBox) {
-        adjustedHeight +=
-          parseFloat(style.borderTopWidth) +
-          parseFloat(style.borderBottomWidth);
-      }
-
-      const from: Keyframe = { height: `${iframeEl.offsetHeight}px` };
-      const to: Keyframe = { height: `${adjustedHeight}px` };
-
-      iframeEl.style.height = `${adjustedHeight}px`;
-      setInlineHeight(adjustedHeight);
-
-      iframeEl.animate([from, to], { duration: 300, easing: "ease-out" });
-    };
-
+  useEffect(() => {
     bridgeRef.current = bridge;
+    if (!bridge) return;
 
-    // Connect bridge with custom transport
-    let isActive = true;
-    bridge.connect(customTransport).catch((error) => {
-      if (!isActive) return;
-      setLoadError(
-        error instanceof Error ? error.message : "Failed to connect MCP App"
-      );
+    lastInitTimeRef.current = 0;
+    toolInputSentRef.current = null;
+    lastSentPropsRef.current = null;
+    lastSentToolOutputKeyRef.current = null;
+    setInitCount(0);
+
+    return () => {
+      lastInitTimeRef.current = 0;
+      clearTimeout(resendTimerRef.current);
+      const toClose = bridge;
+      bridgeRef.current = null;
+      lastHostContextRef.current = null;
+      const TEARDOWN_TIMEOUT = 2000;
+      void (async () => {
+        try {
+          await Promise.race([
+            toClose.teardownResource({}),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("teardown timeout")),
+                TEARDOWN_TIMEOUT
+              )
+            ),
+          ]);
+        } catch {
+          // Timeout or error — proceed with close
+        } finally {
+          toClose.close().catch(() => {});
+        }
+      })();
+    };
+  }, [bridge]);
+
+  useEffect(() => {
+    return () => {
+      removeWidget(toolCallId);
+    };
+  }, [toolCallId, removeWidget]);
+
+  // Sandbox URL: CSP mode + permissions (+ declared csp) as query params.
+  // We intentionally omit SandboxConfig.csp so AppFrame's buildSandboxUrl does
+  // not add a competing `csp` param; the proxy reads our query params and the
+  // resource-ready message (csp undefined from AppFrame is fine).
+  const sandboxUrl = useMemo(() => {
+    if (!widgetHtml) return null;
+    return buildMcpAppsSandboxUrl({
+      cspMode,
+      permissions: widgetPermissions,
+      widgetCsp: declaredCsp,
     });
+  }, [widgetHtml, cspMode, widgetPermissions, declaredCsp]);
 
-    // Set up message handler for incoming messages from widget (via SandboxedIframe)
+  const sandboxOrigin = useMemo(() => {
+    if (!sandboxUrl) return null;
+    try {
+      return sandboxUrl.origin;
+    } catch {
+      return null;
+    }
+  }, [sandboxUrl]);
+
+  // Show spinner when portal remount recreates the bridge
+  const prevPipFsRef = useRef({ isPip, isFullscreen });
+  useEffect(() => {
+    const prev = prevPipFsRef.current;
+    if (prev.isPip !== isPip || prev.isFullscreen !== isFullscreen) {
+      prevPipFsRef.current = { isPip, isFullscreen };
+      if (hasLoadedOnceRef.current) {
+        setShowSpinner(true);
+      }
+    }
+  }, [isPip, isFullscreen]);
+
+  // CSP violations + iframe console error forwarding (AppFrame gives no iframe ref)
+  useEffect(() => {
+    if (!sandboxOrigin) return;
+
     const handleMessage = (event: MessageEvent) => {
-      const activeIframe = sandboxRef.current?.getIframeElement();
-      if (!activeIframe?.contentWindow) return;
-      // Only process messages from our sandbox proxy
-      const proxyOrigin = new URL(activeIframe.src).origin;
-      if (event.origin !== proxyOrigin) return;
-      if (event.source !== activeIframe.contentWindow) return;
+      const iframe =
+        frameContainerRef.current?.querySelector("iframe") ?? null;
+      if (!iframe?.contentWindow) return;
+      if (event.source !== iframe.contentWindow) return;
+      if (event.origin !== sandboxOrigin && sandboxOrigin !== "*") return;
+
+      if (event.data?.type === "mcp-apps:csp-violation") {
+        const {
+          directive,
+          blockedUri,
+          sourceFile,
+          lineNumber,
+          columnNumber,
+          effectiveDirective,
+          originalPolicy,
+          timestamp,
+        } = event.data;
+
+        addCspViolation(toolCallId, {
+          directive,
+          effectiveDirective,
+          blockedUri,
+          sourceFile,
+          lineNumber,
+          columnNumber,
+          originalPolicy,
+          timestamp: timestamp || Date.now(),
+        });
+
+        console.warn(
+          `[MCP Apps CSP Violation] ${directive}: Blocked ${blockedUri}`,
+          sourceFile ? `at ${sourceFile}:${lineNumber}:${columnNumber}` : ""
+        );
+        return;
+      }
 
       if (event.data?.type === "iframe-console-log") {
         if (
@@ -806,122 +750,85 @@ function MCPAppsRendererBase({
             "*"
           );
         }
-        return;
-      }
-
-      // Widget re-initialization detection (e.g. after Vite HMR page reload).
-      // bridge.oninitialized already handles initCount bumping for all
-      // ui/initialize messages (with debounce to prevent feedback loops).
-      // No initCount bump needed here.
-
-      // Log received message
-      rpcLogBus.publish({
-        serverId: `widget-${toolCallId}`,
-        direction: "receive",
-        timestamp: new Date().toISOString(),
-        message: event.data,
-      });
-
-      // Pass message to AppBridge
-      if (customTransport.onmessage && event.data) {
-        customTransport.onmessage(event.data as JSONRPCMessage);
       }
     };
 
     window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [sandboxOrigin, toolCallId, addCspViolation, resourceUri]);
 
-    return () => {
-      lastInitTimeRef.current = 0;
+  const handleInitialized = useCallback(() => {
+    const now = Date.now();
+    const activeBridge = bridgeRef.current;
+    if (!activeBridge) return;
+
+    if (lastInitTimeRef.current > 0 && now - lastInitTimeRef.current < 2000) {
       clearTimeout(resendTimerRef.current);
-      isActive = false;
-      window.removeEventListener("message", handleMessage);
-      if (bridge) {
-        const TEARDOWN_TIMEOUT = 2000;
-        (async () => {
-          try {
-            await Promise.race([
-              bridge.teardownResource({}),
-              new Promise((_, reject) =>
-                setTimeout(
-                  () => reject(new Error("teardown timeout")),
-                  TEARDOWN_TIMEOUT
-                )
-              ),
-            ]);
-          } catch {
-            // Timeout or error — proceed with close
-          } finally {
-            bridge.close().catch(() => {});
-          }
-        })();
-      }
-      bridgeRef.current = null;
-      lastHostContextRef.current = null;
-      removeWidget(toolCallId);
-    };
-  }, [
-    widgetHtml,
-    sandboxRef,
-    toolCallId,
-    sandboxGeneration,
-    // readResource, server: use refs to avoid bridge tear-down/recreate on parent re-renders
-    // (which would reset initCount and cause iframe/widget to re-init, appearing as "re-render")
-  ]);
+      resendTimerRef.current = setTimeout(() => {
+        const mergedArgs = {
+          ...toolInputRef.current,
+          ...parseCustomProps(customPropsRef.current),
+        };
+        activeBridge.sendToolInput({ arguments: mergedArgs });
+        const output = toolOutputRef.current;
+        if (output) {
+          activeBridge.sendToolResult(
+            output as unknown as Parameters<
+              typeof activeBridge.sendToolResult
+            >[0]
+          );
+        }
+      }, 300);
+      return;
+    }
+    lastInitTimeRef.current = now;
+    setInitCount((c) => c + 1);
+  }, []);
 
-  // Update host context when it changes (skip redundant notifications to avoid double render)
+  const handleSizeChanged = useCallback(
+    ({ height }: { width?: number; height?: number }) => {
+      // AppFrame already applies height/width on its iframe; we only track
+      // inlineHeight for our wrapper chrome (avoid a second iframe resize).
+      if (displayModeRef.current !== "inline") return;
+      if (height === undefined) return;
+      setInlineHeight(height);
+    },
+    []
+  );
+
+  const handleAppFrameError = useCallback((error: Error) => {
+    setLoadError(error.message || "Failed to connect MCP App");
+  }, []);
+
   useEffect(() => {
-    const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0) return;
+    const active = bridgeRef.current;
+    if (!active || initCount === 0) return;
 
     const contextKey = JSON.stringify(hostContext);
     if (lastHostContextRef.current === contextKey) return;
     lastHostContextRef.current = contextKey;
 
-    bridge.setHostContext(hostContext);
+    active.setHostContext(hostContext);
   }, [hostContext, initCount]);
 
-  // Send partial/streaming tool input when available
-  // This must be defined BEFORE the sendToolInput effect so it fires first
   useEffect(() => {
-    const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0 || !partialToolInput) return;
+    const active = bridgeRef.current;
+    if (!active || initCount === 0 || !partialToolInput) return;
 
-    bridge.sendToolInputPartial({ arguments: partialToolInput });
+    active.sendToolInputPartial({ arguments: partialToolInput });
   }, [initCount, partialToolInput]);
 
-  // Send tool input when ready. Re-send when toolCallId changes (re-execution)
-  // or when customProps changes (user selects/creates preset with different props).
   useEffect(() => {
-    const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0) return;
+    const active = bridgeRef.current;
+    if (!active || initCount === 0) return;
 
-    // Parse JSON strings in customProps so arrays/objects reach the widget as real values
-    const parsedCustomProps: Record<string, unknown> = {};
-    if (customProps) {
-      for (const [k, v] of Object.entries(customProps)) {
-        if (
-          typeof v === "string" &&
-          (v.trim().startsWith("[") || v.trim().startsWith("{"))
-        ) {
-          try {
-            parsedCustomProps[k] = JSON.parse(v);
-          } catch {
-            parsedCustomProps[k] = v;
-          }
-        } else {
-          parsedCustomProps[k] = v;
-        }
-      }
-    }
+    const parsedCustomProps = parseCustomProps(customProps);
     const mergedArgs = {
       ...toolInput,
       ...parsedCustomProps,
     };
     const propsKey = JSON.stringify(mergedArgs);
 
-    // Skip only if we've already sent this exact payload for this toolCallId
-    // Include initCount so a widget re-initialization (e.g. HMR page reload)
-    // always re-sends the tool input to the new widget instance.
     const sentKey = `${toolCallId}:${initCount}`;
     if (
       toolInputSentRef.current === sentKey &&
@@ -932,29 +839,23 @@ function MCPAppsRendererBase({
 
     if (partialToolInput) {
       const frame = requestAnimationFrame(() => {
-        bridge.sendToolInput({ arguments: mergedArgs });
+        active.sendToolInput({ arguments: mergedArgs });
         toolInputSentRef.current = sentKey;
         lastSentPropsRef.current = propsKey;
       });
       return () => cancelAnimationFrame(frame);
     } else {
-      bridge.sendToolInput({ arguments: mergedArgs });
+      active.sendToolInput({ arguments: mergedArgs });
       toolInputSentRef.current = sentKey;
       lastSentPropsRef.current = propsKey;
     }
   }, [initCount, toolInput, customProps, toolCallId, partialToolInput]);
 
-  // Send tool output when ready
-  // Allow sending null to reset widget to pending state (Issue #930)
   useEffect(() => {
-    const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0) return;
+    const active = bridgeRef.current;
+    if (!active || initCount === 0) return;
 
-    // Send toolOutput even if null (allows widget to show pending state on re-execution)
     if (toolOutput) {
-      // Skip if we already sent this exact payload (parent re-renders with new ref, same data).
-      // Include customProps in the key so a preset change always triggers a re-send with the
-      // new structuredContent, even when toolOutput itself hasn't changed.
       const contentKey = JSON.stringify({
         content: (toolOutput as any)?.structuredContent ?? toolOutput,
         customProps: customProps ?? null,
@@ -963,88 +864,26 @@ function MCPAppsRendererBase({
       lastSentToolOutputKeyRef.current = contentKey;
       const result = toolOutput as CallToolResult;
 
-      // When customProps are set (from user presets), inject them as
-      // structuredContent so the widget receives them via useWidget().props.
-      // Without this, props only flow through sendToolInput (toolInput) while
-      // the widget reads props from the tool result's structuredContent.
       if (customProps && Object.keys(customProps).length > 0) {
-        const parsed: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(customProps)) {
-          if (
-            typeof v === "string" &&
-            (v.trim().startsWith("[") || v.trim().startsWith("{"))
-          ) {
-            try {
-              parsed[k] = JSON.parse(v);
-            } catch {
-              parsed[k] = v;
-            }
-          } else {
-            parsed[k] = v;
-          }
-        }
-        bridge.sendToolResult({
+        const parsed = parseCustomProps(customProps);
+        active.sendToolResult({
           ...result,
           structuredContent: parsed,
-        } as unknown as Parameters<typeof bridge.sendToolResult>[0]);
+        } as unknown as Parameters<typeof active.sendToolResult>[0]);
       } else {
-        bridge.sendToolResult(
-          result as unknown as Parameters<typeof bridge.sendToolResult>[0]
+        active.sendToolResult(
+          result as unknown as Parameters<typeof active.sendToolResult>[0]
         );
       }
     }
-    // Note: When toolOutput is null, widget stays in pending state (isPending=true)
   }, [initCount, toolOutput, toolCallId, customProps]);
 
-  // Send tool-cancelled notification when user cancels from the host UI
   useEffect(() => {
-    const bridge = bridgeRef.current;
-    if (!bridge || initCount === 0 || !cancelled) return;
-    bridge.sendToolCancelled({ reason: "Cancelled by user" });
+    const active = bridgeRef.current;
+    if (!active || initCount === 0 || !cancelled) return;
+    active.sendToolCancelled({ reason: "Cancelled by user" });
   }, [cancelled, initCount]);
 
-  // Handle CSP violations
-  const handleSandboxMessage = useCallback(
-    (event: MessageEvent) => {
-      if (event.data?.type !== "mcp-apps:csp-violation") return;
-
-      const {
-        directive,
-        blockedUri,
-        sourceFile,
-        lineNumber,
-        columnNumber,
-        effectiveDirective,
-        originalPolicy,
-        timestamp,
-      } = event.data;
-
-      addCspViolation(toolCallId, {
-        directive,
-        effectiveDirective,
-        blockedUri,
-        sourceFile,
-        lineNumber,
-        columnNumber,
-        originalPolicy,
-        timestamp: timestamp || Date.now(),
-      });
-
-      console.warn(
-        `[MCP Apps CSP Violation] ${directive}: Blocked ${blockedUri}`,
-        sourceFile ? `at ${sourceFile}:${lineNumber}:${columnNumber}` : ""
-      );
-    },
-    [toolCallId, addCspViolation]
-  );
-
-  // Hide spinner after iframe loads + brief delay for widget to render (first load only)
-  // Also hide when bridge initializes (initCount > 0), which proves the iframe is loaded
-  // even if the onLoad event was missed during a rapid remount/re-render cycle.
-  const iframeEffectivelyReady =
-    initCount > 0 || (isReady && !hasLoadedOnceRef.current);
-
-  // Fire onReady once after the AppBridge handshake completes (initCount goes 0 → 1).
   const readyFiredRef = useRef(false);
   useEffect(() => {
     if (readyFiredRef.current) return;
@@ -1055,7 +894,7 @@ function MCPAppsRendererBase({
   }, [initCount, onReady]);
 
   useEffect(() => {
-    if (!iframeEffectivelyReady || !showSpinner) return;
+    if (initCount === 0 || !showSpinner) return;
 
     const timer = setTimeout(() => {
       setShowSpinner(false);
@@ -1063,9 +902,26 @@ function MCPAppsRendererBase({
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [iframeEffectivelyReady, showSpinner]);
+  }, [initCount, showSpinner]);
 
-  // Loading states
+  const initialToolInput = useMemo(() => {
+    return {
+      ...toolInput,
+      ...parseCustomProps(customProps),
+    };
+  }, [toolInput, customProps]);
+
+  const initialToolResult = useMemo(() => {
+    if (!toolOutput) return undefined;
+    if (customProps && Object.keys(customProps).length > 0) {
+      return {
+        ...(toolOutput as CallToolResult),
+        structuredContent: parseCustomProps(customProps),
+      } as CallToolResult;
+    }
+    return toolOutput as CallToolResult;
+  }, [toolOutput, customProps]);
+
   if (loadError) {
     return (
       <WidgetWrapper className={className} noWrapper={noWrapper}>
@@ -1078,7 +934,7 @@ function MCPAppsRendererBase({
     );
   }
 
-  if (!widgetHtml) {
+  if (!widgetHtml || !bridge || !sandboxUrl) {
     return (
       <WidgetWrapper className={className} noWrapper={noWrapper}>
         <div className="flex absolute left-0 top-0 items-center justify-center w-full h-full">
@@ -1098,7 +954,7 @@ function MCPAppsRendererBase({
     return "flex group flex-1 items-center justify-center";
   })();
 
-  const iframeStyle: CSSProperties = {
+  const frameStyle: CSSProperties = {
     height: isFullscreen || isPip ? "100%" : `${inlineHeight}px`,
     width: "100%",
     maxWidth: displayMode === "inline" ? `${inlineMaxWidth}px` : "100%",
@@ -1135,7 +991,6 @@ function MCPAppsRendererBase({
         </button>
       )}
 
-      {/* Main content with centering like Apps SDK */}
       <div
         className={cn(
           "relative w-full min-h-0",
@@ -1158,7 +1013,7 @@ function MCPAppsRendererBase({
           style={
             isFullscreen || isPip
               ? undefined
-              : { maxWidth: iframeStyle.maxWidth }
+              : { maxWidth: frameStyle.maxWidth }
           }
         >
           {!isPip && !isFullscreen && (invoking || invoked) && (
@@ -1171,27 +1026,41 @@ function MCPAppsRendererBase({
               )}
             </div>
           )}
-          <SandboxedIframe
-            ref={sandboxRef}
-            html={widgetHtml}
-            sandbox={IFRAME_SANDBOX_PERMISSIONS}
-            csp={widgetCsp}
-            permissions={widgetPermissions}
-            permissive={cspMode === "permissive"}
-            onSandboxMount={handleSandboxMount}
-            onLoad={() => setIsReady(true)}
-            onMessage={handleSandboxMessage}
-            title={`MCP App: ${toolName}`}
+          {/*
+            DOM for e2e: container[data-testid=mcp-app-frame] > AppFrame's div > iframe
+            (no title= on the iframe — AppFrame does not expose title/className).
+            Former selector iframe[title^="MCP App: "] must be updated to
+            [data-testid="mcp-app-frame"] iframe (or the testid itself).
+          */}
+          <div
+            ref={frameContainerRef}
+            data-testid="mcp-app-frame"
+            data-mcp-app-tool={toolName}
             className={cn(
+              "mcp-app-frame",
               displayMode === "inline" && "w-full",
               displayMode === "fullscreen" && "w-full h-full rounded-none",
               displayMode === "pip" && "w-full h-full",
               displayMode !== "fullscreen" && prefersBorder && "rounded-lg",
               "overflow-hidden",
-              prefersBorder && "border border-zinc-200 dark:border-zinc-700"
+              prefersBorder && "border border-zinc-200 dark:border-zinc-700",
+              // Style AppFrame's inner iframe (no className/title props on AppFrame)
+              "[&>div]:h-full [&>div]:w-full",
+              "[&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-0 [&_iframe]:bg-transparent"
             )}
-            style={iframeStyle}
-          />{" "}
+            style={frameStyle}
+          >
+            <AppFrame
+              html={widgetHtml}
+              sandbox={{ url: sandboxUrl }}
+              appBridge={bridge}
+              toolInput={initialToolInput}
+              toolResult={initialToolResult}
+              onInitialized={handleInitialized}
+              onSizeChanged={handleSizeChanged}
+              onError={handleAppFrameError}
+            />
+          </div>
         </div>
       </div>
     </div>
