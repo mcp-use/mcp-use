@@ -24,7 +24,7 @@ function ViewRoot({
 /**
  * Mount a view module into the iframe document: connects the bridge
  * (declaring `tools: { listChanged: true }`), renders the default export
- * immediately (the component reads {@link useViewContext} and related hooks),
+ * immediately (the component reads {@link useToolContext} and related hooks),
  * re-renders as bridge notifications arrive; wraps everything in an error
  * boundary and enables auto-resize.
  *

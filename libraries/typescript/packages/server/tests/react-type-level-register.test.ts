@@ -11,7 +11,7 @@ import type {
 } from "../src/react/types/register.js";
 import type { CallToolResult } from "../src/react/types/result-types.js";
 import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
-import type { ViewContextHandle } from "../src/react/hooks/use-view-context.js";
+import type { ToolContextHandle } from "../src/react/hooks/use-tool-context.js";
 
 declare module "../src/react/types/register.js" {
   interface Register {
@@ -33,21 +33,32 @@ describe("ToolsFromModule / Register", () => {
     expect(true).toBe(true);
   });
 
-  it("narrows useViewContext toolOutput after status === ready", () => {
-    type Handle = ViewContextHandle<"search-fruits">;
-    type Ready = Extract<Handle, { status: "ready" }>;
+  it("narrows useToolContext toolInput / toolOutput by status", () => {
+    type Handle = ToolContextHandle<"search-fruits">;
+    type Input = RegisteredTools["search-fruits"]["input"];
+    type Output = RegisteredTools["search-fruits"]["output"];
 
-    expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<{
-      query: string;
-      items: { id: string }[];
-    }>();
-    expectTypeOf<Ready["partialToolInput"]>().toEqualTypeOf<undefined>();
+    type Ready = Extract<Handle, { status: "ready" }>;
+    expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<Output>();
+    expectTypeOf<Ready["toolInput"]>().toEqualTypeOf<Input | undefined>();
 
     type Streaming = Extract<Handle, { status: "streaming" }>;
-    expectTypeOf<Streaming["partialToolInput"]>().toEqualTypeOf<
-      DeepPartial<{ query?: string | undefined }> | undefined
+    expectTypeOf<Streaming["toolInput"]>().toEqualTypeOf<
+      DeepPartial<Input> | undefined
     >();
     expectTypeOf<Streaming["toolOutput"]>().toEqualTypeOf<undefined>();
+
+    type Cancelled = Extract<Handle, { status: "cancelled" }>;
+    expectTypeOf<Cancelled["reason"]>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<Cancelled["toolInput"]>().toEqualTypeOf<
+      DeepPartial<Input> | undefined
+    >();
+    expectTypeOf<Cancelled["toolOutput"]>().toEqualTypeOf<undefined>();
+
+    type Pending = Extract<Handle, { status: "pending" }>;
+    expectTypeOf<Pending["toolInput"]>().toEqualTypeOf<Input | undefined>();
+    expectTypeOf<Pending["toolOutput"]>().toEqualTypeOf<undefined>();
+
     expect(true).toBe(true);
   });
 });

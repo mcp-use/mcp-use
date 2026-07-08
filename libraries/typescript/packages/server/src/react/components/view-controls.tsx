@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 import { useViewActions } from "../bridge/view-bridge.js";
 import { useHostContext } from "../hooks/use-host-context.js";
-import { useViewContext } from "../hooks/use-view-context.js";
+import { useToolContext } from "../hooks/use-tool-context.js";
 
 interface ViewControlsProps {
   children: React.ReactNode;
@@ -20,7 +20,7 @@ export function ViewControls({
   debugger: enableDebugger = false,
   viewControls = false,
 }: ViewControlsProps) {
-  const context = useViewContext();
+  const context = useToolContext();
   const host = useHostContext();
   const { requestDisplayMode } = useViewActions();
   const [open, setOpen] = useState(false);

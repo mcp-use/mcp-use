@@ -27,14 +27,18 @@ export interface ViewBridgeSnapshot {
   content: ContentBlock[] | undefined;
   /** Whether a tool result notification has arrived. */
   hasToolResult: boolean;
-  /** Complete tool arguments from the host. */
+  /**
+   * Latest tool arguments from the host — partial while streaming, complete
+   * after `ui/notifications/tool-input`. Last write wins.
+   */
   toolInput: Record<string, unknown> | undefined;
-  /** Progressive argument stream while the model is still generating the call. */
-  partialToolInput: Record<string, unknown> | undefined;
   /** Whether an argument stream is in progress. */
   isStreaming: boolean;
-  /** Tool input received but no result yet. */
-  isPending: boolean;
+  /**
+   * Set when the host sends `ui/notifications/tool-cancelled`; `reason` is the
+   * optional spec-provided string.
+   */
+  cancelled: { reason?: string } | undefined;
   /** View-only result `_meta` channel. */
   meta: Record<string, unknown> | undefined;
   /** Current host context (updated on `host-context-changed`). */
@@ -48,9 +52,8 @@ const defaultSnapshot: ViewBridgeSnapshot = {
   content: undefined,
   hasToolResult: false,
   toolInput: undefined,
-  partialToolInput: undefined,
   isStreaming: false,
-  isPending: false,
+  cancelled: undefined,
   meta: undefined,
   hostContext: undefined,
   isConnected: false,
@@ -95,18 +98,16 @@ function getOrCreateApp(): App {
 
 function wireAppEvents(app: App): void {
   app.ontoolinput = (params) => {
-    const toolInput = params.arguments ?? {};
     setSnapshot({
-      toolInput,
-      isPending: !snapshot.hasToolResult,
+      toolInput: params.arguments ?? {},
+      isStreaming: false,
     });
   };
 
   app.ontoolinputpartial = (params) => {
     setSnapshot({
-      partialToolInput: params.arguments ?? {},
+      toolInput: params.arguments ?? {},
       isStreaming: true,
-      isPending: !snapshot.hasToolResult,
     });
   };
 
@@ -123,9 +124,16 @@ function wireAppEvents(app: App): void {
           ? (params._meta as Record<string, unknown>)
           : undefined,
       hasToolResult: true,
-      partialToolInput: undefined,
       isStreaming: false,
-      isPending: false,
+    });
+  };
+
+  app.ontoolcancelled = (params) => {
+    setSnapshot({
+      cancelled: {
+        ...(params.reason !== undefined && { reason: params.reason }),
+      },
+      isStreaming: false,
     });
   };
 

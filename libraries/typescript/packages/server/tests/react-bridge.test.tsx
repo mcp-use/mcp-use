@@ -15,7 +15,7 @@ import {
   useHostContext,
   useOpenExternal,
   useSendFollowUp,
-  useViewContext,
+  useToolContext,
   useViewTool,
 } from "../src/react/index.js";
 import { _resetModelContextForTesting } from "../src/react/bridge/model-context-store.js";
@@ -92,12 +92,12 @@ async function startHost(
 }
 
 describe("react bridge runtime", () => {
-  it("mounts the default export immediately and transitions useViewContext pending → streaming → ready", async () => {
+  it("mounts the default export immediately and transitions useToolContext pending → streaming → ready", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
     function View() {
-      const handle = useViewContext();
+      const handle = useToolContext();
       if (handle.status === "ready") {
         const { query, items } = handle.toolOutput as {
           query: string;
@@ -114,8 +114,7 @@ describe("react bridge runtime", () => {
       return (
         <div data-testid="lifecycle">
           {handle.status}-
-          {(handle.partialToolInput as { query?: string } | undefined)?.query ??
-            ""}
+          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}
         </div>
       );
     }
@@ -147,7 +146,111 @@ describe("react bridge runtime", () => {
     expect(screen.queryByTestId("lifecycle")).toBeNull();
   });
 
-  it("surfaces meta on useViewContext and useCallTool round-trips with state transitions", async () => {
+  it("streams toolInput through partial → complete → ready with status streaming → pending → ready", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|
+          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|");
+    });
+
+    await bridge.sendToolInputPartial({ arguments: { query: "a" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|a");
+    });
+
+    await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ap");
+    });
+
+    await bridge.sendToolInput({ arguments: { query: "apple" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|apple");
+    });
+
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { query: "apple", items: ["a"] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("ready|apple");
+    });
+  });
+
+  it("surfaces cancelled status with reason and last partial toolInput", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|
+          {(handle.toolInput as { query?: string } | undefined)?.query ?? ""}|
+          {handle.status === "cancelled" ? (handle.reason ?? "none") : ""}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolInputPartial({ arguments: { query: "ap" } });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("streaming|ap|");
+    });
+
+    await bridge.sendToolCancelled({ reason: "user action" });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "cancelled|ap|user action"
+      );
+    });
+  });
+
+  it("surfaces cancelled status with undefined reason when host omits it", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|
+          {handle.status === "cancelled"
+            ? handle.reason === undefined
+              ? "undef"
+              : handle.reason
+            : ""}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolCancelled({});
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("cancelled|undef");
+    });
+  });
+
+  it("surfaces meta on useToolContext and useCallTool round-trips with state transitions", async () => {
     resetRuntime();
     const { bridge, init } = await startHost(async (name, args) => {
       if (args.id === "fail") {
@@ -160,7 +263,7 @@ describe("react bridge runtime", () => {
     });
 
     function Probe() {
-      const context = useViewContext();
+      const context = useToolContext();
       const tool = useCallTool<{ id: string }, { value: string }>("lookup");
       return (
         <div>

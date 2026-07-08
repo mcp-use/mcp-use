@@ -25,9 +25,9 @@ export { useOpenExternal } from "./hooks/use-open-external.js";
 export { useSendFollowUp } from "./hooks/use-send-follow-up.js";
 export { useViewTheme } from "./hooks/use-view-theme.js";
 export {
-  useViewContext,
-  type ViewContextHandle,
-} from "./hooks/use-view-context.js";
+  useToolContext,
+  type ToolContextHandle,
+} from "./hooks/use-tool-context.js";
 export { useViewState } from "./hooks/use-view-state.js";
 export { useViewTool, type ViewToolDefinition } from "./hooks/use-view-tool.js";
 export {
