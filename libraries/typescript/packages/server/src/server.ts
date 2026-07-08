@@ -15,6 +15,7 @@ import { Hono } from "hono";
 import type { ServerConfig } from "./config.js";
 import { toRequestContext } from "./context.js";
 import { mountInspectorShell } from "./inspector-shell.js";
+import { requestLogger } from "./logging.js";
 import { mountMcp } from "./mount-mcp.js";
 import type {
   InferPromptInput,
@@ -314,6 +315,7 @@ export class MCPServer {
           );
         }
       }
+      app.use("*", requestLogger(this.#config.logging));
       const handler = mountMcp(app, () => this.#buildSdkServer(), {
         path: this.#basePath(),
       });
