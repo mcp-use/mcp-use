@@ -8,6 +8,8 @@ import { useState, type ComponentType } from "react";
 import {
   bootstrapView,
   Image,
+  ModelContext,
+  modelContext,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -32,7 +34,16 @@ function resetRuntime(): void {
 }
 
 async function startHost(
-  onCallTool?: (name: string, args: Record<string, unknown>) => Promise<unknown>
+  onCallTool?: (
+    name: string,
+    args: Record<string, unknown>
+  ) => Promise<unknown>,
+  capabilities: ConstructorParameters<typeof AppBridge>[2] = {
+    openLinks: {},
+    serverTools: {},
+    logging: {},
+    updateModelContext: { text: {} },
+  }
 ) {
   const [guestTransport, hostTransport] = createPairedTransports();
   _setTransportForTesting(guestTransport);
@@ -40,7 +51,7 @@ async function startHost(
   const bridge = new AppBridge(
     null,
     { name: "test-host", version: "1.0.0" },
-    { openLinks: {}, serverTools: {}, logging: {} }
+    capabilities
   );
 
   bridge.oncalltool = async ({ name, arguments: args }) => {
@@ -56,7 +67,19 @@ async function startHost(
     };
   };
 
-  bridge.onupdatemodelcontext = async () => ({});
+  const modelContextUpdates: {
+    content?: { type: string; text?: string }[];
+    structuredContent?: Record<string, unknown>;
+  }[] = [];
+  bridge.onupdatemodelcontext = async (params) => {
+    modelContextUpdates.push(
+      params as {
+        content?: { type: string; text?: string }[];
+        structuredContent?: Record<string, unknown>;
+      }
+    );
+    return {};
+  };
 
   const init = new Promise<void>((resolve) => {
     bridge.oninitialized = () => {
@@ -65,7 +88,7 @@ async function startHost(
   });
 
   await bridge.connect(hostTransport);
-  return { bridge, init };
+  return { bridge, init, modelContextUpdates };
 }
 
 describe("react bridge runtime", () => {
@@ -343,7 +366,7 @@ describe("react bridge runtime", () => {
       useViewTool(
         {
           name: "pick-item",
-          schema: z.object({ id: z.string() }),
+          inputSchema: z.object({ id: z.string() }),
           enabled: true,
         },
         async ({ id }) => {
@@ -378,6 +401,216 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("selected").textContent).toBe("x");
       expect(callCount).toBe(1);
     });
+  });
+
+  it("useViewTool with inline schema does not re-register per render and toggles enabled in place", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let listChangedCount = 0;
+    bridge.fallbackNotificationHandler = async (notification) => {
+      if (notification.method === "notifications/tools/list_changed") {
+        listChangedCount += 1;
+      }
+    };
+
+    function View() {
+      const [count, setCount] = useState(0);
+      const [enabled, setEnabled] = useState(true);
+      // Inline z.object literal: fresh identity every render.
+      useViewTool(
+        { name: "pick-item", schema: z.object({ id: z.string() }), enabled },
+        async ({ id }) => ({
+          content: [{ type: "text", text: `${id}:${count}` }],
+        })
+      );
+      return (
+        <div>
+          <span data-testid="count">{count}</span>
+          <button type="button" onClick={() => setCount((n) => n + 1)}>
+            rerender
+          </button>
+          <button type="button" onClick={() => setEnabled(false)}>
+            disable
+          </button>
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    // Registration itself emits exactly one list_changed.
+    await waitFor(async () => {
+      const result = await bridge.callTool({
+        name: "pick-item",
+        arguments: { id: "a" },
+      });
+      expect(result.content?.[0]).toMatchObject({ text: "a:0" });
+    });
+    expect(listChangedCount).toBe(1);
+
+    screen.getByText("rerender").click();
+    screen.getByText("rerender").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("count").textContent).toBe("2");
+    });
+
+    // Handler sees latest state without re-registration; no list_changed churn.
+    const result = await bridge.callTool({
+      name: "pick-item",
+      arguments: { id: "b" },
+    });
+    expect(result.content?.[0]).toMatchObject({ text: "b:2" });
+    expect(listChangedCount).toBe(1);
+
+    screen.getByText("disable").click();
+    await waitFor(() => {
+      expect(listChangedCount).toBe(2);
+    });
+    await expect(
+      bridge.callTool({ name: "pick-item", arguments: { id: "c" } })
+    ).rejects.toThrow();
+  });
+
+  it("sends no model-context update for views that never use ModelContext", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return <div data-testid="plain">plain</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plain")).not.toBeNull();
+    });
+    // Allow any (erroneous) post-connect flush to drain before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(modelContextUpdates).toHaveLength(0);
+  });
+
+  it("pushes ModelContext content and clears after removal", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      const [on, setOn] = useState(true);
+      return (
+        <div>
+          {on && <ModelContext content="Viewing apples" />}
+          <button type="button" onClick={() => setOn(false)}>
+            remove
+          </button>
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content).toEqual([
+      { type: "text", text: "- Viewing apples" },
+    ]);
+
+    screen.getByText("remove").click();
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expect(modelContextUpdates[1]?.content).toEqual([]);
+  });
+
+  it("pushes structuredContent and imperative content blocks alongside the text tree", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return (
+        <ModelContext
+          content="Cart summary"
+          structuredContent={{ itemCount: 2, totalCost: 9.5 }}
+        />
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]).toMatchObject({
+      content: [{ type: "text", text: "- Cart summary" }],
+      structuredContent: { itemCount: 2, totalCost: 9.5 },
+    });
+
+    // Imperative ContentBlock entries append after the serialized tree.
+    modelContext.set("note", [{ type: "text", text: "extra block" }]);
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expect(modelContextUpdates[1]?.content).toEqual([
+      { type: "text", text: "- Cart summary" },
+      { type: "text", text: "extra block" },
+    ]);
+    expect(modelContextUpdates[1]?.structuredContent).toEqual({
+      itemCount: 2,
+      totalCost: 9.5,
+    });
+  });
+
+  it("serializes ModelContext siblings in document order, not useId sort order", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    // Enough siblings that useId values reach two digits (":r10:" would sort
+    // before ":r2:" lexicographically).
+    const labels = Array.from({ length: 12 }, (_, i) => `node-${i + 1}`);
+
+    function View() {
+      return (
+        <div>
+          {labels.map((label) => (
+            <ModelContext key={label} content={label} />
+          ))}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe(
+      labels.map((label) => `- ${label}`).join("\n")
+    );
+  });
+
+  it("skips model-context updates when the host lacks the updateModelContext capability", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost(undefined, {
+      openLinks: {},
+      serverTools: {},
+      logging: {},
+    });
+
+    function View() {
+      return <ModelContext content="Viewing apples" />;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    // Allow the flush to drain; the capability gate must swallow it.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(modelContextUpdates).toHaveLength(0);
   });
 
   it("resolves root-relative public assets via Image", async () => {

@@ -43,7 +43,7 @@ const resultsSchema = z.object({
 export const searchFruits = server.tool(
   {
     name: "search-fruits",
-    schema: z.object({ query: z.string().optional() }),
+    inputSchema: z.object({ query: z.string().optional() }),
     outputSchema: resultsSchema,
     view: {
       name: "product-search-result",
@@ -134,7 +134,7 @@ Per the `SPEC.md` stateless posture, UI support is a **request-scoped** fact: th
 
 ```ts
 export const searchFruits = server.tool(
-  { name: "search-fruits", schema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, view: { name: "product-search-result" } },
+  { name: "search-fruits", inputSchema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, view: { name: "product-search-result" } },
   async ({ query = "" }, ctx) => {
     const items = await search(query);
     if (!ctx.client.supportsViews()) {
@@ -266,7 +266,7 @@ For the running example, `tools/list` carries:
 ```jsonc
 {
   "name": "search-fruits",
-  "inputSchema": { /* JSON Schema converted from `schema` */ },
+  "inputSchema": { /* JSON Schema converted from `inputSchema` */ },
   "outputSchema": { /* converted from `outputSchema` */ },
   "_meta": {
     "ui": { "resourceUri": "ui://views/product-search-result.html" },
@@ -632,7 +632,7 @@ export default function ProductSearchResult() {
 }
 ```
 
-During `"streaming"`, `partialToolInput` is `DeepPartial<Input>` — deep-partial because streamed JSON is incomplete by nature (objects missing fields, string values possibly truncated mid-token: treat as provisional, render-only, never act on them). Once `ui/notifications/tool-input` arrives, `toolInput` carries the complete arguments on every subsequent branch, including after `"ready"`. The deliberate type-source split: `partialToolInput` types from the tool's `schema` (input); `toolOutput` from its `outputSchema` — both read off the same `ToolRef`.
+During `"streaming"`, `partialToolInput` is `DeepPartial<Input>` — deep-partial because streamed JSON is incomplete by nature (objects missing fields, string values possibly truncated mid-token: treat as provisional, render-only, never act on them). Once `ui/notifications/tool-input` arrives, `toolInput` carries the complete arguments on every subsequent branch, including after `"ready"`. The deliberate type-source split: `partialToolInput` types from the tool's `inputSchema` (input); `toolOutput` from its `outputSchema` — both read off the same `ToolRef`.
 
 **"Streaming tool output" (the generative-UI recipe).** When the thing to render *is* what the model is writing (a drawing, generated UI code, long-form content — the Excalidraw MCP app pattern), put that payload in the tool's **input** schema and render it progressively via `partialToolInput` inside the single always-mounted component. The final `"ready"` state shows the same visual surface with complete, honestly-typed data from `toolOutput` — no echo-input-into-output workaround is needed for the pre-result window:
 
@@ -641,7 +641,7 @@ During `"streaming"`, `partialToolInput` is `DeepPartial<Input>` — deep-partia
 export const draw = server.tool(
   {
     name: "draw",
-    schema: z.object({ elements: z.array(elementSchema) }),
+    inputSchema: z.object({ elements: z.array(elementSchema) }),
     outputSchema: z.object({ elements: z.array(elementSchema) }),
     view: { name: "canvas" },
   },
@@ -678,13 +678,13 @@ The apps spec lets the *view* expose tools the **host/model** calls while the vi
 | server tool, app-visible | `server.tool({ view: { visibility: "app" } })` | the view, via `useCallTool` | server process; host hides from the model per `_meta.ui.visibility` |
 | **view tool** | `useViewTool` inside the component | host/model over the bridge | while the component is mounted |
 
-View tools are ephemeral, conversational UI affordances whose handlers close over live React state ("highlight-fruit", "pan-map"). The hook mirrors `server.tool(definition, callback)` — same config keys (`name`, `title`, `description`, `schema`, `outputSchema`, `annotations`, plus `enabled`), `schema` translated to ext-apps `inputSchema` internally, handler args inferred via Standard Schema, return typed by the same `ToolResult<Output>` conditional as server tools (raw `CallToolResult`):
+View tools are ephemeral, conversational UI affordances whose handlers close over live React state ("highlight-fruit", "pan-map"). The hook mirrors `server.tool(definition, callback)` — same config keys (`name`, `title`, `description`, `inputSchema`, `outputSchema`, `annotations`, plus `enabled`; `schema` aliases `inputSchema`), handler args inferred via Standard Schema, return typed by the same `ToolResult<Output>` conditional as server tools (raw `CallToolResult`):
 
 ```tsx
 const [selected, setSelected] = useState<string | null>(null);
 
 useViewTool(
-  { name: "highlight-fruit", description: "Highlight a visible result", schema: z.object({ id: z.string() }) },
+  { name: "highlight-fruit", description: "Highlight a visible result", inputSchema: z.object({ id: z.string() }) },
   async ({ id }) => {
     setSelected(id);
     return { content: [{ type: "text", text: `Highlighted ${id}` }] };
@@ -694,7 +694,7 @@ useViewTool(
 
 Contract:
 
-- **React lifecycle = tool lifecycle.** Register on mount, `remove()` on unmount, `update()` on config change, `enabled: false` → `disable()` without unmounting (a disabled tool stays registered but is not listed/callable); ext-apps emits `tools/list_changed` automatically, so the host's tool list always matches the mounted UI (strict-mode double-mount is safe: remove + re-register).
+- **React lifecycle = tool lifecycle.** Register on mount keyed by `name`, `remove()` on unmount, `update()` in place when `title`/`description`/`annotations` change, `enabled: false` → `disable()` without unmounting (a disabled tool stays registered but is not listed/callable); ext-apps emits `tools/list_changed` automatically, so the host's tool list always matches the mounted UI (strict-mode double-mount is safe: remove + re-register). `inputSchema`/`outputSchema` are captured at registration time — inline `z.object(...)` literals in the definition never re-register the tool per render (ext-apps fixes the handler's arity at registration anyway); changing a tool's schema means registering under a new name. `schema` is accepted as an alias for `inputSchema`.
 - **Latest-closure handler:** the registered callback delegates through a per-render ref (`useEffectEvent` pattern) — handlers always see current state, no re-registration per render.
 - **Connect-time capability:** ext-apps only auto-advertises the `tools` capability for pre-connect registrations, and hooks run post-connect — so the generated iframe entry always declares `tools: { listChanged: true }`. Harmless for views with no tools (empty list).
 - **Not in `Register`:** view tools never appear on the server's `tools/list` and are never callable from views — typing them into `useCallTool` would advertise calls nobody can make. Their input/output types live and die inside the component.
@@ -805,7 +805,7 @@ function useDisplayMode(): {
 
 **`useViewTheme(): "light" | "dark"`** — narrow theme-only subscription; rerenders only on host theme changes.
 
-**`<ModelContext content={string}>{children?}</ModelContext>`** and **`modelContext.set/remove/clear`** — the explicit view→model channel, API carried from v1 unchanged: components register `content` in a parent-child tree, nested `<ModelContext>` elements serialize as an indented list, updates batch per microtask and push over `ui/update-model-context`; the imperative `modelContext` API covers non-React call sites (event handlers, stores) with stable keys.
+**`<ModelContext content={string} structuredContent?={object}>{children?}</ModelContext>`** and **`modelContext.set/setStructured/remove/clear`** — the explicit view→model channel, covering the full `ui/update-model-context` params surface (`content: ContentBlock[]` + `structuredContent`). Components register `content` in a parent-child tree; nested `<ModelContext>` elements serialize as an indented list forming the push's leading text block. The imperative `modelContext` API covers non-React call sites (event handlers, stores) with stable keys: `set(key, string)` joins the text tree, `set(key, ContentBlock[])` appends blocks of any modality after it, and `setStructured(key, object)` (also the component's `structuredContent` prop) merges entries into the push's `structuredContent` in registration order, later keys winning collisions; `remove(key)` clears every channel under the key. Each push carries the complete current context — matching the spec's overwrite semantics ("each request overwrites the previous context sent by the View"); siblings serialize in registration order (React mounts siblings in document order, so the list tracks what's on screen). Nothing is pushed until the first non-empty context registers: views that never use `ModelContext` send no `ui/update-model-context` traffic at all, and an empty push is delivered only as an explicit clear after context was previously delivered. Pushes are gated on the host's `updateModelContext` capability (draft) — hosts that don't declare it get no requests, with a single console warning naming the gap.
 
 **Providers and components.** The generated iframe entry owns the essentials itself — bridge connection, always-mounted default export, auto-resize, a top-level error boundary — so **no provider is required**. `<McpUseProvider>` remains as the opt-in wrapper bundling theme application + error-boundary customization; `<ThemeProvider>` applies host style variables/fonts (ext-apps `applyDocumentTheme`/`applyHostStyleVariables`/`applyHostFonts`); `<ViewControls>` is the dev-only overlay (v1's `WidgetControls`, renamed); `<ErrorBoundary>` is carried unchanged; `<Image>` resolves root-relative `src` paths against the request-scoped `__mcpUseViewConfig.publicBase` injected into the synthesized document (Public assets).
 
@@ -820,7 +820,7 @@ export const searchFruits = server.tool(/* the running example above */);
 export const getFruitDetails = server.tool(
   {
     name: "get-fruit-details",
-    schema: z.object({ fruit: z.string() }),
+    inputSchema: z.object({ fruit: z.string() }),
     outputSchema: detailsSchema, // e.g. z.object({ name: …, producer: …, nutrition: … })
   },
   async ({ fruit }) => {
@@ -865,7 +865,7 @@ export default function ProductSearchResult() {
 
   // view tool — the model can manipulate this UI while it is on screen
   useViewTool(
-    { name: "highlight-fruit", description: "Highlight a visible result", schema: z.object({ id: z.string() }) },
+    { name: "highlight-fruit", description: "Highlight a visible result", inputSchema: z.object({ id: z.string() }) },
     async ({ id }) => {
       setSelected(id);
       return { content: [{ type: "text", text: `Highlighted ${id}` }] };
@@ -961,7 +961,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 - **Type-level** (`tests/type-level.test.ts` pattern): `ToolRef` name/input/output inference incl. non-zod Standard Schema libs; `ToolsFromModule` filtering and re-export composition; `useCallTool` name union + arg/result types; empty-`Register` fallback; `structuredContent` vs `outputSchema` agreement at the return position; `useViewContext` discriminated union narrowing (`status === "ready"` → typed `toolOutput`); input-schema vs output-schema type-source split (`partialToolInput` vs `toolOutput`); `DeepPartial` over arrays/nested objects.
 - **e2e over HTTP** (official client): view resource listing/reading with correct mimetype and framework auto-CSP in `_meta.ui.*` on both `resources/list` entries and `resources/read` content items for all clients; `tools/list` includes every registered tool for all clients (including `visibility: "app"` tools with `_meta.ui.visibility: ["app"]`); `ui.visibility` emitted only when `view.visibility` is set; **channel separation** — handler `{ structuredContent, content, _meta }` lands on the wire as `structuredContent` / `content` / `_meta` respectively, with handler `_meta` absent from everything model-facing; `_meta.ui.resourceUri` auto-stamped on every non-error view-bound tool result.
 - **Build/serve** (CLI-test pattern from `tests/cli/`, real `build` against a views fixture): manifest `views` map shape (`entry`, `css` only); the built wrapper entry primes registration with zero `fs` on the MCP path (list/read succeed with the built assets dir absent; only asset routes 404); document + asset routes under `${basePath}/_mcp-use/` with correct cache headers; the manifest→URL→disk basename mapping; per-request origin resolution (proxy headers, override) reflected in both the HTTP document and the `resources/read` body and content-item `_meta.ui.csp.resourceDomains`; asset origin auto-appended to `csp.resourceDomains`; the binding checks — `view.name` naming a missing view, a `view:` tool without `outputSchema`, and two tools binding one view fail loudly naming the view/tool, a view directory no tool binds warns (build still succeeds, view still registered).
-- **Bridge-level:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted on connect before any notification; `tool-input-partial` sequence driving `useViewContext().status === "streaming"` with progressive `partialToolInput` on the same mounted component; `tool-input` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); `tools/call` round-trip through `useCallTool` (`data`/`error`/`isPending` transitions); handler `meta` surfaced on `useViewContext()` when ready; split-hook channel isolation (environment/action subscriptions rerender independently of data); **view tools** — `bridge.listTools()` reflects mounted `useViewTool`s, call round-trip mutates component state, unmount/`enabled: false` emits `list_changed` and removes/disables.
+- **Bridge-level:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted on connect before any notification; `tool-input-partial` sequence driving `useViewContext().status === "streaming"` with progressive `partialToolInput` on the same mounted component; `tool-input` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); `tools/call` round-trip through `useCallTool` (`data`/`error`/`isPending` transitions); handler `meta` surfaced on `useViewContext()` when ready; split-hook channel isolation (environment/action subscriptions rerender independently of data); **view tools** — `bridge.listTools()` reflects mounted `useViewTool`s, call round-trip mutates component state, unmount/`enabled: false` emits `list_changed` and removes/disables, re-renders with inline schema literals emit no re-registration or `list_changed` churn; **model context** — a view that never registers `ModelContext` sends no `ui/update-model-context`, content pushes the serialized tree, removal after content pushes an explicit clear, siblings serialize in document order (12+ nodes: `useId` sort order would shuffle them), `structuredContent` (component prop) and imperative `ContentBlock[]` entries ride the same push alongside the text tree, a host without the `updateModelContext` capability receives no requests.
 
 ## Deltas vs v1 (for the migration guide)
 

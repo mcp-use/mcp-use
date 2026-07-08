@@ -140,6 +140,7 @@ function wireAppEvents(app: App): void {
 }
 
 let injectedTransport: ViewBridgeTransport | null = null;
+let warnedModelContextUnsupported = false;
 
 /** @internal Inject a transport before connect (bridge tests only). */
 export function _setTransportForTesting(
@@ -207,17 +208,27 @@ export function ViewBridgeProvider({ children }: { children: ReactNode }) {
       console.error("[mcp-use] Failed to connect view bridge:", error);
     });
 
-    const unregister = registerModelContextFlush((description) => {
+    const unregister = registerModelContextFlush((params) => {
       void (async () => {
         try {
           const app = await store.connect();
-          if (description.trim().length === 0) {
-            await app.updateModelContext({ content: [] });
+          // Spec draft: hosts declare acceptance of ui/update-model-context
+          // via the updateModelContext capability. Skip (once, loudly) when
+          // the host does not accept context updates.
+          if (app.getHostCapabilities()?.updateModelContext === undefined) {
+            if (!warnedModelContextUnsupported) {
+              warnedModelContextUnsupported = true;
+              console.warn(
+                "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
+              );
+            }
             return;
           }
-          await app.updateModelContext({
-            content: [{ type: "text", text: description }],
-          });
+          // Full spec params: content blocks + optional structuredContent
+          // (v2 ContentBlock is wire-compatible with ext-apps' v1 type).
+          await app.updateModelContext(
+            params as Parameters<App["updateModelContext"]>[0]
+          );
         } catch (error: unknown) {
           console.warn("[ModelContext] Failed to update model context:", error);
         }
@@ -331,6 +342,7 @@ export function _resetViewBridgeForTesting(): void {
   appInstance = null;
   connectPromise = null;
   injectedTransport = null;
+  warnedModelContextUnsupported = false;
   snapshot = { ...defaultSnapshot };
   listeners.clear();
 }
