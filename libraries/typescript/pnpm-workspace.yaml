@@ -3,6 +3,7 @@ packages:
   # examples
   - packages/mcp-use/examples/**/*
   - packages/server/examples/*
+  - packages/server/examples/views/*
   - packages/create-mcp-use-app/src/templates/**/*
   # tests
   - test_app

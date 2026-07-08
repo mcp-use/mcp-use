@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-use/server-example-views",
+  "name": "@mcp-use/server-example-views-basic",
   "type": "module",
   "version": "0.0.0",
   "private": true,

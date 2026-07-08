@@ -7,7 +7,7 @@ import {
   useDisplayMode,
   useOpenExternal,
   useSendFollowUp,
-  useViewContext,
+  useToolContext,
   useViewState,
   useViewTheme,
   useViewTool,
@@ -147,7 +147,7 @@ function Spinner() {
 }
 
 export default function ProductSearchResult() {
-  const view = useViewContext<"search-fruits">();
+  const view = useToolContext<"search-fruits">();
   const theme = useViewTheme();
   const { displayMode, requestDisplayMode } = useDisplayMode();
   const sendFollowUpMessage = useSendFollowUp();
@@ -173,8 +173,8 @@ export default function ProductSearchResult() {
   if (view.status !== "ready") {
     return (
       <SearchSkeleton
-        {...(view.partialToolInput?.query !== undefined && {
-          query: view.partialToolInput.query,
+        {...(view.toolInput?.query !== undefined && {
+          query: view.toolInput.query,
         })}
         pulsing={view.status === "streaming"}
       />

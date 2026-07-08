@@ -136,7 +136,7 @@ const server = new MCPServer({
   name: "fruit-store",
   version: "1.0.0",
   title: "Fruit Store",
-  legacy: "stateless",
+  legacy: "reject",
   logging: { level: "debug" },
   description: "Search fruits and browse details with an MCP Apps view.",
   basePath: BASE_PATH,
