@@ -477,7 +477,7 @@ function TunnelBadge({
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-semibold text-sm">Tunnel URL</h4>
               <a
-                href="https://manufact.com/docs/tunneling"
+                href="https://mcp-use.com/docs/tunneling"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
