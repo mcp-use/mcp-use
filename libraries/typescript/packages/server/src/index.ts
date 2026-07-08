@@ -30,7 +30,7 @@ export { completable } from "./completable.js";
 export type { CompletionCallback, CompletionContext } from "./completable.js";
 
 /**
- * Schema contracts accepted by `schema`/`outputSchema` fields (re-exported
+ * Schema contracts accepted by `inputSchema`/`outputSchema` fields (re-exported
  * from the SDK): `StandardSchemaWithJSON` requires validation plus JSON
  * Schema conversion; `completable()` needs only `StandardSchemaV1`.
  * Implemented by zod v4, ArkType, Valibot, …

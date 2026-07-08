@@ -161,7 +161,7 @@ export const searchFruits = server.tool(
     name: "search-fruits",
     title: "Search fruits",
     description: "Search the fruit catalog and render results in a view.",
-    schema: z.object({ query: z.string().optional() }),
+    inputSchema: z.object({ query: z.string().optional() }),
     outputSchema: resultsSchema,
     view: {
       name: "product-search-result",
@@ -204,7 +204,7 @@ export const getFruitDetails = server.tool(
     name: "get-fruit-details",
     title: "Get fruit details",
     description: "Look up producer and nutrition information for a fruit.",
-    schema: z.object({ fruit: z.string() }),
+    inputSchema: z.object({ fruit: z.string() }),
     outputSchema: detailsSchema,
   },
   async ({ fruit }) => {

@@ -40,7 +40,7 @@ describe("useCallTool empty Register", () => {
     const ref = server.tool(
       {
         name: "echo",
-        schema: z.object({ text: z.string() }),
+        inputSchema: z.object({ text: z.string() }),
         outputSchema: z.object({ text: z.string() }),
       },
       async ({ text }) => ({

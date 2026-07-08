@@ -43,6 +43,7 @@ import type {
   ToolRef,
   ToolViewConfig,
 } from "./tools.js";
+import { resolveToolInputSchema } from "./tools.js";
 import type { ViewResourceFacts } from "./views/types.js";
 import {
   mountViewRoutes,
@@ -97,7 +98,7 @@ interface PromptEntry {
  * ```ts
  * const server = new MCPServer({ name: "my-server", version: "1.0.0" });
  * server.tool(
- *   { name: "add", schema: z.object({ a: z.number(), b: z.number() }) },
+ *   { name: "add", inputSchema: z.object({ a: z.number(), b: z.number() }) },
  *   async ({ a, b }) => ({
  *     content: [{ type: "text", text: String(a + b) }],
  *   })
@@ -149,7 +150,7 @@ export class MCPServer {
   }
 
   /**
-   * Register a tool. Input is validated against `schema` before the callback
+   * Register a tool. Input is validated against `inputSchema` before the callback
    * runs; results carrying `structuredContent` are type-checked against
    * `outputSchema` at the callback's return position.
    *
@@ -587,12 +588,14 @@ export class MCPServer {
     const wireResultMeta =
       view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
 
-    if (definition.schema !== undefined) {
+    const inputSchema = resolveToolInputSchema(definition);
+
+    if (inputSchema !== undefined) {
       server.registerTool(
         definition.name,
-        { ...config, inputSchema: definition.schema },
+        { ...config, inputSchema },
         async (args, ctx) => {
-          // The SDK has already validated `args` against `definition.schema`.
+          // The SDK has already validated `args` against the input schema.
           const params = args as Record<string, unknown>;
           const result = await callback(params, toRequestContext(ctx));
           if (wireResultMeta === undefined || result.isError === true) {

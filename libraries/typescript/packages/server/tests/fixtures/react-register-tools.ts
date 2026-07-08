@@ -9,7 +9,7 @@ export const notATool = "ignored";
 export const searchFruits = server.tool(
   {
     name: "search-fruits",
-    schema: z.object({ query: z.string().optional() }),
+    inputSchema: z.object({ query: z.string().optional() }),
     outputSchema: z.object({
       query: z.string(),
       items: z.array(z.object({ id: z.string() })),

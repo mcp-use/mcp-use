@@ -105,7 +105,7 @@ describe("runDev", () => {
       source.replace(
         "export default server;",
         `server.tool(
-  { name: "subtract", description: "Subtract", schema: z.object({ a: z.number(), b: z.number() }) },
+  { name: "subtract", description: "Subtract", inputSchema: z.object({ a: z.number(), b: z.number() }) },
   async ({ a, b }) => ({ content: [{ type: "text", text: String(a - b) }] })
 );
 export default server;`

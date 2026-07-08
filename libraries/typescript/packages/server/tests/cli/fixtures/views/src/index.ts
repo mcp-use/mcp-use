@@ -12,7 +12,7 @@ export const searchProducts = server.tool(
   {
     name: "search-products",
     description: "Search products",
-    schema: z.object({ query: z.string().optional() }),
+    inputSchema: z.object({ query: z.string().optional() }),
     outputSchema: resultsSchema,
     view: {
       name: "product-search-result",

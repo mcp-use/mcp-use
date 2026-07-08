@@ -55,7 +55,7 @@ function buildViewsServer(): MCPServer {
   server.tool(
     {
       name: "search-fruits",
-      schema: z.object({
+      inputSchema: z.object({
         query: z.string().optional(),
         fail: z.boolean().optional(),
       }),
@@ -774,7 +774,7 @@ describe("views dev CSP (e2e over HTTP)", () => {
   server.tool(
     {
       name: "search-fruits",
-      schema: z.object({ query: z.string().optional() }),
+      inputSchema: z.object({ query: z.string().optional() }),
       outputSchema: resultsSchema,
       view: {
         name: "product-search-result",
@@ -858,7 +858,7 @@ describe("views prod CSP (e2e over HTTP)", () => {
     server.tool(
       {
         name: "search-fruits",
-        schema: z.object({ query: z.string().optional() }),
+        inputSchema: z.object({ query: z.string().optional() }),
         outputSchema: resultsSchema,
         view: {
           name: "product-search-result",

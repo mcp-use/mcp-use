@@ -65,7 +65,7 @@ function buildServer(): MCPServer {
       name: "fetch-weather",
       title: "Fetch weather",
       description: "Fetch the weather for a city",
-      schema: z.object({
+      inputSchema: z.object({
         city: z.string().describe("The city to fetch the weather for"),
       }),
       outputSchema: z.object({
@@ -105,7 +105,7 @@ function buildServer(): MCPServer {
     {
       name: "fail",
       description: "Always errors",
-      schema: z.object({ reason: z.string() }),
+      inputSchema: z.object({ reason: z.string() }),
     },
     async ({ reason }) => ({
       content: [{ type: "text", text: `failed: ${reason}` }],
@@ -117,7 +117,8 @@ function buildServer(): MCPServer {
     {
       name: "echo",
       description: "Echo a message, uppercased",
-      schema: echoInput,
+      // `schema` is accepted as an alias for `inputSchema`.
+    schema: echoInput,
     },
     // `message: string` is inferred from the hand-rolled schema's Output type.
     async ({ message }) => ({

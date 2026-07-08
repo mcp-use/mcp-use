@@ -130,7 +130,7 @@ describe("ToolRef inference", () => {
     const ref = server.tool(
       {
         name: "search-fruits",
-        schema: z.object({ query: z.string().optional() }),
+        inputSchema: z.object({ query: z.string().optional() }),
         outputSchema: z.object({
           query: z.string(),
           items: z.array(z.object({ id: z.string() })),
@@ -143,6 +143,21 @@ describe("ToolRef inference", () => {
     );
     expectTypeOf(ref.name).toEqualTypeOf<"search-fruits">();
     expect(ref.name).toBe("search-fruits");
+  });
+
+  it("infers input from the schema alias when inputSchema is omitted", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    const ref = server.tool(
+      {
+        name: "alias-input",
+        schema: z.object({ id: z.string() }),
+      },
+      async ({ id }) => ({
+        content: [{ type: "text", text: id }],
+      })
+    );
+    expectTypeOf(ref.name).toEqualTypeOf<"alias-input">();
+    expect(ref.name).toBe("alias-input");
   });
 });
 

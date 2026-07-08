@@ -110,7 +110,7 @@ export type Auth<TUser> = AuthInfo & { user: TUser };
 `TUser` flows from the adapter with zero user annotations: `clerkAuth(...)` returns `AuthConfig<ClerkUser>`, the `MCPServer` constructor infers it, and every callback's `ctx.auth.user` is fully typed. A custom `verifyToken` infers `TUser` from its own return type.
 
 ```ts
-server.tool({ name: "whoami", schema: z.object({}) }, async (_p, ctx) => {
+server.tool({ name: "whoami", inputSchema: z.object({}) }, async (_p, ctx) => {
   ctx.auth.user.id;        // ✅ typed, autocompleted
   ctx.auth.scopes;         // ✅ SDK AuthInfo fields still present
   ctx.auth.user.nope;      // ❌ compile error
@@ -146,7 +146,7 @@ On the wire we stay SDK-pure: the middleware builds a plain `AuthInfo` with the 
 server.tool(
   {
     name: "delete_org",
-    schema: z.object({ orgId: z.string() }),
+    inputSchema: z.object({ orgId: z.string() }),
     enabled: (auth) => auth?.scopes.includes("admin") ?? false,
   },
   async ({ orgId }, ctx) => { /* … */ }

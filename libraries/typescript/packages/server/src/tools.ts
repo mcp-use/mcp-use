@@ -64,7 +64,12 @@ export interface ToolDefinition {
    * Object schema for input validation — any Standard Schema library with
    * JSON Schema conversion ({@link StandardSchemaWithJSON}): zod v4, ArkType,
    * Valibot, …. Field descriptions become LLM hints. Input is validated by
-   * the SDK before the callback runs.
+   * the SDK before the callback runs. Emitted on the wire as `inputSchema`.
+   */
+  inputSchema?: StandardSchemaWithJSON;
+  /**
+   * Alias for {@link ToolDefinition.inputSchema}. Prefer `inputSchema` in new
+   * code — it matches the MCP wire field name.
    */
   schema?: StandardSchemaWithJSON;
   /**
@@ -133,14 +138,32 @@ export type ToolResult<TOutput = never> = [TOutput] extends [never]
       | (CallToolResult & { structuredContent: TOutput })
       | (CallToolResult & { isError: true });
 
-/** Infer the callback params type from a tool definition's `schema`. */
+/** Infer the callback params type from a tool definition's input schema. */
 export type InferToolInput<T> = T extends {
-  schema: infer S extends StandardSchemaWithJSON;
+  inputSchema: infer S extends StandardSchemaWithJSON;
 }
   ? StandardSchemaWithJSON.InferOutput<S> extends Record<string, unknown>
     ? StandardSchemaWithJSON.InferOutput<S>
     : Record<string, unknown>
-  : Record<string, unknown>;
+  : T extends {
+        schema: infer S extends StandardSchemaWithJSON;
+      }
+    ? StandardSchemaWithJSON.InferOutput<S> extends Record<string, unknown>
+      ? StandardSchemaWithJSON.InferOutput<S>
+      : Record<string, unknown>
+    : Record<string, unknown>;
+
+/**
+ * Resolve a tool definition's input schema. `inputSchema` wins when both are
+ * set.
+ *
+ * @internal
+ */
+export function resolveToolInputSchema(
+  definition: Pick<ToolDefinition, "inputSchema" | "schema">
+): StandardSchemaWithJSON | undefined {
+  return definition.inputSchema ?? definition.schema;
+}
 
 /**
  * Infer the structured output type from a definition's `outputSchema` —

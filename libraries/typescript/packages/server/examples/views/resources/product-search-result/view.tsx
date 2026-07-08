@@ -162,7 +162,7 @@ export default function ProductSearchResult() {
     {
       name: "highlight-fruit",
       description: "Highlight a visible result",
-      schema: z.object({ id: z.string() }),
+      inputSchema: z.object({ id: z.string() }),
     },
     async ({ id }) => {
       setSelected(id);

@@ -7,7 +7,7 @@ server.tool(
   {
     name: "add",
     description: "Add two numbers",
-    schema: z.object({ a: z.number(), b: z.number() }),
+    inputSchema: z.object({ a: z.number(), b: z.number() }),
   },
   async ({ a, b }) => ({
     content: [{ type: "text", text: String(a + b) }],
