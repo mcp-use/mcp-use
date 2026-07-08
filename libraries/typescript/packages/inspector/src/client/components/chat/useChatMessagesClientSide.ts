@@ -233,39 +233,6 @@ export function useChatMessagesClientSide({
           );
         };
 
-        const maybeFetchAppsSdkResource = async (toolPart: {
-          type: "text" | "tool-invocation";
-          toolInvocation?: {
-            toolName: string;
-            args: Record<string, unknown>;
-            result?: any;
-            state?: "pending" | "streaming" | "result" | "error";
-          };
-        }) => {
-          const result = toolPart.toolInvocation?.result;
-          const appsSdkUri = result?._meta?.["openai/outputTemplate"];
-          if (!appsSdkUri || typeof appsSdkUri !== "string" || !readResource)
-            return;
-          try {
-            const resourceData = await readResource(appsSdkUri);
-            if (
-              resourceData?.contents &&
-              Array.isArray(resourceData.contents)
-            ) {
-              const mcpResources = resourceData.contents.map(
-                (content: any) => ({ type: "resource", resource: content })
-              );
-              toolPart.toolInvocation!.result = {
-                ...result,
-                content: [...(result.content || []), ...mcpResources],
-                structuredContent: result?.structuredContent || null,
-              };
-            }
-          } catch (error) {
-            console.error("Failed to fetch Apps SDK resource:", error);
-          }
-        };
-
         for await (const ev of runToolLoop({
           config: {
             provider: llmConfig.provider,
@@ -380,7 +347,6 @@ export function useChatMessagesClientSide({
               toolPart.toolInvocation.result = ev.result;
               toolPart.toolInvocation.state =
                 ev.isError || (ev.result as any)?.isError ? "error" : "result";
-              await maybeFetchAppsSdkResource(toolPart);
               commitMessageParts();
             }
           } else if (ev.type === "error") {

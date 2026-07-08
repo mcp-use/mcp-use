@@ -2,26 +2,7 @@
  * MCP Apps configuration constants
  */
 
-import { inspectorApi } from "@/client/utils/basePath";
-
 export const MCP_APPS_CONFIG = {
-  /**
-   * API endpoints for widget operations. Getters so the basePath-aware URL is
-   * resolved lazily at call time (after `window.__MCP_BASE_PATH__` is injected).
-   */
-  API_ENDPOINTS: {
-    get WIDGET_STORE() {
-      return inspectorApi("mcp-apps/widget/store");
-    },
-    WIDGET_CONTENT: (toolCallId: string) =>
-      inspectorApi(`mcp-apps/widget-content/${toolCallId}`),
-  },
-
-  /**
-   * Protocol version for MCP Apps bridge
-   */
-  VERSION: "0.16.2",
-
   /**
    * Timeout values (in milliseconds)
    */

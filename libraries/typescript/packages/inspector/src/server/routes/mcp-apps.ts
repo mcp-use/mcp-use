@@ -1,14 +1,13 @@
 /**
  * MCP Apps (SEP-1865) Server Routes
  *
- * Provides endpoints for storing widget data and serving widget HTML.
- * Reuses existing widget storage infrastructure from shared-utils.ts
+ * Serves the double-iframe sandbox proxy. Guest HTML is resolved client-side;
+ * AppFrame posts `ui/notifications/sandbox-resource-ready` with `{ html, csp }`.
+ * CSP mode / permissions / declared CSP arrive as URL query params on this page
+ * (we omit SandboxConfig.csp so AppFrame does not add a competing `csp` param).
  */
 
 import type { Hono } from "hono";
-import { getWidgetData, storeWidgetData } from "../shared-utils.js";
-
-const RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
 // Sandbox proxy HTML (inlined to avoid file path issues at runtime)
 const SANDBOX_PROXY_HTML = `<!doctype html>
@@ -197,6 +196,21 @@ window.addEventListener('unhandledrejection', function(event) {
         }
       }
 
+      // Query params from host (csp_mode, permissions, widget_csp). AppFrame only
+      // sends { html, csp } in sandbox-resource-ready; we carry the rest on the URL.
+      const query = new URLSearchParams(location.search);
+      const queryCspMode = query.get("csp_mode") || "permissive";
+      let queryPermissions = null;
+      let queryWidgetCsp = null;
+      try {
+        const rawPerm = query.get("permissions");
+        if (rawPerm) queryPermissions = JSON.parse(rawPerm);
+      } catch (e) {}
+      try {
+        const rawCsp = query.get("widget_csp");
+        if (rawCsp) queryWidgetCsp = JSON.parse(rawCsp);
+      } catch (e) {}
+
       const inner = document.createElement("iframe");
       inner.style = "width:100%; height:100%; border:none;";
       inner.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
@@ -205,7 +219,16 @@ window.addEventListener('unhandledrejection', function(event) {
       window.addEventListener("message", async (event) => {
         if (event.source === window.parent) {
           if (event.data && event.data.method === "ui/notifications/sandbox-resource-ready") {
-            const { html, sandbox, csp, permissions, permissive } = event.data.params || {};
+            const params = event.data.params || {};
+            const html = params.html;
+            const sandbox = params.sandbox;
+            // Prefer message csp when present; fall back to URL widget_csp
+            const csp = params.csp != null ? params.csp : queryWidgetCsp;
+            const permissions = params.permissions != null ? params.permissions : queryPermissions;
+            const permissive =
+              typeof params.permissive === "boolean"
+                ? params.permissive
+                : queryCspMode === "permissive";
             if (typeof sandbox === "string") {
               inner.setAttribute("sandbox", sandbox);
             }
@@ -261,115 +284,6 @@ window.addEventListener('unhandledrejection', function(event) {
 export function registerMcpAppsRoutes(app: Hono, basePath: string = "") {
   // All MCP Apps routes relocate under the server-wide basePath.
   const p = (suffix: string) => `${basePath}${suffix}`;
-  // Store widget data - reuses existing storeWidgetData function
-  app.post(p("/inspector/api/mcp-apps/widget/store"), async (c) => {
-    try {
-      const body = await c.req.json();
-      const result = storeWidgetData({
-        ...body,
-        protocol: "mcp-apps", // Tag as MCP Apps protocol
-      });
-
-      if (!result.success) {
-        return c.json(result, 400);
-      }
-
-      return c.json(result);
-    } catch (error) {
-      console.error("[MCP Apps] Error storing widget data:", error);
-      return c.json(
-        {
-          success: false,
-          error: error instanceof Error ? error.message : "Unknown error",
-        },
-        500
-      );
-    }
-  });
-
-  // Serve widget content with CSP metadata (SEP-1865)
-  app.get(p("/inspector/api/mcp-apps/widget-content/:toolId"), async (c) => {
-    try {
-      // Hono can't infer the :toolId param from a computed route pattern.
-      const toolId = c.req.param("toolId") ?? "";
-      const cspModeParam = c.req.query("csp_mode") as
-        | "permissive"
-        | "widget-declared"
-        | undefined;
-
-      const widgetData = getWidgetData(toolId);
-
-      if (!widgetData) {
-        return c.json({ error: "Widget data not found or expired" }, 404);
-      }
-
-      const { resourceData, mcpAppsCsp, mcpAppsPermissions } = widgetData;
-
-      // Extract HTML content from the pre-fetched resource data
-      let htmlContent = "";
-      let mimeType: string | undefined;
-
-      const contentsArray = Array.isArray(resourceData?.contents)
-        ? resourceData.contents
-        : [];
-
-      const firstContent = contentsArray[0];
-      if (firstContent) {
-        mimeType = firstContent.mimeType;
-        if (typeof firstContent.text === "string") {
-          htmlContent = firstContent.text;
-        } else if (typeof firstContent.blob === "string") {
-          htmlContent = Buffer.from(firstContent.blob, "base64").toString(
-            "utf-8"
-          );
-        }
-      }
-
-      if (!htmlContent) {
-        return c.json({ error: "No HTML content in resource" }, 404);
-      }
-
-      // SEP-1865: Validate MIME type
-      const mimeTypeValid = mimeType === RESOURCE_MIME_TYPE;
-      const mimeTypeWarning = !mimeTypeValid
-        ? mimeType
-          ? `Invalid MIME type "${mimeType}" - SEP-1865 requires "${RESOURCE_MIME_TYPE}"`
-          : `Missing MIME type - SEP-1865 requires "${RESOURCE_MIME_TYPE}"`
-        : null;
-
-      if (mimeTypeWarning) {
-        console.warn("[MCP Apps] MIME type validation:", mimeTypeWarning, {
-          resourceUri: widgetData.uri,
-        });
-      }
-
-      // Determine CSP mode
-      const cspMode = cspModeParam || "permissive";
-      const isPermissive = cspMode === "permissive";
-
-      // Return JSON with HTML and metadata for CSP enforcement.
-      // The HTML is served as-is -- the MCP server is responsible for
-      // producing fully-resolved HTML with absolute asset URLs and any
-      // runtime globals the widget framework needs.
-      c.header("Cache-Control", "no-cache, no-store, must-revalidate");
-      return c.json({
-        html: htmlContent,
-        csp: isPermissive ? undefined : mcpAppsCsp,
-        permissions: mcpAppsPermissions,
-        permissive: isPermissive,
-        cspMode,
-        mimeType,
-        mimeTypeValid,
-        mimeTypeWarning,
-      });
-    } catch (error) {
-      console.error("[MCP Apps] Error fetching widget content:", error);
-      return c.json(
-        { error: error instanceof Error ? error.message : "Unknown error" },
-        500
-      );
-    }
-  });
 
   // Serve sandbox proxy HTML
   app.get(p("/inspector/api/mcp-apps/sandbox-proxy"), (c) => {

@@ -8,7 +8,7 @@ interface WidgetWrapperProps {
 
 /**
  * Widget wrapper with dotted radial gradient background
- * Shared by OpenAI Apps SDK and MCP Apps renderers
+ * Shared by MCP Apps renderers
  */
 export function WidgetWrapper({
   children,
