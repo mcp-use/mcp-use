@@ -24,6 +24,7 @@ import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -33,9 +34,17 @@ import {
   type PluginOption,
 } from "vite";
 import { getRequestListener } from "@hono/node-server";
+import {
+  localhostAllowedHostnames,
+  localhostAllowedOrigins,
+  validateHostHeader,
+  validateOriginHeader,
+} from "@modelcontextprotocol/server";
 
+import { resolvePort as resolvePreferredPort } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
 import { resolvePort } from "./port.js";
+import { resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import { createTunnelManager } from "./tunnel.js";
 import { resolveWorkspacePaths } from "./workspace.js";
@@ -86,7 +95,16 @@ export interface DevOptions {
    */
   port?: number;
   /**
-   * Host to bind.
+   * Interface address to bind — `"0.0.0.0"` exposes the dev server to the
+   * local network (phones, containers, teammates); the default keeps it
+   * machine-local. Printed and auto-opened URLs use `localhost` for
+   * loopback/wildcard binds and the given host verbatim otherwise.
+   *
+   * Localhost-class binds get DNS-rebinding protection: every request's
+   * `Host`/`Origin` is validated against the localhost allowlists (plus the
+   * active tunnel hostname) before any routing. Non-localhost binds skip
+   * validation — the legitimate hostnames are unknowable here — and log a
+   * warning instead.
    *
    * @defaultValue `"127.0.0.1"` (matching the server's localhost-first posture).
    */
@@ -141,21 +159,19 @@ function openInBrowser(url: string): void {
   }
 }
 
-const VITE_CONFIG_CANDIDATES = [
-  "vite.config.ts",
-  "vite.config.js",
-  "vite.config.mts",
-  "vite.config.cjs",
-] as const;
-
-function resolveUserViteConfig(cwd: string): string | false {
-  for (const name of VITE_CONFIG_CANDIDATES) {
-    const path = join(cwd, name);
-    if (existsSync(path)) {
-      return path;
+/**
+ * First non-internal IPv4 address of this machine, for the "Network:" line
+ * printed on wildcard binds — `undefined` when offline.
+ */
+function lanAddress(): string | undefined {
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses ?? []) {
+      if (!address.internal && address.family === "IPv4") {
+        return address.address;
+      }
     }
   }
-  return false;
+  return undefined;
 }
 
 /** Collect resolved plugin names from a Vite `plugins` config value. */
@@ -299,7 +315,11 @@ export async function runDev(options: DevOptions): Promise<void> {
 
   const entry = discoverEntry(options.cwd, options.entry);
   let currentViews: DiscoveredView[] = discoverViews(options.cwd);
-  const hasViews = () => currentViews.length > 0;
+  // The Vite client environment (views plugin, Fast Refresh, HMR socket,
+  // asset origin) is configured once, from this snapshot. `currentViews`
+  // stays live for request routing and re-priming, but a project that starts
+  // with zero views needs a dev-server restart to pick up its first view.
+  const viewsAtStartup = currentViews.length > 0;
   const userViteConfig = resolveUserViteConfig(options.cwd);
 
   // The HTTP listener is a raw node:http server rather than
@@ -315,30 +335,37 @@ export async function runDev(options: DevOptions): Promise<void> {
   // without websocket port collisions.
   const httpServer = createNodeServer();
 
-  const requestedPort =
-    options.port ??
-    (process.env["PORT"] !== undefined
-      ? Number.parseInt(process.env["PORT"], 10)
-      : 3000);
-  const { port, requested } = await resolvePort(requestedPort, host);
+  const { port, requested } = await resolvePort(
+    resolvePreferredPort(options.port),
+    host
+  );
   if (port !== requested) {
     console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
   }
   process.env["PORT"] = String(port);
 
-  const devOrigin = `http://${host}:${port}`;
+  // The bind address is not always a browsable address: `0.0.0.0`/`::`
+  // accept connections on every interface but are not valid request hosts
+  // in every browser, and `127.0.0.1` reads worse than `localhost` in logs.
+  // Anything else (a LAN IP, a hostname) is browsable as itself; bare IPv6
+  // addresses need brackets in URLs.
+  const loopbackOrWildcard = ["127.0.0.1", "localhost", "0.0.0.0", "::", "::1"];
+  const browsableHost = loopbackOrWildcard.includes(host) ? "localhost" : host;
+  const devOrigin = `http://${
+    browsableHost.includes(":") ? `[${browsableHost}]` : browsableHost
+  }:${port}`;
 
-  const reactRefresh = hasViews()
+  const reactRefresh = viewsAtStartup
     ? await resolveReactRefresh(options.cwd, userViteConfig)
     : { plugins: [], active: false };
 
   const vite = await createServer({
     root: options.cwd,
-    configFile: hasViews() ? userViteConfig : false,
+    configFile: viewsAtStartup ? userViteConfig : false,
     envFile: false,
     logLevel: "warn",
     cacheDir: paths.cache,
-    plugins: hasViews()
+    plugins: viewsAtStartup
       ? [
           mcpUseViewsPlugin({
             getViews: () => currentViews,
@@ -351,11 +378,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       middlewareMode: true,
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
       // paths that resolve against the host page inside srcdoc iframes.
-      ...(hasViews() && { origin: devOrigin }),
+      ...(viewsAtStartup && { origin: devOrigin }),
       // View HMR rides the one HTTP listener: Vite attaches its websocket
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
-      hmr: hasViews() ? { server: httpServer } : false,
+      hmr: viewsAtStartup ? { server: httpServer } : false,
     },
     ssr: {
       external: true,
@@ -466,16 +493,88 @@ export async function runDev(options: DevOptions): Promise<void> {
     }
   };
 
-  const onFileEvent = (file: string): void => {
+  const onFileAddOrUnlink = (file: string): void => {
     onViewFilesystemEvent(file);
     onSsrFileEvent(file);
   };
 
-  vite.watcher.on("change", onFileEvent);
-  vite.watcher.on("add", onFileEvent);
-  vite.watcher.on("unlink", onFileEvent);
+  // A `change` event cannot add or remove a view directory, so only
+  // `add`/`unlink` rescan `resources/` — content edits never pay for the
+  // synchronous filesystem walk in discoverViews().
+  vite.watcher.on("change", onSsrFileEvent);
+  vite.watcher.on("add", onFileAddOrUnlink);
+  vite.watcher.on("unlink", onFileAddOrUnlink);
 
   const tunnelManager = createTunnelManager(paths.tunnel);
+
+  // --- DNS-rebinding protection. --------------------------------------------
+  // getHandler() applies no Host/Origin validation (its contract assumes a
+  // platform edge in front); in dev this process *is* the edge, so
+  // localhost-class binds get the same localhost-allowlist checks listen()
+  // applies — extended with the active tunnel hostname, since tunnel traffic
+  // arrives with the tunnel's public Host. The check runs before any routing,
+  // covering the MCP endpoint, the dev API (tunnel control), and Vite-served
+  // module URLs alike. Non-localhost binds get no validation (the legitimate
+  // hostnames are unknowable here) — a startup warning below says so.
+  //
+  // Host is validated on every request: rebinding works by making the
+  // attacker's page same-origin with this server, and the Host header is
+  // where that shows up. Origin is validated only on side-effect-bearing
+  // methods (the MCP wire and the dev API are all POST): sandboxed view
+  // iframes have an opaque origin, so their module/asset GETs legitimately
+  // carry `Origin: null` — and external hosts rendering views through the
+  // tunnel fetch assets with their own origins. Cross-origin GET *reads*
+  // are already denied by CORS (no permissive ACAO is emitted anywhere in
+  // dev), so exempting GET/HEAD from the Origin check gives up nothing.
+  const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
+  const rejectDisallowedRequest = (
+    req: IncomingMessage,
+    res: ServerResponse
+  ): boolean => {
+    const tunnelUrl = tunnelManager.status().url;
+    const tunnelHost = tunnelUrl !== null ? new URL(tunnelUrl).hostname : null;
+    const extra = tunnelHost !== null ? [tunnelHost] : [];
+    const readOnly = req.method === "GET" || req.method === "HEAD";
+    const hostResult = validateHostHeader(req.headers.host, [
+      ...localhostAllowedHostnames(),
+      ...extra,
+    ]);
+    const result =
+      hostResult.ok && !readOnly
+        ? validateOriginHeader(req.headers.origin, [
+            ...localhostAllowedOrigins(),
+            ...extra,
+          ])
+        : hostResult;
+    if (result.ok) {
+      return false;
+    }
+    // Same JSON-RPC 403 shape the SDK's own validation responses use.
+    res.writeHead(403, { "content-type": "application/json" });
+    res.end(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        error: { code: -32000, message: result.message },
+        id: null,
+      })
+    );
+    return true;
+  };
+
+  /**
+   * Tear down everything the running dev process owns, in dependency order:
+   * watcher subscriptions, tunnel, HTTP listener, module runner, Vite.
+   */
+  const teardown = async (): Promise<void> => {
+    vite.watcher.off("change", onSsrFileEvent);
+    vite.watcher.off("add", onFileAddOrUnlink);
+    vite.watcher.off("unlink", onFileAddOrUnlink);
+    await tunnelManager.stop();
+    await new Promise<void>((done) => httpServer.close(() => done()));
+    await runner.close();
+    await vite.close();
+  };
+
   const devFetch = createDevApiHandler(
     {
       getBasePath: () => basePath,
@@ -488,13 +587,17 @@ export async function runDev(options: DevOptions): Promise<void> {
   // Same adapter serve() uses internally — the handler sees identical
   // requests (see the comment where httpServer is created). devFetch wraps
   // the swappable Hono handler with the dev API (tunnel control) routes.
-  const honoListener = getRequestListener((request: Request) =>
-    devFetch(request)
-  );
+  const honoListener = getRequestListener(devFetch);
 
   const onRequest = (req: IncomingMessage, res: ServerResponse): void => {
+    if (localhostBind && rejectDisallowedRequest(req, res)) {
+      return;
+    }
     const url = req.url ?? "/";
     const pathname = new URL(url, "http://127.0.0.1").pathname;
+    // Routing to Vite requires both the client environment (configured only
+    // when views existed at startup) and a currently non-empty registry.
+    const viewsEnabled = viewsAtStartup && currentViews.length > 0;
     // View documents must come from the server's own route (per-request
     // origin resolution, no-store) — never from Vite, which would try to
     // serve/transform the .html itself.
@@ -509,9 +612,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       (pathname.startsWith("/@") ||
         pathname.startsWith("/node_modules/") ||
         pathname.startsWith("/.mcp-use/") ||
-        (hasViews() && pathname.startsWith("/resources/")));
+        (viewsEnabled && pathname.startsWith("/resources/")));
 
-    if (hasViews() && !isViewDocument && isViteRequest) {
+    if (viewsEnabled && !isViewDocument && isViteRequest) {
       vite.middlewares(req, res, () => {
         void honoListener(req, res);
       });
@@ -532,18 +635,28 @@ export async function runDev(options: DevOptions): Promise<void> {
       `  ➜ Views:         ${currentViews.map((v) => v.name).join(", ")}`
     );
   }
-  console.log(`  ➜ MCP endpoint:  http://localhost:${port}${basePath}`);
-  console.log(`  ➜ Inspector:     http://localhost:${port}${basePath}/inspector`);
+  console.log(`  ➜ MCP endpoint:  ${devOrigin}${basePath}`);
+  console.log(`  ➜ Inspector:     ${devOrigin}${basePath}/inspector`);
+  if (host === "0.0.0.0" || host === "::") {
+    const lan = lanAddress();
+    if (lan !== undefined) {
+      console.log(`  ➜ Network:       http://${lan}:${port}${basePath}`);
+    }
+  }
+  if (!localhostBind) {
+    console.warn(
+      `[mcp-use] --host ${host} serves beyond this machine without Host ` +
+        `validation or authentication — anyone with network access can call ` +
+        `the MCP endpoint and dev routes.`
+    );
+  }
 
   if (options.tunnel === true) {
     try {
       const { url } = await tunnelManager.start(port);
       console.log(`  ➜ Tunnel:        ${url}${basePath}`);
     } catch (error) {
-      await tunnelManager.stop();
-      await new Promise<void>((done) => httpServer.close(() => done()));
-      await runner.close();
-      await vite.close();
+      await teardown();
       throw error;
     }
   }
@@ -551,7 +664,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   // Auto-open the inspector — unless disabled (`--no-open`) or stdout is not
   // a TTY (agents/CI: no browser to open, and no error to fail on).
   if (options.open !== false && process.stdout.isTTY === true) {
-    openInBrowser(`http://localhost:${port}${basePath}/inspector`);
+    openInBrowser(`${devOrigin}${basePath}/inspector`);
   }
 
   // --- Graceful shutdown (SIGINT/SIGTERM or options.signal). ---------------
@@ -563,13 +676,7 @@ export async function runDev(options: DevOptions): Promise<void> {
       process.off("SIGINT", shutdown);
       process.off("SIGTERM", shutdown);
       void (async () => {
-        vite.watcher.off("change", onFileEvent);
-        vite.watcher.off("add", onFileEvent);
-        vite.watcher.off("unlink", onFileEvent);
-        await tunnelManager.stop();
-        await new Promise<void>((done) => httpServer.close(() => done()));
-        await runner.close();
-        await vite.close();
+        await teardown();
         resolve();
       })();
     };

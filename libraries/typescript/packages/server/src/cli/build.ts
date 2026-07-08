@@ -36,19 +36,13 @@ import {
   resolveWorkspacePaths,
   type BuildManifest,
 } from "./workspace.js";
+import { resolveUserViteConfig } from "./vite-config.js";
 import type { ViewsManifest } from "../views/types.js";
 
 /** Fixed filename of the emitted server entry inside `.mcp-use/build/`. */
 const BUILD_ENTRY_NAME = "index.js";
 
 const WRAPPER_BASENAME = "entry-wrapper.ts";
-
-const VITE_CONFIG_CANDIDATES = [
-  "vite.config.ts",
-  "vite.config.js",
-  "vite.config.mts",
-  "vite.config.cjs",
-] as const;
 
 /**
  * Options for {@link runBuild}.
@@ -65,16 +59,6 @@ export interface BuildOptions {
    * `index.ts`, `server.ts` — first hit wins.
    */
   entry?: string;
-}
-
-function resolveUserViteConfig(cwd: string): string | false {
-  for (const name of VITE_CONFIG_CANDIDATES) {
-    const path = join(cwd, name);
-    if (existsSync(path)) {
-      return path;
-    }
-  }
-  return false;
 }
 
 /**

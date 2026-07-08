@@ -140,7 +140,83 @@ export default server;`
       /export default server/
     );
   });
+
+  // DNS-rebinding protection: the dev listener validates Host/Origin on
+  // localhost binds before any routing — same posture as MCPServer.listen()
+  // (CLI_SPEC.md § dev). Raw node:http requests because fetch() sanitizes
+  // Host/Origin headers.
+  it("rejects non-localhost Host and Origin headers (DNS rebinding)", async () => {
+    const cwd = copyFixture("dev-rebind");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    // MCP endpoint: rebound Host and cross-site Origin are both rejected.
+    expect(await rawStatus(dev.url, { host: "evil.example.com" })).toBe(403);
+    expect(
+      await rawStatus(dev.url, { origin: "https://evil.example.com" })
+    ).toBe(403);
+    expect(
+      await rawStatus(dev.url, { origin: `http://localhost:${port}` })
+    ).not.toBe(403);
+
+    // Dev API routes sit in front of the MCP handler and must be covered by
+    // the same check (starting a tunnel would expose the server publicly).
+    const infoUrl = `${dev.url}/inspector/api/dev/info`;
+    expect(
+      await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")
+    ).toBe(403);
+    expect(await rawStatus(infoUrl, {}, "GET")).toBe(200);
+
+    // GET/HEAD are exempt from the Origin check (Host still validated):
+    // opaque-origin view iframes fetch modules/assets with `Origin: null`.
+    expect(await rawStatus(infoUrl, { origin: "null" }, "GET")).toBe(200);
+    expect(await rawStatus(dev.url, { origin: "null" })).toBe(403);
+  });
 });
+
+/** Issue a raw request with unsanitized headers; resolves with the status. */
+async function rawStatus(
+  target: string,
+  headers: Record<string, string>,
+  method: "POST" | "GET" = "POST"
+): Promise<number> {
+  const { request } = await import("node:http");
+  const body =
+    method === "POST"
+      ? JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        })
+      : undefined;
+  return new Promise((resolve, reject) => {
+    const req = request(
+      target,
+      {
+        method,
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          ...(body !== undefined && {
+            "content-length": Buffer.byteLength(body),
+          }),
+          ...headers,
+        },
+      },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode ?? 0));
+      }
+    );
+    req.on("error", reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
+}
 
 describe("runDev (views)", () => {
   it("serves view documents, virtual entries, and reloads on view add", async () => {
@@ -191,8 +267,10 @@ describe("runDev (views)", () => {
     );
     expect(assetImportResponse.status).toBe(200);
     const assetImportJs = await assetImportResponse.text();
+    // Vite `server.origin` is the browsable origin: `localhost`, not the
+    // 127.0.0.1 bind address (VIEWS_SPEC.md § Dev).
     expect(assetImportJs).toMatch(
-      new RegExp(`http://127\\.0\\.0\\.1:${port}/resources/product-search-result/badge\\.png`)
+      new RegExp(`http://localhost:${port}/resources/product-search-result/badge\\.png`)
     );
 
     const publicResponse = await fetch(
