@@ -101,10 +101,9 @@ export interface DevOptions {
    * loopback/wildcard binds and the given host verbatim otherwise.
    *
    * Localhost-class binds get DNS-rebinding protection: every request's
-   * `Host`/`Origin` is validated against the localhost allowlists (plus the
-   * active tunnel hostname) before any routing. Non-localhost binds skip
-   * validation — the legitimate hostnames are unknowable here — and log a
-   * warning instead.
+   * `Host` is validated (plus the active tunnel hostname); `Origin` only on
+   * non-GET/HEAD. Non-localhost binds skip validation — the legitimate
+   * hostnames are unknowable here — and log a warning instead.
    *
    * @defaultValue `"127.0.0.1"` (matching the server's localhost-first posture).
    */
@@ -379,6 +378,11 @@ export async function runDev(options: DevOptions): Promise<void> {
       // Absolute asset URLs in dev: without `origin`, Vite emits root-relative
       // paths that resolve against the host page inside srcdoc iframes.
       ...(viewsAtStartup && { origin: devOrigin }),
+      // CORS on module URLs is owned by onRequest below (permissive ACAO
+      // only while the tunnel is active), not by Vite's own middleware —
+      // whose default localhost-only policy would block tunnel-rendering
+      // hosts, and whose headers would fight the tunnel-gated ones.
+      cors: false,
       // View HMR rides the one HTTP listener: Vite attaches its websocket
       // upgrade handler to our server, so no dedicated HMR port exists to
       // collide when several dev processes run side by side.
@@ -523,9 +527,11 @@ export async function runDev(options: DevOptions): Promise<void> {
   // methods (the MCP wire and the dev API are all POST): sandboxed view
   // iframes have an opaque origin, so their module/asset GETs legitimately
   // carry `Origin: null` — and external hosts rendering views through the
-  // tunnel fetch assets with their own origins. Cross-origin GET *reads*
-  // are already denied by CORS (no permissive ACAO is emitted anywhere in
-  // dev), so exempting GET/HEAD from the Origin check gives up nothing.
+  // tunnel fetch assets with their own origins. Those cross-origin loads also
+  // need CORS: the MCP server's view asset/public routes always emit
+  // `Access-Control-Allow-Origin: *`; Vite-served module URLs get the same
+  // header from onRequest below, but only while the tunnel is active — an
+  // unexposed dev server's module graph stays unreadable cross-origin.
   const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const rejectDisallowedRequest = (
     req: IncomingMessage,
@@ -615,6 +621,13 @@ export async function runDev(options: DevOptions): Promise<void> {
         (viewsEnabled && pathname.startsWith("/resources/")));
 
     if (viewsEnabled && !isViewDocument && isViteRequest) {
+      // Tunnel-gated CORS: hosts rendering views through the tunnel fetch
+      // these module URLs in CORS mode from their own (or opaque) origins.
+      // Without a tunnel the dev server isn't exposed, so no permissive
+      // ACAO is emitted and the module graph stays unreadable cross-origin.
+      if (tunnelManager.status().url !== null) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+      }
       vite.middlewares(req, res, () => {
         void honoListener(req, res);
       });

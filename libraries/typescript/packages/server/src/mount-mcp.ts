@@ -37,12 +37,11 @@ export interface MountMcpOptions {
  * shutdown to abort in-flight exchanges, and use `notify`/`bus` for
  * list-changed notifications.
  *
- * Prefer apps created with `createMcpHonoApp` (what `MCPServer` uses when
- * Host validation applies): it installs JSON body parsing and Host/Origin
- * validation (DNS-rebinding protection). On a bare Hono app this mount
- * performs no such validation itself — compose the
- * `@modelcontextprotocol/hono` middleware in front, only bind to localhost,
- * or serve behind a platform edge that routes by hostname.
+ * Prefer apps wired like `MCPServer` (JSON body parsing stashed in context
+ * vars plus Host/Origin validation when Host validation applies).
+ * On a bare Hono app this mount performs no such validation itself — compose
+ * the `@modelcontextprotocol/hono` middleware in front, only bind to
+ * localhost, or serve behind a platform edge that routes by hostname.
  */
 export function mountMcp<E extends Env>(
   app: Hono<E>,
@@ -55,9 +54,9 @@ export function mountMcp<E extends Env>(
     ...handlerOptions,
   });
   app.all(path, async (c) => {
-    // createMcpHonoApp's JSON middleware stashes the parsed body in context
-    // vars (a request body is only readable once); on bare apps it is absent
-    // and the SDK handler parses the body itself.
+    // JSON body parsing middleware stashes the parsed body in context vars
+    // (a request body is only readable once); on bare apps it is absent and
+    // the SDK handler parses the body itself.
     let parsedBody = (c.var as Record<string, unknown>)["parsedBody"];
     if (parsedBody === undefined) {
       try {

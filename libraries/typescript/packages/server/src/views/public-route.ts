@@ -56,7 +56,9 @@ export function resolvePublicFilePath(
  * Serve one file from the project's `public/` directory.
  *
  * @param diskPath - Absolute path resolved by {@link resolvePublicFilePath}.
- * @returns A `Response` with `Cache-Control: public, max-age=0, must-revalidate`.
+ * @returns A `Response` with `Cache-Control: public, max-age=0, must-revalidate`
+ * and `Access-Control-Allow-Origin: *` so cross-origin sandboxed view iframes
+ * can load public files (module scripts and fetches use CORS mode).
  *
  * @internal
  */
@@ -70,6 +72,7 @@ export function servePublicFile(diskPath: string): Response {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "public, max-age=0, must-revalidate",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }

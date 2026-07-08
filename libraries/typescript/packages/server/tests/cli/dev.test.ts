@@ -17,6 +17,23 @@ import {
   waitFor,
 } from "./helpers.js";
 
+// Controllable tunnel state: the real manager spawns `npx @mcp-use/tunnel`.
+// Tests flip `url` to pin the tunnel-gated CORS contract on Vite module URLs.
+const tunnelState = vi.hoisted(() => ({ url: null as string | null }));
+vi.mock("../../src/cli/tunnel.js", () => ({
+  createTunnelManager: () => ({
+    start: async (port: number) => {
+      tunnelState.url = `https://fake.local.mcp-use.run`;
+      void port;
+      return { url: tunnelState.url, subdomain: "fake" };
+    },
+    stop: async () => {
+      tunnelState.url = null;
+    },
+    status: () => ({ url: tunnelState.url }),
+  }),
+}));
+
 interface DevHandle {
   url: string;
   stop: () => Promise<void>;
@@ -24,6 +41,7 @@ interface DevHandle {
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
+  tunnelState.url = null;
   while (cleanups.length > 0) {
     await cleanups.pop()?.();
   }
@@ -256,6 +274,25 @@ describe("runDev (views)", () => {
     expect(virtualResponse.status).toBe(200);
     const virtualJs = await virtualResponse.text();
     expect(virtualJs).toMatch(/bootstrapView/);
+
+    // Tunnel-gated CORS on Vite module URLs (CLI_SPEC.md § DNS-rebinding
+    // protection): no permissive ACAO while the dev server is unexposed…
+    const localResponse = await fetch(virtualUrl, {
+      headers: { origin: "https://host.example" },
+    });
+    expect(localResponse.status).toBe(200);
+    expect(localResponse.headers.get("access-control-allow-origin")).toBeNull();
+
+    // …and `*` while a tunnel is active, since hosts rendering through it
+    // fetch modules in CORS mode from their own (or opaque) origins.
+    tunnelState.url = "https://fake.local.mcp-use.run";
+    const tunneledResponse = await fetch(virtualUrl, {
+      headers: { origin: "https://host.example" },
+    });
+    expect(tunneledResponse.status).toBe(200);
+    expect(tunneledResponse.headers.get("access-control-allow-origin")).toBe(
+      "*"
+    );
 
     const viewModuleResponse = await fetch(
       `${base}/resources/product-search-result/view.tsx`

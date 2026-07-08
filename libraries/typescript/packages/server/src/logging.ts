@@ -501,9 +501,9 @@ export function requestLogger(options: LoggingOptions = {}): MiddlewareHandler {
     const requestHeaders: Record<string, string> =
       level === "trace" ? c.req.header() : {};
 
-    // Body: prefer the parsed body createMcpHonoApp's JSON middleware stashed
-    // in context vars (a request body is only readable once); fall back to
-    // cloning on bare apps where that middleware is absent.
+    // Body: prefer the parsed body the JSON middleware stashed in context
+    // vars (a request body is only readable once); fall back to cloning on
+    // bare apps where that middleware is absent.
     let requestBody: unknown;
     if (httpMethod !== "GET" && httpMethod !== "HEAD") {
       const parsedBody = (c.var as Record<string, unknown>)["parsedBody"];

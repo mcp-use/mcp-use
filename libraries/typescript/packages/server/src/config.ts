@@ -49,8 +49,8 @@ export interface ServerConfig {
   basePath?: string;
   /**
    * Hostname `listen()` binds. Defaults to `127.0.0.1`; localhost-class
-   * binds get DNS-rebinding protection (Host/Origin validation)
-   * automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
+   * binds get DNS-rebinding protection (`Host` on every request; `Origin`
+   * only on non-GET/HEAD) automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
    * edge (Railway, Fly, …) nothing more is needed, since the edge only
    * routes hostnames assigned to the deployment. Ignored by `getHandler()`,
    * which never binds.
@@ -67,8 +67,10 @@ export interface ServerConfig {
   /**
    * Extra allowed origin hostnames for Origin-header validation
    * (port-agnostic, additive to the localhost-class origins). When unset,
-   * mirrors the effective Host allowlist. Requests without an `Origin`
-   * header always pass (non-browser MCP clients don't send one).
+   * mirrors the effective Host allowlist. Origin is validated only on
+   * non-GET/HEAD requests (sandboxed view iframes send `Origin: null` on
+   * asset GETs; the MCP wire is POST). Requests without an `Origin` header
+   * always pass (non-browser MCP clients don't send one).
    */
   allowedOrigins?: string[];
   /**

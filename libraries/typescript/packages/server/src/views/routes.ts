@@ -25,6 +25,9 @@ const CONTENT_TYPES: Record<string, string> = {
 /**
  * Mount view document and asset routes under `${basePath}/_mcp-use/`.
  *
+ * Asset and public responses include `Access-Control-Allow-Origin: *` for
+ * cross-origin sandboxed view iframes (module scripts use CORS mode).
+ *
  * Routes exist only when views are primed; a tool-only server is unchanged.
  *
  * @param options - When `dev` is true, the public route reads from
@@ -87,6 +90,7 @@ export function mountViewRoutes(
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000, immutable",
+        "Access-Control-Allow-Origin": "*",
       },
     });
   });

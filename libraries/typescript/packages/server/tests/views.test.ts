@@ -529,6 +529,129 @@ describe("views HTTP routes", () => {
     );
     expect(response.status).toBe(404);
   });
+
+  /** Raw GET with unsanitized headers (fetch() sanitizes Origin). */
+  async function rawGetStatus(
+    target: string,
+    headers: Record<string, string> = {}
+  ): Promise<number> {
+    const { request } = await import("node:http");
+    const url = new URL(target);
+    return new Promise((resolve, reject) => {
+      const req = request(
+        {
+          hostname: url.hostname,
+          port: url.port,
+          path: url.pathname + url.search,
+          method: "GET",
+          headers,
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(res.statusCode ?? 0));
+        }
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  }
+
+  /** Raw GET resolving status and response headers. */
+  async function rawGet(
+    target: string,
+    headers: Record<string, string> = {}
+  ): Promise<{ status: number; headers: import("node:http").IncomingHttpHeaders }> {
+    const { request } = await import("node:http");
+    const url = new URL(target);
+    return new Promise((resolve, reject) => {
+      const req = request(
+        {
+          hostname: url.hostname,
+          port: url.port,
+          path: url.pathname + url.search,
+          method: "GET",
+          headers,
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () =>
+            resolve({ status: res.statusCode ?? 0, headers: res.headers })
+          );
+        }
+      );
+      req.on("error", reject);
+      req.end();
+    });
+  }
+
+  it("allows GET asset and view requests with Origin: null", async () => {
+    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
+    mkdirSync(assetsDir, { recursive: true });
+    const fileName = "origin-null-abc123.js";
+    const filePath = join(assetsDir, fileName);
+    writeFileSync(filePath, "export {};\n");
+
+    try {
+      expect(
+        await rawGetStatus(`${baseUrl}/mcp/_mcp-use/assets/${fileName}`, {
+          origin: "null",
+        })
+      ).toBe(200);
+      expect(
+        await rawGetStatus(
+          `${baseUrl}/mcp/_mcp-use/views/product-search-result.html`,
+          { origin: "null" }
+        )
+      ).toBe(200);
+    } finally {
+      rmSync(filePath, { force: true });
+    }
+  });
+
+  it("allows GET asset requests with an external Origin", async () => {
+    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
+    mkdirSync(assetsDir, { recursive: true });
+    const fileName = "external-origin-abc123.js";
+    const filePath = join(assetsDir, fileName);
+    writeFileSync(filePath, "export {};\n");
+
+    try {
+      expect(
+        await rawGetStatus(`${baseUrl}/mcp/_mcp-use/assets/${fileName}`, {
+          origin: "https://claude.ai",
+        })
+      ).toBe(200);
+    } finally {
+      rmSync(filePath, { force: true });
+    }
+  });
+
+  it("emits Access-Control-Allow-Origin: * on asset and public responses", async () => {
+    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
+    const publicDir = join(process.cwd(), ".mcp-use/build/views/public");
+    mkdirSync(assetsDir, { recursive: true });
+    mkdirSync(publicDir, { recursive: true });
+    const fileName = "cors-asset-abc123.js";
+    const assetPath = join(assetsDir, fileName);
+    const publicPath = join(publicDir, "cors-fixture.txt");
+    writeFileSync(assetPath, "export {};\n");
+    writeFileSync(publicPath, "cors-fixture\n");
+
+    try {
+      const asset = await rawGet(`${baseUrl}/mcp/_mcp-use/assets/${fileName}`);
+      expect(asset.status).toBe(200);
+      expect(asset.headers["access-control-allow-origin"]).toBe("*");
+
+      const publicFile = await rawGet(
+        `${baseUrl}/mcp/_mcp-use/public/cors-fixture.txt`
+      );
+      expect(publicFile.status).toBe(200);
+      expect(publicFile.headers["access-control-allow-origin"]).toBe("*");
+    } finally {
+      rmSync(assetPath, { force: true });
+      rmSync(publicPath, { force: true });
+    }
+  });
 });
 
 describe("views binding validation", () => {

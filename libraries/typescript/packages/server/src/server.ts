@@ -1,5 +1,8 @@
 import { serve, type ServerType } from "@hono/node-server";
-import { createMcpHonoApp, originValidation } from "@modelcontextprotocol/hono";
+import {
+  hostHeaderValidation,
+  originValidation,
+} from "@modelcontextprotocol/hono";
 import {
   localhostAllowedHostnames,
   localhostAllowedOrigins,
@@ -279,10 +282,11 @@ export class MCPServer {
    * Serve over HTTP on Node. Pass port `0` for an ephemeral port.
    *
    * Binds `config.host` (default `127.0.0.1`). Localhost-class binds get
-   * DNS-rebinding protection automatically. To serve publicly set
-   * `host: "0.0.0.0"`; behind a platform edge that is all that's needed,
-   * and `allowedHosts` restricts direct exposure (additive — localhost-class
-   * values stay allowed).
+   * DNS-rebinding protection automatically: `Host` on every request,
+   * `Origin` only on non-GET/HEAD (sandboxed view iframes send
+   * `Origin: null` on asset GETs). To serve publicly set `host: "0.0.0.0"`;
+   * behind a platform edge that is all that's needed, and `allowedHosts`
+   * restricts direct exposure (additive — localhost-class values stay allowed).
    *
    * @throws If called on a localhost-class bind after {@link MCPServer.getHandler}
    * already mounted the app without Host validation.
@@ -345,7 +349,8 @@ export class MCPServer {
    * configured, `listen()` on a localhost-class bind validates against the
    * localhost lists (the DNS-rebinding threat model), while `getHandler()` —
    * which never binds — applies no validation. `allowedOrigins` defaults to
-   * mirroring the effective Host allowlist.
+   * mirroring the effective Host allowlist. Origin validation runs only on
+   * non-GET/HEAD requests.
    */
   #validationPolicy(mode: "listen" | "handler"): {
     hosts: string[] | undefined;
@@ -372,21 +377,47 @@ export class MCPServer {
   } {
     if (this.#app === undefined || this.#handler === undefined) {
       const { hosts, origins } = this.#validationPolicy(mode);
-      let app: Hono;
+      const app = new Hono();
+      // JSON body parsing (same semantics as createMcpHonoApp): stash parsed
+      // bodies in context vars for mountMcp and requestLogger.
+      app.use("*", async (c, next) => {
+        if ((c.var as Record<string, unknown>)["parsedBody"] !== undefined) {
+          return await next();
+        }
+        if (!(c.req.header("content-type") ?? "").includes("application/json")) {
+          return await next();
+        }
+        try {
+          const parsed: unknown = await c.req.raw.clone().json();
+          // c.var is a read-only snapshot; c.set is the write path (untyped
+          // here because the app runs on Hono's default Env).
+          (c.set as (key: string, value: unknown) => void)("parsedBody", parsed);
+        } catch {
+          return c.text("Invalid JSON", 400);
+        }
+        return await next();
+      });
       if (hosts !== undefined) {
-        // Official Hono adapter: JSON body parsing plus Host/Origin
-        // validation against exactly the computed lists (passing explicit
-        // lists bypasses the adapter's own host-keyed defaulting).
-        app = createMcpHonoApp({
-          allowedHosts: hosts,
-          allowedOrigins: origins ?? hosts,
+        app.use("*", hostHeaderValidation(hosts));
+        // Origin on side-effect methods only: sandboxed view iframes send
+        // `Origin: null` on asset GETs; external hosts fetch with their own
+        // origins. The MCP wire is POST; read rebinding is covered by Host.
+        app.use("*", async (c, next) => {
+          if (c.req.method === "GET" || c.req.method === "HEAD") {
+            return await next();
+          }
+          return originValidation(origins ?? hosts)(c, next);
         });
       } else {
-        // Host validation off: mount on a bare app (the SDK handler parses
-        // the JSON body itself; see mountMcp).
-        app = new Hono();
+        // Host validation off: the SDK handler parses JSON itself when
+        // parsedBody is absent (see mountMcp).
         if (origins !== undefined) {
-          app.use("*", originValidation(origins));
+          app.use("*", async (c, next) => {
+            if (c.req.method === "GET" || c.req.method === "HEAD") {
+              return await next();
+            }
+            return originValidation(origins)(c, next);
+          });
         }
         if (mode === "listen") {
           console.warn(
