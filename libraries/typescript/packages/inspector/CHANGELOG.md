@@ -1,5 +1,12 @@
 # @mcp-use/inspector
 
+## 12.0.3
+
+### Patch Changes
+
+- 6231261: Fix broken tunneling docs link in the tunnel popover. The "Docs" link pointed to https://manufact.com/docs/tunneling, which returns a 404; it now points to https://mcp-use.com/docs/tunneling.
+  - mcp-use@1.34.3
+
 ## 12.0.3-canary.0
 
 ### Patch Changes
