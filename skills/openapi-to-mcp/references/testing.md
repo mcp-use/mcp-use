@@ -40,7 +40,7 @@ If you don't see your tool list, you missed a step in the operations loop in `in
 
 ## 2. Layer 1 — `mcp-use client` CLI (primary)
 
-The `mcp-use` package ships a CLI client that connects to any streamable-HTTP MCP server, handles session and auth bookkeeping, and gives a clean `tools list` / `tools call` / `interactive` surface from the terminal. This is the first thing to reach for. Full docs at <https://docs.mcp-use.com/typescript/client/cli>.
+The `mcp-use` package ships a CLI client that connects to any streamable-HTTP MCP server, handles session and auth bookkeeping, and gives a clean `tools list` / `tools call` / `interactive` surface from the terminal. This is the first thing to reach for. Full docs at <https://docs.mcp-use.com/typescript/tooling/client-cli>.
 
 ### Connect once, then run commands against the name
 

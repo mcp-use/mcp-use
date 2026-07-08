@@ -195,6 +195,6 @@ Check that:
 
 ## Next Steps
 
-- Read the full [CLI Client documentation](https://mcp-use.com/docs/typescript/client/cli)
+- Read the full [CLI Client documentation](https://docs.mcp-use.com/typescript/tooling/client-cli)
 - Explore [MCP Server examples](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server)
 - Learn about [MCP Agents](https://mcp-use.com/docs/typescript/agent)
