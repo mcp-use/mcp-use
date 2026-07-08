@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 
-import { useView } from "../hooks/use-view.js";
+import { useViewActions } from "../bridge/view-bridge.js";
+import { useHostContext } from "../hooks/use-host-context.js";
+import { useViewContext } from "../hooks/use-view-context.js";
 
 interface ViewControlsProps {
   children: React.ReactNode;
@@ -18,7 +20,9 @@ export function ViewControls({
   debugger: enableDebugger = false,
   viewControls = false,
 }: ViewControlsProps) {
-  const view = useView();
+  const context = useViewContext();
+  const host = useHostContext();
+  const { requestDisplayMode } = useViewActions();
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -43,13 +47,13 @@ export function ViewControls({
             transition: "opacity 0.2s",
           }}
         >
-          {viewControls && view.displayMode === "inline" && (
+          {viewControls && host.displayMode === "inline" && (
             <>
               {(viewControls === true || viewControls === "fullscreen") && (
                 <button
                   type="button"
                   aria-label="Fullscreen"
-                  onClick={() => void view.requestDisplayMode({ mode: "fullscreen" })}
+                  onClick={() => void requestDisplayMode({ mode: "fullscreen" })}
                 >
                   FS
                 </button>
@@ -58,7 +62,7 @@ export function ViewControls({
                 <button
                   type="button"
                   aria-label="Picture in picture"
-                  onClick={() => void view.requestDisplayMode({ mode: "pip" })}
+                  onClick={() => void requestDisplayMode({ mode: "pip" })}
                 >
                   PiP
                 </button>
@@ -89,13 +93,14 @@ export function ViewControls({
         >
           {JSON.stringify(
             {
-              toolOutput: view.toolOutput,
-              content: view.content,
-              toolInput: view.toolInput,
-              meta: view.meta,
-              theme: view.theme,
-              displayMode: view.displayMode,
-              isAvailable: view.isAvailable,
+              toolOutput:
+                context.status === "ready" ? context.toolOutput : undefined,
+              content: context.status === "ready" ? context.content : undefined,
+              toolInput: context.toolInput,
+              meta: context.status === "ready" ? context.meta : undefined,
+              theme: host.theme,
+              displayMode: host.displayMode,
+              isAvailable: host.isAvailable,
             },
             null,
             2

@@ -8,9 +8,9 @@
 ## Decisions at a glance
 
 1. **One protocol: MCP Apps.** The [MCP Apps extension](https://github.com/modelcontextprotocol/ext-apps) (`io.modelcontextprotocol/ui`, spec revision `2026-01-26` + draft) is the only wire format. The v1 adapter system (`AppsSdkAdapter`, dual-protocol metadata, `window.openai` transport) is **not ported**.
-2. **Public naming is "view", everywhere.** `view` tool config, `useView` hook, `ui://views/…`. "Widget" survives nowhere in the v2 API.
+2. **Public naming is "view", everywhere.** `view` tool config, `useViewContext` hook, `ui://views/…`. "Widget" survives nowhere in the v2 API.
 3. **`tool()` returns `ToolRef<Name, Input, Output>`** (not `this`). Typed `useCallTool` is pure type inference over exported refs — zero codegen, nothing generated on the dev/build hot path.
-4. **Hook-first view data.** The default export mounts when the bridge connects — before any tool result — and stays mounted for the iframe lifetime; the runtime never spreads props onto it. `useViewContext<Name>()` is the primary data API: a discriminated union over `pending` / `streaming` / `ready` that carries tool input, partial input during streaming, typed `toolOutput` after the result, plus `content` and view-only `meta`. Split hooks cover host context and actions; `useView()` remains the v1 `useWidget` migration aggregate.
+4. **Hook-first view data.** The default export mounts when the bridge connects — before any tool result — and stays mounted for the iframe lifetime; the runtime never spreads props onto it. `useViewContext<Name>()` is the primary data API: a discriminated union over `pending` / `streaming` / `ready` that carries tool input, partial input during streaming, typed `toolOutput` after the result, plus `content` and view-only `meta`. Split hooks cover host context and actions; there is deliberately no aggregate hook — v1 `useWidget` migrates onto the split hooks.
 5. **The React runtime builds on `@modelcontextprotocol/ext-apps`** (guest `App` class); the server package **inlines** the few wire constants and emits spec `_meta` itself — no ext-apps import server-side.
 6. **No response helpers — views included.** The no-response-helpers ground rule (`SPEC.md`) applies without exception. View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery).
 7. **React runtime ships as the `/react` subpath** of this package, with `react` an optional peer — tool-only servers never pay for it.
@@ -240,10 +240,10 @@ The full `CallToolResult` reaches the view (the host forwards it via `ui/notific
 
 | Data | Model | View | Text-only host | Carried as |
 | --- | --- | --- | --- | --- |
-| `structuredContent` | ✅ | ✅ (`useViewContext().toolOutput` when `ready`; `useView().toolOutput`) | host may render raw | `structuredContent`, typed by `outputSchema` |
-| `content` | ✅ | ✅ (`useViewContext().content` when `ready`; `useView().content`) | ✅ (the fallback) | `content` blocks |
-| result `_meta` (handler keys) | ❌ | ✅ (`useViewContext().meta` when `ready`; `useView().meta`) | ❌ (ignored) | result `_meta` |
-| tool input | ✅ (it authored it) | ✅ (`useViewContext().toolInput` / `partialToolInput`; `useView()` mirrors) | ✅ | `tools/call` arguments |
+| `structuredContent` | ✅ | ✅ (`useViewContext().toolOutput` when `ready`) | host may render raw | `structuredContent`, typed by `outputSchema` |
+| `content` | ✅ | ✅ (`useViewContext().content` when `ready`) | ✅ (the fallback) | `content` blocks |
+| result `_meta` (handler keys) | ❌ | ✅ (`useViewContext().meta` when `ready`) | ❌ (ignored) | result `_meta` |
+| tool input | ✅ (it authored it) | ✅ (`useViewContext().toolInput` / `partialToolInput`) | ✅ | `tools/call` arguments |
 | view→model context | ✅ (subsequent turns) | source | n/a | `ui/update-model-context` / `ModelContext` |
 | view-tool result | ✅ (it called the tool) | source | n/a | `tools/call` over the bridge → `useViewTool` handler |
 
@@ -251,7 +251,7 @@ Consequences worth spelling out in docs:
 
 - **`structuredContent` is model-visible.** That is a feature — the model reasons over exactly what the user is looking at — but it prices structured output in tokens and rules it out for bulk payloads. The dividing question for every field: *should the model see this?* Yes → `structuredContent`; no (bulk, presentation-only, e.g. base64 images, geometry, full result sets beyond what's discussed) → `_meta`.
 - **`content` is the model/text-host narrative** ("Found 12 results, top match …"). Handlers should pass a short summary; since `structuredContent` is already model-visible, omitting `content` leaves text-only hosts with only the structured payload.
-- **Result `_meta` is the view-only channel**: handler-supplied keys are preserved on result `_meta`, read via `useViewContext().meta` when `ready` (or `useView().meta`), never typed by `outputSchema`, never model context. The framework also stamps the wire `ui.*` link keys (`ui.resourceUri`, `"ui/resourceUri"`) onto every non-error result from a view-bound tool; the `ui` namespace is reserved and wire keys win on collision.
+- **Result `_meta` is the view-only channel**: handler-supplied keys are preserved on result `_meta`, read via `useViewContext().meta` when `ready`, never typed by `outputSchema`, never model context. The framework also stamps the wire `ui.*` link keys (`ui.resourceUri`, `"ui/resourceUri"`) onto every non-error result from a view-bound tool; the `ui` namespace is reserved and wire keys win on collision.
 - The reverse direction is explicit, not ambient: nothing a user does *inside* the view reaches the model unless sent via `ModelContext`/`updateModelContext` (model context push, no follow-up turn) or `sendFollowUpMessage` (`ui/message`, triggers a turn). A view tool's result is the third view→model channel, distinguished by being *model-initiated* (see View tools).
 
 ### URI scheme and serving
@@ -612,7 +612,7 @@ export default function ProductSearchResult() {
 
 **Unbound views** (warned at mount — decision 10) mount and run hooks but never reach `"ready"` if nothing delivers a tool result (inspector preview); such components branch on hook state and don't assume result payload.
 
-**Aggregate access.** `useView<Name>()` exposes the same data channels on one object (v1 `useWidget` migration path — see Hook surface). New code should prefer the split hooks; `useView` rerenders on all channels while split hooks subscribe only to theirs.
+Components compose the split hooks they need — no aggregate; rerender isolation by design.
 
 ### Streaming
 
@@ -801,40 +801,7 @@ function useDisplayMode(): {
 
 **`useViewState<T>(initial: T): [T, (next: T) => void]`** — local UI state, **iframe lifetime only**. Not persisted by the host, not model-visible (see "Dropped from v1" for the deliberate split from v1's `setWidgetState`).
 
-**`useView<Name?>()`** — aggregate hook: the v1 `useWidget` migration path. Same everything-object shape as v1; new code should prefer the split hooks above. Rerenders on **all** channels; split hooks subscribe only to theirs.
-
-```ts
-function useView<Name extends keyof RegisteredTools = never>(): ViewHandle<Name>;
-
-// Below, Input/Output stand for RegisteredTools[Name]["input"/"output"];
-// when the type parameter is omitted they are `unknown`.
-interface ViewHandle<Name> {
-  // data channels — mirrors useViewContext fields (flat, not discriminated)
-  toolOutput: Output | undefined;         // structuredContent when ready
-  content: ContentBlock[] | undefined;    // result content when ready
-  toolInput: Input | undefined;           // complete tool arguments
-  partialToolInput: DeepPartial<Input> | undefined; // argument stream during streaming
-  isStreaming: boolean;                   // status === "streaming"
-  isPending: boolean;                     // status !== "ready" && toolInput !== undefined
-  meta: Record<string, unknown> | undefined; // result _meta — view-only channel
-
-  // host context — same fields as useHostContext()
-  theme: "light" | "dark";
-  locale: string; timeZone: string; userAgent: string;
-  displayMode: "inline" | "fullscreen" | "pip";
-  safeArea: SafeAreaInsets; maxHeight: number | undefined; maxWidth: number | undefined;
-  hostInfo: HostInfo | undefined;
-  hostCapabilities: HostCapabilities | undefined;
-  hostContext: HostContext | undefined;
-  isAvailable: boolean;
-
-  // actions — same as split hooks (stable identities; v1 argument shapes kept)
-  callTool: (name: string, args: Record<string, unknown>) => Promise<CallToolResult>; // untyped; prefer useCallTool
-  sendFollowUpMessage: (args: { prompt: string }) => Promise<void>;
-  openExternal: (args: { url: string }) => void;
-  requestDisplayMode: (args: { mode: "inline" | "fullscreen" | "pip" }) => Promise<void>;
-}
-```
+**`useViewTheme(): "light" | "dark"`** — narrow theme-only subscription; rerenders only on host theme changes.
 
 **`<ModelContext content={string}>{children?}</ModelContext>`** and **`modelContext.set/remove/clear`** — the explicit view→model channel, API carried from v1 unchanged: components register `content` in a parent-child tree, nested `<ModelContext>` elements serialize as an indented list, updates batch per microtask and push over `ui/update-model-context`; the imperative `modelContext` API covers non-React call sites (event handlers, stores) with stable keys.
 
@@ -942,17 +909,17 @@ export default function ProductSearchResult() {
 }
 ```
 
-Everything result-shaped enters through `useViewContext` (typed by the server's `outputSchema`; `query` is there because the handler echoes it for model visibility); everything ambient or imperative goes through split hooks; the view→model paths (`ModelContext`, `sendFollowUpMessage`) are visible and explicit in the JSX. For tools not in the `Register` (dynamic registration, unexported refs), the explicit-generics rung applies with hand-written types: `useCallTool<{ fruit: string }, { name: string; producer: string }>("get-fruit-details")`. For v1 migration, `useView()` exposes the same fields on one object — prefer split hooks in new code.
+Everything result-shaped enters through `useViewContext` (typed by the server's `outputSchema`; `query` is there because the handler echoes it for model visibility); everything ambient or imperative goes through split hooks; the view→model paths (`ModelContext`, `sendFollowUpMessage`) are visible and explicit in the JSX. For tools not in the `Register` (dynamic registration, unexported refs), the explicit-generics rung applies with hand-written types: `useCallTool<{ fruit: string }, { name: string; producer: string }>("get-fruit-details")`.
 
 ### Hook surface (v1 → v2 → backing primitive)
 
 | v1                                                                                                      | v2                                                                                        | Backed by                                                                    |
 | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `useWidget()`                                                                                           | `useView()` — aggregate migration path; prefer split hooks                                | `App` events + `getHostContext()`                                            |
-| — `props` / `toolInput` / `output`                                                                      | `useViewContext()` primary (`status` discriminant); `useView().toolOutput` / `content` / `toolInput` flat mirror (`output` folds into `toolOutput`) | `ontoolinput` / `ontoolinputpartial` / `ontoolresult`                        |
-| — `metadata`                                                                                            | `meta` on `useViewContext` when `ready`; `useView().meta` — view-only result channel        | result `_meta` from `ontoolresult`                                           |
-| — `partialToolInput` / `isStreaming`                                                                    | on `useViewContext` (`streaming` branch) and `useView()`                                    | `ontoolinputpartial`                                                         |
-| — `isPending`                                                                                           | `useViewContext().status !== "ready"`; `useView().isPending` for flat access                | input-received-but-no-result state                                           |
+| `useWidget()`                                                                                           | split hooks (no aggregate)                                                                | `App` events + `getHostContext()`                                            |
+| — `props` / `toolInput` / `output`                                                                      | `useViewContext()` primary (`status` discriminant; `output` folds into `toolOutput`)      | `ontoolinput` / `ontoolinputpartial` / `ontoolresult`                        |
+| — `metadata`                                                                                            | `meta` on `useViewContext` when `ready` — view-only result channel                        | result `_meta` from `ontoolresult`                                           |
+| — `partialToolInput` / `isStreaming`                                                                    | on `useViewContext` (`streaming` branch)                                                  | `ontoolinputpartial`                                                         |
+| — `isPending`                                                                                           | `useViewContext().status !== "ready"`                                                     | input-received-but-no-result state                                           |
 | — `theme` / `locale` / … / `isAvailable`                                                                | `useHostContext()`; `useViewTheme()` for theme-only                                       | `hostContext` + `onhostcontextchanged`                                       |
 | — `callTool`                                                                                            | `useCallTool()` (typed; preferred)                                                        | `App.callServerTool`                                                         |
 | — `sendFollowUpMessage`                                                                                 | `useSendFollowUp()`                                                                       | `App.sendMessage` (`ui/message`)                                             |
@@ -997,7 +964,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 ## Deltas vs v1 (for the migration guide)
 
 1. Every `widget` name → `view` (`widget:` config, `useWidget*`, `WidgetControls`, `ui://widget/…` → `ui://views/…`). The v1 `widget()` response helper is dropped — handlers return plain `CallToolResult`.
-2. `useWidgetProps()` → `useViewContext()` as the primary data API (`ViewContextHandle` discriminated union, `toolOutput` not `props`); `useWidget()` → `useView()` as the aggregate migration path (`toolOutput` + `content`). Components mount once on bridge connect and branch on hook state — no props spread, no separate loading component export. Result payload is `structuredContent` only — v1's `toolInput` merge is gone (read input via `useViewContext().toolInput` / `partialToolInput`, or echo input fields into the output schema for model visibility).
+2. `useWidgetProps()` → `useViewContext()` as the primary data API (`ViewContextHandle` discriminated union, `toolOutput` not `props`); `useWidget()` → the split hooks (`useViewContext()` for data, `useHostContext()` for ambient host context, per-action hooks for bridge actions). Components mount once on bridge connect and branch on hook state — no props spread, no separate loading component export. Result payload is `structuredContent` only — v1's `toolInput` merge is gone (read input via `useViewContext().toolInput` / `partialToolInput`, or echo input fields into the output schema for model visibility).
 3. `widgetMetadata` export dropped — view files default-export the component only. Result types come from `outputSchema` via `useViewContext<Name>()` (required on view-bound tools). Resource facts (description, CSP, permissions, domain, prefersBorder) are declared on the bound tool's `view:` config and emitted on the resource.
 4. In-component `isPending` skeleton branching → `useViewContext()` status branching inside the always-mounted default export.
 5. `useCallTool` types come from exporting tool refs, not from generated `.mcp-use/generated/tool-registry.d.ts`; template `postinstall`/dev-loop typegen is gone.
@@ -1008,13 +975,13 @@ The full build/serve contract is "Build system & serving", above; it extends the
 10. Views work against the stateless 2026-07-28 wire; nothing view-related depends on sessions.
 11. Asset routes move from `${basePath}/mcp-use/widgets/…` to `${basePath}/_mcp-use/…`; build output from `.mcp-use/build/resources/widgets/<name>/` to one shared-chunk build in `.mcp-use/build/views/`. Boot-time origin baking and the v1 `window.__getFile`/`__mcpServerUrl` globals are gone — origin resolves per request (forwarded headers, plus an override whose shape — `publicUrl` config vs v1's `MCP_URL` — is pending, see Open questions); `assetPrefix` has no v2 equivalent (a CDN fronts the asset route instead). One request-scoped `globalThis.__mcpUseViewConfig` (public asset base only) is injected into the synthesized document — not boot-time baked like v1's `__mcpPublicAssetsUrl`.
 12. Registration no longer happens inside `listen()`/`getHandler()` (v1's async `mountWidgets` → `server.uiResource()`): the build primes the instance through a generated wrapper entry, and `resources/read` synthesizes the document from manifest data instead of re-reading built HTML from disk on every read. `server.uiResource()` has no v2 equivalent, and neither do v1's `exposeAsTool` / hand-built `uiResource` registrations — a view is bound by at most one tool via `view: { name }`, and an unbound view warns (decision 10).
-13. Ambient hooks split by concern: `useHostContext()`, `useSendFollowUp()`, `useOpenExternal()`, `useDisplayMode()` — new code should prefer these over `useView()` for rerender isolation.
+13. Ambient hooks split by concern: `useHostContext()`, `useSendFollowUp()`, `useOpenExternal()`, `useDisplayMode()` — split-by-concern is the design; each hook rerenders only on its channel.
 
 ## Open questions
 
 - Stable `ui://views/<name>.html` vs content-hashed URIs: revisit only with evidence that a target host over-caches by URI (v1's `buildId` existed for ChatGPT; ChatGPT's MCP Apps path may not need it). External evidence: Skybridge appends `?v=<content-hash>` to view URIs in production — a second framework independently concluding hosts over-cache by URI. Expectation is this resolves toward a manifest-driven hash suffix once tested against ChatGPT; still deferred to that test, not decided here.
 - **Origin override: `MCP_URL` vs `publicUrl`.** The request-scoped resolution order is decided (override → forwarded headers → request URL, applied at emission time); the override's surface is not — v1 shipped `MCP_URL` as an environment variable, and what of its v1 role carries into v2 deserves its own discussion. Until then this spec names it only "the override".
-- `ui/download-file` (draft) exposure — as a `useView` action or standalone hook — once a target host ships it.
+- `ui/download-file` (draft) exposure — as a standalone hook — once a target host ships it.
 - Partial/streamed **tool results**: not in the 2026-07-28 protocol or the apps spec today (see Streaming). When a partial-result channel lands upstream, deliver it as ordinary `useViewContext` re-renders; until then, progressive UIs pull via `useCallTool`.
 - **Single-file inline mode** (v1's `--inline`, all JS/CSS inlined into the HTML document): needed only for hosts whose CSP refuses all external resources (VS Code was v1's case). Deferred until a target host demands it; when it comes back it is a per-view build flag whose prebuilt single-file document rides the manifest and replaces synthesis for that view, with the asset routes unused.
 - **Vite dev `script-src` / eval:** Vite HMR and some dev transforms use `eval`, which strict host `script-src` policies may block. The MCP Apps CSP shape is origin-lists only — no `'unsafe-eval'` or nonce slot — so this cannot be declared in `view.csp`. If it bites in practice, the fix is Vite-side (jitless deps, no eval-based sourcemaps); dev already auto-appends the HMR websocket origin to `connectDomains` (Serving).

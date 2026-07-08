@@ -23,7 +23,7 @@ export {
 } from "./hooks/use-host-context.js";
 export { useOpenExternal } from "./hooks/use-open-external.js";
 export { useSendFollowUp } from "./hooks/use-send-follow-up.js";
-export { useView, useViewTheme, type ViewHandle } from "./hooks/use-view.js";
+export { useViewTheme } from "./hooks/use-view-theme.js";
 export {
   useViewContext,
   type ViewContextHandle,

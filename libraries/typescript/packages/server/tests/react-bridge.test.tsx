@@ -13,7 +13,6 @@ import {
   useHostContext,
   useOpenExternal,
   useSendFollowUp,
-  useView,
   useViewContext,
   useViewTool,
 } from "../src/react/index.js";
@@ -125,7 +124,7 @@ describe("react bridge runtime", () => {
     expect(screen.queryByTestId("lifecycle")).toBeNull();
   });
 
-  it("surfaces meta on useView and useCallTool round-trips with state transitions", async () => {
+  it("surfaces meta on useViewContext and useCallTool round-trips with state transitions", async () => {
     resetRuntime();
     const { bridge, init } = await startHost(async (name, args) => {
       if (args.id === "fail") {
@@ -138,11 +137,15 @@ describe("react bridge runtime", () => {
     });
 
     function Probe() {
-      const view = useView();
+      const context = useViewContext();
       const tool = useCallTool<{ id: string }, { value: string }>("lookup");
       return (
         <div>
-          <span data-testid="meta">{view.meta ? JSON.stringify(view.meta) : ""}</span>
+          <span data-testid="meta">
+            {context.status === "ready" && context.meta
+              ? JSON.stringify(context.meta)
+              : ""}
+          </span>
           <span data-testid="pending">{String(tool.isPending)}</span>
           <span data-testid="error">{tool.error?.message ?? ""}</span>
           <span data-testid="data">
