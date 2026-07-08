@@ -52,29 +52,47 @@ function resolveDisplayMode(hostContext: HostContext | undefined): DisplayMode {
  * Host environment and bridge availability for the current view.
  */
 export interface HostContextHandle {
-  /** Host color theme. */
+  /** Host color theme. `"light"` until the host reports a theme. */
   theme: "light" | "dark";
-  /** User locale (BCP 47). */
+  /** User locale (BCP 47). Falls back to `"en-US"` when the host does not report one. */
   locale: string;
-  /** User timezone (IANA). */
+  /** User timezone (IANA). Falls back to the browser's timezone, then `"UTC"`. */
   timeZone: string;
-  /** Host application user-agent string. */
+  /** Host application user-agent string. Falls back to the browser's own user agent. */
   userAgent: string;
-  /** How the view is currently displayed. */
+  /** How the host is currently displaying the view. `"inline"` until the host reports otherwise. */
   displayMode: DisplayMode;
-  /** Mobile safe area insets in pixels. */
+  /** Mobile safe area insets in pixels. All zeros when the host reports none. */
   safeArea: SafeAreaInsets;
-  /** Maximum container height in pixels, when provided by the host. */
+  /**
+   * Vertical layout budget in pixels: the most height the view can occupy.
+   *
+   * Derived from the host's container dimensions. When the host fixes the
+   * container to an exact height, that height is reported; otherwise the
+   * host's stated maximum is. `undefined` when the host reports no layout
+   * constraint — treat that as unbounded. The raw dimensions remain available
+   * on `hostContext.containerDimensions`.
+   */
   maxHeight: number | undefined;
-  /** Maximum container width in pixels, when provided by the host. */
+  /**
+   * Horizontal layout budget in pixels: the most width the view can occupy.
+   *
+   * Same derivation as `maxHeight`: an exact container width when the host
+   * fixes one, otherwise the host's stated maximum, otherwise `undefined`
+   * (unbounded).
+   */
   maxWidth: number | undefined;
-  /** Host identity from {@link App.getHostVersion}. */
+  /** Host identity (name and version). `undefined` until the bridge has connected. */
   hostInfo: HostInfo | undefined;
-  /** Host capabilities from initialization. */
+  /** Host capabilities negotiated at initialization. `undefined` until the bridge has connected. */
   hostCapabilities: HostCapabilities | undefined;
-  /** Raw host context object. */
+  /**
+   * The host context object exactly as the host reported it, with none of the
+   * fallbacks the fields above apply. Use it to read host-specific fields this
+   * handle does not surface. `undefined` until the host first reports context.
+   */
   hostContext: HostContext | undefined;
-  /** Whether the MCP Apps bridge is connected. */
+  /** Whether the MCP Apps bridge is connected. While `false`, every field holds its documented fallback. */
   isAvailable: boolean;
 }
 

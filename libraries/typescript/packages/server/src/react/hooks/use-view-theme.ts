@@ -1,8 +1,14 @@
 import { useHostContextSubscription } from "../bridge/view-bridge.js";
 
 /**
- * Dedicated host-theme subscription without re-rendering on tool-data or other
- * host-context channels.
+ * Subscribe to the host color theme only.
+ *
+ * @remarks
+ * Returns the same value as {@link useHostContext}'s `theme` and updates live
+ * when the user or host switches themes. Prefer this hook when theme is all a
+ * component needs: it re-renders on host context changes only, never on
+ * tool-input or result updates. Returns `"light"` until the host reports a
+ * theme.
  *
  * @example
  * ```tsx

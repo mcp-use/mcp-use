@@ -1,7 +1,16 @@
 import { useViewActions } from "../bridge/view-bridge.js";
 
 /**
- * Returns a callback that sends a follow-up user message to trigger a model turn.
+ * Returns a callback that sends a follow-up message to the conversation,
+ * triggering a model turn.
+ *
+ * @remarks
+ * The prompt is delivered to the host as a user-authored chat message, as if
+ * the user had typed it. The returned promise resolves when the host accepts
+ * the message — not when the model responds; any response arrives through the
+ * normal conversation flow (and, if the model calls this view's tool again,
+ * through {@link useToolContext}). Hosts may require user confirmation or
+ * decline the message entirely.
  *
  * @example
  * ```tsx
