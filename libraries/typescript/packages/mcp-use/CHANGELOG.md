@@ -1,5 +1,13 @@
 # mcp-use
 
+## 1.34.4-canary.1
+
+### Patch Changes
+
+- 79df5e4: Fix `useMcp` auto proxy fallback pointing at a retired host. The default `autoProxyFallback` proxy address was `https://inspector.mcp-use.com/inspector/api/proxy`, which now 301-redirects to `inspector.manufact.com`. Browsers treat a redirect on a CORS preflight as a hard failure, so the automatic direct→proxy fallback could never connect (it would retry through a dead URL and fail). The default now points at the live `https://inspector.manufact.com/inspector/api/proxy`.
+  - @mcp-use/cli@3.6.5-canary.1
+  - @mcp-use/inspector@12.0.4-canary.1
+
 ## 1.34.4-canary.0
 
 ### Patch Changes

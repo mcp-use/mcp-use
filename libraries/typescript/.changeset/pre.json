@@ -8,6 +8,7 @@
     "mcp-use": "1.34.3"
   },
   "changesets": [
+    "fix-auto-proxy-fallback-host",
     "fix-dead-doc-links"
   ]
 }
