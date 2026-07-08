@@ -36,15 +36,41 @@ export interface ViewResourceFacts {
   prefersBorder?: boolean;
 }
 
-/** One entry in the primed views manifest. */
-export interface ViewManifestEntry {
+/**
+ * Production manifest entry: a self-contained view bundle whose JS and CSS are
+ * inlined into the synthesized HTML document (zero asset fetches at srcdoc boot).
+ */
+export interface InlineViewManifestEntry {
+  /** Discriminant for the production self-contained bundle shape. */
+  kind: "inline";
   /**
-   * Asset path relative to `.mcp-use/build/` (production), or an
-   * origin-absolute URL path starting with `/` (dev: the Vite client-env
-   * module URL).
+   * Minified ES module source embedded in a `<script type="module">` by
+   * {@link synthesizeViewDocument}.
+   */
+  js: string;
+  /**
+   * Aggregated stylesheet text embedded in a `<style>` element (empty string
+   * when the view has no CSS).
+   */
+  css: string;
+}
+
+/**
+ * Dev manifest entry: Vite client-environment module URLs loaded by the
+ * synthesized document (HMR / Fast Refresh).
+ */
+export interface ExternalViewManifestEntry {
+  /** Discriminant for the dev external-module shape. */
+  kind: "external";
+  /**
+   * Origin-absolute URL path starting with `/` — the Vite client-env module
+   * URL for the view's virtual entry.
    */
   entry: string;
-  /** Stylesheet paths, using the same path rules as {@link ViewManifestEntry.entry}. */
+  /**
+   * Stylesheet URL paths, using the same path rules as
+   * {@link ExternalViewManifestEntry.entry}.
+   */
   css: string[];
   /**
    * Optional extra module-script URL paths prepended to the synthesized
@@ -54,6 +80,16 @@ export interface ViewManifestEntry {
    */
   scripts?: string[];
 }
+
+/**
+ * One entry in the primed views manifest.
+ *
+ * Production builds emit {@link InlineViewManifestEntry}; `mcp-use dev` emits
+ * {@link ExternalViewManifestEntry}.
+ */
+export type ViewManifestEntry =
+  | InlineViewManifestEntry
+  | ExternalViewManifestEntry;
 
 /** Map of view name → manifest entry, primed via {@link registerViews}. */
 export interface ViewsManifest {

@@ -52,7 +52,13 @@ export type {
   ToolResult,
   ToolViewConfig,
 } from "./tools.js";
-export type { UiPermissions, ViewManifestEntry, ViewsManifest } from "./views/index.js";
+export type {
+  ExternalViewManifestEntry,
+  InlineViewManifestEntry,
+  UiPermissions,
+  ViewManifestEntry,
+  ViewsManifest,
+} from "./views/index.js";
 export type {
   InferTemplateParams,
   ResourceCallback,

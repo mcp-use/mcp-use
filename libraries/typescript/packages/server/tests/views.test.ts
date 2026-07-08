@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MCPServer, registerViews } from "../src/index.js";
+import { synthesizeViewDocument } from "../src/views/document.js";
 
 const UI_CAPABILITIES = {
   extensions: {
@@ -29,16 +30,19 @@ const resultsSchema = z.object({
 function primeViews(server: MCPServer): void {
   server[registerViews]({
     "product-search-result": {
-      entry: "views/assets/product-search-result-D2f9a1Kc.js",
-      css: ["views/assets/product-search-result-B99z1bQd.css"],
+      kind: "inline",
+      js: 'console.log("product-search-result");',
+      css: ".results { color: red; }",
     },
     "orphan-view": {
-      entry: "views/assets/orphan-D2f9a1Kc.js",
-      css: [],
+      kind: "inline",
+      js: 'console.log("orphan");',
+      css: "",
     },
     "app-only-view": {
-      entry: "views/assets/app-only-D2f9a1Kc.js",
-      css: [],
+      kind: "inline",
+      js: 'console.log("app-only");',
+      css: "",
     },
   });
 }
@@ -228,8 +232,10 @@ describe("views server core (e2e over HTTP)", () => {
     expect(content.mimeType).toBe("text/html;profile=mcp-app");
     expect(content.text).toContain("<!doctype html>");
     expect(content.text).toContain('id="root"');
-    expect(content.text).toContain("/mcp/_mcp-use/assets/product-search-result-D2f9a1Kc.js");
-    expect(content.text).toContain("/mcp/_mcp-use/assets/product-search-result-B99z1bQd.css");
+    expect(content.text).toContain('console.log("product-search-result");');
+    expect(content.text).toContain("<style>.results { color: red; }</style>");
+    expect(content.text).not.toMatch(/<script[^>]+src=/);
+    expect(content.text).toContain("/mcp/_mcp-use/public/");
     expect(content._meta?.["ui"]).toMatchObject({
       csp: {
         connectDomains: [],
@@ -490,8 +496,10 @@ describe("views HTTP routes", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     const html = await response.text();
     expect(html).toContain(
-      "https://fruit-store.fly.dev/mcp/_mcp-use/assets/product-search-result-D2f9a1Kc.js"
+      "https://fruit-store.fly.dev/mcp/_mcp-use/public/"
     );
+    expect(html).toContain('console.log("product-search-result");');
+    expect(html).not.toMatch(/<script[^>]+src=/);
   });
 
   it("404s unknown view documents", async () => {
@@ -689,7 +697,7 @@ describe("views binding validation", () => {
   it("throws at mount when a tool binds a missing primed view", async () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     server[registerViews]({
-      other: { entry: "views/assets/other.js", css: [] },
+      other: { kind: "inline", js: "export {};", css: "" },
     });
     server.tool(
       {
@@ -728,8 +736,9 @@ describe("views binding validation", () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     server[registerViews]({
       "lonely-view": {
-        entry: "views/assets/lonely.js",
-        css: [],
+        kind: "inline",
+        js: "export {};",
+        css: "",
       },
     });
     const { port } = await server.listen(0);
@@ -744,13 +753,70 @@ describe("views binding validation", () => {
   it("throws when priming views twice", () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     server[registerViews]({
-      a: { entry: "views/assets/a.js", css: [] },
+      a: { kind: "inline", js: "export {};", css: "" },
     });
     expect(() =>
       server[registerViews]({
-        b: { entry: "views/assets/b.js", css: [] },
+        b: { kind: "inline", js: "export {};", css: "" },
       })
     ).toThrow(/already primed/);
+  });
+});
+
+describe("views document synthesis", () => {
+  it("inlines JS/CSS for production entries without external asset script tags", () => {
+    const html = synthesizeViewDocument(
+      {
+        kind: "inline",
+        js: 'console.log("hello");',
+        css: "body{color:red}",
+      },
+      "https://example.com",
+      "/mcp"
+    );
+    expect(html).toContain('<script type="module">console.log("hello");</script>');
+    expect(html).toContain("<style>body{color:red}</style>");
+    expect(html).not.toMatch(/<script[^>]+src=/);
+    expect(html).not.toMatch(/<link[^>]+stylesheet/);
+    expect(html).toContain("__mcpUseViewConfig");
+  });
+
+  it("escapes </script> inside inlined module source so the document does not terminate early", () => {
+    const html = synthesizeViewDocument(
+      {
+        kind: "inline",
+        js: 'const s = "</script>"; console.log(s);',
+        css: "",
+      },
+      "https://example.com",
+      "/mcp"
+    );
+    // Raw `</script>` must not appear inside the module body (would close the tag).
+    const moduleMatch = html.match(
+      /<script type="module">([\s\S]*?)<\/script>\s*<\/body>/
+    );
+    expect(moduleMatch).not.toBeNull();
+    const body = moduleMatch![1]!;
+    expect(body).not.toContain("</script>");
+    expect(body).toContain("<\\/script>");
+    expect(html).toContain('const s = "<\\/script>";');
+  });
+
+  it("keeps external script/link tags for dev entries", () => {
+    const html = synthesizeViewDocument(
+      {
+        kind: "external",
+        entry: "/@id/__x00__virtual:mcp-use/views/demo",
+        css: [],
+        scripts: ["/@vite/client"],
+      },
+      "http://localhost:3000",
+      "/mcp"
+    );
+    expect(html).toContain(
+      'src="http://localhost:3000/@id/__x00__virtual:mcp-use/views/demo"'
+    );
+    expect(html).toContain('src="http://localhost:3000/@vite/client"');
   });
 });
 
@@ -764,8 +830,10 @@ describe("views dev CSP (e2e over HTTP)", () => {
   server[registerViews](
     {
       "product-search-result": {
-        entry: "views/assets/product-search-result-D2f9a1Kc.js",
-        css: ["views/assets/product-search-result-B99z1bQd.css"],
+        kind: "external",
+        entry: "/@id/__x00__virtual:mcp-use/views/product-search-result",
+        css: [],
+        scripts: ["/@vite/client"],
       },
     },
     { dev: true }
@@ -850,8 +918,9 @@ describe("views prod CSP (e2e over HTTP)", () => {
 
     server[registerViews]({
       "product-search-result": {
-        entry: "views/assets/product-search-result-D2f9a1Kc.js",
-        css: [],
+        kind: "inline",
+        js: 'console.log("prod");',
+        css: "",
       },
     });
 

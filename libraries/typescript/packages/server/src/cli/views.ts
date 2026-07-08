@@ -5,23 +5,10 @@
  */
 
 import { existsSync, readdirSync } from "node:fs";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import type { ViteDevServer } from "vite";
 
 import type { ViewsManifest } from "../views/types.js";
-
-/** Minimal Rollup chunk shape used to map client build output to manifest paths. */
-export interface BuildOutputChunk {
-  type: "chunk";
-  fileName: string;
-  facadeModuleId: string | null;
-  name: string;
-  imports: string[];
-  viteMetadata?: { importedCss?: Set<string> };
-}
-
-/** Minimal Rollup bundle map from a client views build. */
-export type BuildOutputBundle = Record<string, BuildOutputChunk | { type: string }>;
 
 /** Prefix for per-view virtual entry modules (`virtual:mcp-use/views/<name>`). */
 export const VIRTUAL_VIEW_PREFIX = "virtual:mcp-use/views/";
@@ -123,86 +110,12 @@ export function buildDevViewsManifest(views: DiscoveredView[]): ViewsManifest {
   const manifest: ViewsManifest = {};
   for (const view of views) {
     manifest[view.name] = {
+      kind: "external",
       entry: devVirtualEntryPath(view.name),
       css: [],
       scripts: ["/@vite/client"],
     };
   }
-  return manifest;
-}
-
-/**
- * Collect CSS asset file names from an entry chunk and its static imports.
- */
-function collectChunkCss(
-  chunk: BuildOutputChunk,
-  bundle: BuildOutputBundle,
-  out: Set<string>
-): void {
-  const imported = chunk.viteMetadata?.importedCss;
-  if (imported !== undefined) {
-    for (const file of imported) {
-      out.add(file);
-    }
-  }
-  for (const importedFile of chunk.imports) {
-    const importedChunk = bundle[importedFile];
-    if (importedChunk?.type === "chunk") {
-      collectChunkCss(importedChunk as BuildOutputChunk, bundle, out);
-    }
-  }
-}
-
-/**
- * Map a client build's Rollup output to production manifest entries.
- *
- * @param views - Built views (for ordering and names).
- * @param bundle - Rollup output bundle from the client build.
- * @returns Manifest paths relative to `.mcp-use/build/`.
- * @throws When an entry chunk cannot be matched to a view.
- *
- * @internal
- */
-export function buildProductionViewsManifest(
-  views: DiscoveredView[],
-  bundle: BuildOutputBundle
-): ViewsManifest {
-  const manifest: ViewsManifest = {};
-
-  for (const view of views) {
-    const resolvedId = `${VIRTUAL_VIEW_RESOLVED_PREFIX}${view.name}`;
-    let entryChunk: BuildOutputChunk | undefined;
-
-    for (const output of Object.values(bundle)) {
-      if (output.type !== "chunk") {
-        continue;
-      }
-      const chunk = output as BuildOutputChunk;
-      if (
-        chunk.facadeModuleId === resolvedId ||
-        chunk.facadeModuleId === virtualViewId(view.name) ||
-        chunk.name === view.name
-      ) {
-        entryChunk = chunk;
-        break;
-      }
-    }
-
-    if (entryChunk === undefined) {
-      throw new Error(
-        `Client build produced no entry chunk for view "${view.name}".`
-      );
-    }
-
-    const cssFiles = new Set<string>();
-    collectChunkCss(entryChunk, bundle, cssFiles);
-
-    manifest[view.name] = {
-      entry: `views/assets/${basename(entryChunk.fileName)}`,
-      css: [...cssFiles].map((file) => `views/assets/${basename(file)}`),
-    };
-  }
-
   return manifest;
 }
 

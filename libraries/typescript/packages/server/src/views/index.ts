@@ -9,6 +9,8 @@ export {
   viewResourceUri,
 } from "./constants.js";
 export type {
+  ExternalViewManifestEntry,
+  InlineViewManifestEntry,
   UiPermissions,
   ViewManifestEntry,
   ViewResourceFacts,
