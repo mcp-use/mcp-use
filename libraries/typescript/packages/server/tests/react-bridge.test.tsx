@@ -9,6 +9,8 @@ import {
   bootstrapView,
   Image,
   McpUseProvider,
+  ModelContext,
+  modelContext,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -19,6 +21,7 @@ import {
   useViewTool,
 } from "../src/react/index.js";
 import { _resetBootstrapRootsForTesting } from "../src/react/bridge/bootstrap-view.js";
+import { _resetModelContextForTesting } from "../src/react/bridge/model-context-store.js";
 import {
   _getAppForTesting,
   _resetViewBridgeForTesting,
@@ -29,6 +32,7 @@ import { createPairedTransports } from "./helpers/paired-transport.js";
 
 function resetRuntime(): void {
   _resetViewBridgeForTesting();
+  _resetModelContextForTesting();
   _resetBootstrapRootsForTesting();
   document.body.innerHTML = "";
 }
@@ -42,6 +46,7 @@ async function startHost(
     openLinks: {},
     serverTools: {},
     logging: {},
+    updateModelContext: { text: {} },
   }
 ) {
   const [guestTransport, hostTransport] = createPairedTransports();
@@ -66,6 +71,18 @@ async function startHost(
     };
   };
 
+  const modelContextUpdates: {
+    content?: { type: string; text?: string }[];
+  }[] = [];
+  bridge.onupdatemodelcontext = async (params) => {
+    modelContextUpdates.push(
+      params as {
+        content?: { type: string; text?: string }[];
+      }
+    );
+    return {};
+  };
+
   const init = new Promise<void>((resolve) => {
     bridge.oninitialized = () => {
       resolve();
@@ -73,7 +90,7 @@ async function startHost(
   });
 
   await bridge.connect(hostTransport);
-  return { bridge, init };
+  return { bridge, init, modelContextUpdates };
 }
 
 describe("react bridge runtime", () => {
@@ -1027,6 +1044,217 @@ describe("react bridge runtime", () => {
     await expect(
       bridge.callTool({ name: "pick-item", arguments: { id: "c" } })
     ).rejects.toThrow();
+  });
+
+  it("sends no model-context update for views that never use ModelContext", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return <div data-testid="plain">plain</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("plain")).not.toBeNull();
+    });
+    // Allow any (erroneous) post-connect flush to drain before asserting.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(modelContextUpdates).toHaveLength(0);
+  });
+
+  it("pushes ModelContext content and clears after removal", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      const [on, setOn] = useState(true);
+      return (
+        <div>
+          {on && <ModelContext content="Viewing apples" />}
+          <button type="button" onClick={() => setOn(false)}>
+            remove
+          </button>
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content).toEqual([
+      { type: "text", text: "- Viewing apples" },
+    ]);
+
+    screen.getByText("remove").click();
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expect(modelContextUpdates[1]?.content).toEqual([]);
+  });
+
+  it("serializes nested ModelContext trees and batches sync updates", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return (
+        <ModelContext content="Dashboard">
+          <ModelContext content="Revenue" />
+          <ModelContext content="Costs" />
+        </ModelContext>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe(
+      ["- Dashboard", "  - Revenue", "  - Costs"].join("\n")
+    );
+
+    // Multiple sync imperative updates in one turn → one additional push.
+    modelContext.set("a", "Alpha");
+    modelContext.set("b", "Beta");
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expect(modelContextUpdates[1]?.content?.[0]?.text).toContain("- Alpha");
+    expect(modelContextUpdates[1]?.content?.[0]?.text).toContain("- Beta");
+  });
+
+  it("dedupes identical consecutive ModelContext pushes", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return <div data-testid="host">host</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host")).not.toBeNull();
+    });
+
+    modelContext.set("k", "Same");
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content).toEqual([
+      { type: "text", text: "- Same" },
+    ]);
+
+    // Identical re-set must not deliver another push.
+    modelContext.set("k", "Same");
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(modelContextUpdates).toHaveLength(1);
+  });
+
+  it("serializes ModelContext siblings in document order, not useId sort order", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    // Enough siblings that useId values reach two digits (":r10:" would sort
+    // before ":r2:" lexicographically).
+    const labels = Array.from({ length: 12 }, (_, i) => `node-${i + 1}`);
+
+    function View() {
+      return (
+        <div>
+          {labels.map((label) => (
+            <ModelContext key={label} content={label} />
+          ))}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe(
+      labels.map((label) => `- ${label}`).join("\n")
+    );
+  });
+
+  it("skips model-context updates when the host lacks the updateModelContext capability", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost(undefined, {
+      openLinks: {},
+      serverTools: {},
+      logging: {},
+    });
+
+    function View() {
+      return <ModelContext content="Viewing apples" />;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    // Allow the flush to drain; the capability gate must swallow it.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(modelContextUpdates).toHaveLength(0);
+  });
+
+  it("supports imperative modelContext set, remove, and clear", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return <div data-testid="host">host</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host")).not.toBeNull();
+    });
+
+    modelContext.set("active", "Viewing cart");
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content).toEqual([
+      { type: "text", text: "- Viewing cart" },
+    ]);
+
+    modelContext.set("active", "Viewing checkout");
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expect(modelContextUpdates[1]?.content).toEqual([
+      { type: "text", text: "- Viewing checkout" },
+    ]);
+
+    modelContext.remove("active");
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(3);
+    });
+    expect(modelContextUpdates[2]?.content).toEqual([]);
+
+    modelContext.set("a", "A");
+    modelContext.set("b", "B");
+    await waitFor(() => {
+      expect(modelContextUpdates.length).toBeGreaterThanOrEqual(4);
+    });
+    modelContext.clear();
+    await waitFor(() => {
+      expect(modelContextUpdates.at(-1)?.content).toEqual([]);
+    });
   });
 
   it("resolves root-relative public assets via Image", async () => {

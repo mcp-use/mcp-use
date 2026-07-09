@@ -2,6 +2,7 @@ import { useState } from "react";
 import { z } from "zod";
 import {
   Image,
+  ModelContext,
   useCallTool,
   useDisplayMode,
   useOpenExternal,
@@ -183,6 +184,10 @@ export default function ProductSearchResult() {
 
   return (
     <div className={theme === "dark" ? `dark ${rootClass}` : rootClass}>
+      <ModelContext
+        content={`User is viewing results for "${query}"; favorites: ${favorites.join(", ") || "none"}`}
+      />
+
       <header className="mb-4 flex flex-wrap items-center gap-2">
         <p className="m-0 text-lg">
           Results for &ldquo;{query}&rdquo; ({items.length})

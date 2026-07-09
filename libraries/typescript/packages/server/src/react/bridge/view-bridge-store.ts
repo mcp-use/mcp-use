@@ -216,6 +216,28 @@ function wireAppEvents(app: App): void {
 
 let injectedTransport: ViewBridgeTransport | null = null;
 
+/**
+ * Warn-once flag for hosts that omit the `updateModelContext` capability.
+ * Owned here so {@link _resetViewBridgeForTesting} clears it with the rest of
+ * the bridge singleton.
+ */
+let warnedModelContextUnsupported = false;
+
+/**
+ * Mark that the missing-`updateModelContext` warning has been emitted.
+ *
+ * @returns `true` if this call should emit the warning (first time only).
+ *
+ * @internal
+ */
+export function markModelContextUnsupportedWarned(): boolean {
+  if (warnedModelContextUnsupported) {
+    return false;
+  }
+  warnedModelContextUnsupported = true;
+  return true;
+}
+
 /** @internal Inject a transport before connect (bridge tests only). */
 export function _setTransportForTesting(
   transport: ViewBridgeTransport | null
@@ -275,6 +297,7 @@ export function _resetViewBridgeForTesting(): void {
   connectPromise = null;
   injectedTransport = null;
   bridgeAppOptions = undefined;
+  warnedModelContextUnsupported = false;
   snapshot = { ...defaultSnapshot };
   listeners.clear();
 }

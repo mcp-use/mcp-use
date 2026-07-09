@@ -12,6 +12,7 @@ export { bootstrapView, type ViewModule } from "./bridge/bootstrap-view.js";
 export { ErrorBoundary } from "./components/error-boundary.js";
 export { Image } from "./components/image.js";
 export { McpUseProvider } from "./components/mcp-use-provider.js";
+export { ModelContext, modelContext } from "./components/model-context.js";
 export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
 export { useCallTool, type CallToolHandle } from "./hooks/use-call-tool.js";

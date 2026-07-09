@@ -10,7 +10,9 @@ import {
   type ReactNode,
 } from "react";
 
+import { registerModelContextFlush } from "./model-context-store.js";
 import {
+  markModelContextUnsupportedWarned,
   viewBridgeStore,
   type ViewBridgeSnapshot,
   type ViewBridgeStore,
@@ -30,6 +32,32 @@ export function ViewBridgeProvider({ children }: { children: ReactNode }) {
     void store.connect().catch((error: unknown) => {
       console.error("[mcp-use] Failed to connect view bridge:", error);
     });
+
+    const unregister = registerModelContextFlush((params) => {
+      void (async () => {
+        try {
+          const app = await store.connect();
+          // Spec draft: hosts declare acceptance of ui/update-model-context
+          // via the updateModelContext capability. Skip (once, loudly) when
+          // the host does not accept context updates.
+          if (app.getHostCapabilities()?.updateModelContext === undefined) {
+            if (markModelContextUnsupportedWarned()) {
+              console.warn(
+                "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
+              );
+            }
+            return;
+          }
+          await app.updateModelContext(
+            params as Parameters<App["updateModelContext"]>[0]
+          );
+        } catch (error: unknown) {
+          console.warn("[ModelContext] Failed to update model context:", error);
+        }
+      })();
+    });
+
+    return unregister;
   }, [store]);
 
   return (
