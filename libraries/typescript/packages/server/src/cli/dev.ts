@@ -259,6 +259,71 @@ async function resolveReactRefresh(
 }
 
 /**
+ * Merge `Origin` into an existing `Vary` header without duplicating it.
+ *
+ * @param res - Node response whose `Vary` may already list other tokens.
+ */
+function appendVaryOrigin(res: ServerResponse): void {
+  const existing = res.getHeader("Vary");
+  const current =
+    typeof existing === "string"
+      ? existing
+      : Array.isArray(existing)
+        ? existing.join(", ")
+        : existing !== undefined
+          ? String(existing)
+          : "";
+  if (
+    current
+      .split(",")
+      .map((token) => token.trim().toLowerCase())
+      .includes("origin")
+  ) {
+    return;
+  }
+  res.setHeader("Vary", current === "" ? "Origin" : `${current}, Origin`);
+}
+
+/**
+ * CORS for Vite-served module-graph URLs on the dev listener.
+ *
+ * Tunnel active → `Access-Control-Allow-Origin: *` (foreign / opaque hosts).
+ * No tunnel on a localhost bind → reflect a validated loopback `Origin`
+ * (exact value) and set `Vary: Origin`; foreign, `null`, or missing Origin
+ * get no ACAO so the source module graph stays unreadable to arbitrary sites.
+ *
+ * @param req - Incoming request (reads `Origin`).
+ * @param res - Response to receive CORS headers.
+ * @param options - `tunnelActive` when a public tunnel URL is set;
+ *   `localhostBind` when the listener is on a loopback host.
+ */
+function applyViteModuleCors(
+  req: IncomingMessage,
+  res: ServerResponse,
+  options: { tunnelActive: boolean; localhostBind: boolean }
+): void {
+  if (options.tunnelActive) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return;
+  }
+  if (!options.localhostBind) {
+    return;
+  }
+  const originHeader = req.headers.origin;
+  // validateOriginHeader treats a missing Origin as ok (no header to check);
+  // CORS reflection requires a concrete loopback origin string.
+  if (typeof originHeader !== "string" || originHeader === "") {
+    return;
+  }
+  const result = validateOriginHeader(originHeader, localhostAllowedOrigins());
+  if (!result.ok || result.origin === undefined) {
+    return;
+  }
+  res.setHeader("Access-Control-Allow-Origin", result.origin);
+  appendVaryOrigin(res);
+}
+
+/**
  * Validate the entry module's default export and return it as a
  * {@link ServerLike}.
  */
@@ -529,9 +594,11 @@ export async function runDev(options: DevOptions): Promise<void> {
   // carry `Origin: null` — and external hosts rendering views through the
   // tunnel fetch assets with their own origins. Those cross-origin loads also
   // need CORS: the MCP server's view asset/public routes always emit
-  // `Access-Control-Allow-Origin: *`; Vite-served module URLs get the same
-  // header from onRequest below, but only while the tunnel is active — an
-  // unexposed dev server's module graph stays unreadable cross-origin.
+  // `Access-Control-Allow-Origin: *`. Vite-served module URLs (onRequest
+  // below) emit `*` while a tunnel is active; without a tunnel, localhost
+  // binds reflect a validated loopback Origin (exact value + `Vary: Origin`)
+  // so a local MCP host can load the module graph, while foreign / opaque /
+  // missing Origin get no ACAO.
   const localhostBind = ["127.0.0.1", "localhost", "::1"].includes(host);
   const rejectDisallowedRequest = (
     req: IncomingMessage,
@@ -621,13 +688,14 @@ export async function runDev(options: DevOptions): Promise<void> {
         (viewsEnabled && pathname.startsWith("/resources/")));
 
     if (viewsEnabled && !isViewDocument && isViteRequest) {
-      // Tunnel-gated CORS: hosts rendering views through the tunnel fetch
-      // these module URLs in CORS mode from their own (or opaque) origins.
-      // Without a tunnel the dev server isn't exposed, so no permissive
-      // ACAO is emitted and the module graph stays unreadable cross-origin.
-      if (tunnelManager.status().url !== null) {
-        res.setHeader("Access-Control-Allow-Origin", "*");
-      }
+      // CORS for Vite module URLs: tunnel → `*`; else localhost bind with a
+      // validated loopback Origin → reflect that origin (+ Vary). Foreign /
+      // opaque / missing Origin stay without ACAO so the source module graph
+      // is not readable to arbitrary websites.
+      applyViteModuleCors(req, res, {
+        tunnelActive: tunnelManager.status().url !== null,
+        localhostBind,
+      });
       vite.middlewares(req, res, () => {
         void honoListener(req, res);
       });

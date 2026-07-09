@@ -275,13 +275,41 @@ describe("runDev (views)", () => {
     const virtualJs = await virtualResponse.text();
     expect(virtualJs).toMatch(/bootstrapView/);
 
-    // Tunnel-gated CORS on Vite module URLs (CLI_SPEC.md § DNS-rebinding
-    // protection): no permissive ACAO while the dev server is unexposed…
-    const localResponse = await fetch(virtualUrl, {
+    // Vite module CORS (CLI_SPEC.md § DNS-rebinding protection):
+    // without a tunnel, a validated loopback Origin is reflected exactly
+    // (with Vary: Origin) so a local MCP host can load the module graph…
+    const loopbackOrigin = "http://localhost:6274";
+    const loopbackResponse = await fetch(virtualUrl, {
+      headers: { origin: loopbackOrigin },
+    });
+    expect(loopbackResponse.status).toBe(200);
+    expect(loopbackResponse.headers.get("access-control-allow-origin")).toBe(
+      loopbackOrigin
+    );
+    expect(loopbackResponse.headers.get("vary")).toMatch(/Origin/i);
+
+    // …while foreign, opaque (`null`), and missing Origin get no ACAO…
+    const foreignResponse = await fetch(virtualUrl, {
       headers: { origin: "https://host.example" },
     });
-    expect(localResponse.status).toBe(200);
-    expect(localResponse.headers.get("access-control-allow-origin")).toBeNull();
+    expect(foreignResponse.status).toBe(200);
+    expect(
+      foreignResponse.headers.get("access-control-allow-origin")
+    ).toBeNull();
+
+    const nullOriginResponse = await fetch(virtualUrl, {
+      headers: { origin: "null" },
+    });
+    expect(nullOriginResponse.status).toBe(200);
+    expect(
+      nullOriginResponse.headers.get("access-control-allow-origin")
+    ).toBeNull();
+
+    const noOriginResponse = await fetch(virtualUrl);
+    expect(noOriginResponse.status).toBe(200);
+    expect(
+      noOriginResponse.headers.get("access-control-allow-origin")
+    ).toBeNull();
 
     // …and `*` while a tunnel is active, since hosts rendering through it
     // fetch modules in CORS mode from their own (or opaque) origins.
