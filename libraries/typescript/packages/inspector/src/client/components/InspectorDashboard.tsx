@@ -176,6 +176,7 @@ export function InspectorDashboard() {
         preventAutoAuth: true,
         useRedirectFlow: true,
         autoProxyFallback,
+        protocolNegotiation: "auto",
         ...(oauth ? { oauth } : {}),
       });
     },
@@ -455,6 +456,9 @@ export function InspectorDashboard() {
       transportType: "http",
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       useRedirectFlow: true,
+      // Probe for modern (2026-07-28) servers, falling back to the classic
+      // 2025 handshake against legacy servers.
+      protocolNegotiation: "auto",
       clientOptions: {
         capabilities: {
           extensions: {
