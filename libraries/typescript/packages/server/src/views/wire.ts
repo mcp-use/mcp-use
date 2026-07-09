@@ -1,5 +1,6 @@
 import type { ViewManifestEntry, ViewResourceFacts } from "./types.js";
 import {
+  TOOL_NAME_META_KEY,
   UI_META_KEY,
   UI_MIME_TYPE,
   UI_RESOURCE_URI_META_KEY,
@@ -7,39 +8,67 @@ import {
 } from "./constants.js";
 
 /**
- * Tool declaration `_meta` for `tools/list` on view-bound tools.
+ * Tool declaration `_meta` for `tools/list`.
  *
- * @param viewName - Bound view directory / manifest key.
- * @param visibility - Optional model/app visibility narrowing from the tool's `view` config.
- * @returns Wire metadata keys for the tool listing, including `ui.visibility` when narrowed.
+ * When `viewName` is set, emits `ui.resourceUri` plus the legacy flat
+ * {@link UI_RESOURCE_URI_META_KEY} key. When `visibility` is set, emits
+ * `ui.visibility: [visibility]`. Either may be set independently — a
+ * view-less tool can still declare app-only visibility. Returns
+ * `undefined` when both are unset so the caller omits `_meta`.
+ *
+ * @param viewName - Bound view directory / manifest key, or `undefined` when
+ * the tool has no view.
+ * @param visibility - Optional model/app visibility narrowing from the tool
+ * definition's top-level `visibility` field.
+ * @returns Wire metadata for the tool listing, or `undefined` when there is
+ * nothing to emit.
  */
 export function buildToolUiMeta(
-  viewName: string,
+  viewName: string | undefined,
   visibility: "model" | "app" | undefined
-): Record<string, unknown> {
-  const resourceUri = viewResourceUri(viewName);
-  const ui: Record<string, unknown> = { resourceUri };
+): Record<string, unknown> | undefined {
+  if (viewName === undefined && visibility === undefined) {
+    return undefined;
+  }
+
+  const ui: Record<string, unknown> = {};
+  const meta: Record<string, unknown> = { [UI_META_KEY]: ui };
+
+  if (viewName !== undefined) {
+    const resourceUri = viewResourceUri(viewName);
+    ui["resourceUri"] = resourceUri;
+    meta[UI_RESOURCE_URI_META_KEY] = resourceUri;
+  }
   if (visibility !== undefined) {
     ui["visibility"] = [visibility];
   }
-  return {
-    [UI_META_KEY]: ui,
-    [UI_RESOURCE_URI_META_KEY]: resourceUri,
-  };
+
+  return meta;
 }
 
 /**
  * Tool result `_meta` stamped on every non-error `CallToolResult` from a
  * view-bound tool.
  *
+ * Emits the resource-URI wire keys (`ui.resourceUri` and the legacy flat
+ * key) plus {@link TOOL_NAME_META_KEY} at the top level of `_meta` (sibling
+ * of `ui`, not inside it). The `ui/notifications/tool-result` wire
+ * notification carries no tool identity; with several tools bound to one
+ * view this is how the view's `useToolContext().toolName` discriminates
+ * which tool's output arrived. Result `_meta` is view-only and never
+ * enters model context.
+ *
  * @param viewName - Bound view directory / manifest key.
- * @returns Resource-URI wire keys only (`ui.resourceUri` and the legacy flat key).
+ * @param toolName - The calling tool's registered name.
+ * @returns Resource-URI wire keys plus the tool-name stamp.
  */
 export function buildToolResultUiMeta(
-  viewName: string
+  viewName: string,
+  toolName: string
 ): Record<string, unknown> {
   const resourceUri = viewResourceUri(viewName);
   return {
+    [TOOL_NAME_META_KEY]: toolName,
     [UI_META_KEY]: { resourceUri },
     [UI_RESOURCE_URI_META_KEY]: resourceUri,
   };

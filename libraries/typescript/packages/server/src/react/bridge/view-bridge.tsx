@@ -17,7 +17,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { registerModelContextFlush } from "./model-context-store.js";
+import { TOOL_NAME_META_KEY } from "../../views/constants.js";
 
 /** Snapshot of view data channels and host context delivered over the bridge. */
 export interface ViewBridgeSnapshot {
@@ -41,6 +41,13 @@ export interface ViewBridgeSnapshot {
   cancelled: { reason?: string } | undefined;
   /** View-only result `_meta` channel. */
   meta: Record<string, unknown> | undefined;
+  /**
+   * Name of the tool for the current call cycle — seeded from
+   * `hostContext.toolInfo`, authoritatively updated from the framework's
+   * `_meta["mcp-use/toolName"]` stamp on each tool result; `undefined` until
+   * either source delivers.
+   */
+  toolName: string | undefined;
   /** Current host context (updated on `host-context-changed`). */
   hostContext: McpUiHostContext | undefined;
   /** Whether the bridge handshake completed. */
@@ -55,6 +62,7 @@ const defaultSnapshot: ViewBridgeSnapshot = {
   isStreaming: false,
   cancelled: undefined,
   meta: undefined,
+  toolName: undefined,
   hostContext: undefined,
   isConnected: false,
 };
@@ -73,6 +81,9 @@ let connectPromise: Promise<App> | null = null;
 let snapshot: ViewBridgeSnapshot = { ...defaultSnapshot };
 const listeners = new Set<Listener>();
 
+/** Guest `App` options applied before the first `App` is constructed. */
+let bridgeAppOptions: { autoResize?: boolean } | undefined;
+
 function emit(): void {
   for (const listener of listeners) {
     listener();
@@ -89,12 +100,36 @@ function setSnapshot(patch: Partial<ViewBridgeSnapshot>): void {
   emit();
 }
 
+/**
+ * Configure guest `App` options before the bridge constructs/`connect`s.
+ *
+ * Called synchronously by {@link bootstrapView} from `module.viewOptions` so
+ * the value is set before any React effect runs `connect()`. Ignored (with a
+ * warning) if an `App` instance already exists — auto-resize cannot be toggled
+ * after connect.
+ *
+ * @param options - Per-view guest options (currently `autoResize`).
+ *
+ * @internal
+ */
+export function setViewBridgeAppOptions(options: {
+  autoResize?: boolean;
+}): void {
+  if (appInstance !== null) {
+    console.warn(
+      "[mcp-use] setViewBridgeAppOptions called after the view bridge App was already created; ignoring."
+    );
+    return;
+  }
+  bridgeAppOptions = options;
+}
+
 function getOrCreateApp(): App {
   if (!appInstance) {
     appInstance = new App(
       { name: "mcp-use-view", version: "2.0.0-alpha.0" },
       { tools: { listChanged: true } },
-      { autoResize: true }
+      { autoResize: bridgeAppOptions?.autoResize ?? true }
     );
     wireAppEvents(appInstance);
   }
@@ -136,20 +171,23 @@ function wireAppEvents(app: App): void {
   };
 
   app.ontoolresult = (params) => {
+    const meta =
+      params._meta !== undefined &&
+      typeof params._meta === "object" &&
+      params._meta !== null
+        ? (params._meta as Record<string, unknown>)
+        : undefined;
+    const stamped = meta?.[TOOL_NAME_META_KEY];
     setSnapshot({
       toolOutput: params.structuredContent,
       content: Array.isArray(params.content)
         ? (params.content as ContentBlock[])
         : undefined,
-      meta:
-        params._meta !== undefined &&
-        typeof params._meta === "object" &&
-        params._meta !== null
-          ? (params._meta as Record<string, unknown>)
-          : undefined,
+      meta,
       hasToolResult: true,
       isStreaming: false,
       cancelled: undefined,
+      ...(typeof stamped === "string" && { toolName: stamped }),
     });
   };
 
@@ -163,17 +201,20 @@ function wireAppEvents(app: App): void {
   };
 
   app.onhostcontextchanged = (params) => {
+    const toolNameFromInfo = params.toolInfo?.tool?.name;
     setSnapshot({
       hostContext: {
         ...(snapshot.hostContext ?? {}),
         ...params,
       },
+      ...(typeof toolNameFromInfo === "string" && {
+        toolName: toolNameFromInfo,
+      }),
     });
   };
 }
 
 let injectedTransport: ViewBridgeTransport | null = null;
-let warnedModelContextUnsupported = false;
 
 /** @internal Inject a transport before connect (bridge tests only). */
 export function _setTransportForTesting(
@@ -197,9 +238,13 @@ async function connectBridge(): Promise<App> {
       new PostMessageTransport(window.parent, window.parent);
     await app.connect(transport);
     const hostContext = app.getHostContext();
+    const toolNameFromInfo = hostContext?.toolInfo?.tool?.name;
     setSnapshot({
       isConnected: true,
       ...(hostContext !== undefined && { hostContext }),
+      ...(typeof toolNameFromInfo === "string" && {
+        toolName: toolNameFromInfo,
+      }),
     });
     return app;
   })();
@@ -233,35 +278,6 @@ export function ViewBridgeProvider({ children }: { children: ReactNode }) {
     void store.connect().catch((error: unknown) => {
       console.error("[mcp-use] Failed to connect view bridge:", error);
     });
-
-    const unregister = registerModelContextFlush((params) => {
-      void (async () => {
-        try {
-          const app = await store.connect();
-          // Spec draft: hosts declare acceptance of ui/update-model-context
-          // via the updateModelContext capability. Skip (once, loudly) when
-          // the host does not accept context updates.
-          if (app.getHostCapabilities()?.updateModelContext === undefined) {
-            if (!warnedModelContextUnsupported) {
-              warnedModelContextUnsupported = true;
-              console.warn(
-                "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
-              );
-            }
-            return;
-          }
-          // Full spec params: content blocks + optional structuredContent
-          // (v2 ContentBlock is wire-compatible with ext-apps' v1 type).
-          await app.updateModelContext(
-            params as Parameters<App["updateModelContext"]>[0]
-          );
-        } catch (error: unknown) {
-          console.warn("[ModelContext] Failed to update model context:", error);
-        }
-      })();
-    });
-
-    return unregister;
   }, [store]);
 
   return (
@@ -345,11 +361,20 @@ export function useViewActions() {
     [store]
   );
 
+  const sendSizeChanged = useCallback(
+    async (size: { width?: number; height?: number }) => {
+      const app = appRef.current ?? (await store.connect());
+      await app.sendSizeChanged(size);
+    },
+    [store]
+  );
+
   return {
     callTool,
     sendFollowUpMessage,
     openExternal,
     requestDisplayMode,
+    sendSizeChanged,
   };
 }
 
@@ -358,7 +383,12 @@ export function _resetViewBridgeForTesting(): void {
   appInstance = null;
   connectPromise = null;
   injectedTransport = null;
-  warnedModelContextUnsupported = false;
+  bridgeAppOptions = undefined;
   snapshot = { ...defaultSnapshot };
   listeners.clear();
+}
+
+/** @internal Guest `App` singleton (bridge tests only). */
+export function _getAppForTesting(): App | null {
+  return appInstance;
 }

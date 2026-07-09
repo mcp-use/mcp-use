@@ -3,15 +3,18 @@
  *
  * Browser-only — built on the ext-apps guest `App` class. Layout:
  * `types/` (the zero-codegen typing layer and vendored host types),
- * `bridge/` (the ext-apps `App` singleton, iframe bootstrap, and the
- * model-context store), `hooks/` (the user-facing hook surface), and
+ * `bridge/` (the ext-apps `App` singleton and iframe bootstrap),
+ * `hooks/` (the user-facing hook surface), and
  * `components/` (provider/utility components).
  */
 
-export { bootstrapView, type ViewModule } from "./bridge/bootstrap-view.js";
+export {
+  bootstrapView,
+  type ViewModule,
+  type ViewOptions,
+} from "./bridge/bootstrap-view.js";
 export { ErrorBoundary } from "./components/error-boundary.js";
 export { Image } from "./components/image.js";
-export { ModelContext, modelContext } from "./components/model-context.js";
 export { McpUseProvider } from "./components/mcp-use-provider.js";
 export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
@@ -23,6 +26,7 @@ export {
 } from "./hooks/use-host-context.js";
 export { useOpenExternal } from "./hooks/use-open-external.js";
 export { useSendFollowUp } from "./hooks/use-send-follow-up.js";
+export { useSendSizeChanged } from "./hooks/use-send-size-changed.js";
 export { useViewTheme } from "./hooks/use-view-theme.js";
 export {
   useToolContext,

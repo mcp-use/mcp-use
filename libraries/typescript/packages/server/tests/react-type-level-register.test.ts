@@ -41,12 +41,16 @@ describe("ToolsFromModule / Register", () => {
     type Ready = Extract<Handle, { status: "ready" }>;
     expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<Output>();
     expectTypeOf<Ready["toolInput"]>().toEqualTypeOf<Input | undefined>();
+    expectTypeOf<Ready["toolName"]>().toEqualTypeOf<"search-fruits">();
 
     type Streaming = Extract<Handle, { status: "streaming" }>;
     expectTypeOf<Streaming["toolInput"]>().toEqualTypeOf<
       DeepPartial<Input> | undefined
     >();
     expectTypeOf<Streaming["toolOutput"]>().toEqualTypeOf<undefined>();
+    expectTypeOf<Streaming["toolName"]>().toEqualTypeOf<
+      "search-fruits" | undefined
+    >();
 
     type Cancelled = Extract<Handle, { status: "cancelled" }>;
     expectTypeOf<Cancelled["reason"]>().toEqualTypeOf<string | undefined>();
@@ -58,6 +62,50 @@ describe("ToolsFromModule / Register", () => {
     type Pending = Extract<Handle, { status: "pending" }>;
     expectTypeOf<Pending["toolInput"]>().toEqualTypeOf<Input | undefined>();
     expectTypeOf<Pending["toolOutput"]>().toEqualTypeOf<undefined>();
+
+    expect(true).toBe(true);
+  });
+
+  it("distributes ready toolName / toolOutput over a union of tool names", () => {
+    type Handle = ToolContextHandle<"search-fruits" | "get-details">;
+    type SearchOut = RegisteredTools["search-fruits"]["output"];
+    type DetailsOut = RegisteredTools["get-details"]["output"];
+
+    type Ready = Extract<Handle, { status: "ready" }>;
+    expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<SearchOut | DetailsOut>();
+    expectTypeOf<Ready["toolName"]>().toEqualTypeOf<
+      "search-fruits" | "get-details"
+    >();
+
+    type SearchReady = Extract<Ready, { toolName: "search-fruits" }>;
+    expectTypeOf<SearchReady["toolOutput"]>().toEqualTypeOf<SearchOut>();
+
+    type DetailsReady = Extract<Ready, { toolName: "get-details" }>;
+    expectTypeOf<DetailsReady["toolOutput"]>().toEqualTypeOf<DetailsOut>();
+
+    type Streaming = Extract<Handle, { status: "streaming" }>;
+    expectTypeOf<Streaming["toolName"]>().toEqualTypeOf<
+      "search-fruits" | "get-details" | undefined
+    >();
+    expectTypeOf<Streaming["toolInput"]>().toEqualTypeOf<
+      | DeepPartial<RegisteredTools["search-fruits"]["input"]>
+      | DeepPartial<RegisteredTools["get-details"]["input"]>
+      | undefined
+    >();
+
+    expect(true).toBe(true);
+  });
+
+  it("keeps untyped useToolContext ready toolName as string | undefined", () => {
+    type Handle = ToolContextHandle;
+    type Ready = Extract<Handle, { status: "ready" }>;
+    expectTypeOf<Ready["toolName"]>().toEqualTypeOf<string | undefined>();
+    // ToolOutput<never> is `never`; ToolInput<never> | undefined collapses to undefined.
+    expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<never>();
+    expectTypeOf<Ready["toolInput"]>().toEqualTypeOf<undefined>();
+
+    type Pending = Extract<Handle, { status: "pending" }>;
+    expectTypeOf<Pending["toolName"]>().toEqualTypeOf<string | undefined>();
 
     expect(true).toBe(true);
   });

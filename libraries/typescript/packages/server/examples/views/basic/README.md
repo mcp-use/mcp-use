@@ -4,7 +4,7 @@ Reference MCP Apps views server for `@mcp-use/server`. It follows the
 [Views spec](../../../specs/VIEWS_SPEC.md) fruit-store shape: view-bound tools,
 view components under `resources/`, typed tool I/O via exported tool refs, and
 the full React runtime surface (`useToolContext`, `useCallTool`, `useViewTool`,
-`ModelContext`, and the per-action hooks).
+and the per-action hooks).
 
 ## What this demonstrates
 
@@ -12,8 +12,10 @@ the full React runtime surface (`useToolContext`, `useCallTool`, `useViewTool`,
   `mcp-use dev` / `build` / `start`.
 - **Tool ↔ view binding** via `view: { name, description, prefersBorder, … }` on
   `search-fruits`, with output typed from the tool's `outputSchema`. Resource
-  facts (description, CSP, permissions, domain, prefersBorder) are declared
-  here and emitted on the view resource.
+  facts (description, CSP, permissions, domain, prefersBorder) are declared on
+  the facts-declaring binder's `view:` config and emitted on the view resource
+  (additional binders for the same view write `view: { name }` only). Tool
+  `visibility` is a top-level tool field, not inside `view:`.
 - **Zero-codegen typing** via `src/tools.d.ts` and exported tool refs
   (`searchFruits`, `getFruitDetails`).
 - **Capability gating** — `search-fruits` returns a markdown table fallback when
@@ -82,7 +84,8 @@ View-bound tool handlers return a plain `CallToolResult` — no response helpers
 2. **`content`** — model/text-host narrative blocks; also surfaced to the view.
 3. **`_meta`** — view-only channel (never model context). The handler passes it
    directly on the returned object; the framework auto-stamps
-   `_meta.ui.resourceUri` on every non-error view-bound tool result.
+   `_meta.ui.resourceUri` and `_meta["mcp-use/toolName"]` on every non-error
+   view-bound tool result.
 
 While waiting for a result, branch on `view.status`:
 
@@ -94,7 +97,7 @@ While waiting for a result, branch on `view.status`:
 - `"cancelled"` — host cancelled the call; `view.reason` is the optional
   host-provided string; `view.toolInput` may still hold the last partial.
 - `"ready"` — render from `view.toolOutput` (and optionally `view.content`,
-  `view.meta`).
+  `view.meta`); `view.toolName` identifies which binder delivered the result.
 
 `view.toolInput` is the single streaming field for arguments (partial or
 complete; last write wins). Host environment comes from `useHostContext()` /
@@ -116,8 +119,8 @@ This example keeps fruit PNGs in `public/fruits/` and references them as
 automatically covered by the framework's serving-origin CSP entry on view
 resources. This example does not declare `view.csp` because it has no external
 image or fetch domains. To load assets from another origin, add
-`view.csp.resourceDomains` (and `connectDomains` for API calls) on the bound
-tool's `view:` config.
+`view.csp.resourceDomains` (and `connectDomains` for API calls) on the
+facts-declaring binder's `view:` config.
 
 Imported assets (Vite `import url from "./file.png"`) are an alternative for
 view-local files; production resolves them via `import.meta.url`, and dev

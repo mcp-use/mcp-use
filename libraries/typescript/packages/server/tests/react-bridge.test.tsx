@@ -8,27 +8,26 @@ import { useState, type ComponentType } from "react";
 import {
   bootstrapView,
   Image,
-  ModelContext,
-  modelContext,
   useCallTool,
   useDisplayMode,
   useHostContext,
   useOpenExternal,
   useSendFollowUp,
+  useSendSizeChanged,
   useToolContext,
   useViewTool,
 } from "../src/react/index.js";
-import { _resetModelContextForTesting } from "../src/react/bridge/model-context-store.js";
 import { _resetBootstrapRootsForTesting } from "../src/react/bridge/bootstrap-view.js";
 import {
+  _getAppForTesting,
   _resetViewBridgeForTesting,
   _setTransportForTesting,
 } from "../src/react/bridge/view-bridge.js";
+import { TOOL_NAME_META_KEY } from "../src/views/constants.js";
 import { createPairedTransports } from "./helpers/paired-transport.js";
 
 function resetRuntime(): void {
   _resetViewBridgeForTesting();
-  _resetModelContextForTesting();
   _resetBootstrapRootsForTesting();
   document.body.innerHTML = "";
 }
@@ -42,7 +41,6 @@ async function startHost(
     openLinks: {},
     serverTools: {},
     logging: {},
-    updateModelContext: { text: {} },
   }
 ) {
   const [guestTransport, hostTransport] = createPairedTransports();
@@ -67,20 +65,6 @@ async function startHost(
     };
   };
 
-  const modelContextUpdates: {
-    content?: { type: string; text?: string }[];
-    structuredContent?: Record<string, unknown>;
-  }[] = [];
-  bridge.onupdatemodelcontext = async (params) => {
-    modelContextUpdates.push(
-      params as {
-        content?: { type: string; text?: string }[];
-        structuredContent?: Record<string, unknown>;
-      }
-    );
-    return {};
-  };
-
   const init = new Promise<void>((resolve) => {
     bridge.oninitialized = () => {
       resolve();
@@ -88,7 +72,7 @@ async function startHost(
   });
 
   await bridge.connect(hostTransport);
-  return { bridge, init, modelContextUpdates };
+  return { bridge, init };
 }
 
 describe("react bridge runtime", () => {
@@ -220,6 +204,156 @@ describe("react bridge runtime", () => {
       expect(screen.getByTestId("lifecycle").textContent).toBe(
         "cancelled|ap|user action"
       );
+    });
+  });
+
+  it("sets toolName from result _meta[mcp-use/toolName]", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|{handle.toolName ?? "undef"}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|undef");
+    });
+
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { saved: true },
+      _meta: { [TOOL_NAME_META_KEY]: "save-checkpoint" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "ready|save-checkpoint"
+      );
+    });
+  });
+
+  it("preserves prior toolName when a result omits the meta stamp", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|{handle.toolName ?? "undef"}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { n: 1 },
+      _meta: { [TOOL_NAME_META_KEY]: "save-checkpoint" },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "ready|save-checkpoint"
+      );
+    });
+
+    // Next call cycle: complete input clears result → pending, toolName kept.
+    await bridge.sendToolInput({ arguments: {} });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "pending|save-checkpoint"
+      );
+    });
+
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { n: 2 },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "ready|save-checkpoint"
+      );
+    });
+  });
+
+  it("updates toolName from host-context toolInfo before a result", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|{handle.toolName ?? "undef"}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|undef");
+    });
+
+    await bridge.sendHostContextChange({
+      toolInfo: {
+        tool: {
+          name: "x",
+          inputSchema: { type: "object", properties: {} },
+        },
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|x");
+    });
+  });
+
+  it("_resetViewBridgeForTesting clears toolName to undefined", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return (
+        <div data-testid="lifecycle">
+          {handle.status}|{handle.toolName ?? "undef"}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolResult({
+      content: [],
+      structuredContent: {},
+      _meta: { [TOOL_NAME_META_KEY]: "save-checkpoint" },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "ready|save-checkpoint"
+      );
+    });
+
+    resetRuntime();
+    const { init: init2 } = await startHost();
+    bootstrapView({ default: View as ComponentType });
+    await init2;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|undef");
     });
   });
 
@@ -644,6 +778,104 @@ describe("react bridge runtime", () => {
     });
   });
 
+  it("useSendSizeChanged sends ui/notifications/size-changed to the host", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    const sizes: { width?: number; height?: number }[] = [];
+    bridge.onsizechange = (params) => {
+      sizes.push(params);
+    };
+
+    function Probe() {
+      const sendSizeChanged = useSendSizeChanged();
+      return (
+        <button
+          type="button"
+          onClick={() => {
+            void sendSizeChanged({ width: 320, height: 240 });
+          }}
+        >
+          resize
+        </button>
+      );
+    }
+
+    bootstrapView({
+      default: Probe as ComponentType,
+      viewOptions: { autoResize: false },
+    });
+    await init;
+
+    // With autoResize disabled, connect must not emit a size-changed notification.
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(sizes).toHaveLength(0);
+
+    screen.getByText("resize").click();
+    await waitFor(() => {
+      expect(sizes).toEqual([{ width: 320, height: 240 }]);
+    });
+  });
+
+  it("bootstrapView viewOptions.autoResize false constructs App without auto-resize", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    const sizes: { width?: number; height?: number }[] = [];
+    bridge.onsizechange = (params) => {
+      sizes.push(params);
+    };
+
+    function Probe() {
+      return <div data-testid="probe">ok</div>;
+    }
+
+    bootstrapView({
+      default: Probe as ComponentType,
+      viewOptions: { autoResize: false },
+    });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("probe").textContent).toBe("ok");
+    });
+
+    // Behavioral pin: disabled auto-resize means no size-changed on connect.
+    // Default-path auto emission is flaky under happy-dom (ResizeObserver /
+    // rAF timing), so we pin the disabled path behaviorally and assert the
+    // option via App's runtime `options` field (typed private; cast for tests).
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(sizes).toHaveLength(0);
+
+    const app = _getAppForTesting();
+    expect(app).not.toBeNull();
+    expect(
+      (app as { options: { autoResize?: boolean } } | null)?.options.autoResize
+    ).toBe(false);
+  });
+
+  it("default viewOptions keep App autoResize true", async () => {
+    resetRuntime();
+    const { init } = await startHost();
+
+    function Probe() {
+      return <div data-testid="probe">ok</div>;
+    }
+
+    bootstrapView({ default: Probe as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("probe").textContent).toBe("ok");
+    });
+
+    const app = _getAppForTesting();
+    expect(app).not.toBeNull();
+    expect(
+      (app as { options: { autoResize?: boolean } } | null)?.options.autoResize
+    ).toBe(true);
+  });
+
   it("registers view tools via useViewTool with list and call round-trip", async () => {
     resetRuntime();
 
@@ -760,146 +992,6 @@ describe("react bridge runtime", () => {
     await expect(
       bridge.callTool({ name: "pick-item", arguments: { id: "c" } })
     ).rejects.toThrow();
-  });
-
-  it("sends no model-context update for views that never use ModelContext", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost();
-
-    function View() {
-      return <div data-testid="plain">plain</div>;
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await waitFor(() => {
-      expect(screen.getByTestId("plain")).not.toBeNull();
-    });
-    // Allow any (erroneous) post-connect flush to drain before asserting.
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    expect(modelContextUpdates).toHaveLength(0);
-  });
-
-  it("pushes ModelContext content and clears after removal", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost();
-
-    function View() {
-      const [on, setOn] = useState(true);
-      return (
-        <div>
-          {on && <ModelContext content="Viewing apples" />}
-          <button type="button" onClick={() => setOn(false)}>
-            remove
-          </button>
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(1);
-    });
-    expect(modelContextUpdates[0]?.content).toEqual([
-      { type: "text", text: "- Viewing apples" },
-    ]);
-
-    screen.getByText("remove").click();
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(2);
-    });
-    expect(modelContextUpdates[1]?.content).toEqual([]);
-  });
-
-  it("pushes structuredContent and imperative content blocks alongside the text tree", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost();
-
-    function View() {
-      return (
-        <ModelContext
-          content="Cart summary"
-          structuredContent={{ itemCount: 2, totalCost: 9.5 }}
-        />
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(1);
-    });
-    expect(modelContextUpdates[0]).toMatchObject({
-      content: [{ type: "text", text: "- Cart summary" }],
-      structuredContent: { itemCount: 2, totalCost: 9.5 },
-    });
-
-    // Imperative ContentBlock entries append after the serialized tree.
-    modelContext.set("note", [{ type: "text", text: "extra block" }]);
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(2);
-    });
-    expect(modelContextUpdates[1]?.content).toEqual([
-      { type: "text", text: "- Cart summary" },
-      { type: "text", text: "extra block" },
-    ]);
-    expect(modelContextUpdates[1]?.structuredContent).toEqual({
-      itemCount: 2,
-      totalCost: 9.5,
-    });
-  });
-
-  it("serializes ModelContext siblings in document order, not useId sort order", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost();
-
-    // Enough siblings that useId values reach two digits (":r10:" would sort
-    // before ":r2:" lexicographically).
-    const labels = Array.from({ length: 12 }, (_, i) => `node-${i + 1}`);
-
-    function View() {
-      return (
-        <div>
-          {labels.map((label) => (
-            <ModelContext key={label} content={label} />
-          ))}
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await waitFor(() => {
-      expect(modelContextUpdates).toHaveLength(1);
-    });
-    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe(
-      labels.map((label) => `- ${label}`).join("\n")
-    );
-  });
-
-  it("skips model-context updates when the host lacks the updateModelContext capability", async () => {
-    resetRuntime();
-    const { init, modelContextUpdates } = await startHost(undefined, {
-      openLinks: {},
-      serverTools: {},
-      logging: {},
-    });
-
-    function View() {
-      return <ModelContext content="Viewing apples" />;
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    // Allow the flush to drain; the capability gate must swallow it.
-    await new Promise((resolve) => setTimeout(resolve, 25));
-    expect(modelContextUpdates).toHaveLength(0);
   });
 
   it("resolves root-relative public assets via Image", async () => {

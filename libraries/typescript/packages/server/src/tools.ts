@@ -12,21 +12,16 @@ import type { UiPermissions } from "./views/types.js";
 /**
  * Binds a tool to a view directory for MCP Apps rendering.
  *
- * The single authoring point for the tool↔view binding and for the view
- * resource's wire facts. The view file exports only the component; the
- * framework reads these fields at registration and emits them on the bound
- * view's MCP resource (hosts read resource `_meta.ui`, not tool-level copies).
+ * Any number of tools may share the same `name`. Resource facts
+ * (`description`, `csp`, `permissions`, `domain`, `prefersBorder`) have one
+ * authoring point — at most one binder may declare them; others pass only
+ * `{ name }`. The view file exports only the component; the framework reads
+ * these fields at registration and emits them on the bound view's MCP
+ * resource (hosts read resource `_meta.ui`, not tool-level copies).
  */
 export interface ToolViewConfig {
   /** View directory / manifest name, e.g. `"product-search-result"`. */
   name: string;
-  /**
-   * Declares who may call or see the tool (`_meta.ui.visibility` on
-   * `tools/list`). Omitted = host default (callable by the model, visible to
-   * the app). The server always lists every registered tool; hosts filter by
-   * this declaration — it does not omit tools from `tools/list`.
-   */
-  visibility?: "model" | "app";
   /**
    * Human-readable description of the view resource → the resource's
    * `description` on `resources/list` and `resources/read`.
@@ -82,6 +77,15 @@ export interface ToolDefinition {
   outputSchema?: StandardSchemaWithJSON;
   /** Behavioral hints for clients (readOnlyHint, destructiveHint, …). */
   annotations?: ToolAnnotations;
+  /**
+   * Declares who may call or see the tool. Emitted as `_meta.ui.visibility`
+   * on `tools/list`. Omitted = host default (callable by the model, visible
+   * to the app). The server always lists every registered tool — hosts
+   * filter by this declaration; the server never omits tools from
+   * `tools/list`. `"app"` marks app-private helper tools callable from
+   * views via `useCallTool` while the host hides them from the model.
+   */
+  visibility?: "model" | "app";
   /**
    * Bind this tool to a view for MCP Apps rendering. Requires
    * {@link ToolDefinition.outputSchema} — the view reads the result's

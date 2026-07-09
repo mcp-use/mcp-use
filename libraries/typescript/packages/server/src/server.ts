@@ -113,9 +113,17 @@ export class MCPServer {
   readonly #resourceTemplates = new Map<string, ResourceTemplateEntry>();
   readonly #prompts = new Map<string, PromptEntry>();
   readonly #views = new Map<string, ViewManifestEntry>();
+  /**
+   * Many-to-one tool→view bindings. `toolNames` lists every binder;
+   * `factsOwner` is the single tool (if any) that declared resource facts
+   * beyond `view.name`.
+   */
   readonly #viewBindings = new Map<
     string,
-    { toolName: string; config: NonNullable<ToolDefinition["view"]> }
+    {
+      toolNames: string[];
+      factsOwner?: { toolName: string; config: ToolViewConfig };
+    }
   >();
   #viewsPrimed = false;
   /** When true, resource CSP emission includes the HMR websocket origin. */
@@ -479,14 +487,50 @@ export class MCPServer {
           `Use outputSchema: z.object({}) for a view that takes no structured output.`
       );
     }
-    const existingBinding = this.#viewBindings.get(view.name);
-    if (existingBinding !== undefined) {
-      throw new Error(
-        `View "${view.name}" is already bound to tool "${existingBinding.toolName}"; ` +
-          `cannot bind a second tool "${definition.name}".`
-      );
+
+    const declaresFacts = this.#viewConfigDeclaresFacts(view);
+    const existing = this.#viewBindings.get(view.name);
+
+    if (existing === undefined) {
+      this.#viewBindings.set(view.name, {
+        toolNames: [definition.name],
+        ...(declaresFacts && {
+          factsOwner: { toolName: definition.name, config: view },
+        }),
+      });
+      return;
     }
-    this.#viewBindings.set(view.name, { toolName: definition.name, config: view });
+
+    if (declaresFacts) {
+      if (existing.factsOwner !== undefined) {
+        throw new Error(
+          `View "${view.name}" already has resource facts declared by tool ` +
+            `"${existing.factsOwner.toolName}"; tool "${definition.name}" must declare ` +
+            `only \`view: { name }\`. A view's resource facts (description, csp, ` +
+            `permissions, domain, prefersBorder) have one authoring point.`
+        );
+      }
+      existing.factsOwner = { toolName: definition.name, config: view };
+    }
+
+    existing.toolNames.push(definition.name);
+  }
+
+  /**
+   * Whether a tool's `view` config declares any resource facts beyond `name`.
+   *
+   * @param view - The tool's view binding config.
+   * @returns `true` when any of description, csp, permissions, domain, or
+   * prefersBorder is set.
+   */
+  #viewConfigDeclaresFacts(view: ToolViewConfig): boolean {
+    return (
+      view.description !== undefined ||
+      view.csp !== undefined ||
+      view.permissions !== undefined ||
+      view.domain !== undefined ||
+      view.prefersBorder !== undefined
+    );
   }
 
   #validateViewBindingsAtMount(): void {
@@ -570,6 +614,7 @@ export class MCPServer {
   ): void {
     const view = definition.view;
 
+    const toolUiMeta = buildToolUiMeta(view?.name, definition.visibility);
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
       ...(definition.description !== undefined && {
@@ -581,12 +626,12 @@ export class MCPServer {
       ...(definition.outputSchema !== undefined && {
         outputSchema: definition.outputSchema,
       }),
-      ...(view !== undefined && {
-        _meta: buildToolUiMeta(view.name, view.visibility),
-      }),
+      ...(toolUiMeta !== undefined && { _meta: toolUiMeta }),
     };
     const wireResultMeta =
-      view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
+      view !== undefined
+        ? buildToolResultUiMeta(view.name, definition.name)
+        : undefined;
 
     const inputSchema = resolveToolInputSchema(definition);
 
@@ -630,7 +675,7 @@ export class MCPServer {
   ): void {
     const uri = viewResourceUri(viewName);
     const authorFacts = this.#viewResourceFacts(
-      this.#viewBindings.get(viewName)?.config
+      this.#viewBindings.get(viewName)?.factsOwner?.config
     );
     const hmrWs = this.#viewsDevMode;
     const resourceConfig = viewResourceConfig(

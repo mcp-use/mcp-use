@@ -10,15 +10,16 @@
 1. **One protocol: MCP Apps.** The [MCP Apps extension](https://github.com/modelcontextprotocol/ext-apps) (`io.modelcontextprotocol/ui`, spec revision `2026-01-26` + draft) is the only wire format. The v1 adapter system (`AppsSdkAdapter`, dual-protocol metadata, `window.openai` transport) is **not ported**.
 2. **Public naming is "view", everywhere.** `view` tool config, `useToolContext` hook, `ui://views/…`. "Widget" survives nowhere in the v2 API.
 3. **`tool()` returns `ToolRef<Name, Input, Output>`** (not `this`). Typed `useCallTool` is pure type inference over exported refs — zero codegen, nothing generated on the dev/build hot path.
-4. **Hook-first view data.** The default export mounts when the bridge connects — before any tool result — and stays mounted for the iframe lifetime; the runtime never spreads props onto it. `useToolContext<Name>()` is the primary data API: a discriminated union over `pending` / `streaming` / `cancelled` / `ready` that carries a single streaming `toolInput` field (partial args and complete args share the field; last write wins), typed `toolOutput` after the result, plus `content`, view-only `meta`, and an optional cancellation `reason`. Split hooks cover host context and actions; there is deliberately no aggregate hook — v1 `useWidget` migrates onto the split hooks.
+4. **Hook-first view data.** The default export mounts when the bridge connects — before any tool result — and stays mounted for the iframe lifetime; the runtime never spreads props onto it. `useToolContext<Name>()` is the primary data API: a discriminated union over `pending` / `streaming` / `cancelled` / `ready` that carries a single streaming `toolInput` field (partial args and complete args share the field; last write wins), typed `toolOutput` after the result, a `toolName` discriminant (authoritative on `"ready"` from the result stamp; informational earlier), plus `content`, view-only `meta`, and an optional cancellation `reason`. Split hooks cover host context and actions; there is deliberately no aggregate hook — v1 `useWidget` migrates onto the split hooks.
 5. **The React runtime builds on `@modelcontextprotocol/ext-apps`** (guest `App` class); the server package **inlines** the few wire constants and emits spec `_meta` itself — no ext-apps import server-side.
 6. **No response helpers — views included.** The no-response-helpers ground rule (`SPEC.md`) applies without exception. View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery).
 7. **React runtime ships as the `/react` subpath** of this package, with `react` an optional peer — tool-only servers never pay for it.
 8. **Parity with v1 hooks, minus two named gaps** (file upload, cross-session view state) that the MCP Apps spec cannot express — see "Dropped from v1".
 9. **Views build into `.mcp-use/build/views/` and serve under `${basePath}/_mcp-use/`.** One self-contained Vite client build per view (JS + CSS inlined into the synthesized document — zero asset fetches at srcdoc boot so the app initializes before/early-into argument streaming; hosts drop pre-`ui/initialize` notifications per ext-apps AppBridge; matches the Excalidraw MCP App reference design; trade-off: no shared chunks across views), a manifest-driven registration + serving path identical for `start` and serverless, request-scoped origin for public assets / CSP. v1's `mcp-use/widgets` routes are not carried over — see "Build system & serving".
-10. **At most one tool per view; view-bound tools declare an `outputSchema`; binding errors are one-directional.** A `view:` naming a missing view, a `view:` tool without an `outputSchema`, and a second tool binding an already-bound view are **hard errors** — the first emits a broken `resourceUri`, the second has no output contract to type (`useToolContext<Name>()` reads the bound tool's `outputSchema`), the third breaks that contract (a second binder could deliver differently-shaped output the type denies). A view directory no tool binds is a **warning only** (unused-code class: harmless dead weight, and erroring would break the scaffold-view-first authoring order and make feature-flagging a tool off a deploy-breaking action). Relaxing to many-to-one later is additive; imposing 1:1 after shipping would break users. Two tools wanting the same UI = two thin `view.tsx` files sharing one component.
+10. **Many tools may bind one view; every binder declares an `outputSchema`; resource facts have one authoring point.** Any number of tools may declare `view: { name: "same-view" }` — sharing one rendered surface across several tools (e.g. a model-visible `draw` plus an app-only `refresh` on one canvas) is first-class. Every view-bound tool still requires an `outputSchema` (hard error otherwise). At most one binder may declare facts beyond `name` (`description`, `csp`, `permissions`, `domain`, `prefersBorder`); a second facts-declaring binder for the same view is a **hard error** at registration naming both tools — additional binders write `view: { name }` only, so the view resource's wire facts stay order-independent. A `view:` naming a missing view directory is a **hard error** (broken `resourceUri`). A view directory no tool binds is a **warning only** (unused-code class: harmless dead weight, and erroring would break the scaffold-view-first authoring order and make feature-flagging a tool off a deploy-breaking action). Many-to-one is safe because the result `_meta["mcp-use/toolName"]` stamp plus `useToolContext`'s `toolName` discriminant keep typing honest across binders, and the single facts-authoring point keeps the resource deterministic.
 11. **Views register from the manifest as code — no filesystem on any MCP path.** `mcp-use build` bakes the views manifest into a generated wrapper entry that primes the server instance before anything mounts; `resources/read` and the document route synthesize the HTML from manifest data per request. No runtime `fs` read, and deliberately no fallback — an unprimed `view:` is a loud mount-time error. See "Registration mechanism".
 12. **Dev shares the one Vite dev server `mcp-use dev` already runs.** The views client environment joins that server; view-file edits get real Vite HMR with **React Fast Refresh** (component state survives edits — `@vitejs/plugin-react` is an optional peer, auto-injected in dev unless the user's Vite config already registers it), while the server entry keeps the implemented reload-and-swap contract (`CLI_SPEC.md`). Emitting `tools/list_changed`/`resources/list_changed` to connected clients on dev reload is **deferred** (it needs the notifications phase; under the stateless wire the next `tools/list` is always current anyway).
+13. **Tool visibility is a top-level `ToolDefinition` field.** `visibility?: "model" | "app"` lives on the tool itself (`server.tool({ name, visibility: "app", … })`), not inside `view:`. Emitted as `_meta.ui.visibility: ["model"] | ["app"]` on `tools/list` for any tool that sets it — view-bound or not — and omitted entirely when unset (host default: callable by the model, visible to the app). The server always lists every registered tool; filtering is host policy (MCP Apps: hosts MUST hide `visibility: ["app"]` tools from the model and MUST reject app `tools/call` for tools without `"app"`). Never on tool results. App-private helper tools (e.g. `save-checkpoint`) are plain tools with `visibility: "app"` and usually no `view:` binding — the view calls them via `useCallTool` and their results return to the caller; a `view:` binding is only for tools whose results should render the view.
 
 ---
 
@@ -106,15 +107,16 @@ Emitted by this package (constants inlined; names are the spec's):
 | ---------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
 | tool `_meta`     | `ui.resourceUri`                                            | `ui://views/<view-name>.html`                                |
 | tool `_meta`     | `"ui/resourceUri"`                                          | same value (legacy flat key, kept while hosts still read it) |
-| tool `_meta`     | `ui.visibility`                                             | `["model"]` / `["app"]` when `view.visibility` narrows it; **omitted entirely when unset** (host default: callable by the model, visible to the app). Declaration only — the server always lists every tool; hosts filter by this key. |
+| tool `_meta`     | `ui.visibility`                                             | `["model"]` / `["app"]` when the tool's top-level `visibility` is set — any tool, view-bound or not; **omitted entirely when unset** (host default: callable by the model, visible to the app). Declaration only — the server always lists every tool; hosts filter by this key. |
 | tool result `_meta` (view-bound `tools/call`, non-error) | `ui.resourceUri` | `ui://views/<view-name>.html` |
 | tool result `_meta` (view-bound `tools/call`, non-error) | `"ui/resourceUri"` | same value (legacy flat key) |
-| resource (`resources/list` entry) | `description`                                    | from the bound tool's `view.description`                     |
+| tool result `_meta` (view-bound `tools/call`, non-error) | `"mcp-use/toolName"` | `"<tool name>"` — the calling tool's name (sibling of `ui` on result `_meta`); lets the view discriminate which binder delivered the result (`ui/notifications/tool-result` carries no tool identity) |
+| resource (`resources/list` entry) | `description`                                    | from the facts-declaring binder's `view.description`                     |
 | resource (`resources/list` entry) | `mimeType`                                       | `text/html;profile=mcp-app`                                  |
-| resource (`resources/list` entry) `_meta` | `ui.csp`                             | `{ connectDomains, resourceDomains }` — author domains from the bound tool's `view.csp`, plus the request-resolved serving origin auto-appended to `resourceDomains`; in dev, the serving origin's websocket variant (`ws://`/`wss://`) is also auto-appended to `connectDomains` (see Dev) |
-| resource (`resources/list` entry) `_meta` | `ui.permissions`                     | from the bound tool's `view.permissions` when set            |
-| resource (`resources/list` entry) `_meta` | `ui.domain`                          | from the bound tool's `view.domain` when set                 |
-| resource (`resources/list` entry) `_meta` | `ui.prefersBorder`                   | from the bound tool's `view.prefersBorder` when set          |
+| resource (`resources/list` entry) `_meta` | `ui.csp`                             | `{ connectDomains, resourceDomains }` — author domains from the facts-declaring binder's `view.csp`, plus the request-resolved serving origin auto-appended to `resourceDomains`; in dev, the serving origin's websocket variant (`ws://`/`wss://`) is also auto-appended to `connectDomains` (see Dev) |
+| resource (`resources/list` entry) `_meta` | `ui.permissions`                     | from the facts-declaring binder's `view.permissions` when set            |
+| resource (`resources/list` entry) `_meta` | `ui.domain`                          | from the facts-declaring binder's `view.domain` when set                 |
+| resource (`resources/list` entry) `_meta` | `ui.prefersBorder`                   | from the facts-declaring binder's `view.prefersBorder` when set          |
 | resource content item (`resources/read` `contents[]`) | `mimeType` | `text/html;profile=mcp-app`                                  |
 | resource content item (`resources/read` `contents[]`) | `text`     | synthesized HTML document (origin-resolved per request)      |
 | resource content item (`resources/read` `contents[]`) `_meta` | `ui.csp` | same shape as the list entry; **content-item value takes precedence** per MCP Apps spec — request-resolved serving origin (and dev HMR websocket origin in `connectDomains` when dev-primed) |
@@ -122,13 +124,13 @@ Emitted by this package (constants inlined; names are the spec's):
 | resource content item (`resources/read` `contents[]`) `_meta` | `ui.domain` | same as list entry when set |
 | resource content item (`resources/read` `contents[]`) `_meta` | `ui.prefersBorder` | same as list entry when set |
 
-Security metadata (CSP, permissions, domain, prefersBorder) lives on the **resource**, never the tool — hosts ignore tool-level copies per spec. Authors declare external domains in the bound tool's `view.csp`; the framework appends its serving origin to `resourceDomains` at emission time. Spec-canonical hosts read `UIResourceMeta` from each `resources/read` content item's `_meta.ui` (the list entry is a static fallback; the content-item copy takes precedence). Both surfaces carry the same author facts; the read-time copy uses the per-request resolved origin so CSP always matches the synthesized HTML's asset URLs.
+Security metadata (CSP, permissions, domain, prefersBorder) lives on the **resource**, never the tool — hosts ignore tool-level copies per spec. Authors declare external domains in the facts-declaring binder's `view.csp`; the framework appends its serving origin to `resourceDomains` at emission time. Spec-canonical hosts read `UIResourceMeta` from each `resources/read` content item's `_meta.ui` (the list entry is a static fallback; the content-item copy takes precedence). Both surfaces carry the same author facts; the read-time copy uses the per-request resolved origin so CSP always matches the synthesized HTML's asset URLs.
 
 ### Capability gating (stateless-first)
 
 Per the `SPEC.md` stateless posture, UI support is a **request-scoped** fact: the 2026-07-28 wire carries `clientCapabilities` in per-request `_meta`, and MCP Apps support is `capabilities.extensions["io.modelcontextprotocol/ui"]` advertising `mimeTypes: ["text/html;profile=mcp-app"]`. Nothing is ever inferred from remembered sessions.
 
-**The wire surface is unconditional.** `tools/list` always includes every registered tool regardless of client capabilities or `view.visibility`. View-bound tools always carry `_meta.ui.resourceUri` (plus the legacy flat `"ui/resourceUri"` key) on `tools/list`, and every non-error result from that tool is stamped with the same link keys — regardless of whether the client advertises the UI extension. View resources always carry `_meta.ui` (framework auto-CSP with the serving origin) on both `resources/list` entries and each `resources/read` content item. When `view.visibility` is set, `_meta.ui.visibility` is emitted as a declaration (`["model"]` or `["app"]`); filtering by that declaration is **client policy** — the server never omits tools from `tools/list`.
+**The wire surface is unconditional.** `tools/list` always includes every registered tool regardless of client capabilities or top-level `visibility`. View-bound tools always carry `_meta.ui.resourceUri` (plus the legacy flat `"ui/resourceUri"` key) on `tools/list`, and every non-error result from that tool is stamped with the same link keys plus `"mcp-use/toolName"` — regardless of whether the client advertises the UI extension. View resources always carry `_meta.ui` (framework auto-CSP with the serving origin) on both `resources/list` entries and each `resources/read` content item. When a tool's top-level `visibility` is set, `_meta.ui.visibility` is emitted as a declaration (`["model"]` or `["app"]`); filtering by that declaration is **client policy** — the server never omits tools from `tools/list`.
 
 **Capability negotiation affects handler branching only.** The user-facing request-context query `ctx.client.supportsViews()` (`RequestContext` grows per phase — this reads per-request capabilities, never session state) lets handlers shape output differently for UI-capable vs text-only hosts:
 
@@ -178,21 +180,23 @@ resources/
     types.ts        # any other files in the directory are ordinary modules the view may import
 ```
 
-A view file has one recognized export: the **default export** — the component, mounted for the iframe lifetime and reading data through hooks (see Component lifecycle & view data). Result types flow from the bound tool's `outputSchema` via `useToolContext<Name>()`.
+A view file has two recognized exports: the **default export** — the component, mounted for the iframe lifetime and reading data through hooks (see Component lifecycle & view data) — and an optional **`viewOptions` named export** for guest-runtime bridge options (currently `autoResize`; see Providers and components / `useSendSizeChanged`). `viewOptions` is iframe behavior only — never wire metadata — so it does not reintroduce v1's server-parses-widget-files problem. Resource facts (description, CSP, permissions, domain, prefersBorder) live exclusively on the facts-declaring binder's server-side `view:` config (decision 10). Result types flow from each binder's `outputSchema` via `useToolContext<Name>()` — a name union when several tools bind the same view.
 
-Discovery registers one `ui://views/<dir-name>.html` resource per view, each bound by at most one tool (decision 10; an unbound view warns). The **build/dev manifest is the source of truth** for what views exist and what asset each serves — production never rediscovers the filesystem and never re-reads the manifest either: it reaches the runtime as code (Registration mechanism, below). Nothing depends on `handler.toString()`.
+Discovery registers one `ui://views/<dir-name>.html` resource per view; any number of tools may bind it (decision 10; an unbound view warns). The **build/dev manifest is the source of truth** for what views exist and what asset each serves — production never rediscovers the filesystem and never re-reads the manifest either: it reaches the runtime as code (Registration mechanism, below). Nothing depends on `handler.toString()`.
 
 Inline JSX returned from tool handlers is a documented **stretch** authoring model and is out of this contract; it must layer on the file-based path without changing it.
 
 ### Binding a tool to a view
 
-The `view:` config on `server.tool()` is the single authoring point for the tool↔view binding **and** for the view resource's wire facts. The view file exports only the component; the framework reads these fields at registration and emits them on the bound view's MCP resource (where hosts read them per spec — tool-level copies are ignored).
+The `view:` config on `server.tool()` binds the tool to a view resource. Resource wire facts (`description`, `csp`, `permissions`, `domain`, `prefersBorder`) are authored on **at most one** binder for that view — additional binders write `view: { name }` only (decision 10). Tool visibility is a separate top-level `ToolDefinition` field (`visibility?: "model" | "app"`), not part of `view:` (decision 13). The view file exports the component (plus optional guest-runtime `viewOptions`); the framework reads the facts-declaring binder's `view:` fields at registration and emits them on the view's MCP resource (where hosts read them per spec — tool-level copies are ignored).
 
 ```ts
+// tool-level (any tool — view-bound or not):
+visibility?: "model" | "app";      // → _meta.ui.visibility on tools/list; omitted = host default (model + app)
+
 view: {
   name: string;                    // view directory name, e.g. "product-search-result"
-  visibility?: "model" | "app";    // → _meta.ui.visibility on tools/list; omitted = host default (model + app)
-  description?: string;            // → resource description on resources/list and resources/read
+  description?: string;            // → resource description on resources/list and resources/read (facts-declaring binder only)
   csp?: {                          // → resource _meta.ui.csp (framework auto-appends serving origin to resourceDomains)
     connectDomains?: string[];
     resourceDomains?: string[];
@@ -203,16 +207,16 @@ view: {
 }
 ```
 
-Authors declare every external domain the view loads in `view.csp.resourceDomains` (and fetch targets in `connectDomains`). The framework always emits `csp` on the resource and appends its request-resolved serving origin to `resourceDomains` so the view's own built assets are loadable. Hosts enforce CSP strictly — undeclared domains are blocked.
+Authors declare every external domain the view loads in the facts-declaring binder's `view.csp.resourceDomains` (and fetch targets in `connectDomains`). The framework always emits `csp` on the resource and appends its request-resolved serving origin to `resourceDomains` so the view's own built assets are loadable. Hosts enforce CSP strictly — undeclared domains are blocked.
 
 Binding rules (decision 10), enforced where the wire would lie — at registration in dev, at build in prod:
 
 - `view.name` naming a missing view directory is a **hard error** (broken `resourceUri`).
-- A `view:` tool without an `outputSchema` is a **hard error** — the output contract *is* the `outputSchema` (`useToolContext<"search-fruits">()` reads it). A view that takes no result payload binds to a tool with an empty object schema (`outputSchema: z.object({})`).
-- A second tool binding an already-bound view is a **hard error** — type honesty: a second binder with a different output shape could deliver output the type says cannot exist.
+- A `view:` tool without an `outputSchema` is a **hard error** — the output contract *is* the `outputSchema` (`useToolContext<"search-fruits">()` reads it; a multi-binder view uses a name union and narrows via `toolName`). A view that takes no result payload binds to a tool with an empty object schema (`outputSchema: z.object({})`).
+- Any number of tools may bind the same view. At most one binder may declare facts beyond `name`; a second facts-declaring binder for the same view is a **hard error** at registration naming both tools — additional binders write `view: { name }` only, so the resource's wire facts stay order-independent.
 - A view directory no tool binds is a **warning naming the view**, never an error — nothing on the wire is wrong (no host renders a view except through a tool result's `_meta.ui.resourceUri`), and erroring would punish the natural authoring order (view directory first, tool second) and turn feature-flagging a tool off into a build/deploy breaker. Unbound views are still built, registered, and served — `resources/read` and the document route staying live is useful for inspector preview of not-yet-wired views.
 
-The check itself is a set difference at mount time — the frozen tool registry against the primed view registry — re-run per dev reload. Sharing a UI across tools stays trivial (two thin `view.tsx` files re-exporting one component), and relaxing to many-to-one later is a non-breaking change if real usage demands it, whereas the reverse migration would not be.
+The check itself is a set difference at mount time — the frozen tool registry against the primed view registry — re-run per dev reload. Many-to-one binding is first-class: the result `_meta["mcp-use/toolName"]` stamp and `useToolContext`'s `toolName` discriminant keep typing honest across binders, and the single facts-authoring point keeps the resource deterministic.
 
 The v1 `invoking`/`invoked` strings and `widgetAccessible` flag are `openai/*` overlay concepts with no spec equivalent — dropped from the alpha config (space reserved in a future overlay, not here).
 
@@ -232,7 +236,7 @@ return {
 
 The handler and the view component are two ends of one call: `structuredContent` is forwarded to the bound view; `useToolContext<Name>()` surfaces it as `toolOutput` when `status === "ready"`. The server side checks `structuredContent` against `outputSchema` at the return position; the view side types the ready branch from the same schema — both ends check against one type, so they cannot drift.
 
-**Auto-stamping `_meta.ui.resourceUri`.** The framework auto-stamps `_meta.ui.resourceUri` (plus legacy flat `"ui/resourceUri"`) onto every non-error result of a view-bound tool, so clients know an MCP App can render. Handlers may pass additional keys on `_meta` for view-only data. On collision, wire `ui` keys win over handler keys.
+**Auto-stamping result `_meta`.** The framework auto-stamps `_meta.ui.resourceUri` (plus legacy flat `"ui/resourceUri"`) and `_meta["mcp-use/toolName"]` (the calling tool's name) onto every non-error result of a view-bound tool — the URI so clients know an MCP App can render, the tool name so the view can discriminate which binder delivered the result (`ui/notifications/tool-result` carries no tool identity). Handlers may pass additional keys on `_meta` for view-only data. On collision, wire keys win over handler keys; the reserved namespaces are `ui.*` and `mcp-use/*`.
 
 ### Channel visibility: what the model sees vs what the view sees
 
@@ -244,15 +248,14 @@ The full `CallToolResult` reaches the view (the host forwards it via `ui/notific
 | `content` | ✅ | ✅ (`useToolContext().content` when `ready`) | ✅ (the fallback) | `content` blocks |
 | result `_meta` (handler keys) | ❌ | ✅ (`useToolContext().meta` when `ready`) | ❌ (ignored) | result `_meta` |
 | tool input | ✅ (it authored it) | ✅ (`useToolContext().toolInput` — partial while streaming, complete after `tool-input`) | ✅ | `tools/call` arguments |
-| view→model context | ✅ (subsequent turns) | source | n/a | `ui/update-model-context` / `ModelContext` |
 | view-tool result | ✅ (it called the tool) | source | n/a | `tools/call` over the bridge → `useViewTool` handler |
 
 Consequences worth spelling out in docs:
 
 - **`structuredContent` is model-visible.** That is a feature — the model reasons over exactly what the user is looking at — but it prices structured output in tokens and rules it out for bulk payloads. The dividing question for every field: *should the model see this?* Yes → `structuredContent`; no (bulk, presentation-only, e.g. base64 images, geometry, full result sets beyond what's discussed) → `_meta`.
 - **`content` is the model/text-host narrative** ("Found 12 results, top match …"). Handlers should pass a short summary; since `structuredContent` is already model-visible, omitting `content` leaves text-only hosts with only the structured payload.
-- **Result `_meta` is the view-only channel**: handler-supplied keys are preserved on result `_meta`, read via `useToolContext().meta` when `ready`, never typed by `outputSchema`, never model context. The framework also stamps the wire `ui.*` link keys (`ui.resourceUri`, `"ui/resourceUri"`) onto every non-error result from a view-bound tool; the `ui` namespace is reserved and wire keys win on collision.
-- The reverse direction is explicit, not ambient: nothing a user does *inside* the view reaches the model unless sent via `ModelContext`/`updateModelContext` (model context push, no follow-up turn) or `sendFollowUpMessage` (`ui/message`, triggers a turn). A view tool's result is the third view→model channel, distinguished by being *model-initiated* (see View tools).
+- **Result `_meta` is the view-only channel**: handler-supplied keys are preserved on result `_meta`, read via `useToolContext().meta` when `ready`, never typed by `outputSchema`, never model context. The framework also stamps the wire `ui.*` link keys (`ui.resourceUri`, `"ui/resourceUri"`) and `_meta["mcp-use/toolName"]` onto every non-error result from a view-bound tool — the tool name never enters model context. The reserved namespaces are `ui.*` and `mcp-use/*`; wire keys win on collision.
+- The reverse direction is explicit, not ambient: nothing a user does *inside* the view reaches the model unless sent via `sendFollowUpMessage` (`ui/message`, triggers a turn) or returned from a view tool (*model-initiated*, see View tools). The spec's third path — the `ui/update-model-context` push — is not exposed in the alpha; its API is deferred with the state-management design (see "Dropped from v1").
 
 ### URI scheme and serving
 
@@ -324,7 +327,7 @@ and `resources/list` carries:
 }
 ```
 
-Resource `_meta.ui` carries author facts from the bound tool's `view:` config plus the framework's auto-appended serving origin in `csp.resourceDomains`. Fields the author did not set (`permissions`, `domain`, …) are omitted. The list entry and each read content item emit the same author facts; the read-time copy resolves the serving origin per request so CSP always matches the synthesized HTML. Clients without the UI extension still receive `ui.*` metadata on view resources, view-bound tools, and every tool on `tools/list` (including `visibility: "app"` tools, which carry `_meta.ui.visibility: ["app"]` for the host to filter).
+Resource `_meta.ui` carries author facts from the facts-declaring binder's `view:` config plus the framework's auto-appended serving origin in `csp.resourceDomains`. Fields the author did not set (`permissions`, `domain`, …) are omitted. The list entry and each read content item emit the same author facts; the read-time copy resolves the serving origin per request so CSP always matches the synthesized HTML. Clients without the UI extension still receive `ui.*` metadata on view resources, view-bound tools, and every tool on `tools/list` (including tools with top-level `visibility: "app"`, which carry `_meta.ui.visibility: ["app"]` for the host to filter).
 
 ---
 
@@ -449,7 +452,7 @@ The HTML route exists for hosts that navigate an iframe to a URL, for the inspec
 
 **srcdoc iframes have no document base URL.** Hosts render view documents via `srcdoc`, so every URL the view still loads over the network (public assets; in **dev**, Vite modules) must be absolute — root-relative paths resolve against the *host page* origin, not the MCP server. Production view JS/CSS need no network URLs (inlined). Dev sets Vite `server.origin` to the dev server's browsable origin so imported assets emit absolute `http://…` URLs. Public assets resolve through a request-scoped config global injected into the synthesized document.
 
-**CSP consequence:** hosts sandbox the view iframe and enforce the resource's `ui.csp` from the `resources/read` content item's `_meta.ui` (content-item value takes precedence; the list entry is a static fallback). Authors declare external domains in the bound tool's `view.csp`; the registration layer **auto-appends the request-derived serving origin** to `csp.resourceDomains` when emitting resource `_meta` on both `resources/list` and each `resources/read` content item so public assets/images from the serving origin remain loadable (production view JS/CSS are inlined and do not need the origin for script/style fetches, but the origin append stays). Public assets are same-origin with the serving origin and need no extra CSP declaration beyond that append. In **dev** (views primed with `{ dev: true }`), the registration layer also **auto-appends the serving origin's websocket variant** (`http:` → `ws:`, `https:` → `wss:`) to `csp.connectDomains` on both surfaces so Vite HMR passes host `connect-src` — derived from the same per-request origin as `resourceDomains`, never emitted in production. Vite dev's `eval` usage can violate host `script-src`; the MCP Apps CSP shape is origin-lists only and cannot declare an eval allowance, so if strict hosts block it the fix is Vite-side (e.g. jitless deps, no eval-based sourcemaps) — deferred until it bites in practice (Open questions).
+**CSP consequence:** hosts sandbox the view iframe and enforce the resource's `ui.csp` from the `resources/read` content item's `_meta.ui` (content-item value takes precedence; the list entry is a static fallback). Authors declare external domains in the facts-declaring binder's `view.csp`; the registration layer **auto-appends the request-derived serving origin** to `csp.resourceDomains` when emitting resource `_meta` on both `resources/list` and each `resources/read` content item so public assets/images from the serving origin remain loadable (production view JS/CSS are inlined and do not need the origin for script/style fetches, but the origin append stays). Public assets are same-origin with the serving origin and need no extra CSP declaration beyond that append. In **dev** (views primed with `{ dev: true }`), the registration layer also **auto-appends the serving origin's websocket variant** (`http:` → `ws:`, `https:` → `wss:`) to `csp.connectDomains` on both surfaces so Vite HMR passes host `connect-src` — derived from the same per-request origin as `resourceDomains`, never emitted in production. Vite dev's `eval` usage can violate host `script-src`; the MCP Apps CSP shape is origin-lists only and cannot declare an eval allowance, so if strict hosts block it the fix is Vite-side (e.g. jitless deps, no eval-based sourcemaps) — deferred until it bites in practice (Open questions).
 
 ### Public assets
 
@@ -526,12 +529,13 @@ type RegisteredTools = ToolsFromModule<RegisteredToolsModule>;
 
 Users export the refs of tools views care about (`export const searchFruits = server.tool(…)`) — the module is the registry; no map API, no `export type AppType` ritual, no user-written `declare module`. The name union covers **every exported ref** regardless of `visibility` (a view may call model-visible tools too; `visibility: "app"` declares app-only visibility — the host hides the tool from the model per `_meta.ui.visibility`, not the server). `typeof import()` is a live tsserver edge: add a tool, and every view's `useCallTool` union updates with no process running. Multi-file registration composes via re-exports (`export * from "./tools/fruits.js"`).
 
-`ToolContextHandle` resolves through the same map, keyed by the **bound tool's name**:
+`ToolContextHandle` resolves through the same map. The type parameter is the set of tools that may deliver results to this view — a single name or a union for multi-binder views. The ready branch **distributes** over the union so narrowing `toolName` narrows `toolOutput`:
 
 ```ts
 type ToolContextHandle<Name extends keyof RegisteredTools> =
   | {
       status: "pending";
+      toolName: Name | undefined; // last known calling tool (hostContext.toolInfo seed); informational — input notifications carry no tool identity
       toolInput: RegisteredTools[Name]["input"] | undefined;
       toolOutput: undefined;
       content: undefined;
@@ -540,6 +544,7 @@ type ToolContextHandle<Name extends keyof RegisteredTools> =
     }
   | {
       status: "streaming";
+      toolName: Name | undefined;
       toolInput: DeepPartial<RegisteredTools[Name]["input"]> | undefined;
       toolOutput: undefined;
       content: undefined;
@@ -548,6 +553,7 @@ type ToolContextHandle<Name extends keyof RegisteredTools> =
     }
   | {
       status: "cancelled";
+      toolName: Name | undefined;
       toolInput: DeepPartial<RegisteredTools[Name]["input"]> | undefined;
       toolOutput: undefined;
       content: undefined;
@@ -555,18 +561,32 @@ type ToolContextHandle<Name extends keyof RegisteredTools> =
       reason: string | undefined;
     }
   | {
-      status: "ready";
-      toolInput: RegisteredTools[Name]["input"] | undefined;
-      toolOutput: RegisteredTools[Name]["output"];
-      content: ContentBlock[] | undefined;
-      meta: Record<string, unknown> | undefined;
-      reason?: undefined;
-    };
+      [N in Name]: {
+        status: "ready";
+        toolName: N; // authoritative — from result `_meta["mcp-use/toolName"]`
+        toolInput: RegisteredTools[N]["input"] | undefined;
+        toolOutput: RegisteredTools[N]["output"];
+        content: ContentBlock[] | undefined;
+        meta: Record<string, unknown> | undefined;
+        reason?: undefined;
+      };
+    }[Name];
 ```
 
-`useToolContext<Name>()` returns this handle. TypeScript narrowing on `status === "ready"` guarantees complete, typed `toolOutput` — the view-side contract that replaces signature-implied completeness. `toolInput` is the single streaming field: partials from `ui/notifications/tool-input-partial` and the complete args from `ui/notifications/tool-input` write the same field (last write wins); during `"streaming"` / `"cancelled"` it is typed `DeepPartial<Input>`.
+`useToolContext<Name>()` returns this handle. TypeScript narrowing on `status === "ready"` guarantees complete, typed `toolOutput`; narrowing further on `toolName` (when `Name` is a union) selects that binder's output type. `toolInput` is the single streaming field: partials from `ui/notifications/tool-input-partial` and the complete args from `ui/notifications/tool-input` write the same field (last write wins); during `"streaming"` / `"cancelled"` it is typed `DeepPartial<Input>`.
 
-Keying by tool name (not view directory name) is deliberate: view names exist only in the filesystem/manifest, which type space cannot see without codegen — tool names exist as literal types on exported refs. The tool-name parameter is the author's declaration of which tool binds the view; it is not enforced in type space (a wrong literal compiles against the wrong schema), the runtime binding checks at mount/build (decision 10) are the enforcement. Unbound views (inspector-preview only) never reach `"ready"` — components branch on hook state and declare no required result payload.
+Canonical multi-binder pattern:
+
+```tsx
+const view = useToolContext<"draw" | "refresh-canvas">();
+if (view.status === "ready" && view.toolName === "draw") {
+  // view.toolOutput is draw's output type
+}
+```
+
+Single-binder usage is unchanged apart from the extra `toolName` field.
+
+Keying by tool name (not view directory name) is deliberate: view names exist only in the filesystem/manifest, which type space cannot see without codegen — tool names exist as literal types on exported refs. The type parameter is the author's declaration of which tools may deliver results to this view; a union covers multi-binder views, and `toolName` narrows the ready branch. It is not enforced in type space (a wrong literal compiles against the wrong schema); the runtime binding checks at mount/build (decision 10) are the enforcement. Unbound views (inspector-preview only) never reach `"ready"` — components branch on hook state and declare no required result payload.
 
 **Note for cutover:** the `declare module` specifier must match the published import path — it becomes `"mcp-use/react"` when the package renames. The scaffolded file is the only thing that changes.
 
@@ -603,13 +623,14 @@ The generated iframe entry — not user code — connects the bridge and mounts 
 - **`"pending"`:** no result yet and arguments are not mid-stream. Covers both "nothing arrived" and "complete input received, awaiting result" — `toolInput` is the complete args when delivered (`Input | undefined`).
 - **`"streaming"`:** partial args are arriving; `toolInput` grows progressively and is typed `DeepPartial<Input>` (provisional, render-only — strings may be truncated mid-token).
 - **`"cancelled"`:** host sent `ui/notifications/tool-cancelled` (host MUST send on any cancellation — user action, sampling error, classifier intervention). `reason` is the optional spec-provided string. `toolInput` may be partial (cancelled mid-stream) — typed `DeepPartial<Input>`.
-- **`"ready"`:** result arrived; `toolOutput` = the tool's output type (from `outputSchema`, via `Register`/`RegisteredTools`); `content` = result `content` blocks; `meta` available (the view-only result channel); `toolInput` is the complete args when delivered.
+- **`"ready"`:** result arrived; `toolName` is authoritative (from result `_meta["mcp-use/toolName"]`); `toolOutput` = that tool's output type (from `outputSchema`, via `Register`/`RegisteredTools`); `content` = result `content` blocks; `meta` available (the view-only result channel); `toolInput` is the complete args when delivered.
+- **`toolName`:** on `"pending"` / `"streaming"` / `"cancelled"`, `Name | undefined` — last known calling tool, seeded from `hostContext.toolInfo` when the host provides it (informational only; input notifications carry no tool identity). On `"ready"`, the result stamp is authoritative and the ready branch distributes over the name union so `toolName === "draw"` narrows `toolOutput` to that tool's output type.
 
-TypeScript narrowing on `status === "ready"` guarantees complete `toolOutput` — this replaces the old guarantee that a component signature implied complete result data.
+TypeScript narrowing on `status === "ready"` guarantees complete `toolOutput`; narrowing on `toolName` (multi-binder unions) selects the binder's output type — this replaces the old guarantee that a component signature implied complete result data.
 
 **Status transitions.** `status` is derived from the bridge notifications, checked in order:
 
-- `"ready"` iff a tool result has arrived for the current call cycle (`ui/notifications/tool-result`; `hasToolResult`). A result also clears any prior cancellation. Later results keep it `"ready"` with updated `toolOutput`, `content`, and `meta`.
+- `"ready"` iff a tool result has arrived for the current call cycle (`ui/notifications/tool-result`; `hasToolResult`). A result also clears any prior cancellation and sets `toolName` from `_meta["mcp-use/toolName"]`. Later results keep it `"ready"` with updated `toolName`, `toolOutput`, `content`, and `meta`.
 - Otherwise `"cancelled"` iff the host sent `ui/notifications/tool-cancelled` for the current call cycle.
 - Otherwise `"streaming"` iff arguments are streaming — set by `ui/notifications/tool-input-partial`. A complete `ui/notifications/tool-input` ends the streaming phase (status returns to `"pending"` while awaiting the result). A call whose host sends no partial notifications stays `"pending"` until `"ready"` (or `"cancelled"`).
 - Otherwise `"pending"`.
@@ -717,7 +738,7 @@ Contract:
 - **Connect-time capability:** ext-apps only auto-advertises the `tools` capability for pre-connect registrations, and hooks run post-connect — so the generated iframe entry always declares `tools: { listChanged: true }`. Harmless for views with no tools (empty list).
 - **Not in `Register`:** view tools never appear on the server's `tools/list` and are never callable from views — typing them into `useCallTool` would advertise calls nobody can make. Their input/output types live and die inside the component.
 - **Progressive enhancement only:** no host capability promises app-tool support; hosts that support it list/call, others ignore. Registration is unconditional and cheap; views must not depend on view tools being invoked.
-- **Channel note:** a view tool's result (`content`/`structuredContent`) flows host→model — the third explicit view→model channel (alongside `updateModelContext` and `ui/message`), distinguished by being *model-initiated*.
+- **Channel note:** a view tool's result (`content`/`structuredContent`) flows host→model — the second explicit view→model channel (alongside `ui/message`), distinguished by being *model-initiated*.
 
 ### `/react` API reference
 
@@ -819,6 +840,10 @@ interface CallToolHandle<Args, Result> {
 
 function useSendFollowUp(): (args: { prompt: string }) => Promise<void>;  // ui/message — triggers a model turn
 function useOpenExternal(): (args: { url: string }) => void;            // App.openLink
+function useSendSizeChanged(): (size: {
+  width?: number;
+  height?: number;
+}) => Promise<void>;                                                    // App.sendSizeChanged — ui/notifications/size-changed
 function useDisplayMode(): {
   displayMode: "inline" | "fullscreen" | "pip";
   requestDisplayMode: (args: { mode: "inline" | "fullscreen" | "pip" }) => Promise<void>;
@@ -827,15 +852,15 @@ function useDisplayMode(): {
 
 **`requestDisplayMode` resolves `void` by design** — the underlying `App.requestDisplayMode` returns the granted mode, but surfacing it would create a second source of truth that invites stashing the mode in state, where it goes stale the moment the host changes modes on its own (user exits fullscreen, mobile reflow). The hook's `displayMode` subscription is the single source of truth for the outcome; a denied request simply leaves it unchanged.
 
+**`useSendSizeChanged()`** — manual size reporting for the host iframe. Auto-resize is on by default (ext-apps measures the document under `height: max-content` and sends `ui/notifications/size-changed`). Views whose height derives from their width — for example a fixed aspect-ratio container sized via `ResizeObserver` — measure ~0 under that strategy and the host collapses the iframe. Export `viewOptions: { autoResize: false }` from `view.tsx` to opt out, then call `useSendSizeChanged()` with `{ width, height }` from a container observer (or equivalent).
+
 **`useViewTool(definition, handler)`** — view-registered tools (contract above). `definition` mirrors `ToolDefinition` plus `enabled?: boolean`; the handler's params/return are inferred exactly like a server tool's.
 
-**Local UI state is plain React `useState`** — there is deliberately no `useViewState` wrapper. MCP Apps has no host-persisted view store (see "Dropped from v1"), so a dedicated hook would only restate `useState` while implying persistence that does not exist. State the model should see is an explicit act via `ModelContext`.
+**Local UI state is plain React `useState`** — there is deliberately no `useViewState` wrapper. MCP Apps has no host-persisted view store (see "Dropped from v1"), so a dedicated hook would only restate `useState` while implying persistence that does not exist. Making state visible to the model is likewise deferred: the alpha exposes no `ui/update-model-context` API (see "Dropped from v1").
 
 **`useViewTheme(): "light" | "dark"`** — narrow theme-only subscription; rerenders only on host theme changes.
 
-**`<ModelContext content={string} structuredContent?={object}>{children?}</ModelContext>`** and **`modelContext.set/setStructured/remove/clear`** — the explicit view→model channel, covering the full `ui/update-model-context` params surface (`content: ContentBlock[]` + `structuredContent`). Components register `content` in a parent-child tree; nested `<ModelContext>` elements serialize as an indented list forming the push's leading text block. The imperative `modelContext` API covers non-React call sites (event handlers, stores) with stable keys: `set(key, string)` joins the text tree, `set(key, ContentBlock[])` appends blocks of any modality after it, and `setStructured(key, object)` (also the component's `structuredContent` prop) merges entries into the push's `structuredContent` in registration order, later keys winning collisions; `remove(key)` clears every channel under the key. Each push carries the complete current context — matching the spec's overwrite semantics ("each request overwrites the previous context sent by the View"); siblings serialize in registration order (React mounts siblings in document order, so the list tracks what's on screen). Nothing is pushed until the first non-empty context registers: views that never use `ModelContext` send no `ui/update-model-context` traffic at all, and an empty push is delivered only as an explicit clear after context was previously delivered. Pushes are gated on the host's `updateModelContext` capability (draft) — hosts that don't declare it get no requests, with a single console warning naming the gap.
-
-**Providers and components.** The generated iframe entry owns the essentials itself — bridge connection, always-mounted default export, auto-resize, a top-level error boundary — so **no provider is required**. `<McpUseProvider>` remains as the opt-in wrapper bundling theme application + error-boundary customization; `<ThemeProvider>` applies host style variables/fonts (ext-apps `applyDocumentTheme`/`applyHostStyleVariables`/`applyHostFonts`); `<ViewControls>` is the dev-only overlay (v1's `WidgetControls`, renamed); `<ErrorBoundary>` is carried unchanged; `<Image>` resolves root-relative `src` paths against the request-scoped `__mcpUseViewConfig.publicBase` injected into the synthesized document (Public assets).
+**Providers and components.** The generated iframe entry owns the essentials itself — bridge connection, always-mounted default export, auto-resize (on by default; per-view opt-out via the `viewOptions` named export, with manual reporting via `useSendSizeChanged`), a top-level error boundary — so **no provider is required**. `<McpUseProvider>` remains as the opt-in wrapper bundling theme application + error-boundary customization; `<ThemeProvider>` applies host style variables/fonts (ext-apps `applyDocumentTheme`/`applyHostStyleVariables`/`applyHostFonts`); `<ViewControls>` is the dev-only overlay (v1's `WidgetControls`, renamed); `<ErrorBoundary>` is carried unchanged; `<Image>` resolves root-relative `src` paths against the request-scoped `__mcpUseViewConfig.publicBase` injected into the synthesized document (Public assets).
 
 ### Putting it together — a complete view
 
@@ -866,7 +891,6 @@ export const getFruitDetails = server.tool(
 import { useState } from "react";
 import { z } from "zod";
 import {
-  ModelContext,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -912,10 +936,6 @@ export default function ProductSearchResult() {
 
   return (
     <div data-theme={theme}>
-      {/* explicit, ambient model visibility (no model turn) — the other view→model
-          paths are sendFollowUpMessage (triggers a turn) and view-tool results */}
-      <ModelContext content={`User is viewing results for "${query}"; favorites: ${favorites.join(", ") || "none"}`} />
-
       <ResultsGrid
         items={items}
         selected={selected}
@@ -938,7 +958,7 @@ export default function ProductSearchResult() {
 }
 ```
 
-Everything result-shaped enters through `useToolContext` (typed by the server's `outputSchema`; `query` is there because the handler echoes it for model visibility); everything ambient or imperative goes through split hooks; the view→model paths (`ModelContext`, `sendFollowUpMessage`) are visible and explicit in the JSX. For tools not in the `Register` (dynamic registration, unexported refs), the explicit-generics rung applies with hand-written types: `useCallTool<{ fruit: string }, { name: string; producer: string }>("get-fruit-details")`.
+Everything result-shaped enters through `useToolContext` (typed by the server's `outputSchema`; `query` is there because the handler echoes it for model visibility); everything ambient or imperative goes through split hooks; the view→model paths (`sendFollowUpMessage`, view-tool results) are explicit, never ambient. For tools not in the `Register` (dynamic registration, unexported refs), the explicit-generics rung applies with hand-written types: `useCallTool<{ fruit: string }, { name: string; producer: string }>("get-fruit-details")`.
 
 ### Hook surface (v1 → v2 → backing primitive)
 
@@ -955,15 +975,16 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 | — `sendFollowUpMessage`                                                                                 | `useSendFollowUp()`                                                                       | `App.sendMessage` (`ui/message`)                                             |
 | — `openExternal`                                                                                        | `useOpenExternal()`                                                                       | `App.openLink`                                                               |
 | — `requestDisplayMode` / `displayMode`                                                                  | `useDisplayMode()` → `{ displayMode, requestDisplayMode }`                                | `App.requestDisplayMode` + `hostContext`                                     |
+| *(no v1 equivalent / auto-size)*                                                                        | `viewOptions.autoResize` (default `true`) + `useSendSizeChanged()`                        | `App` `autoResize` option + `App.sendSizeChanged`                            |
 | `useWidgetProps()`                                                                                      | `useToolContext()` — primary data API                                                       | bridge notifications → discriminated union                                   |
-| `useWidgetState()`                                                                                      | dropped — plain `useState` for local UI state; `ModelContext` for model visibility        | no host store in MCP Apps — see "Dropped from v1"                            |
+| `useWidgetState()`                                                                                      | dropped — plain `useState` for local UI state; model visibility deferred                  | no host store in MCP Apps — see "Dropped from v1"                            |
 | `useWidgetTheme()`                                                                                      | `useViewTheme()`                                                                          | dedicated `hostcontextchanged` subscription                                  |
 | `useCallTool(name \| ref)`                                                                              | kept, typed via `Register`/`ToolRef`                                                      | `App.callServerTool`                                                         |
 | *(no v1 equivalent)*                                                                                    | `useViewTool()` — view-registered tools the host/model calls (see View tools)             | `App.registerTool` + `tools/list_changed`                                    |
-| `<McpUseProvider>`                                                                                      | kept (optional — the generated entry covers the essentials)                               | auto-resize via `App`'s built-in `autoResize`; theme; error boundary         |
+| `<McpUseProvider>`                                                                                      | kept (optional — the generated entry covers the essentials)                               | auto-resize via `App`'s built-in `autoResize` (default on; opt out with `viewOptions`); theme; error boundary |
 | `<ThemeProvider>`                                                                                       | kept                                                                                      | ext-apps `applyDocumentTheme` / `applyHostStyleVariables` / `applyHostFonts` |
 | `<WidgetControls>`                                                                                      | `<ViewControls>`                                                                          | dev-only overlay, ported                                                     |
-| `<ModelContext>` / `modelContext`                                                                       | kept                                                                                      | `App.updateModelContext` (`ui/update-model-context`)                         |
+| `<ModelContext>` / `modelContext`                                                                       | deferred — no model-context API in the alpha (see "Dropped from v1")                      | `App.updateModelContext` (`ui/update-model-context`)                         |
 | `<ErrorBoundary>`                                                                                       | kept                                                                                      | unchanged                                                                    |
 | `<Image>`                                                                                               | kept — resolves root-relative `src` via `__mcpUseViewConfig.publicBase` (Public assets)   | `<img>` with absolute URL                                                    |
 | `generateHelpers()`                                                                                     | dropped                                                                                   | subsumed by `Register` typing                                                |
@@ -971,7 +992,8 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 ### Dropped from v1 (spec gaps)
 
 - **`useFiles()` (upload):** file upload does not exist in MCP Apps (upstream: "not yet implemented"); it is a ChatGPT-only `window.openai` extension. Dropped from the alpha; host-mediated *download* (`ui/download-file`, draft) may land later.
-- **Cross-session view state:** `window.openai.setWidgetState`'s host-persisted-and-restored state has no spec equivalent, so there is no state hook at all — local UI state is plain React `useState` (iframe lifetime), and a `useViewState` wrapper would only restate it while implying a host store that does not exist. Model visibility is a separate, explicit act via `ModelContext`/`updateModelContext` — v1's conflation of "UI state" and "model context" in one `setState` is deliberately split.
+- **Cross-session view state:** `window.openai.setWidgetState`'s host-persisted-and-restored state has no spec equivalent, so there is no state hook at all — local UI state is plain React `useState` (iframe lifetime), and a `useViewState` wrapper would only restate it while implying a host store that does not exist.
+- **Model context (`ui/update-model-context`):** deferred — no runtime API in the alpha. The wire method exists (ext-apps `App.updateModelContext`), but the SDK surface for it is a state-management design question — what state the model should see, when it updates, and how it composes with local UI state — and it will be decided as one piece rather than shipped as a standalone push API. v1's conflation of "UI state" and "model context" in one `setWidgetState` is deliberately split; the model-context half lands with that design.
 - **`_meta.openai/*` emission** (`outputTemplate`, `widgetCSP`, invocation strings, …): overlay territory, out of the alpha (see Protocol posture).
 
 ---
@@ -981,31 +1003,31 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 The full build/serve contract is "Build system & serving", above; it extends the **implemented** `CLI_SPEC.md` (which scoped views out) and its ground rules hold — reload-not-HMR for the server entry, `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk. Command summary:
 
 - **`mcp-use dev`:** adds the Vite client environment to the existing dev server; view documents/assets serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract. `list_changed` emission on reload stays deferred (decision 12). No typegen hooks anywhere.
-- **`mcp-use build`:** one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, double binding → errors; unbound view → warning).
+- **`mcp-use build`:** one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, two facts-declaring binders for one view → errors naming both tools; unbound view → warning).
 - **`mcp-use start`:** imports the built wrapper entry (views arrive primed) and serves prebuilt assets; no vite, no discovery, no runtime manifest read.
 
 ## Testing
 
-- **Type-level** (`tests/type-level.test.ts` pattern): `ToolRef` name/input/output inference incl. non-zod Standard Schema libs; `ToolsFromModule` filtering and re-export composition; `useCallTool` name union + arg/result types; empty-`Register` fallback; `structuredContent` vs `outputSchema` agreement at the return position; `useToolContext` discriminated union narrowing (`status === "ready"` → typed `toolOutput`; `"streaming"` / `"cancelled"` → `DeepPartial` `toolInput`; `"cancelled"` → `reason`); input-schema vs output-schema type-source split (`toolInput` vs `toolOutput`); `DeepPartial` over arrays/nested objects.
-- **e2e over HTTP** (official client): view resource listing/reading with correct mimetype and framework auto-CSP in `_meta.ui.*` on both `resources/list` entries and `resources/read` content items for all clients; `tools/list` includes every registered tool for all clients (including `visibility: "app"` tools with `_meta.ui.visibility: ["app"]`); `ui.visibility` emitted only when `view.visibility` is set; **channel separation** — handler `{ structuredContent, content, _meta }` lands on the wire as `structuredContent` / `content` / `_meta` respectively, with handler `_meta` absent from everything model-facing; `_meta.ui.resourceUri` auto-stamped on every non-error view-bound tool result.
-- **Build/serve** (CLI-test pattern from `tests/cli/`, real `build` against a views fixture): manifest `views` map shape (`entry`, `css` only); the built wrapper entry primes registration with zero `fs` on the MCP path (list/read succeed with the built assets dir absent; only asset routes 404); document + asset routes under `${basePath}/_mcp-use/` with correct cache headers; the manifest→URL→disk basename mapping; per-request origin resolution (proxy headers, override) reflected in both the HTTP document and the `resources/read` body and content-item `_meta.ui.csp.resourceDomains`; asset origin auto-appended to `csp.resourceDomains`; the binding checks — `view.name` naming a missing view, a `view:` tool without `outputSchema`, and two tools binding one view fail loudly naming the view/tool, a view directory no tool binds warns (build still succeeds, view still registered).
-- **Bridge-level:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted on connect before any notification; `tool-input-partial` sequence driving `useToolContext().status === "streaming"` with progressive `toolInput` on the same mounted component; complete `tool-input` returning to `"pending"` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); mid-stream `tool-cancelled` → `"cancelled"` with optional `reason` and last partial still in `toolInput`; post-cancel retry — a new `tool-input-partial` after cancel returns to `"streaming"` (not stuck `"cancelled"`), then result → `"ready"`; post-ready second call — a new `tool-input` (or partial) after a delivered result leaves `"ready"` into `"pending"`/`"streaming"`, a subsequent result lands `"ready"` with the new payload, and a `tool-cancelled` after the second call's input surfaces `"cancelled"`; `tools/call` round-trip through `useCallTool` (`data`/`error`/`isPending` transitions); handler `meta` surfaced on `useToolContext()` when ready; split-hook channel isolation (environment/action subscriptions rerender independently of data — `useHostContext` / `useDisplayMode` do not re-render on `tool-input-partial`, still re-render on host-context change and when `isConnected` flips); **view tools** — `bridge.listTools()` reflects mounted `useViewTool`s, call round-trip mutates component state, unmount/`enabled: false` emits `list_changed` and removes/disables, re-renders with inline schema literals emit no re-registration or `list_changed` churn; **model context** — a view that never registers `ModelContext` sends no `ui/update-model-context`, content pushes the serialized tree, removal after content pushes an explicit clear, siblings serialize in document order (12+ nodes: `useId` sort order would shuffle them), `structuredContent` (component prop) and imperative `ContentBlock[]` entries ride the same push alongside the text tree, a host without the `updateModelContext` capability receives no requests.
+- **Type-level** (`tests/type-level.test.ts` pattern): `ToolRef` name/input/output inference incl. non-zod Standard Schema libs; `ToolsFromModule` filtering and re-export composition; `useCallTool` name union + arg/result types; empty-`Register` fallback; `structuredContent` vs `outputSchema` agreement at the return position; `useToolContext` discriminated union narrowing (`status === "ready"` → typed `toolOutput`; multi-binder `toolName` narrows `toolOutput`; `"streaming"` / `"cancelled"` → `DeepPartial` `toolInput`; `"cancelled"` → `reason`); input-schema vs output-schema type-source split (`toolInput` vs `toolOutput`); `DeepPartial` over arrays/nested objects.
+- **e2e over HTTP** (official client): view resource listing/reading with correct mimetype and framework auto-CSP in `_meta.ui.*` on both `resources/list` entries and `resources/read` content items for all clients; `tools/list` includes every registered tool for all clients (including `visibility: "app"` tools with `_meta.ui.visibility: ["app"]`); `ui.visibility` emitted only when top-level `visibility` is set (any tool); **channel separation** — handler `{ structuredContent, content, _meta }` lands on the wire as `structuredContent` / `content` / `_meta` respectively, with handler `_meta` absent from everything model-facing; `_meta.ui.resourceUri` and `_meta["mcp-use/toolName"]` auto-stamped on every non-error view-bound tool result.
+- **Build/serve** (CLI-test pattern from `tests/cli/`, real `build` against a views fixture): manifest `views` map shape (`entry`, `css` only); the built wrapper entry primes registration with zero `fs` on the MCP path (list/read succeed with the built assets dir absent; only asset routes 404); document + asset routes under `${basePath}/_mcp-use/` with correct cache headers; the manifest→URL→disk basename mapping; per-request origin resolution (proxy headers, override) reflected in both the HTTP document and the `resources/read` body and content-item `_meta.ui.csp.resourceDomains`; asset origin auto-appended to `csp.resourceDomains`; the binding checks — `view.name` naming a missing view, a `view:` tool without `outputSchema`, and two facts-declaring binders for one view fail loudly naming both tools, a view directory no tool binds warns (build still succeeds, view still registered); many tools may bind one view when only one declares facts.
+- **Bridge-level:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted on connect before any notification; `tool-input-partial` sequence driving `useToolContext().status === "streaming"` with progressive `toolInput` on the same mounted component; complete `tool-input` returning to `"pending"` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); mid-stream `tool-cancelled` → `"cancelled"` with optional `reason` and last partial still in `toolInput`; post-cancel retry — a new `tool-input-partial` after cancel returns to `"streaming"` (not stuck `"cancelled"`), then result → `"ready"`; post-ready second call — a new `tool-input` (or partial) after a delivered result leaves `"ready"` into `"pending"`/`"streaming"`, a subsequent result lands `"ready"` with the new payload, and a `tool-cancelled` after the second call's input surfaces `"cancelled"`; `tools/call` round-trip through `useCallTool` (`data`/`error`/`isPending` transitions); handler `meta` surfaced on `useToolContext()` when ready; split-hook channel isolation (environment/action subscriptions rerender independently of data — `useHostContext` / `useDisplayMode` do not re-render on `tool-input-partial`, still re-render on host-context change and when `isConnected` flips); **view tools** — `bridge.listTools()` reflects mounted `useViewTool`s, call round-trip mutates component state, unmount/`enabled: false` emits `list_changed` and removes/disables, re-renders with inline schema literals emit no re-registration or `list_changed` churn; **size / auto-resize** — `useSendSizeChanged` delivers `ui/notifications/size-changed` with the given `{ width, height }` (observable on the host `sizechange` / `onsizechange`); `viewOptions: { autoResize: false }` constructs the guest `App` without auto-resize so connect does not emit a size-changed notification, while the default keeps `autoResize: true`.
 
 ## Deltas vs v1 (for the migration guide)
 
 1. Every `widget` name → `view` (`widget:` config, `useWidget*`, `WidgetControls`, `ui://widget/…` → `ui://views/…`). The v1 `widget()` response helper is dropped — handlers return plain `CallToolResult`.
 2. `useWidgetProps()` → `useToolContext()` as the primary data API (`ToolContextHandle` four-status discriminated union, `toolOutput` not `props`; partial and complete args share `toolInput`); `useWidget()` → the split hooks (`useToolContext()` for data, `useHostContext()` for ambient host context, per-action hooks for bridge actions). Components mount once on bridge connect and branch on hook state — no props spread, no separate loading component export. Result payload is `structuredContent` only — v1's `toolInput` merge is gone (read input via `useToolContext().toolInput`, or echo input fields into the output schema for model visibility).
-3. `widgetMetadata` export dropped — view files default-export the component only. Result types come from `outputSchema` via `useToolContext<Name>()` (required on view-bound tools). Resource facts (description, CSP, permissions, domain, prefersBorder) are declared on the bound tool's `view:` config and emitted on the resource.
+3. `widgetMetadata` export dropped — view files default-export the component, plus an optional `viewOptions` named export for guest-runtime options (currently `autoResize`). Result types come from `outputSchema` via `useToolContext<Name>()` (required on view-bound tools). Resource facts (description, CSP, permissions, domain, prefersBorder) are declared on at most one binder's `view:` config (additional binders write `view: { name }` only) and emitted on the resource — `viewOptions` is never wire metadata.
 4. In-component `isPending` skeleton branching → `useToolContext()` status branching (`pending` / `streaming` / `cancelled` / `ready`) inside the always-mounted default export.
 5. `useCallTool` types come from exporting tool refs, not from generated `.mcp-use/generated/tool-registry.d.ts`; template `postinstall`/dev-loop typegen is gone.
-6. `useWidgetState` has no replacement hook — hold local UI state with React's `useState` (iframe lifetime only) and feed the model explicitly via `ModelContext`.
+6. `useWidgetState` has no replacement hook — hold local UI state with React's `useState` (iframe lifetime only); a model-visibility API is deferred (see "Dropped from v1").
 7. `useFiles` removed (ChatGPT-only capability).
 8. `window.openai` is never consumed by the runtime; ChatGPT works through its native MCP Apps support.
 9. Tool config `invoking`/`invoked`/`widgetAccessible` removed (openai overlay, no spec equivalent; `visibility` covers app/model narrowing).
 10. Views work against the stateless 2026-07-28 wire; nothing view-related depends on sessions.
 11. Asset routes move from `${basePath}/mcp-use/widgets/…` to `${basePath}/_mcp-use/…`; build output from `.mcp-use/build/resources/widgets/<name>/` to one self-contained client build per view whose JS/CSS are inlined into the synthesized document (no shared chunks across views). Boot-time origin baking and the v1 `window.__getFile`/`__mcpServerUrl` globals are gone — origin resolves per request (forwarded headers, plus an override whose shape — `publicUrl` config vs v1's `MCP_URL` — is pending, see Open questions); `assetPrefix` has no v2 equivalent (a CDN fronts the public-asset route instead). One request-scoped `globalThis.__mcpUseViewConfig` (public asset base only) is injected into the synthesized document — not boot-time baked like v1's `__mcpPublicAssetsUrl`.
-12. Registration no longer happens inside `listen()`/`getHandler()` (v1's async `mountWidgets` → `server.uiResource()`): the build primes the instance through a generated wrapper entry, and `resources/read` synthesizes the document from manifest data instead of re-reading built HTML from disk on every read. `server.uiResource()` has no v2 equivalent, and neither do v1's `exposeAsTool` / hand-built `uiResource` registrations — a view is bound by at most one tool via `view: { name }`, and an unbound view warns (decision 10).
-13. Ambient hooks split by concern: `useHostContext()`, `useSendFollowUp()`, `useOpenExternal()`, `useDisplayMode()` — split-by-concern is the design; each hook rerenders only on its channel.
+12. Registration no longer happens inside `listen()`/`getHandler()` (v1's async `mountWidgets` → `server.uiResource()`): the build primes the instance through a generated wrapper entry, and `resources/read` synthesizes the document from manifest data instead of re-reading built HTML from disk on every read. `server.uiResource()` has no v2 equivalent, and neither do v1's `exposeAsTool` / hand-built `uiResource` registrations — any number of tools may bind one view via `view: { name }` (at most one facts-declaring binder), and an unbound view warns (decision 10).
+13. Ambient hooks split by concern: `useHostContext()`, `useSendFollowUp()`, `useOpenExternal()`, `useDisplayMode()`, `useSendSizeChanged()` — split-by-concern is the design; each hook rerenders only on its channel (action hooks return stable callbacks).
 
 ## Open questions
 
