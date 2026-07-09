@@ -4,7 +4,7 @@ import { useViewActions } from "../bridge/view-bridge.js";
  * Returns a callback that notifies the host of the view's size via
  * `ui/notifications/size-changed`.
  *
- * Pair with `viewOptions: { autoResize: false }` when the view's height
+ * Pair with {@link McpUseProvider} `autoSize={false}` when the view's height
  * derives from its width (for example a fixed aspect-ratio container).
  * Ext-apps auto-resize measures the document under `height: max-content`,
  * which collapses those layouts; disable it and report `{ width, height }`
@@ -13,14 +13,17 @@ import { useViewActions } from "../bridge/view-bridge.js";
  * @example
  * ```tsx
  * import { useEffect, useRef } from "react";
- * import {
- *   useSendSizeChanged,
- *   type ViewOptions,
- * } from "@mcp-use/server/react";
- *
- * export const viewOptions: ViewOptions = { autoResize: false };
+ * import { McpUseProvider, useSendSizeChanged } from "@mcp-use/server/react";
  *
  * export default function AspectRatioView() {
+ *   return (
+ *     <McpUseProvider autoSize={false}>
+ *       <AspectRatioInner />
+ *     </McpUseProvider>
+ *   );
+ * }
+ *
+ * function AspectRatioInner() {
  *   const sendSizeChanged = useSendSizeChanged();
  *   const ref = useRef<HTMLDivElement>(null);
  *

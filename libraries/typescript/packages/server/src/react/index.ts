@@ -8,11 +8,7 @@
  * `components/` (provider/utility components).
  */
 
-export {
-  bootstrapView,
-  type ViewModule,
-  type ViewOptions,
-} from "./bridge/bootstrap-view.js";
+export { bootstrapView, type ViewModule } from "./bridge/bootstrap-view.js";
 export { ErrorBoundary } from "./components/error-boundary.js";
 export { Image } from "./components/image.js";
 export { McpUseProvider } from "./components/mcp-use-provider.js";

@@ -103,10 +103,10 @@ function setSnapshot(patch: Partial<ViewBridgeSnapshot>): void {
 /**
  * Configure guest `App` options before the bridge constructs/`connect`s.
  *
- * Called synchronously by {@link bootstrapView} from `module.viewOptions` so
- * the value is set before any React effect runs `connect()`. Ignored (with a
- * warning) if an `App` instance already exists — auto-resize cannot be toggled
- * after connect.
+ * Called by {@link McpUseProvider} during its first render (render precedes
+ * all effects, so the value is set before any effect runs `connect()`).
+ * Ignored (with a warning) if an `App` instance already exists — auto-resize
+ * cannot be toggled after connect.
  *
  * @param options - Per-view guest options (currently `autoResize`).
  *

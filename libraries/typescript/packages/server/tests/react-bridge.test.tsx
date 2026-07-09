@@ -8,6 +8,7 @@ import { useState, type ComponentType } from "react";
 import {
   bootstrapView,
   Image,
+  McpUseProvider,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -778,7 +779,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("useSendSizeChanged sends ui/notifications/size-changed to the host", async () => {
+  it("autoSize disabled + useSendSizeChanged delivers manual size, no auto emit on connect", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -802,8 +803,11 @@ describe("react bridge runtime", () => {
     }
 
     bootstrapView({
-      default: Probe as ComponentType,
-      viewOptions: { autoResize: false },
+      default: (() => (
+        <McpUseProvider autoSize={false}>
+          <Probe />
+        </McpUseProvider>
+      )) as ComponentType,
     });
     await init;
 
@@ -817,7 +821,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("bootstrapView viewOptions.autoResize false constructs App without auto-resize", async () => {
+  it("McpUseProvider autoSize={false} constructs App without auto-resize", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -831,8 +835,11 @@ describe("react bridge runtime", () => {
     }
 
     bootstrapView({
-      default: Probe as ComponentType,
-      viewOptions: { autoResize: false },
+      default: (() => (
+        <McpUseProvider autoSize={false}>
+          <Probe />
+        </McpUseProvider>
+      )) as ComponentType,
     });
     await init;
 
@@ -854,7 +861,7 @@ describe("react bridge runtime", () => {
     ).toBe(false);
   });
 
-  it("default viewOptions keep App autoResize true", async () => {
+  it("default without McpUseProvider keeps App autoResize true", async () => {
     resetRuntime();
     const { init } = await startHost();
 
@@ -863,6 +870,34 @@ describe("react bridge runtime", () => {
     }
 
     bootstrapView({ default: Probe as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("probe").textContent).toBe("ok");
+    });
+
+    const app = _getAppForTesting();
+    expect(app).not.toBeNull();
+    expect(
+      (app as { options: { autoResize?: boolean } } | null)?.options.autoResize
+    ).toBe(true);
+  });
+
+  it("McpUseProvider without autoSize prop keeps App autoResize true", async () => {
+    resetRuntime();
+    const { init } = await startHost();
+
+    function Probe() {
+      return <div data-testid="probe">ok</div>;
+    }
+
+    bootstrapView({
+      default: (() => (
+        <McpUseProvider>
+          <Probe />
+        </McpUseProvider>
+      )) as ComponentType,
+    });
     await init;
 
     await waitFor(() => {
