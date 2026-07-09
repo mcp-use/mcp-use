@@ -5,9 +5,33 @@ import "./view.css";
 const rootClass =
   "p-4 font-sans bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100";
 
-function splitParagraphs(story: string | undefined): string[] {
+interface Paragraph {
+  text: string;
+  /**
+   * Character offset of the paragraph within the story. The story only grows
+   * (text streams in append-only), so the offset is a stable identity for
+   * each paragraph across renders — unlike an array index, which would shift
+   * if paragraphs were ever inserted or removed.
+   */
+  offset: number;
+}
+
+function splitParagraphs(story: string | undefined): Paragraph[] {
   if (typeof story !== "string" || story.length === 0) return [];
-  return story.split(/\n\n+/).filter((part) => part.length > 0);
+  const paragraphs: Paragraph[] = [];
+  let offset = 0;
+  // Splitting on a capture group keeps the separators, alternating
+  // [text, separator, text, …], so each part's offset can be tracked.
+  const parts = story.split(/(\n\n+)/);
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!;
+    const isSeparator = i % 2 === 1;
+    if (!isSeparator && part.length > 0) {
+      paragraphs.push({ text: part, offset });
+    }
+    offset += part.length;
+  }
+  return paragraphs;
 }
 
 function StatusLine({ label }: { label: string }) {
@@ -47,8 +71,8 @@ function StoryBody({
           paragraphs.map((paragraph, index) => {
             const isLast = index === paragraphs.length - 1;
             return (
-              <p key={index} className="m-0 whitespace-pre-wrap">
-                {paragraph}
+              <p key={paragraph.offset} className="m-0 whitespace-pre-wrap">
+                {paragraph.text}
                 {showCaret && isLast ? (
                   <span className="story-caret" aria-hidden="true" />
                 ) : null}

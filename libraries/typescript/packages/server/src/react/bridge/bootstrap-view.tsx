@@ -2,10 +2,8 @@ import { createRoot, type Root } from "react-dom/client";
 import type { ComponentType } from "react";
 
 import { ErrorBoundary } from "../components/error-boundary.js";
-import {
-  setViewBridgeAppOptions,
-  ViewBridgeProvider,
-} from "./view-bridge.js";
+import { setViewBridgeAppOptions } from "./view-bridge-store.js";
+import { ViewBridgeProvider } from "./view-bridge.js";
 
 const mountedRoots = new Map<string, Root>();
 
@@ -41,15 +39,6 @@ export interface ViewModule {
    * Applied synchronously before the bridge connects.
    */
   viewOptions?: ViewOptions;
-}
-
-function ViewRoot({
-  module,
-}: {
-  module: ViewModule;
-}) {
-  const View = module.default;
-  return <View />;
 }
 
 /**
@@ -96,10 +85,11 @@ export function bootstrapView(
     mountedRoots.set(rootId, root);
   }
 
+  const View = module.default;
   root.render(
     <ErrorBoundary>
       <ViewBridgeProvider>
-        <ViewRoot module={module} />
+        <View />
       </ViewBridgeProvider>
     </ErrorBoundary>
   );

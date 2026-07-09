@@ -22,7 +22,7 @@ import {
   _getAppForTesting,
   _resetViewBridgeForTesting,
   _setTransportForTesting,
-} from "../src/react/bridge/view-bridge.js";
+} from "../src/react/bridge/view-bridge-store.js";
 import { TOOL_NAME_META_KEY } from "../src/views/constants.js";
 import { createPairedTransports } from "./helpers/paired-transport.js";
 

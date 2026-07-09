@@ -4,6 +4,23 @@ import { useViewActions } from "../bridge/view-bridge.js";
 import { useHostContext } from "../hooks/use-host-context.js";
 import { useToolContext } from "../hooks/use-tool-context.js";
 
+/**
+ * Static styles for the debug overlay `<pre>`. Hoisted to module scope so the
+ * object keeps a stable identity across renders (this runtime ships no
+ * stylesheet, so a CSS class is not an option here).
+ */
+const debugOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 10000,
+  margin: 0,
+  padding: 16,
+  background: "#111",
+  color: "#eee",
+  overflow: "auto",
+  fontSize: 12,
+};
+
 interface ViewControlsProps {
   children: React.ReactNode;
   /** Show a debug overlay with view state and action testers. */
@@ -78,19 +95,7 @@ export function ViewControls({
       )}
       {children}
       {enableDebugger && open && (
-        <pre
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 10000,
-            margin: 0,
-            padding: 16,
-            background: "#111",
-            color: "#eee",
-            overflow: "auto",
-            fontSize: 12,
-          }}
-        >
+        <pre style={debugOverlayStyle}>
           {JSON.stringify(
             {
               toolOutput:
