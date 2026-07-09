@@ -48,7 +48,8 @@
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "npm run typecheck && vitest run",
-    "typecheck": "tsc -p tsconfig.test.json"
+    "typecheck": "tsc -p tsconfig.test.json",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
