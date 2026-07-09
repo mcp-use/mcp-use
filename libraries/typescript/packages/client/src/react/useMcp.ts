@@ -128,6 +128,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     wrapTransport,
     fetch: customFetch,
     clientOptions,
+    protocolNegotiation,
     onNotification,
     onSampling: onSamplingOption,
     samplingCallback: samplingCallbackOption,
@@ -762,6 +763,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           })(),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
+          // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
+          // connector defaults to "legacy" when omitted
+          ...(protocolNegotiation !== undefined && { protocolNegotiation }),
           // Pass user-configurable reconnection options, or when autoReconnect
           // is disabled, disable SDK transport SSE reconnection to prevent
           // unwanted GET polling requests
@@ -1383,6 +1387,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout,
     sseReadTimeout,
     mergedClientInfo,
+    protocolNegotiation,
     // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
     gatewayUrl,
     oauthProxyUrlOption,

@@ -86,6 +86,9 @@ export function Layout({ children }: LayoutProps) {
         preventAutoAuth: true,
         useRedirectFlow: true,
         autoProxyFallback,
+        // Probe for modern (2026-07-28) servers, falling back to the classic
+        // 2025 handshake against legacy servers.
+        protocolNegotiation: "auto",
         clientOptions: {
           capabilities: {
             extensions: {
