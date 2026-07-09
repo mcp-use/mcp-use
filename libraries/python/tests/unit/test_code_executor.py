@@ -11,6 +11,7 @@ import pytest
 
 from mcp_use.client.client import MCPClient
 from mcp_use.client.code_executor import CodeExecutor
+from mcp_use.client.executors.vm import InsecureCodeExecutionWarning, VMCodeExecutor
 
 
 @pytest.fixture
@@ -124,38 +125,293 @@ return data
 
 
 class TestCodeExecutorSecurity:
-    """Test security restrictions in code execution."""
+    """Defense-in-depth checks for the in-process executor (issue #1718).
+
+    The in-process executor is NOT a security boundary (see VMCodeExecutor). These
+    tests verify the AST defense-in-depth layer: known namespace-escape vectors are
+    rejected before execution, and the introspection builtins that make escapes
+    trivial are withheld. They are risk-reduction guarantees, not a sandbox.
+    """
 
     @pytest.mark.asyncio
-    async def test_restricted_builtins(self, code_executor):
-        """Test that dangerous builtins are not available."""
-        code = "import os"
+    async def test_no_import(self, code_executor):
+        """Import statements are rejected."""
+        result = await code_executor.execute("import os", timeout=5.0)
 
-        result = await code_executor.execute(code, timeout=5.0)
-
-        # Should fail because import is restricted
         assert result["error"] is not None
-        assert "import" in result["error"].lower() or "name" in result["error"].lower()
+        assert "import" in result["error"].lower()
 
     @pytest.mark.asyncio
     async def test_no_file_access(self, code_executor):
-        """Test that file operations are restricted."""
-        code = "open('/etc/passwd', 'r')"
+        """`open` is not available."""
+        result = await code_executor.execute("open('/etc/passwd', 'r')", timeout=5.0)
 
-        result = await code_executor.execute(code, timeout=5.0)
-
-        # Should fail because open is not in safe builtins
         assert result["error"] is not None
 
     @pytest.mark.asyncio
     async def test_no_eval(self, code_executor):
-        """Test that eval is not available."""
-        code = "eval('1 + 1')"
+        """`eval` is not available."""
+        result = await code_executor.execute("eval('1 + 1')", timeout=5.0)
+
+        assert result["error"] is not None
+
+    # --- #1718 sandbox-escape regression tests -------------------------------
+
+    @pytest.mark.asyncio
+    async def test_subclasses_escape_blocked(self, code_executor):
+        """The classic ().__class__.__base__.__subclasses__() walk is blocked."""
+        code = "return ().__class__.__base__.__subclasses__()"
 
         result = await code_executor.execute(code, timeout=5.0)
 
-        # Should fail because eval is restricted
+        assert result["result"] is None
         assert result["error"] is not None
+        assert "__subclasses__" in result["error"] or "dunder" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_builtins_reconstruction_blocked(self, code_executor):
+        """Reconstructing __import__ via a function's __globals__ is blocked."""
+        code = (
+            "for c in ().__class__.__base__.__subclasses__():\n"
+            "    g = c.__init__.__globals__\n"
+            "    if '__builtins__' in g:\n"
+            "        return g['__builtins__']['__import__']('os')\n"
+            "return None"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    async def test_getattr_string_escape_blocked(self, code_executor):
+        """getattr-with-a-dunder-string escape is blocked (getattr withheld + dunder string)."""
+        code = "return getattr((), '__class__')"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    async def test_format_string_escape_blocked(self, code_executor):
+        """str.format attribute traversal is blocked by the dunder-string rule."""
+        code = "return '{0.__class__}'.format(())"
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "snippet",
+        [
+            'return asyncio.base_events.os.popen("whoami").read()',
+            'return asyncio.base_subprocess.os.popen("hostname").read()',
+            "return asyncio.base_events.subprocess",
+            "return asyncio.events.os.environ",
+            'return asyncio.events.sys.modules["os"]',
+            "return asyncio.get_event_loop",
+        ],
+    )
+    async def test_asyncio_facade_blocks_module_escape(self, code_executor, snippet):
+        """The injected ``asyncio`` is a curated facade: the real module's
+        transitive os/sys/subprocess attribute chains are not reachable."""
+        result = await code_executor.execute(snippet, timeout=5.0)
+
+        assert result["result"] is None
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "snippet",
+        [
+            "async def f():\n    return 1\nc = f()\nreturn c.cr_frame",  # coroutine frame
+            "g = (i for i in [1])\nreturn g.gi_frame",  # generator frame
+            "g = (i for i in [1])\nreturn g.gi_code",  # generator code object
+            "return [].append.f_back",  # any .f_back access is rejected
+            "x = 1\nreturn x.f_globals",  # any .f_globals access is rejected
+        ],
+    )
+    async def test_frame_introspection_attrs_blocked(self, code_executor, snippet):
+        """Non-dunder frame/code/coroutine/generator/traceback attributes are
+        rejected (they re-expose real globals/builtins)."""
+        result = await code_executor.execute(snippet, timeout=5.0)
+
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    async def test_asyncio_facade_still_supports_await(self, code_executor):
+        """The facade must keep documented coroutine helpers working."""
+        code = (
+            "async def one(n):\n"
+            "    await asyncio.sleep(0.01)\n"
+            "    return n\n"
+            "results = await asyncio.gather(one(1), one(2))\n"
+            "return sum(results)"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == 3
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "snippet",
+        [
+            # `case Cls(__dunder__=x)` does getattr(subject, "__dunder__") internally.
+            "match []:\n    case list(__class__=c):\n        pass\nreturn c",
+            "match {}:\n    case dict(__class__=c):\n        return c",
+            "match ():\n    case tuple(__doc__=d):\n        return d",
+            # introspection attrs are blocked in patterns too
+            "async def f():\n    return 1\nc = f()\nmatch c:\n    case object(cr_frame=fr):\n        return fr",
+            "g = (i for i in [1])\nmatch g:\n    case object(gi_frame=fr):\n        return fr",
+        ],
+    )
+    async def test_match_pattern_attr_escape_blocked(self, code_executor, snippet):
+        """Class match patterns cannot be used as a getattr bypass for dunder /
+        introspection attributes (#1718 follow-up)."""
+        result = await code_executor.execute(snippet, timeout=5.0)
+
+        assert result["result"] is None
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    async def test_benign_match_still_works(self, code_executor):
+        """Ordinary structural pattern matching (no dunder attrs) is unaffected."""
+        code = (
+            "point = (3, 4)\n"
+            "match point:\n"
+            "    case (x, y):\n"
+            "        return x + y\n"
+            "    case _:\n"
+            "        return 0"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == 7
+
+    @pytest.mark.asyncio
+    async def test_denied_names_can_be_shadowed_as_locals(self, code_executor):
+        """A denied builtin name used as an ordinary local (assigned then read) is
+        allowed; only loading the real builtin is rejected. Prevents false positives
+        on common data like `type = row["type"]`."""
+        code = (
+            'row = {"type": "user", "input": "hi"}\n'
+            'type = row["type"]\n'
+            'input = row["input"]\n'
+            "object = {\"k\": 1}\n"
+            "return [type, input, object[\"k\"]]"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == ["user", "hi", 1]
+
+    @pytest.mark.asyncio
+    async def test_warn_does_not_break_under_warnings_as_errors(self, code_executor):
+        """The one-time insecure-execution warning must never raise out of
+        execute(), even under `warnings.simplefilter("error")`."""
+        import warnings as _warnings
+
+        VMCodeExecutor._warned = False  # force the warning to fire this run
+        try:
+            with _warnings.catch_warnings():
+                _warnings.simplefilter("error")
+                result = await code_executor.execute("return 1 + 1", timeout=5.0)
+        finally:
+            VMCodeExecutor._warned = True
+
+        assert result["error"] is None
+        assert result["result"] == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "snippet",
+        [
+            "return asyncio.gather().get_loop()",  # Future.get_loop() -> running loop
+            "return asyncio.gather(asyncio.sleep(0))._loop",
+            "return asyncio.Lock()._get_loop()",
+            "return asyncio.Lock()._loop",
+            "return asyncio.Queue()._loop",
+            # full loop-leak RCE: duck-typed protocol (no class) + loop.subprocess_shell
+            (
+                "p = Exception()\n"
+                "p.connection_made = lambda t: None\n"
+                "p.process_exited = lambda: None\n"
+                "lo = asyncio.gather(asyncio.sleep(0)).get_loop()\n"
+                "return await lo.subprocess_shell(lambda: p, 'echo hi')"
+            ),
+        ],
+    )
+    async def test_event_loop_not_reachable_via_facade(self, code_executor, snippet):
+        """The asyncio facade returns real Futures/primitives; the running loop
+        (which exposes subprocess_shell -> RCE) must not be reachable through
+        get_loop/_get_loop/_loop."""
+        result = await code_executor.execute(snippet, timeout=5.0)
+
+        assert result["result"] is None
+        assert result["error"] is not None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "snippet",
+        [
+            "x = (1).__class__",  # dunder attribute access
+            "return type(1)",  # `type` withheld + denied
+            "return getattr",  # `getattr` withheld + denied
+            "return hasattr((), 'x')",  # `hasattr` withheld + denied
+            "return object()",  # `object` denied
+            "return '__subclasses__'",  # dunder string literal
+            "y = __builtins__",  # dunder name
+        ],
+    )
+    async def test_escape_primitives_blocked(self, code_executor, snippet):
+        """Each known escape primitive is rejected."""
+        result = await code_executor.execute(snippet, timeout=5.0)
+
+        assert result["error"] is not None, f"expected {snippet!r} to be blocked"
+
+    @pytest.mark.asyncio
+    async def test_dynamic_dunder_string_cannot_escalate_to_rce(self, code_executor):
+        """A dunder name built at runtime evades the literal scan, and ``str.format``
+        can walk it to real module/builtins state, but only as a *repr string* --
+        never a live/callable handle -- so it is info-disclosure, not RCE.
+
+        Here we assert the security-relevant boundary: the format traversal yields a
+        plain ``str`` and cannot be invoked or used as a live object.
+        """
+        code = (
+            "g = '__glob' + 'als__'\n"
+            "s = '{0.' + g + '}'\n"
+            "leaked = s.format(search_tools)\n"
+            "return isinstance(leaked, str)"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        # The traversal "succeeds" (info-disclosure residual: it reaches __globals__)
+        # but only ever produces a string; there is no path to a callable, hence no RCE.
+        assert result["error"] is None
+        assert result["result"] is True
+
+    @pytest.mark.asyncio
+    async def test_legit_code_still_runs(self, code_executor):
+        """Hardening must not break ordinary data-processing code."""
+        code = (
+            "data = [{'n': i, 'sq': i * i} for i in range(5)]\n"
+            "total = sum(d['sq'] for d in data)\n"
+            "names = sorted(['b', 'a', 'c'])\n"
+            "return {'total': total, 'names': names, 'count': len(data)}"
+        )
+
+        result = await code_executor.execute(code, timeout=5.0)
+
+        assert result["error"] is None
+        assert result["result"] == {"total": 30, "names": ["a", "b", "c"], "count": 5}
 
     @pytest.mark.asyncio
     async def test_safe_builtins_available(self, code_executor):
@@ -424,3 +680,32 @@ return a + b
 
         assert result["error"] is None
         assert result["result"] == 3
+
+
+class TestCodeExecutorSecurityWarning:
+    """The in-process executor warns that it is not a security boundary."""
+
+    @pytest.mark.asyncio
+    async def test_insecure_warning_emitted(self, mock_client):
+        """An InsecureCodeExecutionWarning is emitted when running in-process."""
+        VMCodeExecutor._warned = False
+        executor = VMCodeExecutor(mock_client)
+
+        with pytest.warns(InsecureCodeExecutionWarning):
+            await executor.execute("return 1", timeout=5.0)
+
+    @pytest.mark.asyncio
+    async def test_insecure_warning_emitted_once(self, mock_client):
+        """The warning is emitted at most once per process, not per call."""
+        VMCodeExecutor._warned = False
+        executor = VMCodeExecutor(mock_client)
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            await executor.execute("return 1", timeout=5.0)
+            await executor.execute("return 2", timeout=5.0)
+
+        insecure = [w for w in caught if issubclass(w.category, InsecureCodeExecutionWarning)]
+        assert len(insecure) == 1
