@@ -20,6 +20,7 @@ import {
 } from "./commands/client.js";
 import { getSession } from "./utils/session-storage.js";
 import { formatError } from "./utils/format.js";
+import { isStartPortFlagExplicit } from "./utils/start-port.js";
 import { deployCommand } from "./commands/deploy.js";
 import { createDeploymentsCommand } from "./commands/deployments.js";
 import { createServersCommand } from "./commands/servers.js";
@@ -2625,12 +2626,8 @@ program
     try {
       const projectPath = path.resolve(options.path);
       // Priority: --port flag > process.env.PORT > default
-      // Check if --port or -p was explicitly provided in command line
-      const portFlagProvided =
-        process.argv.includes("--port") ||
-        process.argv.includes("-p") ||
-        process.argv.some((arg) => arg.startsWith("--port=")) ||
-        process.argv.some((arg) => arg.startsWith("-p="));
+      // `-p` is the --path alias; only --port counts as an explicit port override.
+      const portFlagProvided = isStartPortFlagExplicit(process.argv);
 
       let port = portFlagProvided
         ? parseInt(options.port, 10) // Flag explicitly provided, use it
