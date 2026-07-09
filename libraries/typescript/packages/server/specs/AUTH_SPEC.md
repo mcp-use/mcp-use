@@ -1,275 +1,457 @@
-# @mcp-use/server — authorization spec
+# @mcp-use/server authorization spec
 
-**Status:** Design (nothing implemented). Companion to `SPEC.md`; this document *is* the Phase 2 "auth seam" item, expanded to a full contract. It folds in review feedback on PR #1832 (context parity with v1, auth adapters as a first-class seam).
-**Protocol basis:** MCP 2026-07-28 authorization (OAuth 2.1 resource server), SDK `@modelcontextprotocol/server@2.0.0-beta.2` (always the latest beta — see the SPEC.md ground rule).
-**SDK reference:** <https://ts.sdk.modelcontextprotocol.io/v2/serving/authorization.html> — the SDK's own authorization guide. Caveat: the site tracks the SDK's main branch and currently documents exports (web-standard `requireBearerAuth`) that have not reached a published beta; check the installed package before assuming an export exists.
-**v1 reference:** `packages/mcp-use/src/server/oauth/*` defines *what* must be possible, never what the API looks like.
+**Status:** Design. Nothing in this document is implemented yet.
 
-## Model
+**Protocol basis:** MCP authorization and OAuth 2.1 resource-server guidance, using `@modelcontextprotocol/server@2.0.0-beta.3` and the v2 authorization documentation at <https://ts.sdk.modelcontextprotocol.io/v2/serving/authorization.html>. Beta.3 has shipped runtime-neutral authorization helpers in server core.
 
-The server is an OAuth **resource server** and nothing else: it verifies access tokens issued by an external authorization server (Clerk, Auth0, WorkOS, …) and never issues, stores, or refreshes tokens itself. This matches the SDK v2 architecture exactly:
+**Scope:** This is the v2 resource-server contract. mcp-use verifies access tokens issued by an external authorization server. It does not issue, store, refresh, or proxy tokens unless the explicit later proxy mode is configured.
 
-1. Token **verification happens in HTTP middleware**, outside the MCP handler. The handler is strictly pass-through: `handler.fetch(request, { authInfo })` performs no verification of its own and never reads request headers for auth.
-2. The verified `AuthInfo` surfaces in two places downstream:
-   - `ctx.http.authInfo` on the SDK `ServerContext` handed to every tool/resource/prompt handler — we lift this into our `RequestContext` as `ctx.auth`.
-   - `McpRequestContext.authInfo` — the argument to the **server factory** (`McpServerFactory`), *before* any registration callback runs. Because we build a fresh `McpServer` per request, this enables per-principal server construction (tools that don't exist for non-admin callers), which v1's single-instance model could not do.
-3. Clients discover how to authenticate via RFC 9728 **protected resource metadata** (`/.well-known/oauth-protected-resource`) plus a `WWW-Authenticate` challenge on `401` that points at it.
+## Use `oauth` in the public API
 
-## What we reuse from the SDK (and what we must build)
-
-Reused as-is from `@modelcontextprotocol/server`:
-
-- **`AuthInfo`** — `{ token, clientId, scopes[], expiresAt?, resource?, extra? }`. Our wire-level carrier; we never fork this type.
-- **`OAuthError` / `OAuthErrorCode` / `OAuthErrorResponse`** — thrown by verifiers, converted to spec-correct `401 invalid_token` / `403 insufficient_scope` bodies by our middleware.
-- **`OAuthProtectedResourceMetadata`** — the shape our well-known endpoint serves. The SDK also exports its validation schema (`OAuthProtectedResourceMetadataSchema`) as a ready-made value; calling `.parse()` on that imported object requires no zod dependency of ours (zod is the SDK's internal concern).
-- **`checkResourceAllowed` / `resourceUrlFromServerUrl`** — RFC 8707 resource-binding validation (token `resource` vs our canonical URL).
-- **`OAuthTokens` / `OAuthClientInformation*` / `AuthorizationServerMetadata` / OpenID discovery types** — used by proxy mode (below); we don't redeclare any OAuth wire shapes.
-
-**Landing in the SDK — wait for it, don't build it** (verified 2026-07-02): a runtime-neutral `requireBearerAuth` for web-standard `fetch(request)` hosts is merged on the SDK's main branch as a pending changeset (minor bump for `@modelcontextprotocol/server`, shipping `requireBearerAuth`, `verifyBearerToken`, `bearerAuthChallengeResponse`, with `OAuthTokenVerifier` moving into core). It is **not** in any published beta yet — beta.2 ships none of it, and `@modelcontextprotocol/hono` still has only host/origin validation — but it covers exactly what we'd otherwise hand-roll (extract bearer → verify → `401`/`403` with `WWW-Authenticate` → produce `AuthInfo`). Usage shape per the SDK guide: `const auth = await gate(request); if (auth instanceof Response) return auth; return handler.fetch(request, { authInfo: auth })`. One behavior to design around: the SDK gate **rejects any verifier result without `expiresAt`** with an automatic `401`.
-
-Built by us:
-
-- `bearerAuth(config)` — thin Hono middleware wrapping the SDK's web-standard `requireBearerAuth` gate (adapt Hono context ↔ `Request`/`Response`, stash `AuthInfo`); challenge/error semantics stay the SDK's. If Phase 2 starts before the export ships in a beta, mirror the semantics behind the same function and swap the internals when it lands.
-- `authMetadata(config)` — Hono routes mirroring `mcpAuthMetadataRouter`, which remains Express-only (RFC 9728 metadata; RFC 8414 / OIDC discovery passthrough where the provider needs it).
-- The provider adapters (below).
-
-Dependency: `jose` (JWKS fetch + JWT verification), already budgeted in SPEC.md ground rules.
-
-## Public API
-
-### Configuring auth
+The public constructor field is `oauth`, matching v1 terminology. `auth` is not a public constructor alias.
 
 ```ts
 import { MCPServer } from "@mcp-use/server";
-import { clerkAuth } from "@mcp-use/server/auth/clerk";
+import { oauthClerkProvider } from "@mcp-use/server/oauth/clerk";
 
 const server = new MCPServer({
   name: "acme-tools",
   version: "1.0.0",
-  auth: clerkAuth({ secretKey: process.env.CLERK_SECRET_KEY }),
+  oauth: oauthClerkProvider({
+    frontendApiUrl: process.env.CLERK_FRONTEND_API_URL!,
+  }),
 });
 ```
 
-or bring-your-own verifier:
+`oauth` configures a resource server. Its provider tells mcp-use how to verify bearer tokens and which external authorization servers to advertise in protected-resource metadata.
+
+## Keep the official SDK behind mcp-use
+
+Consumers import OAuth APIs only from `@mcp-use/server/oauth`. They do not install, version, or import `@modelcontextprotocol/server` directly. It remains a regular dependency of mcp-use, not a consumer-managed peer dependency.
+
+mcp-use does not reimplement protocol types, error classes, or runtime-neutral helpers that already exist. The OAuth entry point re-exports the upstream values unchanged:
+
+```ts
+// @mcp-use/server/oauth
+export {
+  OAuthError,
+  OAuthErrorCode,
+  bearerAuthChallengeResponse,
+  getOAuthProtectedResourceMetadataUrl,
+  oauthMetadataResponse,
+  requireBearerAuth,
+  verifyBearerToken,
+} from "@modelcontextprotocol/server";
+
+export type {
+  AuthInfo as OAuthAuthInfo,
+  AuthMetadataOptions,
+  BearerAuthOptions,
+  OAuthMetadata,
+  OAuthProtectedResourceMetadata,
+  OAuthTokenVerifier,
+} from "@modelcontextprotocol/server";
+```
+
+Re-exporting preserves the upstream runtime identity and type identity. In particular, `OAuthError` remains the same class for `instanceof` checks. mcp-use owns only its higher-level provider, context, and Hono composition APIs.
+
+Public documentation and examples never import from `@modelcontextprotocol/server`:
+
+```ts
+import {
+  OAuthError,
+  OAuthErrorCode,
+  oauthCustomProvider,
+  type OAuthAuthInfo,
+  type OAuthMetadata,
+  type OAuthTokenVerifier,
+} from "@mcp-use/server/oauth";
+```
+
+## Keep provider plumbing private
+
+`OAuthProvider<TUser>` is an opaque value returned by provider factories. Consumers pass it to `MCPServer`; they do not implement its internal plumbing. TypeScript interfaces cannot declare private members, so privacy comes from an unexported brand and a separate, unexported internal interface.
+
+```ts
+export type OAuthExtra<TUser> = Record<string, unknown> & {
+  user: TUser;
+  payload: Record<string, unknown>;
+  permissions: string[];
+};
+
+declare const oauthProviderBrand: unique symbol;
+
+export interface OAuthProvider<TUser> {
+  readonly [oauthProviderBrand]: TUser;
+}
+
+export interface OAuthResourceOptions {
+  /** Full canonical public MCP endpoint URL. */
+  resource?: URL | string;
+
+  /** Endpoint-wide scopes enforced by the SDK bearer gate. */
+  requiredScopes?: readonly string[];
+
+  /** Value for protected-resource metadata `scopes_supported`. */
+  scopesSupported?: readonly string[];
+
+  /** Value for protected-resource metadata `resource_name`. */
+  resourceName?: string;
+
+  /** Value for protected-resource metadata `resource_documentation`. */
+  serviceDocumentationUrl?: URL;
+}
+
+export interface CustomOAuthProviderOptions<TUser>
+  extends OAuthResourceOptions {
+  /** Verifies or introspects the token and returns SDK-native AuthInfo. */
+  tokenVerifier: OAuthTokenVerifier;
+
+  /** RFC 8414 authorization-server metadata for discovery. */
+  oauthMetadata: OAuthMetadata;
+
+  /** Maps verified information into the public mcp-use auth context. */
+  mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
+}
+
+export function oauthCustomProvider<TUser>(
+  options: CustomOAuthProviderOptions<TUser>,
+): OAuthProvider<TUser>;
+
+/** Not exported. Factory implementations return this internal shape. */
+interface OAuthProviderInternal<TUser> extends OAuthProvider<TUser> {
+  tokenVerifier: OAuthTokenVerifier;
+  oauthMetadata: OAuthMetadata;
+  toMcpUseExtra: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
+  resource?: URL | string;
+  requiredScopes?: readonly string[];
+  scopesSupported?: readonly string[];
+  resourceName?: string;
+  serviceDocumentationUrl?: URL;
+}
+```
+
+Provider factories preserve v1 concepts and names:
+
+```ts
+oauthClerkProvider(...)
+oauthAuth0Provider(...)
+oauthWorkOSProvider(...)
+oauthSupabaseProvider(...)
+oauthKeycloakProvider(...)
+oauthCustomProvider(...)
+```
+
+`oauthCustomProvider` is the supported escape hatch. Its public callback is `mapAuthInfo`, not the internal `toMcpUseExtra` hook. The factory validates the options and converts them into `OAuthProviderInternal<TUser>`. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
+
+Before calling `requireBearerAuth`, mcp-use resolves the opaque value to its private internal representation and wraps its verifier. The wrapper calls the verifier, then returns the final SDK-compatible `AuthInfo` with `extra` merged as `{ ...authInfo.extra, ...internal.toMcpUseExtra(authInfo) }`. Therefore every successful bearer-gate result has the typed mcp-use values before it reaches Hono, `mountMcp`, or the SDK callback. Custom providers use this same wrapper; they cannot omit the public `mapAuthInfo` callback or rely on an optional `extra` value.
+
+## Resolve the canonical resource URL
+
+Every protected resource has one canonical public MCP URL. mcp-use uses it for metadata, bearer challenges, and resource binding. The canonical URL includes the MCP endpoint path.
+
+```ts
+const resource = new URL("https://api.example.com/mcp");
+getOAuthProtectedResourceMetadataUrl(resource).toString();
+// "https://api.example.com/.well-known/oauth-protected-resource/mcp"
+```
+
+Resolution order:
+
+1. Use the provider factory's explicit `resource` option when configured. It is the full canonical MCP endpoint URL, including `basePath`.
+2. Otherwise use `MCP_URL` with the v1 compatibility convention: it is an absolute public origin, optionally ending in `/`, not an endpoint URL or path prefix. Resolve `basePath` against that origin exactly once.
+3. Otherwise derive from the trusted local `listen()` URL only. Append `basePath` exactly once.
+4. `getHandler()` and public or wildcard deployments without an explicit provider `resource` or a valid `MCP_URL` fail configuration. They must not derive a security identity from request headers.
+
+Never derive the security identity, metadata URL, or resource-binding target from an untrusted request `Host` header. Hono remains responsible for configured host and origin validation.
+
+`basePath` is the MCP endpoint route, not a prefix. Its default is `/mcp`. For `basePath: "/api/mcp"`, the resource is `https://api.example.com/api/mcp` and metadata is `https://api.example.com/.well-known/oauth-protected-resource/api/mcp`. For `basePath: "/api"`, the resource is `https://api.example.com/api`. With `MCP_URL=https://api.example.com`, each resolves by appending its `basePath` once.
+
+Validate the resolved resource once during construction. It must be an absolute URL, contain no query or fragment, use HTTPS outside localhost, and have a path that matches `basePath` after trailing-slash normalization.
+
+## Preserve typed `ctx.auth`
+
+The constructor fixes the auth user type once. It does not accumulate a type through return values from `tool()`, `resource()`, or `prompt()`.
 
 ```ts
 const server = new MCPServer({
   name: "acme-tools",
   version: "1.0.0",
-  auth: {
-    verifyToken: async (token, request) => {
-      const claims = await verifyJwt(token, { jwksUri: JWKS_URI });
-      if (!claims) return null; // → 401 + WWW-Authenticate challenge
-      return {
-        clientId: claims.azp,
-        scopes: claims.scope?.split(" ") ?? [],
-        expiresAt: claims.exp,
-        user: { id: claims.sub, email: claims.email, plan: claims.plan },
-      };
-    },
-    requiredScopes: ["mcp:read"],               // endpoint-wide → 403 insufficient_scope
-    authorizationServers: ["https://auth.acme.com"], // published in RFC 9728 metadata
-  },
+  oauth: oauthClerkProvider(/* ... */),
+});
+
+server.tool({ name: "whoami", schema }, async (_params, ctx) => {
+  ctx.auth.user.id;          // Clerk user type
+  ctx.auth.accessToken;      // string
+  ctx.auth.clientId;         // string
+  return { content: [] };
 });
 ```
 
-Contract:
+The documented type contract is:
 
 ```ts
-/** Returned by verifiers. `token` is filled in by the middleware; `extra` is internal plumbing. */
-export interface VerifiedAuth<TUser> {
-  clientId: string;
+export type OAuthAuth<TUser> = {
+  user: TUser;
+  payload: Record<string, unknown>;
+  accessToken: string;
   scopes: string[];
-  /** Required: the SDK's bearer gate auto-401s a verifier result without it. Non-expiring credentials (opaque/session tokens) must synthesize one (e.g. now + introspection TTL). */
+  permissions: string[];
+  clientId: string;
   expiresAt: number;
   resource?: URL;
-  user: TUser;
-}
+};
 
-export interface AuthConfig<TUser> {
-  /** Return the verified identity, or null to reject (→ 401). May also throw OAuthError for specific codes. */
-  verifyToken: (token: string, request: Request) => Promise<VerifiedAuth<TUser> | null>;
-  /** Scopes every request must carry; missing → 403 insufficient_scope. */
-  requiredScopes?: string[];
-  /** Authorization server issuer URLs, published in protected-resource metadata. Adapters fill this in. */
-  authorizationServers?: string[];
-  /** Canonical resource identifier for RFC 8707 binding checks. Defaults to the public server URL. */
-  resource?: string;
-}
+export type RequestContext<TUser = never, HasOAuth extends boolean = false> =
+  HasOAuth extends true
+    ? { signal: AbortSignal; request?: Request; auth: OAuthAuth<TUser> }
+    : { signal: AbortSignal; request?: Request; auth?: never };
 ```
 
-### The context: `ctx.auth`, typed end-to-end
+With `oauth`, `ctx.auth` is present and non-optional. OAuth callbacks are registered only through the gated HTTP MCP endpoint, so absence of `ctx.http?.authInfo` is an internal invariant violation. `request` remains optional because `ServerContext.http` is optional in the SDK. Without `oauth`, `ctx.auth` is unavailable by the documented type contract. A fixed construction generic such as `MCPServer<TUser, HasOAuth>` is allowed because the constructor infers it once and it remains unchanged. Forbidden return-type accumulation is different: `tool()` must not return a progressively growing `MCPServer<TTools & ...>` type, because it cannot accurately model loops and conditionals.
 
-`RequestContext` gains `auth`:
+## Keep SDK AuthInfo on the wire
 
-```ts
-/** What ctx.auth looks like. TUser is decided by the auth adapter. */
-export type Auth<TUser> = AuthInfo & { user: TUser };
-```
-
-`TUser` flows from the adapter with zero user annotations: `clerkAuth(...)` returns `AuthConfig<ClerkUser>`, the `MCPServer` constructor infers it, and every callback's `ctx.auth.user` is fully typed. A custom `verifyToken` infers `TUser` from its own return type.
+SDK `AuthInfo` remains the wire carrier. The provider wrapper produces the final `AuthInfo`, including typed mcp-use values under `extra`, before `requireBearerAuth` receives it. The gate returns that final value and `mountMcp` forwards it unchanged:
 
 ```ts
-server.tool({ name: "whoami", schema: z.object({}) }, async (_p, ctx) => {
-  ctx.auth.user.id;        // ✅ typed, autocompleted
-  ctx.auth.scopes;         // ✅ SDK AuthInfo fields still present
-  ctx.auth.user.nope;      // ❌ compile error
-  return { content: [{ type: "text", text: `Hi ${ctx.auth.user.firstName}` }] };
+handler.fetch(c.req.raw, {
+  parsedBody,
+  authInfo,
 });
 ```
 
-No-auth narrowing (replaces v1's `McpContext<HasOAuth>`): when no `auth` config is passed, `ctx.auth` is not on the context type — reaching for it is a compile error, not a runtime surprise. When auth is configured, `ctx.auth` is **non-optional**; no null-check boilerplate in every tool.
+The SDK exposes it as `ctx.http.authInfo` in its `ServerContext`. `toRequestContext`, which already receives SDK `ServerContext`, is the single place that projects it into mcp-use `ctx.auth`. There is no `AsyncLocalStorage`, global request state, or second token-verification path.
 
-Handlers defined outside a `server.tool(...)` callsite use the exported alias:
+`toRequestContext` maps once:
 
 ```ts
-import type { ToolCtx } from "@mcp-use/server";
-import type { ClerkUser } from "@mcp-use/server/auth/clerk";
-export async function whoami(_p: {}, ctx: ToolCtx<ClerkUser>) { /* … */ }
+type MappedOAuthAuthInfo<TUser> = OAuthAuthInfo & {
+  expiresAt: number;
+  extra: OAuthExtra<TUser>;
+};
+
+function requireOAuthAuthInfo<TUser>(
+  authInfo: OAuthAuthInfo | undefined,
+): asserts authInfo is MappedOAuthAuthInfo<TUser> {
+  const extra = authInfo?.extra;
+  if (
+    extra === undefined ||
+    typeof extra !== "object" ||
+    typeof authInfo?.expiresAt !== "number" ||
+    !("user" in extra) ||
+    !("payload" in extra) ||
+    !Array.isArray(extra.permissions)
+  ) {
+    throw new Error("OAuth callback did not receive mapped AuthInfo.extra");
+  }
+}
+
+function toRequestContext<TUser>(
+  sdkContext: ServerContext,
+): RequestContext<TUser, true> {
+  const authInfo = sdkContext.http?.authInfo;
+  requireOAuthAuthInfo<TUser>(authInfo);
+  const request = sdkContext.http?.req;
+
+  return {
+    signal: sdkContext.mcpReq.signal,
+    ...(request !== undefined && { request }),
+    auth: {
+      user: authInfo.extra.user,
+      payload: authInfo.extra.payload,
+      accessToken: authInfo.token,
+      scopes: [...authInfo.scopes],
+      permissions: [...authInfo.extra.permissions],
+      clientId: authInfo.clientId,
+      expiresAt: authInfo.expiresAt,
+      ...(authInfo.resource !== undefined && { resource: authInfo.resource }),
+    },
+  };
+}
 ```
 
-Rejected alternative: Hono/Express-style global `declare module` augmentation for the user type — global state, breaks with two servers in one process, and fights adapter-shipped types.
+The exact value mappings are:
 
-**Ground-rule 26 note (`MCPServer` stays non-generic).** That decision rejected *return-type accumulation* (`tool()` returning `MCPServer<TTools & {…}>`): types that grow per chained call and structurally can't see loops/conditionals. The auth generic is a different animal — a single parameter **fixed at construction**, inferred once from the constructor argument, never accumulating across calls, fully compatible with loop/conditional/OpenAPI registration. None of the rejection reasons apply. If we still want the letter of the rule preserved, the fallback is `new MCPServer(config)` staying non-generic with `auth` carrying a phantom type that only `ToolCtx<TUser>` reads — but the inferred class generic is strictly better DX and is the recommendation.
+- `ctx.auth.accessToken` takes `sdkAuthInfo.token`.
+- `ctx.auth.scopes` copies `sdkAuthInfo.scopes`.
+- `ctx.auth.clientId` takes `sdkAuthInfo.clientId`.
+- `ctx.auth.expiresAt` takes `sdkAuthInfo.expiresAt`.
+- `ctx.auth.resource` takes `sdkAuthInfo.resource` and remains optional.
+- `ctx.auth.user`, `ctx.auth.payload`, and `ctx.auth.permissions` come from `sdkAuthInfo.extra`
 
-The auth generic also **forecloses nothing** should accumulation ever be revisited: a construction-fixed generic and per-call accumulating generics compose (`tool()` would return `MCPServer<TUser, TTools & {…}>`, re-threading `TUser` unchanged — the tRPC `initTRPC.context<C>()` / Hono `Env` pattern). Adding a second, defaulted type parameter later is non-breaking.
+Built-in adapters supply typed mcp-use additions through the private `toMcpUseExtra` hook. Custom providers supply the same data through public `mapAuthInfo`, which the factory stores as that private hook. The wrapper merges the result under `AuthInfo.extra`; a provider may retain unrelated SDK `extra` fields, but mcp-use's fields always come from verified data. It must not populate user data from an unverified decode.
 
-### Wire mapping (internal)
+## Run routes in this order
 
-On the wire we stay SDK-pure: the middleware builds a plain `AuthInfo` with the adapter's `user` (and optional `claims`) tucked into `extra` — the field the SDK explicitly reserves for attached data — and passes it to `handler.fetch(req, { parsedBody, authInfo })`. `toRequestContext` lifts `ctx.http.authInfo` into `ctx.auth`, surfacing `extra.user` as `ctx.auth.user`. Consumers never see `extra`.
+The v2 architecture is stateless. It creates a fresh SDK server per request. Route and request ordering is exact:
 
-### Per-principal registration
-
-`authInfo` reaches the factory before registration callbacks run, so tools can be conditionally *absent* (not just guarded) — they never appear in `tools/list` for callers that don't qualify:
-
-```ts
-server.tool(
-  {
-    name: "delete_org",
-    schema: z.object({ orgId: z.string() }),
-    enabled: (auth) => auth?.scopes.includes("admin") ?? false,
-  },
-  async ({ orgId }, ctx) => { /* … */ }
-);
-```
-
-Per-tool scope *checks* inside handlers stay soft-fail (`isError: true` + explanatory text) so the model can react; HTTP-level `403` is reserved for the endpoint-wide `requiredScopes` gate.
-
-### Composition escape hatch (`mountMcp`)
-
-Users mounting into their own Hono app keep their own middleware and forward the result explicitly:
+1. Register public OAuth discovery and protected-resource metadata routes.
+2. Register the exact MCP endpoint bearer gate. Do not protect a broad prefix that unintentionally covers metadata or unrelated routes.
+3. The gate calls `requireBearerAuth(...)` and stores a successful `AuthInfo` in Hono variables.
+4. `mountMcp` reads the Hono variable and forwards it as `MountMcpOptions.authInfo` to `handler.fetch`.
+5. The MCP route creates the SDK server factory for this request with the forwarded `authInfo`.
+6. Callback execution receives SDK `ctx.http.authInfo`; `toRequestContext` projects it once to `ctx.auth`.
 
 ```ts
-app.use("/mcp", myOwnAuthMiddleware);          // sets c.var.authInfo
-mountMcp(app, factory, {
-  path: "/mcp",
-  authInfo: (c) => c.var.authInfo,             // forwarded into handler.fetch
+const internal = resolveOAuthProvider(provider);
+const gate = requireBearerAuth({
+  verifier: wrapOAuthTokenVerifier(internal),
+  resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
+  ...(internal.requiredScopes !== undefined && {
+    requiredScopes: [...internal.requiredScopes],
+  }),
+});
+
+app.use(basePath, async (c, next) => {
+  const result = await gate(c.req.raw);
+  if (result instanceof Response) return result;
+  c.set("authInfo", result);
+  await next();
+});
+
+mountMcp(app, createServerForRequest, {
+  path: basePath,
+  authInfo: (c) => c.get("authInfo"),
 });
 ```
 
-`bearerAuth()` and `authMetadata()` are exported standalone for this audience.
-
-## Request flow
-
-```
-client ── POST /mcp (no token) ──▶ bearerAuth → 401
-                                    WWW-Authenticate: Bearer resource_metadata=
-                                      "https://srv/.well-known/oauth-protected-resource"
-client ── GET  /.well-known/oauth-protected-resource ──▶ authMetadata → RFC 9728 doc
-client ── OAuth flow directly with the authorization server (DCR or proxy mode) ──▶ token
-client ── POST /mcp (Bearer token) ──▶ bearerAuth
-             │ verifyToken(token, request) → VerifiedAuth | null | throws OAuthError
-             │ requiredScopes check → 403 insufficient_scope
-             ▼
-          handler.fetch(req, { parsedBody, authInfo })
-             │                         │
-             ▼                         ▼
-   factory({ era, authInfo, … })   ctx.http.authInfo → toRequestContext → ctx.auth
-   (per-principal registration)    (typed ctx.auth.user in every callback)
-```
-
-## Provider adapters
-
-All six v1 providers are ported, **not** in the v1 structure. v1's `OAuthProvider` interface (verifyToken/getUserInfo/getIssuer/endpoints, `payload: any` throughout) dissolves into a simpler shape: each adapter is a factory returning `AuthConfig<TProviderUser>`.
-
-| v1 provider | v2 adapter | User type |
-|---|---|---|
-| `clerk.ts` | `@mcp-use/server/auth/clerk` → `clerkAuth()` | `ClerkUser` |
-| `auth0.ts` | `@mcp-use/server/auth/auth0` → `auth0Auth()` | `Auth0User` |
-| `workos.ts` | `@mcp-use/server/auth/workos` → `workosAuth()` | `WorkOSUser` |
-| `supabase.ts` | `@mcp-use/server/auth/supabase` → `supabaseAuth()` | `SupabaseUser` |
-| `keycloak.ts` | `@mcp-use/server/auth/keycloak` → `keycloakAuth()` | `KeycloakUser` |
-| `better-auth.ts` | `@mcp-use/server/auth/better-auth` → `betterAuth()` | `BetterAuthUser` |
-
-Subpath exports keep provider code out of the main bundle; adapters share one internal JWKS/JWT core (`jose`) so each is mostly claim-mapping + endpoint derivation.
-
-### The user-type contract
-
-Every adapter's user type extends a normalized baseline (v1's `UserInfo`, kept but enforced in the type system):
+`mountMcp` adds this composition seam:
 
 ```ts
-export interface BaseUser {
-  id: string;              // token subject — always present
-  email?: string;          // optional = honest: phone-only accounts exist
-  name?: string;
-  picture?: string;
-  roles: string[];         // normalized (Clerk org_role, Auth0 roles claim, Keycloak realm roles, …)
-  permissions: string[];
+export interface MountMcpOptions<E extends Env = Env> {
+  path?: string;
+  handler?: CreateMcpHandlerOptions;
+  authInfo?: (context: Context<E>) => AuthInfo | undefined;
 }
-export interface ClerkUser extends BaseUser { orgId?: string; orgSlug?: string; sessionId: string; }
 ```
 
-Rules (the point of owning the adapters):
+It combines the resolved `authInfo` with `parsedBody` in the same `handler.fetch` options object. When `authInfo` is absent, `mountMcp` keeps its current unauthenticated behavior.
 
-- **Map, never cast.** Adapters construct the user object field-by-field from verified claims; `payload as XUser` is banned. Types are true by construction, and provider claim drift breaks loudly in our adapter tests, not silently in user code.
-- **Honest optionality.** A field is non-optional only when the token structurally guarantees it. "Mapped properly" means the types tell the truth, including about absence.
-- **Self-contained types.** Adapter user types are defined here, structurally matching the provider — never re-exported from `@clerk/backend` etc., so consumers don't inherit provider SDKs as type dependencies.
-- **Claims escape hatch.** JWT-based adapters also expose the full verified payload as `ctx.auth.claims` (typed `Record<string, unknown>`), so an unmapped custom claim never forces re-verification.
-- **Thin vs rich.** What claims a token carries varies by provider config (Clerk session tokens are minimal unless the JWT template is customized). Default is claims-only (no network hop — we're stateless, verification runs per request). `fetchUser: true` opts into the provider's user-info API for a richer, distinctly-typed user (`ClerkFullUser`), with an internal TTL cache since it would otherwise be one API call per MCP request.
-- **No unverified mode.** v1's `verifyJwt: false` (decode-without-verify) is not ported. There is no configuration in which a token reaches `ctx.auth` unverified.
+The SDK factory receives the same value before registrations run:
 
-### Validation posture (no internal zod)
+```ts
+const createServerForRequest: McpServerFactory = ({ authInfo }) => {
+  return buildSdkServer({ authInfo });
+};
+```
 
-Decided 2026-07-02, superseding a same-day relaxation that briefly made zod a declared internal dependency (SPEC.md ground rule updated in step): auth needs **no zod of our own**. The public invariant is unchanged and absolute — user-facing schema inputs (`schema`/`outputSchema`) are Standard Schema only, and the auth API takes no schemas from users at all.
+This ordering lets a factory omit tools for a principal before registration. Per-tool authorization failures remain soft MCP results, such as `{ isError: true, content: [...] }`. Endpoint-wide required scopes are the only HTTP `403` check.
 
-Three validation jobs, none of which needs a validator dependency:
+## Reuse Beta.3 core helpers
 
-1. **Tokens** — `jose` (signature, expiry, issuer, audience). The security-critical layer; the SDK deliberately ships no JWT verifier, and nothing a schema adds.
-2. **Our RFC 9728 metadata document** — conformance-checked once at server construction with the SDK's exported `OAuthProtectedResourceMetadataSchema`, used as an imported value (`.parse()` on the SDK's own object; zod stays the SDK's internal concern, not our dependency). Never per request.
-3. **Claims → `user` mapping and `fetchUser` responses** — hand-declared public interfaces (`ClerkUser` etc.) constructed field-by-field through a small set of internal narrowing helpers (`asString`, `asStringArray`, …) that null out wrongly-typed claims instead of trusting them. The interfaces are hand-written deliberately, not as a fallback: they're the documentation surface (per-field TSDoc, which inferred types can't carry) and they keep validator types out of the public `.d.ts`. Strict TS (`exactOptionalPropertyTypes`, no-`any` lint) forces every interface field to be handled at the construction site, and adapter tests pin against recorded provider fixtures so upstream claim drift breaks in our CI, not in user code. `fetchUser` provider-API responses — the drift-prone external boundary — go through the same helpers and fixtures.
+Package internals use the official Beta.3 implementations. The public OAuth entry point re-exports the same helpers and types so consumers remain inside the mcp-use package boundary:
 
-Reversal note: an internal validator would be invisible to users (nothing zod-shaped may appear in a public signature regardless), so if the `fetchUser` mappers prove unwieldy in practice, adopting zod internally later is a zero-migration change. What was rejected is carrying the dependency — and its version-coupling watch items — for six flat claim-mapping objects that narrowing helpers cover.
+- `OAuthTokenVerifier`
+- `requireBearerAuth`
+- `verifyBearerToken` and `bearerAuthChallengeResponse`
+- `oauthMetadataResponse`
+- `getOAuthProtectedResourceMetadataUrl`
+- `OAuthError` and `OAuthErrorCode`
+- `OAuthAuthInfo`, aliased directly from SDK `AuthInfo`
+- `OAuthMetadata`, `OAuthProtectedResourceMetadata`, and the corresponding option types
 
-### Security defaults (all adapters)
+Do not fork these declarations or copy their implementations into mcp-use. Thin Hono adapters may call them, but protocol behavior remains owned by the official SDK.
 
-- JWKS fetched via `jose` `createRemoteJWKSet` with caching; issuer check always on; audience check on when the provider issues audience-bound tokens.
-- RFC 8707 resource binding validated with the SDK's `checkResourceAllowed` when the token carries `resource`.
-- Expiry enforced by verification, surfaced on `AuthInfo.expiresAt`.
-- Failures map to spec responses via `OAuthError`: `401 invalid_token` (missing/expired/bad signature) with the `WWW-Authenticate` challenge, `403 insufficient_scope` with `scope` listed.
+`requireBearerAuth` is the sole bearer gate. Its outcomes are:
 
-## Discovery endpoints & proxy mode
+- Missing, malformed, invalid, or expired bearer tokens return `401` with `invalid_token`.
+- Missing endpoint-required scopes return `403` with `insufficient_scope`.
+- Unexpected non-OAuth verifier failures return `500` with `server_error`.
+- The `WWW-Authenticate` challenge includes the `resource_metadata` URL for the canonical resource.
 
-Two serving modes, ported from v1's `routes.ts` split:
+Use `oauthMetadataResponse` for public discovery routes with the concrete provider metadata and resource metadata options:
 
-1. **DCR-direct (default).** We serve only `/.well-known/oauth-protected-resource` (RFC 9728: `resource`, `authorization_servers`, `scopes_supported`, `bearer_methods_supported`). Clients register and exchange tokens directly with the provider. Where a provider's discovery documents need path massaging, v1's `well-known.ts` RFC 8414 / OIDC-Discovery URL helpers port as internal utilities.
-2. **Proxy mode (non-DCR providers: Google, GitHub, enterprise IdPs).** Port of v1's `oauth-proxy.ts` + proxy routes: `/register` returns the pre-registered client, `/authorize` redirects upstream, the broker callback keeps `<baseUrl>/oauth/callback` the only redirect URI to register, and token exchange injects the configured client secret. Reuses the SDK's `OAuthTokens` / `OAuthClientInformation` types for all wire shapes. Ships as `oauthProxy({...})`, itself producing an `AuthConfig<TUser>` — the seam does not care which mode filled it.
+```ts
+app.use("*", async (c, next) => {
+  const response = oauthMetadataResponse(c.req.raw, {
+    oauthMetadata: internal.oauthMetadata,
+    resourceServerUrl: resource,
+    ...(internal.scopesSupported !== undefined && {
+      scopesSupported: [...internal.scopesSupported],
+    }),
+    ...(internal.resourceName !== undefined && {
+      resourceName: internal.resourceName,
+    }),
+    ...(internal.serviceDocumentationUrl !== undefined && {
+      serviceDocumentationUrl: internal.serviceDocumentationUrl,
+    }),
+  });
 
-Explicitly deferred, not dropped: v1's CORS-proxy layer for browser clients (`oauth/proxy.ts`) — decide with the inspector team once inspector-v2 requirements are known; it's additive middleware either way.
+  if (response !== undefined) return response;
+  await next();
+});
+```
 
-## Instrumentation note
+It serves path-aware protected-resource metadata at `/.well-known/oauth-protected-resource/<resource path>` and authorization-server metadata at `/.well-known/oauth-authorization-server`. It supports `GET`, `HEAD`, and `OPTIONS` with CORS, and falls through for unmatched paths.
 
-Not auth, but the same review thread: the observability seam is **not** `ctx.log` (deprecated in 2026-07-28). It is SEP-414 trace context (`traceparent`/`tracestate`/`baggage` in `_meta`, key constants exported by the SDK) + the SDK's `ServerEventBus`/`onerror` hooks. An instrumentation adapter starts an OTel span per request with `mcpReq.method`, tool name, and `ctx.auth.clientId` as attributes. Specced separately when Phase 2 lands; called out here so `AuthInfo` fields stay stable for it.
+## Use Hono as the host adapter
 
-## Phasing
+No upstream `@modelcontextprotocol/hono` auth feature is required. Beta.3 deliberately places web-standard authorization helpers in server core so they work in Hono, Workers, Deno, Bun, and other `Request`/`Response` hosts.
 
-1. **Seam** — `AuthConfig`/`VerifiedAuth`/`Auth<TUser>`, `bearerAuth`, `authMetadata`, `authInfo` pass-through in `mountMcp`, `ctx.auth` in `toRequestContext`, typed-context narrowing + type-level tests. e2e: real HTTP `401` challenge → metadata → authorized `tools/call` with the official client.
-2. **Adapters** — shared `jose` core, then the six providers (Clerk first — it's the doc example), `claims` + `fetchUser` variants, `enabled` per-tool gating.
-3. **Proxy mode** — non-DCR flow, broker callback, secret injection.
+Hono handles body parsing, configured host validation, and origin validation. mcp-use exports thin ergonomic adapters from `@mcp-use/server/oauth`:
 
-## Deltas vs v1 (for the migration guide)
+- `bearerAuth(provider, resource)` invokes `requireBearerAuth` and stores `authInfo` in Hono variables.
+- `oauthMetadata(provider, resource)` serves `oauthMetadataResponse` and falls through on unrelated routes.
+- `MountMcpOptions.authInfo` forwards custom middleware results through `mountMcp`.
 
-- `ctx.auth.user` is typed per adapter; v1's `AuthInfo` (`user: UserInfo; payload; accessToken; scopes; permissions`) becomes SDK `AuthInfo` + typed `user` + `claims`. `accessToken` → `ctx.auth.token`; `permissions` live on `user.permissions`.
-- Verification is explicit pass-through (`handler.fetch({ authInfo })`), not AsyncLocalStorage — v1's `context-storage.ts` (with its `globalThis` bundler workaround) has no v2 counterpart at all.
-- `verifyJwt: false` removed (security).
-- OAuth config moves from server-level options + `setup.ts` state machine into one `auth` constructor field; provider factories return config, not class instances.
-- New capabilities v1 didn't have: per-principal tool *existence* (`enabled`), RFC 8707 resource binding, typed no-auth compile-time narrowing.
+Those adapters are conveniences for normal and custom composition. An upstream Hono convenience wrapper is optional and not a blocker.
+
+## Port provider adapters after the seam
+
+The first implementation phase supplies only the resource-server seam. The next phase ports five v1 provider adapters:
+
+1. Clerk with `oauthClerkProvider`
+2. Auth0 with `oauthAuth0Provider`
+3. WorkOS with `oauthWorkOSProvider`
+4. Supabase with `oauthSupabaseProvider`
+5. Keycloak with `oauthKeycloakProvider`
+
+Each adapter verifies tokens, maps verified claims to a typed `user`, preserves the verified payload, provides normalized permissions, and advertises its authorization-server metadata. Each adapter must map claims rather than cast decoded payloads. No adapter offers `verifyJwt: false`.
+
+JWT adapters share a `jose` implementation for remote JWKS caching and signature verification. They always validate issuer and expiry, validate audience when the provider issues audience-bound tokens, and apply SDK resource-binding checks when the token carries a resource. Opaque-token adapters use RFC 7662 introspection and map the response into the same `AuthInfo` contract. Verifiers throw `OAuthError` with `OAuthErrorCode.InvalidToken` for rejected credentials so the core gate returns the correct challenge.
+
+In the direct flow, clients use the external authorization server's registration, authorization, and token endpoints. mcp-use serves resource metadata, mirrors the supplied authorization-server metadata for compatibility, and verifies the resulting access token. It never handles authorization codes or client secrets in this phase.
+
+Better Auth is explicitly deferred. Do not port `oauthBetterAuthProvider` as part of the resource-server adapter phase. Its v2 integration will be designed separately so a Better Auth instance can compose with `MCPServer` more directly than the v1 provider wrapper. The custom provider escape hatch remains available in the meantime, but its shape does not constrain the future first-class Better Auth API.
+
+## Keep proxy mode explicit and later
+
+The final phase ports v1 proxy mode for authorization servers that cannot support the direct flow. It includes v1 proxy registration, authorization redirect, callback, and token-exchange behavior, including configured client-secret handling. The public entry point is an explicit proxy provider or proxy configuration, not an implicit fallback in the initial seam.
+
+Proxy mode must remain visible in the API, but it must not obscure or delay the initial resource-server seam. It still produces verified `AuthInfo` and uses the same `OAuthProvider<TUser>` projection.
+
+Proxy mode preserves v1's pre-registered client behavior: local registration reports the configured client, authorization redirects upstream, the callback restores the original client redirect and state, and token exchange injects the configured client secret. The proxy passes upstream access tokens through and never mints its own.
+
+## Meet the beta.3 dependency prerequisite
+
+As of 2026-07-09, `@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` all have `2.0.0-beta.3` releases. The implementation may use coordinated beta.3 pins. This documentation change does not modify `package.json`.
+
+## Verify the implementation
+
+Acceptance coverage must include:
+
+- An official client e2e flow: unauthenticated MCP request, `401` challenge, protected-resource metadata retrieval, OAuth authorization and token acquisition, retry, then an authorized `tools/call`.
+- Missing and malformed token `401 invalid_token`; expired token `401 invalid_token`; endpoint scope failure `403 insufficient_scope`; expected `WWW-Authenticate` `resource_metadata`.
+- Exact-route protection: public discovery routes work without bearer auth, while only the configured MCP endpoint is gated.
+- A custom Hono composition that stores `authInfo` and forwards it through `mountMcp`.
+- Canonical URL, `basePath`, MCP path, `MCP_URL`, path-aware metadata, and unsafe-derivation configuration tests.
+- URL validation tests for HTTPS, localhost exceptions, path matching, queries, fragments, and trailing slashes.
+- Context parity: `user`, `payload`, `accessToken`, `scopes`, and `permissions`, plus `clientId`, `expiresAt`, and `resource`.
+- Provider contract tests for JWT issuer, audience, expiry, resource binding, JWKS caching, opaque-token introspection, and verified claim mapping.
+- Compile-time tests proving `ctx.auth` is present with `oauth`, unavailable without it, and retains each provider user type.
+- Concurrency tests proving identity isolation by construction with fresh per-request SDK servers and explicit `authInfo` forwarding.
+
+## Migrate from v1
+
+v1 support remains the behavioral baseline:
+
+- Port the Clerk, Auth0, WorkOS, Supabase, and Keycloak provider concepts and their typed user mappings.
+- Defer Better Auth to a separate integration design; do not carry the v1 provider API forward by default.
+- Preserve v1 proxy behavior as the explicit third phase.
+- Preserve `user`, `payload`, `accessToken`, `scopes`, and `permissions` on `ctx.auth`.
+- `accessToken` is the mcp-use compatibility name and aliases SDK `AuthInfo.token`. It is not renamed to a mcp-use `token` field.
+- Do not port `verifyJwt: false` or any decode-only authentication path.
+- Do not port v1's unauthenticated `HEAD` bypass on the MCP endpoint. Beta.3 bearer authentication gates every method on that route; metadata routes retain public `HEAD` support.
+- Replace v1 context storage with explicit `handler.fetch(..., { authInfo })` forwarding and one `toRequestContext` projection.
+- Do not claim beta.3 helpers are pending, Express-only, or supplied by an upstream Hono auth feature.
