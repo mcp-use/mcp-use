@@ -30,6 +30,30 @@
     "./react": {
       "types": "./dist/react/index.d.ts",
       "import": "./dist/react/index.js"
+    },
+    "./oauth": {
+      "types": "./dist/oauth/index.d.ts",
+      "import": "./dist/oauth/index.js"
+    },
+    "./oauth/clerk": {
+      "types": "./dist/oauth/clerk.d.ts",
+      "import": "./dist/oauth/clerk.js"
+    },
+    "./oauth/auth0": {
+      "types": "./dist/oauth/auth0.d.ts",
+      "import": "./dist/oauth/auth0.js"
+    },
+    "./oauth/workos": {
+      "types": "./dist/oauth/workos.d.ts",
+      "import": "./dist/oauth/workos.js"
+    },
+    "./oauth/supabase": {
+      "types": "./dist/oauth/supabase.d.ts",
+      "import": "./dist/oauth/supabase.js"
+    },
+    "./oauth/keycloak": {
+      "types": "./dist/oauth/keycloak.d.ts",
+      "import": "./dist/oauth/keycloak.js"
     }
   },
   "module": "./dist/index.js",
@@ -53,9 +77,10 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
-    "@modelcontextprotocol/hono": "2.0.0-beta.2",
-    "@modelcontextprotocol/server": "2.0.0-beta.2",
-    "hono": "^4.12.27"
+    "@modelcontextprotocol/hono": "2.0.0-beta.3",
+    "@modelcontextprotocol/server": "2.0.0-beta.3",
+    "hono": "^4.12.27",
+    "jose": "6.1.3"
   },
   "peerDependencies": {
     "@modelcontextprotocol/ext-apps": "^1.7.4",
@@ -83,7 +108,7 @@
   },
   "devDependencies": {
     "@mcp-use/server": "workspace:*",
-    "@modelcontextprotocol/client": "2.0.0-beta.2",
+    "@modelcontextprotocol/client": "2.0.0-beta.3",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",

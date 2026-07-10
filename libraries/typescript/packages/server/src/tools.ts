@@ -194,7 +194,9 @@ export type InferToolName<T> = T extends { name: infer N extends string }
 export type ToolCallback<
   TInput = Record<string, unknown>,
   TOutput = never,
+  TUser = never,
+  HasOAuth extends boolean = false,
 > = (
   params: TInput,
-  ctx: RequestContext
+  ctx: RequestContext<TUser, HasOAuth>
 ) => ToolResult<TOutput> | Promise<ToolResult<TOutput>>;

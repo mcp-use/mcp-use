@@ -377,15 +377,8 @@ export async function runDev(options: DevOptions): Promise<void> {
     process.loadEnvFile(envPath);
   }
 
-  const entry = discoverEntry(options.cwd, options.entry);
-  let currentViews: DiscoveredView[] = discoverViews(options.cwd);
-  // The Vite client environment (views plugin, Fast Refresh, HMR socket,
-  // asset origin) is configured once, from this snapshot. `currentViews`
-  // stays live for request routing and re-priming, but a project that starts
-  // with zero views needs a dev-server restart to pick up its first view.
-  const viewsAtStartup = currentViews.length > 0;
-  const userViteConfig = resolveUserViteConfig(options.cwd);
-
+  // Resolve the listener before importing the entry so module-scope OAuth
+  // configuration observes the canonical port that this CLI will own.
   // The HTTP listener is a raw node:http server rather than
   // @hono/node-server's serve() wrapper — deliberately, and only one level
   // lower: serve() is itself createServer(getRequestListener(fetch)), and we
@@ -407,6 +400,21 @@ export async function runDev(options: DevOptions): Promise<void> {
     console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
   }
   process.env["PORT"] = String(port);
+
+  const localFallbackMcpUrl =
+    process.env["MCP_URL"] === undefined &&
+    (host === "127.0.0.1" || host === "localhost" || host === "::1")
+      ? `http://localhost:${port}`
+      : undefined;
+
+  const entry = discoverEntry(options.cwd, options.entry);
+  let currentViews: DiscoveredView[] = discoverViews(options.cwd);
+  // The Vite client environment (views plugin, Fast Refresh, HMR socket,
+  // asset origin) is configured once, from this snapshot. `currentViews`
+  // stays live for request routing and re-priming, but a project that starts
+  // with zero views needs a dev-server restart to pick up its first view.
+  const viewsAtStartup = currentViews.length > 0;
+  const userViteConfig = resolveUserViteConfig(options.cwd);
 
   // The bind address is not always a browsable address: `0.0.0.0`/`::`
   // accept connections on every interface but are not valid request hosts
@@ -465,26 +473,49 @@ export async function runDev(options: DevOptions): Promise<void> {
   });
 
   const importServer = async (): Promise<ServerLike> => {
-    const moduleExports = (await runner.import(entry)) as Record<
-      string,
-      unknown
-    >;
-    const server = serverFrom(moduleExports);
+    const load = async (): Promise<ServerLike> => {
+      const moduleExports = (await runner.import(entry)) as Record<
+        string,
+        unknown
+      >;
+      const server = serverFrom(moduleExports);
 
-    if (currentViews.length > 0) {
-      const viewsManifest = buildDevViewsManifest(currentViews);
-      if (typeof server.__primeViews !== "function") {
-        throw new Error(
-          "Loaded MCPServer instance does not support __primeViews."
-        );
+      if (currentViews.length > 0) {
+        const viewsManifest = buildDevViewsManifest(currentViews);
+        if (typeof server.__primeViews !== "function") {
+          throw new Error(
+            "Loaded MCPServer instance does not support __primeViews."
+          );
+        }
+        server.__primeViews(viewsManifest, {
+          dev: true,
+          projectRoot: options.cwd,
+        });
       }
-      server.__primeViews(viewsManifest, {
-        dev: true,
-        projectRoot: options.cwd,
-      });
+
+      return server;
+    };
+
+    if (localFallbackMcpUrl === undefined) {
+      return load();
     }
 
-    return server;
+    // This is safe only because this CLI selected and will bind this local
+    // listener. Never derive OAuth identity from an untrusted request Host.
+    // Scope it to entry evaluation: MCPServer freezes the trusted canonical
+    // resource during construction, while later runtime code must not inherit
+    // this CLI-owned synthetic environment value.
+    const previousMcpUrl = process.env["MCP_URL"];
+    try {
+      process.env["MCP_URL"] = localFallbackMcpUrl;
+      return await load();
+    } finally {
+      if (previousMcpUrl === undefined) {
+        delete process.env["MCP_URL"];
+      } else {
+        process.env["MCP_URL"] = previousMcpUrl;
+      }
+    }
   };
 
   let currentHandler: FetchHandler;
@@ -574,6 +605,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   vite.watcher.on("add", onFileAddOrUnlink);
   vite.watcher.on("unlink", onFileAddOrUnlink);
 
+  // --- One long-lived HTTP listener delegating to the current handler. -----
   const tunnelManager = createTunnelManager(paths.tunnel);
 
   // --- DNS-rebinding protection. --------------------------------------------
