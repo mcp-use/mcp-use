@@ -1491,21 +1491,24 @@ importers:
         specifier: ^2.0.6
         version: 2.0.6(hono@4.12.27)
       '@modelcontextprotocol/hono':
-        specifier: 2.0.0-beta.2
-        version: 2.0.0-beta.2(@modelcontextprotocol/server@2.0.0-beta.2)(hono@4.12.27)
+        specifier: 2.0.0-beta.3
+        version: 2.0.0-beta.3(@modelcontextprotocol/server@2.0.0-beta.3)(hono@4.12.27)
       '@modelcontextprotocol/server':
-        specifier: 2.0.0-beta.2
-        version: 2.0.0-beta.2
+        specifier: 2.0.0-beta.3
+        version: 2.0.0-beta.3
       hono:
         specifier: '>=4.12.27'
         version: 4.12.27
+      jose:
+        specifier: 6.1.3
+        version: 6.1.3
     devDependencies:
       '@mcp-use/server':
         specifier: workspace:*
         version: 'link:'
       '@modelcontextprotocol/client':
-        specifier: 2.0.0-beta.2
-        version: 2.0.0-beta.2
+        specifier: 2.0.0-beta.3
+        version: 2.0.0-beta.3
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
@@ -1521,6 +1524,104 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+
+  packages/server/examples/auth/auth0:
+    dependencies:
+      '@mcp-use/server':
+        specifier: workspace:*
+        version: link:../../..
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/server/examples/auth/clerk:
+    dependencies:
+      '@mcp-use/server':
+        specifier: workspace:*
+        version: link:../../..
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/server/examples/auth/keycloak:
+    dependencies:
+      '@mcp-use/server':
+        specifier: workspace:*
+        version: link:../../..
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/server/examples/auth/supabase:
+    dependencies:
+      '@mcp-use/server':
+        specifier: workspace:*
+        version: link:../../..
+      '@supabase/supabase-js':
+        specifier: ^2.104.0
+        version: 2.104.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/server/examples/auth/workos:
+    dependencies:
+      '@mcp-use/server':
+        specifier: workspace:*
+        version: link:../../..
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^24.13.2
+        version: 24.13.2
+      typescript:
+        specifier: 7.0.1-rc
+        version: 7.0.1-rc
+      vite:
+        specifier: '>=8.0.5'
+        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/railway:
     dependencies:
@@ -2437,8 +2538,8 @@ packages:
   '@microsoft/tsdoc@0.16.0':
     resolution: {integrity: sha512-xgAyonlVVS+q7Vc7qLW0UrJU7rSFcETRWsqdXZtjzRU8dF+6CkozTK4V4y1LwOX7j8r/vHphjDeMeGI4tNGeGA==}
 
-  '@modelcontextprotocol/client@2.0.0-beta.2':
-    resolution: {integrity: sha512-IKEJQmvM2g7HLSOofLXECjQyeryB1YWgjazHcYygyH3ERSe7b8cFS3WHlupMxees5URNXcqBLVlbDRgodaBQ9A==}
+  '@modelcontextprotocol/client@2.0.0-beta.3':
+    resolution: {integrity: sha512-o9z9YCGNxWNdklPdjcD0tr8pocC9OgjdArqgx3OjPMlTe0M/SSPC2olOJs5ueq77HSpz36mND0f0KteqEhKF3A==}
     engines: {node: '>=20'}
 
   '@modelcontextprotocol/ext-apps@0.3.1':
@@ -2467,11 +2568,11 @@ packages:
       react-dom:
         optional: true
 
-  '@modelcontextprotocol/hono@2.0.0-beta.2':
-    resolution: {integrity: sha512-sYChIqZFoOIwDN/8MTROOGMMJPFxRF1yr7koKZT57lGPF/cXgC71ouXIjBkn1KspDoX0C9XN6aKKeecWx0DySw==}
+  '@modelcontextprotocol/hono@2.0.0-beta.3':
+    resolution: {integrity: sha512-VP/qrOM4kYMGf+UznowHnoiI2W3UmtuQh2UGLa3L3VrrTr/2QIIuRb6EEkFt3ItnoNn+B1qZRdH5Q+QlQ0UbCA==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@modelcontextprotocol/server': ^2.0.0-beta.2
+      '@modelcontextprotocol/server': ^2.0.0-beta.3
       hono: '>=4.12.27'
 
   '@modelcontextprotocol/sdk@1.27.1':
@@ -2484,8 +2585,8 @@ packages:
       '@cfworker/json-schema':
         optional: true
 
-  '@modelcontextprotocol/server@2.0.0-beta.2':
-    resolution: {integrity: sha512-XK+sgFntT5ZzeqtTGpT9uti+Sqmq7YJZdx/N76eLJv9UA9vKvP04Qh9Hc45LCeIHGfTKRwDG6eh4C1Hs4omyIg==}
+  '@modelcontextprotocol/server@2.0.0-beta.3':
+    resolution: {integrity: sha512-EQxVIWf2XMAgjR38ZRZnX1iiOWH42tT/YJG8N4dVjAnrEGSEfPirR6FYfDC72yuNSvVYbPDTD1H3KHLLHPd18A==}
     engines: {node: '>=20'}
 
   '@napi-rs/wasm-runtime@1.1.5':
@@ -9127,7 +9228,7 @@ snapshots:
 
   '@microsoft/tsdoc@0.16.0': {}
 
-  '@modelcontextprotocol/client@2.0.0-beta.2':
+  '@modelcontextprotocol/client@2.0.0-beta.3':
     dependencies:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
@@ -9186,9 +9287,9 @@ snapshots:
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
 
-  '@modelcontextprotocol/hono@2.0.0-beta.2(@modelcontextprotocol/server@2.0.0-beta.2)(hono@4.12.27)':
+  '@modelcontextprotocol/hono@2.0.0-beta.3(@modelcontextprotocol/server@2.0.0-beta.3)(hono@4.12.27)':
     dependencies:
-      '@modelcontextprotocol/server': 2.0.0-beta.2
+      '@modelcontextprotocol/server': 2.0.0-beta.3
       hono: 4.12.27
 
   '@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.4.3)':
@@ -9215,7 +9316,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@modelcontextprotocol/server@2.0.0-beta.2':
+  '@modelcontextprotocol/server@2.0.0-beta.3':
     dependencies:
       zod: 4.4.3
 

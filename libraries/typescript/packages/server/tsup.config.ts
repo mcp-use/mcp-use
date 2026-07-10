@@ -3,6 +3,14 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     index: "src/index.ts",
+    // OAuth subpath exports mirror tsc's rootDir:src layout so generated JS
+    // and declarations stay aligned with package.json's exports map.
+    "oauth/index": "src/oauth/index.ts",
+    "oauth/clerk": "src/oauth/clerk.ts",
+    "oauth/auth0": "src/oauth/auth0.ts",
+    "oauth/workos": "src/oauth/workos.ts",
+    "oauth/supabase": "src/oauth/supabase.ts",
+    "oauth/keycloak": "src/oauth/keycloak.ts",
     // The `mcp-use` bin (package.json "bin"). Its source shebang is
     // preserved by esbuild, so dist/bin.js stays directly executable.
     bin: "src/bin.ts",

@@ -1,13 +1,14 @@
 import {
   createMcpHandler,
   type CreateMcpHandlerOptions,
+  type AuthInfo,
   type McpHttpHandler,
   type McpServerFactory,
 } from "@modelcontextprotocol/server";
-import type { Env, Hono } from "hono";
+import type { Context, Env, Hono } from "hono";
 
 /** Options for {@link mountMcp}. */
-export interface MountMcpOptions {
+export interface MountMcpOptions<E extends Env = Env> {
   /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
   path?: string;
   /**
@@ -19,6 +20,8 @@ export interface MountMcpOptions {
    * `legacy: "stateless"` to also serve old-revision clients.
    */
   handler?: CreateMcpHandlerOptions;
+  /** AuthInfo produced by host middleware and forwarded to the SDK request. */
+  authInfo?: (context: Context<E>) => AuthInfo | undefined;
 }
 
 /**
@@ -42,9 +45,10 @@ export interface MountMcpOptions {
 export function mountMcp<E extends Env>(
   app: Hono<E>,
   factory: McpServerFactory,
-  options: MountMcpOptions = {}
+  options: MountMcpOptions<E> = {}
 ): McpHttpHandler {
-  const { path = "/mcp", handler: handlerOptions } = options;
+  const { path = "/mcp", handler: handlerOptions, authInfo: getAuthInfo } =
+    options;
   const handler = createMcpHandler(factory, {
     legacy: "stateless",
     ...handlerOptions,
@@ -54,10 +58,11 @@ export function mountMcp<E extends Env>(
     // vars (a request body is only readable once); on bare apps it is absent
     // and the SDK handler parses the body itself.
     const parsedBody = (c.var as Record<string, unknown>)["parsedBody"];
-    return handler.fetch(
-      c.req.raw,
-      parsedBody === undefined ? undefined : { parsedBody }
-    );
+    const authInfo = getAuthInfo?.(c);
+    return handler.fetch(c.req.raw, {
+      ...(parsedBody !== undefined && { parsedBody }),
+      ...(authInfo !== undefined && { authInfo }),
+    });
   });
   return handler;
 }

@@ -5,18 +5,34 @@ import {
   localhostAllowedOrigins,
   McpServer as SdkMcpServer,
   ResourceTemplate,
+  type AuthInfo,
   type McpHttpHandler,
   type PromptCallback as SdkPromptCallback,
   type ServerContext,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
-import { Hono } from "hono";
+import { Hono, type Env } from "hono";
 
-import type { ServerConfig } from "./config.js";
-import { toRequestContext } from "./context.js";
+import { assertServerConfig, type ServerConfig } from "./config.js";
+import {
+  toAuthenticatedRequestContext,
+  toRequestContext,
+  type RequestContext,
+} from "./context.js";
 import { mountInspectorShell } from "./inspector-shell.js";
 import { requestLogger } from "./logging.js";
 import { mountMcp } from "./mount-mcp.js";
+import {
+  getOAuthProtectedResourceMetadataUrl,
+  oauthMetadataResponse,
+  requireBearerAuth,
+} from "./oauth/index.js";
+import {
+  getOAuthProviderOptions,
+  resolveConfiguredOAuthResource,
+  resolveLocalOAuthResource,
+  wrapOAuthTokenVerifier,
+} from "./oauth/internal.js";
 import type {
   InferPromptInput,
   PromptCallback,
@@ -43,24 +59,43 @@ import type {
  * Safe because the SDK validates params against the definition's schema
  * before any callback runs.
  */
-interface ToolEntry {
+type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
+
+/**
+ * The per-request Hono variable used to carry verified identity through the
+ * MCP adapter.
+ *
+ * `createMcpHonoApp` currently returns an unparameterized `Hono`, so this is
+ * the narrow type boundary that describes the variable added by this class.
+ */
+interface OAuthHonoEnv extends Env {
+  Variables: {
+    authInfo?: AuthInfo;
+  };
+}
+
+interface ToolEntry<TUser> {
   definition: ToolDefinition;
-  callback: ToolCallback;
+  callback: ToolCallback<Record<string, unknown>, never, TUser, HasOAuth<TUser>>;
 }
 
-interface ResourceEntry {
+interface ResourceEntry<TUser> {
   definition: ResourceDefinition;
-  callback: ResourceCallback;
+  callback: ResourceCallback<TUser, HasOAuth<TUser>>;
 }
 
-interface ResourceTemplateEntry {
+interface ResourceTemplateEntry<TUser> {
   definition: ResourceTemplateDefinition;
-  callback: ResourceTemplateCallback;
+  callback: ResourceTemplateCallback<
+    Record<string, TemplateVariableValue>,
+    TUser,
+    HasOAuth<TUser>
+  >;
 }
 
-interface PromptEntry {
+interface PromptEntry<TUser> {
   definition: PromptDefinition;
-  callback: PromptCallback;
+  callback: PromptCallback<Record<string, unknown>, TUser, HasOAuth<TUser>>;
 }
 
 /**
@@ -84,16 +119,22 @@ interface PromptEntry {
  * await server.listen(3000);
  * ```
  */
-export class MCPServer {
-  readonly #config: ServerConfig;
-  readonly #tools = new Map<string, ToolEntry>();
-  readonly #resources = new Map<string, ResourceEntry>();
-  readonly #resourceTemplates = new Map<string, ResourceTemplateEntry>();
-  readonly #prompts = new Map<string, PromptEntry>();
+export class MCPServer<TUser = never> {
+  readonly #config: ServerConfig<TUser>;
+  readonly #tools = new Map<string, ToolEntry<TUser>>();
+  readonly #resources = new Map<string, ResourceEntry<TUser>>();
+  readonly #resourceTemplates = new Map<
+    string,
+    ResourceTemplateEntry<TUser>
+  >();
+  readonly #prompts = new Map<string, PromptEntry<TUser>>();
 
   #app: Hono | undefined;
   #handler: McpHttpHandler | undefined;
   #httpServer: ServerType | undefined;
+  #oauthResource: URL | undefined;
+  #oauthResourceResolved = false;
+  #oauthResourceConfigurationAbsent = false;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
 
@@ -102,8 +143,21 @@ export class MCPServer {
    * to clients during initialization; nothing binds or listens until
    * {@link MCPServer.listen} or {@link MCPServer.getHandler} is called.
    */
-  constructor(config: ServerConfig) {
+  constructor(config: ServerConfig<TUser>) {
+    assertServerConfig(config);
     this.#config = config;
+    if (config.oauth !== undefined) {
+      const mcpUrl =
+        typeof process === "undefined" ? undefined : process.env["MCP_URL"];
+      const resource = resolveConfiguredOAuthResource({
+        provider: config.oauth,
+        basePath: this.#basePath(),
+        ...(mcpUrl !== undefined && { mcpUrl }),
+      });
+      this.#oauthResource = resource;
+      this.#oauthResourceResolved = resource !== undefined;
+      this.#oauthResourceConfigurationAbsent = resource === undefined;
+    }
   }
 
   /**
@@ -124,18 +178,31 @@ export class MCPServer {
    */
   tool<T extends ToolDefinition>(
     definition: T,
-    callback: ToolCallback<InferToolInput<T>, InferToolOutput<T>>
+    callback: ToolCallback<
+      InferToolInput<T>,
+      InferToolOutput<T>,
+      TUser,
+      HasOAuth<TUser>
+    >
   ): this {
     this.#assertNotStarted("tool", definition.name);
     this.#tools.set(definition.name, {
       definition,
-      callback: callback as ToolCallback,
+      callback: callback as ToolCallback<
+        Record<string, unknown>,
+        never,
+        TUser,
+        HasOAuth<TUser>
+      >,
     });
     return this;
   }
 
   /** Register a static resource readable at `definition.uri`. */
-  resource(definition: ResourceDefinition, callback: ResourceCallback): this {
+  resource(
+    definition: ResourceDefinition,
+    callback: ResourceCallback<TUser, HasOAuth<TUser>>
+  ): this {
     this.#assertNotStarted("resource", definition.name);
     this.#resources.set(definition.name, { definition, callback });
     return this;
@@ -152,12 +219,16 @@ export class MCPServer {
    */
   resourceTemplate<const T extends ResourceTemplateDefinition>(
     definition: T,
-    callback: ResourceTemplateCallback<InferTemplateParams<T>>
+    callback: ResourceTemplateCallback<InferTemplateParams<T>, TUser, HasOAuth<TUser>>
   ): this {
     this.#assertNotStarted("resourceTemplate", definition.name);
     this.#resourceTemplates.set(definition.name, {
       definition,
-      callback: callback as ResourceTemplateCallback,
+      callback: callback as ResourceTemplateCallback<
+        Record<string, TemplateVariableValue>,
+        TUser,
+        HasOAuth<TUser>
+      >,
     });
     return this;
   }
@@ -168,12 +239,16 @@ export class MCPServer {
    */
   prompt<T extends PromptDefinition>(
     definition: T,
-    callback: PromptCallback<InferPromptInput<T>>
+    callback: PromptCallback<InferPromptInput<T>, TUser, HasOAuth<TUser>>
   ): this {
     this.#assertNotStarted("prompt", definition.name);
     this.#prompts.set(definition.name, {
       definition,
-      callback: callback as PromptCallback,
+      callback: callback as PromptCallback<
+        Record<string, unknown>,
+        TUser,
+        HasOAuth<TUser>
+      >,
     });
     return this;
   }
@@ -206,19 +281,59 @@ export class MCPServer {
    * already mounted the app without Host validation.
    */
   async listen(port = 3000): Promise<{ port: number; url: string }> {
-    const { app } = this.#ensureMounted("listen");
+    this.#assertListenOAuthConfiguration();
     return new Promise((resolve, reject) => {
-      const server = serve(
-        { fetch: app.fetch, port, hostname: this.#config.host ?? "127.0.0.1" },
-        (info) => {
-          resolve({
-            port: info.port,
-            url: `http://localhost:${info.port}${this.#basePath()}`,
+      let resolveApp: ((app: Hono) => void) | undefined;
+      let rejectApp: ((error: unknown) => void) | undefined;
+      const appReady = new Promise<Hono>((resolveAppPromise, rejectAppPromise) => {
+        resolveApp = resolveAppPromise;
+        rejectApp = rejectAppPromise;
+      });
+      // A failed mount rejects pending requests; when none arrived, consume
+      // that rejection here so a configuration error is reported only through
+      // the listen() promise.
+      void appReady.catch(() => undefined);
+      let settled = false;
+      const rejectAndClose = (error: unknown) => {
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+        rejectApp?.(error);
+        void new Promise<void>((closeResolve) => server.close(() => closeResolve()))
+          .catch(() => undefined)
+          .finally(() => {
+            if (this.#httpServer === server) {
+              this.#httpServer = undefined;
+            }
           });
+      };
+      const server = serve(
+        {
+          // The listener can accept before its callback runs. Queue those
+          // requests until mounting completes instead of failing normal startup.
+          fetch: async (request) => (await appReady).fetch(request),
+          port,
+          hostname: this.#config.host ?? "127.0.0.1",
+        },
+        (info) => {
+          try {
+            const { app } = this.#ensureMounted("listen", info.port);
+            resolveApp?.(app);
+            if (!settled) {
+              settled = true;
+              resolve({
+                port: info.port,
+                url: `http://localhost:${info.port}${this.#basePath()}`,
+              });
+            }
+          } catch (error) {
+            rejectAndClose(error);
+          }
         }
       );
       this.#httpServer = server;
-      server.once("error", reject);
+      server.once("error", rejectAndClose);
     });
   }
 
@@ -242,6 +357,53 @@ export class MCPServer {
 
   #basePath(): string {
     return this.#config.basePath ?? "/mcp";
+  }
+
+  #resolveOAuthResource(
+    mode: "listen" | "handler",
+    listenPort?: number
+  ): URL | undefined {
+    if (this.#config.oauth === undefined) {
+      return undefined;
+    }
+    if (this.#oauthResourceResolved) {
+      return this.#oauthResource;
+    }
+
+    const host = this.#config.host ?? "127.0.0.1";
+    const localListen =
+      mode === "listen" &&
+      listenPort !== undefined &&
+      ["127.0.0.1", "localhost", "::1"].includes(host);
+    if (this.#oauthResourceConfigurationAbsent && localListen) {
+      this.#oauthResource = resolveLocalOAuthResource(
+        `http://localhost:${listenPort}`,
+        this.#basePath()
+      );
+      this.#oauthResourceResolved = true;
+      return this.#oauthResource;
+    }
+
+    throw new Error(
+      "OAuth requires an explicit resource or MCP_URL when using getHandler()"
+    );
+  }
+
+  #assertListenOAuthConfiguration(): void {
+    if (this.#config.oauth === undefined) {
+      return;
+    }
+    const host = this.#config.host ?? "127.0.0.1";
+    if (["127.0.0.1", "localhost", "::1"].includes(host)) {
+      return;
+    }
+    if (!this.#oauthResourceResolved) {
+      // Public/wildcard listeners have no stable local fallback. Their
+      // configured resource was already validated during construction.
+      throw new Error(
+        "OAuth listen() on a public or wildcard host requires an explicit provider resource or valid MCP_URL."
+      );
+    }
   }
 
   #assertNotStarted(kind: string, name: string): void {
@@ -284,7 +446,7 @@ export class MCPServer {
     return { hosts, origins };
   }
 
-  #ensureMounted(mode: "listen" | "handler"): {
+  #ensureMounted(mode: "listen" | "handler", listenPort?: number): {
     app: Hono;
     handler: McpHttpHandler;
   } {
@@ -316,15 +478,70 @@ export class MCPServer {
         }
       }
       app.use("*", requestLogger(this.#config.logging));
-      const handler = mountMcp(app, () => this.#buildSdkServer(), {
-        path: this.#basePath(),
-      });
+      // The official adapter returns an unparameterized Hono app. Its
+      // runtime Context supports request-scoped variables, so narrow the
+      // type only at the OAuth composition seam we own.
+      const mcpApp = app as unknown as Hono<OAuthHonoEnv>;
+      const resource = this.#resolveOAuthResource(mode, listenPort);
+      if (resource !== undefined) {
+        const provider = this.#config.oauth!;
+        const providerOptions = getOAuthProviderOptions(provider);
+        app.use("*", async (c, next) => {
+          const response = oauthMetadataResponse(c.req.raw, {
+            oauthMetadata: providerOptions.oauthMetadata,
+            resourceServerUrl: resource,
+            ...(providerOptions.scopesSupported !== undefined && {
+              scopesSupported: providerOptions.scopesSupported,
+            }),
+            ...(providerOptions.resourceName !== undefined && {
+              resourceName: providerOptions.resourceName,
+            }),
+            ...(providerOptions.serviceDocumentationUrl !== undefined && {
+              serviceDocumentationUrl: providerOptions.serviceDocumentationUrl,
+            }),
+          });
+          if (response !== undefined) {
+            return response;
+          }
+          await next();
+        });
+
+        const gate = requireBearerAuth({
+          verifier: wrapOAuthTokenVerifier(provider, resource),
+          resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
+          ...(providerOptions.requiredScopes !== undefined && {
+            requiredScopes: providerOptions.requiredScopes,
+          }),
+        });
+        mcpApp.use(this.#basePath(), async (c, next) => {
+          const result = await gate(c.req.raw);
+          if (result instanceof Response) {
+            return result;
+          }
+          c.set("authInfo", result);
+          await next();
+        });
+      }
+      const handler = mountMcp(
+        mcpApp,
+        ({ authInfo }) => this.#buildSdkServer(authInfo),
+        {
+          path: this.#basePath(),
+          ...(resource !== undefined && {
+            authInfo: (context) => context.get("authInfo"),
+          }),
+        }
+      );
       // Inspector shell (default enabled, FastAPI /docs style) rides the
       // same app, so the validation middleware above covers it too.
       mountInspectorShell(app, this.#config.inspector, {
         serverName: this.#config.name,
         basePath: this.#basePath(),
       });
+      // Custom routes last: after OAuth wiring and MCP/inspector mounts so
+      // they cannot run before the bearer gate and are not shadowed-checked
+      // against MCP internals. Not covered by the OAuth gate (basePath only).
+      this.#config.configureApp?.(app);
       this.#app = app;
       this.#handler = handler;
       this.#hostValidated = hosts !== undefined;
@@ -345,11 +562,14 @@ export class MCPServer {
   }
 
   /** Build a fresh SDK server from the registry (runs once per request). */
-  #buildSdkServer(): SdkMcpServer {
+  #buildSdkServer(authInfo?: AuthInfo): SdkMcpServer {
     const { name, version, title, instructions } = this.#config;
     const server = new SdkMcpServer(
       { name, version, ...(title !== undefined && { title }) },
-      instructions !== undefined ? { instructions } : undefined
+      {
+        ...(instructions !== undefined && { instructions }),
+        ...(authInfo !== undefined && { authInfo }),
+      }
     );
 
     for (const entry of this.#tools.values()) {
@@ -369,7 +589,7 @@ export class MCPServer {
 
   #registerTool(
     server: SdkMcpServer,
-    { definition, callback }: ToolEntry
+    { definition, callback }: ToolEntry<TUser>
   ): void {
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
@@ -390,19 +610,19 @@ export class MCPServer {
         async (args, ctx) => {
           // The SDK has already validated `args` against `definition.schema`.
           const params = args as Record<string, unknown>;
-          return callback(params, toRequestContext(ctx));
+          return callback(params, this.#toRequestContext(ctx));
         }
       );
     } else {
       server.registerTool(definition.name, config, async (ctx) =>
-        callback({}, toRequestContext(ctx))
+        callback({}, this.#toRequestContext(ctx))
       );
     }
   }
 
   #registerResource(
     server: SdkMcpServer,
-    { definition, callback }: ResourceEntry
+    { definition, callback }: ResourceEntry<TUser>
   ): void {
     server.registerResource(
       definition.name,
@@ -416,13 +636,13 @@ export class MCPServer {
           mimeType: definition.mimeType,
         }),
       },
-      async (uri, ctx) => callback(uri, toRequestContext(ctx))
+      async (uri, ctx) => callback(uri, this.#toRequestContext(ctx))
     );
   }
 
   #registerResourceTemplate(
     server: SdkMcpServer,
-    { definition, callback }: ResourceTemplateEntry
+    { definition, callback }: ResourceTemplateEntry<TUser>
   ): void {
     const template = new ResourceTemplate(definition.uriTemplate, {
       list: undefined,
@@ -443,14 +663,14 @@ export class MCPServer {
         callback(
           uri,
           variables as Record<string, TemplateVariableValue>,
-          toRequestContext(ctx)
+          this.#toRequestContext(ctx)
         )
     );
   }
 
   #registerPrompt(
     server: SdkMcpServer,
-    { definition, callback }: PromptEntry
+    { definition, callback }: PromptEntry<TUser>
   ): void {
     const config = {
       ...(definition.title !== undefined && { title: definition.title }),
@@ -465,7 +685,7 @@ export class MCPServer {
         async (args, ctx) => {
           // The SDK has already validated `args` against `definition.schema`.
           const params = args as Record<string, unknown>;
-          return callback(params, toRequestContext(ctx));
+          return callback(params, this.#toRequestContext(ctx));
         }
       );
     } else {
@@ -474,12 +694,19 @@ export class MCPServer {
       // explicit, contained cast (verified against the SDK's
       // createPromptHandler implementation, 2.0.0-beta.1).
       const handler = async (ctx: ServerContext) =>
-        callback({}, toRequestContext(ctx));
+        callback({}, this.#toRequestContext(ctx));
       server.registerPrompt(
         definition.name,
         config,
         handler as unknown as SdkPromptCallback<StandardSchemaWithJSON>
       );
     }
+  }
+
+  #toRequestContext(ctx: ServerContext): RequestContext<TUser, HasOAuth<TUser>> {
+    if (this.#config.oauth === undefined) {
+      return toRequestContext(ctx) as RequestContext<TUser, HasOAuth<TUser>>;
+    }
+    return toAuthenticatedRequestContext<TUser>(ctx) as RequestContext<TUser, HasOAuth<TUser>>;
   }
 }

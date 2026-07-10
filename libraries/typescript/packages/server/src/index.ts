@@ -39,8 +39,9 @@ export type {
   StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
 
+export type { Hono } from "hono";
 export type { InspectorOptions, ServerConfig } from "./config.js";
-export type { RequestContext } from "./context.js";
+export type { OAuthAuth, RequestContext } from "./context.js";
 export type {
   InferToolInput,
   InferToolOutput,

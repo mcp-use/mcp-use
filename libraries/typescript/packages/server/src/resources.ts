@@ -30,9 +30,9 @@ export interface ResourceDefinition {
  * })
  * ```
  */
-export type ResourceCallback = (
+export type ResourceCallback<TUser = never, HasOAuth extends boolean = false> = (
   uri: URL,
-  ctx: RequestContext
+  ctx: RequestContext<TUser, HasOAuth>
 ) => ReadResourceResult | Promise<ReadResourceResult>;
 
 /** Declares a parameterized resource matched by URI template. First argument to {@link MCPServer.resourceTemplate}. */
@@ -97,8 +97,10 @@ export type InferTemplateParams<T> = T extends {
 /** Resource template read callback; receives the matched URI and variables. */
 export type ResourceTemplateCallback<
   TParams = Record<string, TemplateVariableValue>,
+  TUser = never,
+  HasOAuth extends boolean = false,
 > = (
   uri: URL,
   params: TParams,
-  ctx: RequestContext
+  ctx: RequestContext<TUser, HasOAuth>
 ) => ReadResourceResult | Promise<ReadResourceResult>;

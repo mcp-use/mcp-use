@@ -1,4 +1,7 @@
+import type { Hono } from "hono";
+
 import type { LoggingOptions } from "./logging.js";
+import type { OAuthProvider } from "./oauth/index.js";
 
 /**
  * Options for the inspector shell route — the shape of
@@ -25,13 +28,12 @@ export interface InspectorOptions {
 }
 
 /**
- * Server identity and behavior, passed to `new MCPServer(...)`.
+ * Common server identity and behavior, passed to `new MCPServer(...)`.
  *
- * Phase 1 carries only the fields the core consumes. Fields from the old
- * package that belong to later phases (favicon, icons, websiteUrl, OAuth, …)
- * are added together with the features that read them.
+ * Includes the fields consumed by the core HTTP and OAuth resource-server
+ * wiring. Other legacy configuration is added with the feature that reads it.
  */
-export interface ServerConfig {
+interface BaseServerConfig {
   /** Server name reported to clients during negotiation. */
   name: string;
   /** Server version reported to clients. */
@@ -120,4 +122,56 @@ export interface ServerConfig {
    * configured level.
    */
   logging?: LoggingOptions;
+  /**
+   * Registers custom routes on the internal Hono app after built-in wiring.
+   *
+   * Invoked once on first mount — either `listen()` or `getHandler()` — after
+   * request logging, OAuth metadata middleware, the bearer gate, the MCP
+   * endpoint, and the inspector shell. Routes registered here are NOT
+   * protected by the OAuth bearer gate (that gate only covers the MCP
+   * `basePath`); use this for public HTTP surfaces such as OAuth consent
+   * pages required by providers like Supabase.
+   *
+   * A custom route on the exact MCP `basePath` will never match: that path is
+   * already claimed by the MCP endpoint.
+   */
+  configureApp?: (app: Hono) => void;
 }
+
+/**
+ * Runtime checks for optional {@link ServerConfig} fields that TypeScript
+ * alone cannot enforce when values arrive from untyped call sites.
+ *
+ * @throws {TypeError} When `configureApp` is present but not a function.
+ */
+export function assertServerConfig(config: {
+  configureApp?: unknown;
+}): void {
+  if (
+    config.configureApp !== undefined &&
+    typeof config.configureApp !== "function"
+  ) {
+    throw new TypeError("configureApp must be a function");
+  }
+}
+
+/**
+ * Server identity and behavior, passed to `new MCPServer(...)`.
+ *
+ * A user type other than `never` requires an OAuth provider, preventing a
+ * callback from declaring authenticated context without authentication at
+ * runtime. Omitting the type keeps the no-OAuth API ergonomic.
+ */
+export type ServerConfig<TUser = never> = BaseServerConfig &
+  ([TUser] extends [never]
+    ? {
+        /** OAuth is unavailable when no authenticated user type is declared. */
+        oauth?: undefined;
+      }
+    : {
+        /**
+         * External OAuth resource-server provider. Callback contexts receive
+         * this provider's user type as required `ctx.auth.user`.
+         */
+        oauth: OAuthProvider<TUser>;
+      });

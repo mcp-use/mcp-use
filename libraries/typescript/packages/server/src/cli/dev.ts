@@ -176,6 +176,25 @@ export async function runDev(options: DevOptions): Promise<void> {
     process.loadEnvFile(envPath);
   }
 
+  // Resolve the listener before importing the entry so module-scope OAuth
+  // configuration observes the canonical port that this CLI will own.
+  const requestedPort =
+    options.port ??
+    (process.env["PORT"] !== undefined
+      ? Number.parseInt(process.env["PORT"], 10)
+      : 3000);
+  const { port, requested } = await resolvePort(requestedPort, host);
+  if (port !== requested) {
+    console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
+  }
+  process.env["PORT"] = String(port);
+
+  const localFallbackMcpUrl =
+    process.env["MCP_URL"] === undefined &&
+    (host === "127.0.0.1" || host === "localhost" || host === "::1")
+      ? `http://localhost:${port}`
+      : undefined;
+
   const entry = discoverEntry(options.cwd, options.entry);
 
   const vite = await createServer({
@@ -202,8 +221,28 @@ export async function runDev(options: DevOptions): Promise<void> {
     sourcemapInterceptor: "node",
   });
 
-  const importServer = async (): Promise<ServerLike> =>
-    serverFrom(await runner.import(entry));
+  const importServer = async (): Promise<ServerLike> => {
+    if (localFallbackMcpUrl === undefined) {
+      return serverFrom(await runner.import(entry));
+    }
+
+    // This is safe only because this CLI selected and will bind this local
+    // listener. Never derive OAuth identity from an untrusted request Host.
+    // Scope it to entry evaluation: MCPServer freezes the trusted canonical
+    // resource during construction, while later runtime code must not inherit
+    // this CLI-owned synthetic environment value.
+    const previousMcpUrl = process.env["MCP_URL"];
+    try {
+      process.env["MCP_URL"] = localFallbackMcpUrl;
+      return serverFrom(await runner.import(entry));
+    } finally {
+      if (previousMcpUrl === undefined) {
+        delete process.env["MCP_URL"];
+      } else {
+        process.env["MCP_URL"] = previousMcpUrl;
+      }
+    }
+  };
 
   // Initial import must succeed — fail loudly before binding the socket.
   let currentHandler: FetchHandler;
@@ -268,17 +307,6 @@ export async function runDev(options: DevOptions): Promise<void> {
   vite.watcher.on("unlink", onFileEvent);
 
   // --- One long-lived HTTP listener delegating to the current handler. -----
-  const requestedPort =
-    options.port ??
-    (process.env["PORT"] !== undefined
-      ? Number.parseInt(process.env["PORT"], 10)
-      : 3000);
-  const { port, requested } = await resolvePort(requestedPort, host);
-  if (port !== requested) {
-    console.log(`[mcp-use] port ${requested} is taken, using ${port}`);
-  }
-  process.env["PORT"] = String(port);
-
   const tunnelManager = createTunnelManager(paths.tunnel);
   const devFetch = createDevApiHandler(
     {
@@ -306,7 +334,9 @@ export async function runDev(options: DevOptions): Promise<void> {
   // basePath was introspected from the loaded MCPServer instance above.
   console.log(`[mcp-use] dev server ready`);
   console.log(`  ➜ MCP endpoint:  http://localhost:${port}${basePath}`);
-  console.log(`  ➜ Inspector:     http://localhost:${port}${basePath}/inspector`);
+  console.log(
+    `  ➜ Inspector:     http://localhost:${port}${basePath}/inspector`
+  );
 
   if (options.tunnel === true) {
     try {
