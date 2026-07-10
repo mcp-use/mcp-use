@@ -5,8 +5,6 @@ import {
 } from "@modelcontextprotocol/ext-apps";
 import type { ContentBlock } from "@modelcontextprotocol/server";
 
-import { TOOL_NAME_META_KEY } from "../../views/constants.js";
-
 type ViewBridgeTransport = NonNullable<Parameters<App["connect"]>[0]>;
 
 /** Snapshot of view data channels and host context delivered over the bridge. */
@@ -33,9 +31,7 @@ export interface ViewBridgeSnapshot {
   meta: Record<string, unknown> | undefined;
   /**
    * Name of the tool for the current call cycle — seeded from
-   * `hostContext.toolInfo`, authoritatively updated from the framework's
-   * `_meta["mcp-use/toolName"]` stamp on each tool result; `undefined` until
-   * either source delivers.
+   * `hostContext.toolInfo`; `undefined` until the host delivers it.
    */
   toolName: string | undefined;
   /** Current host context (updated on `host-context-changed`). */
@@ -177,7 +173,6 @@ function wireAppEvents(app: App): void {
       params._meta !== null
         ? (params._meta as Record<string, unknown>)
         : undefined;
-    const stamped = meta?.[TOOL_NAME_META_KEY];
     setSnapshot({
       toolOutput: params.structuredContent,
       content: Array.isArray(params.content)
@@ -187,7 +182,6 @@ function wireAppEvents(app: App): void {
       hasToolResult: true,
       isStreaming: false,
       cancelled: undefined,
-      ...(typeof stamped === "string" && { toolName: stamped }),
     });
   };
 

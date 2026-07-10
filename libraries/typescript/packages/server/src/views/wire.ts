@@ -1,6 +1,5 @@
 import type { ViewManifestEntry, ViewResourceFacts } from "./types.js";
 import {
-  TOOL_NAME_META_KEY,
   UI_META_KEY,
   UI_MIME_TYPE,
   UI_RESOURCE_URI_META_KEY,
@@ -50,25 +49,20 @@ export function buildToolUiMeta(
  * Tool result `_meta` stamped on every non-error `CallToolResult` from a
  * view-bound tool.
  *
- * Emits the resource-URI wire keys (`ui.resourceUri` and the legacy flat
- * key) plus {@link TOOL_NAME_META_KEY} at the top level of `_meta` (sibling
- * of `ui`, not inside it). The `ui/notifications/tool-result` wire
- * notification carries no tool identity; with several tools bound to one
- * view this is how the view's `useToolContext().toolName` discriminates
- * which tool's output arrived. Result `_meta` is view-only and never
- * enters model context.
+ * Emits the nested `ui.resourceUri` key and the legacy flat
+ * {@link UI_RESOURCE_URI_META_KEY} key so hosts can open the bound view.
+ * Error results (`isError: true`) must not receive this metadata — a
+ * stamped URI would create a new rendered view through legacy host
+ * behavior. Result `_meta` is view-only and never enters model context.
  *
  * @param viewName - Bound view directory / manifest key.
- * @param toolName - The calling tool's registered name.
- * @returns Resource-URI wire keys plus the tool-name stamp.
+ * @returns Nested and legacy resource-URI wire keys.
  */
 export function buildToolResultUiMeta(
-  viewName: string,
-  toolName: string
+  viewName: string
 ): Record<string, unknown> {
   const resourceUri = viewResourceUri(viewName);
   return {
-    [TOOL_NAME_META_KEY]: toolName,
     [UI_META_KEY]: { resourceUri },
     [UI_RESOURCE_URI_META_KEY]: resourceUri,
   };

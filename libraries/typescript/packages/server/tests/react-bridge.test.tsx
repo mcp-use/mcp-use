@@ -27,7 +27,6 @@ import {
   _resetViewBridgeForTesting,
   _setTransportForTesting,
 } from "../src/react/bridge/view-bridge-store.js";
-import { TOOL_NAME_META_KEY } from "../src/views/constants.js";
 import { createPairedTransports } from "./helpers/paired-transport.js";
 
 function resetRuntime(): void {
@@ -225,7 +224,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("sets toolName from result _meta[mcp-use/toolName]", async () => {
+  it("preserves prior toolName from hostContext across tool results", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -241,43 +240,23 @@ describe("react bridge runtime", () => {
     bootstrapView({ default: View as ComponentType });
     await init;
 
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|undef");
+    await bridge.sendHostContextChange({
+      toolInfo: {
+        tool: {
+          name: "save-checkpoint",
+          inputSchema: { type: "object", properties: {} },
+        },
+      },
     });
-
-    await bridge.sendToolResult({
-      content: [{ type: "text", text: "ok" }],
-      structuredContent: { saved: true },
-      _meta: { [TOOL_NAME_META_KEY]: "save-checkpoint" },
-    });
-
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "ready|save-checkpoint"
+        "pending|save-checkpoint"
       );
     });
-  });
-
-  it("preserves prior toolName when a result omits the meta stamp", async () => {
-    resetRuntime();
-    const { bridge, init } = await startHost();
-
-    function View() {
-      const handle = useToolContext();
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|{handle.toolName ?? "undef"}
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
 
     await bridge.sendToolResult({
       content: [{ type: "text", text: "ok" }],
       structuredContent: { n: 1 },
-      _meta: { [TOOL_NAME_META_KEY]: "save-checkpoint" },
     });
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe(
@@ -354,14 +333,17 @@ describe("react bridge runtime", () => {
     bootstrapView({ default: View as ComponentType });
     await init;
 
-    await bridge.sendToolResult({
-      content: [],
-      structuredContent: {},
-      _meta: { [TOOL_NAME_META_KEY]: "save-checkpoint" },
+    await bridge.sendHostContextChange({
+      toolInfo: {
+        tool: {
+          name: "save-checkpoint",
+          inputSchema: { type: "object", properties: {} },
+        },
+      },
     });
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "ready|save-checkpoint"
+        "pending|save-checkpoint"
       );
     });
 

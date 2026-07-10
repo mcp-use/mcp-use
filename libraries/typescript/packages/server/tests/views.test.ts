@@ -416,10 +416,10 @@ describe("views server core (e2e over HTTP)", () => {
     expect(result.content).toEqual([{ type: "text", text: "Found 1 fruit" }]);
     expect(result._meta).toEqual({
       viewOnly: true,
-      "mcp-use/toolName": "search-fruits",
       ui: { resourceUri: "ui://views/product-search-result.html" },
       "ui/resourceUri": "ui://views/product-search-result.html",
     });
+    expect(result._meta).not.toHaveProperty("mcp-use/toolName");
   });
 
   it("stamps ui resourceUri wire keys on view-bound tool results", async () => {
@@ -433,7 +433,7 @@ describe("views server core (e2e over HTTP)", () => {
     expect(result._meta?.["ui/resourceUri"]).toBe(
       "ui://views/product-search-result.html"
     );
-    expect(result._meta?.["mcp-use/toolName"]).toBe("search-fruits");
+    expect(result._meta).not.toHaveProperty("mcp-use/toolName");
     expect(result._meta).toMatchObject({ viewOnly: true });
   });
 
@@ -448,7 +448,7 @@ describe("views server core (e2e over HTTP)", () => {
     expect(result._meta?.["ui/resourceUri"]).toBe(
       "ui://views/product-search-result.html"
     );
-    expect(result._meta?.["mcp-use/toolName"]).toBe("search-fruits");
+    expect(result._meta).not.toHaveProperty("mcp-use/toolName");
     expect(result._meta).toMatchObject({ viewOnly: true });
   });
 
@@ -472,7 +472,7 @@ describe("views server core (e2e over HTTP)", () => {
       resourceUri: "ui://views/app-only-view.html",
     });
     expect(result._meta?.["ui"]).not.toHaveProperty("visibility");
-    expect(result._meta?.["mcp-use/toolName"]).toBe("app-only-action");
+    expect(result._meta).not.toHaveProperty("mcp-use/toolName");
   });
 
   it("reports ctx.client.supportsViews() per request", async () => {
@@ -716,79 +716,14 @@ describe("views binding validation", () => {
     ).toThrow(/no outputSchema/);
   });
 
-  it("allows multiple tools to bind the same view", async () => {
-    const server = new MCPServer({ name: "bind", version: "0.0.0" });
-    const schema = z.object({ ok: z.boolean(), which: z.string() });
-    server[registerViews]({
-      "shared-view": { kind: "inline", js: "export {};", css: "" },
-    });
-    server.tool(
-      {
-        name: "first",
-        outputSchema: schema,
-        view: { name: "shared-view", description: "Shared view" },
-      },
-      async () => ({
-        structuredContent: { ok: true, which: "first" },
-        content: [{ type: "text", text: "first" }],
-      })
-    );
-    server.tool(
-      { name: "second", outputSchema: schema, view: { name: "shared-view" } },
-      async () => ({
-        structuredContent: { ok: true, which: "second" },
-        content: [{ type: "text", text: "second" }],
-      })
-    );
-
-    const { url } = await server.listen(0);
-    const client = new Client(
-      { name: "multi-bind", version: "1.0.0" },
-      { versionNegotiation: { mode: { pin: "2026-07-28" } } }
-    );
-    await client.connect(new StreamableHTTPClientTransport(new URL(url)));
-    try {
-      const { tools } = await client.listTools();
-      const first = tools.find((t) => t.name === "first");
-      const second = tools.find((t) => t.name === "second");
-      expect(first?._meta?.["ui"]).toMatchObject({
-        resourceUri: "ui://views/shared-view.html",
-      });
-      expect(second?._meta?.["ui"]).toMatchObject({
-        resourceUri: "ui://views/shared-view.html",
-      });
-
-      const firstResult = await client.callTool({
-        name: "first",
-        arguments: {},
-      });
-      expect(firstResult._meta?.["mcp-use/toolName"]).toBe("first");
-      expect(firstResult._meta?.["ui"]).toMatchObject({
-        resourceUri: "ui://views/shared-view.html",
-      });
-
-      const secondResult = await client.callTool({
-        name: "second",
-        arguments: {},
-      });
-      expect(secondResult._meta?.["mcp-use/toolName"]).toBe("second");
-      expect(secondResult._meta?.["ui"]).toMatchObject({
-        resourceUri: "ui://views/shared-view.html",
-      });
-    } finally {
-      await client.close();
-      await server.close();
-    }
-  });
-
-  it("throws when two tools declare resource facts for the same view", () => {
+  it("rejects a second tool binding the same view", () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     const schema = z.object({ ok: z.boolean() });
     server.tool(
       {
-        name: "first",
+        name: "draw",
         outputSchema: schema,
-        view: { name: "shared-view", description: "from first" },
+        view: { name: "canvas" },
       },
       async () => ({
         structuredContent: { ok: true },
@@ -798,38 +733,33 @@ describe("views binding validation", () => {
     expect(() =>
       server.tool(
         {
-          name: "second",
+          name: "refresh",
           outputSchema: schema,
-          view: { name: "shared-view", description: "from second" },
+          view: { name: "canvas" },
         },
         async () => ({
           structuredContent: { ok: true },
           content: [{ type: "text", text: "ok" }],
         })
       )
-    ).toThrow(/already has resource facts/);
+    ).toThrow(
+      'View "canvas" is already bound to tool "draw"; tool "refresh" cannot bind the same view. Each view may be bound to one tool.'
+    );
   });
 
-  it("uses resource facts from the facts-declaring binder regardless of order", async () => {
+  it("uses resource facts from the sole binder", async () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     const schema = z.object({ ok: z.boolean() });
     server[registerViews]({
       "shared-view": { kind: "inline", js: "export {};", css: "" },
     });
     server.tool(
-      { name: "name-only", outputSchema: schema, view: { name: "shared-view" } },
-      async () => ({
-        structuredContent: { ok: true },
-        content: [{ type: "text", text: "ok" }],
-      })
-    );
-    server.tool(
       {
         name: "facts-owner",
         outputSchema: schema,
         view: {
           name: "shared-view",
-          description: "Facts from second binder",
+          description: "Facts from the binder",
         },
       },
       async () => ({
@@ -840,7 +770,7 @@ describe("views binding validation", () => {
 
     const { url } = await server.listen(0);
     const client = new Client(
-      { name: "facts-order", version: "1.0.0" },
+      { name: "facts-owner", version: "1.0.0" },
       { versionNegotiation: { mode: { pin: "2026-07-28" } } }
     );
     await client.connect(new StreamableHTTPClientTransport(new URL(url)));
@@ -849,7 +779,7 @@ describe("views binding validation", () => {
       const view = resources.find(
         (r) => r.uri === "ui://views/shared-view.html"
       );
-      expect(view?.description).toBe("Facts from second binder");
+      expect(view?.description).toBe("Facts from the binder");
     } finally {
       await client.close();
       await server.close();

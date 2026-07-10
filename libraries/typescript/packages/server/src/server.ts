@@ -114,15 +114,15 @@ export class MCPServer {
   readonly #prompts = new Map<string, PromptEntry>();
   readonly #views = new Map<string, ViewManifestEntry>();
   /**
-   * Many-to-one tool→view bindings. `toolNames` lists every binder;
-   * `factsOwner` is the single tool (if any) that declared resource facts
-   * beyond `view.name`.
+   * One-to-one tool→view bindings. Each view name maps to the single tool
+   * that bound it; that tool's `view:` config is the sole source of
+   * resource facts for the primed view resource.
    */
   readonly #viewBindings = new Map<
     string,
     {
-      toolNames: string[];
-      factsOwner?: { toolName: string; config: ToolViewConfig };
+      toolName: string;
+      config: ToolViewConfig;
     }
   >();
   #viewsPrimed = false;
@@ -488,49 +488,19 @@ export class MCPServer {
       );
     }
 
-    const declaresFacts = this.#viewConfigDeclaresFacts(view);
     const existing = this.#viewBindings.get(view.name);
-
-    if (existing === undefined) {
-      this.#viewBindings.set(view.name, {
-        toolNames: [definition.name],
-        ...(declaresFacts && {
-          factsOwner: { toolName: definition.name, config: view },
-        }),
-      });
-      return;
+    if (existing !== undefined) {
+      throw new Error(
+        `View "${view.name}" is already bound to tool "${existing.toolName}"; ` +
+          `tool "${definition.name}" cannot bind the same view. ` +
+          `Each view may be bound to one tool.`
+      );
     }
 
-    if (declaresFacts) {
-      if (existing.factsOwner !== undefined) {
-        throw new Error(
-          `View "${view.name}" already has resource facts declared by tool ` +
-            `"${existing.factsOwner.toolName}"; tool "${definition.name}" must declare ` +
-            `only \`view: { name }\`. A view's resource facts (description, csp, ` +
-            `permissions, domain, prefersBorder) have one authoring point.`
-        );
-      }
-      existing.factsOwner = { toolName: definition.name, config: view };
-    }
-
-    existing.toolNames.push(definition.name);
-  }
-
-  /**
-   * Whether a tool's `view` config declares any resource facts beyond `name`.
-   *
-   * @param view - The tool's view binding config.
-   * @returns `true` when any of description, csp, permissions, domain, or
-   * prefersBorder is set.
-   */
-  #viewConfigDeclaresFacts(view: ToolViewConfig): boolean {
-    return (
-      view.description !== undefined ||
-      view.csp !== undefined ||
-      view.permissions !== undefined ||
-      view.domain !== undefined ||
-      view.prefersBorder !== undefined
-    );
+    this.#viewBindings.set(view.name, {
+      toolName: definition.name,
+      config: view,
+    });
   }
 
   #validateViewBindingsAtMount(): void {
@@ -629,9 +599,7 @@ export class MCPServer {
       ...(toolUiMeta !== undefined && { _meta: toolUiMeta }),
     };
     const wireResultMeta =
-      view !== undefined
-        ? buildToolResultUiMeta(view.name, definition.name)
-        : undefined;
+      view !== undefined ? buildToolResultUiMeta(view.name) : undefined;
 
     const inputSchema = resolveToolInputSchema(definition);
 
@@ -675,7 +643,7 @@ export class MCPServer {
   ): void {
     const uri = viewResourceUri(viewName);
     const authorFacts = this.#viewResourceFacts(
-      this.#viewBindings.get(viewName)?.factsOwner?.config
+      this.#viewBindings.get(viewName)?.config
     );
     const hmrWs = this.#viewsDevMode;
     const resourceConfig = viewResourceConfig(
