@@ -37,12 +37,9 @@ pnpm install   # once, from the monorepo root or here
 pnpm dev
 ```
 
-`mcp-use dev` serves MCP at `http://127.0.0.1:3000/mcp` and view assets under
-`/_mcp-use/`:
-
-- View document:
-  `http://127.0.0.1:3000/mcp/_mcp-use/views/product-search-result.html`
-- Built-in inspector (when enabled): linked in the dev server log
+`mcp-use dev` serves MCP at `http://127.0.0.1:3000/mcp`. Preview the view
+through the built-in inspector (linked in the dev server log): open the
+`ui://views/product-search-result.html` resource via `resources/read`.
 
 Production path:
 

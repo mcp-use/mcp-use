@@ -247,23 +247,15 @@ describe("runDev (views)", () => {
 
     const base = dev.url.replace(/\/mcp$/, "");
 
-    const docResponse = await fetch(
-      `${base}/mcp/_mcp-use/views/product-search-result.html`
-    );
-    expect(docResponse.status).toBe(200);
-    expect(docResponse.headers.get("cache-control")).toBe("no-store");
-    const docHtml = await docResponse.text();
-    expect(docHtml).toContain('id="root"');
-    expect(docHtml).toContain("/@vite/client");
-    expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
-
     const readBody = await mcpRequest(dev.url, "resources/read", {
       uri: "ui://views/product-search-result.html",
     }, { ui: true });
-    const readText = (
+    const docHtml = (
       readBody["result"] as { contents: { text: string }[] }
     ).contents[0]!.text;
-    expect(readText).toContain("/@vite/client");
+    expect(docHtml).toContain('id="root"');
+    expect(docHtml).toContain("/@vite/client");
+    expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
 
     const virtualMatch = /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
       docHtml
@@ -536,11 +528,13 @@ describe("runDev (views)", () => {
 
     // Both servers keep serving MCP + view documents side by side.
     for (const dev of [devA, devB]) {
-      const base = dev.url.replace(/\/mcp$/, "");
-      const doc = await fetch(
-        `${base}/mcp/_mcp-use/views/product-search-result.html`
-      );
-      expect(doc.status).toBe(200);
+      const readBody = await mcpRequest(dev.url, "resources/read", {
+        uri: "ui://views/product-search-result.html",
+      }, { ui: true });
+      const docHtml = (
+        readBody["result"] as { contents: { text: string }[] }
+      ).contents[0]!.text;
+      expect(docHtml).toContain("/@vite/client");
     }
   }, 90_000);
 });

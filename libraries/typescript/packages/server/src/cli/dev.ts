@@ -671,11 +671,6 @@ export async function runDev(options: DevOptions): Promise<void> {
     // Routing to Vite requires both the client environment (configured only
     // when views existed at startup) and a currently non-empty registry.
     const viewsEnabled = viewsAtStartup && currentViews.length > 0;
-    // View documents must come from the server's own route (per-request
-    // origin resolution, no-store) — never from Vite, which would try to
-    // serve/transform the .html itself.
-    const isViewDocument =
-      pathname.includes("/_mcp-use/views/") && pathname.endsWith(".html");
     // Vite sees module-graph URLs (/@vite/client, /@id/virtual:…,
     // /.mcp-use/cache/deps/…, view files under /resources/…) plus standard
     // node_modules pre-bundles; everything else — the MCP endpoint included —
@@ -687,7 +682,7 @@ export async function runDev(options: DevOptions): Promise<void> {
         pathname.startsWith("/.mcp-use/") ||
         (viewsEnabled && pathname.startsWith("/resources/")));
 
-    if (viewsEnabled && !isViewDocument && isViteRequest) {
+    if (viewsEnabled && isViteRequest) {
       // CORS for Vite module URLs: tunnel → `*`; else localhost bind with a
       // validated loopback Origin → reflect that origin (+ Vary). Foreign /
       // opaque / missing Origin stay without ACAO so the source module graph

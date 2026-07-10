@@ -1,6 +1,6 @@
 /**
  * End-to-end tests for the views server core: wire metadata, capability
- * queries, binding validation, document/asset routes, and plain tool results.
+ * queries, binding validation, the public-asset route, and plain tool results.
  */
 import {
   Client,
@@ -525,62 +525,6 @@ describe("views HTTP routes", () => {
     await server.close();
   });
 
-  it("returns synthesized HTML from the document route with no-store caching", async () => {
-    const response = await fetch(
-      `${baseUrl}/mcp/_mcp-use/views/product-search-result.html`,
-      {
-        headers: {
-          "x-forwarded-proto": "https",
-          "x-forwarded-host": "fruit-store.fly.dev",
-        },
-      }
-    );
-    expect(response.status).toBe(200);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    const html = await response.text();
-    expect(html).toContain(
-      "https://fruit-store.fly.dev/mcp/_mcp-use/public/"
-    );
-    expect(html).toContain('console.log("product-search-result");');
-    expect(html).not.toMatch(/<script[^>]+src=/);
-  });
-
-  it("404s unknown view documents", async () => {
-    const response = await fetch(`${baseUrl}/mcp/_mcp-use/views/missing.html`);
-    expect(response.status).toBe(404);
-  });
-
-  it("serves built assets with immutable cache headers", async () => {
-    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
-    mkdirSync(assetsDir, { recursive: true });
-    const fileName = "test-asset-abc123.js";
-    const filePath = join(assetsDir, fileName);
-    writeFileSync(filePath, "export {};\n");
-
-    try {
-      const response = await fetch(
-        `${baseUrl}/mcp/_mcp-use/assets/${fileName}`
-      );
-      expect(response.status).toBe(200);
-      expect(response.headers.get("cache-control")).toBe(
-        "public, max-age=31536000, immutable"
-      );
-      expect(response.headers.get("content-type")).toBe(
-        "application/javascript"
-      );
-      expect(await response.text()).toContain("export");
-    } finally {
-      rmSync(filePath, { force: true });
-    }
-  });
-
-  it("rejects path traversal on the asset route", async () => {
-    const response = await fetch(
-      `${baseUrl}/mcp/_mcp-use/assets/..%2F..%2Fpackage.json`
-    );
-    expect(response.status).toBe(404);
-  });
-
   /** Raw GET with unsanitized headers (fetch() sanitizes Origin). */
   async function rawGetStatus(
     target: string,
@@ -635,71 +579,55 @@ describe("views HTTP routes", () => {
     });
   }
 
-  it("allows GET asset and view requests with Origin: null", async () => {
-    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
-    mkdirSync(assetsDir, { recursive: true });
-    const fileName = "origin-null-abc123.js";
-    const filePath = join(assetsDir, fileName);
-    writeFileSync(filePath, "export {};\n");
+  it("allows GET public requests with Origin: null", async () => {
+    const publicDir = join(process.cwd(), ".mcp-use/build/views/public");
+    mkdirSync(publicDir, { recursive: true });
+    const publicPath = join(publicDir, "origin-null-fixture.txt");
+    writeFileSync(publicPath, "origin-null\n");
 
     try {
       expect(
-        await rawGetStatus(`${baseUrl}/mcp/_mcp-use/assets/${fileName}`, {
-          origin: "null",
-        })
-      ).toBe(200);
-      expect(
         await rawGetStatus(
-          `${baseUrl}/mcp/_mcp-use/views/product-search-result.html`,
+          `${baseUrl}/mcp/_mcp-use/public/origin-null-fixture.txt`,
           { origin: "null" }
         )
       ).toBe(200);
     } finally {
-      rmSync(filePath, { force: true });
+      rmSync(publicPath, { force: true });
     }
   });
 
-  it("allows GET asset requests with an external Origin", async () => {
-    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
-    mkdirSync(assetsDir, { recursive: true });
-    const fileName = "external-origin-abc123.js";
-    const filePath = join(assetsDir, fileName);
-    writeFileSync(filePath, "export {};\n");
+  it("allows GET public requests with an external Origin", async () => {
+    const publicDir = join(process.cwd(), ".mcp-use/build/views/public");
+    mkdirSync(publicDir, { recursive: true });
+    const publicPath = join(publicDir, "external-origin-fixture.txt");
+    writeFileSync(publicPath, "external-origin\n");
 
     try {
       expect(
-        await rawGetStatus(`${baseUrl}/mcp/_mcp-use/assets/${fileName}`, {
-          origin: "https://claude.ai",
-        })
+        await rawGetStatus(
+          `${baseUrl}/mcp/_mcp-use/public/external-origin-fixture.txt`,
+          { origin: "https://claude.ai" }
+        )
       ).toBe(200);
     } finally {
-      rmSync(filePath, { force: true });
+      rmSync(publicPath, { force: true });
     }
   });
 
-  it("emits Access-Control-Allow-Origin: * on asset and public responses", async () => {
-    const assetsDir = join(process.cwd(), ".mcp-use/build/views/assets");
+  it("emits Access-Control-Allow-Origin: * on public responses", async () => {
     const publicDir = join(process.cwd(), ".mcp-use/build/views/public");
-    mkdirSync(assetsDir, { recursive: true });
     mkdirSync(publicDir, { recursive: true });
-    const fileName = "cors-asset-abc123.js";
-    const assetPath = join(assetsDir, fileName);
     const publicPath = join(publicDir, "cors-fixture.txt");
-    writeFileSync(assetPath, "export {};\n");
     writeFileSync(publicPath, "cors-fixture\n");
 
     try {
-      const asset = await rawGet(`${baseUrl}/mcp/_mcp-use/assets/${fileName}`);
-      expect(asset.status).toBe(200);
-      expect(asset.headers["access-control-allow-origin"]).toBe("*");
-
       const publicFile = await rawGet(
         `${baseUrl}/mcp/_mcp-use/public/cors-fixture.txt`
       );
       expect(publicFile.status).toBe(200);
       expect(publicFile.headers["access-control-allow-origin"]).toBe("*");
     } finally {
-      rmSync(assetPath, { force: true });
       rmSync(publicPath, { force: true });
     }
   });
@@ -909,6 +837,20 @@ describe("views document synthesis", () => {
       'src="http://localhost:3000/@id/__x00__virtual:mcp-use/views/demo"'
     );
     expect(html).toContain('src="http://localhost:3000/@vite/client"');
+  });
+
+  it("rejects non-origin-absolute external manifest paths", () => {
+    expect(() =>
+      synthesizeViewDocument(
+        {
+          kind: "external",
+          entry: "views/demo/assets/entry.js",
+          css: [],
+        },
+        "http://localhost:3000",
+        "/mcp"
+      )
+    ).toThrow(/origin-absolute/);
   });
 });
 

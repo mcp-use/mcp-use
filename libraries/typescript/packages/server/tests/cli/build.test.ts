@@ -237,19 +237,8 @@ describe("runBuild (views)", () => {
         expect(text).toContain("<style>");
       }
 
-      const docResponse = await handler(
-        new Request(
-          "http://localhost/mcp/_mcp-use/views/product-search-result.html"
-        )
-      );
-      expect(docResponse.status).toBe(200);
-      expect(docResponse.headers.get("cache-control")).toBe("no-store");
-      const docHtml = await docResponse.text();
-      expect(docHtml).toContain('<script type="module">');
-      expect(docHtml).not.toMatch(/<script[^>]+src=["'][^"']*\/assets\//);
-
-      // Asset route still exists for any residual build artifacts / tooling;
-      // production view documents do not depend on it for the view bundle.
+      // Public route needs the views/public tree on disk; restore after the
+      // MCP-path-without-fs check above.
       renameSync(assetsBackup, join(buildDir, "views"));
 
       const publicOk = await handler(
@@ -265,24 +254,6 @@ describe("runBuild (views)", () => {
         new Request("http://localhost/mcp/_mcp-use/public/../index.js")
       );
       expect(publicTraversal.status).toBe(404);
-
-      const proxied = await handler(
-        new Request(
-          "http://localhost/mcp/_mcp-use/views/product-search-result.html",
-          {
-            headers: {
-              "x-forwarded-proto": "https",
-              "x-forwarded-host": "fruit.example.com",
-            },
-          }
-        )
-      );
-      const proxiedHtml = await proxied.text();
-      expect(proxiedHtml).toContain(
-        "https://fruit.example.com/mcp/_mcp-use/public/"
-      );
-      expect(proxiedHtml).toContain('<script type="module">');
-      expect(proxiedHtml).not.toMatch(/<script[^>]+src=["'][^"']*\/assets\//);
 
       const readProxied = await handlerMcp(
         handler,
@@ -303,6 +274,10 @@ describe("runBuild (views)", () => {
       ).contents[0]!;
       expect(proxiedReadContent.text).toContain(
         "https://fruit.example.com/mcp/_mcp-use/public/"
+      );
+      expect(proxiedReadContent.text).toContain('<script type="module">');
+      expect(proxiedReadContent.text).not.toMatch(
+        /<script[^>]+src=["'][^"']*\/assets\//
       );
       const readResourceDomains =
         proxiedReadContent._meta?.ui?.csp?.resourceDomains;
