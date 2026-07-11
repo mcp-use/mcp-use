@@ -8,7 +8,11 @@
  * (provider/utility components).
  */
 
-export { bootstrapView, type ViewModule } from "./runtime/bootstrap-view.js";
+export {
+  bootstrapView,
+  disposeView,
+  type ViewModule,
+} from "./runtime/bootstrap-view.js";
 export { type ViewConfig } from "./runtime/view-config.js";
 export { ErrorBoundary } from "./components/error-boundary.js";
 export { Image } from "./components/image.js";

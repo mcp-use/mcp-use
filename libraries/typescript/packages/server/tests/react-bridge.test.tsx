@@ -7,6 +7,7 @@ import { useState, type ComponentType } from "react";
 
 import {
   bootstrapView,
+  disposeView,
   Image,
   ModelContext,
   modelContext,
@@ -23,6 +24,7 @@ import { _resetBootstrapRootsForTesting } from "../src/react/runtime/bootstrap-v
 import { _resetModelContextForTesting } from "../src/react/runtime/model-context-store.js";
 import {
   _getAppForTesting,
+  _getRuntimeForTesting,
   _resetViewBridgeForTesting,
   _setTransportForTesting,
 } from "../src/react/runtime/view-runtime.js";
@@ -47,6 +49,7 @@ function appCapabilities(
 }
 
 function resetRuntime(): void {
+  // disposeView first: unmount React, then close the App (real disposal path).
   _resetBootstrapRootsForTesting();
   _resetViewBridgeForTesting();
   _resetModelContextForTesting();
@@ -1324,5 +1327,278 @@ describe("react bridge runtime", () => {
     expect(screen.getByTestId("absolute").getAttribute("src")).toBe(
       "https://cdn.example.com/logo.svg"
     );
+  });
+
+  it("same-root HMR bootstrap reuses the runtime without reconnecting", async () => {
+    resetRuntime();
+    const [guestTransport, hostTransport] = createPairedTransports();
+    let startCount = 0;
+    const originalStart = guestTransport.start.bind(guestTransport);
+    guestTransport.start = async () => {
+      startCount += 1;
+      await originalStart();
+    };
+    _setTransportForTesting(guestTransport);
+
+    const bridge = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init = new Promise<void>((resolve) => {
+      bridge.oninitialized = () => resolve();
+    });
+    await bridge.connect(hostTransport);
+
+    function First() {
+      return <div data-testid="label">first</div>;
+    }
+    function Second() {
+      return <div data-testid="label">second</div>;
+    }
+
+    bootstrapView({ default: First as ComponentType });
+    await init;
+    await waitFor(() => {
+      expect(screen.getByTestId("label").textContent).toBe("first");
+    });
+
+    const runtimeAfterFirst = _getRuntimeForTesting();
+    expect(runtimeAfterFirst).not.toBeNull();
+    expect(startCount).toBe(1);
+
+    bootstrapView({ default: Second as ComponentType });
+    await waitFor(() => {
+      expect(screen.getByTestId("label").textContent).toBe("second");
+    });
+
+    expect(_getRuntimeForTesting()).toBe(runtimeAfterFirst);
+    expect(startCount).toBe(1);
+  });
+
+  it("changed HMR viewConfig warns and keeps the original config", async () => {
+    resetRuntime();
+    const { init } = await startHost();
+
+    function Probe() {
+      return <div data-testid="probe">ok</div>;
+    }
+
+    bootstrapView({
+      default: Probe as ComponentType,
+      viewConfig: { autoResize: true },
+    });
+    await init;
+
+    const runtime = _getRuntimeForTesting();
+    expect(runtime).not.toBeNull();
+    expect(runtime!.config.autoResize).toBe(true);
+
+    const warnings: unknown[][] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args);
+    };
+    try {
+      bootstrapView({
+        default: Probe as ComponentType,
+        viewConfig: { autoResize: false, displayModes: ["inline"] },
+      });
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    expect(
+      warnings.some((args) =>
+        String(args[0]).includes("viewConfig changed during HMR")
+      )
+    ).toBe(true);
+    expect(_getRuntimeForTesting()).toBe(runtime);
+    expect(runtime!.config.autoResize).toBe(true);
+    expect(appOptions(_getAppForTesting()!).autoResize).toBe(true);
+  });
+
+  it("a second rootId while one is mounted throws", async () => {
+    resetRuntime();
+    const { init } = await startHost();
+
+    function Probe() {
+      return <div data-testid="probe">ok</div>;
+    }
+
+    bootstrapView({ default: Probe as ComponentType }, { rootId: "root" });
+    await init;
+
+    expect(() =>
+      bootstrapView({ default: Probe as ComponentType }, { rootId: "other" })
+    ).toThrow(/already mounted on "#root".*second root "#other"/);
+  });
+
+  it("disposeView unmounts React, closes the transport, and clears the mount", async () => {
+    resetRuntime();
+    const [guestTransport, hostTransport] = createPairedTransports();
+    let closeCount = 0;
+    const originalClose = guestTransport.close.bind(guestTransport);
+    guestTransport.close = async () => {
+      closeCount += 1;
+      await originalClose();
+    };
+    _setTransportForTesting(guestTransport);
+
+    const bridge = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init = new Promise<void>((resolve) => {
+      bridge.oninitialized = () => resolve();
+    });
+    await bridge.connect(hostTransport);
+
+    function Probe() {
+      return <div data-testid="probe">mounted</div>;
+    }
+
+    bootstrapView({ default: Probe as ComponentType });
+    await init;
+    await waitFor(() => {
+      expect(screen.getByTestId("probe").textContent).toBe("mounted");
+    });
+
+    expect(_getRuntimeForTesting()).not.toBeNull();
+
+    await disposeView();
+
+    expect(screen.queryByTestId("probe")).toBeNull();
+    expect(_getRuntimeForTesting()).toBeNull();
+    expect(closeCount).toBeGreaterThanOrEqual(1);
+
+    // Mount record cleared: a second rootId is allowed after disposal.
+    const [guest2, host2] = createPairedTransports();
+    _setTransportForTesting(guest2);
+    const bridge2 = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init2 = new Promise<void>((resolve) => {
+      bridge2.oninitialized = () => resolve();
+    });
+    await bridge2.connect(host2);
+    expect(() =>
+      bootstrapView({ default: Probe as ComponentType }, { rootId: "other" })
+    ).not.toThrow();
+    await init2;
+    await disposeView();
+  });
+
+  it("rebootstrap after disposeView creates a fresh runtime and reconnects", async () => {
+    resetRuntime();
+    const [guest1, host1] = createPairedTransports();
+    let startCount = 0;
+    const wrapStart = (
+      transport: (typeof guest1)
+    ): typeof guest1 => {
+      const originalStart = transport.start.bind(transport);
+      transport.start = async () => {
+        startCount += 1;
+        await originalStart();
+      };
+      return transport;
+    };
+    _setTransportForTesting(wrapStart(guest1));
+
+    const bridge1 = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init1 = new Promise<void>((resolve) => {
+      bridge1.oninitialized = () => resolve();
+    });
+    await bridge1.connect(host1);
+
+    function Probe() {
+      return <div data-testid="probe">ok</div>;
+    }
+
+    bootstrapView({ default: Probe as ComponentType });
+    await init1;
+    const firstRuntime = _getRuntimeForTesting();
+    expect(firstRuntime).not.toBeNull();
+    expect(startCount).toBe(1);
+
+    await disposeView();
+    expect(_getRuntimeForTesting()).toBeNull();
+
+    const [guest2, host2] = createPairedTransports();
+    _setTransportForTesting(wrapStart(guest2));
+    const bridge2 = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init2 = new Promise<void>((resolve) => {
+      bridge2.oninitialized = () => resolve();
+    });
+    await bridge2.connect(host2);
+
+    bootstrapView({ default: Probe as ComponentType });
+    await init2;
+
+    const secondRuntime = _getRuntimeForTesting();
+    expect(secondRuntime).not.toBeNull();
+    expect(secondRuntime).not.toBe(firstRuntime);
+    expect(startCount).toBe(2);
+  });
+
+  it("disposeView unmounts React before closing the App (view tools remove first)", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      useViewTool(
+        {
+          name: "ephemeral",
+          inputSchema: z.object({}),
+        },
+        async () => ({
+          content: [{ type: "text", text: "ok" }],
+        })
+      );
+      return <div data-testid="view">ok</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      expect(listed.tools.map((tool) => tool.name)).toContain("ephemeral");
+    });
+
+    const runtime = _getRuntimeForTesting();
+    expect(runtime).not.toBeNull();
+
+    const sequence: string[] = [];
+    let toolsWhenDisposeEntered: string[] | undefined;
+    const originalDispose = runtime!.dispose.bind(runtime);
+    runtime!.dispose = async () => {
+      sequence.push("runtime.dispose");
+      // React unmount (and useViewTool cleanup) must already have run —
+      // disposeView calls root.unmount() before runtime.dispose().
+      expect(screen.queryByTestId("view")).toBeNull();
+      toolsWhenDisposeEntered = (await bridge.listTools({})).tools.map(
+        (tool) => tool.name
+      );
+      await originalDispose();
+      sequence.push("runtime.dispose.done");
+    };
+
+    await disposeView();
+
+    expect(sequence).toEqual(["runtime.dispose", "runtime.dispose.done"]);
+    expect(toolsWhenDisposeEntered).toEqual([]);
+    expect(_getRuntimeForTesting()).toBeNull();
   });
 });

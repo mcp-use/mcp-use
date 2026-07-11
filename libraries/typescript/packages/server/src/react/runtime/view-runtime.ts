@@ -144,7 +144,14 @@ export interface McpAppRuntime {
 
   /** Connect (or return the connected / in-flight App). Idempotent per generation. */
   connect(): Promise<App>;
-  /** Invalidate the generation, clear listeners/snapshots, and close the App. */
+  /**
+   * Invalidate the active generation, prevent late event delivery, clear
+   * listeners and snapshots, and close the App/transport.
+   *
+   * Model-context flush unbinding is owned by React: callers should unmount
+   * the view tree first (see `disposeView`) so `ViewRuntimeProvider`'s effect
+   * cleanup runs before this closes the App.
+   */
   dispose(): Promise<void>;
 
   /** Subscribe to tool-channel changes. */
@@ -688,12 +695,41 @@ export function takePendingTestTransport(): ViewRuntimeTransport | undefined {
   return transport;
 }
 
-/** @internal Reset runtime module seams between tests. */
+/**
+ * Optional disposer registered by bootstrap-view so test reset can run the
+ * real unmount-then-close path without a circular static import.
+ */
+let registeredDisposeView: (() => Promise<void>) | null = null;
+
+/**
+ * Register {@link disposeView} for {@link _resetViewBridgeForTesting}.
+ *
+ * @param disposer - The document dispose function from bootstrap-view.
+ *
+ * @internal
+ */
+export function _registerDisposeViewForTesting(
+  disposer: () => Promise<void>
+): void {
+  registeredDisposeView = disposer;
+}
+
+/**
+ * @internal Reset runtime module seams between tests.
+ *
+ * Uses the real {@link disposeView} path when bootstrap has registered it
+ * (unmount React, then close the App). Falls back to disposing an orphaned
+ * active runtime when nothing is mounted through bootstrap.
+ */
 export function _resetViewBridgeForTesting(): void {
-  const runtime = activeRuntime;
-  activeRuntime = null;
   pendingTestTransport = null;
   warnedModelContextUnsupported = false;
+  if (registeredDisposeView) {
+    void registeredDisposeView();
+    return;
+  }
+  const runtime = activeRuntime;
+  activeRuntime = null;
   if (runtime) {
     void runtime.dispose();
   }
