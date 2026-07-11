@@ -74,9 +74,15 @@ function parseSessionCookie(
   }
 }
 
-function serializeSessionCookie(session: StoredSession): string {
+function serializeSessionCookie(
+  session: StoredSession,
+  host: string | undefined
+): string {
   const value = encodeURIComponent(JSON.stringify(session));
-  return `${SESSION_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600`;
+  const isLocalhost =
+    host?.startsWith("localhost") || host?.startsWith("127.0.0.1");
+  const secureFlag = isLocalhost ? "" : "; Secure";
+  return `${SESSION_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600${secureFlag}`;
 }
 
 export function mountAuthRoutes(
@@ -144,10 +150,13 @@ export function mountAuthRoutes(
     // Production: replace with signed/encrypted session storage.
     c.header(
       "Set-Cookie",
-      serializeSessionCookie({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      })
+      serializeSessionCookie(
+        {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        },
+        c.req.header("Host")
+      )
     );
     return c.json({ ok: true });
   });
