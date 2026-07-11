@@ -5318,7 +5318,7 @@ screenshot --tool <tool>`) silently produced a blank PNG and exited 0
 
   WebSocket transport support has been removed. Use streamable HTTP or SSE transports instead.
 
-  **Learn more:** [Client Configuration](https://mcp-use.com/docs/typescript/client/client-configuration)
+  **Learn more:** [Client Configuration](https://docs.mcp-use.com/typescript/client/index)
 
   ## Features
 
@@ -5393,13 +5393,13 @@ screenshot --tool <tool>`) silently produced a blank PNG and exited 0
   - CLI build process includes favicon in widget HTML pages
   - Long-term caching (1 year) for favicon assets
 
-  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://mcp-use.com/docs/typescript/server/configuration)
+  **Learn more:** [UI Widgets](https://mcp-use.com/docs/typescript/server/ui-widgets) and [Server Configuration](https://docs.mcp-use.com/typescript/api-reference/server/server-config)
 
   ### CLI Client Support
 
   Added dedicated CLI client support for better command-line integration and testing.
 
-  **Learn more:** [CLI Client](https://mcp-use.com/docs/typescript/client/cli)
+  **Learn more:** [CLI Client](https://docs.mcp-use.com/typescript/tooling/client-cli)
 
   ### Enhanced Session Methods
   - `callTool()` method now defaults args to an empty object

@@ -217,7 +217,7 @@ Load these before diving into tools/resources/widgets sections.
 
   Add `--device-scale-factor 2` for Retina output, or `--cdp-url <ws>` plus `--inspector <publicly-reachable-url>` to drive a remote Chromium (e.g. Notte) from a sandbox without a local Chrome install.
 
-Both commands are documented in full at [docs/typescript/client/cli](https://docs.mcp-use.com/typescript/client/cli).
+Both commands are documented in full at [docs/typescript/client/cli](https://docs.mcp-use.com/typescript/tooling/client-cli).
 
 ---
 

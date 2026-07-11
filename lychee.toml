@@ -29,6 +29,13 @@ exclude = [
   # Example/template URLs
   "^https://github\\.com/your-org/",
 
+  # GitHub /stargazers pages return 404 to non-browser clients (bot mitigation);
+  # they load fine in a browser. Verified against other repos' stargazers pages too.
+  "^https://github\\.com/[^/]+/[^/]+/stargazers$",
+
+  # star-history.com badge API intermittently returns 500s; the badge is decorative
+  "^https://api\\.star-history\\.com",
+
 ]
 
 exclude_loopback = true
