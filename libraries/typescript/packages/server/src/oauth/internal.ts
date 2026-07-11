@@ -142,14 +142,18 @@ function assertResourceBinding(
   expectedResource: URL | undefined
 ): void {
   if (authInfo.resource === undefined) {
+    if (expectedResource !== undefined) {
+      throw invalidToken(
+        "Token must include a resource claim matching the protected resource"
+      );
+    }
     return;
   }
   const resource = parseTokenResource(authInfo.resource);
-  if (expectedResource === undefined) {
-    return;
-  }
-  if (resource.href !== normalizeResourceUrl(expectedResource).href) {
-    throw invalidToken("Token resource does not match the protected resource");
+  if (expectedResource !== undefined) {
+    if (resource.href !== normalizeResourceUrl(expectedResource).href) {
+      throw invalidToken("Token resource does not match the protected resource");
+    }
   }
 }
 

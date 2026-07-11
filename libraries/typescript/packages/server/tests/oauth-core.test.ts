@@ -114,7 +114,7 @@ describe("OAuth core", () => {
         createProvider(authInfo),
         expectedResource
       ).verifyAccessToken("presented-token")
-    ).resolves.toMatchObject(authInfo);
+    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
     await expect(
       wrapOAuthTokenVerifier(
         createProvider({
