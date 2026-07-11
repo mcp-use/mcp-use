@@ -283,7 +283,8 @@ function appendBasePath(origin: URL, basePath: string): URL {
   return resource;
 }
 
-function parseAbsoluteUrl(value: string | URL, name: string): URL {
+/** @internal Parses and validates an absolute URL without credentials. */
+export function parseAbsoluteUrl(value: string | URL, name: string): URL {
   let url: URL;
   try {
     url = new URL(value);
@@ -311,7 +312,8 @@ function normalizePathname(pathname: string): string {
   return pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
 }
 
-function isLocalhost(url: URL): boolean {
+/** @internal Checks if a URL points to localhost or a loopback address. */
+export function isLocalhost(url: URL): boolean {
   const hostname = url.hostname.toLowerCase();
   return (
     hostname === "localhost" ||
@@ -321,7 +323,8 @@ function isLocalhost(url: URL): boolean {
   );
 }
 
-function assertSecureHttpUrl(url: URL, name: string): void {
+/** @internal Validates that a URL uses HTTPS, or HTTP for localhost. */
+export function assertSecureHttpUrl(url: URL, name: string): void {
   if (url.protocol === "https:") {
     return;
   }
