@@ -4,6 +4,11 @@ import type {
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
+import {
+  assertSecureHttpUrl,
+  parseAbsoluteUrl,
+} from "./internal.js";
+
 /** Additional verified identity information exposed by mcp-use callbacks. */
 export type OAuthExtra<TUser> = Record<string, unknown> & {
   /** The authenticated application user. */
@@ -162,38 +167,6 @@ function assertStringArray(
   ) {
     throw new TypeError(`${name} must be an array of strings`);
   }
-}
-
-function parseAbsoluteUrl(value: URL | string, name: string): URL {
-  try {
-    const url = new URL(value);
-    if (url.origin === "null" || url.username !== "" || url.password !== "") {
-      throw new TypeError();
-    }
-    return url;
-  } catch {
-    throw new TypeError(`${name} must be an absolute URL without credentials`);
-  }
-}
-
-function assertSecureHttpUrl(url: URL, name: string): void {
-  if (url.protocol === "https:") {
-    return;
-  }
-  if (url.protocol === "http:" && isLocalhost(url)) {
-    return;
-  }
-  throw new TypeError(`${name} must use HTTPS, or HTTP for localhost`);
-}
-
-function isLocalhost(url: URL): boolean {
-  const hostname = url.hostname.toLowerCase();
-  return (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname === "[::1]" ||
-    /^127(?:\.\d{1,3}){3}$/.test(hostname)
-  );
 }
 
 /** @internal Resolves the private provider implementation for server wiring. */
