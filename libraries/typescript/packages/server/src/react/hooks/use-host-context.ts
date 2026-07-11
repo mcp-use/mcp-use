@@ -1,9 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import {
-  useHostContextSubscription,
-  useViewRuntime,
-} from "../runtime/view-runtime-context.js";
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type {
   DisplayMode,
   HostCapabilities,
@@ -115,11 +112,10 @@ export interface HostContextHandle {
  * ```
  */
 export function useHostContext(): HostContextHandle {
-  const hostContext = useHostContextSubscription();
   const runtime = useViewRuntime();
-  const isConnected = useSyncExternalStore(
+  const { hostContext, isConnected } = useSyncExternalStore(
     runtime.subscribeHost,
-    () => runtime.getHostSnapshot().isConnected
+    runtime.getHostSnapshot
   );
   const app = runtime.getApp();
 

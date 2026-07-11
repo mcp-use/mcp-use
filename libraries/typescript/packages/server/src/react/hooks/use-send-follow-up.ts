@@ -1,4 +1,6 @@
-import { useViewActions } from "../runtime/view-runtime-context.js";
+import { useCallback } from "react";
+
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 
 /**
  * Returns a callback that sends a follow-up message to the conversation,
@@ -11,6 +13,9 @@ import { useViewActions } from "../runtime/view-runtime-context.js";
  * normal conversation flow (and, if the model calls this view's tool again,
  * through {@link useToolContext}). Hosts may require user confirmation or
  * decline the message entirely.
+ *
+ * The returned callback is referentially stable for the lifetime of the
+ * mounted runtime.
  *
  * @example
  * ```tsx
@@ -30,6 +35,14 @@ import { useViewActions } from "../runtime/view-runtime-context.js";
 export function useSendFollowUp(): (args: {
   prompt: string;
 }) => Promise<void> {
-  const { sendFollowUpMessage } = useViewActions();
-  return sendFollowUpMessage;
+  const runtime = useViewRuntime();
+  return useCallback(
+    async (args: { prompt: string }) => {
+      await runtime.sendMessage({
+        role: "user",
+        content: [{ type: "text", text: args.prompt }],
+      });
+    },
+    [runtime]
+  );
 }

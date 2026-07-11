@@ -18,6 +18,7 @@ import {
   useSendFollowUp,
   useSendSizeChanged,
   useToolContext,
+  useViewTheme,
   useViewTool,
 } from "../src/react/index.js";
 import { _resetBootstrapRootsForTesting } from "../src/react/runtime/bootstrap-view.js";
@@ -588,6 +589,279 @@ describe("react bridge runtime", () => {
     });
     expect(hostRenders).toBeGreaterThan(hostRendersAfterConnect);
     expect(displayRenders).toBeGreaterThan(displayRendersAfterConnect);
+  });
+
+  it("host changes do not rerender tool-only consumers", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let toolRenders = 0;
+
+    function ToolProbe() {
+      toolRenders += 1;
+      const handle = useToolContext();
+      return (
+        <div data-testid="tool">
+          {handle.status}|{toolRenders}
+        </div>
+      );
+    }
+
+    function HostProbe() {
+      const { theme, displayMode } = useHostContext();
+      return (
+        <div data-testid="host">
+          {theme}|{displayMode}
+        </div>
+      );
+    }
+
+    function View() {
+      return (
+        <div>
+          <ToolProbe />
+          <HostProbe />
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("tool").textContent).toContain("pending");
+    });
+    const toolRendersAfterConnect = toolRenders;
+
+    await bridge.sendHostContextChange({
+      theme: "dark",
+      displayMode: "fullscreen",
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("host").textContent).toBe("dark|fullscreen");
+    });
+
+    expect(toolRenders).toBe(toolRendersAfterConnect);
+  });
+
+  it("tool changes do not rerender host, theme, display, or action-only consumers", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let hostRenders = 0;
+    let themeRenders = 0;
+    let displayRenders = 0;
+    let actionRenders = 0;
+
+    function HostProbe() {
+      hostRenders += 1;
+      const { theme, isAvailable } = useHostContext();
+      return (
+        <div data-testid="host">
+          {theme}|{String(isAvailable)}|{hostRenders}
+        </div>
+      );
+    }
+
+    function ThemeProbe() {
+      themeRenders += 1;
+      const theme = useViewTheme();
+      return (
+        <div data-testid="theme">
+          {theme}|{themeRenders}
+        </div>
+      );
+    }
+
+    function DisplayProbe() {
+      displayRenders += 1;
+      const { displayMode } = useDisplayMode();
+      return (
+        <div data-testid="display">
+          {displayMode}|{displayRenders}
+        </div>
+      );
+    }
+
+    function ActionProbe() {
+      actionRenders += 1;
+      const openExternal = useOpenExternal();
+      const sendFollowUp = useSendFollowUp();
+      const sendSizeChanged = useSendSizeChanged();
+      return (
+        <div data-testid="actions">
+          {actionRenders}|{typeof openExternal}|{typeof sendFollowUp}|
+          {typeof sendSizeChanged}
+        </div>
+      );
+    }
+
+    function ToolProbe() {
+      const handle = useToolContext();
+      return <div data-testid="tool">{handle.status}</div>;
+    }
+
+    function View() {
+      return (
+        <div>
+          <HostProbe />
+          <ThemeProbe />
+          <DisplayProbe />
+          <ActionProbe />
+          <ToolProbe />
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host").textContent).toContain("true");
+      expect(screen.getByTestId("tool").textContent).toBe("pending");
+    });
+
+    const hostAfter = hostRenders;
+    const themeAfter = themeRenders;
+    const displayAfter = displayRenders;
+    const actionAfter = actionRenders;
+
+    await bridge.sendToolInput({ arguments: { query: "apple" } });
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "ok" }],
+      structuredContent: { query: "apple", items: ["a"] },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("tool").textContent).toBe("ready");
+    });
+
+    expect(hostRenders).toBe(hostAfter);
+    expect(themeRenders).toBe(themeAfter);
+    expect(displayRenders).toBe(displayAfter);
+    expect(actionRenders).toBe(actionAfter);
+  });
+
+  it("theme-only consumer does not rerender on locale or dimension changes", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    let themeRenders = 0;
+    let hostRenders = 0;
+
+    function ThemeProbe() {
+      themeRenders += 1;
+      const theme = useViewTheme();
+      return (
+        <div data-testid="theme">
+          {theme}|{themeRenders}
+        </div>
+      );
+    }
+
+    function HostProbe() {
+      hostRenders += 1;
+      const { locale } = useHostContext();
+      return (
+        <div data-testid="host">
+          {locale}|{hostRenders}
+        </div>
+      );
+    }
+
+    function View() {
+      return (
+        <div>
+          <ThemeProbe />
+          <HostProbe />
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("theme").textContent).toContain("light");
+    });
+    const themeAfterConnect = themeRenders;
+
+    await bridge.sendHostContextChange({
+      locale: "fr-FR",
+      containerDimensions: { width: 400, height: 300 },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("host").textContent).toContain("fr-FR");
+    });
+
+    expect(themeRenders).toBe(themeAfterConnect);
+
+    await bridge.sendHostContextChange({ theme: "dark" });
+    await waitFor(() => {
+      expect(screen.getByTestId("theme").textContent).toContain("dark");
+    });
+    expect(themeRenders).toBeGreaterThan(themeAfterConnect);
+  });
+
+  it("action hooks return referentially stable callbacks across rerenders", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    const refs: {
+      openExternal?: (args: { url: string }) => void;
+      sendFollowUp?: (args: { prompt: string }) => Promise<void>;
+      sendSizeChanged?: (size: {
+        width?: number;
+        height?: number;
+      }) => Promise<void>;
+      requestDisplayMode?: (args: {
+        mode: "inline" | "fullscreen" | "pip";
+      }) => Promise<void>;
+    } = {};
+
+    function Probe() {
+      const openExternal = useOpenExternal();
+      const sendFollowUp = useSendFollowUp();
+      const sendSizeChanged = useSendSizeChanged();
+      const { displayMode, requestDisplayMode } = useDisplayMode();
+      const { theme } = useHostContext();
+
+      if (refs.openExternal === undefined) {
+        refs.openExternal = openExternal;
+        refs.sendFollowUp = sendFollowUp;
+        refs.sendSizeChanged = sendSizeChanged;
+        refs.requestDisplayMode = requestDisplayMode;
+      }
+
+      return (
+        <div data-testid="stable">
+          {theme}|{displayMode}|
+          {String(refs.openExternal === openExternal)}|
+          {String(refs.sendFollowUp === sendFollowUp)}|
+          {String(refs.sendSizeChanged === sendSizeChanged)}|
+          {String(refs.requestDisplayMode === requestDisplayMode)}
+        </div>
+      );
+    }
+
+    bootstrapView({ default: Probe as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("stable").textContent).toContain("light");
+    });
+
+    await bridge.sendHostContextChange({
+      theme: "dark",
+      displayMode: "fullscreen",
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("stable").textContent).toContain("dark");
+      expect(screen.getByTestId("stable").textContent).toContain("fullscreen");
+    });
+
+    expect(screen.getByTestId("stable").textContent).toBe(
+      "dark|fullscreen|true|true|true|true"
+    );
   });
 
   it("surfaces meta on useToolContext and useCallTool round-trips with state transitions", async () => {

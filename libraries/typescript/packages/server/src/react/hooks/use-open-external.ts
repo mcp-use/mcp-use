@@ -1,4 +1,6 @@
-import { useViewActions } from "../runtime/view-runtime-context.js";
+import { useCallback } from "react";
+
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 
 /**
  * Returns a callback that asks the host to open a URL outside the view.
@@ -9,6 +11,9 @@ import { useViewActions } from "../runtime/view-runtime-context.js";
  * user's browser, often behind a confirmation prompt — so treat it as a
  * request, not a guaranteed navigation. Views run sandboxed and cannot
  * navigate the user themselves; this is the supported way to link out.
+ *
+ * The returned callback is referentially stable for the lifetime of the
+ * mounted runtime.
  *
  * @example
  * ```tsx
@@ -26,6 +31,11 @@ import { useViewActions } from "../runtime/view-runtime-context.js";
  * ```
  */
 export function useOpenExternal(): (args: { url: string }) => void {
-  const { openExternal } = useViewActions();
-  return openExternal;
+  const runtime = useViewRuntime();
+  return useCallback(
+    (args: { url: string }) => {
+      void runtime.openLink({ url: args.url });
+    },
+    [runtime]
+  );
 }

@@ -1,6 +1,7 @@
 import type { ContentBlock } from "@modelcontextprotocol/server";
+import { useSyncExternalStore } from "react";
 
-import { useViewBridgeSnapshot } from "../runtime/view-runtime-context.js";
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type { DeepPartial, RegisteredTools } from "../types/register.js";
 
 type ToolOutput<Name extends keyof RegisteredTools> = Name extends keyof RegisteredTools
@@ -203,7 +204,11 @@ export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
 export function useToolContext<
   Name extends keyof RegisteredTools = never,
 >(): ToolContextHandle<Name> {
-  const snap = useViewBridgeSnapshot();
+  const runtime = useViewRuntime();
+  const snap = useSyncExternalStore(
+    runtime.subscribeTool,
+    runtime.getToolSnapshot
+  );
 
   if (snap.hasToolResult) {
     return {

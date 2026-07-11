@@ -74,13 +74,6 @@ export interface DisplaySnapshot {
 }
 
 /**
- * Combined internal snapshot used until Phase 7 splits channel caching.
- *
- * @internal
- */
-export interface ViewRuntimeSnapshot extends ToolSnapshot, HostSnapshot {}
-
-/**
  * Parameters for {@link McpAppRuntime.callServerTool}.
  *
  * @internal
@@ -131,7 +124,7 @@ export type ViewToolCallback = Parameters<App["registerTool"]>[2];
 
 /**
  * Per-document MCP Apps runtime: owns the guest {@link App}, connection retry
- * generations, tool-handler handoff, snapshots, and disposal.
+ * generations, tool-handler handoff, narrow external-store channels, and disposal.
  *
  * Created by {@link createMcpAppRuntime} / {@link bootstrapView}. Hooks obtain
  * the instance from {@link ViewRuntimeContext}.
@@ -156,31 +149,23 @@ export interface McpAppRuntime {
 
   /** Subscribe to tool-channel changes. */
   subscribeTool(listener: Listener): () => void;
-  /** Current tool-channel snapshot. */
+  /** Current tool-channel snapshot (stable until a tool field changes). */
   getToolSnapshot(): ToolSnapshot;
 
   /** Subscribe to host-channel changes. */
   subscribeHost(listener: Listener): () => void;
-  /** Current host-channel snapshot. */
+  /** Current host-channel snapshot (stable until host/connection fields change). */
   getHostSnapshot(): HostSnapshot;
 
   /** Subscribe to theme-channel changes. */
   subscribeTheme(listener: Listener): () => void;
-  /** Current theme (`"light"` until the host reports otherwise). */
+  /** Current theme (`"light"` until the host reports otherwise). Primitive; stable until theme changes. */
   getThemeSnapshot(): "light" | "dark";
 
   /** Subscribe to display-channel changes. */
   subscribeDisplay(listener: Listener): () => void;
-  /** Current display-channel snapshot. */
+  /** Current display-channel snapshot (stable until display mode changes). */
   getDisplaySnapshot(): DisplaySnapshot;
-
-  /**
-   * Combined snapshot subscription used by hooks until Phase 7 splits
-   * rerender isolation. Notifies on any channel change.
-   */
-  subscribe(listener: Listener): () => void;
-  /** Combined snapshot (tool + host fields). */
-  getSnapshot(): ViewRuntimeSnapshot;
 
   /** Guest {@link App} for the current generation, or `null` before connect starts. */
   getApp(): App | null;
@@ -242,11 +227,65 @@ function resolveDisplayMode(
     : "inline";
 }
 
+function resolveTheme(
+  hostContext: McpUiHostContext | undefined
+): "light" | "dark" {
+  return hostContext?.theme === "dark" ? "dark" : "light";
+}
+
 function installEmptyToolHandlers(app: App): void {
   app.onlisttools = async () => ({ tools: [] });
   app.oncalltool = async ({ name }) => {
     throw new Error(`View tool "${name}" is not registered`);
   };
+}
+
+function createChannelStore(): {
+  subscribe: (listener: Listener) => () => void;
+  emit: () => void;
+  clear: () => void;
+} {
+  const listeners = new Set<Listener>();
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    emit() {
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+    clear() {
+      listeners.clear();
+    },
+  };
+}
+
+function toolSnapshotChanged(
+  prev: ToolSnapshot,
+  patch: Partial<ToolSnapshot>
+): boolean {
+  for (const key of Object.keys(patch) as (keyof ToolSnapshot)[]) {
+    if (prev[key] !== patch[key]) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hostSnapshotChanged(
+  prev: HostSnapshot,
+  patch: Partial<HostSnapshot>
+): boolean {
+  for (const key of Object.keys(patch) as (keyof HostSnapshot)[]) {
+    if (prev[key] !== patch[key]) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -286,61 +325,74 @@ export function createMcpAppRuntime(
   let toolRegistryActivated = false;
   let nextTransport: ViewRuntimeTransport | undefined = options?.transport;
 
-  let snapshot: ViewRuntimeSnapshot = {
-    ...defaultToolSnapshot,
-    ...defaultHostSnapshot,
+  let toolSnapshot: ToolSnapshot = { ...defaultToolSnapshot };
+  let hostSnapshot: HostSnapshot = { ...defaultHostSnapshot };
+  let themeSnapshot: "light" | "dark" = "light";
+  let displaySnapshot: DisplaySnapshot = {
+    displayMode: "inline",
+    availableDisplayModes: config.displayModes,
   };
 
-  const listeners = new Set<Listener>();
+  const toolChannel = createChannelStore();
+  const hostChannel = createChannelStore();
+  const themeChannel = createChannelStore();
+  const displayChannel = createChannelStore();
 
-  function emit(): void {
-    for (const listener of listeners) {
-      listener();
+  function patchTool(patch: Partial<ToolSnapshot>): void {
+    if (!toolSnapshotChanged(toolSnapshot, patch)) {
+      return;
     }
+    toolSnapshot = { ...toolSnapshot, ...patch };
+    toolChannel.emit();
   }
 
-  function setSnapshot(patch: Partial<ViewRuntimeSnapshot>): void {
-    snapshot = { ...snapshot, ...patch };
-    emit();
+  function patchHost(patch: Partial<HostSnapshot>): void {
+    if (!hostSnapshotChanged(hostSnapshot, patch)) {
+      return;
+    }
+    hostSnapshot = { ...hostSnapshot, ...patch };
+    hostChannel.emit();
   }
 
-  function subscribe(listener: Listener): () => void {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
+  function syncThemeFromHost(
+    hostContext: McpUiHostContext | undefined
+  ): void {
+    const next = resolveTheme(hostContext);
+    if (next === themeSnapshot) {
+      return;
+    }
+    themeSnapshot = next;
+    themeChannel.emit();
   }
 
-  function getToolSnapshot(): ToolSnapshot {
-    return {
-      toolOutput: snapshot.toolOutput,
-      content: snapshot.content,
-      hasToolResult: snapshot.hasToolResult,
-      toolInput: snapshot.toolInput,
-      isStreaming: snapshot.isStreaming,
-      cancelled: snapshot.cancelled,
-      meta: snapshot.meta,
-      toolName: snapshot.toolName,
-    };
-  }
-
-  function getHostSnapshot(): HostSnapshot {
-    return {
-      hostContext: snapshot.hostContext,
-      isConnected: snapshot.isConnected,
-      connectionError: snapshot.connectionError,
-    };
-  }
-
-  function getThemeSnapshot(): "light" | "dark" {
-    return snapshot.hostContext?.theme === "dark" ? "dark" : "light";
-  }
-
-  function getDisplaySnapshot(): DisplaySnapshot {
-    return {
-      displayMode: resolveDisplayMode(snapshot.hostContext),
+  function syncDisplayFromHost(
+    hostContext: McpUiHostContext | undefined
+  ): void {
+    const nextMode = resolveDisplayMode(hostContext);
+    if (nextMode === displaySnapshot.displayMode) {
+      return;
+    }
+    displaySnapshot = {
+      displayMode: nextMode,
       availableDisplayModes: config.displayModes,
     };
+    displayChannel.emit();
+  }
+
+  /**
+   * Apply a host-context update and fan out to host / theme / display / tool
+   * channels that actually changed.
+   */
+  function applyHostContext(
+    nextHostContext: McpUiHostContext,
+    toolNameFromInfo?: string
+  ): void {
+    patchHost({ hostContext: nextHostContext });
+    syncThemeFromHost(nextHostContext);
+    syncDisplayFromHost(nextHostContext);
+    if (typeof toolNameFromInfo === "string") {
+      patchTool({ toolName: toolNameFromInfo });
+    }
   }
 
   function installRuntimeEventHandlers(app: App): void {
@@ -352,8 +404,8 @@ export function createMcpAppRuntime(
     // still false and the mid-cycle pending→ready path is unchanged.
     app.ontoolinput = (params) => {
       if (app !== currentApp) return;
-      const clearResult = snapshot.hasToolResult;
-      setSnapshot({
+      const clearResult = toolSnapshot.hasToolResult;
+      patchTool({
         toolInput: params.arguments ?? {},
         isStreaming: false,
         cancelled: undefined,
@@ -368,7 +420,7 @@ export function createMcpAppRuntime(
 
     app.ontoolinputpartial = (params) => {
       if (app !== currentApp) return;
-      setSnapshot({
+      patchTool({
         toolInput: params.arguments ?? {},
         isStreaming: true,
         cancelled: undefined,
@@ -387,7 +439,7 @@ export function createMcpAppRuntime(
         params._meta !== null
           ? (params._meta as Record<string, unknown>)
           : undefined;
-      setSnapshot({
+      patchTool({
         toolOutput: params.structuredContent,
         content: Array.isArray(params.content)
           ? (params.content as ContentBlock[])
@@ -401,7 +453,7 @@ export function createMcpAppRuntime(
 
     app.ontoolcancelled = (params) => {
       if (app !== currentApp) return;
-      setSnapshot({
+      patchTool({
         cancelled: {
           ...(params.reason !== undefined && { reason: params.reason }),
         },
@@ -412,15 +464,13 @@ export function createMcpAppRuntime(
     app.onhostcontextchanged = (params) => {
       if (app !== currentApp) return;
       const toolNameFromInfo = params.toolInfo?.tool?.name;
-      setSnapshot({
-        hostContext: {
-          ...(snapshot.hostContext ?? {}),
+      applyHostContext(
+        {
+          ...(hostSnapshot.hostContext ?? {}),
           ...params,
         },
-        ...(typeof toolNameFromInfo === "string" && {
-          toolName: toolNameFromInfo,
-        }),
-      });
+        typeof toolNameFromInfo === "string" ? toolNameFromInfo : undefined
+      );
     };
   }
 
@@ -467,14 +517,18 @@ export function createMcpAppRuntime(
       const hostContext = app.getHostContext();
       const toolNameFromInfo = hostContext?.toolInfo?.tool?.name;
       connectedApp = app;
-      setSnapshot({
+      patchHost({
         isConnected: true,
         connectionError: undefined,
         ...(hostContext !== undefined && { hostContext }),
-        ...(typeof toolNameFromInfo === "string" && {
-          toolName: toolNameFromInfo,
-        }),
       });
+      if (hostContext !== undefined) {
+        syncThemeFromHost(hostContext);
+        syncDisplayFromHost(hostContext);
+      }
+      if (typeof toolNameFromInfo === "string") {
+        patchTool({ toolName: toolNameFromInfo });
+      }
       return app;
     } catch (error) {
       const failure =
@@ -486,7 +540,7 @@ export function createMcpAppRuntime(
         connectedApp = null;
         connectPromise = null;
         toolRegistryActivated = false;
-        setSnapshot({
+        patchHost({
           isConnected: false,
           connectionError: failure,
         });
@@ -555,10 +609,16 @@ export function createMcpAppRuntime(
     connectedApp = null;
     connectPromise = null;
     toolRegistryActivated = false;
-    listeners.clear();
-    snapshot = {
-      ...defaultToolSnapshot,
-      ...defaultHostSnapshot,
+    toolChannel.clear();
+    hostChannel.clear();
+    themeChannel.clear();
+    displayChannel.clear();
+    toolSnapshot = { ...defaultToolSnapshot };
+    hostSnapshot = { ...defaultHostSnapshot };
+    themeSnapshot = "light";
+    displaySnapshot = {
+      displayMode: "inline",
+      availableDisplayModes: config.displayModes,
     };
     if (activeRuntime === runtime) {
       activeRuntime = null;
@@ -568,44 +628,56 @@ export function createMcpAppRuntime(
     }
   }
 
+  async function callServerTool(
+    params: CallToolParams
+  ): Promise<CallToolResult> {
+    const app = await connect();
+    return app.callServerTool(params);
+  }
+
+  async function sendMessage(params: SendMessageParams): Promise<void> {
+    const app = await connect();
+    await app.sendMessage(params);
+  }
+
+  async function openLink(params: OpenLinkParams): Promise<void> {
+    const app = await connect();
+    await app.openLink(params);
+  }
+
+  async function requestDisplayMode(
+    params: RequestDisplayModeParams
+  ): Promise<void> {
+    const app = await connect();
+    await app.requestDisplayMode(params);
+  }
+
+  async function sendSizeChanged(params: SizeChangedParams): Promise<void> {
+    const app = await connect();
+    await app.sendSizeChanged(params);
+  }
+
   const runtime: McpAppRuntime = {
     config,
     connect,
     dispose,
-    subscribeTool: subscribe,
-    getToolSnapshot,
-    subscribeHost: subscribe,
-    getHostSnapshot,
-    subscribeTheme: subscribe,
-    getThemeSnapshot,
-    subscribeDisplay: subscribe,
-    getDisplaySnapshot,
-    subscribe,
-    getSnapshot: () => snapshot,
+    subscribeTool: toolChannel.subscribe,
+    getToolSnapshot: () => toolSnapshot,
+    subscribeHost: hostChannel.subscribe,
+    getHostSnapshot: () => hostSnapshot,
+    subscribeTheme: themeChannel.subscribe,
+    getThemeSnapshot: () => themeSnapshot,
+    subscribeDisplay: displayChannel.subscribe,
+    getDisplaySnapshot: () => displaySnapshot,
     getApp: () => currentApp,
     setTransport(transport) {
       nextTransport = transport;
     },
-    async callServerTool(params) {
-      const app = await connect();
-      return app.callServerTool(params);
-    },
-    async sendMessage(params) {
-      const app = await connect();
-      await app.sendMessage(params);
-    },
-    async openLink(params) {
-      const app = await connect();
-      await app.openLink(params);
-    },
-    async requestDisplayMode(params) {
-      const app = await connect();
-      await app.requestDisplayMode(params);
-    },
-    async sendSizeChanged(params) {
-      const app = await connect();
-      await app.sendSizeChanged(params);
-    },
+    callServerTool,
+    sendMessage,
+    openLink,
+    requestDisplayMode,
+    sendSizeChanged,
     registerViewTool,
   };
 

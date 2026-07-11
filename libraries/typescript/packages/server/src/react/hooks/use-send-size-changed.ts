@@ -1,4 +1,4 @@
-import { useViewActions } from "../runtime/view-runtime-context.js";
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 
 /**
  * Returns a callback that notifies the host of the view's size via
@@ -9,6 +9,9 @@ import { useViewActions } from "../runtime/view-runtime-context.js";
  * measures the document under `height: max-content`, which collapses those
  * layouts; disable it and report `{ width, height }` from a `ResizeObserver`
  * (or equivalent) instead.
+ *
+ * Returns the runtime-owned `sendSizeChanged` method — referentially stable
+ * for the lifetime of the mounted runtime.
  *
  * @example
  * ```tsx
@@ -58,6 +61,6 @@ export function useSendSizeChanged(): (size: {
   width?: number;
   height?: number;
 }) => Promise<void> {
-  const { sendSizeChanged } = useViewActions();
-  return sendSizeChanged;
+  const runtime = useViewRuntime();
+  return runtime.sendSizeChanged;
 }

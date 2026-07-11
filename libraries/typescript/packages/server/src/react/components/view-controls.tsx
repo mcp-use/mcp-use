@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { useViewActions } from "../runtime/view-runtime-context.js";
+import { useDisplayMode } from "../hooks/use-display-mode.js";
 import { useHostContext } from "../hooks/use-host-context.js";
 import { useToolContext } from "../hooks/use-tool-context.js";
 
@@ -39,7 +39,7 @@ export function ViewControls({
 }: ViewControlsProps) {
   const context = useToolContext();
   const host = useHostContext();
-  const { requestDisplayMode } = useViewActions();
+  const { requestDisplayMode } = useDisplayMode();
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
 

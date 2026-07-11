@@ -1,4 +1,6 @@
-import { useHostContextSubscription } from "../runtime/view-runtime-context.js";
+import { useSyncExternalStore } from "react";
+
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 
 /**
  * Subscribe to the host color theme only.
@@ -6,9 +8,9 @@ import { useHostContextSubscription } from "../runtime/view-runtime-context.js";
  * @remarks
  * Returns the same value as {@link useHostContext}'s `theme` and updates live
  * when the user or host switches themes. Prefer this hook when theme is all a
- * component needs: it re-renders on host context changes only, never on
- * tool-input or result updates. Returns `"light"` until the host reports a
- * theme.
+ * component needs: it re-renders only when the resolved theme string changes,
+ * never on locale, dimensions, display mode, or tool updates. Returns
+ * `"light"` until the host reports a theme.
  *
  * @example
  * ```tsx
@@ -16,6 +18,9 @@ import { useHostContextSubscription } from "../runtime/view-runtime-context.js";
  * ```
  */
 export function useViewTheme(): "light" | "dark" {
-  const hostContext = useHostContextSubscription();
-  return hostContext?.theme === "dark" ? "dark" : "light";
+  const runtime = useViewRuntime();
+  return useSyncExternalStore(
+    runtime.subscribeTheme,
+    runtime.getThemeSnapshot
+  );
 }

@@ -9,6 +9,10 @@ import { useHostContextSubscription } from "../runtime/view-runtime-context.js";
 
 /**
  * Applies host theme, style variables, and fonts to the document root.
+ *
+ * Subscribes to the host channel (theme, `styles.variables`, `styles.css.fonts`)
+ * via {@link useHostContextSubscription}. Theme-only consumers should use
+ * {@link useViewTheme} instead so locale/dimension updates do not rerender them.
  */
 export const ThemeProvider: React.FC<{
   children: React.ReactNode;
