@@ -121,18 +121,56 @@ describe("RFC 7662 custom-provider acceptance", () => {
       expect(auth.clientId).toBeUndefined();
     });
   });
+});
+
+describe("RFC 7662 introspection endpoint outages", () => {
+  let outageIntrospection: IntrospectionServer;
+
+  beforeAll(async () => {
+    outageIntrospection = await startIntrospectionServer();
+  });
+
+  afterAll(async () => {
+    await outageIntrospection.close();
+  });
 
   it("surfaces introspection endpoint outages as server errors", async () => {
-    await introspection.close();
+    await outageIntrospection.close();
 
-    await withMcpServer(async (url) => {
+    const server = new MCPServer({
+      name: "introspection-acceptance",
+      version: "1.0.0",
+      oauth: introspectionProvider(outageIntrospection.endpoint),
+    });
+    server.tool({ name: "whoami" }, (_params, ctx) => ({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            user: ctx.auth.user,
+            payload: ctx.auth.payload,
+            permissions: ctx.auth.permissions,
+            clientId: ctx.auth.clientId,
+            scopes: ctx.auth.scopes,
+            accessToken: ctx.auth.accessToken,
+            resource: ctx.auth.resource?.href,
+          }),
+        },
+      ],
+    }));
+
+    const started = await server.listen(0);
+    try {
+      const url = new URL(`http://127.0.0.1:${started.port}/mcp`);
       const response = await callTool(url, "opaque-outage-token");
 
       expect(response.status).toBe(500);
       expect(response.headers.get("www-authenticate") ?? "").not.toContain(
         'error="invalid_token"'
       );
-    });
+    } finally {
+      await server.close();
+    }
   });
 });
 
