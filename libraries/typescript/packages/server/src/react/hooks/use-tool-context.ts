@@ -1,6 +1,6 @@
 import type { ContentBlock } from "@modelcontextprotocol/server";
 
-import { useViewBridgeSnapshot } from "../bridge/view-bridge.js";
+import { useViewBridgeSnapshot } from "../runtime/view-runtime-context.js";
 import type { DeepPartial, RegisteredTools } from "../types/register.js";
 
 type ToolOutput<Name extends keyof RegisteredTools> = Name extends keyof RegisteredTools

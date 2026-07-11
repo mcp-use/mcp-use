@@ -17,7 +17,7 @@ import {
   buildDescriptionString,
   buildModelContextParams,
   modelContextNodes,
-} from "../bridge/model-context-store.js";
+} from "../runtime/model-context-store.js";
 
 const ParentIdContext = createContext<string | null>(null);
 

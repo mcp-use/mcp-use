@@ -1,4 +1,4 @@
-import { useViewActions } from "../bridge/view-bridge.js";
+import { useViewActions } from "../runtime/view-runtime-context.js";
 
 /**
  * Returns a callback that asks the host to open a URL outside the view.

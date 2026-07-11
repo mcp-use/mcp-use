@@ -1,4 +1,4 @@
-import { useViewActions } from "../bridge/view-bridge.js";
+import { useViewActions } from "../runtime/view-runtime-context.js";
 
 /**
  * Returns a callback that notifies the host of the view's size via

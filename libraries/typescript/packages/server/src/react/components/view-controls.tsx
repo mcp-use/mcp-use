@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-import { useViewActions } from "../bridge/view-bridge.js";
+import { useViewActions } from "../runtime/view-runtime-context.js";
 import { useHostContext } from "../hooks/use-host-context.js";
 import { useToolContext } from "../hooks/use-tool-context.js";
 

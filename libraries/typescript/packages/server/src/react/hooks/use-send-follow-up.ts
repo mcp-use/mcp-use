@@ -1,4 +1,4 @@
-import { useViewActions } from "../bridge/view-bridge.js";
+import { useViewActions } from "../runtime/view-runtime-context.js";
 
 /**
  * Returns a callback that sends a follow-up message to the conversation,

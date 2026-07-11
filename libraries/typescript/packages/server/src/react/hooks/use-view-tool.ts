@@ -9,7 +9,8 @@ import type {
 } from "../../tools.js";
 import { resolveToolInputSchema } from "../../tools.js";
 import type { CallToolResult } from "../types/result-types.js";
-import { useViewBridgeStore } from "../bridge/view-bridge.js";
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
+import type { McpAppRuntime } from "../runtime/view-runtime.js";
 
 /** View-tool definition — mirrors {@link ToolDefinition} plus `enabled`. */
 export type ViewToolDefinition = Pick<
@@ -26,10 +27,8 @@ export type ViewToolDefinition = Pick<
   enabled?: boolean;
 };
 
-/** Handle returned by the ext-apps `App.registerTool`. */
-type RegisteredViewTool = ReturnType<
-  Awaited<ReturnType<ReturnType<typeof useViewBridgeStore>["connect"]>>["registerTool"]
->;
+/** Handle returned by {@link McpAppRuntime.registerViewTool}. */
+type RegisteredViewTool = ReturnType<McpAppRuntime["registerViewTool"]>;
 
 /**
  * Register an ephemeral tool the host/model can call while this component is mounted.
@@ -63,7 +62,7 @@ export function useViewTool<
   definition: TDef,
   handler: (args: TInput) => ToolResult<TOutput> | Promise<ToolResult<TOutput>>
 ): void {
-  const store = useViewBridgeStore();
+  const runtime = useViewRuntime();
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
   const definitionRef = useRef<ViewToolDefinition>(definition);
@@ -82,7 +81,7 @@ export function useViewTool<
     let cancelled = false;
 
     void (async () => {
-      const app = await store.connect();
+      await runtime.connect();
       if (cancelled) return;
 
       // Read the latest definition: config may have changed while connecting.
@@ -106,7 +105,7 @@ export function useViewTool<
       const callback = async (args: unknown) =>
         (await handlerRef.current(args as TInput)) as CallToolResult;
 
-      const registered = app.registerTool(
+      const registered = runtime.registerViewTool(
         name,
         config,
         // v2 ToolResult matches ext-apps CallToolResult on the wire; SDK index signatures differ.
@@ -124,7 +123,7 @@ export function useViewTool<
       registeredRef.current?.remove();
       registeredRef.current = null;
     };
-  }, [store, name]);
+  }, [runtime, name]);
 
   useEffect(() => {
     const registered = registeredRef.current;

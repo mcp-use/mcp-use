@@ -2,8 +2,8 @@ import { useSyncExternalStore } from "react";
 
 import {
   useHostContextSubscription,
-  useViewBridgeStore,
-} from "../bridge/view-bridge.js";
+  useViewRuntime,
+} from "../runtime/view-runtime-context.js";
 import type {
   DisplayMode,
   HostCapabilities,
@@ -116,12 +116,12 @@ export interface HostContextHandle {
  */
 export function useHostContext(): HostContextHandle {
   const hostContext = useHostContextSubscription();
-  const store = useViewBridgeStore();
+  const runtime = useViewRuntime();
   const isConnected = useSyncExternalStore(
-    store.subscribe,
-    () => store.getSnapshot().isConnected
+    runtime.subscribeHost,
+    () => runtime.getHostSnapshot().isConnected
   );
-  const app = store.getApp();
+  const app = runtime.getApp();
 
   return {
     theme: hostContext?.theme === "dark" ? "dark" : "light",

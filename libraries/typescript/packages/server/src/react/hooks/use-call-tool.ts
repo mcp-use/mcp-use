@@ -3,7 +3,7 @@ import { useCallback, useRef, useState } from "react";
 
 import type { ToolRef } from "../../tools.js";
 import type { RegisteredTools } from "../types/register.js";
-import { useViewBridgeStore } from "../bridge/view-bridge.js";
+import { useViewRuntime } from "../runtime/view-runtime-context.js";
 
 /**
  * Typed server-tool call handle returned by {@link useCallTool}.
@@ -59,7 +59,7 @@ export function useCallTool<
 export function useCallTool(nameOrRef: string | ToolRef<string, unknown, unknown>) {
   const toolName =
     typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
-  const store = useViewBridgeStore();
+  const runtime = useViewRuntime();
   const [data, setData] = useState<
     (CallToolResult & { structuredContent: unknown }) | undefined
   >(undefined);
@@ -74,8 +74,7 @@ export function useCallTool(nameOrRef: string | ToolRef<string, unknown, unknown
       setError(undefined);
 
       try {
-        const app = await store.connect();
-        const result = await app.callServerTool({
+        const result = await runtime.callServerTool({
           name: toolName,
           arguments: args,
         });
@@ -94,7 +93,7 @@ export function useCallTool(nameOrRef: string | ToolRef<string, unknown, unknown
         throw failure;
       }
     },
-    [store, toolName]
+    [runtime, toolName]
   );
 
   return { callTool, data, error, isPending };

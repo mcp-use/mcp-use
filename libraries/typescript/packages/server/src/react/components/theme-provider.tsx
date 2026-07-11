@@ -5,7 +5,7 @@ import {
 } from "@modelcontextprotocol/ext-apps";
 import React, { useLayoutEffect, useState } from "react";
 
-import { useHostContextSubscription } from "../bridge/view-bridge.js";
+import { useHostContextSubscription } from "../runtime/view-runtime-context.js";
 
 /**
  * Applies host theme, style variables, and fonts to the document root.

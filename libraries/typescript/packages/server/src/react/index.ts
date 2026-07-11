@@ -3,13 +3,13 @@
  *
  * Browser-only — built on the ext-apps guest `App` class. Layout:
  * `types/` (the zero-codegen typing layer and vendored host types),
- * `bridge/` (the ext-apps `App` singleton and iframe bootstrap),
- * `hooks/` (the user-facing hook surface), and
- * `components/` (provider/utility components).
+ * `runtime/` (per-document `McpAppRuntime`, snapshots, and iframe bootstrap),
+ * `hooks/` (the user-facing hook surface), and `components/`
+ * (provider/utility components).
  */
 
-export { bootstrapView, type ViewModule } from "./bridge/bootstrap-view.js";
-export { type ViewConfig } from "./bridge/view-config.js";
+export { bootstrapView, type ViewModule } from "./runtime/bootstrap-view.js";
+export { type ViewConfig } from "./runtime/view-config.js";
 export { ErrorBoundary } from "./components/error-boundary.js";
 export { Image } from "./components/image.js";
 export { ModelContext, modelContext } from "./components/model-context.js";

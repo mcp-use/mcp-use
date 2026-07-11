@@ -1,4 +1,4 @@
-import { useHostContextSubscription } from "../bridge/view-bridge.js";
+import { useHostContextSubscription } from "../runtime/view-runtime-context.js";
 
 /**
  * Subscribe to the host color theme only.

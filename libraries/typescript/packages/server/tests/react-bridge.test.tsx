@@ -19,13 +19,13 @@ import {
   useToolContext,
   useViewTool,
 } from "../src/react/index.js";
-import { _resetBootstrapRootsForTesting } from "../src/react/bridge/bootstrap-view.js";
-import { _resetModelContextForTesting } from "../src/react/bridge/model-context-store.js";
+import { _resetBootstrapRootsForTesting } from "../src/react/runtime/bootstrap-view.js";
+import { _resetModelContextForTesting } from "../src/react/runtime/model-context-store.js";
 import {
   _getAppForTesting,
   _resetViewBridgeForTesting,
   _setTransportForTesting,
-} from "../src/react/bridge/view-bridge-store.js";
+} from "../src/react/runtime/view-runtime.js";
 import { createPairedTransports } from "./helpers/paired-transport.js";
 
 function appOptions(app: NonNullable<ReturnType<typeof _getAppForTesting>>): {
@@ -47,9 +47,9 @@ function appCapabilities(
 }
 
 function resetRuntime(): void {
+  _resetBootstrapRootsForTesting();
   _resetViewBridgeForTesting();
   _resetModelContextForTesting();
-  _resetBootstrapRootsForTesting();
   document.body.innerHTML = "";
 }
 
@@ -727,7 +727,9 @@ describe("react bridge runtime", () => {
     bootstrapView({ default: Probe as ComponentType });
     await init;
 
-    expect(screen.getByTestId("mode").textContent).toBe("inline");
+    await waitFor(() => {
+      expect(screen.getByTestId("mode").textContent).toBe("inline");
+    });
 
     screen.getByText("expand").click();
     await waitFor(() => {
@@ -783,6 +785,10 @@ describe("react bridge runtime", () => {
 
     bootstrapView({ default: Probe as ComponentType });
     await init;
+
+    await waitFor(() => {
+      expect(screen.getByText("follow-up")).not.toBeNull();
+    });
 
     screen.getByText("follow-up").click();
     await waitFor(() => {
@@ -1310,9 +1316,11 @@ describe("react bridge runtime", () => {
     bootstrapView({ default: Probe as ComponentType });
     await init;
 
-    expect(screen.getByTestId("fruit").getAttribute("src")).toBe(
-      "http://test.example/mcp/_mcp-use/public/fruits/apple.png"
-    );
+    await waitFor(() => {
+      expect(screen.getByTestId("fruit").getAttribute("src")).toBe(
+        "http://test.example/mcp/_mcp-use/public/fruits/apple.png"
+      );
+    });
     expect(screen.getByTestId("absolute").getAttribute("src")).toBe(
       "https://cdn.example.com/logo.svg"
     );

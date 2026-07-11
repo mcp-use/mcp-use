@@ -1,4 +1,4 @@
-import { useViewActions } from "../bridge/view-bridge.js";
+import { useViewActions } from "../runtime/view-runtime-context.js";
 import type { DisplayMode } from "../types/host-types.js";
 import { useHostContext } from "./use-host-context.js";
 
