@@ -22,7 +22,7 @@ const getUserInfoOutputSchema = z.object({
 
 const keycloakServerUrl = requireEnv("KEYCLOAK_SERVER_URL");
 const keycloakRealm = requireEnv("KEYCLOAK_REALM");
-const keycloakAudience = optionalEnv("KEYCLOAK_AUDIENCE");
+const keycloakAudience = requireEnv("KEYCLOAK_AUDIENCE");
 
 const server = new MCPServer({
   name: "keycloak-auth-example",
@@ -33,7 +33,7 @@ const server = new MCPServer({
   oauth: oauthKeycloakProvider({
     serverUrl: keycloakServerUrl,
     realm: keycloakRealm,
-    ...(keycloakAudience !== undefined && { audience: keycloakAudience }),
+    audience: keycloakAudience,
   }),
 });
 
@@ -77,11 +77,6 @@ function requireEnv(name: string): string {
     throw new Error(`${name} must be set`);
   }
   return value;
-}
-
-function optionalEnv(name: string): string | undefined {
-  const value = process.env[name]?.trim();
-  return value === "" ? undefined : value;
 }
 
 export default server;
