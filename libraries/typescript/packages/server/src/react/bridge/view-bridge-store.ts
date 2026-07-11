@@ -5,6 +5,11 @@ import {
 } from "@modelcontextprotocol/ext-apps";
 import type { ContentBlock } from "@modelcontextprotocol/server";
 
+import {
+  normalizeViewConfig,
+  type NormalizedViewConfig,
+} from "./view-config.js";
+
 type ViewBridgeTransport = NonNullable<Parameters<App["connect"]>[0]>;
 
 /** Snapshot of view data channels and host context delivered over the bridge. */
@@ -77,8 +82,8 @@ let connectPromise: Promise<App> | null = null;
 let snapshot: ViewBridgeSnapshot = { ...defaultSnapshot };
 const listeners = new Set<Listener>();
 
-/** Guest `App` options applied before the first `App` is constructed. */
-let bridgeAppOptions: { autoResize?: boolean } | undefined;
+/** Normalized view config applied before the first `App` is constructed. */
+let bridgeConfig: NormalizedViewConfig = normalizeViewConfig();
 
 function emit(): void {
   for (const listener of listeners) {
@@ -97,35 +102,38 @@ function setSnapshot(patch: Partial<ViewBridgeSnapshot>): void {
 }
 
 /**
- * Configure guest `App` options before the bridge constructs/`connect`s.
+ * Apply normalized view configuration before the bridge constructs the guest
+ * `App`.
  *
- * Called by {@link McpUseProvider} during its first render (render precedes
- * all effects, so the value is set before any effect runs `connect()`).
- * Ignored (with a warning) if an `App` instance already exists — auto-resize
- * cannot be toggled after connect.
+ * Called by {@link bootstrapView} before React mounts so `autoResize` and
+ * `availableDisplayModes` are fixed at App construction time. Ignored (with a
+ * warning) if an `App` instance already exists — configuration cannot change
+ * after connect.
  *
- * @param options - Per-view guest options (currently `autoResize`).
+ * @param config - Fully-resolved {@link NormalizedViewConfig} from
+ *   {@link normalizeViewConfig}.
  *
  * @internal
  */
-export function setViewBridgeAppOptions(options: {
-  autoResize?: boolean;
-}): void {
+export function setViewBridgeConfig(config: NormalizedViewConfig): void {
   if (appInstance !== null) {
     console.warn(
-      "[mcp-use] setViewBridgeAppOptions called after the view bridge App was already created; ignoring."
+      "[mcp-use] setViewBridgeConfig called after the view bridge App was already created; ignoring."
     );
     return;
   }
-  bridgeAppOptions = options;
+  bridgeConfig = config;
 }
 
 function getOrCreateApp(): App {
   if (!appInstance) {
     appInstance = new App(
       { name: "mcp-use-view", version: "2.0.0-alpha.0" },
-      { tools: { listChanged: true } },
-      { autoResize: bridgeAppOptions?.autoResize ?? true }
+      {
+        tools: { listChanged: true },
+        availableDisplayModes: [...bridgeConfig.displayModes],
+      },
+      { autoResize: bridgeConfig.autoResize }
     );
     wireAppEvents(appInstance);
   }
@@ -290,7 +298,7 @@ export function _resetViewBridgeForTesting(): void {
   appInstance = null;
   connectPromise = null;
   injectedTransport = null;
-  bridgeAppOptions = undefined;
+  bridgeConfig = normalizeViewConfig();
   warnedModelContextUnsupported = false;
   snapshot = { ...defaultSnapshot };
   listeners.clear();

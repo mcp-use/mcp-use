@@ -266,6 +266,8 @@ describe("runDev (views)", () => {
     expect(virtualResponse.status).toBe(200);
     const virtualJs = await virtualResponse.text();
     expect(virtualJs).toMatch(/bootstrapView/);
+    expect(virtualJs).toContain("import * as viewModule from");
+    expect(virtualJs).toContain("bootstrapView(viewModule)");
 
     // Vite module CORS (CLI_SPEC.md § DNS-rebinding protection):
     // without a tunnel, a validated loopback Origin is reflected exactly
@@ -417,6 +419,8 @@ describe("runDev (views)", () => {
     const entryJs = await entryResponse.text();
     expect(entryJs).toContain("@vitejs/plugin-react/preamble");
     expect(entryJs).toContain("import.meta.hot.accept()");
+    expect(entryJs).toContain("import * as viewModule from");
+    expect(entryJs).toContain("bootstrapView(viewModule)");
 
     // Populate the client module graph the way a browser loading the view
     // document would: fetch each module and, recursively, its static

@@ -20,13 +20,13 @@ const morphdom = (
 ) => Element;
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  McpUseProvider,
   ModelContext,
   useCallTool,
   useDisplayMode,
   useHostContext,
   useOpenExternal,
   useToolContext,
+  type ViewConfig,
 } from "@mcp-use/server/react";
 import { initPencilAudio, playStroke } from "./pencil-audio.js";
 import {
@@ -39,6 +39,14 @@ import {
   setSaveCheckpoint,
 } from "./edit-context.js";
 import "./view.css";
+
+/**
+ * Fixed aspect-ratio SVG preview collapses under ext-apps auto-resize
+ * (`height: max-content`); report size manually instead.
+ */
+export const viewConfig = {
+  autoResize: false,
+} satisfies ViewConfig;
 
 // ============================================================
 // Debug logging (routes through SDK → host log file)
@@ -907,7 +915,6 @@ export default function ExcalidrawView() {
           : undefined
       }
     >
-    <McpUseProvider autoSize={false}>
       <ModelContext content={modelContextText} />
       {isCancelled && displayMode === "inline" && (
         <div className="cancelled-banner" role="status">
@@ -1065,9 +1072,8 @@ export default function ExcalidrawView() {
               }
             }}
           />
-        </div>  
+        </div>
       )}
-      </McpUseProvider>
     </main>
   );
 }

@@ -8,7 +8,6 @@ import { useState, type ComponentType } from "react";
 import {
   bootstrapView,
   Image,
-  McpUseProvider,
   ModelContext,
   modelContext,
   useCallTool,
@@ -28,6 +27,24 @@ import {
   _setTransportForTesting,
 } from "../src/react/bridge/view-bridge-store.js";
 import { createPairedTransports } from "./helpers/paired-transport.js";
+
+function appOptions(app: NonNullable<ReturnType<typeof _getAppForTesting>>): {
+  autoResize?: boolean;
+} {
+  return (app as unknown as { options: { autoResize?: boolean } }).options;
+}
+
+function appCapabilities(
+  app: NonNullable<ReturnType<typeof _getAppForTesting>>
+): {
+  availableDisplayModes?: readonly string[];
+} {
+  return (
+    app as unknown as {
+      _capabilities: { availableDisplayModes?: readonly string[] };
+    }
+  )._capabilities;
+}
 
 function resetRuntime(): void {
   _resetViewBridgeForTesting();
@@ -778,7 +795,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("autoSize disabled + useSendSizeChanged delivers manual size, no auto emit on connect", async () => {
+  it("viewConfig.autoResize false + useSendSizeChanged delivers manual size, no auto emit on connect", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -802,11 +819,8 @@ describe("react bridge runtime", () => {
     }
 
     bootstrapView({
-      default: (() => (
-        <McpUseProvider autoSize={false}>
-          <Probe />
-        </McpUseProvider>
-      )) as ComponentType,
+      default: Probe as ComponentType,
+      viewConfig: { autoResize: false },
     });
     await init;
 
@@ -820,7 +834,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("McpUseProvider autoSize={false} constructs App without auto-resize", async () => {
+  it("viewConfig.autoResize false constructs App without auto-resize", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -834,11 +848,8 @@ describe("react bridge runtime", () => {
     }
 
     bootstrapView({
-      default: (() => (
-        <McpUseProvider autoSize={false}>
-          <Probe />
-        </McpUseProvider>
-      )) as ComponentType,
+      default: Probe as ComponentType,
+      viewConfig: { autoResize: false },
     });
     await init;
 
@@ -855,12 +866,10 @@ describe("react bridge runtime", () => {
 
     const app = _getAppForTesting();
     expect(app).not.toBeNull();
-    expect(
-      (app as { options: { autoResize?: boolean } } | null)?.options.autoResize
-    ).toBe(false);
+    expect(appOptions(app!).autoResize).toBe(false);
   });
 
-  it("default without McpUseProvider keeps App autoResize true", async () => {
+  it("default viewConfig keeps App autoResize true", async () => {
     resetRuntime();
     const { init } = await startHost();
 
@@ -877,12 +886,15 @@ describe("react bridge runtime", () => {
 
     const app = _getAppForTesting();
     expect(app).not.toBeNull();
-    expect(
-      (app as { options: { autoResize?: boolean } } | null)?.options.autoResize
-    ).toBe(true);
+    expect(appOptions(app!).autoResize).toBe(true);
+    expect(appCapabilities(app!).availableDisplayModes).toEqual([
+      "inline",
+      "fullscreen",
+      "pip",
+    ]);
   });
 
-  it("McpUseProvider without autoSize prop keeps App autoResize true", async () => {
+  it("valid custom displayModes are normalized into App capabilities", async () => {
     resetRuntime();
     const { init } = await startHost();
 
@@ -891,11 +903,8 @@ describe("react bridge runtime", () => {
     }
 
     bootstrapView({
-      default: (() => (
-        <McpUseProvider>
-          <Probe />
-        </McpUseProvider>
-      )) as ComponentType,
+      default: Probe as ComponentType,
+      viewConfig: { displayModes: ["inline", "fullscreen"] },
     });
     await init;
 
@@ -905,9 +914,48 @@ describe("react bridge runtime", () => {
 
     const app = _getAppForTesting();
     expect(app).not.toBeNull();
-    expect(
-      (app as { options: { autoResize?: boolean } } | null)?.options.autoResize
-    ).toBe(true);
+    expect(appCapabilities(app!).availableDisplayModes).toEqual([
+      "inline",
+      "fullscreen",
+    ]);
+  });
+
+  it("rejects invalid viewConfig.displayModes at bootstrap", () => {
+    resetRuntime();
+
+    function Probe() {
+      return <div>ok</div>;
+    }
+
+    expect(() =>
+      bootstrapView({
+        default: Probe as ComponentType,
+        viewConfig: { displayModes: [] },
+      })
+    ).toThrow(/non-empty array.*inline/);
+
+    expect(() =>
+      bootstrapView({
+        default: Probe as ComponentType,
+        viewConfig: { displayModes: ["inline", "inline"] },
+      })
+    ).toThrow(/duplicate mode "inline"/);
+
+    expect(() =>
+      bootstrapView({
+        default: Probe as ComponentType,
+        viewConfig: { displayModes: ["fullscreen"] },
+      })
+    ).toThrow(/must include "inline"/);
+
+    expect(() =>
+      bootstrapView({
+        default: Probe as ComponentType,
+        viewConfig: {
+          displayModes: ["inline", "bogus" as "fullscreen"],
+        },
+      })
+    ).toThrow(/invalid mode "bogus"/);
   });
 
   it("registers view tools via useViewTool with list and call round-trip", async () => {

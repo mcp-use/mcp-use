@@ -16,6 +16,8 @@ import {
   WORKSPACE_DIR_NAME,
   type BuildManifest,
 } from "../../src/cli/index.js";
+import { mcpUseViewsPlugin } from "../../src/cli/views-plugin.js";
+import { VIRTUAL_VIEW_RESOLVED_PREFIX } from "../../src/cli/views.js";
 import { synthesizeViewDocument } from "../../src/views/document.js";
 import { copyFixture, removeDir } from "./helpers.js";
 
@@ -158,6 +160,27 @@ describe("runBuild", () => {
 });
 
 describe("runBuild (views)", () => {
+  it("virtual entry imports the full view module for named viewConfig", () => {
+    const plugin = mcpUseViewsPlugin({
+      getViews: () => [
+        {
+          name: "demo",
+          entryPath: "/abs/resources/demo/view.tsx",
+        },
+      ],
+    });
+    const load = plugin.load;
+    expect(load).toBeTypeOf("function");
+    const source = (
+      load as (id: string) => string | undefined
+    )(`${VIRTUAL_VIEW_RESOLVED_PREFIX}demo`);
+    expect(source).toContain(
+      'import * as viewModule from "/abs/resources/demo/view.tsx"'
+    );
+    expect(source).toContain("bootstrapView(viewModule)");
+    expect(source).not.toMatch(/bootstrapView\(\s*viewModule\.default\s*\)/);
+  });
+
   it("builds views manifest, assets, wrapper entry, and binding checks", async () => {
     const cwd = copyFixture("build-views", "views");
     dirs.push(cwd);
