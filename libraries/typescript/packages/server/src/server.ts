@@ -451,7 +451,8 @@ export class MCPServer<TUser = never> {
   }
 
   #basePath(): string {
-    return this.#config.basePath ?? "/mcp";
+    const raw = this.#config.basePath ?? "/mcp";
+    return raw === "/" ? "/" : raw.replace(/\/+$/, "");
   }
 
   #resolveOAuthResource(

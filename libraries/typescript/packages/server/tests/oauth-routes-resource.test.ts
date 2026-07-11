@@ -252,9 +252,16 @@ describe("OAuth HTTP route acceptance", () => {
       request("/.well-known/oauth-protected-resource/api/mcp")
     );
     expect(metadata.status).toBe(200);
-    expect(await metadata.json()).toMatchObject({
+    const metadataJson = await metadata.json();
+    expect(metadataJson).toMatchObject({
       resource: "https://canonical.example.test/api/mcp",
     });
+
+    const mcpResponse = await handler(
+      request("/api/mcp", { method: "POST" })
+    );
+    expect(mcpResponse.status).toBe(401);
+    expect(challenge(mcpResponse)).toContain('error="invalid_token"');
   });
 
   it("derives a usable canonical resource for ephemeral localhost listen()", async () => {
