@@ -34,7 +34,7 @@ exclude = [
   "^https://github\\.com/[^/]+/[^/]+/stargazers$",
 
   # star-history.com badge API intermittently returns 500s; the badge is decorative
-  "^https://api\\.star-history\\.com",
+  "^https://api\\.star-history\\.com/svg",
 
 ]
 
