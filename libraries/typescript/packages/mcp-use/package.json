@@ -247,7 +247,7 @@
     "express-rate-limit": ">=8.2.2",
     "husky": "^9.1.7",
     "jsdom": "^27.0.0",
-    "morgan": "^1.10.1",
+    "morgan": "^1.11.0",
     "react": "^19.2.3",
     "react-test-renderer": "^19.2.4",
     "tsx": "^4.21.0",
