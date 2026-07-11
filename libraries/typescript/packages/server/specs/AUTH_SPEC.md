@@ -536,6 +536,7 @@ function requireOAuthAuthInfo<TUser>(
   const extra = authInfo?.extra;
   if (
     extra === undefined ||
+    extra === null ||
     typeof extra !== "object" ||
     typeof authInfo?.expiresAt !== "number" ||
     !("user" in extra) ||
