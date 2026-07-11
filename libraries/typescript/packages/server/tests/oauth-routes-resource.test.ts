@@ -44,6 +44,9 @@ function provider(
             token === "expired"
               ? Date.now() / 1000 - 60
               : Date.now() / 1000 + 60,
+          ...(options.resource !== undefined && {
+            resource: new URL(options.resource),
+          }),
         };
       },
     },
