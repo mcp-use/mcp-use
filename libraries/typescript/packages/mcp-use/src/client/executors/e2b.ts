@@ -58,11 +58,6 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
 
     return this.codeExecSandbox;
   }
-
-  /**
-   * Generate the shim code that exposes tools to the sandbox environment.
-   * Creates a bridge that intercepts tool calls and sends them back to host.
-   */
     /**
    * Generate the shim code that exposes tools to the sandbox environment.
    * Creates a bridge that intercepts tool calls and sends them back to host.
