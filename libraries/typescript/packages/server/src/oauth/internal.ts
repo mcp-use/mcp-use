@@ -1,13 +1,16 @@
-import {
-  OAuthError,
-  OAuthErrorCode,
-  type AuthInfo,
-  type OAuthTokenVerifier,
-} from "@modelcontextprotocol/server";
+import type { AuthInfo, OAuthTokenVerifier } from "@modelcontextprotocol/server";
 
-import { oauthAudienceValidated } from "./jwt.js";
+import {
+  assertSecureHttpUrl,
+  isLocalhost,
+  isRecord,
+  parseAbsoluteUrl,
+} from "./guards.js";
+import { invalidToken, oauthAudienceValidated } from "./jwt.js";
 import type { OAuthExtra, OAuthProvider } from "./provider.js";
 import { resolveOAuthProvider as resolveProvider } from "./provider.js";
+
+export { assertSecureHttpUrl, isLocalhost, parseAbsoluteUrl } from "./guards.js";
 
 /** @internal Resolves an opaque provider for server-side wiring. */
 export const resolveOAuthProvider = resolveProvider;
@@ -264,14 +267,6 @@ function assertMappedExtra<TUser>(
   }
 }
 
-function invalidToken(message: string, cause?: unknown): OAuthError {
-  const error = new OAuthError(OAuthErrorCode.InvalidToken, message);
-  if (cause !== undefined) {
-    error.cause = cause;
-  }
-  return error;
-}
-
 function requireAbsoluteOrigin(value: string | URL, name: string): URL {
   const url = parseAbsoluteUrl(value, name);
   if (
@@ -292,20 +287,6 @@ function appendBasePath(origin: URL, basePath: string): URL {
   return resource;
 }
 
-/** @internal Parses and validates an absolute URL without credentials. */
-export function parseAbsoluteUrl(value: string | URL, name: string): URL {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new Error(`${name} must be an absolute URL`);
-  }
-  if (url.origin === "null" || url.username !== "" || url.password !== "") {
-    throw new Error(`${name} must be an absolute URL without credentials`);
-  }
-  return url;
-}
-
 function normalizeBasePath(basePath: string): string {
   if (
     !basePath.startsWith("/") ||
@@ -319,30 +300,4 @@ function normalizeBasePath(basePath: string): string {
 
 function normalizePathname(pathname: string): string {
   return pathname === "/" ? "/" : pathname.replace(/\/+$/, "");
-}
-
-/** @internal Checks if a URL points to localhost or a loopback address. */
-export function isLocalhost(url: URL): boolean {
-  const hostname = url.hostname.toLowerCase();
-  return (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname === "[::1]" ||
-    /^127(?:\.\d{1,3}){3}$/.test(hostname)
-  );
-}
-
-/** @internal Validates that a URL uses HTTPS, or HTTP for localhost. */
-export function assertSecureHttpUrl(url: URL, name: string): void {
-  if (url.protocol === "https:") {
-    return;
-  }
-  if (url.protocol === "http:" && isLocalhost(url)) {
-    return;
-  }
-  throw new Error(`${name} must use HTTPS, or HTTP for localhost`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

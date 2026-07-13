@@ -1,5 +1,6 @@
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { isRecord } from "./guards.js";
 import {
   booleanValue,
   createJwtVerifier,
@@ -11,7 +12,6 @@ import {
   recordValue,
   requiredString,
   stringValue,
-  type VerifiedPayload,
 } from "./jwt.js";
 import {
   oauthCustomProvider,
@@ -143,8 +143,4 @@ function resourcePermissions(
       ? normalizedStrings(value["roles"]).map((role) => `${resource}:${role}`)
       : []
   );
-}
-
-function isRecord(value: unknown): value is VerifiedPayload {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

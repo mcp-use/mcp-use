@@ -1,5 +1,6 @@
 import type { AuthInfo, OAuthMetadata } from "@modelcontextprotocol/server";
 
+import { isRecord } from "./guards.js";
 import {
   createJwtVerifier,
   invalidToken,
@@ -147,8 +148,4 @@ function supabaseAmr(value: unknown): SupabaseAmr[] {
     }
     return [timestamp === undefined ? { method } : { method, timestamp }];
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
