@@ -3,6 +3,9 @@ import { useSyncExternalStore } from "react";
 
 import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type { DeepPartial, RegisteredTools } from "../types/register.js";
+import type { ToolContextError } from "../types/result-types.js";
+
+export type { ToolContextError } from "../types/result-types.js";
 
 type ToolOutput<Name extends keyof RegisteredTools> = Name extends keyof RegisteredTools
   ? RegisteredTools[Name]["output"]
@@ -13,158 +16,146 @@ type ToolInput<Name extends keyof RegisteredTools> = Name extends keyof Register
   : unknown;
 
 /**
- * Last-known calling tool name on non-ready branches.
+ * No result yet and arguments are not mid-stream.
  *
- * Seeded from host context; may lag until the first result. Input notifications
- * carry no tool identity, so during streaming this is informational — not a
- * type discriminant.
- *
- * @typeParam Name - Bound tool name(s) from {@link RegisteredTools}.
+ * @typeParam Name - Bound tool name from {@link RegisteredTools}.
  */
-type ToolNameField<Name extends keyof RegisteredTools> = [Name] extends [never]
-  ? string | undefined
-  : Name | undefined;
+interface PendingToolContext<Name extends keyof RegisteredTools> {
+  /**
+   * No result yet and arguments are not mid-stream. Covers both "nothing
+   * arrived" and "complete input received, awaiting result" —
+   * {@link ToolContextHandle.toolInput} is the complete args when delivered.
+   */
+  status: "pending";
+  /** Complete tool arguments when delivered; otherwise `undefined`. */
+  toolInput: ToolInput<Name> | undefined;
+  /** Always `undefined` until a ready result arrives. */
+  toolOutput: undefined;
+  /** Always `undefined` until a ready or error result arrives. */
+  content: undefined;
+  /** Always `undefined` until a ready or error result arrives. */
+  meta: undefined;
+  /** Absent outside `"cancelled"`. */
+  reason?: undefined;
+  /** Absent outside `"error"`. */
+  error?: undefined;
+}
 
 /**
- * Ready-branch shape for {@link ToolContextHandle}.
+ * Partial args are arriving.
  *
- * Distributes over a union of tool names so `toolName` and `toolOutput` pair
- * per member (narrowing on `toolName` narrows `toolOutput`). When `Name` is
- * `never` (untyped), collapses to a single branch with
- * `toolName: string | undefined` so untyped usage keeps compiling.
- *
- * @typeParam Name - Bound tool name(s) from {@link RegisteredTools}.
+ * @typeParam Name - Bound tool name from {@link RegisteredTools}.
  */
-type ReadyToolContext<Name extends keyof RegisteredTools> = [Name] extends [never]
-  ? {
-      /** Result arrived; render from {@link ToolContextHandle.toolOutput}. */
-      status: "ready";
-      /**
-       * Calling tool name — seeded from host context, authoritatively updated
-       * from result `_meta["mcp-use/toolName"]`.
-       */
-      toolName: string | undefined;
-      /** Complete tool arguments from the host, when delivered. */
-      toolInput: ToolInput<Name> | undefined;
-      /** Model-visible tool output from the host's `structuredContent`. */
-      toolOutput: ToolOutput<Name>;
-      /** Model-visible content blocks from the tool result. */
-      content: ContentBlock[] | undefined;
-      /** View-only result `_meta`, when present. */
-      meta: Record<string, unknown> | undefined;
-      /** Absent outside `"cancelled"`. */
-      reason?: undefined;
-    }
-  : Name extends unknown
-    ? {
-        /** Result arrived; render from {@link ToolContextHandle.toolOutput}. */
-        status: "ready";
-        /**
-         * Calling tool name for this result — pairs with {@link ToolContextHandle.toolOutput}
-         * so narrowing on the literal narrows the output type.
-         */
-        toolName: Name;
-        /** Complete tool arguments from the host, when delivered. */
-        toolInput: ToolInput<Name> | undefined;
-        /** Model-visible tool output from the host's `structuredContent`. */
-        toolOutput: ToolOutput<Name>;
-        /** Model-visible content blocks from the tool result. */
-        content: ContentBlock[] | undefined;
-        /** View-only result `_meta`, when present. */
-        meta: Record<string, unknown> | undefined;
-        /** Absent outside `"cancelled"`. */
-        reason?: undefined;
-      }
-    : never;
+interface StreamingToolContext<Name extends keyof RegisteredTools> {
+  /**
+   * Partial args are arriving; {@link ToolContextHandle.toolInput} grows
+   * progressively and is typed `DeepPartial` (provisional, render-only —
+   * strings may be truncated mid-token).
+   */
+  status: "streaming";
+  /** Progressive tool arguments (`DeepPartial`); last write wins. */
+  toolInput: DeepPartial<ToolInput<Name>> | undefined;
+  /** Always `undefined` until a ready result arrives. */
+  toolOutput: undefined;
+  /** Always `undefined` until a ready or error result arrives. */
+  content: undefined;
+  /** Always `undefined` until a ready or error result arrives. */
+  meta: undefined;
+  /** Absent outside `"cancelled"`. */
+  reason?: undefined;
+  /** Absent outside `"error"`. */
+  error?: undefined;
+}
 
 /**
- * Discriminated union returned by {@link useToolContext}: tool arguments (partial
- * while streaming, complete otherwise), result payload when ready, and lifecycle
- * status for the current tool call.
+ * Host cancelled the current tool call.
  *
- * Status derivation order: result → `"ready"`; else cancelled → `"cancelled"`;
- * else streaming → `"streaming"`; else `"pending"`.
+ * @typeParam Name - Bound tool name from {@link RegisteredTools}.
+ */
+interface CancelledToolContext<Name extends keyof RegisteredTools> {
+  /**
+   * Host sent `ui/notifications/tool-cancelled` (host MUST send on any
+   * cancellation — user action, sampling error, classifier intervention).
+   * {@link ToolContextHandle.toolInput} may be partial if cancelled mid-stream.
+   */
+  status: "cancelled";
+  /** Last args before cancel — may be partial (`DeepPartial`). */
+  toolInput: DeepPartial<ToolInput<Name>> | undefined;
+  /** Always `undefined` after cancellation (no result). */
+  toolOutput: undefined;
+  /** Always `undefined` after cancellation (no result). */
+  content: undefined;
+  /** Always `undefined` after cancellation (no result). */
+  meta: undefined;
+  /** Optional host-provided cancellation reason. */
+  reason: string | undefined;
+  /** Absent outside `"error"`. */
+  error?: undefined;
+}
+
+/**
+ * Non-error result with `structuredContent` — typed output is available.
  *
- * When `Name` is a union of registered tool names, the `"ready"` branch
- * distributes so `toolName` acts as a discriminant for `toolOutput`.
+ * @typeParam Name - Bound tool name from {@link RegisteredTools}.
+ */
+interface ReadyToolContext<Name extends keyof RegisteredTools> {
+  /** Result arrived; render from {@link ToolContextHandle.toolOutput}. */
+  status: "ready";
+  /** Complete tool arguments from the host, when delivered. */
+  toolInput: ToolInput<Name> | undefined;
+  /** Model-visible tool output from the host's `structuredContent`. */
+  toolOutput: ToolOutput<Name>;
+  /** Model-visible content blocks from the tool result. */
+  content: ContentBlock[] | undefined;
+  /** View-only result `_meta`, when present. */
+  meta: Record<string, unknown> | undefined;
+  /** Absent outside `"cancelled"`. */
+  reason?: undefined;
+  /** Absent outside `"error"`. */
+  error?: undefined;
+}
+
+/**
+ * Tool error or invalid non-error result — never cast to typed output.
+ *
+ * @typeParam Name - Bound tool name from {@link RegisteredTools}.
+ */
+interface ErrorToolContext<Name extends keyof RegisteredTools> {
+  /** Valid tool error or malformed non-error result. */
+  status: "error";
+  /** Complete tool arguments from the host, when delivered. */
+  toolInput: ToolInput<Name> | undefined;
+  /** Always `undefined` on the error branch — never typed output. */
+  toolOutput: undefined;
+  /** Content blocks from the result, when present. */
+  content: ContentBlock[] | undefined;
+  /** View-only result `_meta`, when present. */
+  meta: Record<string, unknown> | undefined;
+  /** Absent outside `"cancelled"`. */
+  reason?: undefined;
+  /** Discriminated tool vs invalid-result payload. */
+  error: ToolContextError;
+}
+
+/**
+ * Discriminated union returned by {@link useToolContext}: tool arguments
+ * (partial while streaming, complete otherwise), typed result payload when
+ * ready, and lifecycle status for the current tool call.
+ *
+ * Status derivation order: error → ready → cancelled → streaming → pending.
+ * The `"ready"` branch is available only for a non-error result with
+ * `structuredContent`. There is no `toolName` field — the view has one bound
+ * tool, so the generic `Name` selects input/output types.
  *
  * @typeParam Name - Bound tool name from {@link RegisteredTools}; defaults to
- * `never` (untyped) when omitted. May be a union for multi-tool views.
+ * `never` (untyped) when omitted.
  */
 export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
-  | {
-      /**
-       * No result yet and arguments are not mid-stream. Covers both "nothing
-       * arrived" and "complete input received, awaiting result" —
-       * {@link ToolContextHandle.toolInput} is the complete args when delivered.
-       */
-      status: "pending";
-      /**
-       * Last known calling tool — seeded from host context, may lag until the
-       * first result; input notifications carry no tool identity so this is
-       * informational, not a type discriminant.
-       */
-      toolName: ToolNameField<Name>;
-      /** Complete tool arguments when delivered; otherwise `undefined`. */
-      toolInput: ToolInput<Name> | undefined;
-      /** Always `undefined` until a result arrives. */
-      toolOutput: undefined;
-      /** Always `undefined` until a result arrives. */
-      content: undefined;
-      /** Always `undefined` until a result arrives. */
-      meta: undefined;
-      /** Absent outside `"cancelled"`. */
-      reason?: undefined;
-    }
-  | {
-      /**
-       * Partial args are arriving; {@link ToolContextHandle.toolInput} grows
-       * progressively and is typed `DeepPartial` (provisional, render-only —
-       * strings may be truncated mid-token).
-       */
-      status: "streaming";
-      /**
-       * Last known calling tool — seeded from host context, may lag until the
-       * first result; input notifications carry no tool identity so during
-       * streaming this is informational, not a type discriminant.
-       */
-      toolName: ToolNameField<Name>;
-      /** Progressive tool arguments (`DeepPartial`); last write wins. */
-      toolInput: DeepPartial<ToolInput<Name>> | undefined;
-      /** Always `undefined` until a result arrives. */
-      toolOutput: undefined;
-      /** Always `undefined` until a result arrives. */
-      content: undefined;
-      /** Always `undefined` until a result arrives. */
-      meta: undefined;
-      /** Absent outside `"cancelled"`. */
-      reason?: undefined;
-    }
-  | {
-      /**
-       * Host sent `ui/notifications/tool-cancelled` (host MUST send on any
-       * cancellation — user action, sampling error, classifier intervention).
-       * {@link ToolContextHandle.toolInput} may be partial if cancelled mid-stream.
-       */
-      status: "cancelled";
-      /**
-       * Last known calling tool — seeded from host context, may lag until the
-       * first result; input notifications carry no tool identity so this is
-       * informational, not a type discriminant.
-       */
-      toolName: ToolNameField<Name>;
-      /** Last args before cancel — may be partial (`DeepPartial`). */
-      toolInput: DeepPartial<ToolInput<Name>> | undefined;
-      /** Always `undefined` after cancellation (no result). */
-      toolOutput: undefined;
-      /** Always `undefined` after cancellation (no result). */
-      content: undefined;
-      /** Always `undefined` after cancellation (no result). */
-      meta: undefined;
-      /** Optional host-provided cancellation reason. */
-      reason: string | undefined;
-    }
-  | ReadyToolContext<Name>;
+  | PendingToolContext<Name>
+  | StreamingToolContext<Name>
+  | CancelledToolContext<Name>
+  | ReadyToolContext<Name>
+  | ErrorToolContext<Name>;
 
 /**
  * Primary data hook for view components: tool arguments (streaming into a single
@@ -172,14 +163,19 @@ export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
  * for the bound tool call.
  *
  * @typeParam Name - Bound tool name from {@link RegisteredTools}; defaults to
- * `never` (untyped) when omitted. Pass a union (e.g. `"draw" | "refresh"`) for
- * multi-tool views — in the `"ready"` branch, narrow on `toolName` to refine
- * `toolOutput`.
+ * `never` (untyped) when omitted.
  *
  * @example
  * ```tsx
  * function ProductSearchResult() {
  *   const view = useToolContext<"search-fruits">();
+ *
+ *   if (view.status === "error") {
+ *     if (view.error.kind === "tool") {
+ *       return <ToolError content={view.content} />;
+ *     }
+ *     return <InvalidResult message={view.error.message} />;
+ *   }
  *
  *   if (view.status !== "ready") {
  *     return (
@@ -189,8 +185,6 @@ export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
  *     );
  *   }
  *
- *   // Single-name: toolName is the literal "search-fruits".
- *   // With a union Name, narrow: if (view.toolName === "search-fruits") { … }
  *   return (
  *     <ul>
  *       {view.toolOutput.items.map((item) => (
@@ -210,10 +204,20 @@ export function useToolContext<
     runtime.getToolSnapshot
   );
 
+  if (snap.error !== undefined) {
+    return {
+      status: "error",
+      toolInput: snap.toolInput as ToolInput<Name> | undefined,
+      toolOutput: undefined,
+      content: snap.content,
+      meta: snap.meta,
+      error: snap.error,
+    };
+  }
+
   if (snap.hasToolResult) {
     return {
       status: "ready",
-      toolName: snap.toolName as ReadyToolContext<Name>["toolName"],
       toolInput: snap.toolInput as ToolInput<Name> | undefined,
       toolOutput: snap.toolOutput as ToolOutput<Name>,
       content: snap.content,
@@ -224,7 +228,6 @@ export function useToolContext<
   if (snap.cancelled !== undefined) {
     return {
       status: "cancelled",
-      toolName: snap.toolName as ToolNameField<Name>,
       toolInput: snap.toolInput as DeepPartial<ToolInput<Name>> | undefined,
       toolOutput: undefined,
       content: undefined,
@@ -236,7 +239,6 @@ export function useToolContext<
   if (snap.isStreaming) {
     return {
       status: "streaming",
-      toolName: snap.toolName as ToolNameField<Name>,
       toolInput: snap.toolInput as DeepPartial<ToolInput<Name>> | undefined,
       toolOutput: undefined,
       content: undefined,
@@ -246,7 +248,6 @@ export function useToolContext<
 
   return {
     status: "pending",
-    toolName: snap.toolName as ToolNameField<Name>,
     toolInput: snap.toolInput as ToolInput<Name> | undefined,
     toolOutput: undefined,
     content: undefined,

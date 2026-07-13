@@ -7,8 +7,11 @@ import { z } from "zod";
 import { MCPServer } from "../src/index.js";
 import type { ToolRef } from "../src/index.js";
 import type { DeepPartial } from "../src/react/types/register.js";
-import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
-import type { useCallTool } from "../src/react/hooks/use-call-tool.js";
+import type {
+  CallToolHandle,
+  useCallTool,
+} from "../src/react/hooks/use-call-tool.js";
+import type { CallToolData } from "../src/react/types/result-types.js";
 
 describe("DeepPartial", () => {
   it("recurses over arrays, nested objects, and preserves primitives", () => {
@@ -55,6 +58,32 @@ describe("useCallTool empty Register", () => {
     expectTypeOf(ref).toMatchTypeOf<
       ToolRef<"echo", { text: string }, { text: string }>
     >();
+    expect(true).toBe(true);
+  });
+
+  it("shares the CallToolData result contract across string, ToolRef, and explicit generics", () => {
+    type Output = { text: string };
+    type FromString = CallToolHandle<Record<string, unknown>, Output>;
+    type FromRef = CallToolHandle<{ text: string }, Output>;
+    type FromExplicit = CallToolHandle<{ text: string }, Output>;
+
+    expectTypeOf<Awaited<ReturnType<FromString["callTool"]>>>().toEqualTypeOf<
+      CallToolData<Output>
+    >();
+    expectTypeOf<Awaited<ReturnType<FromRef["callTool"]>>>().toEqualTypeOf<
+      CallToolData<Output>
+    >();
+    expectTypeOf<Awaited<ReturnType<FromExplicit["callTool"]>>>().toEqualTypeOf<
+      CallToolData<Output>
+    >();
+    expectTypeOf<FromString["data"]>().toEqualTypeOf<
+      CallToolData<Output> | undefined
+    >();
+    expectTypeOf<FromRef["data"]>().toEqualTypeOf<CallToolData<Output> | undefined>();
+    expectTypeOf<FromExplicit["data"]>().toEqualTypeOf<
+      CallToolData<Output> | undefined
+    >();
+
     expect(true).toBe(true);
   });
 });

@@ -98,11 +98,19 @@ export function ViewControls({
         <pre style={debugOverlayStyle}>
           {JSON.stringify(
             {
+              status: context.status,
               toolOutput:
                 context.status === "ready" ? context.toolOutput : undefined,
-              content: context.status === "ready" ? context.content : undefined,
+              content:
+                context.status === "ready" || context.status === "error"
+                  ? context.content
+                  : undefined,
               toolInput: context.toolInput,
-              meta: context.status === "ready" ? context.meta : undefined,
+              meta:
+                context.status === "ready" || context.status === "error"
+                  ? context.meta
+                  : undefined,
+              error: context.status === "error" ? context.error : undefined,
               theme: host.theme,
               displayMode: host.displayMode,
               isAvailable: host.isAvailable,

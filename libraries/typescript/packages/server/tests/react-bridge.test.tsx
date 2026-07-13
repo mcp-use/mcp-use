@@ -9,6 +9,7 @@ import {
   bootstrapView,
   disposeView,
   Image,
+  InvalidToolResultError,
   ModelContext,
   modelContext,
   useCallTool,
@@ -245,136 +246,104 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("preserves prior toolName from hostContext across tool results", async () => {
+  it("surfaces valid tool errors as status error with kind tool", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
     function View() {
       const handle = useToolContext();
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|{handle.toolName ?? "undef"}
-        </div>
-      );
+      if (handle.status === "error") {
+        return (
+          <div data-testid="lifecycle">
+            error|{handle.error.kind}|
+            {handle.toolOutput === undefined ? "no-out" : "has-out"}|
+            {handle.content?.[0] && "type" in handle.content[0]
+              ? handle.content[0].type
+              : ""}
+          </div>
+        );
+      }
+      return <div data-testid="lifecycle">{handle.status}</div>;
     }
 
     bootstrapView({ default: View as ComponentType });
     await init;
 
-    await bridge.sendHostContextChange({
-      toolInfo: {
-        tool: {
-          name: "save-checkpoint",
-          inputSchema: { type: "object", properties: {} },
-        },
-      },
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "pending|save-checkpoint"
-      );
-    });
-
+    await bridge.sendToolInput({ arguments: { query: "x" } });
     await bridge.sendToolResult({
-      content: [{ type: "text", text: "ok" }],
-      structuredContent: { n: 1 },
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "ready|save-checkpoint"
-      );
+      content: [{ type: "text", text: "failed" }],
+      isError: true,
     });
 
-    // Next call cycle: complete input clears result → pending, toolName kept.
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "error|tool|no-out|text"
+      );
+    });
+  });
+
+  it("surfaces missing structuredContent as invalid-result error", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      if (handle.status === "error") {
+        return (
+          <div data-testid="lifecycle">
+            error|{handle.error.kind}|
+            {handle.error.kind === "invalid-result"
+              ? handle.error.message
+              : ""}|
+            {handle.toolOutput === undefined ? "no-out" : "has-out"}
+          </div>
+        );
+      }
+      return <div data-testid="lifecycle">{handle.status}</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
     await bridge.sendToolInput({ arguments: {} });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "pending|save-checkpoint"
-      );
+    await bridge.sendToolResult({
+      content: [{ type: "text", text: "no structured" }],
     });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("lifecycle").textContent).toContain(
+        "error|invalid-result|"
+      );
+      expect(screen.getByTestId("lifecycle").textContent).toContain(
+        "without structuredContent"
+      );
+      expect(screen.getByTestId("lifecycle").textContent).toContain("|no-out");
+    });
+  });
+
+  it("clears error state on a subsequent tool-input cycle", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      return <div data-testid="lifecycle">{handle.status}</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
 
     await bridge.sendToolResult({
-      content: [{ type: "text", text: "ok" }],
-      structuredContent: { n: 2 },
+      content: [{ type: "text", text: "failed" }],
+      isError: true,
     });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "ready|save-checkpoint"
-      );
+      expect(screen.getByTestId("lifecycle").textContent).toBe("error");
     });
-  });
 
-  it("updates toolName from host-context toolInfo before a result", async () => {
-    resetRuntime();
-    const { bridge, init } = await startHost();
-
-    function View() {
-      const handle = useToolContext();
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|{handle.toolName ?? "undef"}
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
+    await bridge.sendToolInput({ arguments: { query: "retry" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|undef");
-    });
-
-    await bridge.sendHostContextChange({
-      toolInfo: {
-        tool: {
-          name: "x",
-          inputSchema: { type: "object", properties: {} },
-        },
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|x");
-    });
-  });
-
-  it("_resetViewBridgeForTesting clears toolName to undefined", async () => {
-    resetRuntime();
-    const { bridge, init } = await startHost();
-
-    function View() {
-      const handle = useToolContext();
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|{handle.toolName ?? "undef"}
-        </div>
-      );
-    }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await bridge.sendHostContextChange({
-      toolInfo: {
-        tool: {
-          name: "save-checkpoint",
-          inputSchema: { type: "object", properties: {} },
-        },
-      },
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "pending|save-checkpoint"
-      );
-    });
-
-    resetRuntime();
-    const { init: init2 } = await startHost();
-    bootstrapView({ default: View as ComponentType });
-    await init2;
-
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|undef");
+      expect(screen.getByTestId("lifecycle").textContent).toBe("pending");
     });
   });
 
@@ -870,6 +839,17 @@ describe("react bridge runtime", () => {
       if (args.id === "fail") {
         throw new Error("tool failed");
       }
+      if (args.id === "tool-error") {
+        return {
+          content: [{ type: "text", text: "tool error" }],
+          isError: true,
+        };
+      }
+      if (args.id === "malformed") {
+        return {
+          content: [{ type: "text", text: "missing structured" }],
+        };
+      }
       return {
         content: [{ type: "text", text: name }],
         structuredContent: { value: String(args.id ?? "") },
@@ -888,10 +868,13 @@ describe("react bridge runtime", () => {
           </span>
           <span data-testid="pending">{String(tool.isPending)}</span>
           <span data-testid="error">{tool.error?.message ?? ""}</span>
+          <span data-testid="error-name">{tool.error?.name ?? ""}</span>
           <span data-testid="data">
-            {tool.data?.structuredContent
-              ? JSON.stringify(tool.data.structuredContent)
-              : ""}
+            {tool.data?.isError === true
+              ? `err:${tool.data.content?.[0] && "text" in tool.data.content[0] ? tool.data.content[0].text : ""}`
+              : tool.data && !tool.data.isError
+                ? JSON.stringify(tool.data.structuredContent)
+                : ""}
           </span>
           <button
             type="button"
@@ -908,6 +891,24 @@ describe("react bridge runtime", () => {
             }}
           >
             fail
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void tool.callTool({ id: "tool-error" });
+            }}
+          >
+            tool-error
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void tool
+                .callTool({ id: "malformed" })
+                .catch(() => undefined);
+            }}
+          >
+            malformed
           </button>
         </div>
       );
@@ -940,6 +941,33 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(screen.getByTestId("error").textContent).toContain("tool failed");
     });
+    // Transport failure preserves previous successful data.
+    expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
+
+    screen.getByText("tool-error").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("data").textContent).toBe("err:tool error");
+      expect(screen.getByTestId("error").textContent).toBe("");
+      expect(screen.getByTestId("pending").textContent).toBe("false");
+    });
+
+    screen.getByText("call").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
+    });
+
+    screen.getByText("malformed").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("error-name").textContent).toBe(
+        "InvalidToolResultError"
+      );
+      expect(screen.getByTestId("error").textContent).toContain(
+        "without structuredContent"
+      );
+    });
+    // Malformed non-error result preserves previous successful data.
+    expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
+    expect(InvalidToolResultError.name).toBe("InvalidToolResultError");
 
     screen.getByText("call").click();
     await waitFor(() => {

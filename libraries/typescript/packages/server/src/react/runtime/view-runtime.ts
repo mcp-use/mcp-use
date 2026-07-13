@@ -7,6 +7,7 @@ import {
 import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server";
 
 import type { DisplayMode } from "../types/host-types.js";
+import type { ToolContextError } from "../types/result-types.js";
 import type { NormalizedViewConfig } from "./view-config.js";
 
 /** Transport accepted by {@link App.connect}. */
@@ -15,16 +16,22 @@ export type ViewRuntimeTransport = NonNullable<Parameters<App["connect"]>[0]>;
 type Listener = () => void;
 
 /**
- * Tool-channel snapshot: inbound tool input, result, cancel, and identity.
+ * Tool-channel snapshot: inbound tool input, result, cancel, and errors.
+ *
+ * `hasToolResult` is true only for a non-error result with `structuredContent`
+ * (the `"ready"` branch). Tool errors and invalid results set `error` instead.
  *
  * @internal
  */
 export interface ToolSnapshot {
-  /** Model-visible tool output from the last result's `structuredContent`. */
+  /** Model-visible tool output from the last ready result's `structuredContent`. */
   toolOutput: unknown;
-  /** Model-visible content blocks from the last tool result. */
+  /** Model-visible content blocks from the last tool result (ready or error). */
   content: ContentBlock[] | undefined;
-  /** Whether a tool result notification has arrived. */
+  /**
+   * Whether a ready (non-error, with `structuredContent`) tool result has
+   * arrived for the current call cycle.
+   */
   hasToolResult: boolean;
   /**
    * Latest tool arguments from the host — partial while streaming, complete
@@ -41,10 +48,10 @@ export interface ToolSnapshot {
   /** View-only result `_meta` channel. */
   meta: Record<string, unknown> | undefined;
   /**
-   * Name of the tool for the current call cycle — seeded from
-   * `hostContext.toolInfo`; `undefined` until the host delivers it.
+   * Tool or invalid-result error for the current call cycle; cleared on a new
+   * input/streaming cycle or a ready result.
    */
-  toolName: string | undefined;
+  error: ToolContextError | undefined;
 }
 
 /**
@@ -209,7 +216,7 @@ const defaultToolSnapshot: ToolSnapshot = {
   isStreaming: false,
   cancelled: undefined,
   meta: undefined,
-  toolName: undefined,
+  error: undefined,
 };
 
 const defaultHostSnapshot: HostSnapshot = {
@@ -380,41 +387,41 @@ export function createMcpAppRuntime(
   }
 
   /**
-   * Apply a host-context update and fan out to host / theme / display / tool
+   * Apply a host-context update and fan out to host / theme / display
    * channels that actually changed.
    */
-  function applyHostContext(
-    nextHostContext: McpUiHostContext,
-    toolNameFromInfo?: string
-  ): void {
+  function applyHostContext(nextHostContext: McpUiHostContext): void {
     patchHost({ hostContext: nextHostContext });
     syncThemeFromHost(nextHostContext);
     syncDisplayFromHost(nextHostContext);
-    if (typeof toolNameFromInfo === "string") {
-      patchTool({ toolName: toolNameFromInfo });
-    }
   }
+
+  /** Clear ready/error result fields shared by new call-cycle transitions. */
+  const clearResultPatch = {
+    hasToolResult: false,
+    toolOutput: undefined,
+    content: undefined,
+    meta: undefined,
+    error: undefined,
+  } as const satisfies Partial<ToolSnapshot>;
 
   function installRuntimeEventHandlers(app: App): void {
     // Both tool-input and tool-input-partial clear `cancelled` (a new/continuing
-    // call cycle). Result state is cleared on every partial (new stream = new
-    // call). On complete tool-input, result state is cleared only when a prior
-    // result already exists — that input belongs to a subsequent call; within a
-    // single call, tool-input always precedes tool-result so hasToolResult is
-    // still false and the mid-cycle pending→ready path is unchanged.
+    // call cycle). Result/error state is cleared on every partial (new stream =
+    // new call). On complete tool-input, result state is cleared only when a
+    // prior result or error already exists — that input belongs to a subsequent
+    // call; within a single call, tool-input always precedes tool-result so
+    // hasToolResult/error are still unset and the mid-cycle pending→ready path
+    // is unchanged.
     app.ontoolinput = (params) => {
       if (app !== currentApp) return;
-      const clearResult = toolSnapshot.hasToolResult;
+      const clearResult =
+        toolSnapshot.hasToolResult || toolSnapshot.error !== undefined;
       patchTool({
         toolInput: params.arguments ?? {},
         isStreaming: false,
         cancelled: undefined,
-        ...(clearResult && {
-          hasToolResult: false,
-          toolOutput: undefined,
-          content: undefined,
-          meta: undefined,
-        }),
+        ...(clearResult && clearResultPatch),
       });
     };
 
@@ -424,26 +431,60 @@ export function createMcpAppRuntime(
         toolInput: params.arguments ?? {},
         isStreaming: true,
         cancelled: undefined,
-        hasToolResult: false,
-        toolOutput: undefined,
-        content: undefined,
-        meta: undefined,
+        ...clearResultPatch,
       });
     };
 
     app.ontoolresult = (params) => {
       if (app !== currentApp) return;
+      const content = Array.isArray(params.content)
+        ? (params.content as ContentBlock[])
+        : undefined;
       const meta =
         params._meta !== undefined &&
         typeof params._meta === "object" &&
         params._meta !== null
           ? (params._meta as Record<string, unknown>)
           : undefined;
+
+      if (params.isError === true) {
+        patchTool({
+          error: {
+            kind: "tool",
+            result: params as CallToolResult & { isError: true },
+          },
+          hasToolResult: false,
+          toolOutput: undefined,
+          content,
+          meta,
+          isStreaming: false,
+          cancelled: undefined,
+        });
+        return;
+      }
+
+      if (params.structuredContent === undefined) {
+        patchTool({
+          error: {
+            kind: "invalid-result",
+            message:
+              "View-bound tool returned a non-error result without structuredContent",
+            result: params,
+          },
+          hasToolResult: false,
+          toolOutput: undefined,
+          content,
+          meta,
+          isStreaming: false,
+          cancelled: undefined,
+        });
+        return;
+      }
+
       patchTool({
+        error: undefined,
         toolOutput: params.structuredContent,
-        content: Array.isArray(params.content)
-          ? (params.content as ContentBlock[])
-          : undefined,
+        content,
         meta,
         hasToolResult: true,
         isStreaming: false,
@@ -463,14 +504,10 @@ export function createMcpAppRuntime(
 
     app.onhostcontextchanged = (params) => {
       if (app !== currentApp) return;
-      const toolNameFromInfo = params.toolInfo?.tool?.name;
-      applyHostContext(
-        {
-          ...(hostSnapshot.hostContext ?? {}),
-          ...params,
-        },
-        typeof toolNameFromInfo === "string" ? toolNameFromInfo : undefined
-      );
+      applyHostContext({
+        ...(hostSnapshot.hostContext ?? {}),
+        ...params,
+      });
     };
   }
 
@@ -515,7 +552,6 @@ export function createMcpAppRuntime(
         throw new Error("View runtime connection superseded");
       }
       const hostContext = app.getHostContext();
-      const toolNameFromInfo = hostContext?.toolInfo?.tool?.name;
       connectedApp = app;
       patchHost({
         isConnected: true,
@@ -525,9 +561,6 @@ export function createMcpAppRuntime(
       if (hostContext !== undefined) {
         syncThemeFromHost(hostContext);
         syncDisplayFromHost(hostContext);
-      }
-      if (typeof toolNameFromInfo === "string") {
-        patchTool({ toolName: toolNameFromInfo });
       }
       return app;
     } catch (error) {
@@ -632,6 +665,13 @@ export function createMcpAppRuntime(
     params: CallToolParams
   ): Promise<CallToolResult> {
     const app = await connect();
+    // Phase 8: capability guard lives here so useCallTool can rely on it.
+    // Phase 9 centralizes the remaining outbound capability checks.
+    if (app.getHostCapabilities()?.serverTools === undefined) {
+      throw new Error(
+        "Host does not advertise the serverTools capability required to call server tools"
+      );
+    }
     return app.callServerTool(params);
   }
 

@@ -19,7 +19,10 @@ export { Image } from "./components/image.js";
 export { ModelContext, modelContext } from "./components/model-context.js";
 export { ThemeProvider } from "./components/theme-provider.js";
 export { ViewControls } from "./components/view-controls.js";
-export { useCallTool, type CallToolHandle } from "./hooks/use-call-tool.js";
+export {
+  useCallTool,
+  type CallToolHandle,
+} from "./hooks/use-call-tool.js";
 export { useDisplayMode } from "./hooks/use-display-mode.js";
 export {
   useHostContext,
@@ -46,3 +49,9 @@ export type {
   HostInfo,
   SafeAreaInsets,
 } from "./types/host-types.js";
+export {
+  InvalidToolResultError,
+  type CallToolData,
+  type CallToolResult,
+  type ToolContextError,
+} from "./types/result-types.js";
