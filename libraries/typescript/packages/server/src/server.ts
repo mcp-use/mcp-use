@@ -203,9 +203,11 @@ export class MCPServer<TUser = never> {
   /**
    * The URL path prefix the MCP endpoint is mounted at.
    *
-   * Reflects `config.basePath` (default `"/mcp"`). Exposed so tooling that
-   * imports the entry module — `mcp-use dev`'s startup log, for example —
-   * can build the endpoint and inspector URLs without assuming the default.
+   * Returns the normalized path: trailing slashes removed except for the
+   * root path `/`. Reflects `config.basePath` (default `"/mcp"`). Exposed so
+   * tooling that imports the entry module — `mcp-use dev`'s startup log, for
+   * example — can build the endpoint and inspector URLs without assuming the
+   * default.
    */
   get basePath(): string {
     return this.#basePath();
@@ -481,7 +483,7 @@ export class MCPServer<TUser = never> {
     }
 
     throw new Error(
-      "OAuth requires an explicit resource or MCP_URL when using getHandler()"
+      "OAuth requires an explicit resource or MCP_URL when using getHandler() or listening on a non-local host"
     );
   }
 

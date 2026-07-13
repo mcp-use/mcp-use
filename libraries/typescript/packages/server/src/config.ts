@@ -47,7 +47,17 @@ interface BaseServerConfig {
   description?: string;
   /** Usage instructions surfaced to the model by clients. */
   instructions?: string;
-  /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
+  /**
+   * Route path the MCP endpoint is served on.
+   *
+   * Must be an absolute URL pathname: starts with `/`, and contains no `?`,
+   * `#`, whitespace, or empty path segments (`//`). A trailing slash is
+   * removed at runtime except for the root path `/`.
+   *
+   * @defaultValue `"/mcp"`
+   * @throws TypeError When the value fails the pathname rules above
+   * (validated by {@link assertServerConfig}).
+   */
   basePath?: string;
   /**
    * Hostname `listen()` binds. Defaults to `127.0.0.1`; localhost-class
@@ -159,16 +169,38 @@ interface BaseServerConfig {
  * Runtime checks for optional {@link ServerConfig} fields that TypeScript
  * alone cannot enforce when values arrive from untyped call sites.
  *
- * @throws {TypeError} When `configureApp` is present but not a function.
+ * @throws TypeError When `configureApp` is present but not a function, or
+ * when `basePath` is present but not an absolute URL pathname without empty
+ * segments, query, fragment, or whitespace.
  */
 export function assertServerConfig(config: {
   configureApp?: unknown;
+  basePath?: unknown;
 }): void {
   if (
     config.configureApp !== undefined &&
     typeof config.configureApp !== "function"
   ) {
     throw new TypeError("configureApp must be a function");
+  }
+  if (config.basePath !== undefined) {
+    if (typeof config.basePath !== "string") {
+      throw new TypeError(
+        "basePath must be an absolute URL pathname without empty segments, query, or fragment"
+      );
+    }
+    const { basePath } = config;
+    if (
+      !basePath.startsWith("/") ||
+      basePath.includes("?") ||
+      basePath.includes("#") ||
+      /\s/.test(basePath) ||
+      basePath.includes("//")
+    ) {
+      throw new TypeError(
+        "basePath must be an absolute URL pathname without empty segments, query, or fragment"
+      );
+    }
   }
 }
 
