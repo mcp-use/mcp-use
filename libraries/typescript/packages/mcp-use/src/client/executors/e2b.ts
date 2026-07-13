@@ -63,6 +63,10 @@ export class E2BCodeExecutor extends BaseCodeExecutor {
    * Generate the shim code that exposes tools to the sandbox environment.
    * Creates a bridge that intercepts tool calls and sends them back to host.
    */
+    /**
+   * Generate the shim code that exposes tools to the sandbox environment.
+   * Creates a bridge that intercepts tool calls and sends them back to host.
+   */
   private generateShim(tools: Record<string, Tool[]>): string {
     let shim = `
 // MCP Bridge Shim
@@ -135,20 +139,25 @@ global.search_tools = async (query, detailLevel = 'full') => {
       // Create safe server name for JS identifier (replace hyphens etc)
       const safeServerName = serverName.replace(/[^a-zA-Z0-9_]/g, "_");
 
+      // Serializăm în siguranță valorile în string-uri JS valide folosind JSON.stringify
+      const escapedServerName = JSON.stringify(serverName);
+      const escapedSafeServerName = JSON.stringify(safeServerName);
+
       shim += `
-global['${serverName}'] = {`;
+global[${escapedServerName}] = {`;
 
       for (const tool of serverTools) {
+        const escapedToolName = JSON.stringify(tool.name);
         shim += `
-    '${tool.name}': async (args) => await global.__callMcpTool('${serverName}', '${tool.name}', args),`;
+    [${escapedToolName}]: async (args) => await global.__callMcpTool(${escapedServerName}, ${escapedToolName}, args),`;
       }
 
       shim += `
 };
 
 // Also expose as safe name if different
-if ('${safeServerName}' !== '${serverName}') {
-    global['${safeServerName}'] = global['${serverName}'];
+if (${escapedSafeServerName} !== ${escapedServerName}) {
+    global[${escapedSafeServerName}] = global[${escapedServerName}];
 }
 `;
     }
