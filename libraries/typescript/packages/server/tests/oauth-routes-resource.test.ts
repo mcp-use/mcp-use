@@ -28,7 +28,7 @@ function provider(
 ) {
   return oauthCustomProvider({
     ...options,
-    tokenVerifier: {
+    createTokenVerifier: (resource) => ({
       verifyAccessToken: async (token) => {
         if (token === "invalid") {
           throw new OAuthError(
@@ -44,12 +44,10 @@ function provider(
             token === "expired"
               ? Date.now() / 1000 - 60
               : Date.now() / 1000 + 60,
-          ...(options.resource !== undefined && {
-            resource: new URL(options.resource),
-          }),
+          resource,
         };
       },
-    },
+    }),
     oauthMetadata: { issuer } as OAuthMetadata,
     mapAuthInfo: () => ({
       user: { id: "user-1" },
@@ -257,9 +255,7 @@ describe("OAuth HTTP route acceptance", () => {
       resource: "https://canonical.example.test/api/mcp",
     });
 
-    const mcpResponse = await handler(
-      request("/api/mcp", { method: "POST" })
-    );
+    const mcpResponse = await handler(request("/api/mcp", { method: "POST" }));
     expect(mcpResponse.status).toBe(401);
     expect(challenge(mcpResponse)).toContain('error="invalid_token"');
   });

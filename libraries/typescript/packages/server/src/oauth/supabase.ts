@@ -61,17 +61,17 @@ export function oauthSupabaseProvider(
   }
   return oauthCustomProvider<SupabaseOAuthUser>({
     ...options,
-    tokenVerifier: createJwtVerifier({
-      issuer,
-      audience: "authenticated",
-      jwksUrl: new URL(
-        providerEndpoint(supabaseUrl, "auth/v1/.well-known/jwks.json")
-      ),
-      ...(secret !== undefined
-        ? { key: new TextEncoder().encode(secret), algorithms: ["HS256"] }
-        : { algorithms: ["ES256"] }),
-      resource: options.resource,
-    }),
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(
+          providerEndpoint(supabaseUrl, "auth/v1/.well-known/jwks.json")
+        ),
+        ...(secret !== undefined
+          ? { key: new TextEncoder().encode(secret), algorithms: ["HS256"] }
+          : { algorithms: ["ES256"] }),
+        resource,
+      }),
     oauthMetadata: {
       issuer,
       authorization_endpoint: providerEndpoint(

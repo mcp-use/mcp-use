@@ -1,4 +1,7 @@
-import type { AuthInfo, OAuthTokenVerifier } from "@modelcontextprotocol/server";
+import type {
+  AuthInfo,
+  OAuthTokenVerifier,
+} from "@modelcontextprotocol/server";
 
 import {
   assertSecureHttpUrl,
@@ -6,10 +9,14 @@ import {
   isRecord,
   parseAbsoluteUrl,
 } from "./guards.js";
-import { invalidToken, oauthAudienceValidated } from "./jwt.js";
+import { invalidToken } from "./jwt.js";
 import type { OAuthExtra, OAuthProvider } from "./provider.js";
 
-export { assertSecureHttpUrl, isLocalhost, parseAbsoluteUrl } from "./guards.js";
+export {
+  assertSecureHttpUrl,
+  isLocalhost,
+  parseAbsoluteUrl,
+} from "./guards.js";
 
 /** @internal Resolves configured resource identity, or undefined when none is configured. */
 export function resolveConfiguredOAuthResource<TUser>(options: {
@@ -76,13 +83,27 @@ export function validateOAuthResource(
 /** @internal Wraps a provider verifier with mcp-use's verified auth mapping. */
 export function wrapOAuthTokenVerifier<TUser>(
   provider: OAuthProvider<TUser>,
-  expectedResource?: URL
+  expectedResource: URL
 ): OAuthTokenVerifier {
+  const canonicalResource = normalizeResourceUrl(expectedResource);
+  const tokenVerifier = provider.createTokenVerifier(
+    new URL(canonicalResource.href)
+  );
+  if (
+    tokenVerifier === null ||
+    typeof tokenVerifier !== "object" ||
+    typeof tokenVerifier.verifyAccessToken !== "function"
+  ) {
+    throw new TypeError(
+      "OAuth provider createTokenVerifier must return an OAuthTokenVerifier"
+    );
+  }
+
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
-      const authInfo = await provider.tokenVerifier.verifyAccessToken(token);
+      const authInfo = await tokenVerifier.verifyAccessToken(token);
       assertVerifiedAuthInfo(authInfo);
-      assertResourceBinding(authInfo, expectedResource);
+      assertResourceBinding(authInfo, canonicalResource);
 
       let mapped: OAuthExtra<TUser>;
       try {
@@ -103,29 +124,16 @@ export function wrapOAuthTokenVerifier<TUser>(
 
 function assertResourceBinding(
   authInfo: AuthInfo,
-  expectedResource: URL | undefined
+  expectedResource: URL
 ): void {
   if (authInfo.resource === undefined) {
-    if (expectedResource !== undefined) {
-      const extra = authInfo.extra as
-        | (Record<string, unknown> & {
-            [oauthAudienceValidated]?: true;
-          })
-        | undefined;
-      if (extra?.[oauthAudienceValidated] === true) {
-        return;
-      }
-      throw invalidToken(
-        "Token must be bound to the protected resource via a validated audience or resource claim"
-      );
-    }
-    return;
+    throw invalidToken(
+      "Token verifier did not return a validated protected resource"
+    );
   }
   const resource = parseTokenResource(authInfo.resource);
-  if (expectedResource !== undefined) {
-    if (resource.href !== normalizeResourceUrl(expectedResource).href) {
-      throw invalidToken("Token resource does not match the protected resource");
-    }
+  if (resource.href !== normalizeResourceUrl(expectedResource).href) {
+    throw invalidToken("Token resource does not match the protected resource");
   }
 }
 

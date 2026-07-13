@@ -34,37 +34,29 @@ export interface ClerkOAuthUser {
 /** Configures Clerk JWT verification and protected-resource metadata. */
 export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
   frontendApiUrl: URL | string;
-  audience?: string;
 }
 
 /**
  * Creates a provider that verifies Clerk access tokens and maps their claims.
  *
- * @param options - Clerk frontend API URL, optional audience, and resource-server settings.
- * @returns A provider that rejects tokens without a valid Clerk signature and issuer.
+ * @param options - Clerk frontend API URL and resource-server settings.
+ * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthClerkProvider(
   options: ClerkOAuthProviderOptions
 ): OAuthProvider<ClerkOAuthUser> {
-  if (
-    options.audience !== undefined &&
-    (typeof options.audience !== "string" ||
-      options.audience.trim().length === 0)
-  ) {
-    throw new TypeError("Clerk audience must be non-empty");
-  }
   const issuer = normalizedProviderUrl(
     options.frontendApiUrl,
     "Clerk frontendApiUrl"
   ).href.replace(/\/$/, "");
   return oauthCustomProvider<ClerkOAuthUser>({
     ...options,
-    tokenVerifier: createJwtVerifier({
-      issuer,
-      jwksUrl: new URL(providerEndpoint(issuer, ".well-known/jwks.json")),
-      ...(options.audience !== undefined && { audience: options.audience }),
-      resource: options.resource,
-    }),
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(providerEndpoint(issuer, ".well-known/jwks.json")),
+        resource,
+      }),
     oauthMetadata: metadata(issuer),
     mapAuthInfo: (authInfo) => mapUser(authInfo),
   });

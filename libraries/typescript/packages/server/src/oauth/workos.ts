@@ -35,34 +35,26 @@ export interface WorkOSOAuthUser {
 /** Configures WorkOS JWT verification and protected-resource metadata. */
 export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
   subdomain: string;
-  audience?: string;
 }
 
 /**
  * Creates a provider that verifies WorkOS access tokens and maps their claims.
  *
- * @param options - WorkOS AuthKit origin, optional audience, and resource-server settings.
- * @returns A provider that rejects tokens without a valid WorkOS signature and issuer.
+ * @param options - WorkOS AuthKit origin and resource-server settings.
+ * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthWorkOSProvider(
   options: WorkOSOAuthProviderOptions
 ): OAuthProvider<WorkOSOAuthUser> {
-  if (
-    options.audience !== undefined &&
-    (typeof options.audience !== "string" ||
-      options.audience.trim().length === 0)
-  ) {
-    throw new TypeError("WorkOS audience must be non-empty");
-  }
   const issuer = workosIssuer(options.subdomain);
   return oauthCustomProvider<WorkOSOAuthUser>({
     ...options,
-    tokenVerifier: createJwtVerifier({
-      issuer,
-      jwksUrl: new URL(providerEndpoint(issuer, "oauth2/jwks")),
-      ...(options.audience !== undefined && { audience: options.audience }),
-      resource: options.resource,
-    }),
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(providerEndpoint(issuer, "oauth2/jwks")),
+        resource,
+      }),
     oauthMetadata: {
       issuer,
       authorization_endpoint: providerEndpoint(issuer, "oauth2/authorize"),

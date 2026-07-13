@@ -32,33 +32,26 @@ export interface Auth0OAuthUser {
 /** Configures Auth0 JWT verification and protected-resource metadata. */
 export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
   domain: URL | string;
-  audience: string;
 }
 
 /**
  * Creates a provider that verifies Auth0 access tokens and maps their claims.
  *
- * @param options - Auth0 domain, required audience, and resource-server settings.
- * @returns A provider that rejects tokens without a valid Auth0 signature, issuer, and audience.
+ * @param options - Auth0 domain and resource-server settings.
+ * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthAuth0Provider(
   options: Auth0OAuthProviderOptions
 ): OAuthProvider<Auth0OAuthUser> {
-  if (
-    typeof options.audience !== "string" ||
-    options.audience.trim().length === 0
-  ) {
-    throw new TypeError("audience must be non-empty");
-  }
   const issuer = normalizedProviderUrl(options.domain, "Auth0 domain").href;
   return oauthCustomProvider<Auth0OAuthUser>({
     ...options,
-    tokenVerifier: createJwtVerifier({
-      issuer,
-      audience: options.audience,
-      jwksUrl: new URL(providerEndpoint(issuer, ".well-known/jwks.json")),
-      resource: options.resource,
-    }),
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(providerEndpoint(issuer, ".well-known/jwks.json")),
+        resource,
+      }),
     oauthMetadata: {
       issuer,
       authorization_endpoint: providerEndpoint(issuer, "authorize"),

@@ -12,15 +12,6 @@ import {
 } from "jose";
 
 import { isLocalhost, isRecord } from "./guards.js";
-import type { OAuthResourceOptions } from "./provider.js";
-
-/**
- * @internal Marks AuthInfo.extra when jose already enforced the configured JWT audience.
- * A symbol is used so the marker cannot be forged by a verifier that copies JSON token claims into `extra`.
- */
-export const oauthAudienceValidated: unique symbol = Symbol(
-  "mcp-use.oauth-audience-validated"
-);
 
 /** @internal Record of claims extracted from a verified JWT. */
 export type VerifiedPayload = Record<string, unknown>;
@@ -29,8 +20,7 @@ export type VerifiedPayload = Record<string, unknown>;
 export interface JwtVerifierOptions {
   issuer: string;
   jwksUrl: URL;
-  audience?: string;
-  resource?: OAuthResourceOptions["resource"];
+  resource: URL;
   algorithms?: readonly string[];
   key?: Uint8Array;
 }
@@ -41,15 +31,13 @@ export function createJwtVerifier(
 ): OAuthTokenVerifier {
   // jose overloads key material vs JWKS getters; runtime accepts either.
   const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
-  const configuredResource =
-    options.resource !== undefined ? canonicalUrl(options.resource) : undefined;
+  const configuredResource = canonicalUrl(options.resource);
 
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
       try {
         const { payload } = await jwtVerify(token, key as JWTVerifyGetKey, {
           issuer: options.issuer,
-          ...(options.audience !== undefined && { audience: options.audience }),
           ...(options.algorithms !== undefined && {
             algorithms: [...options.algorithms],
           }),
@@ -65,21 +53,13 @@ export function createJwtVerifier(
         const expiresAt = requiredFutureNumber(claims, "exp");
         const resource = verifiedResource(claims, configuredResource);
 
-        const extra: {
-          payload: VerifiedPayload;
-          [oauthAudienceValidated]?: true;
-        } = { payload: claims };
-        if (options.audience !== undefined) {
-          extra[oauthAudienceValidated] = true;
-        }
-
         return {
           token,
           clientId: clientId ?? "",
           scopes: normalizedStrings(claims["scope"]),
           expiresAt,
-          extra: extra as Record<string, unknown>,
-          ...(resource !== undefined && { resource }),
+          extra: { payload: claims },
+          resource,
         };
       } catch (error) {
         if (error instanceof OAuthError) {
@@ -219,25 +199,42 @@ export function invalidToken(message: string, cause?: unknown): OAuthError {
 
 function verifiedResource(
   claims: VerifiedPayload,
-  configuredResource: URL | undefined
-): URL | undefined {
+  configuredResource: URL
+): URL {
   const value = claims["resource"];
-  if (value === undefined) {
-    return undefined;
+  if (value !== undefined) {
+    if (typeof value !== "string") {
+      throw invalidToken("Token resource claim must be an absolute URL");
+    }
+    const resource = canonicalUrl(value);
+    if (resource.href !== configuredResource.href) {
+      throw invalidToken(
+        "Token resource claim does not match protected resource"
+      );
+    }
+    return configuredResource;
   }
-  if (typeof value !== "string") {
-    throw invalidToken("Token resource claim must be an absolute URL");
+
+  const audience = claims["aud"];
+  if (!validAudience(audience)) {
+    throw invalidToken("Token audience claim must be a string or string array");
   }
-  const resource = canonicalUrl(value);
-  if (
-    configuredResource !== undefined &&
-    resource.href !== configuredResource.href
-  ) {
+  const audiences = typeof audience === "string" ? [audience] : audience;
+  if (!audiences.includes(configuredResource.href)) {
     throw invalidToken(
-      "Token resource claim does not match configured resource"
+      "Token audience does not include the protected resource"
     );
   }
-  return resource;
+  return configuredResource;
+}
+
+function validAudience(value: unknown): value is string | string[] {
+  return (
+    typeof value === "string" ||
+    (Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((item) => typeof item === "string"))
+  );
 }
 
 function canonicalUrl(value: URL | string): URL {

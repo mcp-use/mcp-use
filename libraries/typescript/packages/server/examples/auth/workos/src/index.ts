@@ -33,8 +33,6 @@ function requireEnv(name: string): string {
   return value;
 }
 
-const audience = process.env.WORKOS_AUDIENCE?.trim();
-
 const server = new MCPServer({
   name: "workos-auth-example",
   version: "1.0.0",
@@ -43,7 +41,6 @@ const server = new MCPServer({
     "An MCP server secured by verified WorkOS AuthKit access tokens.",
   oauth: oauthWorkOSProvider({
     subdomain: requireEnv("WORKOS_SUBDOMAIN"),
-    ...(audience !== undefined && audience.length > 0 && { audience }),
   }),
 });
 

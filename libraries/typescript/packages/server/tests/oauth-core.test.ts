@@ -17,12 +17,13 @@ import { oauthCustomProvider } from "../src/oauth/provider.js";
 const metadata = {
   issuer: "https://issuer.example.com",
 } as OAuthMetadata;
+const canonicalResource = new URL("https://api.example.test/mcp");
 
 function createProvider(authInfo: AuthInfo) {
   return oauthCustomProvider({
-    tokenVerifier: {
+    createTokenVerifier: () => ({
       verifyAccessToken: async () => authInfo,
-    },
+    }),
     oauthMetadata: metadata,
     mapAuthInfo: () => ({
       user: { id: "user-1" },
@@ -39,11 +40,14 @@ describe("OAuth core", () => {
       clientId: "client-1",
       scopes: ["mcp"],
       expiresAt: Date.now() / 1000 + 60,
+      resource: canonicalResource,
       extra: { upstream: true },
     });
 
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken("presented-token")
+      wrapOAuthTokenVerifier(provider, canonicalResource).verifyAccessToken(
+        "presented-token"
+      )
     ).resolves.toMatchObject({
       token: "verified-token",
       clientId: "client-1",
@@ -66,7 +70,9 @@ describe("OAuth core", () => {
     });
 
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken("presented-token")
+      wrapOAuthTokenVerifier(provider, canonicalResource).verifyAccessToken(
+        "presented-token"
+      )
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
   });
 
@@ -94,7 +100,7 @@ describe("OAuth core", () => {
           ...authInfo,
           resource: new URL("https://api.example.test/mcp/"),
         }),
-        expectedResource
+        expectedResource!
       ).verifyAccessToken("presented-token")
     ).resolves.toMatchObject({
       resource: new URL("https://api.example.test/mcp/"),
@@ -105,18 +111,17 @@ describe("OAuth core", () => {
           ...authInfo,
           resource: "https://api.example.test/mcp" as never,
         }),
-        expectedResource
+        expectedResource!
       ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
     await expect(
       wrapOAuthTokenVerifier(
         createProvider(authInfo),
-        expectedResource
+        expectedResource!
       ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({
       code: OAuthErrorCode.InvalidToken,
-      message:
-        "Token must be bound to the protected resource via a validated audience or resource claim",
+      message: "Token verifier did not return a validated protected resource",
     });
     await expect(
       wrapOAuthTokenVerifier(
@@ -124,7 +129,7 @@ describe("OAuth core", () => {
           ...authInfo,
           resource: new URL("https://other.example.test/mcp"),
         }),
-        expectedResource
+        expectedResource!
       ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
 
@@ -139,41 +144,13 @@ describe("OAuth core", () => {
       await expect(
         wrapOAuthTokenVerifier(
           createProvider({ ...authInfo, resource: resource as never }),
-          expectedResource
+          expectedResource!
         ).verifyAccessToken("presented-token")
       ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
     }
   });
 
-  it("validates returned token resources without an expected resource", async () => {
-    const authInfo = {
-      token: "verified-token",
-      clientId: "client-1",
-      scopes: [],
-      expiresAt: Date.now() / 1000 + 60,
-    };
-
-    await expect(
-      wrapOAuthTokenVerifier(
-        createProvider({
-          ...authInfo,
-          resource: new URL("https://api.example.test/mcp"),
-        })
-      ).verifyAccessToken("presented-token")
-    ).resolves.toMatchObject({
-      resource: new URL("https://api.example.test/mcp"),
-    });
-    await expect(
-      wrapOAuthTokenVerifier(
-        createProvider({
-          ...authInfo,
-          resource: new URL("https://api.example.test/mcp?query=1"),
-        })
-      ).verifyAccessToken("presented-token")
-    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
-  });
-
-  it("accepts audience-validated JWTs without a resource claim", async () => {
+  it("accepts JWTs whose audience is the protected resource", async () => {
     const key = new TextEncoder().encode(
       "a sufficiently long test signing key"
     );
@@ -185,10 +162,10 @@ describe("OAuth core", () => {
       jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
       key,
       algorithms: ["HS256"],
-      audience,
+      resource: expectedResource,
     });
     const provider = oauthCustomProvider({
-      tokenVerifier: verifier,
+      createTokenVerifier: () => verifier,
       oauthMetadata: metadata,
       mapAuthInfo: () => ({
         user: { id: "user-1" },
@@ -209,21 +186,60 @@ describe("OAuth core", () => {
     ).verifyAccessToken(token);
     expect(authInfo).toMatchObject({
       clientId: "client-1",
+      resource: expectedResource,
     });
-    expect(authInfo.resource).toBeUndefined();
   });
 
-  it("rejects forged audience-validated markers that use string keys", async () => {
+  it("accepts aud arrays or resource claims and rejects unbound JWTs", async () => {
+    const key = new TextEncoder().encode(
+      "a sufficiently long test signing key"
+    );
+    const issuer = "https://issuer.example.test";
+    const verifier = createJwtVerifier({
+      issuer,
+      jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+      key,
+      algorithms: ["HS256"],
+      resource: canonicalResource,
+    });
+    const sign = (claims: Record<string, unknown>) =>
+      new SignJWT({ sub: "user-1", client_id: "client-1", ...claims })
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuer(issuer)
+        .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
+        .sign(key);
+
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({ aud: ["provider-api", canonicalResource.href] })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+    await expect(
+      verifier.verifyAccessToken(
+        await sign({ resource: `${canonicalResource.href}/` })
+      )
+    ).resolves.toMatchObject({ resource: canonicalResource });
+
+    for (const claims of [
+      {},
+      { aud: "provider-api" },
+      { aud: 123 },
+      { aud: canonicalResource.href, resource: "https://other.example/mcp" },
+    ]) {
+      await expect(
+        verifier.verifyAccessToken(await sign(claims))
+      ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+    }
+  });
+
+  it("rejects verifier output that does not prove resource binding", async () => {
     const expectedResource = new URL("https://api.example.test/mcp");
     const provider = createProvider({
       token: "verified-token",
       clientId: "client-1",
       scopes: [],
       expiresAt: Date.now() / 1000 + 60,
-      extra: {
-        payload: { sub: "user-1" },
-        "mcp-use.oauth-audience-validated": true,
-      },
+      extra: { payload: { sub: "user-1" } },
     });
 
     await expect(
@@ -232,9 +248,41 @@ describe("OAuth core", () => {
       )
     ).rejects.toMatchObject({
       code: OAuthErrorCode.InvalidToken,
-      message:
-        "Token must be bound to the protected resource via a validated audience or resource claim",
+      message: "Token verifier did not return a validated protected resource",
     });
+  });
+
+  it("does not let a custom verifier mutate the expected resource", async () => {
+    const provider = oauthCustomProvider({
+      createTokenVerifier: (resource) => {
+        resource.hostname = "other.example.test";
+        return {
+          verifyAccessToken: async () => ({
+            token: "verified-token",
+            clientId: "client-1",
+            scopes: [],
+            expiresAt: Date.now() / 1000 + 60,
+            resource,
+          }),
+        };
+      },
+      oauthMetadata: metadata,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: { sub: "user-1" },
+        permissions: [],
+      }),
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(provider, canonicalResource).verifyAccessToken(
+        "presented-token"
+      )
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message: "Token resource does not match the protected resource",
+    });
+    expect(canonicalResource.href).toBe("https://api.example.test/mcp");
   });
 
   it("uses empty clientId when client_id and azp are absent", async () => {
@@ -246,10 +294,12 @@ describe("OAuth core", () => {
       jwksUrl: new URL("https://issuer.example.test/.well-known/jwks.json"),
       key,
       algorithms: ["HS256"],
+      resource: canonicalResource,
     });
     const token = await new SignJWT({ sub: "user-1" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("https://issuer.example.test")
+      .setAudience(canonicalResource.href)
       .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
       .sign(key);
 
@@ -267,10 +317,12 @@ describe("OAuth core", () => {
       jwksUrl: new URL("https://issuer.example.test/.well-known/jwks.json"),
       key,
       algorithms: ["HS256"],
+      resource: canonicalResource,
     });
     const token = await new SignJWT({ sub: "   " })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("https://issuer.example.test")
+      .setAudience(canonicalResource.href)
       .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
       .sign(key);
 
@@ -281,51 +333,57 @@ describe("OAuth core", () => {
 
   it("converts mapper failures and malformed mapped data to invalid tokens", async () => {
     const mapperFailure = oauthCustomProvider({
-      tokenVerifier: {
+      createTokenVerifier: () => ({
         verifyAccessToken: async () => ({
           token: "verified-token",
           clientId: "client-1",
           scopes: [],
           expiresAt: Date.now() / 1000 + 60,
+          resource: canonicalResource,
         }),
-      },
+      }),
       oauthMetadata: metadata,
       mapAuthInfo: () => {
         throw new Error("mapper failed");
       },
     });
     const malformedMapping = oauthCustomProvider({
-      tokenVerifier: {
+      createTokenVerifier: () => ({
         verifyAccessToken: async () => ({
           token: "verified-token",
           clientId: "client-1",
           scopes: [],
           expiresAt: Date.now() / 1000 + 60,
+          resource: canonicalResource,
         }),
-      },
+      }),
       oauthMetadata: metadata,
       mapAuthInfo: () =>
         ({ user: { id: "user-1" }, payload: {}, permissions: [123] }) as never,
     });
 
     await expect(
-      wrapOAuthTokenVerifier(mapperFailure).verifyAccessToken("presented-token")
+      wrapOAuthTokenVerifier(
+        mapperFailure,
+        canonicalResource
+      ).verifyAccessToken("presented-token")
     ).rejects.toBeInstanceOf(OAuthError);
     await expect(
-      wrapOAuthTokenVerifier(malformedMapping).verifyAccessToken(
-        "presented-token"
-      )
+      wrapOAuthTokenVerifier(
+        malformedMapping,
+        canonicalResource
+      ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
   });
 
   it("leaves unexpected verifier failures untouched", async () => {
     const verifierFailure = new Error("verifier unavailable");
     const provider = oauthCustomProvider({
-      tokenVerifier: {
+      createTokenVerifier: () => ({
         verifyAccessToken: async () => {
           throw verifierFailure;
         },
-      },
+      }),
       oauthMetadata: metadata,
       mapAuthInfo: () => ({
         user: { id: "user-1" },
@@ -335,20 +393,23 @@ describe("OAuth core", () => {
     });
 
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken("presented-token")
+      wrapOAuthTokenVerifier(provider, canonicalResource).verifyAccessToken(
+        "presented-token"
+      )
     ).rejects.toBe(verifierFailure);
   });
 
   it("validates supplied custom-provider options", () => {
     const validOptions = {
-      tokenVerifier: {
+      createTokenVerifier: () => ({
         verifyAccessToken: async () => ({
           token: "verified-token",
           clientId: "client-1",
           scopes: [],
           expiresAt: Date.now() / 1000 + 60,
+          resource: canonicalResource,
         }),
-      },
+      }),
       oauthMetadata: metadata,
       mapAuthInfo: () => ({
         user: { id: "user-1" },
@@ -387,9 +448,9 @@ describe("OAuth core", () => {
     expect(() =>
       oauthCustomProvider({
         ...validOptions,
-        tokenVerifier: {} as never,
+        createTokenVerifier: undefined as never,
       })
-    ).toThrow("oauthCustomProvider requires tokenVerifier");
+    ).toThrow("oauthCustomProvider requires createTokenVerifier");
     expect(() =>
       oauthCustomProvider({
         ...validOptions,
@@ -400,14 +461,15 @@ describe("OAuth core", () => {
 
   it("resolves an explicit canonical resource and rejects a path mismatch", () => {
     const provider = oauthCustomProvider({
-      tokenVerifier: {
+      createTokenVerifier: () => ({
         verifyAccessToken: async () => ({
           token: "verified-token",
           clientId: "client-1",
           scopes: [],
           expiresAt: Date.now() / 1000 + 60,
+          resource: canonicalResource,
         }),
-      },
+      }),
       oauthMetadata: metadata,
       mapAuthInfo: () => ({
         user: { id: "user-1" },

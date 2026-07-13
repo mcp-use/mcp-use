@@ -121,14 +121,15 @@ function writeOAuthEntry(cwd: string, basePath = "/mcp"): void {
 import { oauthCustomProvider } from "@mcp-use/server/oauth";
 
 const oauth = oauthCustomProvider({
-  tokenVerifier: {
+  createTokenVerifier: (resource) => ({
     verifyAccessToken: async (token) => ({
       token,
       clientId: "cli-dev-test",
       scopes: [],
       expiresAt: Date.now() / 1000 + 60,
+      resource,
     }),
-  },
+  }),
   oauthMetadata: { issuer: "https://issuer.example.test" },
   mapAuthInfo: () => ({
     user: { id: "user-1" },

@@ -4,10 +4,7 @@ import type {
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
-import {
-  assertSecureHttpUrl,
-  parseAbsoluteUrl,
-} from "./internal.js";
+import { assertSecureHttpUrl, parseAbsoluteUrl } from "./internal.js";
 
 /** Additional verified identity information exposed by mcp-use callbacks. */
 export type OAuthExtra<TUser> = Record<string, unknown> & {
@@ -37,8 +34,8 @@ export interface OAuthResourceOptions {
 export interface CustomOAuthProviderOptions<
   TUser,
 > extends OAuthResourceOptions {
-  /** Verifies access tokens issued by the external authorization server. */
-  tokenVerifier: OAuthTokenVerifier;
+  /** Creates a verifier bound to the resolved canonical MCP resource. */
+  createTokenVerifier: (resource: URL) => OAuthTokenVerifier;
   /** RFC 8414 metadata for the external authorization server. */
   oauthMetadata: OAuthMetadata;
   /** Maps verified SDK auth information into mcp-use callback identity data. */
@@ -46,8 +43,9 @@ export interface CustomOAuthProviderOptions<
 }
 
 /** OAuth resource-server provider accepted by {@link MCPServer}. */
-export interface OAuthProvider<TUser>
-  extends CustomOAuthProviderOptions<TUser> {}
+export interface OAuthProvider<
+  TUser,
+> extends CustomOAuthProviderOptions<TUser> {}
 
 /**
  * Creates an OAuth provider backed by an external authorization server.
@@ -62,13 +60,11 @@ export function oauthCustomProvider<TUser>(
   if (
     options === null ||
     typeof options !== "object" ||
-    options.tokenVerifier === null ||
-    typeof options.tokenVerifier !== "object" ||
-    typeof options.tokenVerifier.verifyAccessToken !== "function" ||
+    typeof options.createTokenVerifier !== "function" ||
     typeof options.mapAuthInfo !== "function"
   ) {
     throw new TypeError(
-      "oauthCustomProvider requires tokenVerifier, oauthMetadata, and mapAuthInfo"
+      "oauthCustomProvider requires createTokenVerifier, oauthMetadata, and mapAuthInfo"
     );
   }
 
@@ -96,7 +92,7 @@ export function oauthCustomProvider<TUser>(
   }
 
   const provider: OAuthProvider<TUser> = {
-    tokenVerifier: options.tokenVerifier,
+    createTokenVerifier: options.createTokenVerifier,
     oauthMetadata: options.oauthMetadata,
     mapAuthInfo: options.mapAuthInfo,
     ...(options.resource !== undefined && { resource: options.resource }),

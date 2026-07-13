@@ -35,7 +35,7 @@ function verifyStructuralProviderTyping(
   oauthMetadata: OAuthMetadata
 ): void {
   const directProvider: OAuthProvider<TestUser> = {
-    tokenVerifier,
+    createTokenVerifier: () => tokenVerifier,
     oauthMetadata,
     mapAuthInfo: () => ({
       user: { id: "user-1" },
@@ -118,7 +118,6 @@ function verifyOAuthCallbackTyping(): void {
     version: "1.0.0",
     oauth: oauthAuth0Provider({
       domain: "https://tenant.auth0.com",
-      audience: "https://api.example.com",
     }),
   });
   auth0.tool({ name: "auth0-user" }, (_params, ctx) => {
@@ -201,24 +200,22 @@ it("throws when authenticated callbacks lack mapped AuthInfo", () => {
 });
 
 it("omits clientId from callback auth when AuthInfo.clientId is empty", () => {
-  const ctx = toAuthenticatedRequestContext<TestUser>(
-    {
-      mcpReq: { signal: new AbortController().signal },
-      http: {
-        authInfo: {
-          token: "token",
-          clientId: "",
-          scopes: ["mcp"],
-          expiresAt: Date.now() / 1000 + 60,
-          extra: {
-            user: { id: "user-1" },
-            payload: { sub: "user-1" },
-            permissions: [],
-          },
+  const ctx = toAuthenticatedRequestContext<TestUser>({
+    mcpReq: { signal: new AbortController().signal },
+    http: {
+      authInfo: {
+        token: "token",
+        clientId: "",
+        scopes: ["mcp"],
+        expiresAt: Date.now() / 1000 + 60,
+        extra: {
+          user: { id: "user-1" },
+          payload: { sub: "user-1" },
+          permissions: [],
         },
       },
-    } as unknown as ServerContext
-  );
+    },
+  } as unknown as ServerContext);
 
   expect(ctx.auth.clientId).toBeUndefined();
   expect(ctx.auth.user.id).toBe("user-1");
@@ -230,14 +227,15 @@ it("rejects public OAuth listen without a canonical resource", async () => {
     version: "1.0.0",
     host: "0.0.0.0",
     oauth: oauthCustomProvider({
-      tokenVerifier: {
+      createTokenVerifier: (resource) => ({
         verifyAccessToken: async () => ({
           token: "token",
           clientId: "client",
           scopes: [],
           expiresAt: Date.now() / 1000 + 60,
+          resource,
         }),
-      },
+      }),
       oauthMetadata: { issuer: "https://issuer.example.com" } as OAuthMetadata,
       mapAuthInfo: () => ({
         user: { id: "user" },

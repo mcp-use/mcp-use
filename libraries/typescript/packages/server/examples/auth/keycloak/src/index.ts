@@ -22,7 +22,6 @@ const getUserInfoOutputSchema = z.object({
 
 const keycloakServerUrl = requireEnv("KEYCLOAK_SERVER_URL");
 const keycloakRealm = requireEnv("KEYCLOAK_REALM");
-const keycloakAudience = requireEnv("KEYCLOAK_AUDIENCE");
 
 const server = new MCPServer({
   name: "keycloak-auth-example",
@@ -33,7 +32,6 @@ const server = new MCPServer({
   oauth: oauthKeycloakProvider({
     serverUrl: keycloakServerUrl,
     realm: keycloakRealm,
-    audience: keycloakAudience,
   }),
 });
 

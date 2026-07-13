@@ -10,6 +10,7 @@ import { oauthWorkOSProvider } from "../src/oauth/workos.js";
 
 const now = () => Math.floor(Date.now() / 1000);
 const originalFetch = globalThis.fetch;
+const protectedResource = new URL("https://api.example.test/mcp");
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -30,7 +31,6 @@ describe("direct OAuth providers", () => {
 
     const provider = oauthAuth0Provider({
       domain: "issuer.example.test",
-      audience: "https://api.example.test/mcp",
       resource: "https://api.example.test/mcp",
     });
     const sign = (claims: Record<string, unknown> = {}) =>
@@ -52,7 +52,7 @@ describe("direct OAuth providers", () => {
         .setExpirationTime(now() + 60)
         .sign(privateKey);
 
-    const verifier = wrapOAuthTokenVerifier(provider);
+    const verifier = wrapOAuthTokenVerifier(provider, protectedResource);
     const token = await sign();
     await expect(verifier.verifyAccessToken(token)).resolves.toMatchObject({
       clientId: "client-1",
@@ -96,7 +96,7 @@ describe("direct OAuth providers", () => {
       projectId: "example-project",
       jwtSecret: secret,
     });
-    const verifier = provider.tokenVerifier;
+    const verifier = provider.createTokenVerifier(protectedResource);
     const token = (issuer: string, audience: string, exp: number) =>
       new SignJWT({ sub: "user-1", client_id: "client-1" })
         .setProtectedHeader({ alg: "HS256" })
@@ -109,13 +109,13 @@ describe("direct OAuth providers", () => {
       verifier.verifyAccessToken(
         await token(
           "https://example-project.supabase.co/auth/v1",
-          "authenticated",
+          protectedResource.href,
           now() + 60
         )
       )
     ).resolves.toMatchObject({ clientId: "client-1" });
     const invalidTokens: readonly [string, string, number][] = [
-      ["https://other.supabase.co/auth/v1", "authenticated", now() + 60],
+      ["https://other.supabase.co/auth/v1", protectedResource.href, now() + 60],
       ["https://example-project.supabase.co/auth/v1", "other", now() + 60],
       [
         "https://example-project.supabase.co/auth/v1",
@@ -141,12 +141,12 @@ describe("direct OAuth providers", () => {
     const token = await new SignJWT({ sub: "user-1" })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("https://example-project.supabase.co/auth/v1")
-      .setAudience("authenticated")
+      .setAudience(protectedResource.href)
       .setExpirationTime(now() + 60)
       .sign(new TextEncoder().encode(secret));
 
     await expect(
-      provider.tokenVerifier.verifyAccessToken(token)
+      provider.createTokenVerifier(protectedResource).verifyAccessToken(token)
     ).resolves.toMatchObject({ clientId: "" });
   });
 
@@ -171,11 +171,13 @@ describe("direct OAuth providers", () => {
     })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuer("http://localhost:54321/platform/auth/v1")
-      .setAudience("authenticated")
+      .setAudience(protectedResource.href)
       .setExpirationTime(now() + 60)
       .sign(new TextEncoder().encode(secret));
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken(token)
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
+        token
+      )
     ).resolves.toMatchObject({
       extra: {
         user: { amr: [{ method: "password", timestamp: 1_700_000_000 }] },
@@ -184,7 +186,6 @@ describe("direct OAuth providers", () => {
     expect(() =>
       oauthAuth0Provider({
         domain: "issuer.example.test",
-        audience: "audience",
         resource: "http://api.example.test/mcp",
       })
     ).toThrow(/HTTPS|localhost/);
@@ -197,23 +198,21 @@ describe("direct OAuth providers", () => {
     globalThis.fetch = jwksFixture(jwk);
     const provider = oauthClerkProvider({
       frontendApiUrl: "https://clerk.example.test/tenant",
-      audience: "mcp",
     });
     expect(provider.oauthMetadata).toMatchObject({
       issuer: "https://clerk.example.test/tenant",
       authorization_endpoint:
         "https://clerk.example.test/tenant/oauth/authorize",
       token_endpoint: "https://clerk.example.test/tenant/oauth/token",
-      registration_endpoint:
-        "https://clerk.example.test/tenant/oauth/register",
+      registration_endpoint: "https://clerk.example.test/tenant/oauth/register",
     });
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken(
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
         await signedToken(
           privateKey,
           "clerk-key",
           "https://clerk.example.test/tenant",
-          "mcp",
+          protectedResource.href,
           {
             sub: "clerk-user",
             client_id: "client",
@@ -245,12 +244,12 @@ describe("direct OAuth providers", () => {
       registration_endpoint: "https://acme.authkit.app/oauth2/register",
     });
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken(
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
         await signedToken(
           privateKey,
           "workos-key",
           "https://acme.authkit.app",
-          undefined,
+          protectedResource.href,
           {
             sub: "workos-user",
             client_id: "client",
@@ -293,13 +292,15 @@ describe("direct OAuth providers", () => {
     })
       .setProtectedHeader({ alg: "RS256", kid: "workos-key" })
       .setIssuer("https://acme.authkit.app")
-      .setAudience("https://acme.authkit.app")
+      .setAudience(protectedResource.href)
       .setIssuedAt(now())
       .setExpirationTime(now() + 60)
       .sign(privateKey);
 
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken(token)
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
+        token
+      )
     ).resolves.toMatchObject({ clientId: "" });
   });
 
@@ -311,7 +312,6 @@ describe("direct OAuth providers", () => {
     const provider = oauthKeycloakProvider({
       serverUrl: "https://keycloak.example.test/auth",
       realm: "mcp",
-      audience: "mcp-api",
     });
     expect(provider.oauthMetadata).toMatchObject({
       issuer: "https://keycloak.example.test/auth/realms/mcp",
@@ -323,12 +323,12 @@ describe("direct OAuth providers", () => {
         "https://keycloak.example.test/auth/realms/mcp/clients-registrations/openid-connect",
     });
     await expect(
-      wrapOAuthTokenVerifier(provider).verifyAccessToken(
+      wrapOAuthTokenVerifier(provider, protectedResource).verifyAccessToken(
         await signedToken(
           privateKey,
           "keycloak-key",
           "https://keycloak.example.test/auth/realms/mcp",
-          "mcp-api",
+          protectedResource.href,
           {
             sub: "keycloak-user",
             client_id: "client",
@@ -351,14 +351,13 @@ describe("direct OAuth providers", () => {
     const provider = oauthKeycloakProvider({
       serverUrl: "https://keycloak.example.test/auth",
       realm: "mcp",
-      audience: "mcp-api",
       resource: expectedResource.href,
     });
     const token = await signedToken(
       privateKey,
       "keycloak-key",
       "https://keycloak.example.test/auth/realms/mcp",
-      "mcp-api",
+      expectedResource.href,
       {
         sub: "keycloak-user",
         client_id: "client",
@@ -373,9 +372,9 @@ describe("direct OAuth providers", () => {
     ).verifyAccessToken(token);
     expect(authInfo).toMatchObject({
       clientId: "client",
+      resource: expectedResource,
       extra: { user: { roles: ["realm-role"] }, permissions: ["api:write"] },
     });
-    expect(authInfo.resource).toBeUndefined();
   });
 
   it("leaves unexpected JWKS network errors as ordinary errors", async () => {
@@ -385,15 +384,14 @@ describe("direct OAuth providers", () => {
     };
     const provider = oauthAuth0Provider({
       domain: "issuer.example.test",
-      audience: "audience",
     });
     await expect(
-      provider.tokenVerifier.verifyAccessToken(
+      provider.createTokenVerifier(protectedResource).verifyAccessToken(
         await signedToken(
           privateKey,
           "missing-key",
           "https://issuer.example.test/",
-          "audience",
+          protectedResource.href,
           {
             sub: "user",
             client_id: "client",

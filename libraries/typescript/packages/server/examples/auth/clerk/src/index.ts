@@ -20,14 +20,12 @@ const getUserInfoOutputSchema = z.object({
   resource: z.string().nullable(),
 });
 
-const audience = process.env.CLERK_AUDIENCE?.trim();
 const server = new MCPServer({
   name: "clerk-direct-auth-example",
   version: "1.0.0",
   description: "An MCP server that verifies Clerk-issued access tokens.",
   oauth: oauthClerkProvider({
     frontendApiUrl: requireEnv("CLERK_FRONTEND_API_URL"),
-    ...(audience && { audience }),
   }),
 });
 

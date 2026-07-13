@@ -12,10 +12,10 @@ import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 
 import { MCPServer } from "../src/index.js";
-import { oauthAuth0Provider } from "../src/oauth/auth0.js";
+import { oauthWorkOSProvider } from "../src/oauth/workos.js";
 
 describe("direct OAuth authorization (official client e2e)", () => {
-  it("discovers an external issuer, obtains a resource token, and calls a tool", async () => {
+  it("completes WorkOS-style resource authorization and rejects its default audience", async () => {
     const { privateKey, publicKey } = await generateKeyPair("RS256");
     const jwk = await exportJWK(publicKey);
     const keyId = "direct-oauth-test-key";
@@ -27,10 +27,8 @@ describe("direct OAuth authorization (official client e2e)", () => {
     const clientRedirectUrl = "http://client.localhost/callback";
 
     const authorizationApp = new Hono();
-    authorizationApp.get("/.well-known/jwks.json", (c) =>
-      c.json({ keys: [jwk] })
-    );
-    authorizationApp.get("/authorize", (c) => {
+    authorizationApp.get("/oauth2/jwks", (c) => c.json({ keys: [jwk] }));
+    authorizationApp.get("/oauth2/authorize", (c) => {
       authorizationRequest = new URL(c.req.url);
       if (
         authorizationRequest.searchParams.get("client_id") !==
@@ -46,7 +44,7 @@ describe("direct OAuth authorization (official client e2e)", () => {
       redirect.searchParams.set("code", authorizationCode);
       return c.redirect(redirect.toString());
     });
-    authorizationApp.post("/oauth/token", async (c) => {
+    authorizationApp.post("/oauth2/token", async (c) => {
       tokenRequest = new URLSearchParams(await c.req.text());
       if (
         tokenRequest.get("grant_type") !== "authorization_code" ||
@@ -60,7 +58,6 @@ describe("direct OAuth authorization (official client e2e)", () => {
         sub: "user_ada",
         client_id: "official-client",
         scope: "mcp tools:call",
-        resource: resourceUrl,
       })
         .setProtectedHeader({ alg: "RS256", kid: keyId })
         .setIssuer(authorizationIssuer)
@@ -76,7 +73,10 @@ describe("direct OAuth authorization (official client e2e)", () => {
     });
     const authorizationServer = await listen(authorizationApp);
     const authorizationUrl = authorizationServer.url;
-    const authorizationIssuer = new URL(authorizationUrl).href;
+    const authorizationIssuer = new URL(authorizationUrl).href.replace(
+      /\/$/,
+      ""
+    );
 
     const mcpApp = new Hono();
     mcpApp.all("*", (c) => mcpHandler(c.req.raw));
@@ -87,9 +87,8 @@ describe("direct OAuth authorization (official client e2e)", () => {
       name: "direct-oauth-test",
       version: "1.0.0",
       inspector: { enabled: false },
-      oauth: oauthAuth0Provider({
-        domain: authorizationIssuer,
-        audience: resourceUrl,
+      oauth: oauthWorkOSProvider({
+        subdomain: authorizationIssuer,
         resource: resourceUrl,
         scopesSupported: ["mcp", "tools:call"],
       }),
@@ -139,7 +138,7 @@ describe("direct OAuth authorization (official client e2e)", () => {
       // deterministic Node browser driver. This test explicitly performs the
       // browser-facing authorization-code redirect and token exchange, then
       // uses the official client transport for the authenticated MCP retry.
-      const authorize = new URL("/authorize", authorizationUrl);
+      const authorize = new URL("/oauth2/authorize", authorizationUrl);
       authorize.search = new URLSearchParams({
         response_type: "code",
         client_id: "official-client",
@@ -159,7 +158,7 @@ describe("direct OAuth authorization (official client e2e)", () => {
         resourceUrl
       );
 
-      const exchange = await fetch(new URL("/oauth/token", authorizationUrl), {
+      const exchange = await fetch(new URL("/oauth2/token", authorizationUrl), {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -175,6 +174,34 @@ describe("direct OAuth authorization (official client e2e)", () => {
         access_token: string;
       };
       expect(tokenRequest?.get("resource")).toBe(resourceUrl);
+
+      const defaultAudienceToken = await new SignJWT({
+        sub: "user_ada",
+        client_id: "official-client",
+        scope: "mcp tools:call",
+      })
+        .setProtectedHeader({ alg: "RS256", kid: keyId })
+        .setIssuer(authorizationIssuer)
+        .setAudience(authorizationIssuer)
+        .setIssuedAt()
+        .setExpirationTime("5m")
+        .sign(privateKey);
+      const wrongAudience = await fetch(resourceUrl, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${defaultAudienceToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+        }),
+      });
+      expect(wrongAudience.status).toBe(401);
+      expect(wrongAudience.headers.get("www-authenticate")).toContain(
+        'error="invalid_token"'
+      );
 
       client = new Client(
         { name: "official-client", version: "2.0.0-beta.3" },

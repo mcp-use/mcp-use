@@ -37,14 +37,13 @@ export interface KeycloakOAuthUser {
 export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
   serverUrl: URL | string;
   realm: string;
-  audience?: string;
 }
 
 /**
  * Creates a provider that verifies Keycloak access tokens and maps their claims.
  *
- * @param options - Keycloak server URL, realm, optional audience, and resource-server settings.
- * @returns A provider that rejects tokens without a valid Keycloak signature and issuer.
+ * @param options - Keycloak server URL, realm, and resource-server settings.
+ * @returns A provider that rejects tokens not issued for the resolved MCP resource.
  */
 export function oauthKeycloakProvider(
   options: KeycloakOAuthProviderOptions
@@ -56,13 +55,6 @@ export function oauthKeycloakProvider(
   ) {
     throw new TypeError("Keycloak realm is invalid");
   }
-  if (
-    options.audience !== undefined &&
-    (typeof options.audience !== "string" ||
-      options.audience.trim().length === 0)
-  ) {
-    throw new TypeError("Keycloak audience must be non-empty");
-  }
   const serverUrl = normalizedProviderUrl(
     options.serverUrl,
     "Keycloak serverUrl"
@@ -73,14 +65,14 @@ export function oauthKeycloakProvider(
   ).replace(/\/$/, "");
   return oauthCustomProvider<KeycloakOAuthUser>({
     ...options,
-    tokenVerifier: createJwtVerifier({
-      issuer,
-      jwksUrl: new URL(
-        providerEndpoint(issuer, "protocol/openid-connect/certs")
-      ),
-      ...(options.audience !== undefined && { audience: options.audience }),
-      resource: options.resource,
-    }),
+    createTokenVerifier: (resource) =>
+      createJwtVerifier({
+        issuer,
+        jwksUrl: new URL(
+          providerEndpoint(issuer, "protocol/openid-connect/certs")
+        ),
+        resource,
+      }),
     oauthMetadata: {
       issuer,
       authorization_endpoint: providerEndpoint(

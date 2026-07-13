@@ -223,7 +223,7 @@ async function withMcpServer(test: (url: URL) => Promise<void>): Promise<void> {
 function introspectionProvider(endpoint: URL) {
   return oauthCustomProvider({
     resource: "http://localhost/mcp",
-    tokenVerifier: {
+    createTokenVerifier: (expectedResource) => ({
       verifyAccessToken: async (token) => {
         let response: Response;
         try {
@@ -252,9 +252,9 @@ function introspectionProvider(endpoint: URL) {
             error
           );
         }
-        return authInfoFromIntrospection(token, payload);
+        return authInfoFromIntrospection(token, payload, expectedResource);
       },
-    },
+    }),
     oauthMetadata: { issuer: "https://issuer.example.test" } as OAuthMetadata,
     mapAuthInfo: (authInfo) => {
       const payload = authInfo.extra?.["introspection"];
@@ -284,7 +284,11 @@ function introspectionProvider(endpoint: URL) {
   });
 }
 
-function authInfoFromIntrospection(token: string, value: unknown): AuthInfo {
+function authInfoFromIntrospection(
+  token: string,
+  value: unknown,
+  expectedResource: URL
+): AuthInfo {
   if (!isRecord(value) || value["active"] !== true) {
     throw invalidToken("RFC 7662 token is inactive");
   }
@@ -308,16 +312,17 @@ function authInfoFromIntrospection(token: string, value: unknown): AuthInfo {
   }
 
   const resource = value["resource"];
-  if (resource !== undefined && typeof resource !== "string") {
-    throw invalidToken("RFC 7662 response has invalid resource");
+  if (typeof resource !== "string") {
+    throw invalidToken("RFC 7662 response is missing a resource");
   }
-  let parsedResource: URL | undefined;
-  if (resource !== undefined) {
-    try {
-      parsedResource = new URL(resource);
-    } catch (error) {
-      throw invalidToken("RFC 7662 response has invalid resource", error);
-    }
+  let parsedResource: URL;
+  try {
+    parsedResource = new URL(resource);
+  } catch (error) {
+    throw invalidToken("RFC 7662 response has invalid resource", error);
+  }
+  if (parsedResource.href !== expectedResource.href) {
+    throw invalidToken("RFC 7662 response has the wrong resource");
   }
 
   return {
@@ -326,7 +331,7 @@ function authInfoFromIntrospection(token: string, value: unknown): AuthInfo {
     scopes: scope.trim() === "" ? [] : scope.trim().split(/\s+/),
     expiresAt: exp,
     extra: { introspection: value },
-    ...(parsedResource !== undefined && { resource: parsedResource }),
+    resource: expectedResource,
   };
 }
 
