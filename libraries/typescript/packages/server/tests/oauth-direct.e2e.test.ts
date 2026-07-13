@@ -205,7 +205,7 @@ async function listen(app: Hono): Promise<{
   url: string;
   close(): Promise<void>;
 }> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = serve(
       { fetch: app.fetch, hostname: "127.0.0.1", port: 0 },
       ({ port }) => {
@@ -215,6 +215,7 @@ async function listen(app: Hono): Promise<{
         });
       }
     );
+    server.once("error", reject);
   });
 }
 

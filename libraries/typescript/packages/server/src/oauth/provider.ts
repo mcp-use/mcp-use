@@ -1,5 +1,5 @@
 import type {
-  AuthInfo,
+  AuthInfo as OAuthAuthInfo,
   OAuthMetadata,
   OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
@@ -54,13 +54,13 @@ export interface CustomOAuthProviderOptions<
   /** RFC 8414 metadata for the external authorization server. */
   oauthMetadata: OAuthMetadata;
   /** Maps verified SDK auth information into mcp-use callback identity data. */
-  mapAuthInfo: (authInfo: AuthInfo) => OAuthExtra<TUser>;
+  mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
 
 interface OAuthProviderInternal<TUser> extends OAuthProvider<TUser> {
   tokenVerifier: OAuthTokenVerifier;
   oauthMetadata: OAuthMetadata;
-  toMcpUseExtra: (authInfo: AuthInfo) => OAuthExtra<TUser>;
+  toMcpUseExtra: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
   resource?: URL | string;
   requiredScopes?: readonly string[];
   scopesSupported?: readonly string[];

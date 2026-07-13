@@ -79,6 +79,7 @@ function requireOAuthAuthInfo<TUser>(
     typeof extra !== "object" ||
     extra === null ||
     !("user" in extra) ||
+    extra.user === undefined ||
     !("payload" in extra) ||
     extra.payload === null ||
     typeof extra.payload !== "object" ||
