@@ -4,6 +4,7 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 
+import type { OAuthExtra } from "./oauth/provider.js";
 import { supportsViews } from "./views/capabilities.js";
 
 /**
@@ -58,12 +59,6 @@ export type RequestContext<TUser = never, HasOAuth extends boolean = false> =
     ? RequestContextBase & { auth: OAuthAuth<TUser> }
     : RequestContextBase & { auth?: never };
 
-type OAuthExtra<TUser> = Record<string, unknown> & {
-  user: TUser;
-  payload: Record<string, unknown>;
-  permissions: string[];
-};
-
 type MappedOAuthAuthInfo<TUser> = AuthInfo & {
   expiresAt: number;
   extra: OAuthExtra<TUser>;
@@ -72,28 +67,10 @@ type MappedOAuthAuthInfo<TUser> = AuthInfo & {
 function requireOAuthAuthInfo<TUser>(
   authInfo: AuthInfo | undefined
 ): asserts authInfo is MappedOAuthAuthInfo<TUser> {
-  const extra = authInfo?.extra;
   if (
     authInfo === undefined ||
-    extra === undefined ||
-    typeof extra !== "object" ||
-    extra === null ||
-    !("user" in extra) ||
-    extra.user === undefined ||
-    !("payload" in extra) ||
-    extra.payload === null ||
-    typeof extra.payload !== "object" ||
-    Array.isArray(extra.payload) ||
-    !("permissions" in extra) ||
-    !Array.isArray(extra.permissions) ||
-    !extra.permissions.every((permission) => typeof permission === "string") ||
-    typeof authInfo.token !== "string" ||
-    !Array.isArray(authInfo.scopes) ||
-    !authInfo.scopes.every((scope) => typeof scope === "string") ||
-    typeof authInfo.clientId !== "string" ||
-    typeof authInfo.expiresAt !== "number" ||
-    !Number.isFinite(authInfo.expiresAt) ||
-    (authInfo.resource !== undefined && !(authInfo.resource instanceof URL))
+    authInfo.extra === undefined ||
+    authInfo.expiresAt === undefined
   ) {
     throw new Error("OAuth callback did not receive mapped AuthInfo.extra");
   }
@@ -127,13 +104,10 @@ export function toRequestContext(ctx: ServerContext): RequestContext<never, fals
 export function toAuthenticatedRequestContext<TUser>(
   ctx: ServerContext
 ): RequestContext<TUser, true> {
-  const request = ctx.http?.req;
   const authInfo = ctx.http?.authInfo;
   requireOAuthAuthInfo<TUser>(authInfo);
   return {
-    signal: ctx.mcpReq.signal,
-    ...(request !== undefined && { request }),
-    client: toClientContext(ctx),
+    ...toRequestContext(ctx),
     auth: {
       user: authInfo.extra.user,
       payload: authInfo.extra.payload,
