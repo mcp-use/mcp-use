@@ -8,6 +8,14 @@ import { createRemoteJWKSet, jwtVerify, errors, type JWTPayload } from "jose";
 
 import type { OAuthResourceOptions } from "./provider.js";
 
+/**
+ * @internal Marks AuthInfo.extra when jose already enforced the configured JWT audience.
+ * A symbol is used so the marker cannot be forged by a verifier that copies JSON token claims into `extra`.
+ */
+export const oauthAudienceValidated: unique symbol = Symbol(
+  "mcp-use.oauth-audience-validated"
+);
+
 /** @internal Record of claims extracted from a verified JWT. */
 export type VerifiedPayload = Record<string, unknown>;
 
@@ -64,12 +72,20 @@ export function createJwtVerifier(
         const expiresAt = requiredFutureNumber(claims, "exp");
         const resource = verifiedResource(claims, configuredResource);
 
+        const extra: {
+          payload: VerifiedPayload;
+          [oauthAudienceValidated]?: true;
+        } = { payload: claims };
+        if (options.audience !== undefined) {
+          extra[oauthAudienceValidated] = true;
+        }
+
         return {
           token,
           clientId: clientId ?? "",
           scopes: normalizedStrings(claims["scope"]),
           expiresAt,
-          extra: { payload: claims },
+          extra: extra as Record<string, unknown>,
           ...(resource !== undefined && { resource }),
         };
       } catch (error) {

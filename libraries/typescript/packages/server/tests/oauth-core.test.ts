@@ -114,7 +114,11 @@ describe("OAuth core", () => {
         createProvider(authInfo),
         expectedResource
       ).verifyAccessToken("presented-token")
-    ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message:
+        "Token must be bound to the protected resource via a validated audience or resource claim",
+    });
     await expect(
       wrapOAuthTokenVerifier(
         createProvider({
@@ -168,6 +172,70 @@ describe("OAuth core", () => {
         })
       ).verifyAccessToken("presented-token")
     ).rejects.toMatchObject({ code: OAuthErrorCode.InvalidToken });
+  });
+
+  it("accepts audience-validated JWTs without a resource claim", async () => {
+    const key = new TextEncoder().encode(
+      "a sufficiently long test signing key"
+    );
+    const audience = "https://api.example.test/mcp";
+    const expectedResource = new URL(audience);
+    const issuer = "https://issuer.example.test";
+    const verifier = createJwtVerifier({
+      issuer,
+      jwksUrl: new URL(`${issuer}/.well-known/jwks.json`),
+      key,
+      algorithms: ["HS256"],
+      audience,
+    });
+    const provider = oauthCustomProvider({
+      tokenVerifier: verifier,
+      oauthMetadata: metadata,
+      mapAuthInfo: () => ({
+        user: { id: "user-1" },
+        payload: { sub: "user-1" },
+        permissions: ["tools:read"],
+      }),
+    });
+    const token = await new SignJWT({ sub: "user-1", client_id: "client-1" })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuer(issuer)
+      .setAudience(audience)
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 60)
+      .sign(key);
+
+    const authInfo = await wrapOAuthTokenVerifier(
+      provider,
+      expectedResource
+    ).verifyAccessToken(token);
+    expect(authInfo).toMatchObject({
+      clientId: "client-1",
+    });
+    expect(authInfo.resource).toBeUndefined();
+  });
+
+  it("rejects forged audience-validated markers that use string keys", async () => {
+    const expectedResource = new URL("https://api.example.test/mcp");
+    const provider = createProvider({
+      token: "verified-token",
+      clientId: "client-1",
+      scopes: [],
+      expiresAt: Date.now() / 1000 + 60,
+      extra: {
+        payload: { sub: "user-1" },
+        "mcp-use.oauth-audience-validated": true,
+      },
+    });
+
+    await expect(
+      wrapOAuthTokenVerifier(provider, expectedResource).verifyAccessToken(
+        "presented-token"
+      )
+    ).rejects.toMatchObject({
+      code: OAuthErrorCode.InvalidToken,
+      message:
+        "Token must be bound to the protected resource via a validated audience or resource claim",
+    });
   });
 
   it("uses empty clientId when client_id and azp are absent", async () => {

@@ -5,6 +5,7 @@ import {
   type OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
 
+import { oauthAudienceValidated } from "./jwt.js";
 import type { OAuthExtra, OAuthProvider } from "./provider.js";
 import { resolveOAuthProvider as resolveProvider } from "./provider.js";
 
@@ -65,7 +66,7 @@ export function resolveOAuthResource<TUser>(
   }
 
   throw new Error(
-    "OAuth requires an explicit resource or MCP_URL when using getHandler()"
+    "OAuth requires an explicit resource or MCP_URL when using getHandler() or listening on a non-local host"
   );
 }
 
@@ -143,8 +144,16 @@ function assertResourceBinding(
 ): void {
   if (authInfo.resource === undefined) {
     if (expectedResource !== undefined) {
+      const extra = authInfo.extra as
+        | (Record<string, unknown> & {
+            [oauthAudienceValidated]?: true;
+          })
+        | undefined;
+      if (extra?.[oauthAudienceValidated] === true) {
+        return;
+      }
       throw invalidToken(
-        "Token must include a resource claim matching the protected resource"
+        "Token must be bound to the protected resource via a validated audience or resource claim"
       );
     }
     return;

@@ -346,6 +346,42 @@ describe("direct OAuth providers", () => {
     });
   });
 
+  it("accepts Keycloak audience-only tokens when a protected resource is expected", async () => {
+    const { privateKey, publicKey } = await generateKeyPair("RS256");
+    const jwk = await exportJWK(publicKey);
+    jwk.kid = "keycloak-key";
+    globalThis.fetch = jwksFixture(jwk);
+    const expectedResource = new URL("https://api.example.test/mcp");
+    const provider = oauthKeycloakProvider({
+      serverUrl: "https://keycloak.example.test/auth",
+      realm: "mcp",
+      audience: "mcp-api",
+      resource: expectedResource.href,
+    });
+    const token = await signedToken(
+      privateKey,
+      "keycloak-key",
+      "https://keycloak.example.test/auth/realms/mcp",
+      "mcp-api",
+      {
+        sub: "keycloak-user",
+        client_id: "client",
+        realm_access: { roles: ["realm-role"] },
+        resource_access: { api: { roles: ["write"] } },
+      }
+    );
+
+    const authInfo = await wrapOAuthTokenVerifier(
+      provider,
+      expectedResource
+    ).verifyAccessToken(token);
+    expect(authInfo).toMatchObject({
+      clientId: "client",
+      extra: { user: { roles: ["realm-role"] }, permissions: ["api:write"] },
+    });
+    expect(authInfo.resource).toBeUndefined();
+  });
+
   it("leaves unexpected JWKS network errors as ordinary errors", async () => {
     const { privateKey } = await generateKeyPair("RS256");
     globalThis.fetch = async () => {
