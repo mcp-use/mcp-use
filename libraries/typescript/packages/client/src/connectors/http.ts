@@ -393,10 +393,14 @@ export class HttpConnector extends BaseConnector {
       );
       this.client = new Client(this.clientInfo, clientOptions);
 
-      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
-      // The server may call roots/list during initialization if it advertises roots capability
+      // Register inbound handlers BEFORE connect() so they are available for the
+      // entire connection lifetime (including reverse RPC during/after initialize).
       this.setupRootsHandler();
-      logger.debug("Roots handler registered before connect");
+      this.setupSamplingHandler();
+      this.setupElicitationHandler();
+      logger.debug(
+        "Roots/sampling/elicitation handlers registered before connect"
+      );
 
       try {
         // Connect with timeout
@@ -462,9 +466,7 @@ export class HttpConnector extends BaseConnector {
       this.connected = true;
       this.transportType = "streamable-http";
       this.setupNotificationHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
-      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
+      // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
       );
@@ -509,19 +511,21 @@ export class HttpConnector extends BaseConnector {
       );
       this.client = new Client(this.clientInfo, clientOptions);
 
-      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
-      // The server may call roots/list during initialization if it advertises roots capability
+      // Register inbound handlers BEFORE connect() so they are available for the
+      // entire connection lifetime (including reverse RPC during/after initialize).
       this.setupRootsHandler();
-      logger.debug("Roots handler registered before connect (SSE)");
+      this.setupSamplingHandler();
+      this.setupElicitationHandler();
+      logger.debug(
+        "Roots/sampling/elicitation handlers registered before connect (SSE)"
+      );
 
       await this.client.connect(transport);
 
       this.connected = true;
       this.transportType = "sse";
       this.setupNotificationHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
-      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
+      // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`
       );

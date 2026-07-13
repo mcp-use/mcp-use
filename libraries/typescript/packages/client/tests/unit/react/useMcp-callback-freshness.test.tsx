@@ -1,0 +1,428 @@
+// @vitest-environment jsdom
+
+/**
+ * Regression: onSampling / onElicitation / onNotification must stay fresh across
+ * reconnects via refs + stable proxies, without reconnecting when only callback
+ * identities change.
+ */
+
+import React from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, create } from "react-test-renderer";
+import type { UseMcpOptions } from "../../../src/react/types.js";
+
+function makeConnector() {
+  return {
+    tools: [],
+    serverInfo: { name: "test-server" },
+    serverCapabilities: {},
+    listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
+    listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
+    listResourceTemplates: vi.fn().mockResolvedValue({ resourceTemplates: [] }),
+  };
+}
+
+const mockAuthProvider = {
+  serverUrl: "http://localhost/mcp",
+  tokens: vi.fn().mockResolvedValue(undefined),
+  clearStorage: vi.fn().mockReturnValue(0),
+};
+
+function makeSession() {
+  return {
+    on: vi.fn(),
+    connector: makeConnector(),
+    initialize: vi.fn().mockResolvedValue(undefined),
+  };
+}
+
+let activeSession: ReturnType<typeof makeSession> | null = null;
+
+const sharedClient = {
+  addServer: vi.fn().mockResolvedValue(undefined),
+  removeServer: vi.fn().mockResolvedValue(undefined),
+  listSessions: vi.fn().mockReturnValue([]),
+  getSession: vi.fn(() => activeSession),
+  createSession: vi.fn(),
+  closeSession: vi.fn().mockResolvedValue(undefined),
+};
+
+vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  BrowserMCPClient: vi.fn(function () {
+    return sharedClient;
+  }),
+}));
+
+vi.mock("../../../src/auth/browser-provider.js", () => ({
+  createBrowserOAuthProvider: vi.fn(() => ({
+    provider: null,
+    oauthProxyUrl: undefined,
+  })),
+}));
+
+vi.mock("../../../src/telemetry/telemetry-browser.js", () => ({
+  Tel: {
+    getInstance: () => ({
+      trackUseMcpConnection: vi.fn().mockResolvedValue(undefined),
+      trackUseMcpToolCall: vi.fn().mockResolvedValue(undefined),
+      trackUseMcpResourceRead: vi.fn().mockResolvedValue(undefined),
+    }),
+  },
+}));
+
+vi.mock("../../../src/react/favicon-detector.js", () => ({
+  detectFavicon: vi.fn().mockResolvedValue(null),
+}));
+
+const samplingResult = {
+  role: "assistant" as const,
+  content: { type: "text" as const, text: "ok" },
+  model: "test",
+  stopReason: "endTurn" as const,
+};
+
+const elicitResult = { action: "accept" as const };
+
+async function flushMicrotasks(times = 3) {
+  for (let i = 0; i < times; i++) {
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+}
+
+describe("useMcp callback freshness", () => {
+  let useMcp: typeof import("../../../src/react/useMcp.js").useMcp;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    activeSession = null;
+    mockAuthProvider.serverUrl = "http://localhost/mcp";
+    sharedClient.createSession.mockImplementation(async () => {
+      activeSession = makeSession();
+      return activeSession;
+    });
+
+    vi.resetModules();
+    const module = await import("../../../src/react/useMcp.js");
+    useMcp = module.useMcp;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses latest callbacks after identity changes without reconnecting", async () => {
+    const samplingV1 = vi.fn().mockResolvedValue(samplingResult);
+    const samplingV2 = vi.fn().mockResolvedValue({
+      ...samplingResult,
+      content: { type: "text" as const, text: "v2" },
+    });
+    const elicitV1 = vi.fn().mockResolvedValue(elicitResult);
+    const elicitV2 = vi.fn().mockResolvedValue({ action: "decline" as const });
+    const notifV1 = vi.fn();
+    const notifV2 = vi.fn();
+
+    let latest: ReturnType<typeof useMcp> | undefined;
+    let renderer: ReturnType<typeof create>;
+
+    function TestComponent({
+      url,
+      onSampling,
+      onElicitation,
+      onNotification,
+    }: {
+      url: string;
+      onSampling: typeof samplingV1;
+      onElicitation: typeof elicitV1;
+      onNotification: typeof notifV1;
+    }) {
+      latest = useMcp({
+        url,
+        enabled: true,
+        authProvider: mockAuthProvider,
+        transportType: "http",
+        autoProxyFallback: false,
+        autoRetry: false,
+        autoReconnect: false,
+        logLevel: "silent",
+        onSampling,
+        onElicitation,
+        onNotification,
+      });
+      return null;
+    }
+
+    await act(async () => {
+      renderer = create(
+        <TestComponent
+          url="http://localhost/mcp"
+          onSampling={samplingV1}
+          onElicitation={elicitV1}
+          onNotification={notifV1}
+        />
+      );
+    });
+    await flushMicrotasks();
+
+    expect(latest?.state).toBe("ready");
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
+    expect(sharedClient.createSession).toHaveBeenCalledTimes(1);
+
+    const addServerConfig = sharedClient.addServer.mock.calls[0][1];
+    expect(typeof addServerConfig.onSampling).toBe("function");
+    expect(typeof addServerConfig.onElicitation).toBe("function");
+    const wiredSampling = addServerConfig.onSampling;
+    const wiredElicitation = addServerConfig.onElicitation;
+
+    expect(activeSession?.on).toHaveBeenCalledWith(
+      "notification",
+      expect.any(Function)
+    );
+    const notificationHandler = activeSession!.on.mock.calls.find(
+      (call) => call[0] === "notification"
+    )?.[1] as (n: { method: string }) => void;
+
+    // Change only callback identities (same URL / connection options)
+    await act(async () => {
+      renderer!.update(
+        <TestComponent
+          url="http://localhost/mcp"
+          onSampling={samplingV2}
+          onElicitation={elicitV2}
+          onNotification={notifV2}
+        />
+      );
+    });
+    await flushMicrotasks();
+
+    // Callback identity churn must not force a reconnect
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
+    expect(sharedClient.createSession).toHaveBeenCalledTimes(1);
+    expect(latest?.state).toBe("ready");
+
+    // Proxies wired at connect time must dispatch to the *latest* handlers
+    await wiredSampling({
+      messages: [],
+      maxTokens: 16,
+    });
+    await wiredElicitation({
+      message: "pick",
+      mode: "form",
+      requestedSchema: { type: "object", properties: {} },
+    });
+    notificationHandler({ method: "notifications/message" });
+
+    expect(samplingV1).not.toHaveBeenCalled();
+    expect(elicitV1).not.toHaveBeenCalled();
+    expect(notifV1).not.toHaveBeenCalled();
+    expect(samplingV2).toHaveBeenCalledTimes(1);
+    expect(elicitV2).toHaveBeenCalledTimes(1);
+    expect(notifV2).toHaveBeenCalledTimes(1);
+
+    // Re-invoke the connection path via URL change; reconnect wiring must
+    // still reach the latest callbacks.
+    mockAuthProvider.serverUrl = "http://localhost/mcp-b";
+    await act(async () => {
+      renderer!.update(
+        <TestComponent
+          url="http://localhost/mcp-b"
+          onSampling={samplingV2}
+          onElicitation={elicitV2}
+          onNotification={notifV2}
+        />
+      );
+    });
+    await flushMicrotasks(5);
+
+    expect(sharedClient.addServer.mock.calls.length).toBeGreaterThan(1);
+    const reconnectedConfig =
+      sharedClient.addServer.mock.calls[
+        sharedClient.addServer.mock.calls.length - 1
+      ][1];
+
+    samplingV2.mockClear();
+    elicitV2.mockClear();
+    await reconnectedConfig.onSampling({ messages: [], maxTokens: 8 });
+    await reconnectedConfig.onElicitation({
+      message: "again",
+      mode: "form",
+      requestedSchema: { type: "object", properties: {} },
+    });
+    expect(samplingV2).toHaveBeenCalledTimes(1);
+    expect(elicitV2).toHaveBeenCalledTimes(1);
+  });
+
+  it("defers callback presence changes until a normal reconnect", async () => {
+    const samplingV1 = vi.fn().mockResolvedValue(samplingResult);
+    const samplingV2 = vi.fn().mockResolvedValue(samplingResult);
+    const elicitV1 = vi.fn().mockResolvedValue(elicitResult);
+    const elicitV2 = vi.fn().mockResolvedValue(elicitResult);
+
+    let renderer: ReturnType<typeof create>;
+
+    function TestComponent({
+      url,
+      onSampling,
+      onElicitation,
+    }: Pick<UseMcpOptions, "onSampling" | "onElicitation"> & { url: string }) {
+      useMcp({
+        url,
+        enabled: true,
+        authProvider: mockAuthProvider,
+        transportType: "http",
+        autoProxyFallback: false,
+        autoRetry: false,
+        autoReconnect: false,
+        logLevel: "silent",
+        onSampling,
+        onElicitation,
+      });
+      return null;
+    }
+
+    await act(async () => {
+      renderer = create(
+        <TestComponent
+          url="http://localhost/mcp"
+          onSampling={samplingV1}
+          onElicitation={elicitV1}
+        />
+      );
+    });
+    await flushMicrotasks();
+
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
+    const liveConfig = sharedClient.addServer.mock.calls[0][1];
+
+    // Removing callback props does not overlap the live connection with an
+    // automatic disconnect/reconnect. Its already-advertised proxies retain
+    // the last defined implementations until a normal reconnect.
+    await act(async () => {
+      renderer!.update(<TestComponent url="http://localhost/mcp" />);
+    });
+    await flushMicrotasks();
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
+    await liveConfig.onSampling({ messages: [], maxTokens: 4 });
+    await liveConfig.onElicitation({
+      message: "still live",
+      mode: "form",
+      requestedSchema: { type: "object", properties: {} },
+    });
+    expect(samplingV1).toHaveBeenCalledTimes(1);
+    expect(elicitV1).toHaveBeenCalledTimes(1);
+
+    // The next normal reconnect evaluates current presence and omits both.
+    mockAuthProvider.serverUrl = "http://localhost/mcp-b";
+    await act(async () => {
+      renderer!.update(<TestComponent url="http://localhost/mcp-b" />);
+    });
+    await flushMicrotasks(5);
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(2);
+    expect(sharedClient.addServer.mock.calls[1][1].onSampling).toBeUndefined();
+    expect(
+      sharedClient.addServer.mock.calls[1][1].onElicitation
+    ).toBeUndefined();
+
+    // Adding callbacks also waits for the next normal reconnect.
+    await act(async () => {
+      renderer!.update(
+        <TestComponent
+          url="http://localhost/mcp-b"
+          onSampling={samplingV2}
+          onElicitation={elicitV2}
+        />
+      );
+    });
+    await flushMicrotasks();
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(2);
+
+    mockAuthProvider.serverUrl = "http://localhost/mcp-c";
+    await act(async () => {
+      renderer!.update(
+        <TestComponent
+          url="http://localhost/mcp-c"
+          onSampling={samplingV2}
+          onElicitation={elicitV2}
+        />
+      );
+    });
+    await flushMicrotasks(5);
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(3);
+    const nextConfig = sharedClient.addServer.mock.calls[2][1];
+    await nextConfig.onSampling({ messages: [], maxTokens: 4 });
+    await nextConfig.onElicitation({
+      message: "new live session",
+      mode: "form",
+      requestedSchema: { type: "object", properties: {} },
+    });
+    expect(samplingV2).toHaveBeenCalledTimes(1);
+    expect(elicitV2).toHaveBeenCalledTimes(1);
+  });
+
+  it("advertises callbacks via deprecated aliases through the same proxies", async () => {
+    const sampling = vi.fn().mockResolvedValue(samplingResult);
+    const elicit = vi.fn().mockResolvedValue(elicitResult);
+
+    function TestComponent() {
+      useMcp({
+        url: "http://localhost/mcp",
+        enabled: true,
+        authProvider: mockAuthProvider,
+        transportType: "http",
+        autoProxyFallback: false,
+        autoRetry: false,
+        autoReconnect: false,
+        logLevel: "silent",
+        samplingCallback: sampling,
+        elicitationCallback: elicit,
+      });
+      return null;
+    }
+
+    await act(async () => {
+      create(<TestComponent />);
+    });
+    await flushMicrotasks();
+
+    expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
+    const config = sharedClient.addServer.mock.calls[0][1];
+    expect(typeof config.onSampling).toBe("function");
+    expect(typeof config.onElicitation).toBe("function");
+
+    await config.onSampling({ messages: [], maxTokens: 1 });
+    await config.onElicitation({
+      message: "x",
+      mode: "form",
+      requestedSchema: { type: "object", properties: {} },
+    });
+    expect(sampling).toHaveBeenCalledTimes(1);
+    expect(elicit).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits sampling/elicitation proxies when no callbacks are provided", async () => {
+    function TestComponent() {
+      useMcp({
+        url: "http://localhost/mcp",
+        enabled: true,
+        authProvider: mockAuthProvider,
+        transportType: "http",
+        autoProxyFallback: false,
+        autoRetry: false,
+        autoReconnect: false,
+        logLevel: "silent",
+      });
+      return null;
+    }
+
+    await act(async () => {
+      create(<TestComponent />);
+    });
+    await flushMicrotasks();
+
+    const config = sharedClient.addServer.mock.calls[0][1];
+    expect(config.onSampling).toBeUndefined();
+    expect(config.onElicitation).toBeUndefined();
+  });
+});

@@ -1,10 +1,48 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   configureLLMAPI,
   connectToConformanceServer,
   navigateToTools,
 } from "./helpers/connection";
 import { getTestMatrix } from "./helpers/test-matrix";
+
+/**
+ * Connection-ready precondition for sampling/elicitation tools.
+ * Fails distinctly when the session is disconnected before we can assert toasts.
+ */
+async function expectCallbackToolReady(page: Page) {
+  await expect(
+    page.getByTestId("tool-execution-execute-button")
+  ).toBeEnabled();
+}
+
+/**
+ * Pending-request precondition: tab badge updates from pending*Requests when
+ * the client callback enqueues a request — independent of toast rendering.
+ * Distinguishes wire/handler failures from toast-render failures.
+ */
+async function expectPendingRequestEnqueued(
+  page: Page,
+  kind: "sampling" | "elicitation"
+) {
+  // Desktop replaces Execute with Cancel; mobile keeps Execute disabled because
+  // its ToolExecutionPanel does not receive an onCancel callback.
+  const executingControl = page.locator(
+    [
+      '[data-testid="tool-execution-cancel-button"]:visible',
+      '[data-testid="tool-execution-execute-button"]:visible:disabled',
+    ].join(", ")
+  );
+  await expect(executingControl).toBeVisible({ timeout: 5000 });
+
+  // TabCountBadge shows pending count on the visible Sampling/Elicitation tab
+  // (works whether the tab bar is collapsed or expanded; no new product test IDs)
+  const visibleTab = page.locator(`[data-testid="tab-${kind}"]:visible`);
+  const pendingBadge = visibleTab
+    .locator(":scope > span")
+    .filter({ hasText: /^1$/ });
+  await expect(pendingBadge).toBeVisible({ timeout: 5000 });
+}
 
 test.describe("Inspector MCP Server Connections", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -512,6 +550,7 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     // Fill prompt parameter
     await expect(page.getByTestId("tool-param-prompt")).toBeVisible();
@@ -519,6 +558,9 @@ test.describe("Inspector MCP Server Connections", () => {
 
     // Execute tool
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "sampling");
 
     // Wait for sampling toast to appear and click Approve
     const approveButton = page.getByTestId("sampling-toast-approve");
@@ -552,11 +594,15 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
     await expect(page.getByTestId("tool-param-prompt")).toBeVisible();
     await page
       .getByTestId("tool-param-prompt")
       .fill("Analyze sentiment: how are you? reply positive");
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "sampling");
 
     // Wait for sampling toast and click "View Details"
     const viewDetailsButton = page.getByTestId("sampling-toast-view-details");
@@ -618,9 +664,13 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     // Execute tool (no parameters)
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "elicitation");
 
     // Wait for elicitation toast to appear and click View Details
     const viewDetailsButton = page.getByTestId(
@@ -681,9 +731,13 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     // Execute tool (no parameters)
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "elicitation");
 
     // Wait for elicitation toast to appear and click View Details
     const viewDetailsButton = page.getByTestId(
@@ -750,8 +804,12 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(
       page.getByTestId("tool-execution-execute-button")
     ).toBeVisible();
+    await expectCallbackToolReady(page);
 
     await page.getByTestId("tool-execution-execute-button").click();
+
+    // Pending request enqueued (wire/handler) before toast (render) assertion
+    await expectPendingRequestEnqueued(page, "elicitation");
 
     const viewDetailsButton = page.getByTestId(
       "elicitation-toast-view-details"
