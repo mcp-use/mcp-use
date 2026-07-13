@@ -139,7 +139,7 @@ global.search_tools = async (query, detailLevel = 'full') => {
       // Create safe server name for JS identifier (replace hyphens etc)
       const safeServerName = serverName.replace(/[^a-zA-Z0-9_]/g, "_");
 
-      // Serializăm în siguranță valorile în string-uri JS valide folosind JSON.stringify
+      // Serialize values as safe JavaScript string literals using JSON.stringify
       const escapedServerName = JSON.stringify(serverName);
       const escapedSafeServerName = JSON.stringify(safeServerName);
 
