@@ -104,6 +104,43 @@ function clearSessionCookie(host: string | undefined): string {
   return `${SESSION_COOKIE}=; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=0${secureFlag}`;
 }
 
+type RestoredSession =
+  | { ok: true; setCookie?: string }
+  | { ok: false; setCookie: string };
+
+/**
+ * Restores the Supabase session from the cookie, reporting the Set-Cookie
+ * header the caller must apply: a cleared cookie when the stored session is
+ * stale, or a refreshed cookie when Supabase rotated the tokens.
+ */
+async function restoreSession(
+  supabase: SupabaseClient,
+  session: StoredSession,
+  host: string | undefined
+): Promise<RestoredSession> {
+  const { data, error } = await supabase.auth.setSession(session);
+  if (error) {
+    return { ok: false, setCookie: clearSessionCookie(host) };
+  }
+  if (
+    data.session &&
+    (data.session.access_token !== session.access_token ||
+      data.session.refresh_token !== session.refresh_token)
+  ) {
+    return {
+      ok: true,
+      setCookie: serializeSessionCookie(
+        {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        },
+        host
+      ),
+    };
+  }
+  return { ok: true };
+}
+
 export function mountAuthRoutes(
   app: Hono,
   { supabaseUrl, publishableKey }: MountAuthRoutesOptions
@@ -134,29 +171,12 @@ export function mountAuthRoutes(
     }
 
     const supabase = createServerClient(supabaseUrl, publishableKey);
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.setSession(session);
-
-    if (sessionError) {
-      c.header("Set-Cookie", clearSessionCookie(host));
-      return c.html(renderSignInPage());
+    const restored = await restoreSession(supabase, session, host);
+    if (restored.setCookie !== undefined) {
+      c.header("Set-Cookie", restored.setCookie);
     }
-
-    if (
-      sessionData.session &&
-      (sessionData.session.access_token !== session.access_token ||
-        sessionData.session.refresh_token !== session.refresh_token)
-    ) {
-      c.header(
-        "Set-Cookie",
-        serializeSessionCookie(
-          {
-            access_token: sessionData.session.access_token,
-            refresh_token: sessionData.session.refresh_token,
-          },
-          host
-        )
-      );
+    if (!restored.ok) {
+      return c.html(renderSignInPage());
     }
 
     const { data, error } =
@@ -236,29 +256,12 @@ export function mountAuthRoutes(
 
     const host = c.req.header("Host");
     const supabase = createServerClient(supabaseUrl, publishableKey);
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.setSession(session);
-
-    if (sessionError) {
-      c.header("Set-Cookie", clearSessionCookie(host));
-      return c.json({ error: "not_authenticated" }, 401);
+    const restored = await restoreSession(supabase, session, host);
+    if (restored.setCookie !== undefined) {
+      c.header("Set-Cookie", restored.setCookie);
     }
-
-    if (
-      sessionData.session &&
-      (sessionData.session.access_token !== session.access_token ||
-        sessionData.session.refresh_token !== session.refresh_token)
-    ) {
-      c.header(
-        "Set-Cookie",
-        serializeSessionCookie(
-          {
-            access_token: sessionData.session.access_token,
-            refresh_token: sessionData.session.refresh_token,
-          },
-          host
-        )
-      );
+    if (!restored.ok) {
+      return c.json({ error: "not_authenticated" }, 401);
     }
 
     // `skipBrowserRedirect: true` keeps the SDK from trying to redirect the
