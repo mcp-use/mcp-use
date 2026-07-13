@@ -74,15 +74,34 @@ function parseSessionCookie(
   }
 }
 
+/** Exact loopback check mirroring the package's isLocalhost semantics. */
+function isLocalHostHeader(host: string | undefined): boolean {
+  if (!host) return false;
+  try {
+    const hostname = new URL("http://" + host).hostname.toLowerCase();
+    return (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "[::1]" ||
+      /^127(?:\.\d{1,3}){3}$/.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function serializeSessionCookie(
   session: StoredSession,
   host: string | undefined
 ): string {
   const value = encodeURIComponent(JSON.stringify(session));
-  const isLocalhost =
-    host?.startsWith("localhost") || host?.startsWith("127.0.0.1");
-  const secureFlag = isLocalhost ? "" : "; Secure";
+  const secureFlag = isLocalHostHeader(host) ? "" : "; Secure";
   return `${SESSION_COOKIE}=${value}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=600${secureFlag}`;
+}
+
+function clearSessionCookie(host: string | undefined): string {
+  const secureFlag = isLocalHostHeader(host) ? "" : "; Secure";
+  return `${SESSION_COOKIE}=; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=0${secureFlag}`;
 }
 
 export function mountAuthRoutes(
@@ -106,15 +125,39 @@ export function mountAuthRoutes(
     }
 
     const session = parseSessionCookie(c.req.header("Cookie"));
+    const host = c.req.header("Host");
 
     // Not signed in yet — show the sign-in prompt. After sign-in the page
     // reloads and falls through to the authenticated branch below.
     if (!session) {
-      return c.html(renderSignInPage(authorizationId));
+      return c.html(renderSignInPage());
     }
 
     const supabase = createServerClient(supabaseUrl, publishableKey);
-    await supabase.auth.setSession(session);
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.setSession(session);
+
+    if (sessionError) {
+      c.header("Set-Cookie", clearSessionCookie(host));
+      return c.html(renderSignInPage());
+    }
+
+    if (
+      sessionData.session &&
+      (sessionData.session.access_token !== session.access_token ||
+        sessionData.session.refresh_token !== session.refresh_token)
+    ) {
+      c.header(
+        "Set-Cookie",
+        serializeSessionCookie(
+          {
+            access_token: sessionData.session.access_token,
+            refresh_token: sessionData.session.refresh_token,
+          },
+          host
+        )
+      );
+    }
 
     const { data, error } =
       await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
@@ -132,7 +175,7 @@ export function mountAuthRoutes(
       return c.redirect(data.redirect_url, 302);
     }
 
-    return c.html(renderConsentPage(authorizationId, data));
+    return c.html(renderConsentPage(data));
   });
 
   // -------------------------------------------------------------------------
@@ -175,14 +218,48 @@ export function mountAuthRoutes(
       return c.json({ error: "Missing authorization_id" }, 400);
     }
 
-    const { approve } = await c.req.json<{ approve: boolean }>();
+    let approve: unknown;
+    try {
+      const body = await c.req.json<{ approve: unknown }>();
+      approve = body.approve;
+    } catch {
+      return c.json({ error: "invalid_json" }, 400);
+    }
+    if (typeof approve !== "boolean") {
+      return c.json({ error: "approve must be a boolean" }, 400);
+    }
+
     const session = parseSessionCookie(c.req.header("Cookie"));
     if (!session) {
       return c.json({ error: "not_authenticated" }, 401);
     }
 
+    const host = c.req.header("Host");
     const supabase = createServerClient(supabaseUrl, publishableKey);
-    await supabase.auth.setSession(session);
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.setSession(session);
+
+    if (sessionError) {
+      c.header("Set-Cookie", clearSessionCookie(host));
+      return c.json({ error: "not_authenticated" }, 401);
+    }
+
+    if (
+      sessionData.session &&
+      (sessionData.session.access_token !== session.access_token ||
+        sessionData.session.refresh_token !== session.refresh_token)
+    ) {
+      c.header(
+        "Set-Cookie",
+        serializeSessionCookie(
+          {
+            access_token: sessionData.session.access_token,
+            refresh_token: sessionData.session.refresh_token,
+          },
+          host
+        )
+      );
+    }
 
     // `skipBrowserRedirect: true` keeps the SDK from trying to redirect the
     // (nonexistent) browser window on the server — we hand the URL back to
@@ -226,7 +303,7 @@ function commonStyles(): string {
   `;
 }
 
-function renderSignInPage(authorizationId: string): string {
+function renderSignInPage(): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -244,9 +321,10 @@ function renderSignInPage(authorizationId: string): string {
   </div>
   <script>
     async function signIn() {
+      const authorizationId = new URLSearchParams(location.search).get('authorization_id') ?? '';
       const res = await fetch('/auth/signin', { method: 'POST' });
       if (res.ok) {
-        window.location.href = '/auth/consent?authorization_id=${encodeURIComponent(authorizationId)}';
+        window.location.href = '/auth/consent?authorization_id=' + encodeURIComponent(authorizationId);
       } else {
         document.getElementById('msg').textContent =
           'Sign-in failed. Enable anonymous sign-ins in the Supabase dashboard.';
@@ -257,10 +335,7 @@ function renderSignInPage(authorizationId: string): string {
 </html>`;
 }
 
-function renderConsentPage(
-  authorizationId: string,
-  details: OAuthAuthorizationDetails
-): string {
+function renderConsentPage(details: OAuthAuthorizationDetails): string {
   const clientName = escapeHtml(details.client.name || "Unknown client");
   const scopes = details.scope
     ? details.scope.split(" ").map(escapeHtml)
@@ -287,8 +362,9 @@ function renderConsentPage(
   </div>
   <script>
     async function decide(approve) {
+      const authorizationId = new URLSearchParams(location.search).get('authorization_id') ?? '';
       const res = await fetch(
-        '/auth/consent?authorization_id=${encodeURIComponent(authorizationId)}',
+        '/auth/consent?authorization_id=' + encodeURIComponent(authorizationId),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
