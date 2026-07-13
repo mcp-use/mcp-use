@@ -11,15 +11,6 @@ import type { OAuthExtra, OAuthProvider } from "./provider.js";
 
 export { assertSecureHttpUrl, isLocalhost, parseAbsoluteUrl } from "./guards.js";
 
-/** @internal Inputs used to resolve a canonical resource-server URL. */
-export interface OAuthResourceResolutionOptions<TUser> {
-  provider: OAuthProvider<TUser>;
-  basePath: string;
-  mode: "handler" | "listen";
-  mcpUrl?: string | URL;
-  listenOrigin?: string | URL;
-}
-
 /** @internal Resolves configured resource identity, or undefined when none is configured. */
 export function resolveConfiguredOAuthResource<TUser>(options: {
   provider: OAuthProvider<TUser>;
@@ -41,32 +32,6 @@ export function resolveConfiguredOAuthResource<TUser>(options: {
     );
   }
   return undefined;
-}
-
-/** @internal Rejects resources that cannot safely identify an OAuth resource server. */
-export function resolveOAuthResource<TUser>(
-  options: OAuthResourceResolutionOptions<TUser>
-): URL {
-  const basePath = normalizeBasePath(options.basePath);
-  const mcpUrl =
-    options.mcpUrl ??
-    (typeof process === "undefined" ? undefined : process.env["MCP_URL"]);
-  const configuredResource = resolveConfiguredOAuthResource({
-    provider: options.provider,
-    basePath,
-    ...(mcpUrl !== undefined && { mcpUrl }),
-  });
-  if (configuredResource !== undefined) {
-    return configuredResource;
-  }
-
-  if (options.mode === "listen" && options.listenOrigin !== undefined) {
-    return resolveLocalOAuthResource(options.listenOrigin, basePath);
-  }
-
-  throw new Error(
-    "OAuth requires an explicit resource or MCP_URL when using getHandler() or listening on a non-local host"
-  );
 }
 
 /** @internal Resolves a canonical resource from a trusted local listener. */

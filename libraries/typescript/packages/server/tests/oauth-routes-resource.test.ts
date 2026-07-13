@@ -245,7 +245,7 @@ describe("OAuth HTTP route acceptance", () => {
     }
 
     const handler = server({
-      basePath: "/api/mcp/",
+      basePath: "/api/mcp",
       resource: "https://canonical.example.test/api/mcp/",
     }).getHandler();
     const metadata = await handler(

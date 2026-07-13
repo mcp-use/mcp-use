@@ -592,14 +592,7 @@ describe("MCPServer basePath accessor", () => {
     expect(server.basePath).toBe("/api/mcp");
   });
 
-  it("strips a trailing slash except for root /", () => {
-    const withSlash = new MCPServer({
-      name: "bp-test",
-      version: "1.0.0",
-      basePath: "/mcp/",
-    });
-    expect(withSlash.basePath).toBe("/mcp");
-
+  it("accepts the root path", () => {
     const root = new MCPServer({
       name: "bp-test",
       version: "1.0.0",
@@ -609,7 +602,14 @@ describe("MCPServer basePath accessor", () => {
   });
 
   it("rejects invalid basePath values at construction", () => {
-    for (const basePath of ["//", "/foo//bar", "/mcp?x", "/mcp#x", "mcp"]) {
+    for (const basePath of [
+      "//",
+      "/foo//bar",
+      "/mcp/",
+      "/mcp?x",
+      "/mcp#x",
+      "mcp",
+    ]) {
       expect(
         () =>
           new MCPServer({

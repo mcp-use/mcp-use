@@ -49,8 +49,8 @@ interface BaseServerConfig {
    * Route path the MCP endpoint is served on.
    *
    * Must be an absolute URL pathname: starts with `/`, and contains no `?`,
-   * `#`, whitespace, or empty path segments (`//`). A trailing slash is
-   * removed at runtime except for the root path `/`.
+   * `#`, whitespace, empty path segments (`//`), or trailing slash (except
+   * for the root path `/`).
    *
    * @defaultValue `"/mcp"`
    * @throws TypeError When the value fails the pathname rules above
@@ -154,7 +154,8 @@ interface BaseServerConfig {
  * alone cannot enforce when values arrive from untyped call sites.
  *
  * @throws TypeError When `basePath` is present but not an absolute URL
- * pathname without empty segments, query, fragment, or whitespace.
+ * pathname without empty segments, trailing slash, query, fragment, or
+ * whitespace.
  */
 export function assertServerConfig(config: {
   basePath?: unknown;
@@ -162,7 +163,7 @@ export function assertServerConfig(config: {
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(
-        "basePath must be an absolute URL pathname without empty segments, query, or fragment"
+        "basePath must be an absolute URL pathname without empty segments, trailing slash, query, fragment, or whitespace"
       );
     }
     const { basePath } = config;
@@ -171,10 +172,11 @@ export function assertServerConfig(config: {
       basePath.includes("?") ||
       basePath.includes("#") ||
       /\s/.test(basePath) ||
-      basePath.includes("//")
+      basePath.includes("//") ||
+      (basePath.length > 1 && basePath.endsWith("/"))
     ) {
       throw new TypeError(
-        "basePath must be an absolute URL pathname without empty segments, query, or fragment"
+        "basePath must be an absolute URL pathname without empty segments, trailing slash, query, fragment, or whitespace"
       );
     }
   }

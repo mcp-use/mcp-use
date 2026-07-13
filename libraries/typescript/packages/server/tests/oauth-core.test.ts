@@ -8,7 +8,7 @@ import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 
 import {
-  resolveOAuthResource,
+  resolveConfiguredOAuthResource,
   wrapOAuthTokenVerifier,
 } from "../src/oauth/internal.js";
 import { createJwtVerifier } from "../src/oauth/jwt.js";
@@ -71,7 +71,7 @@ describe("OAuth core", () => {
   });
 
   it("binds a returned token resource to the resolved canonical resource", async () => {
-    const expectedResource = resolveOAuthResource({
+    const expectedResource = resolveConfiguredOAuthResource({
       provider: createProvider({
         token: "verified-token",
         clientId: "client-1",
@@ -79,7 +79,6 @@ describe("OAuth core", () => {
         expiresAt: Date.now() / 1000 + 60,
       }),
       basePath: "/mcp",
-      mode: "handler",
       mcpUrl: "https://api.example.test",
     });
     const authInfo = {
@@ -419,17 +418,15 @@ describe("OAuth core", () => {
     });
 
     expect(
-      resolveOAuthResource({
+      resolveConfiguredOAuthResource({
         provider,
         basePath: "/api/mcp",
-        mode: "handler",
-      }).href
+      })?.href
     ).toBe("https://api.example.com/api/mcp");
     expect(() =>
-      resolveOAuthResource({
+      resolveConfiguredOAuthResource({
         provider,
         basePath: "/mcp",
-        mode: "handler",
       })
     ).toThrow("must exactly match basePath");
   });
@@ -449,19 +446,17 @@ describe("OAuth core", () => {
       "http://[::1]",
     ]) {
       expect(
-        resolveOAuthResource({
+        resolveConfiguredOAuthResource({
           provider,
           basePath: "/mcp",
-          mode: "handler",
           mcpUrl: origin,
-        }).href
+        })?.href
       ).toBe(`${origin}/mcp`);
     }
     expect(() =>
-      resolveOAuthResource({
+      resolveConfiguredOAuthResource({
         provider,
         basePath: "/mcp",
-        mode: "handler",
         mcpUrl: "http://evil-localhost",
       })
     ).toThrow("must use HTTPS, or HTTP for localhost");
@@ -477,40 +472,28 @@ describe("OAuth core", () => {
 
     for (const mcpUrl of ["ftp://localhost", "http://api.example.com"]) {
       expect(() =>
-        resolveOAuthResource({
+        resolveConfiguredOAuthResource({
           provider,
           basePath: "/mcp",
-          mode: "handler",
           mcpUrl,
         })
       ).toThrow("must use HTTPS, or HTTP for localhost");
     }
   });
 
-  it("requires an explicit resource or MCP_URL in handler mode", () => {
+  it("returns undefined when no configured resource is available", () => {
     const provider = createProvider({
       token: "verified-token",
       clientId: "client-1",
       scopes: [],
       expiresAt: Date.now() / 1000 + 60,
     });
-    const originalMcpUrl = process.env["MCP_URL"];
 
-    try {
-      delete process.env["MCP_URL"];
-      expect(() =>
-        resolveOAuthResource({
-          provider,
-          basePath: "/mcp",
-          mode: "handler",
-        })
-      ).toThrow("requires an explicit resource or MCP_URL");
-    } finally {
-      if (originalMcpUrl === undefined) {
-        delete process.env["MCP_URL"];
-      } else {
-        process.env["MCP_URL"] = originalMcpUrl;
-      }
-    }
+    expect(
+      resolveConfiguredOAuthResource({
+        provider,
+        basePath: "/mcp",
+      })
+    ).toBeUndefined();
   });
 });

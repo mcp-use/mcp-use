@@ -96,18 +96,27 @@ interface OAuthHonoEnv extends Env {
   };
 }
 
+/** Type-erased registry entry replayed when a per-request SDK server is built. */
 interface ToolEntry<TUser> {
+  /** Declarative tool metadata and schemas supplied at registration time. */
   definition: ToolDefinition;
+  /** Tool callback widened for heterogeneous storage in the registry. */
   callback: ToolCallback<Record<string, unknown>, never, TUser, HasOAuth<TUser>>;
 }
 
+/** Static resource definition and callback retained for per-request replay. */
 interface ResourceEntry<TUser> {
+  /** Declarative resource metadata supplied at registration time. */
   definition: ResourceDefinition;
+  /** Callback invoked when the registered resource URI is read. */
   callback: ResourceCallback<TUser, HasOAuth<TUser>>;
 }
 
+/** Parameterized resource definition and type-erased callback registry entry. */
 interface ResourceTemplateEntry<TUser> {
+  /** Declarative template metadata, including its URI template. */
   definition: ResourceTemplateDefinition;
+  /** Template callback widened to store every inferred variable shape. */
   callback: ResourceTemplateCallback<
     Record<string, TemplateVariableValue>,
     TUser,
@@ -115,8 +124,11 @@ interface ResourceTemplateEntry<TUser> {
   >;
 }
 
+/** Prompt definition and type-erased callback retained for request-time replay. */
 interface PromptEntry<TUser> {
+  /** Declarative prompt metadata and optional argument schema. */
   definition: PromptDefinition;
+  /** Prompt callback widened to store every inferred argument shape. */
   callback: PromptCallback<Record<string, unknown>, TUser, HasOAuth<TUser>>;
 }
 
@@ -180,8 +192,11 @@ export class MCPServer<TUser = never> {
 
   /**
    * Create a server. `config.name` and `config.version` identify the server
-   * to clients during initialization; nothing binds or listens until
-   * {@link MCPServer.listen} or {@link MCPServer.getHandler} is called.
+   * to clients during initialization. `config.basePath` (default `"/mcp"`)
+   * is both the MCP route and the path of the OAuth protected-resource
+   * identity, so any explicit OAuth resource URL must use that exact path.
+   * Nothing binds or listens until {@link MCPServer.listen} or
+   * {@link MCPServer.getHandler} is called.
    */
   constructor(config: ServerConfig<TUser>) {
     assertServerConfig(config);
@@ -203,11 +218,9 @@ export class MCPServer<TUser = never> {
   /**
    * The URL path prefix the MCP endpoint is mounted at.
    *
-   * Returns the normalized path: trailing slashes removed except for the
-   * root path `/`. Reflects `config.basePath` (default `"/mcp"`). Exposed so
-   * tooling that imports the entry module — `mcp-use dev`'s startup log, for
-   * example — can build the endpoint and inspector URLs without assuming the
-   * default.
+   * Reflects `config.basePath` (default `"/mcp"`). Exposed so tooling that
+   * imports the entry module — `mcp-use dev`'s startup log, for example —
+   * can build the endpoint and inspector URLs without assuming the default.
    */
   get basePath(): string {
     return this.#basePath();
@@ -374,6 +387,12 @@ export class MCPServer<TUser = never> {
    * behind a platform edge that is all that's needed, and `allowedHosts`
    * restricts direct exposure (additive — localhost-class values stay allowed).
    *
+   * With OAuth and no explicit resource or `MCP_URL`, a localhost listener
+   * derives its protected-resource URL from the actual bound port. Mounting
+   * therefore waits for the listener callback (especially for port `0`), and
+   * requests accepted before then are queued. Public/wildcard listeners must
+   * configure the resource before calling this method.
+   *
    * @throws If called on a localhost-class bind after {@link MCPServer.getHandler}
    * already mounted the app without Host validation.
    */
@@ -453,8 +472,7 @@ export class MCPServer<TUser = never> {
   }
 
   #basePath(): string {
-    const raw = this.#config.basePath ?? "/mcp";
-    return raw === "/" ? "/" : raw.replace(/\/+$/, "");
+    return this.#config.basePath ?? "/mcp";
   }
 
   #resolveOAuthResource(
