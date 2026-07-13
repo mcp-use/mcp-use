@@ -9,11 +9,16 @@ export to excalidraw.com.
 
 - **Streaming tool input** — `create_view` streams an `elements` JSON string;
   the view parses partial JSON and morphdom-diffs SVG via `exportToSvg`.
+- **Manual resize + display modes** — `viewConfig` sets `autoResize: false`
+  (fixed 4:3 SVG preview) and `displayModes: ["inline", "fullscreen"]`.
 - **View-bound tool** — `view: { name: "excalidraw", prefersBorder, csp, permissions }`
-  on `create_view`.
+  on `create_view` (one tool per view).
 - **App-private tools** — `export_to_excalidraw`, `save_checkpoint`, and
   `read_checkpoint` use `visibility: "app"` and are called from the view via
-  `useCallTool`.
+  `useCallTool` (narrow with `if (result.isError)` before reading success data).
+- **Tool-error handling** — `status === "error"` distinguishes tool failures
+  from invalid results; `create_view` can return `isError: true` for oversized
+  or invalid JSON.
 - **Model context** — `<ModelContext>` plus imperative `modelContext.set` for
   user edit summaries from fullscreen.
 - **External assets CSP** — Excalidraw CSS/fonts load from `https://esm.sh`
@@ -39,7 +44,9 @@ pnpm install
 pnpm dev
 ```
 
-`mcp-use dev` serves MCP at `http://127.0.0.1:3000/mcp`.
+`mcp-use dev` serves MCP at `http://127.0.0.1:3000/mcp`. Preview the view
+through the built-in inspector: open `ui://views/excalidraw.html` via
+`resources/read`.
 
 ```sh
 pnpm build && pnpm start

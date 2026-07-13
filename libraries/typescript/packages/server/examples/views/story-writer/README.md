@@ -8,10 +8,13 @@ they arrive via `useToolContext<"write-story">()`.
 ## What this demonstrates
 
 - **Streaming tool input** — arguments land in `toolInput` (a `DeepPartial`)
-  while `status === "streaming"`, including the `"cancelled"` branch.
+  while `status === "streaming"`, including the `"cancelled"` and `"error"`
+  branches.
+- **Default `viewConfig`** — no named export; runtime defaults apply
+  (`autoResize: true`, all standard display modes).
 - **File-based views** under `resources/<name>/view.tsx`, discovered by
   `mcp-use dev` / `build` / `start`.
-- **Tool ↔ view binding** via `view: { name, description, prefersBorder }` on
+- **One tool ↔ one view** via `view: { name, description, prefersBorder }` on
   `write-story`.
 - **Zero-codegen typing** via `src/tools.d.ts` and the exported `writeStory`
   tool ref.
@@ -29,8 +32,11 @@ a short summary (`title`, `wordCount`). The view uses
   grow as tokens arrive; the UI shows a caret and a "Writing…" indicator.
 - `"pending"` — waiting to start, or complete input received and awaiting the
   tool result ("Finishing…").
-- `"ready"` — final layout from complete `toolInput` plus `toolOutput.wordCount`.
+- `"ready"` — final layout from complete `toolInput` plus `toolOutput.wordCount`
+  (ready requires a non-error result with `structuredContent`).
 - `"cancelled"` — dimmed partial story plus `reason` when the host cancels.
+- `"error"` — tool failure (`error.kind === "tool"`) or malformed non-error
+  result (`error.kind === "invalid-result"`); no typed `toolOutput`.
 
 To see it: run `pnpm dev` (`mcp-use dev`), open the inspector chat, and ask for
 a short story. The inspector forwards the model's streamed tool arguments to the

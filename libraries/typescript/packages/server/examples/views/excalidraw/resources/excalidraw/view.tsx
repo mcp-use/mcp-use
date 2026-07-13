@@ -42,10 +42,12 @@ import "./view.css";
 
 /**
  * Fixed aspect-ratio SVG preview collapses under ext-apps auto-resize
- * (`height: max-content`); report size manually instead.
+ * (`height: max-content`); report size manually instead. Only inline and
+ * fullscreen are supported — PiP is not a useful mode for the canvas editor.
  */
 export const viewConfig = {
   autoResize: false,
+  displayModes: ["inline", "fullscreen"],
 } satisfies ViewConfig;
 
 // ============================================================
@@ -169,7 +171,7 @@ const ExternalLinkIcon = () => (
 async function shareToExcalidraw(
   data: { elements: any[]; appState: any; files: any },
   exportTool: (args: { json: string }) => Promise<{ isError?: boolean | undefined; content?: any[] | undefined }>,
-  openExternal: (args: { url: string }) => void,
+  openExternal: (args: { url: string }) => Promise<void>,
 ) {
   try {
     if (!data.elements?.length) return;
@@ -183,7 +185,7 @@ async function shareToExcalidraw(
     }
 
     const url = (result.content?.[0] as { text?: string } | undefined)?.text;
-    if (url) openExternal({ url });
+    if (url) await openExternal({ url });
   } catch (err) {
     fsLog(`shareToExcalidraw error: ${err}`);
   }
@@ -719,20 +721,35 @@ export default function ExcalidrawView() {
   // example relies on to stop showing its streaming caret, so no different
   // "isFinal" condition is warranted here.
   //
-  // On `"cancelled"` the host will send no further tool-input notifications,
-  // so `toolInput` (partial or not) is final by definition — treat it as
-  // final too so the diagram renders whatever was captured instead of
-  // waiting forever for updates that will never arrive (see the cancelled
-  // banner below for the corresponding user-visible state).
+  // On `"cancelled"` / `"error"` the host will send no further tool-input
+  // notifications, so `toolInput` (partial or not) is final by definition —
+  // treat it as final too so the diagram renders whatever was captured
+  // instead of waiting forever for updates that will never arrive (see the
+  // cancelled / error banners below for the corresponding user-visible state).
   const inputIsFinal =
     toolCtx.status === "ready" ||
     isCancelled ||
+    toolCtx.status === "error" ||
     (toolCtx.status === "pending" && toolCtx.toolInput !== undefined);
   const checkpointId =
     toolCtx.status === "ready" ? toolCtx.toolOutput.checkpointId : undefined;
   const cancelledReason =
     isCancelled && typeof toolCtx.reason === "string" && toolCtx.reason.length > 0
       ? toolCtx.reason
+      : undefined;
+  const errorBanner =
+    toolCtx.status === "error"
+      ? toolCtx.error.kind === "tool"
+        ? {
+            title: "Drawing failed",
+            message:
+              (toolCtx.content?.[0] as { text?: string } | undefined)?.text ??
+              "The create_view tool returned an error.",
+          }
+        : {
+            title: "Invalid tool result",
+            message: toolCtx.error.message,
+          }
       : undefined;
 
   const [elements, setElements] = useState<any[]>([]);
@@ -900,11 +917,13 @@ export default function ExcalidrawView() {
 
   const modelContextText = isCancelled
     ? `Excalidraw diagram drawing was cancelled${cancelledReason ? `: ${cancelledReason}` : "."} Showing whatever elements were drawn before cancellation.`
-    : toolCtx.status === "ready"
-      ? `Excalidraw diagram ready (checkpoint: ${toolCtx.toolOutput.checkpointId}). Display mode: ${displayMode}.`
-      : toolCtx.status === "streaming"
-        ? "Excalidraw diagram is streaming into the view."
-        : "Excalidraw diagram view is waiting for elements.";
+    : errorBanner !== undefined
+      ? `Excalidraw diagram failed: ${errorBanner.message}`
+      : toolCtx.status === "ready"
+        ? `Excalidraw diagram ready (checkpoint: ${toolCtx.toolOutput.checkpointId}). Display mode: ${displayMode}.`
+        : toolCtx.status === "streaming"
+          ? "Excalidraw diagram is streaming into the view."
+          : "Excalidraw diagram view is waiting for elements.";
 
   return (
     <main
@@ -922,6 +941,12 @@ export default function ExcalidrawView() {
           {cancelledReason ? (
             <p className="cancelled-banner-reason">{cancelledReason}</p>
           ) : null}
+        </div>
+      )}
+      {errorBanner !== undefined && displayMode === "inline" && (
+        <div className="cancelled-banner" role="alert">
+          <p className="cancelled-banner-title">{errorBanner.title}</p>
+          <p className="cancelled-banner-reason">{errorBanner.message}</p>
         </div>
       )}
       {displayMode === "inline" && (
@@ -990,7 +1015,7 @@ export default function ExcalidrawView() {
             <MainMenu>
               <MainMenu.Item
                 onSelect={() => {
-                  openExternal({
+                  void openExternal({
                     url: "https://plus.excalidraw.com?utm_source=mcp_app_menu",
                   });
                 }}
@@ -1000,7 +1025,7 @@ export default function ExcalidrawView() {
               </MainMenu.Item>
               <MainMenu.Item
                 onSelect={() => {
-                  openExternal({ url: "https://github.com/excalidraw/excalidraw" });
+                  void openExternal({ url: "https://github.com/excalidraw/excalidraw" });
                 }}
                 style={{ minWidth: 200 }}
               >
@@ -1008,7 +1033,7 @@ export default function ExcalidrawView() {
               </MainMenu.Item>
               <MainMenu.Item
                 onSelect={() => {
-                  openExternal({ url: "https://x.com/excalidraw" });
+                  void openExternal({ url: "https://x.com/excalidraw" });
                 }}
                 style={{ minWidth: 200 }}
               >
@@ -1016,7 +1041,7 @@ export default function ExcalidrawView() {
               </MainMenu.Item>
               <MainMenu.Item
                 onSelect={() => {
-                  openExternal({ url: "https://discord.gg/UexuTaE" });
+                  void openExternal({ url: "https://discord.gg/UexuTaE" });
                 }}
                 style={{ minWidth: 200 }}
               >
@@ -1063,6 +1088,7 @@ export default function ExcalidrawView() {
             loadCheckpoint={async (id) => {
               try {
                 const result = await readCheckpoint({ id });
+                if (result.isError) return null;
                 const text = (result.content?.[0] as { text?: string } | undefined)
                   ?.text;
                 if (!text) return null;

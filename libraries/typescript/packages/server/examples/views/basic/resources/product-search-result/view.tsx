@@ -3,6 +3,8 @@ import { z } from "zod";
 import {
   Image,
   ModelContext,
+  ThemeProvider,
+  ViewControls,
   useCallTool,
   useDisplayMode,
   useOpenExternal,
@@ -145,10 +147,21 @@ function Spinner() {
   );
 }
 
-export default function ProductSearchResult() {
+function contentText(
+  content: ReadonlyArray<{ type: string; text?: string }> | undefined
+): string | undefined {
+  const block = content?.find(
+    (entry): entry is { type: "text"; text: string } =>
+      entry.type === "text" && typeof entry.text === "string"
+  );
+  return block?.text;
+}
+
+function ProductSearchResultContent() {
   const view = useToolContext<"search-fruits">();
   const theme = useViewTheme();
-  const { displayMode, requestDisplayMode } = useDisplayMode();
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
   const sendFollowUpMessage = useSendFollowUp();
   const openExternal = useOpenExternal();
 
@@ -169,21 +182,76 @@ export default function ProductSearchResult() {
     }
   );
 
-  if (view.status !== "ready") {
+  const root = theme === "dark" ? `dark ${rootClass}` : rootClass;
+
+  if (view.status === "streaming") {
     return (
       <SearchSkeleton
         {...(view.toolInput?.query !== undefined && {
           query: view.toolInput.query,
         })}
-        pulsing={view.status === "streaming"}
+        pulsing
+      />
+    );
+  }
+
+  if (view.status === "cancelled") {
+    return (
+      <div className={root}>
+        <p className="m-0 font-medium">Search cancelled</p>
+        {typeof view.reason === "string" && view.reason.length > 0 ? (
+          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
+            {view.reason}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (view.status === "error") {
+    if (view.error.kind === "tool") {
+      return (
+        <div className={root} role="alert">
+          <p className="m-0 font-medium">Search failed</p>
+          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
+            {contentText(view.content) ?? "The tool returned an error."}
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={root} role="alert">
+        <p className="m-0 font-medium">Invalid tool result</p>
+        <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
+          {view.error.message}
+        </p>
+      </div>
+    );
+  }
+
+  if (view.status === "pending") {
+    return (
+      <SearchSkeleton
+        {...(view.toolInput?.query !== undefined && {
+          query: view.toolInput.query,
+        })}
       />
     );
   }
 
   const { query, items } = view.toolOutput;
+  const detailsData =
+    details.data !== undefined && details.data.isError !== true
+      ? details.data.structuredContent
+      : undefined;
+  const detailsErrorText =
+    details.data?.isError === true
+      ? (contentText(details.data.content) ?? "Could not load fruit details.")
+      : details.error?.message;
 
   return (
-    <div className={theme === "dark" ? `dark ${rootClass}` : rootClass}>
+    <div className={root}>
       <ModelContext
         content={`User is viewing results for "${query}"; favorites: ${favorites.join(", ") || "none"}`}
       />
@@ -193,21 +261,26 @@ export default function ProductSearchResult() {
           Results for &ldquo;{query}&rdquo; ({items.length})
         </p>
         <div className="ml-auto flex flex-wrap gap-2">
-          {displayMode === "inline" && (
-            <button
-              type="button"
-              className={buttonClass}
-              onClick={() => requestDisplayMode({ mode: "fullscreen" })}
-            >
-              Expand
-            </button>
-          )}
+          {displayMode === "inline" &&
+            availableDisplayModes.includes("fullscreen") && (
+              <button
+                type="button"
+                className={buttonClass}
+                onClick={() => {
+                  void requestDisplayMode({ mode: "fullscreen" });
+                }}
+              >
+                Expand
+              </button>
+            )}
           <button
             type="button"
             className={buttonClass}
-            onClick={() =>
-              sendFollowUpMessage({ prompt: "Compare my favorite fruits" })
-            }
+            onClick={() => {
+              void sendFollowUpMessage({
+                prompt: "Compare my favorite fruits",
+              });
+            }}
           >
             Compare favorites
           </button>
@@ -228,13 +301,33 @@ export default function ProductSearchResult() {
         onDetails={(fruit) => {
           void details.callTool({ fruit });
         }}
-        onOpenProducer={(url) => openExternal({ url })}
+        onOpenProducer={(url) => {
+          void openExternal({ url });
+        }}
       />
 
       {details.isPending && <Spinner />}
-      {details.data && (
-        <DetailsCard data={details.data.structuredContent} />
+      {detailsData !== undefined && <DetailsCard data={detailsData} />}
+      {detailsErrorText !== undefined && (
+        <p className="mb-4 text-sm text-red-600 dark:text-red-400" role="alert">
+          {detailsErrorText}
+        </p>
       )}
     </div>
+  );
+}
+
+/**
+ * Fruit-store search results. No `viewConfig` export — defaults apply
+ * (`autoResize: true`, all standard display modes). Theme and debug controls
+ * are composed directly (there is no `McpUseProvider`).
+ */
+export default function ProductSearchResult() {
+  return (
+    <ThemeProvider>
+      <ViewControls debugger>
+        <ProductSearchResultContent />
+      </ViewControls>
+    </ThemeProvider>
   );
 }
