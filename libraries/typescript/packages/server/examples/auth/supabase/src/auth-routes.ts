@@ -18,7 +18,7 @@
  * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
  */
 
-import type { Hono } from "@mcp-use/server";
+import type { Hono } from "hono";
 import {
   createClient,
   type OAuthAuthorizationDetails,

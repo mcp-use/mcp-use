@@ -1611,12 +1611,18 @@ importers:
 
   packages/server/examples/auth/supabase:
     dependencies:
+      '@hono/node-server':
+        specifier: ^2.0.6
+        version: 2.0.8(hono@4.12.27)
       '@mcp-use/server':
         specifier: workspace:*
         version: link:../../..
       '@supabase/supabase-js':
         specifier: ^2.104.0
         version: 2.104.0
+      hono:
+        specifier: '>=4.12.27'
+        version: 4.12.27
       zod:
         specifier: 4.4.3
         version: 4.4.3
@@ -1624,12 +1630,12 @@ importers:
       '@types/node':
         specifier: ^24.13.2
         version: 24.13.2
+      tsx:
+        specifier: ^4.21.0
+        version: 4.21.0
       typescript:
         specifier: 7.0.1-rc
         version: 7.0.1-rc
-      vite:
-        specifier: '>=8.0.5'
-        version: 8.0.16(@types/node@24.13.2)(esbuild@0.27.1)(jiti@2.7.0)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/server/examples/auth/workos:
     dependencies:

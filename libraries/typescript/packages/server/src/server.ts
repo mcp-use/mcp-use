@@ -672,10 +672,6 @@ export class MCPServer<TUser = never> {
         serverName: this.#config.name,
         basePath: this.#basePath(),
       });
-      // Custom routes last: after OAuth wiring and MCP/inspector mounts so
-      // they cannot run before the bearer gate and are not shadowed-checked
-      // against MCP internals. Not covered by the OAuth gate (basePath only).
-      this.#config.configureApp?.(app);
       this.#app = app;
       this.#handler = handler;
       this.#hostValidated = hosts !== undefined;

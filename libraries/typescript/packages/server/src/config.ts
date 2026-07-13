@@ -1,5 +1,3 @@
-import type { Hono } from "hono";
-
 import type { LoggingOptions } from "./logging.js";
 import type { OAuthProvider } from "./oauth/index.js";
 
@@ -149,40 +147,18 @@ interface BaseServerConfig {
    * configured level.
    */
   logging?: LoggingOptions;
-  /**
-   * Registers custom routes on the internal Hono app after built-in wiring.
-   *
-   * Invoked once on first mount — either `listen()` or `getHandler()` — after
-   * request logging, OAuth metadata middleware, the bearer gate, the MCP
-   * endpoint, and the inspector shell. Routes registered here are NOT
-   * protected by the OAuth bearer gate (that gate only covers the MCP
-   * `basePath`); use this for public HTTP surfaces such as OAuth consent
-   * pages required by providers like Supabase.
-   *
-   * A custom route on the exact MCP `basePath` will never match: that path is
-   * already claimed by the MCP endpoint.
-   */
-  configureApp?: (app: Hono) => void;
 }
 
 /**
  * Runtime checks for optional {@link ServerConfig} fields that TypeScript
  * alone cannot enforce when values arrive from untyped call sites.
  *
- * @throws TypeError When `configureApp` is present but not a function, or
- * when `basePath` is present but not an absolute URL pathname without empty
- * segments, query, fragment, or whitespace.
+ * @throws TypeError When `basePath` is present but not an absolute URL
+ * pathname without empty segments, query, fragment, or whitespace.
  */
 export function assertServerConfig(config: {
-  configureApp?: unknown;
   basePath?: unknown;
 }): void {
-  if (
-    config.configureApp !== undefined &&
-    typeof config.configureApp !== "function"
-  ) {
-    throw new TypeError("configureApp must be a function");
-  }
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(

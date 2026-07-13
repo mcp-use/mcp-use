@@ -8,19 +8,20 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "mcp-use dev",
-    "build": "mcp-use build",
-    "start": "mcp-use start",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.6",
     "@mcp-use/server": "workspace:*",
     "@supabase/supabase-js": "^2.104.0",
+    "hono": "^4.12.27",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "typescript": "7.0.1-rc",
-    "vite": "^8.0.16"
+    "tsx": "^4.21.0",
+    "typescript": "7.0.1-rc"
   }
 }
