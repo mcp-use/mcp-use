@@ -4,8 +4,14 @@ import {
   type AuthInfo,
   type OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
-import { createRemoteJWKSet, jwtVerify, errors, type JWTPayload } from "jose";
+import {
+  createRemoteJWKSet,
+  jwtVerify,
+  errors,
+  type JWTVerifyGetKey,
+} from "jose";
 
+import { isLocalhost, isRecord } from "./guards.js";
 import type { OAuthResourceOptions } from "./provider.js";
 
 /**
@@ -33,36 +39,23 @@ export interface JwtVerifierOptions {
 export function createJwtVerifier(
   options: JwtVerifierOptions
 ): OAuthTokenVerifier {
-  let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
-  if (options.key === undefined) {
-    jwks = createRemoteJWKSet(options.jwksUrl);
-  }
-
-  let configuredResource: URL | undefined;
-  if (options.resource !== undefined) {
-    configuredResource = canonicalUrl(options.resource);
-  }
+  // jose overloads key material vs JWKS getters; runtime accepts either.
+  const key = options.key ?? createRemoteJWKSet(options.jwksUrl);
+  const configuredResource =
+    options.resource !== undefined ? canonicalUrl(options.resource) : undefined;
 
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
       try {
-        const verificationOptions = {
+        const { payload } = await jwtVerify(token, key as JWTVerifyGetKey, {
           issuer: options.issuer,
           ...(options.audience !== undefined && { audience: options.audience }),
           ...(options.algorithms !== undefined && {
             algorithms: [...options.algorithms],
           }),
           requiredClaims: ["exp", "sub"],
-        };
-        const { payload } =
-          options.key !== undefined
-            ? await jwtVerify(token, options.key, verificationOptions)
-            : jwks !== undefined
-              ? await jwtVerify(token, jwks, verificationOptions)
-              : (() => {
-                  throw new Error("JWT verification key is unavailable");
-                })();
-        const claims = payloadRecord(payload);
+        });
+        const claims: VerifiedPayload = { ...payload };
         // clientId is only the OAuth client (client_id / azp), never sub.
         // SDK AuthInfo requires a string, but many IdPs (WorkOS AuthKit,
         // Supabase) issue tokens without client claims; empty string is mapped
@@ -116,14 +109,7 @@ export function normalizedProviderUrl(value: URL | string, name: string): URL {
   } catch {
     throw new TypeError(`${name} must be an absolute HTTP(S) URL`);
   }
-  if (
-    !/^https?:$/.test(url.protocol) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash ||
-    (url.protocol === "http:" && !isLocalhost(url))
-  ) {
+  if (!isAllowedHttpUrl(url)) {
     throw new TypeError(
       `${name} must use HTTPS, or HTTP for localhost, without credentials, query, or fragment`
     );
@@ -134,7 +120,7 @@ export function normalizedProviderUrl(value: URL | string, name: string): URL {
 
 /** @internal Resolves a provider endpoint without losing an issuer path prefix. */
 export function providerEndpoint(issuer: string | URL, path: string): string {
-  const base = typeof issuer === "string" ? new URL(issuer) : new URL(issuer);
+  const base = new URL(issuer);
   base.pathname = `${base.pathname.replace(/\/+$/, "")}/`;
   return new URL(path.replace(/^\/+/, ""), base).href;
 }
@@ -257,14 +243,7 @@ function verifiedResource(
 function canonicalUrl(value: URL | string): URL {
   try {
     const url = new URL(value);
-    if (
-      !/^https?:$/.test(url.protocol) ||
-      url.username ||
-      url.password ||
-      url.search ||
-      url.hash ||
-      (url.protocol === "http:" && !isLocalhost(url))
-    ) {
+    if (!isAllowedHttpUrl(url)) {
       throw new TypeError();
     }
     url.pathname =
@@ -275,6 +254,18 @@ function canonicalUrl(value: URL | string): URL {
       "Token resource claim must be an absolute HTTPS URL, or HTTP URL for localhost"
     );
   }
+}
+
+/** Shared URL-shape rules for provider and resource URLs (HTTP only on localhost). */
+function isAllowedHttpUrl(url: URL): boolean {
+  return (
+    /^https?:$/.test(url.protocol) &&
+    !url.username &&
+    !url.password &&
+    !url.search &&
+    !url.hash &&
+    (url.protocol !== "http:" || isLocalhost(url))
+  );
 }
 
 function isCredentialFailure(error: unknown): boolean {
@@ -288,24 +279,6 @@ function isCredentialFailure(error: unknown): boolean {
     error instanceof errors.JWSSignatureVerificationFailed ||
     error instanceof errors.JWKSNoMatchingKey
   );
-}
-
-function isLocalhost(url: URL): boolean {
-  const hostname = url.hostname.toLowerCase();
-  return (
-    hostname === "localhost" ||
-    hostname.endsWith(".localhost") ||
-    hostname === "[::1]" ||
-    /^127(?:\.\d{1,3}){3}$/.test(hostname)
-  );
-}
-
-function payloadRecord(payload: JWTPayload): VerifiedPayload {
-  return { ...payload };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 const JWT_DEBUG_CLAIMS = [
@@ -322,12 +295,16 @@ const JWT_DEBUG_CLAIMS = [
   "jti",
 ] as const;
 
+function debugErrorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function logJwtFailure(token: string, error: unknown): void {
   try {
-    const name =
-      error instanceof Error ? error.constructor.name : typeof error;
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[oauth-debug] JWT verify failed: ${name}: ${message}`);
+    const name = error instanceof Error ? error.constructor.name : typeof error;
+    console.error(
+      `[oauth-debug] JWT verify failed: ${name}: ${debugErrorText(error)}`
+    );
     if (error instanceof errors.JWTClaimValidationFailed) {
       console.error(
         `[oauth-debug] claim=${error.claim} reason=${error.reason}`
@@ -337,33 +314,34 @@ function logJwtFailure(token: string, error: unknown): void {
     const segments = token.split(".");
     console.error(`[oauth-debug] token segments: ${segments.length}`);
     if (segments.length !== 3) {
-      const preview =
-        token.length > 12 ? `${token.slice(0, 12)}…` : token;
+      const preview = token.length > 12 ? `${token.slice(0, 12)}…` : token;
       console.error(
         `[oauth-debug] non-JWT token preview=${preview} length=${token.length}`
       );
       return;
     }
 
-    try {
-      const headerJson = Buffer.from(segments[0]!, "base64url").toString(
-        "utf8"
-      );
-      console.error(`[oauth-debug] header=${headerJson}`);
-    } catch (decodeError) {
-      console.error(
-        `[oauth-debug] header decode failed: ${
-          decodeError instanceof Error
-            ? decodeError.message
-            : String(decodeError)
-        }`
-      );
+    function decodeSegment(segment: string, label: string): string | undefined {
+      try {
+        return Buffer.from(segment, "base64url").toString("utf8");
+      } catch (decodeError) {
+        console.error(
+          `[oauth-debug] ${label} decode failed: ${debugErrorText(decodeError)}`
+        );
+        return undefined;
+      }
     }
 
+    const headerJson = decodeSegment(segments[0]!, "header");
+    if (headerJson !== undefined) {
+      console.error(`[oauth-debug] header=${headerJson}`);
+    }
+
+    const payloadJson = decodeSegment(segments[1]!, "payload");
+    if (payloadJson === undefined) {
+      return;
+    }
     try {
-      const payloadJson = Buffer.from(segments[1]!, "base64url").toString(
-        "utf8"
-      );
       const payload = JSON.parse(payloadJson) as Record<string, unknown>;
       const selected: Record<string, unknown> = {};
       for (const claim of JWT_DEBUG_CLAIMS) {
@@ -375,11 +353,7 @@ function logJwtFailure(token: string, error: unknown): void {
       console.error(`[oauth-debug] payload=${JSON.stringify(selected)}`);
     } catch (decodeError) {
       console.error(
-        `[oauth-debug] payload decode failed: ${
-          decodeError instanceof Error
-            ? decodeError.message
-            : String(decodeError)
-        }`
+        `[oauth-debug] payload decode failed: ${debugErrorText(decodeError)}`
       );
     }
   } catch {
