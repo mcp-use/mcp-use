@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { useState, type ComponentType } from "react";
 
@@ -1413,6 +1413,298 @@ describe("react bridge runtime", () => {
     await expect(
       bridge.callTool({ name: "pick-item", arguments: { id: "c" } })
     ).rejects.toThrow();
+  });
+
+  it("useViewTool aborts registration when unmounted before connection completes", async () => {
+    resetRuntime();
+    const [guestTransport, hostTransport] = createPairedTransports();
+    let releaseGate!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      releaseGate = resolve;
+    });
+    const originalSend = guestTransport.send.bind(guestTransport);
+    guestTransport.send = async (message) => {
+      await gate;
+      return originalSend(message);
+    };
+    _setTransportForTesting(guestTransport);
+
+    const bridge = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init = new Promise<void>((resolve) => {
+      bridge.oninitialized = () => resolve();
+    });
+    await bridge.connect(hostTransport);
+
+    const errors: unknown[][] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+
+    try {
+      function ToolChild() {
+        useViewTool(
+          {
+            name: "late-tool",
+            inputSchema: z.object({}),
+          },
+          async () => ({
+            content: [{ type: "text", text: "ok" }],
+          })
+        );
+        return <div data-testid="tool-child">mounted</div>;
+      }
+
+      function Parent() {
+        const [show, setShow] = useState(true);
+        return (
+          <div>
+            {show ? <ToolChild /> : <div data-testid="gone">gone</div>}
+            <button type="button" onClick={() => setShow(false)}>
+              unmount-tool
+            </button>
+          </div>
+        );
+      }
+
+      bootstrapView({ default: Parent as ComponentType });
+      await waitFor(() => {
+        expect(screen.getByTestId("tool-child")).not.toBeNull();
+      });
+
+      screen.getByText("unmount-tool").click();
+      await waitFor(() => {
+        expect(screen.getByTestId("gone")).not.toBeNull();
+      });
+
+      releaseGate();
+      await init;
+      // Allow any late registration attempt to settle.
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      const listed = await bridge.listTools({});
+      expect(listed.tools.map((tool) => tool.name)).not.toContain("late-tool");
+      expect(
+        errors.filter((args) =>
+          String(args[0]).includes("useViewTool failed to register")
+        )
+      ).toHaveLength(0);
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  it("useViewTool removes the registration when unmounted after connect", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function ToolChild() {
+      useViewTool(
+        {
+          name: "ephemeral",
+          inputSchema: z.object({}),
+        },
+        async () => ({
+          content: [{ type: "text", text: "ok" }],
+        })
+      );
+      return <div data-testid="tool-child">mounted</div>;
+    }
+
+    function Parent() {
+      const [show, setShow] = useState(true);
+      return (
+        <div>
+          {show ? <ToolChild /> : <div data-testid="gone">gone</div>}
+          <button type="button" onClick={() => setShow(false)}>
+            unmount-tool
+          </button>
+        </div>
+      );
+    }
+
+    bootstrapView({ default: Parent as ComponentType });
+    await init;
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      expect(listed.tools.map((tool) => tool.name)).toContain("ephemeral");
+    });
+
+    screen.getByText("unmount-tool").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("gone")).not.toBeNull();
+    });
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      expect(listed.tools.map((tool) => tool.name)).not.toContain("ephemeral");
+    });
+  });
+
+  it("useViewTool metadata update clears title and description with explicit undefined", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const [rich, setRich] = useState(true);
+      useViewTool(
+        rich
+          ? {
+              name: "meta-tool",
+              title: "Rich Title",
+              description: "Rich description",
+              inputSchema: z.object({}),
+            }
+          : {
+              name: "meta-tool",
+              inputSchema: z.object({}),
+            },
+        async () => ({
+          content: [{ type: "text", text: "ok" }],
+        })
+      );
+      return (
+        <button type="button" onClick={() => setRich(false)}>
+          clear-meta
+        </button>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      const tool = listed.tools.find((entry) => entry.name === "meta-tool");
+      expect(tool?.title).toBe("Rich Title");
+      expect(tool?.description).toBe("Rich description");
+    });
+
+    screen.getByText("clear-meta").click();
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      const tool = listed.tools.find((entry) => entry.name === "meta-tool");
+      expect(tool).toBeDefined();
+      expect(tool?.title).toBeUndefined();
+      expect(tool?.description).toBeUndefined();
+    });
+  });
+
+  it("useViewTool rapid name change removes the old tool and keeps the new one", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const [name, setName] = useState("tool-a");
+      useViewTool(
+        {
+          name,
+          inputSchema: z.object({}),
+        },
+        async () => ({
+          content: [{ type: "text", text: name }],
+        })
+      );
+      return (
+        <div>
+          <span data-testid="name">{name}</span>
+          <button type="button" onClick={() => setName("tool-b")}>
+            rename
+          </button>
+        </div>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      expect(listed.tools.map((tool) => tool.name)).toEqual(["tool-a"]);
+    });
+
+    screen.getByText("rename").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("name").textContent).toBe("tool-b");
+    });
+
+    await waitFor(async () => {
+      const listed = await bridge.listTools({});
+      expect(listed.tools.map((tool) => tool.name)).toEqual(["tool-b"]);
+    });
+
+    // Stale cleanup must not have removed the new registration.
+    const result = await bridge.callTool({
+      name: "tool-b",
+      arguments: {},
+    });
+    expect(result.content?.[0]).toMatchObject({ text: "tool-b" });
+  });
+
+  it("useViewTool reports registration failure without throwing or breaking the app", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      function View() {
+        useViewTool(
+          {
+            name: "shared-name",
+            inputSchema: z.object({}),
+          },
+          async () => ({
+            content: [{ type: "text", text: "first" }],
+          })
+        );
+        useViewTool(
+          {
+            name: "shared-name",
+            inputSchema: z.object({}),
+          },
+          async () => ({
+            content: [{ type: "text", text: "second" }],
+          })
+        );
+        return <div data-testid="alive">alive</div>;
+      }
+
+      bootstrapView({ default: View as ComponentType });
+      await init;
+
+      await waitFor(() => {
+        expect(screen.getByTestId("alive").textContent).toBe("alive");
+      });
+
+      await waitFor(() => {
+        expect(
+          errorSpy.mock.calls.some((args) =>
+            String(args[0]).includes(
+              'useViewTool failed to register tool "shared-name"'
+            )
+          )
+        ).toBe(true);
+      });
+
+      await waitFor(async () => {
+        const listed = await bridge.listTools({});
+        expect(listed.tools.map((tool) => tool.name)).toEqual(["shared-name"]);
+      });
+
+      const result = await bridge.callTool({
+        name: "shared-name",
+        arguments: {},
+      });
+      expect(result.content?.[0]).toMatchObject({ text: "first" });
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("sends no model-context update for views that never use ModelContext", async () => {
