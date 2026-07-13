@@ -1,17 +1,12 @@
-import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
+import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps";
 import {
   createContext,
   useContext,
-  useEffect,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
 
-import { registerModelContextFlush } from "./model-context-store.js";
-import {
-  markModelContextUnsupportedWarned,
-  type McpAppRuntime,
-} from "./view-runtime.js";
+import type { McpAppRuntime } from "./view-runtime.js";
 
 /**
  * React context holding the document's {@link McpAppRuntime}.
@@ -23,10 +18,11 @@ import {
 export const ViewRuntimeContext = createContext<McpAppRuntime | null>(null);
 
 /**
- * Provide a {@link McpAppRuntime} to the view tree and wire model-context flush.
+ * Provide a {@link McpAppRuntime} to the view tree.
  *
- * Connection is started by {@link bootstrapView} before render; this provider
- * only registers the model-context flush against the runtime.
+ * Connection is started by {@link bootstrapView} before render. Model-context
+ * delivery is owned by the runtime's {@link McpAppRuntime.modelContextStore};
+ * this provider only exposes the runtime through context.
  *
  * @param props - Provider props.
  * @param props.runtime - Runtime created by bootstrap for this mount.
@@ -41,34 +37,6 @@ export function ViewRuntimeProvider({
   runtime: McpAppRuntime;
   children: ReactNode;
 }) {
-  useEffect(() => {
-    const unregister = registerModelContextFlush((params) => {
-      void (async () => {
-        try {
-          const app = await runtime.connect();
-          // Spec draft: hosts declare acceptance of ui/update-model-context
-          // via the updateModelContext capability. Skip (once, loudly) when
-          // the host does not accept context updates.
-          if (app.getHostCapabilities()?.updateModelContext === undefined) {
-            if (markModelContextUnsupportedWarned()) {
-              console.warn(
-                "[ModelContext] Host does not declare the updateModelContext capability; model-context updates are not sent."
-              );
-            }
-            return;
-          }
-          await app.updateModelContext(
-            params as Parameters<App["updateModelContext"]>[0]
-          );
-        } catch (error: unknown) {
-          console.warn("[ModelContext] Failed to update model context:", error);
-        }
-      })();
-    });
-
-    return unregister;
-  }, [runtime]);
-
   return (
     <ViewRuntimeContext.Provider value={runtime}>
       {children}

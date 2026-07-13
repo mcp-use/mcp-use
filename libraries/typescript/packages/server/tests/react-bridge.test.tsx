@@ -23,7 +23,7 @@ import {
   useViewTool,
 } from "../src/react/index.js";
 import { _resetBootstrapRootsForTesting } from "../src/react/runtime/bootstrap-view.js";
-import { _resetModelContextForTesting } from "../src/react/runtime/model-context-store.js";
+import { _resetModelContextForTesting } from "../src/react/components/model-context.js";
 import {
   _getAppForTesting,
   _getRuntimeForTesting,
@@ -1916,6 +1916,270 @@ describe("react bridge runtime", () => {
     await waitFor(() => {
       expect(modelContextUpdates.at(-1)?.content).toEqual([]);
     });
+  });
+
+  it("empty ModelContext parent preserves children at the nearest ancestor", async () => {
+    resetRuntime();
+    const { init, modelContextUpdates } = await startHost();
+
+    function View() {
+      return (
+        <ModelContext content="">
+          <ModelContext content="child" />
+        </ModelContext>
+      );
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe("- child");
+  });
+
+  it("failed model-context send remains dirty and retries on the next mutation", async () => {
+    resetRuntime();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { bridge, init, modelContextUpdates } = await startHost();
+
+    let shouldFail = true;
+    bridge.onupdatemodelcontext = async (params) => {
+      if (shouldFail) {
+        shouldFail = false;
+        throw new Error("inject-model-context-fail");
+      }
+      modelContextUpdates.push(
+        params as {
+          content?: { type: string; text?: string }[];
+        }
+      );
+      return {};
+    };
+
+    function View() {
+      return <div data-testid="host">host</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host")).not.toBeNull();
+    });
+
+    modelContext.set("k", "First");
+    await waitFor(() => {
+      expect(shouldFail).toBe(false);
+    });
+    expect(modelContextUpdates).toHaveLength(0);
+
+    modelContext.set("k", "Second");
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content).toEqual([
+      { type: "text", text: "- Second" },
+    ]);
+
+    warnSpy.mockRestore();
+  });
+
+  it("in-flight model-context updates coalesce to the latest payload", async () => {
+    resetRuntime();
+    const { bridge, init, modelContextUpdates } = await startHost();
+
+    let releaseFirst: (() => void) | undefined;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let callCount = 0;
+
+    bridge.onupdatemodelcontext = async (params) => {
+      callCount += 1;
+      if (callCount === 1) {
+        await firstGate;
+      }
+      modelContextUpdates.push(
+        params as {
+          content?: { type: string; text?: string }[];
+        }
+      );
+      return {};
+    };
+
+    function View() {
+      return <div data-testid="host">host</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host")).not.toBeNull();
+    });
+
+    modelContext.set("k", "A");
+    await waitFor(() => {
+      expect(callCount).toBe(1);
+    });
+
+    modelContext.set("k", "B");
+    modelContext.set("k", "C");
+    releaseFirst?.();
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(2);
+    });
+    expect(modelContextUpdates[0]?.content?.[0]?.text).toBe("- A");
+    expect(modelContextUpdates[1]?.content?.[0]?.text).toBe("- C");
+    expect(callCount).toBe(2);
+  });
+
+  it("reconnect retries dirty model context after a failed connect", async () => {
+    resetRuntime();
+    await disposeView();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // First generation fails; ModelContext still registers and the pump stays
+    // dirty. Stage the retry transport before failing so a follow-up pump cannot
+    // fall through to window.parent PostMessageTransport.
+    let rejectStart: ((err: Error) => void) | undefined;
+    const hangingTransport = {
+      async start() {
+        await new Promise<void>((_resolve, reject) => {
+          rejectStart = reject;
+        });
+      },
+      async send() {},
+      async close() {},
+    };
+    _setTransportForTesting(hangingTransport as never);
+
+    function View() {
+      return <ModelContext content="after-reconnect" />;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+
+    const runtime = _getRuntimeForTesting();
+    expect(runtime).not.toBeNull();
+
+    await waitFor(() => {
+      expect(rejectStart).toBeTypeOf("function");
+    });
+
+    const [guestTransport, hostTransport] = createPairedTransports();
+    const bridge = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      {
+        openLinks: {},
+        serverTools: {},
+        message: { text: {} },
+        logging: {},
+        updateModelContext: { text: {} },
+      }
+    );
+    const modelContextUpdates: {
+      content?: { type: string; text?: string }[];
+    }[] = [];
+    bridge.onupdatemodelcontext = async (params) => {
+      modelContextUpdates.push(
+        params as {
+          content?: { type: string; text?: string }[];
+        }
+      );
+      return {};
+    };
+    const init = new Promise<void>((resolve) => {
+      bridge.oninitialized = () => resolve();
+    });
+    await bridge.connect(hostTransport);
+
+    // Same in-flight promise bootstrap started — attach rejection handling
+    // before failing the transport so vitest does not see an unhandled reject.
+    const firstConnect = runtime!.connect();
+    runtime!.setTransport(guestTransport);
+    rejectStart?.(new Error("inject-connect-fail"));
+    await expect(firstConnect).rejects.toThrow(/inject-connect-fail/);
+
+    // Successful reconnect: notifyConnected re-pumps the dirty payload.
+    const app = await runtime!.connect();
+    expect(app).toBeTruthy();
+    await init;
+
+    await waitFor(() => {
+      expect(modelContextUpdates).toHaveLength(1);
+    });
+    expect(modelContextUpdates[0]?.content).toEqual([
+      { type: "text", text: "- after-reconnect" },
+    ]);
+
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it("disposal cancels stale model-context completion", async () => {
+    resetRuntime();
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { bridge, init, modelContextUpdates } = await startHost();
+
+    let releaseSend: (() => void) | undefined;
+    const sendGate = new Promise<void>((resolve) => {
+      releaseSend = resolve;
+    });
+    let hostCalls = 0;
+
+    bridge.onupdatemodelcontext = async (params) => {
+      hostCalls += 1;
+      await sendGate;
+      modelContextUpdates.push(
+        params as {
+          content?: { type: string; text?: string }[];
+        }
+      );
+      return {};
+    };
+
+    function View() {
+      return <div data-testid="host">host</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await waitFor(() => {
+      expect(screen.getByTestId("host")).not.toBeNull();
+    });
+
+    modelContext.set("k", "Stale");
+    await waitFor(() => {
+      expect(hostCalls).toBe(1);
+    });
+
+    await disposeView();
+    expect(_getRuntimeForTesting()).toBeNull();
+
+    releaseSend?.();
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    // The in-flight host call may complete, but the disposed store must not
+    // acknowledge or schedule another send.
+    expect(hostCalls).toBe(1);
+
+    warnSpy.mockRestore();
+  });
+
+  it("imperative modelContext throws when no view runtime is mounted", async () => {
+    resetRuntime();
+    await disposeView();
+    expect(_getRuntimeForTesting()).toBeNull();
+    expect(() => modelContext.set("k", "x")).toThrow(/bootstrapView/);
+    expect(() => modelContext.remove("k")).toThrow(/bootstrapView/);
+    expect(() => modelContext.clear()).toThrow(/bootstrapView/);
   });
 
   it("resolves root-relative public assets via Image", async () => {

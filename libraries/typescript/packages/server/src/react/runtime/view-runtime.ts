@@ -8,6 +8,7 @@ import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server"
 
 import type { DisplayMode } from "../types/host-types.js";
 import type { ToolContextError } from "../types/result-types.js";
+import { ModelContextStore } from "./model-context-store.js";
 import type { NormalizedViewConfig } from "./view-config.js";
 
 /** Transport accepted by {@link App.connect}. */
@@ -136,7 +137,8 @@ export type ViewToolCallback = Parameters<App["registerTool"]>[2];
 
 /**
  * Per-document MCP Apps runtime: owns the guest {@link App}, connection retry
- * generations, tool-handler handoff, narrow external-store channels, and disposal.
+ * generations, tool-handler handoff, narrow external-store channels, one
+ * {@link ModelContextStore}, and disposal.
  *
  * Created by {@link createMcpAppRuntime} / {@link bootstrapView}. Hooks obtain
  * the instance from {@link ViewRuntimeContext}.
@@ -147,15 +149,24 @@ export interface McpAppRuntime {
   /** Normalized immutable view configuration fixed at construction. */
   readonly config: NormalizedViewConfig;
 
+  /**
+   * Per-runtime model-context node tree and async flush pump.
+   *
+   * Constructed with this runtime and disposed with it. React components obtain
+   * it via {@link useViewRuntime}; the imperative `modelContext` API delegates
+   * to the active document runtime's store.
+   */
+  readonly modelContextStore: ModelContextStore;
+
   /** Connect (or return the connected / in-flight App). Idempotent per generation. */
   connect(): Promise<App>;
   /**
-   * Invalidate the active generation, prevent late event delivery, clear
+   * Invalidate the active generation, dispose the model-context store (so late
+   * in-flight completions are ignored), prevent late event delivery, clear
    * listeners and snapshots, and close the App/transport.
    *
-   * Model-context flush unbinding is owned by React: callers should unmount
-   * the view tree first (see `disposeView`) so `ViewRuntimeProvider`'s effect
-   * cleanup runs before this closes the App.
+   * Callers should unmount the view tree first (see `disposeView`) so hook
+   * cleanup can run while the App connection still exists.
    */
   dispose(): Promise<void>;
 
@@ -376,6 +387,26 @@ export function createMcpAppRuntime(
   const hostChannel = createChannelStore();
   const themeChannel = createChannelStore();
   const displayChannel = createChannelStore();
+
+  // Declared before connect so the store host can close over it; connect is a
+  // function declaration and is initialized before any store method runs.
+  async function connect(): Promise<App> {
+    if (disposed) {
+      throw new Error("View runtime has been disposed");
+    }
+    if (connectedApp) return connectedApp;
+    if (connectPromise) return connectPromise;
+
+    const generation = ++currentGeneration;
+    const app = createAppGeneration();
+    currentApp = app;
+    toolRegistryActivated = false;
+
+    connectPromise = connectGeneration(app, generation);
+    return connectPromise;
+  }
+
+  const modelContextStore = new ModelContextStore({ connect });
 
   function patchTool(patch: Partial<ToolSnapshot>): void {
     if (!toolSnapshotChanged(toolSnapshot, patch)) {
@@ -600,6 +631,8 @@ export function createMcpAppRuntime(
       // Always re-derive display (host omitting modes → ["inline"]).
       syncThemeFromHost(hostContext);
       syncDisplayFromHost(hostContext);
+      // Retry a dirty model-context payload after a successful (re)connect.
+      modelContextStore.notifyConnected();
       return app;
     } catch (error) {
       const failure =
@@ -619,22 +652,6 @@ export function createMcpAppRuntime(
       await closeAppQuietly(app);
       throw error;
     }
-  }
-
-  async function connect(): Promise<App> {
-    if (disposed) {
-      throw new Error("View runtime has been disposed");
-    }
-    if (connectedApp) return connectedApp;
-    if (connectPromise) return connectPromise;
-
-    const generation = ++currentGeneration;
-    const app = createAppGeneration();
-    currentApp = app;
-    toolRegistryActivated = false;
-
-    connectPromise = connectGeneration(app, generation);
-    return connectPromise;
   }
 
   function registerViewTool(
@@ -675,6 +692,7 @@ export function createMcpAppRuntime(
     if (disposed) return;
     disposed = true;
     currentGeneration += 1;
+    modelContextStore.dispose();
     const app = currentApp;
     currentApp = null;
     connectedApp = null;
@@ -756,6 +774,7 @@ export function createMcpAppRuntime(
 
   const runtime: McpAppRuntime = {
     config,
+    modelContextStore,
     connect,
     dispose,
     subscribeTool: toolChannel.subscribe,
@@ -782,18 +801,12 @@ export function createMcpAppRuntime(
 }
 
 /**
- * Document-level active runtime used by the imperative model-context flush
- * path until Phase 11 owns a per-runtime store.
+ * Document-level active runtime used by the imperative {@link modelContext}
+ * API and test seams.
  *
- * Set by {@link bootstrapView} / {@link ViewRuntimeProvider}; cleared on
- * {@link McpAppRuntime.dispose}.
+ * Set by {@link bootstrapView}; cleared on {@link McpAppRuntime.dispose}.
  */
 let activeRuntime: McpAppRuntime | null = null;
-
-/**
- * Warn-once flag for hosts that omit the `updateModelContext` capability.
- */
-let warnedModelContextUnsupported = false;
 
 /** Transport queued for the next bootstrap when set before the runtime exists. */
 let pendingTestTransport: ViewRuntimeTransport | null = null;
@@ -816,21 +829,6 @@ export function setActiveRuntime(runtime: McpAppRuntime | null): void {
  */
 export function getActiveRuntime(): McpAppRuntime | null {
   return activeRuntime;
-}
-
-/**
- * Mark that the missing-`updateModelContext` warning has been emitted.
- *
- * @returns `true` if this call should emit the warning (first time only).
- *
- * @internal
- */
-export function markModelContextUnsupportedWarned(): boolean {
-  if (warnedModelContextUnsupported) {
-    return false;
-  }
-  warnedModelContextUnsupported = true;
-  return true;
 }
 
 /**
@@ -892,7 +890,6 @@ export function _registerDisposeViewForTesting(
  */
 export function _resetViewBridgeForTesting(): void {
   pendingTestTransport = null;
-  warnedModelContextUnsupported = false;
   if (registeredDisposeView) {
     void registeredDisposeView();
     return;
