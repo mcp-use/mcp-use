@@ -148,7 +148,18 @@ oauthCustomProvider(...)
 
 `oauthCustomProvider` is the supported escape hatch. Its public callback is `mapAuthInfo`, not the internal `toMcpUseExtra` hook. The factory validates the options and converts them into `OAuthProviderInternal<TUser>`. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
 
-Before calling `requireBearerAuth`, mcp-use resolves the opaque value to its private internal representation and wraps its verifier. The wrapper calls the verifier, then returns the final SDK-compatible `AuthInfo` with `extra` merged as `{ ...authInfo.extra, ...internal.toMcpUseExtra(authInfo) }`. Therefore every successful bearer-gate result has the typed mcp-use values before it reaches Hono, `mountMcp`, or the SDK callback. Custom providers use this same wrapper; they cannot omit the public `mapAuthInfo` callback or rely on an optional `extra` value.
+Before calling `requireBearerAuth`, mcp-use wraps the opaque provider with
+`wrapOAuthTokenVerifier(provider, expectedResource?)`. The wrapper calls the
+provider verifier, asserts resource binding against the resolved canonical
+resource URL, then returns the final SDK-compatible `AuthInfo` with `extra`
+merged as `{ ...authInfo.extra, ...internal.toMcpUseExtra(authInfo) }`. Binding
+succeeds when the token carries an RFC 8707 `resource` claim matching
+`expectedResource`, or when `authInfo.resource` is absent but audience
+validation was proven (an internal marker set by `createJwtVerifier`).
+Therefore every successful bearer-gate result has the typed mcp-use values
+before it reaches Hono, `mountMcp`, or the SDK callback. Custom providers use
+this same wrapper; they cannot omit the public `mapAuthInfo` callback or rely
+on an optional `extra` value.
 
 ## Resolve the canonical resource URL
 
@@ -206,10 +217,16 @@ export type OAuthAuth<TUser> = {
   resource?: URL;
 };
 
+type RequestContextBase = {
+  signal: AbortSignal;
+  request?: Request;
+  client: RequestClientContext;
+};
+
 export type RequestContext<TUser = never, HasOAuth extends boolean = false> =
   HasOAuth extends true
-    ? { signal: AbortSignal; request?: Request; auth: OAuthAuth<TUser> }
-    : { signal: AbortSignal; request?: Request; auth?: never };
+    ? RequestContextBase & { auth: OAuthAuth<TUser> }
+    : RequestContextBase & { auth?: never };
 ```
 
 With `oauth`, `ctx.auth` is present and non-optional. OAuth callbacks are registered only through the gated HTTP MCP endpoint, so absence of `ctx.http?.authInfo` is an internal invariant violation. `request` remains optional because `ServerContext.http` is optional in the SDK. Without `oauth`, `ctx.auth` is unavailable by the documented type contract. A fixed construction generic such as `MCPServer<TUser, HasOAuth>` is allowed because the constructor infers it once and it remains unchanged. Forbidden return-type accumulation is different: `tool()` must not return a progressively growing `MCPServer<TTools & ...>` type, because it cannot accurately model loops and conditionals.
@@ -225,49 +242,76 @@ handler.fetch(c.req.raw, {
 });
 ```
 
-The SDK exposes it as `ctx.http.authInfo` in its `ServerContext`. `toRequestContext`, which already receives SDK `ServerContext`, is the single place that projects it into mcp-use `ctx.auth`. There is no `AsyncLocalStorage`, global request state, or second token-verification path.
+The SDK exposes it as `ctx.http.authInfo` in its `ServerContext`. Projection
+into mcp-use callback context uses two exported helpers:
 
-`toRequestContext` maps once:
+- `toRequestContext(ctx)` — unauthenticated context (`RequestContext<never, false>`): `signal`, optional `request`, and `client`.
+- `toAuthenticatedRequestContext<TUser>(ctx)` — authenticated context (`RequestContext<TUser, true>`): the same fields plus `auth`, after `requireOAuthAuthInfo` succeeds.
+
+`MCPServer` picks between them from whether `oauth` is configured. There is no
+`AsyncLocalStorage`, global request state, or second token-verification path.
+
+`requireOAuthAuthInfo` and the authenticated projection:
 
 ```ts
-type MappedOAuthAuthInfo<TUser> = OAuthAuthInfo & {
-  expiresAt: number;
-  extra: OAuthExtra<TUser>;
-};
-
 function requireOAuthAuthInfo<TUser>(
-  authInfo: OAuthAuthInfo | undefined,
+  authInfo: AuthInfo | undefined,
 ): asserts authInfo is MappedOAuthAuthInfo<TUser> {
   const extra = authInfo?.extra;
   if (
+    authInfo === undefined ||
     extra === undefined ||
     typeof extra !== "object" ||
-    typeof authInfo?.expiresAt !== "number" ||
+    extra === null ||
     !("user" in extra) ||
+    extra.user === undefined ||
     !("payload" in extra) ||
-    !Array.isArray(extra.permissions)
+    extra.payload === null ||
+    typeof extra.payload !== "object" ||
+    Array.isArray(extra.payload) ||
+    !("permissions" in extra) ||
+    !Array.isArray(extra.permissions) ||
+    !extra.permissions.every((permission) => typeof permission === "string") ||
+    typeof authInfo.token !== "string" ||
+    !Array.isArray(authInfo.scopes) ||
+    !authInfo.scopes.every((scope) => typeof scope === "string") ||
+    typeof authInfo.clientId !== "string" ||
+    typeof authInfo.expiresAt !== "number" ||
+    !Number.isFinite(authInfo.expiresAt) ||
+    (authInfo.resource !== undefined && !(authInfo.resource instanceof URL))
   ) {
     throw new Error("OAuth callback did not receive mapped AuthInfo.extra");
   }
 }
 
-function toRequestContext<TUser>(
-  sdkContext: ServerContext,
-): RequestContext<TUser, true> {
-  const authInfo = sdkContext.http?.authInfo;
-  requireOAuthAuthInfo<TUser>(authInfo);
-  const request = sdkContext.http?.req;
-
+export function toRequestContext(
+  ctx: ServerContext,
+): RequestContext<never, false> {
+  const request = ctx.http?.req;
   return {
-    signal: sdkContext.mcpReq.signal,
+    signal: ctx.mcpReq.signal,
     ...(request !== undefined && { request }),
+    client: toClientContext(ctx),
+  };
+}
+
+export function toAuthenticatedRequestContext<TUser>(
+  ctx: ServerContext,
+): RequestContext<TUser, true> {
+  const request = ctx.http?.req;
+  const authInfo = ctx.http?.authInfo;
+  requireOAuthAuthInfo<TUser>(authInfo);
+  return {
+    signal: ctx.mcpReq.signal,
+    ...(request !== undefined && { request }),
+    client: toClientContext(ctx),
     auth: {
       user: authInfo.extra.user,
       payload: authInfo.extra.payload,
       accessToken: authInfo.token,
       scopes: [...authInfo.scopes],
       permissions: [...authInfo.extra.permissions],
-      ...(authInfo.clientId !== "" && { clientId: authInfo.clientId }),
+      ...(authInfo.clientId.length > 0 && { clientId: authInfo.clientId }),
       expiresAt: authInfo.expiresAt,
       ...(authInfo.resource !== undefined && { resource: authInfo.resource }),
     },
@@ -295,23 +339,24 @@ Route and request ordering is exact:
 3. The gate calls `requireBearerAuth(...)` and stores a successful `AuthInfo` in Hono variables.
 4. `mountMcp` reads the Hono variable and forwards it as `MountMcpOptions.authInfo` to `handler.fetch`.
 5. The MCP route creates the SDK server factory for this request with the forwarded `authInfo`.
-6. Callback execution receives SDK `ctx.http.authInfo`; `toRequestContext` projects it once to `ctx.auth`.
+6. Callback execution receives SDK `ctx.http.authInfo`; `toAuthenticatedRequestContext` (or `toRequestContext` when OAuth is not configured) projects it once to mcp-use callback context.
 
 ```ts
-const internal = resolveOAuthProvider(provider);
+const provider = config.oauth!;
+const providerOptions = getOAuthProviderOptions(provider);
 
 app.use("*", async (c, next) => {
   const response = oauthMetadataResponse(c.req.raw, {
-    oauthMetadata: internal.oauthMetadata,
+    oauthMetadata: providerOptions.oauthMetadata,
     resourceServerUrl: resource,
-    ...(internal.scopesSupported !== undefined && {
-      scopesSupported: [...internal.scopesSupported],
+    ...(providerOptions.scopesSupported !== undefined && {
+      scopesSupported: providerOptions.scopesSupported,
     }),
-    ...(internal.resourceName !== undefined && {
-      resourceName: internal.resourceName,
+    ...(providerOptions.resourceName !== undefined && {
+      resourceName: providerOptions.resourceName,
     }),
-    ...(internal.serviceDocumentationUrl !== undefined && {
-      serviceDocumentationUrl: internal.serviceDocumentationUrl,
+    ...(providerOptions.serviceDocumentationUrl !== undefined && {
+      serviceDocumentationUrl: providerOptions.serviceDocumentationUrl,
     }),
   });
 
@@ -320,10 +365,10 @@ app.use("*", async (c, next) => {
 });
 
 const gate = requireBearerAuth({
-  verifier: wrapOAuthTokenVerifier(internal),
+  verifier: wrapOAuthTokenVerifier(provider, resource),
   resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
-  ...(internal.requiredScopes !== undefined && {
-    requiredScopes: [...internal.requiredScopes],
+  ...(providerOptions.requiredScopes !== undefined && {
+    requiredScopes: providerOptions.requiredScopes,
   }),
 });
 
@@ -448,5 +493,5 @@ Migrate provider concepts and public context compatibility, not deferred behavio
 - In direct mode, `accessToken` aliases verified SDK `AuthInfo.token`.
 - Do not port `verifyJwt: false` or any decode-only authentication path.
 - Do not port v1's unauthenticated `HEAD` bypass on the MCP endpoint. Beta.3 bearer authentication gates every method on that route; metadata routes retain public `HEAD` support.
-- Replace v1 context storage with explicit `handler.fetch(..., { authInfo })` forwarding and one `toRequestContext` projection.
+- Replace v1 context storage with explicit `handler.fetch(..., { authInfo })` forwarding and `toRequestContext` / `toAuthenticatedRequestContext` projection.
 - Do not claim beta.3 helpers are pending, Express-only, or supplied by an upstream Hono auth feature. Use only beta.3 resource-server helpers.

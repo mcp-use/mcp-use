@@ -40,9 +40,9 @@ token's resource binding when the token carries one.
 
 [Supabase's OAuth 2.1 server](https://supabase.com/docs/guides/auth/oauth-server)
 requires the application to host its own authorization/consent UI. In the
-Supabase dashboard (Authentication → OAuth Server), set
-`authorization_url_path` to `/auth/consent` so it matches the path this example
-serves.
+Supabase dashboard (Authentication → OAuth Server), set Authorization Path to
+`/auth/consent` so it matches the path this example serves (the same setting is
+`authorization_url_path` in CLI `config.toml`).
 
 When a user needs to approve an OAuth client, Supabase redirects their browser
 to that path with `?authorization_id=<uuid>`. This example mounts the consent

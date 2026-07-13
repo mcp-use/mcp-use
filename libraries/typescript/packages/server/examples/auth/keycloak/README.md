@@ -41,7 +41,7 @@ To configure Keycloak to include the audience claim:
 
 ## Environment
 
-Copy `.env.example` into your deployment's environment and configure:
+Copy `.env.example` to `.env` and configure:
 
 ```sh
 KEYCLOAK_SERVER_URL=https://keycloak.example.com
@@ -49,8 +49,10 @@ KEYCLOAK_REALM=mcp
 KEYCLOAK_AUDIENCE=mcp-api
 ```
 
-For a public deployment, also set `MCP_URL` to the canonical public MCP
-endpoint origin, for example `https://mcp.example.com`.
+For deployments, set the same variables in the deployment environment.
+
+For a public deployment, also set `MCP_URL` to the server origin, for example
+`https://mcp.example.com`, not the `/mcp` endpoint.
 
 ## Run
 
