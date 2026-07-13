@@ -7,12 +7,13 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
  * triggering a model turn.
  *
  * @remarks
- * The prompt is delivered to the host as a user-authored chat message, as if
- * the user had typed it. The returned promise resolves when the host accepts
- * the message — not when the model responds; any response arrives through the
- * normal conversation flow (and, if the model calls this view's tool again,
- * through {@link useToolContext}). Hosts may require user confirmation or
- * decline the message entirely.
+ * Requires the host `message` capability; otherwise the returned promise
+ * rejects before any wire traffic. The prompt is delivered to the host as a
+ * user-authored chat message, as if the user had typed it. The returned
+ * promise resolves when the host accepts the message — not when the model
+ * responds; any response arrives through the normal conversation flow (and, if
+ * the model calls this view's tool again, through {@link useToolContext}).
+ * Hosts may require user confirmation or decline the message entirely.
  *
  * The returned callback is referentially stable for the lifetime of the
  * mounted runtime.

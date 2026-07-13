@@ -17,9 +17,11 @@ import type { DisplayMode } from "../types/host-types.js";
  * makes on its own (for example, the user exiting fullscreen).
  *
  * `displayMode` is `"inline"` until the host reports otherwise.
- * `availableDisplayModes` is the view's declared modes from `viewConfig`
- * (Phase 9 intersects with host-reported modes).
- * `requestDisplayMode` is the runtime-owned method — referentially stable.
+ * `availableDisplayModes` is the negotiated intersection of
+ * `viewConfig.displayModes` and `hostContext.availableDisplayModes`. When the
+ * host omits available modes, only `"inline"` is requestable.
+ * `requestDisplayMode` rejects modes outside that intersection before sending;
+ * the method itself is runtime-owned and referentially stable.
  *
  * @example
  * ```tsx
@@ -31,7 +33,9 @@ import type { DisplayMode } from "../types/host-types.js";
  *   return (
  *     <button
  *       type="button"
- *       onClick={() => requestDisplayMode({ mode: "fullscreen" })}
+ *       onClick={() => {
+ *         void requestDisplayMode({ mode: "fullscreen" });
+ *       }}
  *     >
  *       Expand
  *     </button>
@@ -42,9 +46,16 @@ import type { DisplayMode } from "../types/host-types.js";
 export function useDisplayMode(): {
   /** How the host is currently displaying the view; `"inline"` until the host reports otherwise. */
   displayMode: DisplayMode;
-  /** Modes this view declared via `viewConfig.displayModes` (host intersection lands in Phase 9). */
+  /**
+   * Negotiated modes: intersection of `viewConfig.displayModes` and host
+   * `availableDisplayModes` (host omits → only `"inline"`).
+   */
   availableDisplayModes: readonly DisplayMode[];
-  /** Ask the host to switch display mode. Resolves when the host has processed the request; observe `displayMode` for the outcome. */
+  /**
+   * Ask the host to switch display mode. Rejects when the mode is outside the
+   * negotiated intersection. Resolves when the host has processed the request;
+   * observe `displayMode` for the outcome.
+   */
   requestDisplayMode: (args: { mode: DisplayMode }) => Promise<void>;
 } {
   const runtime = useViewRuntime();

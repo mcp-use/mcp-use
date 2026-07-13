@@ -69,14 +69,19 @@ export interface HostSnapshot {
 }
 
 /**
- * Display-channel snapshot: current mode and modes this view declared.
+ * Display-channel snapshot: current mode and negotiated available modes.
  *
  * @internal
  */
 export interface DisplaySnapshot {
   /** How the host is currently displaying the view. */
   displayMode: DisplayMode;
-  /** Modes declared by normalized {@link NormalizedViewConfig.displayModes}. */
+  /**
+   * Negotiated modes: intersection of normalized
+   * {@link NormalizedViewConfig.displayModes} and
+   * `hostContext.availableDisplayModes`. When the host omits available modes,
+   * only `"inline"`.
+   */
   availableDisplayModes: readonly DisplayMode[];
 }
 
@@ -171,7 +176,10 @@ export interface McpAppRuntime {
 
   /** Subscribe to display-channel changes. */
   subscribeDisplay(listener: Listener): () => void;
-  /** Current display-channel snapshot (stable until display mode changes). */
+  /**
+   * Current display-channel snapshot (stable until `displayMode` or
+   * negotiated `availableDisplayModes` change).
+   */
   getDisplaySnapshot(): DisplaySnapshot;
 
   /** Guest {@link App} for the current generation, or `null` before connect starts. */
@@ -238,6 +246,29 @@ function resolveTheme(
   hostContext: McpUiHostContext | undefined
 ): "light" | "dark" {
   return hostContext?.theme === "dark" ? "dark" : "light";
+}
+
+function sameDisplayModes(
+  a: readonly DisplayMode[],
+  b: readonly DisplayMode[]
+): boolean {
+  return a.length === b.length && a.every((mode, index) => mode === b[index]);
+}
+
+/**
+ * Negotiated display modes: view modes ∩ host modes.
+ *
+ * When the host omits `availableDisplayModes`, only `"inline"` is requestable.
+ */
+function resolveAvailableDisplayModes(
+  viewModes: readonly DisplayMode[],
+  hostContext: McpUiHostContext | undefined
+): readonly DisplayMode[] {
+  const hostModes = hostContext?.availableDisplayModes;
+  if (hostModes === undefined) {
+    return ["inline"];
+  }
+  return viewModes.filter((mode) => hostModes.includes(mode));
 }
 
 function installEmptyToolHandlers(app: App): void {
@@ -335,9 +366,10 @@ export function createMcpAppRuntime(
   let toolSnapshot: ToolSnapshot = { ...defaultToolSnapshot };
   let hostSnapshot: HostSnapshot = { ...defaultHostSnapshot };
   let themeSnapshot: "light" | "dark" = "light";
+  // Host has not reported modes yet → treat as omitted → only "inline".
   let displaySnapshot: DisplaySnapshot = {
     displayMode: "inline",
-    availableDisplayModes: config.displayModes,
+    availableDisplayModes: ["inline"],
   };
 
   const toolChannel = createChannelStore();
@@ -376,12 +408,19 @@ export function createMcpAppRuntime(
     hostContext: McpUiHostContext | undefined
   ): void {
     const nextMode = resolveDisplayMode(hostContext);
-    if (nextMode === displaySnapshot.displayMode) {
+    const nextAvailable = resolveAvailableDisplayModes(
+      config.displayModes,
+      hostContext
+    );
+    if (
+      nextMode === displaySnapshot.displayMode &&
+      sameDisplayModes(nextAvailable, displaySnapshot.availableDisplayModes)
+    ) {
       return;
     }
     displaySnapshot = {
       displayMode: nextMode,
-      availableDisplayModes: config.displayModes,
+      availableDisplayModes: nextAvailable,
     };
     displayChannel.emit();
   }
@@ -558,10 +597,9 @@ export function createMcpAppRuntime(
         connectionError: undefined,
         ...(hostContext !== undefined && { hostContext }),
       });
-      if (hostContext !== undefined) {
-        syncThemeFromHost(hostContext);
-        syncDisplayFromHost(hostContext);
-      }
+      // Always re-derive display (host omitting modes → ["inline"]).
+      syncThemeFromHost(hostContext);
+      syncDisplayFromHost(hostContext);
       return app;
     } catch (error) {
       const failure =
@@ -651,7 +689,7 @@ export function createMcpAppRuntime(
     themeSnapshot = "light";
     displaySnapshot = {
       displayMode: "inline",
-      availableDisplayModes: config.displayModes,
+      availableDisplayModes: ["inline"],
     };
     if (activeRuntime === runtime) {
       activeRuntime = null;
@@ -665,8 +703,6 @@ export function createMcpAppRuntime(
     params: CallToolParams
   ): Promise<CallToolResult> {
     const app = await connect();
-    // Phase 8: capability guard lives here so useCallTool can rely on it.
-    // Phase 9 centralizes the remaining outbound capability checks.
     if (app.getHostCapabilities()?.serverTools === undefined) {
       throw new Error(
         "Host does not advertise the serverTools capability required to call server tools"
@@ -677,11 +713,21 @@ export function createMcpAppRuntime(
 
   async function sendMessage(params: SendMessageParams): Promise<void> {
     const app = await connect();
+    if (app.getHostCapabilities()?.message === undefined) {
+      throw new Error(
+        "Host does not advertise the message capability required to send follow-up messages"
+      );
+    }
     await app.sendMessage(params);
   }
 
   async function openLink(params: OpenLinkParams): Promise<void> {
     const app = await connect();
+    if (app.getHostCapabilities()?.openLinks === undefined) {
+      throw new Error(
+        "Host does not advertise the openLinks capability required to open external links"
+      );
+    }
     await app.openLink(params);
   }
 
@@ -689,6 +735,17 @@ export function createMcpAppRuntime(
     params: RequestDisplayModeParams
   ): Promise<void> {
     const app = await connect();
+    // Re-derive from the latest host context so a race with host-context
+    // updates cannot approve a mode the snapshot has not yet published.
+    const negotiated = resolveAvailableDisplayModes(
+      config.displayModes,
+      app.getHostContext() ?? hostSnapshot.hostContext
+    );
+    if (!negotiated.includes(params.mode as DisplayMode)) {
+      throw new Error(
+        `Display mode "${params.mode}" is not in the negotiated available modes [${negotiated.join(", ")}]`
+      );
+    }
     await app.requestDisplayMode(params);
   }
 

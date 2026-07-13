@@ -66,6 +66,7 @@ async function startHost(
   capabilities: ConstructorParameters<typeof AppBridge>[2] = {
     openLinks: {},
     serverTools: {},
+    message: { text: {} },
     logging: {},
     updateModelContext: { text: {} },
   }
@@ -776,7 +777,7 @@ describe("react bridge runtime", () => {
     const { bridge, init } = await startHost();
 
     const refs: {
-      openExternal?: (args: { url: string }) => void;
+      openExternal?: (args: { url: string }) => Promise<void>;
       sendFollowUp?: (args: { prompt: string }) => Promise<void>;
       sendSizeChanged?: (size: {
         width?: number;
@@ -1013,10 +1014,14 @@ describe("react bridge runtime", () => {
     };
 
     function Probe() {
-      const { displayMode, requestDisplayMode } = useDisplayMode();
+      const { displayMode, availableDisplayModes, requestDisplayMode } =
+        useDisplayMode();
       return (
         <div>
           <span data-testid="mode">{displayMode}</span>
+          <span data-testid="available">
+            {availableDisplayModes.join(",")}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -1034,6 +1039,17 @@ describe("react bridge runtime", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("mode").textContent).toBe("inline");
+      // Host omitted availableDisplayModes → only inline until host reports.
+      expect(screen.getByTestId("available").textContent).toBe("inline");
+    });
+
+    await bridge.sendHostContextChange({
+      availableDisplayModes: ["inline", "fullscreen"],
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("available").textContent).toBe(
+        "inline,fullscreen"
+      );
     });
 
     screen.getByText("expand").click();
@@ -1048,6 +1064,9 @@ describe("react bridge runtime", () => {
 
     let followUpPrompt: string | undefined;
     let openedUrl: string | undefined;
+    let openExternalRef:
+      | ((args: { url: string }) => Promise<void>)
+      | undefined;
 
     bridge.onmessage = async ({ content }) => {
       const block = content?.[0];
@@ -1066,6 +1085,7 @@ describe("react bridge runtime", () => {
     function Probe() {
       const sendFollowUp = useSendFollowUp();
       const openExternal = useOpenExternal();
+      openExternalRef = openExternal;
       return (
         <div>
           <button
@@ -1079,7 +1099,7 @@ describe("react bridge runtime", () => {
           <button
             type="button"
             onClick={() => {
-              openExternal({ url: "https://example.com" });
+              void openExternal({ url: "https://example.com" });
             }}
           >
             open
@@ -1093,7 +1113,15 @@ describe("react bridge runtime", () => {
 
     await waitFor(() => {
       expect(screen.getByText("follow-up")).not.toBeNull();
+      expect(openExternalRef).toBeTypeOf("function");
     });
+
+    // useOpenExternal returns a Promise-returning callback.
+    const openPromise = openExternalRef!({ url: "https://probe.example" });
+    expect(openPromise).toBeInstanceOf(Promise);
+    await openPromise;
+    expect(openedUrl).toBe("https://probe.example");
+    openedUrl = undefined;
 
     screen.getByText("follow-up").click();
     await waitFor(() => {
