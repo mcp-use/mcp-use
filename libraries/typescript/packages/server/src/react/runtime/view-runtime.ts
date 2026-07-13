@@ -7,7 +7,10 @@ import {
 import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server";
 
 import type { DisplayMode } from "../types/host-types.js";
-import type { ToolContextError } from "../types/result-types.js";
+import {
+  toolContextErrorMessage,
+  type ToolContextError,
+} from "../types/result-types.js";
 import { ModelContextStore } from "./model-context-store.js";
 import type { NormalizedViewConfig } from "./view-config.js";
 
@@ -518,10 +521,12 @@ export function createMcpAppRuntime(
           : undefined;
 
       if (params.isError === true) {
+        const result = params as CallToolResult & { isError: true };
         patchTool({
           error: {
             kind: "tool",
-            result: params as CallToolResult & { isError: true },
+            message: toolContextErrorMessage(result),
+            result,
           },
           hasToolResult: false,
           toolOutput: undefined,

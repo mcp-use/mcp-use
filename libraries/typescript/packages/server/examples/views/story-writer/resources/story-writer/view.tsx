@@ -155,24 +155,11 @@ export default function StoryWriter() {
   }
 
   if (ctx.status === "error") {
-    if (ctx.error.kind === "tool") {
-      const message = ctx.content?.find(
-        (block): block is { type: "text"; text: string } =>
-          block.type === "text" && typeof block.text === "string"
-      )?.text;
-      return (
-        <div className={root} role="alert">
-          <p className="m-0 font-medium">Story failed</p>
-          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
-            {message ?? "The tool returned an error."}
-          </p>
-        </div>
-      );
-    }
-
     return (
       <div className={root} role="alert">
-        <p className="m-0 font-medium">Invalid tool result</p>
+        <p className="m-0 font-medium">
+          {ctx.error.kind === "tool" ? "Story failed" : "Invalid tool result"}
+        </p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {ctx.error.message}
         </p>

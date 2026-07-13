@@ -5,6 +5,7 @@ import {
   ModelContext,
   ThemeProvider,
   ViewControls,
+  toolResultText,
   useCallTool,
   useDisplayMode,
   useOpenExternal,
@@ -147,16 +148,6 @@ function Spinner() {
   );
 }
 
-function contentText(
-  content: ReadonlyArray<{ type: string; text?: string }> | undefined
-): string | undefined {
-  const block = content?.find(
-    (entry): entry is { type: "text"; text: string } =>
-      entry.type === "text" && typeof entry.text === "string"
-  );
-  return block?.text;
-}
-
 function ProductSearchResultContent() {
   const view = useToolContext<"search-fruits">();
   const theme = useViewTheme();
@@ -209,20 +200,11 @@ function ProductSearchResultContent() {
   }
 
   if (view.status === "error") {
-    if (view.error.kind === "tool") {
-      return (
-        <div className={root} role="alert">
-          <p className="m-0 font-medium">Search failed</p>
-          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
-            {contentText(view.content) ?? "The tool returned an error."}
-          </p>
-        </div>
-      );
-    }
-
     return (
       <div className={root} role="alert">
-        <p className="m-0 font-medium">Invalid tool result</p>
+        <p className="m-0 font-medium">
+          {view.error.kind === "tool" ? "Search failed" : "Invalid tool result"}
+        </p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {view.error.message}
         </p>
@@ -247,7 +229,7 @@ function ProductSearchResultContent() {
       : undefined;
   const detailsErrorText =
     details.data?.isError === true
-      ? (contentText(details.data.content) ?? "Could not load fruit details.")
+      ? (toolResultText(details.data) ?? "Could not load fruit details.")
       : details.error?.message;
 
   return (

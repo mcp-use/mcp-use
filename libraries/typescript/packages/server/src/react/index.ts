@@ -51,6 +51,7 @@ export type {
 } from "./types/host-types.js";
 export {
   InvalidToolResultError,
+  toolResultText,
   type CallToolData,
   type CallToolResult,
   type ToolContextError,

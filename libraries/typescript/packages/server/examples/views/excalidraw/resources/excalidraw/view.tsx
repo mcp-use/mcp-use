@@ -742,9 +742,7 @@ export default function ExcalidrawView() {
       ? toolCtx.error.kind === "tool"
         ? {
             title: "Drawing failed",
-            message:
-              (toolCtx.content?.[0] as { text?: string } | undefined)?.text ??
-              "The create_view tool returned an error.",
+            message: toolCtx.error.message,
           }
         : {
             title: "Invalid tool result",

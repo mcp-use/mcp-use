@@ -75,10 +75,14 @@ describe("ToolsFromModule / Register", () => {
 
     type ToolError = Extract<ErrorBranch["error"], { kind: "tool" }>;
     expectTypeOf<ToolError["result"]["isError"]>().toEqualTypeOf<true>();
+    expectTypeOf<ToolError["message"]>().toEqualTypeOf<string>();
 
     type InvalidError = Extract<ErrorBranch["error"], { kind: "invalid-result" }>;
     expectTypeOf<InvalidError["message"]>().toEqualTypeOf<string>();
     expectTypeOf<InvalidError["result"]>().toEqualTypeOf<CallToolResult>();
+
+    // Both branches expose `message` without narrowing on kind.
+    expectTypeOf<ErrorBranch["error"]["message"]>().toEqualTypeOf<string>();
 
     expect(true).toBe(true);
   });

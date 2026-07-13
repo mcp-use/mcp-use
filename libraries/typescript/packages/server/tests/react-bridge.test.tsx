@@ -12,6 +12,7 @@ import {
   InvalidToolResultError,
   ModelContext,
   modelContext,
+  toolResultText,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -256,7 +257,7 @@ describe("react bridge runtime", () => {
       if (handle.status === "error") {
         return (
           <div data-testid="lifecycle">
-            error|{handle.error.kind}|
+            error|{handle.error.kind}|{handle.error.message}|
             {handle.toolOutput === undefined ? "no-out" : "has-out"}|
             {handle.content?.[0] && "type" in handle.content[0]
               ? handle.content[0].type
@@ -278,9 +279,87 @@ describe("react bridge runtime", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("lifecycle").textContent).toBe(
-        "error|tool|no-out|text"
+        "error|tool|failed|no-out|text"
       );
     });
+  });
+
+  it("derives tool error message from multiple text blocks joined with newlines", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      if (handle.status === "error") {
+        return <div data-testid="msg">{handle.error.message}</div>;
+      }
+      return <div data-testid="msg">{handle.status}</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolResult({
+      content: [
+        { type: "text", text: "line one" },
+        { type: "text", text: "line two" },
+      ],
+      isError: true,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("msg").textContent).toBe("line one\nline two");
+    });
+  });
+
+  it("falls back to a generic tool error message when there are no text blocks", async () => {
+    resetRuntime();
+    const { bridge, init } = await startHost();
+
+    function View() {
+      const handle = useToolContext();
+      if (handle.status === "error") {
+        return <div data-testid="msg">{handle.error.message}</div>;
+      }
+      return <div data-testid="msg">{handle.status}</div>;
+    }
+
+    bootstrapView({ default: View as ComponentType });
+    await init;
+
+    await bridge.sendToolResult({
+      content: [],
+      isError: true,
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("msg").textContent).toBe(
+        "Tool returned an error."
+      );
+    });
+  });
+
+  it("toolResultText joins text blocks and returns undefined when empty", () => {
+    expect(
+      toolResultText({
+        content: [
+          { type: "text", text: "a" },
+          { type: "image", data: "x", mimeType: "image/png" },
+          { type: "text", text: "b" },
+        ],
+      })
+    ).toBe("a\nb");
+    expect(toolResultText({ content: [] })).toBeUndefined();
+    expect(
+      toolResultText({
+        content: [{ type: "text", text: "   " }],
+      })
+    ).toBeUndefined();
+    expect(
+      toolResultText({
+        content: [{ type: "image", data: "x", mimeType: "image/png" }],
+      })
+    ).toBeUndefined();
   });
 
   it("surfaces missing structuredContent as invalid-result error", async () => {

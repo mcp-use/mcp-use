@@ -106,8 +106,8 @@ While waiting for a result, branch on `view.status`:
 - `"cancelled"` — host cancelled the call; `view.reason` is the optional
   host-provided string; `view.toolInput` may still hold the last partial.
 - `"error"` — a valid tool error (`error.kind === "tool"`) or a malformed
-  non-error result (`error.kind === "invalid-result"`); `toolOutput` is
-  undefined.
+  non-error result (`error.kind === "invalid-result"`); both expose
+  `error.message` for rendering; `toolOutput` is undefined.
 - `"ready"` — render from `view.toolOutput` (and optionally `view.content`,
   `view.meta`).
 

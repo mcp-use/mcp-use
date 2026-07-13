@@ -36,7 +36,8 @@ a short summary (`title`, `wordCount`). The view uses
   (ready requires a non-error result with `structuredContent`).
 - `"cancelled"` — dimmed partial story plus `reason` when the host cancels.
 - `"error"` — tool failure (`error.kind === "tool"`) or malformed non-error
-  result (`error.kind === "invalid-result"`); no typed `toolOutput`.
+  result (`error.kind === "invalid-result"`); both expose `error.message`;
+  no typed `toolOutput`.
 
 To see it: run `pnpm dev` (`mcp-use dev`), open the inspector chat, and ask for
 a short story. The inspector forwards the model's streamed tool arguments to the
