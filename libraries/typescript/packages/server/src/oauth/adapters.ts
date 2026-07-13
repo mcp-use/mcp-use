@@ -20,7 +20,7 @@ interface OAuthHonoEnv extends Env {
 /**
  * Creates Hono middleware that requires a bearer token for a canonical resource.
  *
- * @typeParam TUser - Application user type carried by the opaque provider.
+ * @typeParam TUser - Application user type carried by the provider.
  * @param provider - OAuth provider that verifies the bearer token.
  * @param resource - Canonical public MCP endpoint URL.
  * @returns Middleware that stores verified {@link AuthInfo} in `authInfo`.
@@ -51,7 +51,7 @@ export function bearerAuth<TUser>(
 /**
  * Creates Hono middleware that serves OAuth discovery metadata.
  *
- * @typeParam TUser - Application user type carried by the opaque provider.
+ * @typeParam TUser - Application user type carried by the provider.
  * @param provider - OAuth provider that supplies authorization-server metadata.
  * @param resource - Canonical public MCP endpoint URL.
  * @returns Middleware that serves matching discovery routes or falls through.

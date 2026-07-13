@@ -8,12 +8,8 @@ import {
 } from "./guards.js";
 import { invalidToken, oauthAudienceValidated } from "./jwt.js";
 import type { OAuthExtra, OAuthProvider } from "./provider.js";
-import { resolveOAuthProvider as resolveProvider } from "./provider.js";
 
 export { assertSecureHttpUrl, isLocalhost, parseAbsoluteUrl } from "./guards.js";
-
-/** @internal Resolves an opaque provider for server-side wiring. */
-export const resolveOAuthProvider = resolveProvider;
 
 /** @internal Inputs used to resolve a canonical resource-server URL. */
 export interface OAuthResourceResolutionOptions<TUser> {
@@ -30,7 +26,7 @@ export function resolveConfiguredOAuthResource<TUser>(options: {
   basePath: string;
   mcpUrl?: string | URL;
 }): URL | undefined {
-  const provider = resolveProvider(options.provider);
+  const provider = options.provider;
   const basePath = normalizeBasePath(options.basePath);
   if (provider.resource !== undefined) {
     return validateOAuthResource(provider.resource, basePath);
@@ -117,16 +113,15 @@ export function wrapOAuthTokenVerifier<TUser>(
   provider: OAuthProvider<TUser>,
   expectedResource?: URL
 ): OAuthTokenVerifier {
-  const internal = resolveProvider(provider);
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
-      const authInfo = await internal.tokenVerifier.verifyAccessToken(token);
+      const authInfo = await provider.tokenVerifier.verifyAccessToken(token);
       assertVerifiedAuthInfo(authInfo);
       assertResourceBinding(authInfo, expectedResource);
 
       let mapped: OAuthExtra<TUser>;
       try {
-        mapped = internal.toMcpUseExtra(authInfo);
+        mapped = provider.mapAuthInfo(authInfo);
       } catch (error) {
         throw invalidToken("Token identity mapping failed", error);
       }
@@ -202,28 +197,25 @@ function normalizeResourceUrl(resource: URL): URL {
 export function getOAuthProviderOptions<TUser>(
   provider: OAuthProvider<TUser>
 ): {
-  oauthMetadata: ReturnType<
-    typeof resolveOAuthProvider<TUser>
-  >["oauthMetadata"];
+  oauthMetadata: OAuthProvider<TUser>["oauthMetadata"];
   requiredScopes?: string[];
   scopesSupported?: string[];
   resourceName?: string;
   serviceDocumentationUrl?: URL;
 } {
-  const internal = resolveProvider(provider);
   return {
-    oauthMetadata: internal.oauthMetadata,
-    ...(internal.requiredScopes !== undefined && {
-      requiredScopes: [...internal.requiredScopes],
+    oauthMetadata: provider.oauthMetadata,
+    ...(provider.requiredScopes !== undefined && {
+      requiredScopes: [...provider.requiredScopes],
     }),
-    ...(internal.scopesSupported !== undefined && {
-      scopesSupported: [...internal.scopesSupported],
+    ...(provider.scopesSupported !== undefined && {
+      scopesSupported: [...provider.scopesSupported],
     }),
-    ...(internal.resourceName !== undefined && {
-      resourceName: internal.resourceName,
+    ...(provider.resourceName !== undefined && {
+      resourceName: provider.resourceName,
     }),
-    ...(internal.serviceDocumentationUrl !== undefined && {
-      serviceDocumentationUrl: internal.serviceDocumentationUrl,
+    ...(provider.serviceDocumentationUrl !== undefined && {
+      serviceDocumentationUrl: provider.serviceDocumentationUrl,
     }),
   };
 }

@@ -39,7 +39,7 @@ export interface Auth0OAuthProviderOptions extends OAuthResourceOptions {
  * Creates a provider that verifies Auth0 access tokens and maps their claims.
  *
  * @param options - Auth0 domain, required audience, and resource-server settings.
- * @returns An opaque provider that rejects tokens without a valid Auth0 signature, issuer, and audience.
+ * @returns A provider that rejects tokens without a valid Auth0 signature, issuer, and audience.
  */
 export function oauthAuth0Provider(
   options: Auth0OAuthProviderOptions

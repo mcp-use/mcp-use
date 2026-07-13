@@ -3,10 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { oauthAuth0Provider } from "../src/oauth/auth0.js";
 import { oauthClerkProvider } from "../src/oauth/clerk.js";
-import {
-  resolveOAuthProvider,
-  wrapOAuthTokenVerifier,
-} from "../src/oauth/internal.js";
+import { wrapOAuthTokenVerifier } from "../src/oauth/internal.js";
 import { oauthKeycloakProvider } from "../src/oauth/keycloak.js";
 import { oauthSupabaseProvider } from "../src/oauth/supabase.js";
 import { oauthWorkOSProvider } from "../src/oauth/workos.js";
@@ -99,7 +96,7 @@ describe("direct OAuth providers", () => {
       projectId: "example-project",
       jwtSecret: secret,
     });
-    const verifier = resolveOAuthProvider(provider).tokenVerifier;
+    const verifier = provider.tokenVerifier;
     const token = (issuer: string, audience: string, exp: number) =>
       new SignJWT({ sub: "user-1", client_id: "client-1" })
         .setProtectedHeader({ alg: "HS256" })
@@ -149,7 +146,7 @@ describe("direct OAuth providers", () => {
       .sign(new TextEncoder().encode(secret));
 
     await expect(
-      resolveOAuthProvider(provider).tokenVerifier.verifyAccessToken(token)
+      provider.tokenVerifier.verifyAccessToken(token)
     ).resolves.toMatchObject({ clientId: "" });
   });
 
@@ -159,8 +156,7 @@ describe("direct OAuth providers", () => {
       supabaseUrl: "http://localhost:54321/platform",
       jwtSecret: secret,
     });
-    const internal = resolveOAuthProvider(provider);
-    expect(internal.oauthMetadata).toMatchObject({
+    expect(provider.oauthMetadata).toMatchObject({
       issuer: "http://localhost:54321/platform/auth/v1",
       authorization_endpoint:
         "http://localhost:54321/platform/auth/v1/oauth/authorize",
@@ -203,7 +199,7 @@ describe("direct OAuth providers", () => {
       frontendApiUrl: "https://clerk.example.test/tenant",
       audience: "mcp",
     });
-    expect(resolveOAuthProvider(provider).oauthMetadata).toMatchObject({
+    expect(provider.oauthMetadata).toMatchObject({
       issuer: "https://clerk.example.test/tenant",
       authorization_endpoint:
         "https://clerk.example.test/tenant/oauth/authorize",
@@ -242,7 +238,7 @@ describe("direct OAuth providers", () => {
     const provider = oauthWorkOSProvider({
       subdomain: "https://acme.authkit.app",
     });
-    expect(resolveOAuthProvider(provider).oauthMetadata).toMatchObject({
+    expect(provider.oauthMetadata).toMatchObject({
       issuer: "https://acme.authkit.app",
       authorization_endpoint: "https://acme.authkit.app/oauth2/authorize",
       token_endpoint: "https://acme.authkit.app/oauth2/token",
@@ -317,7 +313,7 @@ describe("direct OAuth providers", () => {
       realm: "mcp",
       audience: "mcp-api",
     });
-    expect(resolveOAuthProvider(provider).oauthMetadata).toMatchObject({
+    expect(provider.oauthMetadata).toMatchObject({
       issuer: "https://keycloak.example.test/auth/realms/mcp",
       authorization_endpoint:
         "https://keycloak.example.test/auth/realms/mcp/protocol/openid-connect/auth",
@@ -392,7 +388,7 @@ describe("direct OAuth providers", () => {
       audience: "audience",
     });
     await expect(
-      resolveOAuthProvider(provider).tokenVerifier.verifyAccessToken(
+      provider.tokenVerifier.verifyAccessToken(
         await signedToken(
           privateKey,
           "missing-key",

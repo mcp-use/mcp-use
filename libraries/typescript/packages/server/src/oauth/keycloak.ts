@@ -44,7 +44,7 @@ export interface KeycloakOAuthProviderOptions extends OAuthResourceOptions {
  * Creates a provider that verifies Keycloak access tokens and maps their claims.
  *
  * @param options - Keycloak server URL, realm, optional audience, and resource-server settings.
- * @returns An opaque provider that rejects tokens without a valid Keycloak signature and issuer.
+ * @returns A provider that rejects tokens without a valid Keycloak signature and issuer.
  */
 export function oauthKeycloakProvider(
   options: KeycloakOAuthProviderOptions

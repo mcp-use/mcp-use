@@ -72,9 +72,9 @@ import {
 } from "@mcp-use/server/oauth";
 ```
 
-## Keep provider plumbing private
+## Define the provider contract
 
-`OAuthProvider<TUser>` is an opaque value returned by provider factories. Consumers pass it to `MCPServer`; they do not implement its internal plumbing. TypeScript interfaces cannot declare private members, so privacy comes from an unexported brand and a separate, unexported internal interface.
+`OAuthProvider<TUser>` is a structural interface. Consumers can use a built-in factory, call `oauthCustomProvider`, or implement the same provider contract directly in server-side code.
 
 ```ts
 export type OAuthExtra<TUser> = Record<string, unknown> & {
@@ -82,12 +82,6 @@ export type OAuthExtra<TUser> = Record<string, unknown> & {
   payload: Record<string, unknown>;
   permissions: string[];
 };
-
-declare const oauthProviderBrand: unique symbol;
-
-export interface OAuthProvider<TUser> {
-  readonly [oauthProviderBrand]: TUser;
-}
 
 export interface OAuthResourceOptions {
   /** Full canonical public MCP endpoint URL. */
@@ -117,6 +111,9 @@ export interface CustomOAuthProviderOptions<TUser>
   /** Maps verified information into the public mcp-use auth context. */
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
+
+export interface OAuthProvider<TUser>
+  extends CustomOAuthProviderOptions<TUser> {}
 
 export function oauthCustomProvider<TUser>(
   options: CustomOAuthProviderOptions<TUser>,
@@ -372,7 +369,7 @@ export interface OAuthProxyLocalOptions {
   refreshTokenTtlSeconds?: number;
 }
 
-/** Creates an opaque provider that also owns local OAuth authorization-server routes. */
+/** Creates a provider that also owns local OAuth authorization-server routes. */
 export function oauthProxyProvider<TUser>(
   options: OAuthProxyProviderOptions<TUser>,
 ): OAuthProvider<TUser>;
@@ -405,20 +402,12 @@ interface OAuthLocalAuthServerRoutes<TUser> {
   mount(app: Hono, context: OAuthLocalRouteContext): void;
 }
 
-/** Not exported. Factory implementations return this internal shape. */
+/** Not exported. Proxy providers add local authorization-server routes. */
 interface OAuthProviderInternal<TUser> extends OAuthProvider<TUser> {
-  tokenVerifier: OAuthTokenVerifier;
-  oauthMetadata: OAuthMetadata;
-  toMcpUseExtra: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
-  resource?: URL | string;
-  requiredScopes?: readonly string[];
-  scopesSupported?: readonly string[];
-  resourceName?: string;
-  serviceDocumentationUrl?: URL;
   /**
-   * Present only for proxy providers, populated by `oauthProxyProvider`. `tokenVerifier` above is then the
+   * Present only for proxy providers, populated by `oauthProxyProvider`. The provider's `tokenVerifier` is then the
    * proxy's own local-token verifier, not `upstream.tokenVerifier`; see "Reconcile the wrapper for proxy
-   * providers" below for how that interacts with `toMcpUseExtra`.
+   * providers" below for how that interacts with `mapAuthInfo`.
    */
   localAuthServer?: OAuthLocalAuthServerRoutes<TUser>;
 }
@@ -435,13 +424,13 @@ oauthKeycloakProvider(...)
 oauthCustomProvider(...)
 ```
 
-`oauthCustomProvider` is the supported escape hatch. Its public callback is `mapAuthInfo`, not the internal `toMcpUseExtra` hook. The factory validates the options and converts them into `OAuthProviderInternal<TUser>`. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
+`oauthCustomProvider` validates the provider options and defensively copies array configuration. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
 
-Before calling `requireBearerAuth`, mcp-use wraps the opaque provider with
+Before calling `requireBearerAuth`, mcp-use wraps the provider with
 `wrapOAuthTokenVerifier(provider, expectedResource?)`. The wrapper calls the
 provider verifier, asserts resource binding against the resolved canonical
 resource URL, then returns the final SDK-compatible `AuthInfo` with `extra`
-merged as `{ ...authInfo.extra, ...internal.toMcpUseExtra(authInfo) }`. Binding
+merged as `{ ...authInfo.extra, ...provider.mapAuthInfo(authInfo) }`. Binding
 succeeds when the token carries an RFC 8707 `resource` claim matching
 `expectedResource`, or when `authInfo.resource` is absent but audience
 validation was proven (an internal marker set by `createJwtVerifier`).
@@ -452,9 +441,9 @@ on an optional `extra` value.
 
 ### Reconcile the wrapper for proxy providers
 
-Proxy providers use this identical wrapper contract, but `internal.tokenVerifier` and `internal.toMcpUseExtra` play different roles than for direct or custom providers. For a proxy provider, `internal.tokenVerifier` is the proxy's own local-JWT verifier described in "Issue and verify local tokens", not `upstream.tokenVerifier`. It verifies the local JWT, resolves its JTI mapping and private upstream token-vault record, refreshes first when required, verifies the stored upstream access token, then calls public `mapAuthInfo` on that freshly verified result. It attaches the resulting `OAuthExtra<TUser>` to `AuthInfo.extra` before the wrapper runs.
+Proxy providers use this identical wrapper contract, but their `tokenVerifier` and `mapAuthInfo` play different roles than for direct or custom providers. For a proxy provider, `tokenVerifier` is the proxy's own local-JWT verifier described in "Issue and verify local tokens", not `upstream.tokenVerifier`. It verifies the local JWT, resolves its JTI mapping and private upstream token-vault record, refreshes first when required, verifies the stored upstream access token, then calls the provider option's `mapAuthInfo` on that freshly verified result. It attaches the resulting `OAuthExtra<TUser>` to `AuthInfo.extra` before the wrapper runs.
 
-`internal.toMcpUseExtra` for a proxy provider is therefore a validate-and-return hook, not a mapping hook: it asserts that `authInfo.extra` already has the shape `OAuthExtra<TUser>` (the same `user`, `payload`, `permissions` checks `requireOAuthAuthInfo` performs later) and returns it unchanged. It never calls public `mapAuthInfo` again and never performs an unsafe cast in place of that check. The public callback runs on every successful proxy bearer verification, after fresh upstream verification, rather than during grant creation.
+The proxy provider's exposed `mapAuthInfo` is therefore a validate-and-return hook: it asserts that `authInfo.extra` already has the shape `OAuthExtra<TUser>` (the same `user`, `payload`, `permissions` checks `requireOAuthAuthInfo` performs later) and returns it unchanged. It never calls the provider option's `mapAuthInfo` again and never performs an unsafe cast in place of that check. The option callback runs on every successful proxy bearer verification, after fresh upstream verification, rather than during grant creation.
 
 ## Resolve the canonical resource URL
 
@@ -623,7 +612,7 @@ The exact value mappings are:
 - `ctx.auth.resource` takes `sdkAuthInfo.resource` and remains optional.
 - `ctx.auth.user`, `ctx.auth.payload`, and `ctx.auth.permissions` come from `sdkAuthInfo.extra`
 
-Built-in adapters supply typed mcp-use additions through the private `toMcpUseExtra` hook. Custom providers supply the same data through public `mapAuthInfo`, which the factory stores as that private hook. The wrapper merges the result under `AuthInfo.extra`; a provider may retain unrelated SDK `extra` fields, but mcp-use's fields always come from verified data. It must not populate user data from an unverified decode. Proxy providers are the one exception to `toMcpUseExtra` computing this data itself; see "Reconcile the wrapper for proxy providers" for why their hook only validates and returns freshly mapped data.
+All providers supply typed mcp-use additions through `mapAuthInfo`. The wrapper merges the result under `AuthInfo.extra`; a provider may retain unrelated SDK `extra` fields, but mcp-use's fields always come from verified data. It must not populate user data from an unverified decode. Proxy providers are the one exception to `mapAuthInfo` computing this data itself; see "Reconcile the wrapper for proxy providers" for why their callback only validates and returns freshly mapped data.
 
 ## Run routes in this order
 
@@ -874,7 +863,7 @@ The upstream code, upstream access token, upstream refresh token, upstream clien
 
 Local bearer verification first verifies the signed local JWT's HS256 signature using the configured shared HMAC key, then verifies local issuer, canonical MCP audience/resource, expiry, `token_use: "access"`, client ID, scopes, and `jti`. It loads the `jti`-to-vault mapping and vault record, rejecting a missing, revoked, or expired record. If the upstream access token is expired or near expiry and refresh is configured, it refreshes server-side and atomically updates the vault before verification. It then calls `upstream.tokenVerifier` on the stored upstream access token and calls public `mapAuthInfo` on the freshly verified upstream `AuthInfo`. It builds SDK `AuthInfo` from local JWT claims plus that mapped extra. A verifier outage or failure rejects the bearer token for that request. Deleting or revoking the `jti` mapping invalidates a local JWT even while its signature and `exp` remain valid. `ctx.auth.accessToken` is the signed local MCP JWT in proxy mode, never an upstream credential.
 
-This whole sequence is exactly `internal.tokenVerifier` for the proxy's `OAuthProviderInternal<TUser>` (see "Reconcile the wrapper for proxy providers"). It runs inside the standard `requireBearerAuth` wrapper like any other provider; only `internal.toMcpUseExtra` differs, validating and returning the `extra` this verifier already attached instead of computing it.
+This whole sequence is exactly `tokenVerifier` for the proxy's provider (see "Reconcile the wrapper for proxy providers"). It runs inside the standard `requireBearerAuth` wrapper like any other provider; only its `mapAuthInfo` differs, validating and returning the `extra` this verifier already attached instead of computing it.
 
 Tools that require an upstream credential need a separate, explicit server-side capability that resolves the private vault record. That capability is not exposed through `ctx.auth.accessToken`.
 
@@ -932,7 +921,7 @@ Acceptance coverage must include:
 - Proxy callback tests prove upstream state is single-use and expiry-bound, `iss` is validated when `upstream.supportsIssuerIdentification` is `true` and rejected on mismatch, the upstream code is exchanged server-side with the recovered S256 verifier when `upstream.pkce` is `"S256"`, an explicit `upstream.pkce: "unsupported"` compatibility configuration sends no upstream PKCE parameters, only a local code plus the original local state reaches the local redirect URI, invalid or replayed state produces a local error page rather than a redirect, and a post-state upstream denial or exchange failure redirects only to the prevalidated local redirect URI with a sanitized error and no upstream diagnostic detail.
 - Scope-mapping tests prove local scopes are never forwarded to the upstream authorization server unmapped, that a local scope outside the keys of `upstreamScopesByLocalScope` is rejected with `invalid_scope`, that construction fails when any upstream scope named in `upstreamScopesByLocalScope` is missing from `upstream.scopes`, and that consent and the upstream authorization request both show the stable deduplicated union of upstream scopes for the approved local scopes.
 - Local token tests prove configured HS256 signing and verification with the shared HMAC key, rejection of a non-`CryptoKey`, under-length, or otherwise ambiguous key at construction, the exact header (`alg: "HS256"`, `typ: "JWT"`, optional `kid`) and payload (`iss`, `aud`, `client_id`, `scope`, `iat`, `exp`, `jti`, `token_use`) shape, local issuer and canonical resource audience binding, `token_use: "access"` versus `token_use: "refresh"`, short expiry, random `jti`, and absence of upstream tokens, mapped identity, payload, permissions, or vault IDs from JWTs. They prove each `jti` maps privately to a vault record, deleting or revoking that mapping invalidates an otherwise valid JWT, and `ctx.auth.accessToken` is the signed local JWT, never an upstream token.
-- Proxy bearer-verification tests prove `internal.tokenVerifier` verifies the local JWT, loads the `jti` mapping and vault, rejects missing, revoked, or expired records, calls `upstream.tokenVerifier` on the stored upstream access token, then calls public `mapAuthInfo` on every successful verification. They prove `internal.toMcpUseExtra` only validates and returns that attached value, and upstream verifier outage or failure rejects the request.
+- Proxy bearer-verification tests prove the provider's `tokenVerifier` verifies the local JWT, loads the `jti` mapping and vault, rejects missing, revoked, or expired records, calls `upstream.tokenVerifier` on the stored upstream access token, then calls the configured `mapAuthInfo` on every successful verification. They prove the provider's exposed `mapAuthInfo` only validates and returns that attached value, and upstream verifier outage or failure rejects the request.
 - Refresh tests prove atomic local refresh-JWT `jti` rotation, uniform `invalid_grant` on invalid or replayed values, conditional upstream refresh before verification when the vault token is expired or near expiry, atomic vault update on success, revocation on failure, and absence of refresh discovery when unsupported.
 - Storage tests cover TTL enforcement and deletion, persistent records without `expiresAt`, atomic consume and transaction behavior, one-use local codes and upstream state, refresh rotation, `jti` and vault invalidation, shared-replica storage behavior, and fail-closed storage failures. Replica tests prove all instances share the HS256 signing key, consent-cookie key material, and secure shared storage. Storage-protection tests prove `oauthProxyProvider` rejects `protection: "development-only"` storage by default, accepts it only with `allowInsecureStorageForDevelopment: true` while logging a clear warning, and accepts `protection: "encrypted-at-rest"` without an override.
 - Route-mounting tests prove `internal.localAuthServer.mount` is called and its routes are reachable before the MCP bearer gate is registered, that the mounted routes derive their issuer and origin only from `OAuthLocalRouteContext`, and that a direct provider leaves `localAuthServer` `undefined` with unchanged metadata-only registration.

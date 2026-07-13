@@ -19,6 +19,7 @@ import {
 import type { OAuthAuth } from "../src/index.js";
 import type {
   OAuthMetadata,
+  OAuthTokenVerifier,
   ServerContext,
 } from "@modelcontextprotocol/server";
 import { expect, it } from "vitest";
@@ -28,6 +29,22 @@ interface TestUser {
 }
 
 declare const provider: OAuthProvider<TestUser>;
+
+function verifyStructuralProviderTyping(
+  tokenVerifier: OAuthTokenVerifier,
+  oauthMetadata: OAuthMetadata
+): void {
+  const directProvider: OAuthProvider<TestUser> = {
+    tokenVerifier,
+    oauthMetadata,
+    mapAuthInfo: () => ({
+      user: { id: "user-1" },
+      payload: {},
+      permissions: [],
+    }),
+  };
+  void directProvider;
+}
 
 function assertOAuthAuthFields<TUser>(auth: OAuthAuth<TUser>): void {
   const accessToken: string = auth.accessToken;

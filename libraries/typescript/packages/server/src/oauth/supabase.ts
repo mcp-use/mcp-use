@@ -48,7 +48,7 @@ export interface SupabaseOAuthProviderOptions extends OAuthResourceOptions {
  * Creates a provider that verifies Supabase access tokens and maps their claims.
  *
  * @param options - Supabase project or URL, optional JWT secret, and resource-server settings.
- * @returns An opaque provider that rejects tokens without a valid configured Supabase signature and issuer.
+ * @returns A provider that rejects tokens without a valid configured Supabase signature and issuer.
  */
 export function oauthSupabaseProvider(
   options: SupabaseOAuthProviderOptions

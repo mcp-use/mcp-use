@@ -41,7 +41,7 @@ export interface ClerkOAuthProviderOptions extends OAuthResourceOptions {
  * Creates a provider that verifies Clerk access tokens and maps their claims.
  *
  * @param options - Clerk frontend API URL, optional audience, and resource-server settings.
- * @returns An opaque provider that rejects tokens without a valid Clerk signature and issuer.
+ * @returns A provider that rejects tokens without a valid Clerk signature and issuer.
  */
 export function oauthClerkProvider(
   options: ClerkOAuthProviderOptions

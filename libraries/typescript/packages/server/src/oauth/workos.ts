@@ -42,7 +42,7 @@ export interface WorkOSOAuthProviderOptions extends OAuthResourceOptions {
  * Creates a provider that verifies WorkOS access tokens and maps their claims.
  *
  * @param options - WorkOS AuthKit origin, optional audience, and resource-server settings.
- * @returns An opaque provider that rejects tokens without a valid WorkOS signature and issuer.
+ * @returns A provider that rejects tokens without a valid WorkOS signature and issuer.
  */
 export function oauthWorkOSProvider(
   options: WorkOSOAuthProviderOptions

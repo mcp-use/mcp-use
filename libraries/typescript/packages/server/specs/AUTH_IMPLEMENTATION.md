@@ -72,9 +72,9 @@ import {
 } from "@mcp-use/server/oauth";
 ```
 
-## Keep provider plumbing private
+## Define the provider contract
 
-`OAuthProvider<TUser>` is an opaque value returned by provider factories. Consumers pass it to `MCPServer`; they do not implement its internal plumbing. TypeScript interfaces cannot declare private members, so privacy comes from an unexported brand and a separate, unexported internal interface.
+`OAuthProvider<TUser>` is a structural interface. Consumers can use a built-in factory, call `oauthCustomProvider`, or implement the same provider contract directly in server-side code.
 
 ```ts
 export type OAuthExtra<TUser> = Record<string, unknown> & {
@@ -82,12 +82,6 @@ export type OAuthExtra<TUser> = Record<string, unknown> & {
   payload: Record<string, unknown>;
   permissions: string[];
 };
-
-declare const oauthProviderBrand: unique symbol;
-
-export interface OAuthProvider<TUser> {
-  readonly [oauthProviderBrand]: TUser;
-}
 
 export interface OAuthResourceOptions {
   /** Full canonical public MCP endpoint URL. */
@@ -118,21 +112,12 @@ export interface CustomOAuthProviderOptions<TUser>
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
 
+export interface OAuthProvider<TUser>
+  extends CustomOAuthProviderOptions<TUser> {}
+
 export function oauthCustomProvider<TUser>(
   options: CustomOAuthProviderOptions<TUser>,
 ): OAuthProvider<TUser>;
-
-/** Not exported. Factory implementations return this internal shape. */
-interface OAuthProviderInternal<TUser> extends OAuthProvider<TUser> {
-  tokenVerifier: OAuthTokenVerifier;
-  oauthMetadata: OAuthMetadata;
-  toMcpUseExtra: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
-  resource?: URL | string;
-  requiredScopes?: readonly string[];
-  scopesSupported?: readonly string[];
-  resourceName?: string;
-  serviceDocumentationUrl?: URL;
-}
 ```
 
 Provider factories preserve v1 concepts and names:
@@ -146,13 +131,13 @@ oauthKeycloakProvider(...)
 oauthCustomProvider(...)
 ```
 
-`oauthCustomProvider` is the supported escape hatch. Its public callback is `mapAuthInfo`, not the internal `toMcpUseExtra` hook. The factory validates the options and converts them into `OAuthProviderInternal<TUser>`. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
+`oauthCustomProvider` validates the provider options and defensively copies array configuration. The verifier must return verified SDK-native fields, including `token`, `clientId`, `scopes`, and a valid future numeric `expiresAt`. Decode-only tokens, `verifyJwt: false`, and equivalent bypasses are forbidden.
 
-Before calling `requireBearerAuth`, mcp-use wraps the opaque provider with
+Before calling `requireBearerAuth`, mcp-use wraps the provider with
 `wrapOAuthTokenVerifier(provider, expectedResource?)`. The wrapper calls the
 provider verifier, asserts resource binding against the resolved canonical
 resource URL, then returns the final SDK-compatible `AuthInfo` with `extra`
-merged as `{ ...authInfo.extra, ...internal.toMcpUseExtra(authInfo) }`. Binding
+merged as `{ ...authInfo.extra, ...provider.mapAuthInfo(authInfo) }`. Binding
 succeeds when the token carries an RFC 8707 `resource` claim matching
 `expectedResource`, or when `authInfo.resource` is absent but audience
 validation was proven (an internal marker set by `createJwtVerifier`).
@@ -328,7 +313,7 @@ The exact value mappings are:
 - `ctx.auth.resource` takes `sdkAuthInfo.resource` and remains optional.
 - `ctx.auth.user`, `ctx.auth.payload`, and `ctx.auth.permissions` come from `sdkAuthInfo.extra`.
 
-Built-in adapters supply typed mcp-use additions through the private `toMcpUseExtra` hook. Custom providers supply the same data through public `mapAuthInfo`, which the factory stores as that private hook. The wrapper merges the result under `AuthInfo.extra`; a provider may retain unrelated SDK `extra` fields, but mcp-use's fields always come from verified data. It must not populate user data from an unverified decode.
+All providers supply typed mcp-use additions through `mapAuthInfo`. The wrapper merges the result under `AuthInfo.extra`; a provider may retain unrelated SDK `extra` fields, but mcp-use's fields always come from verified data. It must not populate user data from an unverified decode.
 
 ## Run routes in this order
 

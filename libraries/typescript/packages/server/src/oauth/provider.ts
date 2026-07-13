@@ -19,18 +19,6 @@ export type OAuthExtra<TUser> = Record<string, unknown> & {
   permissions: string[];
 };
 
-const oauthProviderBrand: unique symbol = Symbol("mcp-use.oauth-provider");
-
-/**
- * Opaque OAuth resource-server provider accepted by {@link MCPServer}.
- *
- * Create one with {@link oauthCustomProvider}; its verification plumbing is
- * intentionally not implementable by consumers.
- */
-export interface OAuthProvider<TUser> {
-  readonly [oauthProviderBrand]: TUser;
-}
-
 /** Resource-server metadata and bearer-gate configuration. */
 export interface OAuthResourceOptions {
   /** Full canonical public MCP endpoint URL. */
@@ -57,23 +45,16 @@ export interface CustomOAuthProviderOptions<
   mapAuthInfo: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
 }
 
-interface OAuthProviderInternal<TUser> extends OAuthProvider<TUser> {
-  tokenVerifier: OAuthTokenVerifier;
-  oauthMetadata: OAuthMetadata;
-  toMcpUseExtra: (authInfo: OAuthAuthInfo) => OAuthExtra<TUser>;
-  resource?: URL | string;
-  requiredScopes?: readonly string[];
-  scopesSupported?: readonly string[];
-  resourceName?: string;
-  serviceDocumentationUrl?: URL;
-}
+/** OAuth resource-server provider accepted by {@link MCPServer}. */
+export interface OAuthProvider<TUser>
+  extends CustomOAuthProviderOptions<TUser> {}
 
 /**
  * Creates an OAuth provider backed by an external authorization server.
  *
  * @typeParam TUser - Application user type exposed to authenticated callbacks.
  * @param options - Token verification, discovery metadata, and identity mapping.
- * @returns An opaque provider for an OAuth-enabled MCP server.
+ * @returns A provider for an OAuth-enabled MCP server.
  */
 export function oauthCustomProvider<TUser>(
   options: CustomOAuthProviderOptions<TUser>
@@ -114,11 +95,10 @@ export function oauthCustomProvider<TUser>(
     );
   }
 
-  const provider: OAuthProviderInternal<TUser> = {
-    [oauthProviderBrand]: undefined as TUser,
+  const provider: OAuthProvider<TUser> = {
     tokenVerifier: options.tokenVerifier,
     oauthMetadata: options.oauthMetadata,
-    toMcpUseExtra: options.mapAuthInfo,
+    mapAuthInfo: options.mapAuthInfo,
     ...(options.resource !== undefined && { resource: options.resource }),
     ...(options.requiredScopes !== undefined && {
       requiredScopes: [...options.requiredScopes],
@@ -167,11 +147,4 @@ function assertStringArray(
   ) {
     throw new TypeError(`${name} must be an array of strings`);
   }
-}
-
-/** @internal Resolves the private provider implementation for server wiring. */
-export function resolveOAuthProvider<TUser>(
-  provider: OAuthProvider<TUser>
-): OAuthProviderInternal<TUser> {
-  return provider as OAuthProviderInternal<TUser>;
 }
