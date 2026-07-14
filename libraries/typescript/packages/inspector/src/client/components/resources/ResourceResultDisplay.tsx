@@ -19,8 +19,6 @@ import { detectWidgetProtocol } from "../../utils/widget-detection";
 import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { MCPAppsRenderer } from "../MCPAppsRenderer";
-import { isMcpUIResource, McpUIRenderer } from "../McpUIRenderer";
-import { OpenAIComponentRenderer } from "../OpenAIComponentRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { Spinner } from "../ui/spinner";
 
@@ -29,7 +27,7 @@ export interface ResourceResult {
   result?: ReadResourceResult | { error?: string; isError?: boolean };
   error?: string;
   timestamp: number;
-  // Resource metadata from definition (includes openai/outputTemplate in annotations)
+  // Resource metadata from definition
   resourceAnnotations?: Record<string, unknown>;
 }
 
@@ -109,58 +107,6 @@ export function ResourceResultDisplay({
   const [mcpAppsDisplayMode, setMcpAppsDisplayMode] = useState<
     "inline" | "pip" | "fullscreen"
   >("inline");
-  // Check for OpenAI Apps SDK component
-  // OpenAI metadata can be in:
-  // 1. Resource annotations from the resource list (resourceAnnotations)
-  // 2. _meta field in the resource contents when read
-  let openaiAnnotations: string[] = [];
-  let openaiOutputTemplate: string | undefined;
-
-  // Check resource annotations first
-  if (result?.resourceAnnotations) {
-    openaiAnnotations = Object.keys(result.resourceAnnotations).filter((key) =>
-      key.startsWith("openai/")
-    );
-    openaiOutputTemplate = result.resourceAnnotations[
-      "openai/outputTemplate"
-    ] as string;
-  }
-
-  // Also check _meta in contents (this is where OpenAI metadata often appears)
-  if (
-    result?.result &&
-    "contents" in result.result &&
-    Array.isArray(result.result.contents) &&
-    result.result.contents[0]?._meta
-  ) {
-    const contentMeta = result.result.contents[0]._meta;
-    const metaKeys = Object.keys(contentMeta).filter((key) =>
-      key.startsWith("openai/")
-    );
-    if (metaKeys.length > 0) {
-      openaiAnnotations = [...openaiAnnotations, ...metaKeys];
-    }
-    // If we don't have outputTemplate yet, check in _meta
-    if (!openaiOutputTemplate && contentMeta["openai/outputTemplate"]) {
-      openaiOutputTemplate = contentMeta["openai/outputTemplate"] as string;
-    }
-    // For resources, the URI itself might be the widget location
-    if (
-      !openaiOutputTemplate &&
-      result.uri &&
-      result.uri.startsWith("ui://widget/")
-    ) {
-      openaiOutputTemplate = result.uri;
-    }
-  }
-
-  const hasOpenAIComponent = !!(
-    openaiAnnotations.length > 0 &&
-    openaiOutputTemplate &&
-    typeof openaiOutputTemplate === "string" &&
-    serverId &&
-    readResource
-  );
 
   // Extract complete metadata from result contents for props configuration
   const contentMetadata =
@@ -193,7 +139,7 @@ export function ResourceResultDisplay({
     return (props.required as string[]) ?? [];
   }, [combinedAnnotations]);
 
-  // Detect widget protocol (Priority: MCP Apps → Apps SDK → MCP-UI)
+  // Detect widget protocol (MCP Apps only)
   const widgetProtocol = detectWidgetProtocol(
     combinedAnnotations,
     result?.result
@@ -258,25 +204,6 @@ export function ResourceResultDisplay({
     );
   }
 
-  // Check if we have MCP UI resources
-  const hasMcpUIResources =
-    result?.result &&
-    "contents" in result.result &&
-    Array.isArray(result.result.contents) &&
-    result.result.contents.some(
-      (item: any) => item.mimeType && isMcpUIResource(item)
-    );
-
-  const mcpUIResources =
-    hasMcpUIResources &&
-    result.result &&
-    "contents" in result.result &&
-    Array.isArray(result.result.contents)
-      ? result.result.contents.filter(
-          (item: any) => item.mimeType && isMcpUIResource(item)
-        )
-      : [];
-
   return (
     <div className="flex flex-col h-full">
       <div className="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-zinc-700 flex items-center justify-between">
@@ -302,14 +229,6 @@ export function ResourceResultDisplay({
               </div>
             ) : null;
           })()}
-          {hasMcpUIResources && (
-            <Badge
-              variant="outline"
-              className="text-xs bg-purple-50 dark:bg-purple-900/20 border-none border-purple-200 dark:border-purple-800/50 text-purple-600 dark:text-purple-400"
-            >
-              MCP UI
-            </Badge>
-          )}
           {hasMcpAppsResource && (
             <Badge
               variant="outline"
@@ -318,17 +237,9 @@ export function ResourceResultDisplay({
               MCP Apps
             </Badge>
           )}
-          {hasOpenAIComponent && (
-            <Badge
-              variant="outline"
-              className="text-xs bg-blue-50 dark:bg-blue-900/20 border-none border-blue-200 dark:border-blue-800/50 text-blue-600 dark:text-blue-400"
-            >
-              OpenAI Widget
-            </Badge>
-          )}
         </div>
         <div className="flex items-center gap-1">
-          {(hasMcpAppsResource || hasMcpUIResources || hasOpenAIComponent) && (
+          {hasMcpAppsResource && (
             <Button
               variant="ghost"
               size="sm"
@@ -342,11 +253,7 @@ export function ResourceResultDisplay({
               ) : (
                 <Brush className="h-4 w-4 mr-1" />
               )}
-              {previewMode
-                ? "JSON"
-                : hasOpenAIComponent
-                  ? "Component"
-                  : "Preview"}
+              {previewMode ? "JSON" : "Preview"}
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={onCopy}>
@@ -367,7 +274,7 @@ export function ResourceResultDisplay({
 
       <div className="flex-1 overflow-y-auto relative">
         {(() => {
-          // Priority 1: Handle MCP Apps (SEP-1865)
+          // Handle MCP Apps (SEP-1865)
           if (
             hasMcpAppsResource &&
             serverId &&
@@ -439,112 +346,7 @@ export function ResourceResultDisplay({
             }
           }
 
-          // Priority 2: Handle OpenAI Apps SDK components
-          if (
-            hasOpenAIComponent &&
-            serverId &&
-            readResource &&
-            openaiOutputTemplate
-          ) {
-            if (previewMode) {
-              // OpenAI Apps SDK Component mode
-              return (
-                <div className="flex-1 h-full relative">
-                  {needsProps ? (
-                    <div className="flex items-center justify-center w-full h-full min-h-[200px] rounded-xl border-2 border-dashed border-gray-300 dark:border-zinc-600 bg-gray-50 dark:bg-zinc-800/50 m-4">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center px-6">
-                        This widget requires props, set or generate them in the
-                        props debugger
-                      </p>
-                    </div>
-                  ) : (
-                    <OpenAIComponentRenderer
-                      componentUrl={openaiOutputTemplate}
-                      toolName={result.uri}
-                      toolArgs={{}}
-                      toolResult={result.result}
-                      serverId={serverId}
-                      readResource={readResource}
-                      className="w-full h-full relative flex p-4"
-                      customProps={activeProps || undefined}
-                    />
-                  )}
-                </div>
-              );
-            } else {
-              // JSON mode for Apps SDK resources
-              return (
-                <div className="px-4 pt-4" data-testid="resource-result-json">
-                  <JSONDisplay
-                    data={result.result}
-                    filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-${Date.now()}.json`}
-                  />
-                </div>
-              );
-            }
-          }
-
-          if (hasMcpUIResources) {
-            if (previewMode) {
-              return (
-                <div className="space-y-0 h-full">
-                  {mcpUIResources.map((resource: any, _idx: number) => (
-                    <div
-                      key={`mcp-ui-${
-                        resource.uri ||
-                        `resource-${Date.now()}-${Math.random()}`
-                      }`}
-                      className="mx-0 size-full"
-                    >
-                      <div className="w-full h-full">
-                        <McpUIRenderer
-                          resource={resource}
-                          // onUIAction={handleUIAction}
-                          className="w-full h-full"
-                          customProps={activeProps || undefined}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  {/* Show JSON for non-UI content */}
-                  {(() => {
-                    if (
-                      result.result &&
-                      "contents" in result.result &&
-                      Array.isArray(result.result.contents)
-                    ) {
-                      const nonUIResources = result.result.contents.filter(
-                        (item: any) => !(item.mimeType && isMcpUIResource(item))
-                      );
-                      if (nonUIResources.length > 0) {
-                        return (
-                          <div className="px-4">
-                            <JSONDisplay
-                              data={nonUIResources}
-                              filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-non-ui-${Date.now()}.json`}
-                            />
-                          </div>
-                        );
-                      }
-                    }
-                    return null;
-                  })()}
-                </div>
-              );
-            } else {
-              // JSON mode for MCP UI resources
-              return (
-                <div className="px-4 pt-4" data-testid="resource-result-json">
-                  <JSONDisplay
-                    data={result.result}
-                    filename={`resource-${result.uri.replace(/[^a-zA-Z0-9]/g, "-")}-mcp-ui-${Date.now()}.json`}
-                  />
-                </div>
-              );
-            }
-          }
-
-          // Default: show JSON for non-MCP UI resources
+          // Default: show JSON for non-widget resources
           return (
             <div className="px-4 pt-4" data-testid="resource-result-json">
               <JSONDisplay

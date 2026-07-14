@@ -334,7 +334,8 @@ export abstract class BaseConnector {
 
   /**
    * Internal: set up roots/list request handler.
-   * This is called after the client connects to register the handler for server requests.
+   * Must be registered after Client construction and before connect() so the
+   * handler is available during initialize / reverse RPC for the full session.
    */
   protected setupRootsHandler(): void {
     if (!this.client) return;
@@ -350,7 +351,7 @@ export abstract class BaseConnector {
 
   /**
    * Internal: set up sampling/createMessage request handler.
-   * This is called after the client connects to register the handler for sampling requests.
+   * Must be registered after Client construction and before connect().
    */
   protected setupSamplingHandler(): void {
     if (!this.client) {
@@ -379,7 +380,7 @@ export abstract class BaseConnector {
 
   /**
    * Internal: set up elicitation/create request handler.
-   * This is called after the client connects to register the handler for elicitation requests.
+   * Must be registered after Client construction and before connect().
    */
   protected setupElicitationHandler(): void {
     if (!this.client) {

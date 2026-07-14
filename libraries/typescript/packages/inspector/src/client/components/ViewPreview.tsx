@@ -300,6 +300,7 @@ function ViewPreviewLive({ view }: { view: string }) {
     addServer(PREVIEW_SERVER_ID, {
       url: serverUrl,
       name: "Preview",
+      protocolNegotiation: "auto",
       ...(previewHeaders ? { headers: previewHeaders } : {}),
     });
   }, [storageLoaded, serverUrl, previewHeaders, addServer]);

@@ -69,18 +69,6 @@ interface MCPAppsDebugControlsProps {
   onPropsChange?: (props: Record<string, string> | null) => void;
   /** When set, auto-opens the props popover with a hint listing these required prop names */
   requiredProps?: string[];
-  // Dual-protocol support
-  protocol?: "apps-sdk" | "mcp-apps";
-  onUpdateGlobals?: (updates: {
-    displayMode?: "inline" | "pip" | "fullscreen";
-    theme?: "light" | "dark";
-    maxHeight?: number;
-    locale?: string;
-    safeArea?: {
-      insets: { top: number; bottom: number; left: number; right: number };
-    };
-    userAgent?: any;
-  }) => void;
 }
 
 const NO_PROPS_VALUE = "__no_props__";
@@ -230,7 +218,7 @@ function buildAgentCspPrompt(
   if (suggestedFix) {
     lines.push("**Apply this CSP config to fix the violations:**");
     lines.push(
-      'Add these domains to the widget\'s CSP metadata (appsSdkMetadata["openai/widgetCSP"] or resource _meta.ui.csp). Use camelCase for MCP Apps (connectDomains, resourceDomains) or snake_case for OpenAI format (connect_domains, resource_domains).'
+      'Add these domains to the widget\'s CSP metadata (resource _meta.ui.csp). Use camelCase for MCP Apps (connectDomains, resourceDomains).'
     );
     lines.push("");
     lines.push("```json");
@@ -267,8 +255,6 @@ export function MCPAppsDebugControls({
   resource,
   onPropsChange,
   requiredProps,
-  protocol = "mcp-apps",
-  onUpdateGlobals,
 }: MCPAppsDebugControlsProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const { playground, updatePlaygroundSettings, widgets, clearCspViolations } =
@@ -292,7 +278,6 @@ export function MCPAppsDebugControls({
       : "";
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
-  const isAppsSdk = protocol === "apps-sdk";
 
   // Props management
   const {
@@ -496,15 +481,6 @@ export function MCPAppsDebugControls({
                     updatePlaygroundSettings({
                       deviceType: device.value as any,
                     });
-                    // Update Apps SDK userAgent.device.type
-                    if (isAppsSdk && onUpdateGlobals) {
-                      onUpdateGlobals({
-                        userAgent: {
-                          device: { type: device.value },
-                          capabilities: playground.capabilities,
-                        },
-                      });
-                    }
                     setDeviceDialogOpen(false);
                   }}
                 >
@@ -528,9 +504,6 @@ export function MCPAppsDebugControls({
             onClick={() => {
               const newTheme = resolvedTheme === "dark" ? "light" : "dark";
               setTheme(newTheme);
-              if (onUpdateGlobals) {
-                onUpdateGlobals({ theme: newTheme });
-              }
             }}
           >
             {resolvedTheme === "dark" ? (
@@ -584,10 +557,6 @@ export function MCPAppsDebugControls({
                     data-testid={`debugger-locale-option-${locale.value}`}
                     onSelect={() => {
                       updatePlaygroundSettings({ locale: locale.value });
-                      // Update Apps SDK locale
-                      if (isAppsSdk && onUpdateGlobals) {
-                        onUpdateGlobals({ locale: locale.value });
-                      }
                       setLocaleDialogOpen(false);
                     }}
                   >
@@ -600,60 +569,59 @@ export function MCPAppsDebugControls({
         </DialogContent>
       </Dialog>
 
-      {/* Timezone - only for MCP Apps (not supported by Apps SDK) */}
-      {!isAppsSdk && (
-        <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button
-                  data-testid="debugger-timezone-button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                >
-                  <Clock className="size-3.5" />
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
-          </Tooltip>
-          <DialogContent
-            className="sm:max-w-[400px]"
-            data-testid="debugger-timezone-dialog"
-          >
-            <DialogHeader>
-              <DialogTitle>Select Timezone</DialogTitle>
-            </DialogHeader>
-            <Command>
-              <CommandInput
-                placeholder="Search timezones..."
-                data-testid="debugger-timezone-search"
-              />
-              <CommandList>
-                <CommandEmpty>No timezone found.</CommandEmpty>
-                <CommandGroup>
-                  {TIMEZONE_OPTIONS.map((tz) => (
-                    <CommandItem
-                      key={tz.value}
-                      value={tz.value}
-                      data-testid={`debugger-timezone-option-${tz.value.replace(/\//g, "-")}`}
-                      onSelect={() => {
-                        updatePlaygroundSettings({ timeZone: tz.value });
-                        setTimezoneDialogOpen(false);
-                      }}
-                    >
-                      {tz.label}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </DialogContent>
-        </Dialog>
-      )}
 
-      {/* CSP Mode — shown for both MCP Apps and Apps SDK */}
+      {/* Timezone */}
+      <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DialogTrigger asChild>
+              <Button
+                data-testid="debugger-timezone-button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              >
+                <Clock className="size-3.5" />
+              </Button>
+            </DialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
+        </Tooltip>
+        <DialogContent
+          className="sm:max-w-[400px]"
+          data-testid="debugger-timezone-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>Select Timezone</DialogTitle>
+          </DialogHeader>
+          <Command>
+            <CommandInput
+              placeholder="Search timezones..."
+              data-testid="debugger-timezone-search"
+            />
+            <CommandList>
+              <CommandEmpty>No timezone found.</CommandEmpty>
+              <CommandGroup>
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <CommandItem
+                    key={tz.value}
+                    value={tz.value}
+                    data-testid={`debugger-timezone-option-${tz.value.replace(/\//g, "-")}`}
+                    onSelect={() => {
+                      updatePlaygroundSettings({ timeZone: tz.value });
+                      setTimezoneDialogOpen(false);
+                    }}
+                  >
+                    {tz.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSP Mode */}
       <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -967,15 +935,6 @@ export function MCPAppsDebugControls({
               updatePlaygroundSettings({
                 capabilities: newCapabilities,
               });
-              // Update Apps SDK userAgent.capabilities
-              if (isAppsSdk && onUpdateGlobals) {
-                onUpdateGlobals({
-                  userAgent: {
-                    device: { type: playground.deviceType },
-                    capabilities: newCapabilities,
-                  },
-                });
-              }
             }}
           >
             <Pointer
@@ -1012,15 +971,6 @@ export function MCPAppsDebugControls({
               updatePlaygroundSettings({
                 capabilities: newCapabilities,
               });
-              // Update Apps SDK userAgent.capabilities
-              if (isAppsSdk && onUpdateGlobals) {
-                onUpdateGlobals({
-                  userAgent: {
-                    device: { type: playground.deviceType },
-                    capabilities: newCapabilities,
-                  },
-                });
-              }
             }}
           >
             <MousePointer2
@@ -1059,10 +1009,6 @@ export function MCPAppsDebugControls({
               value={playground.safeAreaInsets}
               onChange={(insets) => {
                 updatePlaygroundSettings({ safeAreaInsets: insets });
-                // Update Apps SDK safeArea
-                if (isAppsSdk && onUpdateGlobals) {
-                  onUpdateGlobals({ safeArea: { insets } });
-                }
               }}
             />
           </div>
