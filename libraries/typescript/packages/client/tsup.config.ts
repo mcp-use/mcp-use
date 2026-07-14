@@ -6,11 +6,14 @@ export default defineConfig({
   // .js and .d.ts line up and match the package.json "exports" map.
   entry: {
     index: "src/index.ts",
+    browser: "src/browser.ts",
     "auth/index": "src/auth/index.ts",
     "auth/index-node": "src/auth/index-node.ts",
     "react/index": "src/react/index.ts",
   },
-  format: ["esm", "cjs"],
+  // ESM-only: @modelcontextprotocol/client v2 is ESM-only, so @mcp-use/client
+  // follows suit (Node 20+).
+  format: ["esm"],
   dts: false,
   splitting: false,
   sourcemap: true,

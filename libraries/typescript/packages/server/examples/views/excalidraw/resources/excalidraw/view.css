@@ -1,0 +1,350 @@
+/* Load Excalidraw component CSS from CDN (avoids inlining ~200KB) */
+@import url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/index.css");
+
+/* Load Excalidraw's hand-drawn font from CDN (Excalifont = v0.18 default) */
+@font-face {
+  font-family: "Excalifont";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2") format("woff2");
+  font-display: swap;
+}
+
+/* Preload Excalidraw UI fonts so they're cached before fullscreen mount.
+   Without this, Excalidraw loads them on component init, triggering a font
+   recalculation pass that corrupts text dimensions on first open. */
+@font-face {
+  font-family: "Assistant";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Assistant";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Assistant";
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Light theme (default) */
+:root {
+  --text-color: #1a1a1a;
+  --text-muted: #666666;
+  --border-color: #e5e5e5;
+  --bg-color: #ffffff;
+}
+
+/* Dark theme */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-color: #e5e5e5;
+    --text-muted: #a0a0a0;
+    --border-color: #444444;
+    --bg-color: #1a1a1a;
+  }
+}
+
+body {
+  background: transparent;
+  color: var(--text-color);
+}
+
+.main {
+  outline: none;
+  position: relative;
+}
+
+/* Fullscreen mode. Mobile safe-area insets are applied via Excalidraw's native
+   --sat/--sar/--sab/--sal vars (set from hostContext.safeAreaInsets in JS),
+   which offset only the floating toolbar/menus — canvas stays full-bleed. */
+.main.fullscreen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-color, #ffffff);
+  z-index: 9999;
+}
+
+.main.fullscreen .excalidraw-container {
+  height: 100%;
+}
+
+/* Hide library button in fullscreen editor */
+.main.fullscreen .default-sidebar-trigger {
+  display: none !important;
+}
+
+/* Mobile: export button moves below the toolbar row (narrow viewports can't
+   fit it in top-right alongside lock/hand icons). */
+.mobile-share-slot {
+  position: absolute;
+  top: calc(var(--sat, 0px) + 64px);
+  right: calc(var(--sar, 0px) + 12px);
+  z-index: 5;
+}
+
+/* Contain SVG inside fullscreen viewport (not cover) */
+.main.fullscreen .svg-wrapper svg {
+  max-height: 100%;
+}
+
+/* Cancelled-drawing banner */
+.cancelled-banner {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  max-width: calc(100% - 16px);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.cancelled-banner-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary-color, #1a1a1a);
+}
+
+.cancelled-banner-reason {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-gray-60, #666);
+}
+
+/* Toolbar - appears on hover */
+.toolbar {
+  display: flex;
+  gap: 1rem;
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.main:hover .toolbar {
+  opacity: 1;
+}
+
+/* Fullscreen button */
+.app-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 28px;
+  color: rgba(0, 0, 0, 0.95);
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  pointer-events: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.app-button:hover {
+  color: rgba(0, 0, 0, 0.7);
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.excalidraw-container {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* SVGLayer is for export only, not rendering — hide to save space */
+.excalidraw-container .excalidraw .SVGLayer {
+  display: none !important;
+}
+
+/* Hide Excalidraw UI chrome in view mode */
+.excalidraw-container .excalidraw .App-menu,
+.excalidraw-container .excalidraw .App-toolbar,
+.excalidraw-container .excalidraw .layer-ui__wrapper__footer,
+.excalidraw-container .excalidraw .App-menu_top,
+.excalidraw-container .excalidraw .undo-redo-buttons,
+.excalidraw-container .excalidraw .HelpButton,
+.excalidraw-container .excalidraw .UserList,
+.excalidraw-container .excalidraw .main-menu-trigger,
+.excalidraw-container .excalidraw .welcome-screen-center,
+.excalidraw-container .excalidraw .welcome-screen-menu-hintContainer,
+.excalidraw-container .excalidraw .layer-ui__wrapper__footer-right {
+  display: none !important;
+}
+
+.excalidraw-container .excalidraw .App-menu_top__left {
+  visibility: hidden !important;
+}
+
+
+.loading-state {
+  padding: 2rem 1rem;
+  text-align: center;
+}
+
+.loading-text {
+  font-size: 1rem;
+  color: var(--text-muted);
+}
+
+/* SVG wrapper */
+.svg-wrapper {
+  width: 100%;
+}
+
+.svg-wrapper > svg {
+  background: #ffffff;
+}
+
+/* Fade-in animation for new SVG elements (opacity only, no transform) */
+.excalidraw-container svg :where(g, rect, circle, ellipse, text, image) {
+  animation: svgFadeIn 0.5s ease-out;
+}
+
+@keyframes svgFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Stroke draw-on animation for line elements */
+.excalidraw-container svg :where(path, line, polyline, polygon) {
+  animation: strokeDraw 0.6s ease-out forwards;
+}
+
+@keyframes strokeDraw {
+  from {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Smooth transitions for property changes on existing elements */
+.excalidraw-container svg :where(rect, circle, ellipse, path, line, polyline, polygon, text, g) {
+  transition: fill 0.4s ease-out, stroke 0.4s ease-out, opacity 0.4s ease-out;
+}
+
+/* Chart container */
+.chart-container {
+  height: 400px;
+  width: 100%;
+}
+
+.chart-title {
+  margin: 12px 16px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.tooltip {
+  background: var(--bg-color, #fff);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* HTML iframe container */
+.html-container {
+  width: 100%;
+  height: 500px;
+  border: none;
+}
+
+.main.fullscreen .html-container {
+  height: 100%;
+}
+
+/* Export modal overlay */
+.export-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.export-modal {
+  min-width: 320px;
+  max-width: 400px;
+  padding: 24px !important;
+}
+
+.export-modal-title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary-color, #1a1a1a);
+}
+
+.export-modal-text {
+  margin: 0 0 20px;
+  font-size: 0.875rem;
+  color: var(--color-gray-60, #666);
+  line-height: 1.4;
+}
+
+.export-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.export-modal-actions .standalone {
+  padding: 8px 16px !important;
+  width: auto !important;
+  height: auto !important;
+  font-size: 0.875rem;
+}
+
+.export-modal-confirm {
+  --button-bg: var(--color-primary, #6965db) !important;
+  --button-color: #fff !important;
+  --button-border: var(--color-primary, #6965db) !important;
+  --button-hover-bg: var(--color-primary-darker, #5b57d1) !important;
+  --button-hover-border: var(--color-primary-darker, #5b57d1) !important;
+  --button-hover-color: #fff !important;
+}
+
+.loading {
+  padding: 1rem;
+  color: var(--text-muted);
+}
+
+.error {
+  padding: 1rem;
+  color: #dc2626;
+}

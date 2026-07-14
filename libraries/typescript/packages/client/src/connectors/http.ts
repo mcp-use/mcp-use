@@ -1,13 +1,37 @@
 import {
   Client,
-  type ClientOptions,
-} from "@modelcontextprotocol/sdk/client/index.js";
-import {
+  SdkError,
+  SdkHttpError,
   StreamableHTTPClientTransport,
-  StreamableHTTPError,
-} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+  UnauthorizedError,
+  type ClientOptions,
+  type VersionNegotiationMode,
+} from "@modelcontextprotocol/client";
 import { logger } from "../logging.js";
+
+/**
+ * Detect a 401 anywhere in an error / cause chain. Under `versionNegotiation:
+ * "auto"` a connect-time 401 can surface wrapped as
+ * `SdkError(EraNegotiationFailed)` with the `UnauthorizedError` at
+ * `error.data.cause` (rather than a bare `SdkHttpError`), so we walk the chain.
+ */
+function detectUnauthorized(err: unknown, depth = 0): boolean {
+  if (!err || depth > 5) return false;
+  if (err instanceof UnauthorizedError) return true;
+  if (err instanceof SdkHttpError && err.status === 401) return true;
+  if (err instanceof Error) {
+    if (err.cause) {
+      if (detectUnauthorized(err.cause, depth + 1)) return true;
+    }
+    // SdkError carries a structured `data` payload; the wrapped cause of an
+    // era-negotiation failure lives there.
+    const data = err instanceof SdkError ? (err.data as any) : undefined;
+    if (data?.cause && detectUnauthorized(data.cause, depth + 1)) return true;
+  }
+  return false;
+}
 import { SseConnectionManager } from "../task_managers/sse.js";
+import { DialectJsonSchemaValidator } from "../validators/dialect-json-schema-validator.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
 
@@ -33,6 +57,19 @@ interface HttpConnectorOptions extends ConnectorInitOptions {
   clientInfo?: ClientInfo;
   preferSse?: boolean; // Force SSE transport instead of trying streamable HTTP first
   disableSseFallback?: boolean; // Disable automatic fallback to SSE when streamable HTTP fails (default: false)
+  /**
+   * Protocol version negotiation mode passed to the SDK `Client`.
+   * - `"legacy"` (default): classic 2025 `initialize` handshake, no probe —
+   *   matches the SDK's own default. Still connects to both v1 and v2 servers
+   *   (v2 servers serve 2025-era traffic).
+   * - `"auto"`: probe with `server/discover`, falling back to the 2025
+   *   handshake against legacy servers. Opt-in: the probe performs OAuth
+   *   discovery on auth-required servers and can fail on servers whose
+   *   authorization-server issuer differs from the server URL (RFC 8414 §3.3),
+   *   which would otherwise mask the normal 401 → auth flow.
+   * - `{ pin: "2026-07-28" }`: modern era only, no fallback.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
   gatewayUrl?: string; // Optional gateway URL to route requests through
   serverId?: string; // Optional server ID for gateway observability
   reconnectionOptions?: {
@@ -58,6 +95,7 @@ export class HttpConnector extends BaseConnector {
   private readonly clientInfo: ClientInfo;
   private readonly preferSse: boolean;
   private readonly disableSseFallback: boolean;
+  private readonly protocolNegotiation: VersionNegotiationMode;
   private readonly gatewayUrl?: string;
   private readonly serverId?: string;
   private readonly reconnectionOptions?: HttpConnectorOptions["reconnectionOptions"];
@@ -105,12 +143,28 @@ export class HttpConnector extends BaseConnector {
     };
     this.preferSse = opts.preferSse ?? false;
     this.disableSseFallback = opts.disableSseFallback ?? false;
+    // Default to "legacy" (the SDK's own default): the classic 2025 handshake,
+    // no server/discover probe. The probe performs OAuth discovery on
+    // auth-required servers and can hard-fail (e.g. RFC 8414 §3.3 issuer
+    // mismatch when the authorization server lives on a different domain than
+    // the MCP server), which masks the normal 401 → pending_auth flow. Legacy
+    // still connects to both v1 and v2 servers (v2 serves 2025-era traffic);
+    // opt into "auto" per connection when modern-era detection is wanted.
+    this.protocolNegotiation = opts.protocolNegotiation ?? "legacy";
     this.reconnectionOptions = opts.reconnectionOptions;
   }
 
   private buildClientOptions(): ClientOptions {
     return {
       ...(this.opts.clientOptions || {}),
+      jsonSchemaValidator:
+        this.opts.clientOptions?.jsonSchemaValidator ??
+        new DialectJsonSchemaValidator(),
+      versionNegotiation: {
+        // Allow a caller-supplied versionNegotiation in clientOptions to win.
+        mode: this.protocolNegotiation,
+        ...(this.opts.clientOptions?.versionNegotiation ?? {}),
+      },
       capabilities: {
         ...(this.opts.clientOptions?.capabilities || {}),
         roots: { listChanged: true },
@@ -122,11 +176,14 @@ export class HttpConnector extends BaseConnector {
     };
   }
 
-  private unwrapStreamableError(err: unknown): StreamableHTTPError | null {
-    if (err instanceof StreamableHTTPError) {
+  // In v2 HTTP transport errors are thrown as SdkHttpError (subclass of
+  // SdkError) with a numeric `.status` accessor, replacing v1's
+  // StreamableHTTPError (which carried the status on `.code`).
+  private unwrapStreamableError(err: unknown): SdkHttpError | null {
+    if (err instanceof SdkHttpError) {
       return err;
     }
-    if (err instanceof Error && err.cause instanceof StreamableHTTPError) {
+    if (err instanceof Error && err.cause instanceof SdkHttpError) {
       return err.cause;
     }
     return null;
@@ -139,21 +196,19 @@ export class HttpConnector extends BaseConnector {
 
     const streamableErr = this.unwrapStreamableError(err);
     if (streamableErr) {
-      is401Error = streamableErr.code === 401;
-      httpStatusCode = streamableErr.code;
+      const status = streamableErr.status;
+      is401Error = status === 401;
+      httpStatusCode = status;
 
-      if (
-        streamableErr.code === 400 &&
-        streamableErr.message.includes("Missing session ID")
-      ) {
+      if (status === 400 && streamableErr.message.includes("Missing session ID")) {
         fallbackReason =
           "Server requires session ID (FastMCP compatibility) - using SSE transport";
         logger.warn(`⚠️  ${fallbackReason}`);
-      } else if (streamableErr.code === 404 || streamableErr.code === 405) {
-        fallbackReason = `Server returned ${streamableErr.code} - server likely doesn't support streamable HTTP`;
+      } else if (status === 404 || status === 405) {
+        fallbackReason = `Server returned ${status} - server likely doesn't support streamable HTTP`;
         logger.debug(fallbackReason);
       } else {
-        fallbackReason = `Server returned ${streamableErr.code}: ${streamableErr.message}`;
+        fallbackReason = `Server returned ${status}: ${streamableErr.message}`;
         logger.debug(fallbackReason);
       }
 
@@ -164,7 +219,9 @@ export class HttpConnector extends BaseConnector {
       const errorStr = err.toString();
       const errorMsg = err.message || "";
       is401Error =
-        errorStr.includes("401") || errorMsg.includes("Unauthorized");
+        detectUnauthorized(err) ||
+        errorStr.includes("401") ||
+        errorMsg.includes("Unauthorized");
 
       if (
         errorStr.includes("Missing session ID") ||
@@ -336,10 +393,14 @@ export class HttpConnector extends BaseConnector {
       );
       this.client = new Client(this.clientInfo, clientOptions);
 
-      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
-      // The server may call roots/list during initialization if it advertises roots capability
+      // Register inbound handlers BEFORE connect() so they are available for the
+      // entire connection lifetime (including reverse RPC during/after initialize).
       this.setupRootsHandler();
-      logger.debug("Roots handler registered before connect");
+      this.setupSamplingHandler();
+      this.setupElicitationHandler();
+      logger.debug(
+        "Roots/sampling/elicitation handlers registered before connect"
+      );
 
       try {
         // Connect with timeout
@@ -405,9 +466,7 @@ export class HttpConnector extends BaseConnector {
       this.connected = true;
       this.transportType = "streamable-http";
       this.setupNotificationHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
-      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
+      // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation via streamable HTTP: ${baseUrl}`
       );
@@ -452,19 +511,21 @@ export class HttpConnector extends BaseConnector {
       );
       this.client = new Client(this.clientInfo, clientOptions);
 
-      // IMPORTANT: Set up roots handler BEFORE connect() so it's available during initialize handshake
-      // The server may call roots/list during initialization if it advertises roots capability
+      // Register inbound handlers BEFORE connect() so they are available for the
+      // entire connection lifetime (including reverse RPC during/after initialize).
       this.setupRootsHandler();
-      logger.debug("Roots handler registered before connect (SSE)");
+      this.setupSamplingHandler();
+      this.setupElicitationHandler();
+      logger.debug(
+        "Roots/sampling/elicitation handlers registered before connect (SSE)"
+      );
 
       await this.client.connect(transport);
 
       this.connected = true;
       this.transportType = "sse";
       this.setupNotificationHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
-      // Note: setupRootsHandler() is called BEFORE connect() to handle roots/list during initialization
+      // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation via HTTP/SSE: ${baseUrl}`
       );
@@ -486,6 +547,7 @@ export class HttpConnector extends BaseConnector {
       type: "http",
       url: this.baseUrl,
       transport: this.transportType || "unknown",
+      protocolEra: this.protocolEra ?? "unknown",
     };
   }
 
@@ -501,7 +563,10 @@ export class HttpConnector extends BaseConnector {
   // controller, and terminateSession()'s DELETE fetch reuses that signal —
   // running it after close() rejects immediately with AbortError.
   protected async cleanupResources(): Promise<void> {
-    if (this.streamableTransport) {
+    // Only legacy (2025-era) connections carry an Mcp-Session-Id worth
+    // terminating. Modern (2026-07-28) connections are stateless per-request,
+    // so there is no session DELETE to issue.
+    if (this.streamableTransport && this.protocolEra !== "modern") {
       try {
         await this.streamableTransport.terminateSession();
       } catch (e) {

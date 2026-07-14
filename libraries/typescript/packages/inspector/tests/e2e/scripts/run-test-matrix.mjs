@@ -278,8 +278,11 @@ async function main() {
         playwrightEnv
       );
 
-      // Wait for the built-in inspector to be ready
-      await waitForUrl("http://localhost:3000/inspector", "Built-in inspector");
+      // Wait for the built-in inspector to be ready (mounted under /mcp basePath)
+      await waitForUrl(
+        "http://localhost:3000/mcp/inspector",
+        "Built-in inspector"
+      );
     } else if (mode === "prod") {
       // Prod mode: Built server on port 3002, built inspector on port 3000
       playwrightEnv = {

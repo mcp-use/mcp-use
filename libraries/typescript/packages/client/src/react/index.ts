@@ -32,9 +32,11 @@ export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/te
 export type {
   Prompt,
   Resource,
-  ResourceTemplate,
+  // v2 exports the resource-template type as `ResourceTemplateType`; re-export
+  // it under the historical `ResourceTemplate` name for API compatibility.
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/client";
 
 // Multi-server client provider and hooks
 export {

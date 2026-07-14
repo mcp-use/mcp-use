@@ -1,17 +1,27 @@
-import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js";
+import type { VersionNegotiationMode } from "@modelcontextprotocol/client";
+import { Client } from "@modelcontextprotocol/client";
+import type { StdioServerParameters } from "@modelcontextprotocol/client/stdio";
 import type { Writable } from "node:stream";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import process from "node:process";
 import type { ConnectorInitOptions } from "./base.js";
 
 import { logger } from "../logging.js";
 import { StdioConnectionManager } from "../task_managers/stdio.js";
+import { DialectJsonSchemaValidator } from "../validators/dialect-json-schema-validator.js";
 import { BaseConnector } from "./base.js";
 import type { ClientInfo } from "./http.js";
 
 interface StdioConnectorOptions extends ConnectorInitOptions {
   clientInfo?: ClientInfo;
+  /**
+   * Protocol version negotiation mode. Defaults to `"legacy"` for stdio: the
+   * SDK docs advise against `"auto"` for spawn-per-invocation CLI/debug tools
+   * (a legacy server that never answers unknown pre-`initialize` requests
+   * stalls the probe, and the probe round trip perturbs byte-stable
+   * transcripts). Opt into `"auto"` or a pin explicitly.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
 }
 
 export class StdioConnector extends BaseConnector {
@@ -21,6 +31,7 @@ export class StdioConnector extends BaseConnector {
   private readonly cwd?: string;
   private readonly errlog: Writable;
   private readonly clientInfo: ClientInfo;
+  private readonly protocolNegotiation: VersionNegotiationMode;
 
   constructor({
     command = "npx",
@@ -46,6 +57,7 @@ export class StdioConnector extends BaseConnector {
       version: "1.0.0",
     };
     this.cwd = rest.cwd;
+    this.protocolNegotiation = rest.protocolNegotiation ?? "legacy";
   }
 
   /** Establish connection to the MCP implementation. */
@@ -91,6 +103,13 @@ export class StdioConnector extends BaseConnector {
       // Always advertise roots capability - server may query roots/list even if client has no roots
       const clientOptions = {
         ...(this.opts.clientOptions || {}),
+        jsonSchemaValidator:
+          this.opts.clientOptions?.jsonSchemaValidator ??
+          new DialectJsonSchemaValidator(),
+        versionNegotiation: {
+          mode: this.protocolNegotiation,
+          ...(this.opts.clientOptions?.versionNegotiation ?? {}),
+        },
         capabilities: {
           ...(this.opts.clientOptions?.capabilities || {}),
           roots: { listChanged: true }, // Always advertise roots capability
@@ -105,13 +124,21 @@ export class StdioConnector extends BaseConnector {
         },
       };
       this.client = new Client(this.clientInfo, clientOptions);
+
+      // Register inbound handlers BEFORE connect() so they are available for the
+      // entire connection lifetime (including reverse RPC during/after initialize).
+      this.setupRootsHandler();
+      this.setupSamplingHandler();
+      this.setupElicitationHandler();
+      logger.debug(
+        "Roots/sampling/elicitation handlers registered before connect (stdio)"
+      );
+
       await this.client.connect(transport);
 
       this.connected = true;
       this.setupNotificationHandler();
-      this.setupRootsHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
+      // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation: ${this.command}`
       );

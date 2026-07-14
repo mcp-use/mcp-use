@@ -35,7 +35,7 @@ server.tool(
     name: "convert-temperature",
     title: "Convert temperature",
     description: "Convert a temperature value between Celsius and Fahrenheit",
-    schema: z.object({
+    inputSchema: z.object({
       value: z.number().describe("The temperature value to convert"),
       from: temperatureUnit.describe("The unit of the input value"),
     }),
@@ -67,7 +67,7 @@ server.tool(
     name: "roll-dice",
     title: "Roll dice",
     description: "Roll one or more dice and report the results",
-    schema: z.object({
+    inputSchema: z.object({
       sides: z
         .number()
         .int()

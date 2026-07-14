@@ -7,12 +7,15 @@ import type {
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
+  OAuthClientProvider,
   Prompt,
   Resource,
-  ResourceTemplate,
+  // v2 exports the resource-template type as `ResourceTemplateType` (the bare
+  // `ResourceTemplate` name is the server package's class).
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+  VersionNegotiationMode,
+} from "@modelcontextprotocol/client";
 import type { BrowserMCPClient } from "../client/browser.js";
 
 /**
@@ -44,6 +47,19 @@ export type UseMcpOptions = {
      */
     customHeaders?: Record<string, string>;
   };
+  /**
+   * OAuth proxy base URL (e.g. `https://inspector.example.com/inspector/api/oauth`)
+   * used to route OAuth requests (`.well-known` discovery, DCR, token exchange)
+   * through a transparent server-side proxy — bypassing browser CORS against
+   * third-party identity providers — WITHOUT proxying MCP traffic itself.
+   *
+   * The proxy is transparent: it forwards requests and responses unmodified, so
+   * the SDK's authorization-server issuer validation (RFC 8414 §3.3) still
+   * passes. When omitted, the OAuth proxy URL is derived from
+   * `proxyConfig.proxyAddress` (replacing a trailing `/proxy` with `/oauth`),
+   * preserving the existing behavior for fully-proxied connections.
+   */
+  oauthProxyUrl?: string;
   /**
    * Connection policy used by higher-level clients such as the Inspector.
    * Behavior is controlled by `proxyConfig` and `autoProxyFallback`; this field
@@ -231,6 +247,15 @@ export type UseMcpOptions = {
   clientOptions?: {
     capabilities?: Record<string, unknown>;
   };
+  /**
+   * Protocol version negotiation mode passed to the underlying SDK `Client`.
+   * - `"legacy"` (default): classic 2025 `initialize` handshake, no probe.
+   *   Still connects to both v1 and v2 servers (v2 servers serve 2025-era traffic).
+   * - `"auto"`: probe with `server/discover` to detect modern (2026-07-28)
+   *   servers, falling back to the 2025 handshake against legacy servers.
+   * - `{ pin: "2026-07-28" }`: modern era only, no fallback.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
   /** Connection timeout in milliseconds for establishing initial connection (default: 30000 / 30 seconds) */
   timeout?: number;
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
@@ -392,6 +417,15 @@ export type UseMcpResult = {
   };
   /** Server capabilities from the initialize response */
   capabilities?: Record<string, any>;
+  /**
+   * Negotiated MCP protocol era for the active connection:
+   * - 'legacy': 2025-era server (v1), sessionful `initialize` handshake.
+   * - 'modern': 2026-07-28-era server (v2), stateless per-request.
+   * `undefined` until a connection has negotiated.
+   */
+  protocolEra?: "legacy" | "modern";
+  /** Negotiated MCP protocol version string (e.g. '2025-06-18', '2026-07-28'). */
+  protocolVersion?: string;
   /**
    * The current state of the MCP connection:
    * - 'discovering': Checking server existence and capabilities (including auth requirements).

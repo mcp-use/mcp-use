@@ -1,8 +1,17 @@
 import { defineConfig } from "tsup";
 
-export default defineConfig({
+export default defineConfig([
+  {
   entry: {
     index: "src/index.ts",
+    // OAuth subpath exports mirror tsc's rootDir:src layout so generated JS
+    // and declarations stay aligned with package.json's exports map.
+    "oauth/index": "src/oauth/index.ts",
+    "oauth/clerk": "src/oauth/clerk.ts",
+    "oauth/auth0": "src/oauth/auth0.ts",
+    "oauth/workos": "src/oauth/workos.ts",
+    "oauth/supabase": "src/oauth/supabase.ts",
+    "oauth/keycloak": "src/oauth/keycloak.ts",
     // The `mcp-use` bin (package.json "bin"). Its source shebang is
     // preserved by esbuild, so dist/bin.js stays directly executable.
     bin: "src/bin.ts",
@@ -28,4 +37,26 @@ export default defineConfig({
   splitting: true,
   sourcemap: true,
   clean: true,
-});
+  },
+  // Browser-only view runtime (`@mcp-use/server/react`). Must not be reachable
+  // from the `.` export or `bin` graphs — same invariant as the cli chunk above.
+  {
+    entry: {
+      "react/index": "src/react/index.ts",
+    },
+    format: ["esm"],
+    target: "es2022",
+    platform: "browser",
+    dts: false,
+    splitting: false,
+    sourcemap: true,
+    clean: false,
+    external: [
+      "react",
+      "react-dom",
+      "react-dom/client",
+      "react/jsx-runtime",
+      "@modelcontextprotocol/ext-apps",
+    ],
+  },
+]);

@@ -19,7 +19,7 @@ import type { MessageAttachment } from "./types";
 import { detectWidgetProtocol } from "@/client/utils/widget-detection";
 import { InlineElicitationCard } from "./InlineElicitationCard";
 import type { PendingElicitationRequest } from "@/client/types/elicitation";
-import type { ElicitResult } from "@modelcontextprotocol/sdk/types.js";
+import type { ElicitResult } from "@modelcontextprotocol/client";
 
 interface Message {
   id: string;
@@ -122,9 +122,7 @@ export const MessageList = memo(
     // Helper function to check if a tool has widget support
     const isWidgetTool = (toolName: string): boolean => {
       const toolMeta = getToolMeta(toolName);
-      const protocol = detectWidgetProtocol(toolMeta, undefined);
-      // mcp-ui requires result to detect, so don't pre-render for those
-      return protocol !== null && protocol !== "mcp-ui";
+      return detectWidgetProtocol(toolMeta, undefined) === "mcp-apps";
     };
 
     // Convert a ui/message content array to a text string + image attachments,
@@ -347,8 +345,8 @@ export const MessageList = memo(
                                 result={toolCall.result}
                                 state={toolCall.result ? "result" : "call"}
                               />
-                              {/* Render tool result (OpenAI Apps SDK or MCP-UI resources) */}
-                              {/* Render immediately for widget tools, even if result is null */}
+                              {/* Render tool result / widget */}
+                              {/* Render immediately for widget tools or streaming tools, even if result is null */}
                               {(toolCall.result ||
                                 isWidgetTool(toolCall.toolName)) && (
                                 <div data-tool-call-id={toolCallKey}>

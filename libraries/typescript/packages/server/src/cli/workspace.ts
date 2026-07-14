@@ -18,7 +18,7 @@
  * ```text
  * .mcp-use/
  * ├─ build/        ← compiled server + manifest.json (this package)
- * ├─ generated/    ← typegen output (.d.ts) — reserved; Phase 5
+ * ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md)
  * ├─ cache/        ← disposable dev/build scratch
  * ├─ state/        ← mutable runtime state (e.g. tunnel.json)
  * └─ cloud/        ← cloud linkage (link.json) — reserved; future
@@ -31,6 +31,8 @@
  */
 
 import { join } from "node:path";
+
+import type { ViewsManifest } from "../views/types.js";
 
 /**
  * Fixed name of the per-project workspace directory.
@@ -63,8 +65,18 @@ export interface BuildManifest {
   entryPoint: string;
   /** ISO-8601 timestamp of when the build finished. */
   createdAt: string;
-  /** Whether the built server mounts the inspector shell route. */
+  /**
+   * Whether the built server mounts the inspector shell route. Currently
+   * always written as `true` (not introspected from the server config) and
+   * consumed by nothing — the built server's own `MCPServer` config governs
+   * the route at runtime. Recorded as a known gap in CLI_SPEC.md § build.
+   */
   inspector: boolean;
+  /**
+   * Built views map (VIEWS_SPEC.md § Manifest). Present only when the project
+   * has view entries under `resources/<name>/view.tsx`.
+   */
+  views?: ViewsManifest;
 }
 
 /**
@@ -79,7 +91,10 @@ export interface WorkspacePaths {
   workspace: string;
   /** Build output directory: `.mcp-use/build`. */
   build: string;
-  /** Generated `.d.ts` artifacts directory — reserved for typegen (Phase 5). */
+  /**
+   * Generated `.d.ts` artifacts directory — reserved for the typegen
+   * escape-hatch command (VIEWS_SPEC.md § Typegen, demoted).
+   */
   generated: string;
   /** Disposable dev/build scratch directory. */
   cache: string;

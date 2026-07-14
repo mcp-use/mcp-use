@@ -1,4 +1,4 @@
-import type { CallToolResult, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, Tool } from "@modelcontextprotocol/client";
 import type { MCPClient } from "../../client.js";
 import { BaseConnector } from "../../connectors/base.js";
 

@@ -4,13 +4,8 @@ import { mountMcpProxy, mountOAuthProxy } from "mcp-use";
 import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
 import {
-  generateWidgetContainerHtml,
-  generateWidgetContentHtml,
-  getWidgetData,
-  getWidgetSecurityHeaders,
   handleChatRequest,
   handleChatRequestStream,
-  storeWidgetData,
 } from "./shared-utils.js";
 import {
   getTunnelStatus,
@@ -19,23 +14,6 @@ import {
   stopTunnel,
 } from "./tunnel.js";
 import { formatErrorResponse } from "./utils.js";
-
-/**
- * Get frame-ancestors policy from environment variable
- * Format: Space-separated list of origins or '*'
- * Example: MCP_INSPECTOR_FRAME_ANCESTORS="https://app.example.com http://localhost:3000"
- */
-function getFrameAncestorsFromEnv(): string | undefined {
-  const envValue = process.env.MCP_INSPECTOR_FRAME_ANCESTORS;
-  if (!envValue) return undefined;
-
-  // Validate format (either '*' or space-separated origins)
-  const trimmed = envValue.trim();
-  if (trimmed === "*") return "*";
-
-  // For origin list, keep as-is (CSP expects space-separated)
-  return trimmed;
-}
 
 /**
  * Register inspector-specific routes (proxy, chat, config, widget rendering)
@@ -128,107 +106,6 @@ export function registerInspectorRoutes(
       return c.json(result);
     } catch (error) {
       return c.json(formatErrorResponse(error, "handleChatRequest"), 500);
-    }
-  });
-
-  // Widget storage endpoint - store widget data for rendering
-  app.post(p("/inspector/api/resources/widget/store"), async (c) => {
-    try {
-      const body = await c.req.json();
-      const result = storeWidgetData(body);
-
-      if (!result.success) {
-        return c.json(result, 400);
-      }
-
-      return c.json(result);
-    } catch (error) {
-      console.error("[Widget Store] Error:", error);
-      console.error(
-        "[Widget Store] Stack:",
-        error instanceof Error ? error.stack : ""
-      );
-      return c.json(formatErrorResponse(error, "storeWidgetData"), 500);
-    }
-  });
-
-  // Widget container endpoint - serves container page that loads widget
-  app.get(p("/inspector/api/resources/widget/:toolId"), async (c) => {
-    // Hono can't infer the :toolId param type from a computed (basePath-prefixed)
-    // route pattern, so coalesce the guaranteed param to a string.
-    const toolId = c.req.param("toolId") ?? "";
-
-    // Check if data exists in storage
-    const widgetData = getWidgetData(toolId);
-    if (!widgetData) {
-      return c.html(
-        "<html><body>Error: Widget data not found or expired</body></html>",
-        404
-      );
-    }
-
-    // Return a container page that will fetch and load the actual widget.
-    // Pass the relocated inspector base so its in-page fetch targets the
-    // basePath-prefixed widget-content route.
-    return c.html(generateWidgetContainerHtml(p("/inspector"), toolId));
-  });
-
-  // Widget content endpoint - serves pre-fetched resource with injected OpenAI API
-  app.get(p("/inspector/api/resources/widget-content/:toolId"), async (c) => {
-    try {
-      // Hono can't infer the :toolId param from a computed route pattern.
-      const toolId = c.req.param("toolId") ?? "";
-
-      // Retrieve widget data from storage
-      const widgetData = getWidgetData(toolId);
-      if (!widgetData) {
-        console.error(
-          "[Widget Content] Widget data not found for toolId:",
-          toolId
-        );
-        return c.html(
-          "<html><body>Error: Widget data not found or expired</body></html>",
-          404
-        );
-      }
-
-      // Generate the widget HTML using shared function
-      const result = generateWidgetContentHtml(widgetData);
-
-      if (result.error) {
-        return c.html(`<html><body>Error: ${result.error}</body></html>`, 404);
-      }
-
-      // Derive the MCP server origin from serverId so widget resources
-      // (scripts, images, styles) hosted on the MCP server are allowed by CSP.
-      let serverOrigin: string | undefined;
-      if (widgetData.serverId && /^https?:\/\//.test(widgetData.serverId)) {
-        try {
-          serverOrigin = new URL(
-            widgetData.serverId.replace(/\/mcp$/, "")
-          ).origin.replace("0.0.0.0", "localhost");
-        } catch {
-          /* ignore invalid URLs */
-        }
-      }
-
-      const headers = getWidgetSecurityHeaders(
-        widgetData.widgetCSP,
-        serverOrigin,
-        getFrameAncestorsFromEnv()
-      );
-      Object.entries(headers).forEach(([key, value]) => {
-        c.header(key, value);
-      });
-
-      return c.html(result.html);
-    } catch (error) {
-      console.error("[Widget Content] Error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      const errorStack = error instanceof Error ? error.stack : "";
-      console.error("[Widget Content] Stack:", errorStack);
-      return c.html(`<html><body>Error: ${errorMessage}</body></html>`, 500);
     }
   });
 

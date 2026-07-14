@@ -1,10 +1,13 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  esbuild: {
+    jsx: "automatic",
+  },
   test: {
     globals: true,
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     exclude: ["node_modules/**", "dist/**", "tests/cli/.tmp/**"],
     // Real Vite build/dev servers in tests/cli/*.test.ts (moved from the
     // now-folded-in @mcp-use/devkit package) need more headroom than the rest

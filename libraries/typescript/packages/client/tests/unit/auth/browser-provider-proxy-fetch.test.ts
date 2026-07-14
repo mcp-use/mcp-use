@@ -12,14 +12,17 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BrowserOAuthClientProvider } from "../../../src/auth/browser-provider.js";
+import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
 const PROXY_URL = "https://inspector.local/inspector/api/oauth";
 
 describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
   let globalFetchSpy: ReturnType<typeof vi.fn>;
   let originalFetch: typeof globalThis.fetch;
+  let restoreLocalStorage: () => void;
 
   beforeEach(() => {
+    restoreLocalStorage = installMemoryLocalStorage();
     localStorage.clear();
     originalFetch = globalThis.fetch;
     globalFetchSpy = vi.fn(async () => new Response("{}", { status: 200 }));
@@ -29,6 +32,7 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
   afterEach(() => {
     globalThis.fetch = originalFetch;
     localStorage.clear();
+    restoreLocalStorage();
     vi.clearAllMocks();
   });
 

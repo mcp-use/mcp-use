@@ -38,13 +38,14 @@ export default defineConfig({
         __dirname,
         "../mcp-use/dist/src/react/index.js"
       ),
+      // Browser MCP client lives in @mcp-use/client after the client split
       "mcp-use/browser": path.resolve(
         __dirname,
-        "../mcp-use/dist/src/browser.js"
+        "../client/dist/browser.js"
       ),
-      "mcp-use/utils": path.resolve(
+      "@mcp-use/client/browser": path.resolve(
         __dirname,
-        "../mcp-use/dist/src/utils/index.js"
+        "../client/dist/browser.js"
       ),
       "posthog-node": path.resolve(stubDir, "posthog-node.js"),
       "@scarf/scarf": path.resolve(stubDir, "@scarf/scarf.js"),
@@ -69,6 +70,12 @@ export default defineConfig({
         stubDir,
         "stdio-transport.js"
       ),
+      // v2: @mcp-use/client's stdio connector imports the stdio transport from
+      // @modelcontextprotocol/client/stdio — stub it out of the browser bundle.
+      "@modelcontextprotocol/client/stdio": path.resolve(
+        stubDir,
+        "stdio-transport.js"
+      ),
     },
   },
   define: {
@@ -81,7 +88,7 @@ export default defineConfig({
     include: [
       "mcp-use/react",
       "mcp-use/browser",
-      "mcp-use/utils",
+      "@mcp-use/client/browser",
       "react-syntax-highlighter",
     ],
     exclude: ["posthog-node", "tar", "path-scurry"],

@@ -1,4 +1,5 @@
 import type { LoggingOptions } from "./logging.js";
+import type { OAuthProvider } from "./oauth/index.js";
 
 /**
  * Options for the inspector shell route — the shape of
@@ -25,29 +26,41 @@ export interface InspectorOptions {
 }
 
 /**
- * Server identity and behavior, passed to `new MCPServer(...)`.
+ * Common server identity and behavior, passed to `new MCPServer(...)`.
  *
- * Phase 1 carries only the fields the core consumes. Fields from the old
- * package that belong to later phases (favicon, icons, websiteUrl, OAuth, …)
- * are added together with the features that read them.
+ * Includes the fields consumed by the core HTTP and OAuth resource-server
+ * wiring. Other legacy configuration is added with the feature that reads it.
  */
-export interface ServerConfig {
+interface BaseServerConfig {
   /** Server name reported to clients during negotiation. */
   name: string;
   /** Server version reported to clients. */
   version: string;
   /** Human-readable display name (falls back to `name`). */
   title?: string;
-  /** Human-readable description of the server. */
+  /**
+   * Human-readable description of the server, reported to clients as
+   * implementation metadata during negotiation.
+   */
   description?: string;
   /** Usage instructions surfaced to the model by clients. */
   instructions?: string;
-  /** Route path the MCP endpoint is served on. Defaults to `/mcp`. */
+  /**
+   * Route path the MCP endpoint is served on.
+   *
+   * Must be an absolute URL pathname: starts with `/`, and contains no `?`,
+   * `#`, whitespace, empty path segments (`//`), or trailing slash (except
+   * for the root path `/`).
+   *
+   * @defaultValue `"/mcp"`
+   * @throws TypeError When the value fails the pathname rules above
+   * (validated by {@link assertServerConfig}).
+   */
   basePath?: string;
   /**
    * Hostname `listen()` binds. Defaults to `127.0.0.1`; localhost-class
-   * binds get DNS-rebinding protection (Host/Origin validation)
-   * automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
+   * binds get DNS-rebinding protection (`Host` on every request; `Origin`
+   * only on non-GET/HEAD) automatically. Set `"0.0.0.0"` to serve publicly — behind a platform
    * edge (Railway, Fly, …) nothing more is needed, since the edge only
    * routes hostnames assigned to the deployment. Ignored by `getHandler()`,
    * which never binds.
@@ -64,10 +77,24 @@ export interface ServerConfig {
   /**
    * Extra allowed origin hostnames for Origin-header validation
    * (port-agnostic, additive to the localhost-class origins). When unset,
-   * mirrors the effective Host allowlist. Requests without an `Origin`
-   * header always pass (non-browser MCP clients don't send one).
+   * mirrors the effective Host allowlist. Origin is validated only on
+   * non-GET/HEAD requests (sandboxed view iframes send `Origin: null` on
+   * asset GETs; the MCP wire is POST). Requests without an `Origin` header
+   * always pass (non-browser MCP clients don't send one).
    */
   allowedOrigins?: string[];
+  /**
+   * How 2025-era (non-envelope) requests are served.
+   *
+   * `"stateless"` answers each legacy request with a fresh instance over a
+   * session-less streamable HTTP transport (2025 session operations — GET and
+   * DELETE — get `405`). `"reject"` is modern-only strict: legacy-classified
+   * requests are refused with the unsupported-protocol-version error naming
+   * the supported revisions.
+   *
+   * @defaultValue `"stateless"`
+   */
+  legacy?: "stateless" | "reject";
   /**
    * Inspector shell route at `${basePath}/inspector` — a browser UI for
    * exploring and calling the server's tools, resources, and prompts.
@@ -121,3 +148,57 @@ export interface ServerConfig {
    */
   logging?: LoggingOptions;
 }
+
+/**
+ * Runtime checks for optional {@link ServerConfig} fields that TypeScript
+ * alone cannot enforce when values arrive from untyped call sites.
+ *
+ * @throws TypeError When `basePath` is present but not an absolute URL
+ * pathname without empty segments, trailing slash, query, fragment, or
+ * whitespace.
+ */
+export function assertServerConfig(config: {
+  basePath?: unknown;
+}): void {
+  if (config.basePath !== undefined) {
+    if (typeof config.basePath !== "string") {
+      throw new TypeError(
+        "basePath must be an absolute URL pathname without empty segments, trailing slash, query, fragment, or whitespace"
+      );
+    }
+    const { basePath } = config;
+    if (
+      !basePath.startsWith("/") ||
+      basePath.includes("?") ||
+      basePath.includes("#") ||
+      /\s/.test(basePath) ||
+      basePath.includes("//") ||
+      (basePath.length > 1 && basePath.endsWith("/"))
+    ) {
+      throw new TypeError(
+        "basePath must be an absolute URL pathname without empty segments, trailing slash, query, fragment, or whitespace"
+      );
+    }
+  }
+}
+
+/**
+ * Server identity and behavior, passed to `new MCPServer(...)`.
+ *
+ * A user type other than `never` requires an OAuth provider, preventing a
+ * callback from declaring authenticated context without authentication at
+ * runtime. Omitting the type keeps the no-OAuth API ergonomic.
+ */
+export type ServerConfig<TUser = never> = BaseServerConfig &
+  ([TUser] extends [never]
+    ? {
+        /** OAuth is unavailable when no authenticated user type is declared. */
+        oauth?: undefined;
+      }
+    : {
+        /**
+         * External OAuth resource-server provider. Callback contexts receive
+         * this provider's user type as required `ctx.auth.user`.
+         */
+        oauth: OAuthProvider<TUser>;
+      });

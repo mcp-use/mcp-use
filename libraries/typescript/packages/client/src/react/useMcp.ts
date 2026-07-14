@@ -1,6 +1,14 @@
 // useMcp.ts
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth, SdkError } from "@modelcontextprotocol/client";
+import type {
+  CompleteRequestParams,
+  CompleteResult,
+  OAuthClientProvider,
+  Prompt,
+  Resource,
+  ResourceTemplateType as ResourceTemplate,
+  Tool,
+} from "@modelcontextprotocol/client";
 import { probeAuthParams } from "../auth/probe-www-auth.js";
 import {
   runAuthPopup,
@@ -8,14 +16,6 @@ import {
   MCP_AUTH_CALLBACK_MESSAGE_TYPE,
   type McpAuthCallbackMessage,
 } from "../auth/popup-runner.js";
-import type {
-  CompleteRequestParams,
-  CompleteResult,
-  Prompt,
-  Resource,
-  ResourceTemplate,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BrowserMCPClient } from "../client/browser.js";
 import { Logger, type LogLevel, logger } from "../logging.js";
@@ -112,6 +112,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     headers: headersOption,
     customHeaders: customHeadersOption,
     proxyConfig,
+    oauthProxyUrl: oauthProxyUrlOption,
     autoProxyFallback = true,
     debug: _debug = false,
     logLevel: logLevelOption,
@@ -127,6 +128,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     wrapTransport,
     fetch: customFetch,
     clientOptions,
+    protocolNegotiation,
     onNotification,
     onSampling: onSamplingOption,
     samplingCallback: samplingCallbackOption,
@@ -184,7 +186,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       '[useMcp] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
     );
   }
-
   // Build clientInfo with defaults, merging with provided clientInfo
   const defaultClientInfo = useMemo(
     () => ({
@@ -348,6 +349,12 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       : undefined
   );
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
+  const [protocolEra, setProtocolEra] = useState<
+    "legacy" | "modern" | undefined
+  >(undefined);
+  const [protocolVersion, setProtocolVersion] = useState<string | undefined>(
+    undefined
+  );
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
@@ -382,6 +389,52 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const failConnectionRef = useRef<
     ((message: string, error?: Error) => void) | null
   >(null);
+
+  // Reverse-request / notification callbacks must stay fresh without putting
+  // their React identities into connect()'s dependency list (which would
+  // reconnect whenever a parent re-creates inline handlers).
+  //
+  // Presence and implementation are tracked separately for reverse requests:
+  // the current presence refs determine capabilities on the next normal
+  // connect, while implementation refs retain the last defined handler so an
+  // already-advertised live session does not start failing merely because its
+  // callback prop was removed before that reconnect.
+  const onSamplingRef = useRef(onSampling);
+  const onElicitationRef = useRef(onElicitation);
+  const hasSamplingCallbackRef = useRef(onSampling !== undefined);
+  const hasElicitationCallbackRef = useRef(onElicitation !== undefined);
+  const onNotificationRef = useRef(onNotification);
+  if (onSampling !== undefined) {
+    onSamplingRef.current = onSampling;
+  }
+  if (onElicitation !== undefined) {
+    onElicitationRef.current = onElicitation;
+  }
+  hasSamplingCallbackRef.current = onSampling !== undefined;
+  hasElicitationCallbackRef.current = onElicitation !== undefined;
+  onNotificationRef.current = onNotification;
+
+  // Stable proxies passed to addServer / session notification wiring. Capability
+  // advertisement uses current presence at connect time; once wired, reverse
+  // requests dispatch to the latest defined implementation retained above.
+  const stableOnSampling = useCallback<
+    NonNullable<UseMcpOptions["onSampling"]>
+  >(async (params) => {
+    // This proxy is only wired when a callback exists, and the implementation
+    // ref is intentionally never cleared during that live session.
+    return onSamplingRef.current!(params);
+  }, []);
+  const stableOnElicitation = useCallback<
+    NonNullable<UseMcpOptions["onElicitation"]>
+  >(async (params) => {
+    return onElicitationRef.current!(params);
+  }, []);
+  const stableOnNotification = useCallback(
+    (notification: Parameters<NonNullable<typeof onNotification>>[0]) => {
+      onNotificationRef.current?.(notification);
+    },
+    []
+  );
 
   /**
    * Effect: Keep refs in sync with state values
@@ -608,8 +661,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             success: false,
             errorType: connectionError?.name || "UnknownError",
             hasOAuth: !!authProviderRef.current,
-            hasSampling: !!onSampling,
-            hasElicitation: !!onElicitation,
+            hasSampling: hasSamplingCallbackRef.current,
+            hasElicitation: hasElicitationCallbackRef.current,
           })
           .catch(() => {});
       }
@@ -620,8 +673,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       addLog,
       url,
       transportType,
-      onSampling,
-      onElicitation,
       autoProxyFallbackConfig,
       activeProxyConfig,
       providedAuthProvider,
@@ -685,6 +736,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         preventAutoAuth,
         useRedirectFlow,
         gatewayUrl,
+        oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
@@ -754,6 +806,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           })(),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
           ...(clientOptions && { clientOptions }),
+          // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
+          // connector defaults to "legacy" when omitted
+          ...(protocolNegotiation !== undefined && { protocolNegotiation }),
           // Pass user-configurable reconnection options, or when autoReconnect
           // is disabled, disable SDK transport SSE reconnection to prevent
           // unwanted GET polling requests
@@ -798,13 +853,20 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           throw initError;
         }
 
-        // Add server to client with OAuth provider
-        // Include wrapTransport if provided
+        // Add server to client with OAuth provider.
+        // Pass stable proxies (when a callback is present) so capability
+        // advertisement happens on initial connect, while dispatch always
+        // reaches the latest React handler via refs — even after reconnects
+        // that reuse a connect() closure created with a different identity.
         clientRef.current.addServer(serverName, {
           ...serverConfig,
           authProvider: authProviderRef.current,
-          onSampling,
-          onElicitation,
+          onSampling: hasSamplingCallbackRef.current
+            ? stableOnSampling
+            : undefined,
+          onElicitation: hasElicitationCallbackRef.current
+            ? stableOnElicitation
+            : undefined,
           wrapTransport: wrapTransport
             ? (transport: any) => {
                 addLog(
@@ -843,8 +905,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             notification.method,
             notification
           );
-          // Call user's callback first
-          onNotification?.(notification);
+          // Call user's callback first (stable proxy → latest ref)
+          stableOnNotification(notification);
 
           // Auto-refresh lists on list_changed notifications
           if (notification.method === "notifications/tools/list_changed") {
@@ -940,8 +1002,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             transportType: transportTypeParam,
             success: true,
             hasOAuth: !!authProviderRef.current,
-            hasSampling: !!onSampling,
-            hasElicitation: !!onElicitation,
+            hasSampling: hasSamplingCallbackRef.current,
+            hasElicitation: hasElicitationCallbackRef.current,
           })
           .catch(() => {});
 
@@ -985,6 +1047,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Get serverInfo and capabilities from the connector (populated during initialize)
         const serverInfo = session.connector.serverInfo;
         const capabilities = session.connector.serverCapabilities;
+
+        // Surface the negotiated protocol era/version (v1 "legacy" vs v2
+        // "modern" 2026-07-28) so consumers (e.g. the inspector) can display it.
+        if (isMountedRef.current) {
+          setProtocolEra(session.connector.protocolEra);
+          setProtocolVersion(session.connector.negotiatedProtocolVersion);
+        }
 
         if (serverInfo) {
           addLog("debug", "Server info:", serverInfo);
@@ -1368,10 +1437,17 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     timeout,
     sseReadTimeout,
     mergedClientInfo,
+    protocolNegotiation,
     // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
     gatewayUrl,
+    oauthProxyUrlOption,
     allHeaders,
     effectiveOAuthUrl,
+    // Stable reverse-request proxies (empty-deps useCallbacks). Listed for
+    // correctness; their identities never change, so they do not reconnect.
+    stableOnSampling,
+    stableOnElicitation,
+    stableOnNotification,
   ]);
 
   /**
@@ -1564,7 +1640,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           onPopupWindow?.(popupUrl, features, popupWin);
         };
 
-        // Recreate the auth provider WITHOUT preventAutoAuth
+        // Recreate the auth provider WITHOUT preventAutoAuth.
+        // proxyOAuthRequests is always true: the scoped OAuth proxy fetch is
+        // the sole browser-CORS mechanism (the gateway no longer fronts OAuth
+        // metadata — it broke RFC 8414 §3.3 issuer validation for strict
+        // clients). It is a no-op when no OAuth proxy URL is configured.
         const { provider: freshAuthProvider, oauthProxyUrl } =
           createBrowserOAuthProvider({
             effectiveOAuthUrl,
@@ -1574,19 +1654,15 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             preventAutoAuth: false,
             useRedirectFlow,
             gatewayUrl,
+            oauthProxyUrl: oauthProxyUrlOption,
             onPopupWindow: captureOnPopupWindow,
-            proxyOAuthRequests: !gatewayUrl,
+            proxyOAuthRequests: true,
             staticClientInfo,
             scope: oauthScope,
           });
 
-        if (oauthProxyUrl && !gatewayUrl) {
+        if (oauthProxyUrl) {
           addLog("info", "Scoped OAuth proxy fetch enabled for manual auth");
-        } else if (oauthProxyUrl && gatewayUrl) {
-          addLog(
-            "info",
-            "Using MCP gateway proxy for OAuth (no scoped OAuth fetch needed)"
-          );
         }
 
         // Replace the auth provider
@@ -2300,6 +2376,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         preventAutoAuth,
         useRedirectFlow,
         gatewayUrl,
+        oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
@@ -2307,10 +2384,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
-        addLog(
-          "debug",
-          `OAuth proxy URL derived from gateway: ${oauthProxyUrl}`
-        );
+        addLog("debug", `OAuth proxy URL in effect: ${oauthProxyUrl}`);
       }
       addLog(
         "debug",
@@ -2440,6 +2514,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     prompts,
     serverInfo,
     capabilities,
+    protocolEra,
+    protocolVersion,
     error,
     log,
     authUrl,

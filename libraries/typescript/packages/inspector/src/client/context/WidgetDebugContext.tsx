@@ -1,7 +1,7 @@
 /**
  * Widget Debug Context
  *
- * Manages debugging state for MCP Apps and ChatGPT Apps widgets.
+ * Manages debugging state for MCP Apps widgets.
  * Tracks CSP violations, widget state, host context, and playground settings.
  *
  * Follows the same React Context pattern as InspectorContext (not Zustand).
@@ -17,7 +17,7 @@ import {
   useState,
 } from "react";
 
-type WidgetProtocol = "mcp-apps" | "chatgpt-app" | "mcp-ui";
+type WidgetProtocol = "mcp-apps";
 
 export interface CspViolation {
   directive: string;
@@ -62,8 +62,6 @@ export interface PlaygroundSettings {
   safeAreaInsets: { top: number; right: number; bottom: number; left: number };
   locale: string;
   timeZone: string;
-  // Protocol selection for dual-protocol tools
-  selectedProtocol: "mcp-apps" | "chatgpt-app" | null; // null = use default (MCP Apps priority)
 }
 
 interface WidgetDebugState {
@@ -110,7 +108,6 @@ const DEFAULT_PLAYGROUND_SETTINGS: PlaygroundSettings = {
   safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
   locale: "en-US",
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-  selectedProtocol: null, // Default to priority-based selection
 };
 
 /**
