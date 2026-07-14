@@ -22,7 +22,6 @@ export { MCPAppsRenderer } from "./components/MCPAppsRenderer.js";
 export { ToolResultRenderer } from "./components/chat/ToolResultRenderer.js";
 export {
   detectWidgetProtocol,
-  hasBothProtocols,
   type WidgetProtocol,
 } from "./utils/widget-detection.js";
 

@@ -122,18 +122,6 @@ Example: {"query": "example search term", "results": [{"fruit": "Apple", "color"
       }
 
       // Fallback: generic prop generation without schema.
-      const isOpenAIWidget = !!(
-        resourceAnnotations &&
-        Object.keys(resourceAnnotations).some((key) =>
-          key.startsWith("openai/")
-        )
-      );
-      const isMcpUI =
-        typeof resourceType === "string" &&
-        (resourceType.toLowerCase().includes("mcp-ui") ||
-          resourceType.toLowerCase().includes("html") ||
-          resourceType.toLowerCase().includes("remote-dom"));
-
       const systemPrompt = `You are helping a developer configure props for a UI widget/resource. 
 Analyze the provided information and suggest appropriate props in key-value format.
 Return ONLY a JSON object with key-value pairs, where both keys and values are strings.
@@ -143,8 +131,6 @@ Example format: {"theme": "dark", "width": "400", "title": "My Widget"}`;
 - Name: ${resource.name || "N/A"}
 - Type: ${resourceType}
 - Description: ${resourceDescription}
-- Is OpenAI Widget: ${isOpenAIWidget ? "Yes" : "No"}
-- Is MCP UI Resource: ${isMcpUI ? "Yes" : "No"}
 
 Based on this information, suggest 3-5 common customizable properties like theme, dimensions, colors, titles, or configuration options that would be useful for this type of resource. Keep it simple and practical.`;
 

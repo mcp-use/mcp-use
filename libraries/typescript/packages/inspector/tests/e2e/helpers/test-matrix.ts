@@ -18,8 +18,10 @@ export function getTestMatrix(): TestMatrixConfig {
     | "remote";
 
   const usesBuiltinInspector = serverMode === "builtin-dev";
+  // Builtin/embedded inspector mounts under the server basePath (default /mcp).
+  // Standalone inspector Vite serves at /inspector with empty basePath.
   const inspectorUrl = usesBuiltinInspector
-    ? "http://localhost:3000/inspector"
+    ? "http://localhost:3000/mcp/inspector"
     : "http://localhost:3000/inspector";
 
   const serverUrl = (() => {

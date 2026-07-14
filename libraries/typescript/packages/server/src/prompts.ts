@@ -40,7 +40,11 @@ export type InferPromptInput<T> = T extends {
  * })
  * ```
  */
-export type PromptCallback<TInput = Record<string, unknown>> = (
+export type PromptCallback<
+  TInput = Record<string, unknown>,
+  TUser = never,
+  HasOAuth extends boolean = false,
+> = (
   params: TInput,
-  ctx: RequestContext
+  ctx: RequestContext<TUser, HasOAuth>
 ) => GetPromptResult | Promise<GetPromptResult>;

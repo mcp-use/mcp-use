@@ -124,13 +124,21 @@ export class StdioConnector extends BaseConnector {
         },
       };
       this.client = new Client(this.clientInfo, clientOptions);
+
+      // Register inbound handlers BEFORE connect() so they are available for the
+      // entire connection lifetime (including reverse RPC during/after initialize).
+      this.setupRootsHandler();
+      this.setupSamplingHandler();
+      this.setupElicitationHandler();
+      logger.debug(
+        "Roots/sampling/elicitation handlers registered before connect (stdio)"
+      );
+
       await this.client.connect(transport);
 
       this.connected = true;
       this.setupNotificationHandler();
-      this.setupRootsHandler();
-      this.setupSamplingHandler();
-      this.setupElicitationHandler();
+      // Inbound request handlers (roots/sampling/elicitation) were registered before connect()
       logger.debug(
         `Successfully connected to MCP implementation: ${this.command}`
       );

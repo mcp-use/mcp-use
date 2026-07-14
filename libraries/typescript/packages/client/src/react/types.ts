@@ -14,6 +14,7 @@ import type {
   // `ResourceTemplate` name is the server package's class).
   ResourceTemplateType as ResourceTemplate,
   Tool,
+  VersionNegotiationMode,
 } from "@modelcontextprotocol/client";
 import type { BrowserMCPClient } from "../client/browser.js";
 
@@ -246,6 +247,15 @@ export type UseMcpOptions = {
   clientOptions?: {
     capabilities?: Record<string, unknown>;
   };
+  /**
+   * Protocol version negotiation mode passed to the underlying SDK `Client`.
+   * - `"legacy"` (default): classic 2025 `initialize` handshake, no probe.
+   *   Still connects to both v1 and v2 servers (v2 servers serve 2025-era traffic).
+   * - `"auto"`: probe with `server/discover` to detect modern (2026-07-28)
+   *   servers, falling back to the 2025 handshake against legacy servers.
+   * - `{ pin: "2026-07-28" }`: modern era only, no fallback.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
   /** Connection timeout in milliseconds for establishing initial connection (default: 30000 / 30 seconds) */
   timeout?: number;
   /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
