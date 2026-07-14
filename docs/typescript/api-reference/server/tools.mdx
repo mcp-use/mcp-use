@@ -239,7 +239,7 @@ interface InputDefinition {
 
 ### ToolWidgetConfig
 
-The per-tool widget configuration, set as the `widget` field of a `ToolDefinition`. It configures the metadata the server emits so a tool's result can render as a widget in MCP Apps hosts (including the Inspector preview) and in ChatGPT via Apps SDK compatibility metadata. When this config is present and has a `name`, `server.tool()` resolves the widget output template (`ui://widget/{name}.html`, with the server build id appended when set), attaches widget keys to the tool's `_meta`, and wraps the callback to backfill an empty text content entry.
+The per-tool widget configuration, set as the `widget` field of a `ToolDefinition`. It configures the metadata the server emits so a tool's result renders as a widget in the inspector and in clients such as ChatGPT. When this config is present and has a `name`, `server.tool()` resolves the widget output template (`ui://widget/{name}.html`, with the server build id appended when set), attaches widget keys to the tool's `_meta`, and wraps the callback to backfill an empty text content entry.
 
 ```ts
 import type { ToolDefinition } from "mcp-use/server"

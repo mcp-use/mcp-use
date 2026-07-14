@@ -150,7 +150,7 @@ Widgets can render before the tool finishes. Check `isPending` before reading re
 
 ## Verify in the Inspector
 
-Use the Inspector to confirm that the server and widget work. The Inspector renders MCP Apps widgets; it does not emulate ChatGPT.
+Use the Inspector to confirm that the server and widget work.
 
 1. Open `http://localhost:3000/inspector`.
 2. Go to the **Tools** tab.
@@ -158,7 +158,7 @@ Use the Inspector to confirm that the server and widget work. The Inspector rend
 4. Run the tool with `{ "query": "a" }` or `{}`.
 5. Confirm that the widget renders below the tool result.
 
-If the tool runs but no widget appears, check that `widget.name` exactly matches the folder under `resources/` and that the handler returns `widget(...)`. For dual-protocol and ChatGPT-only cases, see [Debug widgets in the Inspector](/inspector/debugging-chatgpt-apps).
+If the tool runs but no widget appears, check that `widget.name` exactly matches the folder under `resources/` and that the handler returns `widget(...)`.
 
 ## Next steps
 

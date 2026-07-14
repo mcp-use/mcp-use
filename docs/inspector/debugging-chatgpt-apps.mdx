@@ -1,39 +1,14 @@
 ---
 title: "Debug widgets in the Inspector"
-description: "Preview MCP Apps widgets in the Inspector, structure dual-protocol servers for ChatGPT, and verify ChatGPT-specific behavior in developer mode."
+description: "Test MCP Apps widgets, ChatGPT compatibility, layout, CSP, and widget data in the Inspector."
 icon: "bug"
 ---
 
 {/* TODO: Add Inspector media when a screenshot or short clip would clarify the workflow. */}
 
-Use the Inspector to debug MCP Apps widgets before you try them in a production host. The Inspector renders widgets through the MCP Apps standard (`_meta.ui.resourceUri`, `text/html;profile=mcp-app`), powered by `@mcp-ui/client`. It does not emulate ChatGPT or the Apps SDK host (`window.openai`, `openai/outputTemplate` only).
+Use the Inspector to debug a widget before you try it in a production host. The fastest loop is: connect your server, run the tool that returns the widget, inspect the widget data, then test layout, display modes, and CSP.
 
-The fastest loop is: connect your server, run the tool that returns the widget, inspect the widget data, then test layout, display modes, and CSP.
-
-For building widgets, start with [Build widgets](/typescript/mcp-apps/widgets). For ChatGPT authoring and Apps SDK metadata, see [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility). For hook fields and host actions, use the [`useWidget()` API reference](/typescript/api-reference/react/usewidget).
-
-## What the Inspector renders
-
-| Server declares | Inspector behavior |
-| --- | --- |
-| MCP Apps (`_meta.ui.resourceUri`, `text/html;profile=mcp-app`) | Renders the widget and exposes debug controls. |
-| Dual-protocol (MCP Apps **and** `openai/outputTemplate`) | Renders the MCP Apps side. ChatGPT-specific behavior is not emulated. |
-| Apps SDK only (`openai/outputTemplate`, no MCP Apps metadata) | Shows the tool result as plain JSON. No widget preview. |
-| Legacy MCP-UI inline `ui://` resources (pre-MCP Apps) | Shows plain resource content. No widget preview. |
-
-Authoring ChatGPT / Apps SDK widgets with the `mcp-use` server library is unchanged. The server still emits Apps SDK metadata for real ChatGPT. Only the Inspector's ChatGPT emulation and legacy MCP-UI widget preview are gone.
-
-## Structure a dual-protocol server for Inspector previews
-
-If you need the same widget in ChatGPT and in the Inspector, declare MCP Apps metadata alongside Apps SDK metadata. With `mcp-use`, the normal widget APIs do this for you:
-
-1. Define the tool with `widget: { name }` and return `widget({ props, output })`.
-2. Use `useWidget()` (and related `mcp-use/react` hooks) in the React widget.
-3. Let `mcp-use` emit both MCP Apps and ChatGPT compatibility metadata from the same definition.
-
-The Inspector then previews the MCP Apps path. ChatGPT still consumes the Apps SDK / ChatGPT metadata when you connect the server there.
-
-See [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) for the authoring boundary and when Apps SDK extensions still matter.
+For building widgets, start with [Build widgets](/typescript/mcp-apps/widgets). For hook fields and host actions, use the [`useWidget()` API reference](/typescript/api-reference/react/usewidget).
 
 ## Connect the widget server
 
@@ -57,8 +32,23 @@ If the tool succeeds but no widget renders, check these values first:
 
 - `widget.name` in the server tool definition
 - the matching folder under `resources/`
-- MCP Apps metadata (`_meta.ui.resourceUri` / `text/html;profile=mcp-app`), not Apps SDK-only `openai/outputTemplate`
+- the tool result metadata that points to the widget resource
 - browser console errors from the widget iframe
+
+## Switch protocols when compatibility matters
+
+The Inspector can test MCP Apps behavior and ChatGPT Apps SDK compatibility for widgets that support both runtimes.
+
+Use the protocol toggle when it appears:
+
+| Protocol | What it tests |
+| --- | --- |
+| **MCP Apps** | The standard MCP Apps bridge over `postMessage`. |
+| **ChatGPT Apps** | ChatGPT compatibility behavior, including Apps SDK-style host globals. |
+
+Prefer `useWidget()` and other `mcp-use/react` hooks in widget code. They abstract over the runtime differences that the Inspector is testing.
+
+See [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) when you need ChatGPT-specific behavior.
 
 ## Inspect props, output, metadata, and state
 
@@ -74,9 +64,11 @@ Use the widget debug panels to confirm what the widget receives.
 
 When `props` are missing, compare the server's `outputSchema` with the widget's expected prop shape. They should describe the same fields.
 
-## Test layout, CSP, and host simulation
+## Test layout and display modes
 
-Use the playground / debug controls to exercise the contexts an MCP Apps host may provide:
+Use the debug controls to test the widget in the contexts a host may provide.
+
+Check:
 
 - inline, picture-in-picture, and fullscreen display modes
 - desktop, tablet, and mobile sizing
@@ -84,17 +76,18 @@ Use the playground / debug controls to exercise the contexts an MCP Apps host ma
 - light and dark themes
 - locale and timezone-dependent formatting
 - safe-area insets for mobile layouts
-- widget-declared vs permissive CSP modes
 
 The host may grant a different display mode than the widget requests. Read `displayMode` from `useWidget()` when the current mode matters.
 
-If the widget works in permissive CSP mode but fails with widget-declared CSP, update the widget CSP configuration. See [Content Security Policy](/typescript/mcp-apps/content-security-policy).
+## Test Content Security Policy
 
-Also use:
+Use the widget-declared CSP mode before shipping a widget that loads external APIs, images, scripts, styles, or embeds.
 
-- the CSP violation panel for blocked loads
-- per-widget RPC logs for bridge traffic
-- console capture / browser DevTools for runtime errors inside the widget iframe
+If the widget works in permissive mode but fails with widget-declared CSP, update the widget CSP configuration. See [Content Security Policy](/typescript/mcp-apps/content-security-policy) for the server and widget settings.
+
+## Use console output
+
+Open browser DevTools while the widget is rendered. Console messages from the widget iframe help identify runtime errors, blocked requests, CSP violations, missing props, and failed tool calls.
 
 Keep console output intentional. Log the minimum state needed to debug the widget, then remove noisy logs before release.
 
@@ -112,33 +105,20 @@ Use chat to verify end-to-end behavior:
 
 Use the Tools tab again when you need to isolate whether a failure is in the tool, widget, or model behavior.
 
-## Verify ChatGPT-specific behavior in ChatGPT
-
-The Inspector does not replace ChatGPT developer mode. Use it for MCP Apps rendering, layout, CSP, and bridge debugging. Use ChatGPT developer mode when you need to confirm:
-
-- Apps SDK-only metadata or host globals
-- ChatGPT-specific extensions with no shared MCP Apps equivalent
-- end-to-end behavior inside ChatGPT itself
-
-Tunnel a local server when ChatGPT must reach your machine. See [Tunneling](/tunneling).
-
 ## Troubleshoot missing widgets
 
 If no widget appears, start with the smallest failing case.
 
 | Symptom | Check |
 | --- | --- |
-| Tool result appears, but no widget appears. | Confirm MCP Apps metadata is present and `widget.name` matches a folder under `resources/`. |
-| Tool declares only `openai/outputTemplate`. | Expected: plain JSON in the Inspector. Add MCP Apps metadata (or use `mcp-use` widget APIs) for a preview. |
-| Legacy `ui://` resource shows as plain content. | Expected. Migrate to MCP Apps (`text/html;profile=mcp-app`). |
-| Widget frame appears blank. | Check iframe console errors, RPC logs, and missing required props. |
+| Tool result appears, but no widget appears. | Confirm `widget.name` matches a folder under `resources/`. |
+| Widget frame appears blank. | Check iframe console errors and missing required props. |
 | Widget loads in permissive CSP only. | Add the required domains to widget CSP. |
-| ChatGPT behaves differently from the Inspector. | Verify ChatGPT-specific paths in ChatGPT developer mode. See [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility). |
-| A widget action fails. | Verify the tool name, arguments, auth state, RPC logs, and iframe console logs. |
+| ChatGPT protocol fails, but MCP Apps works. | Check [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility). |
+| A widget action fails. | Verify the tool name, arguments, auth state, and iframe console logs. |
 
 ## Next steps
 
 - Use [Build widgets](/typescript/mcp-apps/widgets) to review the server and widget structure.
-- Use [Apps SDK compatibility](/typescript/mcp-apps/apps-sdk-compatibility) for ChatGPT authoring and metadata.
 - Use [Interactivity](/typescript/mcp-apps/interactivity) to add tool calls, state, follow-up messages, and display controls.
 - Use [`useWidget()`](/typescript/api-reference/react/usewidget) for the full hook reference.

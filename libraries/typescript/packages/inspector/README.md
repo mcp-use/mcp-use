@@ -21,7 +21,7 @@
         <img src="https://dcbadge.limes.pink/api/server/XkNkSkMz3V?style=flat" /></a>
 </p>
 
-🔍 **MCP Inspector by mcp-use** is an open-source, interactive developer tool for testing and debugging MCP servers with support for MCP Apps widgets. It provides a beautiful, intuitive interface for testing tools, exploring resources, managing prompts, and monitoring server connections - all from your browser.
+🔍 **MCP Inspector by mcp-use** is an open-source, interactive developer tool for testing and debugging MCP servers with support for MCP-UI and OpenAI Apps SDK widgets. It provides a beautiful, intuitive interface for testing tools, exploring resources, managing prompts, and monitoring server connections - all from your browser.
 
 ## 🚀 Try it:
 
@@ -64,7 +64,7 @@ For detailed usage instructions and guides, visit [mcp-use.com/docs/inspector](h
 | **📁 Resource Browser**    | View and copy resource URIs with syntax highlighting               |
 | **💬 Prompt Manager**      | Test and manage prompts with argument templates                    |
 | **🌐 Universal Support**   | Works with HTTP/SSE and WebSocket connections                      |
-| **🎨 Widget Support**      | Full support for MCP Apps widgets (`text/html;profile=mcp-app`)    |
+| **🎨 Widget Support**      | Full support for MCP-UI and OpenAI Apps SDK widgets                |
 | **🔑 BYOK Chat**           | Bring Your Own Key chat interface for testing conversational flows |
 | **💾 Saved Tool Calls**    | Save and replay tool executions for repeated testing               |
 | **⌨️ Quick Actions**       | Cmd + K keyboard shortcuts for rapid navigation                    |
@@ -177,7 +177,7 @@ The Tools tab displays all available tools from the MCP server.
 - Click **"Execute"** to test the tool
 - Enter JSON parameters in the input panel
 - View real-time results with syntax highlighting
-- Support for MCP Apps widgets (MCP Apps standard via `@mcp-ui/client`; not ChatGPT/Apps SDK emulation)
+- Support for MCP-UI and OpenAI Apps SDK widgets
 
 **Example**: When connected to Linear MCP server, you'll see 23+ tools for managing issues, projects, and teams.
 

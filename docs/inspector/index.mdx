@@ -72,7 +72,7 @@ Keep chat testing focused on end-to-end behavior. Use the Tools tab first when y
 
 ## Debug widgets
 
-When a tool returns an MCP Apps widget (`_meta.ui.resourceUri`, `text/html;profile=mcp-app`), the Inspector renders it below the tool result and exposes widget debug controls. Rendering follows the MCP Apps standard via `@mcp-ui/client`. The Inspector does not emulate ChatGPT or Apps SDK-only widgets.
+When a tool returns an MCP App widget, the Inspector renders it below the tool result and exposes widget debug controls.
 
 Use the widget view to check:
 
@@ -81,9 +81,8 @@ Use the widget view to check:
 - desktop, tablet, and mobile layout behavior
 - theme, locale, timezone, hover, touch, and safe-area settings
 - Content Security Policy behavior before trying the widget in a host
-- CSP violations, per-widget RPC logs, and console capture
 
-See [Debug widgets in the Inspector](/inspector/debugging-chatgpt-apps) for the full workflow, including dual-protocol servers and ChatGPT developer-mode verification.
+See [Debug widgets in the Inspector](/inspector/debugging-chatgpt-apps) for the full workflow.
 
 ## Add the server to a client
 
@@ -114,7 +113,7 @@ For the full shortcut list, see [Keyboard shortcuts](/inspector/keyboard-shortcu
     Choose Direct or Via Proxy and tune connection details only when needed.
   </Card>
   <Card title="Debug widgets" icon="bug" href="/inspector/debugging-chatgpt-apps">
-    Preview MCP Apps widgets, layout, CSP, and dual-protocol servers.
+    Test MCP Apps widgets, layout behavior, CSP, and display modes.
   </Card>
   <Card title="Mount the Inspector" icon="plug-2" href="/inspector/integration">
     Serve the Inspector from an Express, Hono, or mcp-use server.
