@@ -29,8 +29,9 @@ and the per-action hooks).
 - **Hook-first data flow** — the default export takes no props; tool output
   arrives via `useToolContext<"search-fruits">()` once `status === "ready"`.
 - **Tool-error handling** — `status === "error"` distinguishes
-  `error.kind === "tool"` from `"invalid-result"`; `useCallTool` results are
-  narrowed with `if (result.isError)` before reading `structuredContent`.
+  `ToolError` from `InvalidToolResultError` (`instanceof`); `useCallTool`
+  rejects tool errors (success-only `data`, with `structuredContent` typed
+  because `get-fruit-details` declares an `outputSchema`).
 - **`useViewTool` without an opt-in flag** — `highlight-fruit` registers when
   mounted and is removed on unmount.
 - **Tailwind CSS v4** — styling is the project's own declaration via
@@ -105,8 +106,8 @@ While waiting for a result, branch on `view.status`:
   `DeepPartial` of the tool input); drive a pulsing skeleton from that field.
 - `"cancelled"` — host cancelled the call; `view.reason` is the optional
   host-provided string; `view.toolInput` may still hold the last partial.
-- `"error"` — a valid tool error (`error.kind === "tool"`) or a malformed
-  non-error result (`error.kind === "invalid-result"`); both expose
+- `"error"` — a valid tool error (`instanceof ToolError`) or a malformed
+  non-error result (`instanceof InvalidToolResultError`); both expose
   `error.message` for rendering; `toolOutput` is undefined.
 - `"ready"` — render from `view.toolOutput` (and optionally `view.content`,
   `view.meta`).

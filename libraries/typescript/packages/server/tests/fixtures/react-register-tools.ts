@@ -21,4 +21,16 @@ export const searchFruits = server.tool(
   })
 );
 
+// Schema-less tool: no outputSchema, so its inferred output is `never` and
+// any CallToolResult (content-only included) is a valid return.
+export const ping = server.tool(
+  {
+    name: "ping",
+    inputSchema: z.object({ id: z.string() }),
+  },
+  async ({ id }) => ({
+    content: [{ type: "text", text: id }],
+  })
+);
+
 export { getDetails } from "./react-register-tools-details.js";

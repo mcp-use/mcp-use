@@ -1,4 +1,4 @@
-import { useToolContext, useViewTheme } from "@mcp-use/server/react";
+import { useToolContext, useViewTheme, ToolError } from "@mcp-use/server/react";
 
 import "./view.css";
 
@@ -158,7 +158,9 @@ export default function StoryWriter() {
     return (
       <div className={root} role="alert">
         <p className="m-0 font-medium">
-          {ctx.error.kind === "tool" ? "Story failed" : "Invalid tool result"}
+          {ctx.error instanceof ToolError
+            ? "Story failed"
+            : "Invalid tool result"}
         </p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {ctx.error.message}

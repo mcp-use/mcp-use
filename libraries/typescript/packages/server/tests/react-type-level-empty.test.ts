@@ -11,7 +11,10 @@ import type {
   CallToolHandle,
   useCallTool,
 } from "../src/react/hooks/use-call-tool.js";
-import type { CallToolData } from "../src/react/types/result-types.js";
+import type {
+  CallToolResult,
+  CallToolSuccess,
+} from "../src/react/types/result-types.js";
 
 describe("DeepPartial", () => {
   it("recurses over arrays, nested objects, and preserves primitives", () => {
@@ -61,27 +64,54 @@ describe("useCallTool empty Register", () => {
     expect(true).toBe(true);
   });
 
-  it("shares the CallToolData result contract across string, ToolRef, and explicit generics", () => {
+  it("infers never output from a schema-less ToolRef and drops the structuredContent guarantee", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    const ref = server.tool(
+      {
+        name: "ping",
+        inputSchema: z.object({ id: z.string() }),
+      },
+      async ({ id }) => ({
+        content: [{ type: "text", text: id }],
+      })
+    );
+    expectTypeOf(ref).toMatchTypeOf<ToolRef<"ping", { id: string }, never>>();
+
+    type FromRef = CallToolHandle<{ id: string }, never>;
+    type Success = Awaited<ReturnType<FromRef["callTool"]>>;
+    // Content-only successes are valid: exactly the base non-error shape.
+    expectTypeOf<Success>().toEqualTypeOf<CallToolResult & { isError?: false }>();
+    // structuredContent stays the base optional `unknown` — not typed output.
+    expectTypeOf<Success["structuredContent"]>().toEqualTypeOf<unknown>();
+    expectTypeOf<FromRef["data"]>().toEqualTypeOf<
+      (CallToolResult & { isError?: false }) | undefined
+    >();
+    expect(true).toBe(true);
+  });
+
+  it("shares the CallToolSuccess result contract across string, ToolRef, and explicit generics", () => {
     type Output = { text: string };
     type FromString = CallToolHandle<Record<string, unknown>, Output>;
     type FromRef = CallToolHandle<{ text: string }, Output>;
     type FromExplicit = CallToolHandle<{ text: string }, Output>;
 
     expectTypeOf<Awaited<ReturnType<FromString["callTool"]>>>().toEqualTypeOf<
-      CallToolData<Output>
+      CallToolSuccess<Output>
     >();
     expectTypeOf<Awaited<ReturnType<FromRef["callTool"]>>>().toEqualTypeOf<
-      CallToolData<Output>
+      CallToolSuccess<Output>
     >();
     expectTypeOf<Awaited<ReturnType<FromExplicit["callTool"]>>>().toEqualTypeOf<
-      CallToolData<Output>
+      CallToolSuccess<Output>
     >();
     expectTypeOf<FromString["data"]>().toEqualTypeOf<
-      CallToolData<Output> | undefined
+      CallToolSuccess<Output> | undefined
     >();
-    expectTypeOf<FromRef["data"]>().toEqualTypeOf<CallToolData<Output> | undefined>();
+    expectTypeOf<FromRef["data"]>().toEqualTypeOf<
+      CallToolSuccess<Output> | undefined
+    >();
     expectTypeOf<FromExplicit["data"]>().toEqualTypeOf<
-      CallToolData<Output> | undefined
+      CallToolSuccess<Output> | undefined
     >();
 
     expect(true).toBe(true);

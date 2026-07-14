@@ -15,10 +15,12 @@ export to excalidraw.com.
   on `create_view` (one tool per view).
 - **App-private tools** — `export_to_excalidraw`, `save_checkpoint`, and
   `read_checkpoint` use `visibility: "app"` and are called from the view via
-  `useCallTool` (narrow with `if (result.isError)` before reading success data).
-- **Tool-error handling** — `status === "error"` distinguishes tool failures
-  from invalid results; `create_view` can return `isError: true` for oversized
-  or invalid JSON.
+  `useCallTool`. They declare no `outputSchema`, so their successes are
+  content-only results — `callTool` resolves them and the view reads
+  `result.content`; tool errors and transport failures reject.
+- **Tool-error handling** — `status === "error"` distinguishes `ToolError`
+  from `InvalidToolResultError` (`instanceof`); `create_view` can return
+  `isError: true` for oversized or invalid JSON.
 - **Model context** — `<ModelContext>` plus imperative `modelContext.set` for
   user edit summaries from fullscreen.
 - **External assets CSP** — Excalidraw CSS/fonts load from `https://esm.sh`

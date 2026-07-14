@@ -8,7 +8,8 @@ import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server"
 
 import type { DisplayMode } from "../types/host-types.js";
 import {
-  toolContextErrorMessage,
+  InvalidToolResultError,
+  ToolError,
   type ToolContextError,
 } from "../types/result-types.js";
 import { ModelContextStore } from "./model-context-store.js";
@@ -523,11 +524,7 @@ export function createMcpAppRuntime(
       if (params.isError === true) {
         const result = params as CallToolResult & { isError: true };
         patchTool({
-          error: {
-            kind: "tool",
-            message: toolContextErrorMessage(result),
-            result,
-          },
+          error: new ToolError(result),
           hasToolResult: false,
           toolOutput: undefined,
           content,
@@ -539,13 +536,16 @@ export function createMcpAppRuntime(
       }
 
       if (params.structuredContent === undefined) {
+        const invalid = new InvalidToolResultError(
+          "View-bound tool returned a non-error result without structuredContent",
+          params
+        );
+        console.error(
+          "[mcp-use] View-bound tool returned a non-error result without structuredContent:",
+          params
+        );
         patchTool({
-          error: {
-            kind: "invalid-result",
-            message:
-              "View-bound tool returned a non-error result without structuredContent",
-            result: params,
-          },
+          error: invalid,
           hasToolResult: false,
           toolOutput: undefined,
           content,

@@ -12,6 +12,7 @@ import {
   InvalidToolResultError,
   ModelContext,
   modelContext,
+  ToolError,
   toolResultText,
   useCallTool,
   useDisplayMode,
@@ -248,7 +249,7 @@ describe("react bridge runtime", () => {
     });
   });
 
-  it("surfaces valid tool errors as status error with kind tool", async () => {
+  it("surfaces valid tool errors as status error with ToolError", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -257,7 +258,9 @@ describe("react bridge runtime", () => {
       if (handle.status === "error") {
         return (
           <div data-testid="lifecycle">
-            error|{handle.error.kind}|{handle.error.message}|
+            error|
+            {handle.error instanceof ToolError ? "tool" : "other"}|
+            {handle.error.message}|
             {handle.toolOutput === undefined ? "no-out" : "has-out"}|
             {handle.content?.[0] && "type" in handle.content[0]
               ? handle.content[0].type
@@ -362,7 +365,7 @@ describe("react bridge runtime", () => {
     ).toBeUndefined();
   });
 
-  it("surfaces missing structuredContent as invalid-result error", async () => {
+  it("surfaces missing structuredContent as InvalidToolResultError", async () => {
     resetRuntime();
     const { bridge, init } = await startHost();
 
@@ -371,8 +374,11 @@ describe("react bridge runtime", () => {
       if (handle.status === "error") {
         return (
           <div data-testid="lifecycle">
-            error|{handle.error.kind}|
-            {handle.error.kind === "invalid-result"
+            error|
+            {handle.error instanceof InvalidToolResultError
+              ? "invalid-result"
+              : "other"}|
+            {handle.error instanceof InvalidToolResultError
               ? handle.error.message
               : ""}|
             {handle.toolOutput === undefined ? "no-out" : "has-out"}
@@ -925,9 +931,9 @@ describe("react bridge runtime", () => {
           isError: true,
         };
       }
-      if (args.id === "malformed") {
+      if (args.id === "bare") {
         return {
-          content: [{ type: "text", text: "missing structured" }],
+          content: [{ type: "text", text: "bare content" }],
         };
       }
       return {
@@ -950,11 +956,11 @@ describe("react bridge runtime", () => {
           <span data-testid="error">{tool.error?.message ?? ""}</span>
           <span data-testid="error-name">{tool.error?.name ?? ""}</span>
           <span data-testid="data">
-            {tool.data?.isError === true
-              ? `err:${tool.data.content?.[0] && "text" in tool.data.content[0] ? tool.data.content[0].text : ""}`
-              : tool.data && !tool.data.isError
+            {tool.data
+              ? tool.data.structuredContent !== undefined
                 ? JSON.stringify(tool.data.structuredContent)
-                : ""}
+                : `content:${tool.data.content?.[0] && "text" in tool.data.content[0] ? String(tool.data.content[0].text) : ""}`
+              : ""}
           </span>
           <button
             type="button"
@@ -975,7 +981,7 @@ describe("react bridge runtime", () => {
           <button
             type="button"
             onClick={() => {
-              void tool.callTool({ id: "tool-error" });
+              void tool.callTool({ id: "tool-error" }).catch(() => undefined);
             }}
           >
             tool-error
@@ -983,12 +989,10 @@ describe("react bridge runtime", () => {
           <button
             type="button"
             onClick={() => {
-              void tool
-                .callTool({ id: "malformed" })
-                .catch(() => undefined);
+              void tool.callTool({ id: "bare" });
             }}
           >
-            malformed
+            bare
           </button>
         </div>
       );
@@ -1026,7 +1030,22 @@ describe("react bridge runtime", () => {
 
     screen.getByText("tool-error").click();
     await waitFor(() => {
-      expect(screen.getByTestId("data").textContent).toBe("err:tool error");
+      expect(screen.getByTestId("error-name").textContent).toBe("ToolError");
+      expect(screen.getByTestId("error").textContent).toBe("tool error");
+      expect(screen.getByTestId("pending").textContent).toBe("false");
+    });
+    // Tool error rejects and preserves previous successful data.
+    expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
+
+    screen.getByText("call").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
+    });
+
+    // A bare content-only success (schema-less tool) resolves into data.
+    screen.getByText("bare").click();
+    await waitFor(() => {
+      expect(screen.getByTestId("data").textContent).toBe("content:bare content");
       expect(screen.getByTestId("error").textContent).toBe("");
       expect(screen.getByTestId("pending").textContent).toBe("false");
     });
@@ -1034,23 +1053,6 @@ describe("react bridge runtime", () => {
     screen.getByText("call").click();
     await waitFor(() => {
       expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
-    });
-
-    screen.getByText("malformed").click();
-    await waitFor(() => {
-      expect(screen.getByTestId("error-name").textContent).toBe(
-        "InvalidToolResultError"
-      );
-      expect(screen.getByTestId("error").textContent).toContain(
-        "without structuredContent"
-      );
-    });
-    // Malformed non-error result preserves previous successful data.
-    expect(screen.getByTestId("data").textContent).toBe('{"value":"42"}');
-    expect(InvalidToolResultError.name).toBe("InvalidToolResultError");
-
-    screen.getByText("call").click();
-    await waitFor(() => {
       expect(screen.getByTestId("error").textContent).toBe("");
     });
   });

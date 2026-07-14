@@ -10,8 +10,11 @@ import type {
   RegisteredTools,
 } from "../src/react/types/register.js";
 import type {
-  CallToolData,
   CallToolResult,
+  CallToolSuccess,
+  InvalidToolResultError,
+  ToolContextError,
+  ToolError,
 } from "../src/react/types/result-types.js";
 import type { CallToolHandle } from "../src/react/hooks/use-call-tool.js";
 import type { ToolContextHandle } from "../src/react/hooks/use-tool-context.js";
@@ -25,7 +28,9 @@ declare module "../src/react/types/register.js" {
 describe("ToolsFromModule / Register", () => {
   it("filters non-ToolRef exports from the registered tools map", () => {
     type Tools = RegisteredTools;
-    expectTypeOf<keyof Tools>().toEqualTypeOf<"search-fruits" | "get-details">();
+    expectTypeOf<keyof Tools>().toEqualTypeOf<
+      "search-fruits" | "get-details" | "ping"
+    >();
     expectTypeOf<Tools["search-fruits"]["input"]>().toEqualTypeOf<{
       query?: string | undefined;
     }>();
@@ -33,6 +38,8 @@ describe("ToolsFromModule / Register", () => {
       query: string;
       items: { id: string }[];
     }>();
+    // No outputSchema → output inferred as `never`.
+    expectTypeOf<Tools["ping"]["output"]>().toEqualTypeOf<never>();
     expect(true).toBe(true);
   });
 
@@ -69,19 +76,10 @@ describe("ToolsFromModule / Register", () => {
     type ErrorBranch = Extract<Handle, { status: "error" }>;
     expectTypeOf<ErrorBranch["toolOutput"]>().toEqualTypeOf<undefined>();
     expectTypeOf<"toolName" extends keyof ErrorBranch ? true : false>().toEqualTypeOf<false>();
-    expectTypeOf<ErrorBranch["error"]["kind"]>().toEqualTypeOf<
-      "tool" | "invalid-result"
+    expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<ToolContextError>();
+    expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<
+      ToolError | InvalidToolResultError
     >();
-
-    type ToolError = Extract<ErrorBranch["error"], { kind: "tool" }>;
-    expectTypeOf<ToolError["result"]["isError"]>().toEqualTypeOf<true>();
-    expectTypeOf<ToolError["message"]>().toEqualTypeOf<string>();
-
-    type InvalidError = Extract<ErrorBranch["error"], { kind: "invalid-result" }>;
-    expectTypeOf<InvalidError["message"]>().toEqualTypeOf<string>();
-    expectTypeOf<InvalidError["result"]>().toEqualTypeOf<CallToolResult>();
-
-    // Both branches expose `message` without narrowing on kind.
     expectTypeOf<ErrorBranch["error"]["message"]>().toEqualTypeOf<string>();
 
     expect(true).toBe(true);
@@ -123,7 +121,7 @@ describe("ToolsFromModule / Register", () => {
 });
 
 describe("useCallTool augmented Register", () => {
-  it("types name union and args/result from Register via CallToolData", () => {
+  it("types name union and args/result from Register via CallToolSuccess", () => {
     type Output = RegisteredTools["search-fruits"]["output"];
     type Handle = CallToolHandle<
       RegisteredTools["search-fruits"]["input"],
@@ -133,24 +131,46 @@ describe("useCallTool augmented Register", () => {
     expectTypeOf<Handle["callTool"]>().parameters.toEqualTypeOf<
       [RegisteredTools["search-fruits"]["input"]]
     >();
-    expectTypeOf<Handle["data"]>().toEqualTypeOf<CallToolData<Output> | undefined>();
+    expectTypeOf<Handle["data"]>().toEqualTypeOf<
+      CallToolSuccess<Output> | undefined
+    >();
     expectTypeOf<Awaited<ReturnType<Handle["callTool"]>>>().toEqualTypeOf<
-      CallToolData<Output>
+      CallToolSuccess<Output>
     >();
     expect(true).toBe(true);
   });
 
-  it("narrows CallToolData success vs tool-error structuredContent", () => {
+  it("exposes success-only data with typed structuredContent", () => {
     type Output = RegisteredTools["search-fruits"]["output"];
-    type Data = CallToolData<Output>;
-
-    type Success = Extract<Data, { isError?: false }>;
-    type ToolError = Extract<Data, { isError: true }>;
+    type Success = CallToolSuccess<Output>;
 
     expectTypeOf<Success["structuredContent"]>().toEqualTypeOf<Output>();
-    expectTypeOf<ToolError["structuredContent"]>().toEqualTypeOf<
-      unknown | undefined
+    expectTypeOf<Success["isError"]>().toEqualTypeOf<false | undefined>();
+
+    // CallToolSuccess is assignable to CallToolResult with structuredContent.
+    expectTypeOf<Success>().toMatchTypeOf<
+      CallToolResult & { structuredContent: Output }
     >();
+
+    expect(true).toBe(true);
+  });
+
+  it("adds no structuredContent guarantee for schema-less registered tools", () => {
+    type PingHandle = CallToolHandle<
+      RegisteredTools["ping"]["input"],
+      RegisteredTools["ping"]["output"]
+    >;
+    type PingSuccess = Awaited<ReturnType<PingHandle["callTool"]>>;
+
+    // `never` output collapses the conditional: exactly the base result shape.
+    expectTypeOf<PingSuccess>().toEqualTypeOf<
+      CallToolResult & { isError?: false }
+    >();
+    expectTypeOf<PingHandle["data"]>().toEqualTypeOf<
+      (CallToolResult & { isError?: false }) | undefined
+    >();
+    // structuredContent stays the base optional `unknown` — not typed output.
+    expectTypeOf<PingSuccess["structuredContent"]>().toEqualTypeOf<unknown>();
 
     expect(true).toBe(true);
   });

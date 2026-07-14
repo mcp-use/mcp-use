@@ -121,7 +121,7 @@ interface ReadyToolContext<Name extends keyof RegisteredTools> {
  * @typeParam Name - Bound tool name from {@link RegisteredTools}.
  */
 interface ErrorToolContext<Name extends keyof RegisteredTools> {
-  /** Valid tool error or malformed non-error result. */
+  /** Valid tool error ({@link ToolError}) or malformed non-error result. */
   status: "error";
   /** Complete tool arguments from the host, when delivered. */
   toolInput: ToolInput<Name> | undefined;
@@ -133,7 +133,10 @@ interface ErrorToolContext<Name extends keyof RegisteredTools> {
   meta: Record<string, unknown> | undefined;
   /** Absent outside `"cancelled"`. */
   reason?: undefined;
-  /** Discriminated tool vs invalid-result payload. */
+  /**
+   * {@link ToolError} or {@link InvalidToolResultError}. Render
+   * `error.message`; narrow with `instanceof` when the class matters.
+   */
   error: ToolContextError;
 }
 
@@ -171,8 +174,8 @@ export type ToolContextHandle<Name extends keyof RegisteredTools = never> =
  *   const view = useToolContext<"search-fruits">();
  *
  *   if (view.status === "error") {
- *     if (view.error.kind === "tool") {
- *       return <ToolError content={view.content} />;
+ *     if (view.error instanceof ToolError) {
+ *       return <ToolErrorBanner content={view.content} />;
  *     }
  *     return <InvalidResult message={view.error.message} />;
  *   }

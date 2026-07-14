@@ -21,6 +21,7 @@ const morphdom = (
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ModelContext,
+  ToolError,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -170,7 +171,7 @@ const ExternalLinkIcon = () => (
 
 async function shareToExcalidraw(
   data: { elements: any[]; appState: any; files: any },
-  exportTool: (args: { json: string }) => Promise<{ isError?: boolean | undefined; content?: any[] | undefined }>,
+  exportTool: (args: { json: string }) => Promise<{ content?: any[] | undefined }>,
   openExternal: (args: { url: string }) => Promise<void>,
 ) {
   try {
@@ -179,14 +180,13 @@ async function shareToExcalidraw(
     const json = serializeAsJSON(data.elements, data.appState, data.files, "database");
     const result = await exportTool({ json });
 
-    if (result.isError) {
-      fsLog(`export failed: ${JSON.stringify(result.content)}`);
-      return;
-    }
-
     const url = (result.content?.[0] as { text?: string } | undefined)?.text;
     if (url) await openExternal({ url });
   } catch (err) {
+    if (err instanceof ToolError) {
+      fsLog(`export failed: ${JSON.stringify(err.result.content)}`);
+      return;
+    }
     fsLog(`shareToExcalidraw error: ${err}`);
   }
 }
@@ -739,7 +739,7 @@ export default function ExcalidrawView() {
       : undefined;
   const errorBanner =
     toolCtx.status === "error"
-      ? toolCtx.error.kind === "tool"
+      ? toolCtx.error instanceof ToolError
         ? {
             title: "Drawing failed",
             message: toolCtx.error.message,
@@ -1086,7 +1086,6 @@ export default function ExcalidrawView() {
             loadCheckpoint={async (id) => {
               try {
                 const result = await readCheckpoint({ id });
-                if (result.isError) return null;
                 const text = (result.content?.[0] as { text?: string } | undefined)
                   ?.text;
                 if (!text) return null;

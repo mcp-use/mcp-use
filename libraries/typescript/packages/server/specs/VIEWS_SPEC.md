@@ -82,7 +82,7 @@ export default function ProductSearchResult() {
   }
 
   if (view.status === "error") {
-    return <ToolError message={view.error.message} kind={view.error.kind} />;
+    return <ErrorBanner message={view.error.message} />;
   }
 
   if (view.status === "pending") {
@@ -542,18 +542,19 @@ Users export the refs of tools views care about (`export const searchFruits = se
 `ToolContextHandle` resolves through the same map. The type parameter is the view's single bound tool name (`keyof RegisteredTools`). There is no `toolName` field on any branch — one-to-one binding makes a runtime tool-name discriminant unnecessary:
 
 ```ts
-type ToolContextError =
-  | {
-      kind: "tool";
-      /** Derived from text content blocks, or `"Tool returned an error."`. */
-      message: string;
-      result: CallToolResult & { isError: true };
-    }
-  | {
-      kind: "invalid-result";
-      message: string;
-      result: CallToolResult;
-    };
+/** The bound/called tool ran and answered with `isError: true` — a domain error. */
+class ToolError extends Error {
+  readonly result: CallToolResult & { isError: true };
+  // message derived from text content, or "Tool returned an error."
+}
+
+/** Non-error result missing required `structuredContent`. */
+class InvalidToolResultError extends Error {
+  readonly result: CallToolResult;
+}
+
+/** What can appear in the error slot of ToolContextHandle. */
+type ToolContextError = ToolError | InvalidToolResultError;
 
 type ToolContextHandle<Name extends keyof RegisteredTools> =
   | {
@@ -603,7 +604,7 @@ type ToolContextHandle<Name extends keyof RegisteredTools> =
     };
 ```
 
-`useToolContext<Name>()` returns this handle. TypeScript narrowing on `status === "ready"` guarantees complete, typed `toolOutput`. The `"ready"` branch is available only for a non-error result with `structuredContent`. A valid MCP tool error (`isError: true`) yields `status: "error"` with `error.kind: "tool"`; a non-error result missing `structuredContent` yields `error.kind: "invalid-result"`. Both branches expose `message` (for `"tool"`, the joined text content of the error result, or `"Tool returned an error."` when there is none) so consumers can render `error.message` without narrowing on `kind` first; `result` remains for full access. `toolInput` is the single streaming field: partials from `ui/notifications/tool-input-partial` and the complete args from `ui/notifications/tool-input` write the same field (last write wins); during `"streaming"` / `"cancelled"` it is typed `DeepPartial<Input>`.
+`useToolContext<Name>()` returns this handle. TypeScript narrowing on `status === "ready"` guarantees complete, typed `toolOutput`. The `"ready"` branch is available only for a non-error result with `structuredContent`. A valid MCP tool error (`isError: true`) yields `status: "error"` with a `ToolError` instance; a non-error result missing `structuredContent` yields `InvalidToolResultError`. Both expose `message` so consumers can render `error.message` without narrowing first; use `instanceof ToolError` / `instanceof InvalidToolResultError` when the class matters. `toolInput` is the single streaming field: partials from `ui/notifications/tool-input-partial` and the complete args from `ui/notifications/tool-input` write the same field (last write wins); during `"streaming"` / `"cancelled"` it is typed `DeepPartial<Input>`.
 
 Keying by tool name (not view directory name) is deliberate: view names exist only in the filesystem/manifest, which type space cannot see without codegen — tool names exist as literal types on exported refs. The type parameter is the author's declaration of which tool delivers results to this view. It is not enforced in type space (a wrong literal compiles against the wrong schema); the runtime binding checks at mount/build (decision 10) are the enforcement. Unbound views (inspector-preview only) never reach `"ready"` — components branch on hook state and declare no required result payload.
 
@@ -665,7 +666,7 @@ The generated iframe entry — not user code — bootstraps the runtime and moun
 - **`"streaming"`:** partial args are arriving; `toolInput` grows progressively and is typed `DeepPartial<Input>` (provisional, render-only — strings may be truncated mid-token).
 - **`"cancelled"`:** host sent `ui/notifications/tool-cancelled` (host MUST send on any cancellation — user action, sampling error, classifier intervention). `reason` is the optional spec-provided string. `toolInput` may be partial (cancelled mid-stream) — typed `DeepPartial<Input>`.
 - **`"ready"`:** a non-error result with `structuredContent` arrived; `toolOutput` = that tool's output type (from `outputSchema`, via `Register`/`RegisteredTools`); `content` = result `content` blocks; `meta` available (the view-only result channel); `toolInput` is the complete args when delivered.
-- **`"error"`:** a valid MCP tool error (`isError: true`, with or without `structuredContent`) → `error: { kind: "tool"; result }`; or a non-error result from a schema-backed tool without `structuredContent` → `error: { kind: "invalid-result"; message; result }`. `toolOutput` is always `undefined` on this branch; `content` / `meta` may still be present from the result.
+- **`"error"`:** a valid MCP tool error (`isError: true`, with or without `structuredContent`) → `error: ToolError`; or a non-error result from a schema-backed tool without `structuredContent` → `error: InvalidToolResultError`. `toolOutput` is always `undefined` on this branch; `content` / `meta` may still be present from the result. Render `error.message`; narrow with `instanceof` when the class matters.
 
 TypeScript narrowing on `status === "ready"` guarantees complete `toolOutput` — this replaces the old guarantee that a component signature implied complete result data. Tool errors and invalid results are never cast to typed output.
 
@@ -694,7 +695,7 @@ export default function ProductSearchResult() {
   }
 
   if (view.status === "error") {
-    return <ToolError message={view.error.message} kind={view.error.kind} />;
+    return <ErrorBanner message={view.error.message} />;
   }
 
   if (view.status === "pending") {
@@ -730,7 +731,7 @@ export default function ProductSearchResult() {
   }
 
   if (view.status === "error") {
-    return <ToolError message={view.error.message} kind={view.error.kind} />;
+    return <ErrorBanner message={view.error.message} />;
   }
 
   if (view.status === "pending") {
@@ -839,18 +840,19 @@ interface ViewConfig {
   displayModes?: readonly DisplayMode[];
 }
 
-type ToolContextError =
-  | {
-      kind: "tool";
-      /** Derived from text content blocks, or `"Tool returned an error."`. */
-      message: string;
-      result: CallToolResult & { isError: true };
-    }
-  | {
-      kind: "invalid-result";
-      message: string;
-      result: CallToolResult;
-    };
+/** The bound/called tool ran and answered with `isError: true` — a domain error. */
+class ToolError extends Error {
+  readonly result: CallToolResult & { isError: true };
+  // message derived from text content, or "Tool returned an error."
+}
+
+/** Non-error result missing required `structuredContent`. */
+class InvalidToolResultError extends Error {
+  readonly result: CallToolResult;
+}
+
+/** What can appear in the error slot of ToolContextHandle. */
+type ToolContextError = ToolError | InvalidToolResultError;
 
 /** Discriminated union returned by useToolContext<Name>(). */
 type ToolContextHandle<Name extends keyof RegisteredTools> =
@@ -909,19 +911,14 @@ type DeepPartial<T> = T extends (infer E)[]
     ? { [K in keyof T]?: DeepPartial<T[K]> }
     : T;
 
-/** Discriminated result of useCallTool — success vs valid tool error. */
-type CallToolData<Result> =
-  | (CallToolResult & {
-      isError?: false;
-      structuredContent: Result;
-    })
-  | (CallToolResult & {
-      isError: true;
-      structuredContent?: unknown;
-    });
+/** Successful non-error tool result. structuredContent is guaranteed and
+ *  typed exactly when the tool declares an outputSchema (Result ≠ never). */
+type CallToolSuccess<Result> = CallToolResult &
+  { isError?: false } &
+  ([Result] extends [never] ? unknown : { structuredContent: Result });
 ```
 
-**`useToolContext<Name>()`** — primary data hook. Returns `ToolContextHandle<Name>` (Component lifecycle & view data). Narrow on `status === "ready"` for typed `toolOutput`; handle `"error"` separately (`error.kind === "tool"` vs `"invalid-result"`). Both error kinds expose `message` for direct rendering.
+**`useToolContext<Name>()`** — primary data hook. Returns `ToolContextHandle<Name>` (Component lifecycle & view data). Narrow on `status === "ready"` for typed `toolOutput`; handle `"error"` separately (`instanceof ToolError` vs `InvalidToolResultError`). Both expose `message` for direct rendering.
 
 ```ts
 function useToolContext<Name extends keyof RegisteredTools>(): ToolContextHandle<Name>;
@@ -934,7 +931,7 @@ function useToolContext<Name extends keyof RegisteredTools>(): ToolContextHandle
 function toolResultText(result: Pick<CallToolResult, "content">): string | undefined;
 ```
 
-Joins the `text` of every `content` block with `type === "text"` using `"\n"`, then trims. Returns `undefined` when there are no text blocks or the joined result is empty/whitespace — callers choose their fallback. The runtime uses the same derivation for `ToolContextError` `kind: "tool"` `message`, falling back to `"Tool returned an error."` so that field is always non-empty.
+Joins the `text` of every `content` block with `type === "text"` using `"\n"`, then trims. Returns `undefined` when there are no text blocks or the joined result is empty/whitespace — callers choose their fallback. A general data-reading utility for any `CallToolResult`; `ToolError.message` is derived the same way (with a non-empty fallback).
 
 **Environment hooks** — split subscriptions; each rerenders only when its channel updates.
 
@@ -967,9 +964,9 @@ function useCallTool<Args extends Record<string, unknown>, Result = unknown>(nam
   CallToolHandle<Args, Result>;
 
 interface CallToolHandle<Args, Result> {
-  callTool: (args: Args) => Promise<CallToolData<Result>>;
-  data: CallToolData<Result> | undefined; // last successful / tool-error result (preserved across pending/failed calls)
-  error: Error | undefined;   // last transport/RPC/capability/malformed-result failure (reset on next call)
+  callTool: (args: Args) => Promise<CallToolSuccess<Result>>;
+  data: CallToolSuccess<Result> | undefined; // last successful result only (preserved across pending/failed calls)
+  error: Error | undefined;   // ToolError | transport/RPC/capability Error (reset on next call)
   isPending: boolean;         // a call is in flight
 }
 
@@ -986,7 +983,12 @@ function useDisplayMode(): {
 };
 ```
 
-**`useCallTool` result contract.** Valid tool errors (`isError: true`) **resolve** and populate `data`. Transport failures, RPC failures, capability failures (host lacks `serverTools`), and malformed non-error results (missing `structuredContent` → `InvalidToolResultError`) **reject** and populate `error`. The hook preserves previous successful `data` while a request is pending or fails. Only the latest call updates hook state.
+**`useCallTool` result contract.** Every non-error result **resolves** and populates `data`. `structuredContent` is present and typed exactly when the tool declares an `outputSchema` — the server (via the official SDK) rejects non-error results from schema-backed tools that lack it, so a resolved result from a schema'd tool always carries it; tools without an `outputSchema` legitimately return content-only results (`Result = never`, no `structuredContent` guarantee). Rejections populate `error`:
+
+1. **`ToolError`** — the tool answered with `isError: true` (domain error; previous `data` preserved).
+2. **Transport / RPC / capability `Error`** — host lacks `serverTools`, network/RPC failure, etc.
+
+`InvalidToolResultError` never rejects `callTool`; it exists only on the view-bound result channel (`useToolContext`), where registration guarantees an `outputSchema` and a `structuredContent`-less non-error result is a genuine framework/host contract violation. The hook preserves previous successful `data` while a request is pending or fails. Only the latest call updates hook state.
 
 **`requestDisplayMode` resolves `void` by design** — the underlying `App.requestDisplayMode` returns the granted mode, but surfacing it would create a second source of truth that invites stashing the mode in state, where it goes stale the moment the host changes modes on its own (user exits fullscreen, mobile reflow). The hook's `displayMode` subscription is the single source of truth for the outcome; a denied request (or a mode outside `availableDisplayModes`) simply leaves it unchanged / rejects. `availableDisplayModes` is the intersection of normalized `viewConfig.displayModes` (always includes `"inline"`) and `hostContext.availableDisplayModes`; if the host omits available modes, only `"inline"` is requestable.
 
@@ -1090,7 +1092,6 @@ import { z } from "zod";
 import {
   ModelContext,
   ThemeProvider,
-  toolResultText,
   useCallTool,
   useDisplayMode,
   useHostContext,
@@ -1140,7 +1141,7 @@ function SearchResultContent() {
   }
 
   if (view.status === "error") {
-    return <ToolError message={view.error.message} kind={view.error.kind} />;
+    return <ErrorBanner message={view.error.message} />;
   }
 
   if (view.status === "pending") {
@@ -1168,11 +1169,11 @@ function SearchResultContent() {
       />
 
       {details.isPending && <Spinner />}
-      {details.data && !details.data.isError && (
-        <DetailsCard data={details.data.structuredContent} />
+      {details.error && (
+        <ErrorBanner message={details.error.message} />
       )}
-      {details.data?.isError && (
-        <ToolError message={toolResultText(details.data) ?? "Could not load fruit details."} />
+      {details.data && (
+        <DetailsCard data={details.data.structuredContent} />
       )}
 
       {availableDisplayModes.includes("fullscreen") && displayMode === "inline" && (
@@ -1221,7 +1222,7 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 | `useWidgetProps()`                                                                                      | `useToolContext()` — primary data API                                                       | bridge notifications → discriminated union                                   |
 | `useWidgetState()`                                                                                      | dropped — plain `useState` for local UI state; `ModelContext` for model visibility        | no host store in MCP Apps — see "Dropped from v1"                            |
 | `useWidgetTheme()`                                                                                      | `useViewTheme()`                                                                          | dedicated `hostcontextchanged` subscription                                  |
-| `useCallTool(name \| ref)`                                                                              | kept, typed via `Register`/`ToolRef`; `CallToolData` discriminates success vs tool error  | `App.callServerTool`                                                         |
+| `useCallTool(name \| ref)`                                                                              | kept, typed via `Register`/`ToolRef`; success-only `CallToolSuccess` data (typed `structuredContent` iff `outputSchema`); tool/transport errors reject | `App.callServerTool`                                                         |
 | *(no v1 equivalent)*                                                                                    | `useViewTool()` — view-registered tools the host/model calls (see View tools)             | `App.registerTool` + temporary-handler handoff + `tools/list_changed`        |
 | `<McpUseProvider>` (v1)                                                                                 | removed — compose `ThemeProvider` / `ViewControls` / own boundaries; bootstrap owns connection + top-level error boundary | `viewConfig` for auto-resize / display modes                                 |
 | `<ThemeProvider>`                                                                                       | kept                                                                                      | ext-apps `applyDocumentTheme` / `applyHostStyleVariables` / `applyHostFonts` |
@@ -1249,10 +1250,10 @@ The full build/serve contract is "Build system & serving", above; it extends the
 
 ## Testing
 
-- **Type-level** (`tests/type-level.test.ts` pattern): `ToolRef` name/input/output inference incl. non-zod Standard Schema libs; `ToolsFromModule` filtering and re-export composition; `useCallTool` name union + arg/result types and `CallToolData` success/error narrowing; empty-`Register` fallback; `structuredContent` vs `outputSchema` agreement at the return position; `useToolContext` discriminated union narrowing (`status === "ready"` → typed `toolOutput`; no `toolName` on any branch; `"streaming"` / `"cancelled"` → `DeepPartial` `toolInput`; `"cancelled"` → `reason`; `"error"` → `toolOutput` undefined, `error.kind` narrows tool vs invalid-result); input-schema vs output-schema type-source split (`toolInput` vs `toolOutput`); `DeepPartial` over arrays/nested objects; string / `ToolRef` / explicit-generic `useCallTool` overloads share the same result contract.
+- **Type-level** (`tests/type-level.test.ts` pattern): `ToolRef` name/input/output inference incl. non-zod Standard Schema libs; `ToolsFromModule` filtering and re-export composition; `useCallTool` name union + arg/result types and `CallToolSuccess` success-only data (`structuredContent` typed iff the tool declares an `outputSchema`; no guarantee for schema-less tools); empty-`Register` fallback; `structuredContent` vs `outputSchema` agreement at the return position; `useToolContext` discriminated union narrowing (`status === "ready"` → typed `toolOutput`; no `toolName` on any branch; `"streaming"` / `"cancelled"` → `DeepPartial` `toolInput`; `"cancelled"` → `reason`; `"error"` → `toolOutput` undefined, `error` is `ToolError | InvalidToolResultError` with `message`); input-schema vs output-schema type-source split (`toolInput` vs `toolOutput`); `DeepPartial` over arrays/nested objects; string / `ToolRef` / explicit-generic `useCallTool` overloads share the same result contract.
 - **e2e over HTTP** (official client): view resource listing/reading with correct mimetype and framework auto-CSP in `_meta.ui.*` on both `resources/list` entries and `resources/read` content items for all clients; `tools/list` includes every registered tool for all clients (including `visibility: "app"` tools with `_meta.ui.visibility: ["app"]`); `ui.visibility` emitted only when top-level `visibility` is set (any tool); **channel separation** — handler `{ structuredContent, content, _meta }` lands on the wire as `structuredContent` / `content` / `_meta` respectively, with handler `_meta` absent from everything model-facing; `_meta.ui.resourceUri` (plus legacy flat `"ui/resourceUri"`) auto-stamped on every non-error view-bound tool result; error results carry no resource-URI stamp; no custom tool-name metadata on results.
 - **Build/serve** (CLI-test pattern from `tests/cli/`, real `build` against a views fixture): manifest `views` map shape; the built wrapper entry primes registration with zero `fs` on the MCP path (list/read succeed with the built assets dir absent); the public route under `${basePath}/_mcp-use/public/` with correct cache headers and ACAO; document and assets HTTP routes are gone; per-request origin resolution (proxy headers, override) reflected in the `resources/read` body and content-item `_meta.ui.csp.resourceDomains`; serving origin auto-appended to `csp.resourceDomains`; the binding checks — `view.name` naming a missing view, a `view:` tool without `outputSchema`, and a second tool binding an already-bound view fail loudly naming both tools; a view directory no tool binds warns (build still succeeds, view still registered and readable via `resources/read`); external manifest entries reject non-`/`-prefixed paths.
-- **Bridge-level / runtime:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted while handshake is in progress (pending state); `tool-input-partial` sequence driving `useToolContext().status === "streaming"` with progressive `toolInput` on the same mounted component; complete `tool-input` returning to `"pending"` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); valid tool errors → `status: "error"` with `error.kind: "tool"` and `error.message` derived from text content (or `"Tool returned an error."`); missing `structuredContent` on a non-error result → `invalid-result`; mid-stream `tool-cancelled` → `"cancelled"` with optional `reason` and last partial still in `toolInput`; post-cancel / post-ready call-cycle resets; `useCallTool` distinguishes tool errors (resolve into `data`) from rejected calls (transport/capability/malformed → `error`), preserves previous `data` while pending/failing, and only the latest call updates state; capability checks prevent outbound requests lacking host support; split-hook channel isolation (tool changes do not rerender host/theme/display/action-only consumers and vice versa); **view tools** — App tools list is valid and empty before registration; first `useViewTool` registration emits `list_changed`; metadata can be cleared; unmount before connection / during registration is safe; **bootstrap / disposal** — default `autoResize: true`, `viewConfig.autoResize: false`, invalid view configuration rejected; same-root HMR bootstrap reuses runtime; changed HMR configuration warns; a second root throws; disposal unmounts React then closes transport; rebootstrap after disposal creates a fresh runtime; failed connection followed by successful retry; old connection generation cannot affect a newer connection; **model context** — empty parent preserves children; failed send remains dirty; in-flight updates coalesce; reconnect retries dirty context; disposal cancels stale completion; a view that never registers `ModelContext` sends no traffic; **size** — `useSendSizeChanged` delivers `ui/notifications/size-changed`; `viewConfig.autoResize: false` constructs the guest `App` without auto-resize.
+- **Bridge-level / runtime:** a minimal `AppBridge` (ext-apps host class, devDep) driving a built view — initialize handshake; default export mounted while handshake is in progress (pending state); `tool-input-partial` sequence driving `useToolContext().status === "streaming"` with progressive `toolInput` on the same mounted component; complete `tool-input` returning to `"pending"` then `tool-result` transitioning to `status === "ready"` with typed `toolOutput` and `content` (no component swap); valid tool errors → `status: "error"` with a `ToolError` instance and `error.message` derived from text content (or `"Tool returned an error."`); missing `structuredContent` on a non-error result → `InvalidToolResultError`; mid-stream `tool-cancelled` → `"cancelled"` with optional `reason` and last partial still in `toolInput`; post-cancel / post-ready call-cycle resets; `useCallTool` resolves every non-error result (including content-only results from schema-less tools) and rejects tool errors (`ToolError`) and transport/capability failures into `error` (success-only `data`), preserves previous `data` while pending/failing, and only the latest call updates state; capability checks prevent outbound requests lacking host support; split-hook channel isolation (tool changes do not rerender host/theme/display/action-only consumers and vice versa); **view tools** — App tools list is valid and empty before registration; first `useViewTool` registration emits `list_changed`; metadata can be cleared; unmount before connection / during registration is safe; **bootstrap / disposal** — default `autoResize: true`, `viewConfig.autoResize: false`, invalid view configuration rejected; same-root HMR bootstrap reuses runtime; changed HMR configuration warns; a second root throws; disposal unmounts React then closes transport; rebootstrap after disposal creates a fresh runtime; failed connection followed by successful retry; old connection generation cannot affect a newer connection; **model context** — empty parent preserves children; failed send remains dirty; in-flight updates coalesce; reconnect retries dirty context; disposal cancels stale completion; a view that never registers `ModelContext` sends no traffic; **size** — `useSendSizeChanged` delivers `ui/notifications/size-changed`; `viewConfig.autoResize: false` constructs the guest `App` without auto-resize.
 
 ## Deltas vs v1 (for the migration guide)
 
@@ -1260,7 +1261,7 @@ The full build/serve contract is "Build system & serving", above; it extends the
 2. `useWidgetProps()` → `useToolContext()` as the primary data API (`ToolContextHandle` five-status discriminated union including `error`, `toolOutput` not `props`; partial and complete args share `toolInput`); `useWidget()` → the split hooks (`useToolContext()` for data, `useHostContext()` for ambient host context, per-action hooks for bridge actions). Components mount once on bootstrap and branch on hook state — no props spread, no separate loading component export. Result payload is `structuredContent` only — v1's `toolInput` merge is gone (read input via `useToolContext().toolInput`, or echo input fields into the output schema for model visibility). Tool errors and invalid results are a dedicated `"error"` branch, never cast to typed `"ready"` output.
 3. View files default-export the component and may export immutable `viewConfig` (auto-resize / display modes). Result types come from `outputSchema` via `useToolContext<Name>()` (required on view-bound tools). Resource facts (description, CSP, permissions, domain, prefersBorder) are declared on the single binder's `view:` config and emitted on the resource. Each view binds at most one tool.
 4. In-component `isPending` skeleton branching → `useToolContext()` status branching (`pending` / `streaming` / `cancelled` / `ready` / `error`) inside the always-mounted default export.
-5. `useCallTool` types come from exporting tool refs, not from generated `.mcp-use/generated/tool-registry.d.ts`; template `postinstall`/dev-loop typegen is gone. `CallToolData` discriminates success vs valid tool error; transport/malformed failures reject.
+5. `useCallTool` types come from exporting tool refs, not from generated `.mcp-use/generated/tool-registry.d.ts`; template `postinstall`/dev-loop typegen is gone. `callTool` resolves every non-error result (`CallToolSuccess`; `structuredContent` typed iff the tool declares an `outputSchema`); `ToolError` and transport/RPC/capability failures reject.
 6. `useWidgetState` has no replacement hook — hold local UI state with React's `useState` (iframe lifetime only) and feed the model explicitly via `ModelContext`.
 7. `useFiles` removed (ChatGPT-only capability).
 8. `window.openai` is never consumed by the runtime; ChatGPT works through its native MCP Apps support.

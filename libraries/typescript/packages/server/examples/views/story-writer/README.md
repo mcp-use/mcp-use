@@ -35,8 +35,8 @@ a short summary (`title`, `wordCount`). The view uses
 - `"ready"` — final layout from complete `toolInput` plus `toolOutput.wordCount`
   (ready requires a non-error result with `structuredContent`).
 - `"cancelled"` — dimmed partial story plus `reason` when the host cancels.
-- `"error"` — tool failure (`error.kind === "tool"`) or malformed non-error
-  result (`error.kind === "invalid-result"`); both expose `error.message`;
+- `"error"` — tool failure (`instanceof ToolError`) or malformed non-error
+  result (`instanceof InvalidToolResultError`); both expose `error.message`;
   no typed `toolOutput`.
 
 To see it: run `pnpm dev` (`mcp-use dev`), open the inspector chat, and ask for

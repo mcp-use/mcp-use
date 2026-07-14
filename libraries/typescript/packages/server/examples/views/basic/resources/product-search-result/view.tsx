@@ -4,8 +4,8 @@ import {
   Image,
   ModelContext,
   ThemeProvider,
+  ToolError,
   ViewControls,
-  toolResultText,
   useCallTool,
   useDisplayMode,
   useOpenExternal,
@@ -203,7 +203,9 @@ function ProductSearchResultContent() {
     return (
       <div className={root} role="alert">
         <p className="m-0 font-medium">
-          {view.error.kind === "tool" ? "Search failed" : "Invalid tool result"}
+          {view.error instanceof ToolError
+            ? "Search failed"
+            : "Invalid tool result"}
         </p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {view.error.message}
@@ -223,14 +225,8 @@ function ProductSearchResultContent() {
   }
 
   const { query, items } = view.toolOutput;
-  const detailsData =
-    details.data !== undefined && details.data.isError !== true
-      ? details.data.structuredContent
-      : undefined;
-  const detailsErrorText =
-    details.data?.isError === true
-      ? (toolResultText(details.data) ?? "Could not load fruit details.")
-      : details.error?.message;
+  const detailsData = details.data?.structuredContent;
+  const detailsErrorText = details.error?.message;
 
   return (
     <div className={root}>
