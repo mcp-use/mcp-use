@@ -1,10 +1,10 @@
 ---
 name: Live typed useCallTool v2
-overview: "Three designs for live-typed useCallTool in mcp-use v2, all removing v1's fragile run-the-server typegen: Proposal A (exported ToolRefs + module-exports inference, server.tool() unchanged), Proposal B (server.tools() object literal, tRPC shape), and Proposal C (dev-integrated static typegen done correctly — TS-checker extraction, no code execution, committed output). Shared distribution mechanism, shared fallback ladder, full ecosystem references included for the decision."
+overview: "Decision record for live-typed useCallTool in mcp-use v2. DECIDED: Proposal A (exported ToolRefs + module-exports inference) is the primary mode, with Proposal C's typegen demoted to an explicit escape-hatch command — the contract lives in specs/VIEWS_SPEC.md § Typing. This document preserves the full option space (A/B/C), the shared machinery, and the ecosystem references behind that decision."
 todos:
   - id: decide-proposal
-    content: "Decide: Proposal A (exported ToolRefs) vs B (server.tools() literal) vs C (correct static typegen) — or A now, B/C later (they compose)"
-    status: pending
+    content: "Decide: Proposal A (exported ToolRefs) vs B (server.tools() literal) vs C (correct static typegen) — DECIDED: A primary, C demoted to escape hatch (see specs/VIEWS_SPEC.md § Typing)"
+    status: completed
   - id: registry-types
     content: Add Register interface + registry projection types in mcp-use/react (ToolsFromModule for A and/or map projection for B); wire useCallTool string overload with loose fallback when unregistered
     status: pending
@@ -12,13 +12,13 @@ todos:
     content: Ensure ToolRef output types come from outputSchema, falling back to handler-returned structuredContent inference
     status: pending
   - id: remove-typegen
-    content: Strip typegen from server startup/HMR/CLI build hot paths; keep generate-types as optional escape hatch; drop generated d.ts from template tsconfig
+    content: Strip typegen from server startup/HMR/CLI build hot paths; keep `mcp-use typegen` as optional escape hatch; drop generated d.ts from template tsconfig
     status: pending
   - id: templates
-    content: "Update create-mcp-use-app templates: chosen registration style in index.tsx, constant-content .mcp-use/register.d.ts (committed, in tsconfig include), widgets import useCallTool from mcp-use/react directly"
+    content: "Update create-mcp-use-app templates: chosen registration style in index.tsx, constant-content src/register.d.ts (committed, in tsconfig include), views import useCallTool from mcp-use/react directly"
     status: pending
   - id: typed-usewidget
-    content: Type useToolInfo/useWidget from the same registry via the tool's widget binding
+    content: Type useView/ViewProps from the same registry via the tool's view binding (contract in specs/VIEWS_SPEC.md § Typing)
     status: pending
   - id: type-tests-docs
     content: Type-level tests (expectTypeOf) for name union, input/output inference, filtering, composition, empty-Register fallback; docs + v1 migration note
@@ -42,13 +42,13 @@ TypeScript physics: without codegen, a type can cross a module boundary through 
 
 ## Shared machinery (identical in both proposals)
 
-**Distribution — constant-content `register.d.ts` (the `vite-env.d.ts` / `next-env.d.ts` precedent).** The template ships a hidden, committed, never-regenerated file:
+**Distribution — constant-content `register.d.ts` (the `vite-env.d.ts` / `next-env.d.ts` precedent).** The template ships a committed, never-regenerated file in the source tree (`src/register.d.ts` — it cannot live in the gitignored `.mcp-use/`):
 
 ```ts
-// .mcp-use/register.d.ts — content is constant; it names no tools, so it can never go stale
+// src/register.d.ts — content is constant; it names no tools, so it can never go stale
 declare module "mcp-use/react" {
   interface Register {
-    tools: typeof import("../index");
+    tools: typeof import("./index.js");
   }
 }
 ```
@@ -73,22 +73,22 @@ export type RegisteredTools = Register extends { tools: infer M }
 
 **Removed / kept:**
 - Remove from hot paths: `generateToolRegistryTypes` calls in `mcp-server.ts` (startup + HMR sync), `mount-widgets-dev.ts` watcher hooks, build-time `generateToolRegistryTypesForServer` in the CLI. Drop generated d.ts from template tsconfig.
-- Keep demoted: `mcp-use generate-types` as optional escape hatch for clients with no compile-time access to server source; never wired into dev/build/postinstall.
+- Keep demoted: `mcp-use typegen` as optional escape hatch for clients with no compile-time access to server source; never wired into dev/build/postinstall.
 
 **Bonus (same registry, second consumer):** type `useToolInfo`/`useWidget` by looking up the tool bound to the current widget (`widget.name` in the tool config types) — replaces today's `useWidget<HandWrittenProps>()` casts. Widget-name strings themselves are a filesystem fact and stay untyped (Skybridge codegens those; optional follow-up).
 
 ---
 
-## Proposal A — exported ToolRefs, `server.tool()` unchanged
+## Proposal A — exported ToolRefs, no new registration API
 
-Channel: **exported value declarations**, one per widget-callable tool. Builds directly on canary-v2's existing `ToolRef` (phantom `<Name, Input, Output>`, `{ name }` at runtime).
+Channel: **exported value declarations**, one per view-callable tool. `server.tool()` keeps its signature and returns a `ToolRef` (phantom `<Name, Input, Output>`, `{ name }` at runtime).
 
 ```tsx
-// index.tsx — today's API; the only change is `export const` on widget-callable tools
+// index.tsx — today's API; the only change is `export const` on view-callable tools
 const server = new MCPServer({ ... });
 
 export const searchFruits = server.tool(
-  { name: "search-fruits", schema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, widget: { name: "product-search-result" } },
+  { name: "search-fruits", schema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, view: { name: "product-search-result" } },
   async ({ query }) => view({ props: { ... } })
 );
 
@@ -122,14 +122,14 @@ const server = new MCPServer({ ... });
 
 export const tools = server.tools({
   "search-fruits": tool(
-    { schema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, widget: { name: "product-search-result" } },
+    { schema: z.object({ query: z.string().optional() }), outputSchema: resultsSchema, view: { name: "product-search-result" } },
     async ({ query }) => view({ props: { ... } })
   ),
   "get-fruit-details": tool({ schema: z.object({ fruit: z.string() }), outputSchema: detailsSchema }, handler),
 });
 ```
 
-`server.tools(map)` registers every entry through the existing `server.tool()` code path (supersedes v2's `defineTools`, whose handlers are currently untyped) and returns the map for `typeof`. The register d.ts extraction picks the map export out of the module type.
+`server.tools(map)` registers every entry through the existing `server.tool()` code path (replacing the earlier `defineTools` sketch, whose handlers were untyped) and returns the map for `typeof`. The register d.ts extraction picks the map export out of the module type.
 
 - Pro: single export; one place to see the whole tool surface; object spread composes (`server.tools({ ...fruitTools, ...orderTools })`); best-understood inference shape in the ecosystem (tRPC routers, proven at scale).
 - Pro: no per-tool export discipline; nothing can be "forgotten".
@@ -152,7 +152,7 @@ Channel: **generated file** — but the generator is a static analyzer, not v1's
 
 ```tsx
 // index.tsx — zero ceremony, exactly today's template
-server.tool({ name: "search-fruits", schema, outputSchema, widget: { name: "product-search-result" } }, handler);
+server.tool({ name: "search-fruits", schema, outputSchema, view: { name: "product-search-result" } }, handler);
 server.tool({ name: "get-fruit-details", schema, outputSchema }, handler);
 ```
 
@@ -172,10 +172,12 @@ server.tool({ name: "get-fruit-details", schema, outputSchema }, handler);
 
 ## Decision guidance
 
-- Choose **A** if API continuity with v1 and the official SDK matters most, and per-tool `export const` is acceptable. Recommended: it is the smaller delta (ToolRef already exists on canary-v2), imposes no structural opinion, and needs no running process for types.
+- Choose **A** if API continuity with v1 and the official SDK matters most, and per-tool `export const` is acceptable. It is the smaller delta (ToolRef is the planned `tool()` return type), imposes no structural opinion, and needs no running process for types.
 - Choose **B** if a canonical single tool map is worth a novel API — strongest guarantees (nothing forgettable), simplest mental model for the registry.
 - Choose **C** if zero user-facing ceremony trumps everything, and a dev/build-integrated generation step (with CI freshness check) is an acceptable cost. It is the only option that types bare statements and, later, filesystem facts like widget names.
 - They compose rather than exclude: A can ship first (pure inference core); B can be added later as sugar returning the same ToolRefs; C's generator can arrive afterwards as an *optional enhancement layer* that fills the same `Register` interface for projects that refuse exports — hooks, fallback, and distribution are identical across all three, so no consumer code ever changes.
+
+**Outcome:** A is the contract's primary mode; C is demoted to the explicit `mcp-use typegen` escape hatch, never on the dev/build hot path; B stays available as future sugar. The normative spelling — including the `src/register.d.ts` location (the scaffolded file is committed, so it cannot live in the gitignored `.mcp-use/`) and the absence of any config file — lives in `specs/VIEWS_SPEC.md` § Typing; where this record's sketches differ (e.g. `.mcp-use/register.d.ts` paths, `mcp-use.json`, v1 package file paths below), the spec wins.
 
 ---
 
@@ -199,20 +201,20 @@ server.tool({ name: "get-fruit-details", schema, outputSchema }, handler);
 - TS language-service plugins — [officially editor-only](https://github.com/microsoft/TypeScript/wiki/Writing-a-Language-Service-Plugin): "plugins aren't loaded during normal commandline typechecking"; cannot carry CI type-checking.
 - `typeof import()` / `import type` erasure — guaranteed elision from emitted JS (`verbatimModuleSyntax` makes it mechanical); the safety proof that widgets never bundle server code.
 
-## Files (mcp-use repo, branch off `canary-v2`)
+## Files (historical sketch — see the Outcome note above; `specs/VIEWS_SPEC.md` § Typing carries the normative file plan, which lives in `packages/server`, not the v1 packages listed here)
 
 - `libraries/typescript/packages/mcp-use/src/react/widget-types.ts` — `Register`, registry projection types (replace the codegen-era empty `ToolRegistry`).
 - `libraries/typescript/packages/mcp-use/src/react/useCallTool.ts` — string overload keyed off `RegisteredTools`; keep ToolRef + explicit-generic overloads.
 - `libraries/typescript/packages/mcp-use/src/react/createTypedHooks.ts` — rework to module-type input (cross-repo alternative path).
 - `libraries/typescript/packages/mcp-use/src/server/types/tool-ref.ts` + `mcp-server.ts` — ToolRef output inference (outputSchema, handler-return fallback); strip typegen calls; Proposal B adds `server.tools()` + `tool()` builder here.
 - `libraries/typescript/packages/cli/src/index.ts` — strip typegen from build.
-- `libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/*` — chosen registration style in `index.tsx`, `.mcp-use/register.d.ts` (committed, in tsconfig `include`), widgets importing hooks from `mcp-use/react`.
+- `libraries/typescript/packages/create-mcp-use-app/src/templates/mcp-apps/*` — chosen registration style in `index.tsx`, committed `src/register.d.ts` (in tsconfig `include`), views importing hooks from `mcp-use/react`.
 - Proposal C only: new `libraries/typescript/packages/cli/src/typegen/` — ts-morph-based extractor (find ToolRef-returning calls, print via `typeToString`), Vite-plugin watcher integration, `mcp-use check` freshness command; replaces `tool-registry-generator.ts` + `zod-to-ts.ts` entirely.
 - Type-level tests with vitest `expectTypeOf` (Skybridge has a good reference suite): literal name union, input/output inference, filtering of non-ToolRef exports, composition (re-exports for A, spread for B), empty-Register fallback.
 
 ## Risks / notes
 
 - A only: forgotten `export const` silently untypes that tool (falls back to loose overload) — template habit + optional lint.
-- `register.d.ts` hardcodes the entry path; renaming the entry surfaces immediately in tsserver and is a one-line fix (`mcp-use.json`'s `entry` keeps scaffold and file in sync at creation).
+- `register.d.ts` hardcodes the entry path; renaming the entry surfaces immediately in tsserver and is a one-line fix at scaffold time (there is no config file to keep in sync — CLI_SPEC.md).
 - TS perf: bounded by the thin `{ input; output }` projection + lazy object-property evaluation (tRPC lesson); Zod inference is the dominant per-tool cost, acceptable.
-- The server entry must resolve within the widget TS program — already true in the v2 template (single tsconfig includes `index.tsx`, `resources/**`, `.mcp-use/**/*.d.ts`).
+- The server entry must resolve within the view TS program — true in the planned template shape (single tsconfig includes the entry, `resources/**`, and `src/register.d.ts`).

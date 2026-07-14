@@ -2,34 +2,76 @@
  * e2e tests for runDev: a real Vite dev server + module runner serving the
  * fixture over HTTP, including edit-triggered reload and error resilience.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDev } from "../../src/cli/index.js";
 import {
   copyFixture,
   getFreePort,
   listToolNames,
+  mcpRequest,
   occupyPort,
   removeDir,
   waitFor,
 } from "./helpers.js";
 
+// Controllable tunnel state: the real manager spawns `npx @mcp-use/tunnel`.
+// Tests flip `url` to pin the tunnel-gated CORS contract on Vite module URLs.
+const tunnelState = vi.hoisted(() => ({ url: null as string | null }));
+vi.mock("../../src/cli/tunnel.js", () => ({
+  createTunnelManager: () => ({
+    start: async (port: number) => {
+      tunnelState.url = `https://fake.local.mcp-use.run`;
+      void port;
+      return { url: tunnelState.url, subdomain: "fake" };
+    },
+    stop: async () => {
+      tunnelState.url = null;
+    },
+    status: () => ({ url: tunnelState.url }),
+  }),
+}));
+
 interface DevHandle {
   url: string;
+  logs: readonly string[];
   stop: () => Promise<void>;
 }
 
 const cleanups: (() => Promise<void> | void)[] = [];
+let originalMcpUrl: string | undefined;
+let originalPort: string | undefined;
+
+beforeEach(() => {
+  originalMcpUrl = process.env["MCP_URL"];
+  originalPort = process.env["PORT"];
+});
+
 afterEach(async () => {
+  tunnelState.url = null;
   while (cleanups.length > 0) {
     await cleanups.pop()?.();
+  }
+  if (originalMcpUrl === undefined) {
+    delete process.env["MCP_URL"];
+  } else {
+    process.env["MCP_URL"] = originalMcpUrl;
+  }
+  if (originalPort === undefined) {
+    delete process.env["PORT"];
+  } else {
+    process.env["PORT"] = originalPort;
   }
 });
 
 /** Start runDev in-process and wait for the ready log to learn the URL. */
-async function startDev(cwd: string, port: number): Promise<DevHandle> {
+async function startDev(
+  cwd: string,
+  port: number,
+  host?: string
+): Promise<DevHandle> {
   const lines: string[] = [];
   const logSpy = vi
     .spyOn(console, "log")
@@ -38,7 +80,12 @@ async function startDev(cwd: string, port: number): Promise<DevHandle> {
     });
 
   const controller = new AbortController();
-  const done = runDev({ cwd, port, signal: controller.signal });
+  const done = runDev({
+    cwd,
+    port,
+    ...(host !== undefined && { host }),
+    signal: controller.signal,
+  });
   // Surface startup failures instead of hanging in waitFor.
   let startupError: unknown;
   done.catch((error: unknown) => (startupError = error));
@@ -52,6 +99,7 @@ async function startDev(cwd: string, port: number): Promise<DevHandle> {
     if (url === undefined) throw new Error(`no URL in: ${endpointLine}`);
     return {
       url,
+      logs: lines,
       stop: async () => {
         controller.abort();
         await done;
@@ -64,6 +112,40 @@ async function startDev(cwd: string, port: number): Promise<DevHandle> {
     await done.catch(() => {});
     throw error;
   }
+}
+
+function writeOAuthEntry(cwd: string, basePath = "/mcp"): void {
+  writeFileSync(
+    join(cwd, "src", "index.ts"),
+    `import { MCPServer } from "@mcp-use/server";
+import { oauthCustomProvider } from "@mcp-use/server/oauth";
+
+const oauth = oauthCustomProvider({
+  createTokenVerifier: (resource) => ({
+    verifyAccessToken: async (token) => ({
+      token,
+      clientId: "cli-dev-test",
+      scopes: [],
+      expiresAt: Date.now() / 1000 + 60,
+      resource,
+    }),
+  }),
+  oauthMetadata: { issuer: "https://issuer.example.test" },
+  mapAuthInfo: () => ({
+    user: { id: "user-1" },
+    payload: { sub: "user-1" },
+    permissions: [],
+  }),
+});
+
+export default new MCPServer({
+  name: "oauth-cli-dev-test",
+  version: "1.0.0",
+  basePath: "${basePath}",
+  oauth,
+});
+`
+  );
 }
 
 describe("runDev", () => {
@@ -86,7 +168,7 @@ describe("runDev", () => {
       source.replace(
         "export default server;",
         `server.tool(
-  { name: "subtract", description: "Subtract", schema: z.object({ a: z.number(), b: z.number() }) },
+  { name: "subtract", description: "Subtract", inputSchema: z.object({ a: z.number(), b: z.number() }) },
   async ({ a, b }) => ({ content: [{ type: "text", text: String(a - b) }] })
 );
 export default server;`
@@ -117,9 +199,7 @@ export default server;`
 
     const port = await getFreePort();
     const blocker = await occupyPort(port);
-    cleanups.push(
-      () => new Promise<void>((r) => blocker.close(() => r()))
-    );
+    cleanups.push(() => new Promise<void>((r) => blocker.close(() => r())));
 
     const dev = await startDev(cwd, port);
     cleanups.push(dev.stop);
@@ -127,6 +207,155 @@ export default server;`
     const boundPort = Number(new URL(dev.url).port);
     expect(boundPort).toBeGreaterThan(port);
     expect(await listToolNames(dev.url)).toEqual(["add"]);
+  });
+
+  it("uses the actual local listener origin for OAuth entries", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd, "/api/mcp");
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const metadata = await fetch(
+      `http://localhost:${port}/.well-known/oauth-protected-resource/api/mcp`
+    );
+    expect(metadata.status).toBe(200);
+    expect(((await metadata.json()) as { resource: string }).resource).toBe(
+      `http://localhost:${port}/api/mcp`
+    );
+    expect(process.env["MCP_URL"]).toBeUndefined();
+    expect(process.env["PORT"]).toBe(String(port));
+  });
+
+  it("uses the probed local port as the OAuth resource", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth-port");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd);
+
+    const requestedPort = await getFreePort();
+    const blocker = await occupyPort(requestedPort);
+    cleanups.push(
+      () => new Promise<void>((resolve) => blocker.close(() => resolve()))
+    );
+
+    const dev = await startDev(cwd, requestedPort);
+    cleanups.push(dev.stop);
+    const actualPort = Number(new URL(dev.url).port);
+
+    expect(actualPort).toBeGreaterThan(requestedPort);
+    const metadata = await fetch(
+      `http://localhost:${actualPort}/.well-known/oauth-protected-resource/mcp`
+    );
+    expect(((await metadata.json()) as { resource: string }).resource).toBe(
+      `http://localhost:${actualPort}/mcp`
+    );
+    expect(process.env["MCP_URL"]).toBeUndefined();
+  });
+
+  it("preserves an explicit MCP_URL for OAuth entries", async () => {
+    process.env["MCP_URL"] = "https://configured.example.test";
+    const cwd = copyFixture("dev-oauth-explicit-resource");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd);
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const metadata = await fetch(
+      `http://localhost:${port}/.well-known/oauth-protected-resource/mcp`
+    );
+    expect(((await metadata.json()) as { resource: string }).resource).toBe(
+      "https://configured.example.test/mcp"
+    );
+    expect(process.env["MCP_URL"]).toBe("https://configured.example.test");
+  });
+
+  it("does not leak a synthetic MCP_URL when startup fails", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth-startup-failure");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd);
+    writeFileSync(
+      join(cwd, "src", "index.ts"),
+      `${readFileSync(join(cwd, "src", "index.ts"), "utf8")}
+throw new Error("startup failure after MCPServer construction");
+`
+    );
+
+    await expect(runDev({ cwd, port: await getFreePort() })).rejects.toThrow(
+      "startup failure after MCPServer construction"
+    );
+    expect(process.env["MCP_URL"]).toBeUndefined();
+  });
+
+  it("does not reuse a prior run's local OAuth identity", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth-sequential-runs");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd);
+
+    const firstPort = await getFreePort();
+    const first = await startDev(cwd, firstPort);
+    const firstMetadata = await fetch(
+      `http://localhost:${firstPort}/.well-known/oauth-protected-resource/mcp`
+    );
+    expect(
+      ((await firstMetadata.json()) as { resource: string }).resource
+    ).toBe(`http://localhost:${firstPort}/mcp`);
+    await first.stop();
+    expect(process.env["MCP_URL"]).toBeUndefined();
+
+    const secondPort = await getFreePort();
+    const second = await startDev(cwd, secondPort);
+    cleanups.push(second.stop);
+    const secondMetadata = await fetch(
+      `http://localhost:${secondPort}/.well-known/oauth-protected-resource/mcp`
+    );
+    expect(
+      ((await secondMetadata.json()) as { resource: string }).resource
+    ).toBe(`http://localhost:${secondPort}/mcp`);
+    expect(process.env["MCP_URL"]).toBeUndefined();
+  });
+
+  it("uses the same canonical local resource after reload", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth-reload");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd, "/api/mcp");
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+    const entry = join(cwd, "src", "index.ts");
+    writeFileSync(entry, `${readFileSync(entry, "utf8")}\n// reload\n`);
+    await waitFor(async () =>
+      dev.logs.includes("[mcp-use] reloaded server entry") ? true : undefined
+    );
+
+    const metadata = await fetch(
+      `http://localhost:${port}/.well-known/oauth-protected-resource/api/mcp`
+    );
+    expect(((await metadata.json()) as { resource: string }).resource).toBe(
+      `http://localhost:${port}/api/mcp`
+    );
+    expect(process.env["MCP_URL"]).toBeUndefined();
+  });
+
+  it("does not configure OAuth from a public listener or request Host", async () => {
+    delete process.env["MCP_URL"];
+    const cwd = copyFixture("dev-oauth-public");
+    cleanups.push(() => removeDir(cwd));
+    writeOAuthEntry(cwd);
+
+    await expect(
+      runDev({ cwd, port: await getFreePort("0.0.0.0"), host: "0.0.0.0" })
+    ).rejects.toThrow("OAuth requires an explicit resource or MCP_URL");
+    expect(process.env["MCP_URL"]).toBeUndefined();
   });
 
   it("rejects an entry without a default MCPServer export", async () => {
@@ -139,4 +368,387 @@ export default server;`
       /export default server/
     );
   });
+
+  // DNS-rebinding protection: the dev listener validates Host/Origin on
+  // localhost binds before any routing — same posture as MCPServer.listen()
+  // (CLI_SPEC.md § dev). Raw node:http requests because fetch() sanitizes
+  // Host/Origin headers.
+  it("rejects non-localhost Host and Origin headers (DNS rebinding)", async () => {
+    const cwd = copyFixture("dev-rebind");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    // MCP endpoint: rebound Host and cross-site Origin are both rejected.
+    expect(await rawStatus(dev.url, { host: "evil.example.com" })).toBe(403);
+    expect(
+      await rawStatus(dev.url, { origin: "https://evil.example.com" })
+    ).toBe(403);
+    expect(
+      await rawStatus(dev.url, { origin: `http://localhost:${port}` })
+    ).not.toBe(403);
+
+    // Dev API routes sit in front of the MCP handler and must be covered by
+    // the same check (starting a tunnel would expose the server publicly).
+    const infoUrl = `${dev.url}/inspector/api/dev/info`;
+    expect(
+      await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")
+    ).toBe(403);
+    expect(await rawStatus(infoUrl, {}, "GET")).toBe(200);
+
+    // GET/HEAD are exempt from the Origin check (Host still validated):
+    // opaque-origin view iframes fetch modules/assets with `Origin: null`.
+    expect(await rawStatus(infoUrl, { origin: "null" }, "GET")).toBe(200);
+    expect(await rawStatus(dev.url, { origin: "null" })).toBe(403);
+  });
+});
+
+/** Issue a raw request with unsanitized headers; resolves with the status. */
+async function rawStatus(
+  target: string,
+  headers: Record<string, string>,
+  method: "POST" | "GET" = "POST"
+): Promise<number> {
+  const { request } = await import("node:http");
+  const body =
+    method === "POST"
+      ? JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/list",
+          params: {},
+        })
+      : undefined;
+  return new Promise((resolve, reject) => {
+    const req = request(
+      target,
+      {
+        method,
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          ...(body !== undefined && {
+            "content-length": Buffer.byteLength(body),
+          }),
+          ...headers,
+        },
+      },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode ?? 0));
+      }
+    );
+    req.on("error", reject);
+    if (body !== undefined) req.write(body);
+    req.end();
+  });
+}
+
+describe("runDev (views)", () => {
+  it("serves view documents, virtual entries, and reloads on view add", async () => {
+    const cwd = copyFixture("dev-views", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const base = dev.url.replace(/\/mcp$/, "");
+
+    const readBody = await mcpRequest(dev.url, "resources/read", {
+      uri: "ui://views/product-search-result.html",
+    }, { ui: true });
+    const docHtml = (
+      readBody["result"] as { contents: { text: string }[] }
+    ).contents[0]!.text;
+    expect(docHtml).toContain('id="root"');
+    expect(docHtml).toContain("/@vite/client");
+    expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
+
+    const virtualMatch = /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
+      docHtml
+    );
+    expect(virtualMatch).not.toBeNull();
+    const virtualUrl = new URL(virtualMatch![1]!, base).href;
+    const virtualResponse = await fetch(virtualUrl);
+    expect(virtualResponse.status).toBe(200);
+    const virtualJs = await virtualResponse.text();
+    expect(virtualJs).toMatch(/bootstrapView/);
+    expect(virtualJs).toContain("import * as viewModule from");
+    expect(virtualJs).toContain("bootstrapView(viewModule)");
+
+    // Vite module CORS (CLI_SPEC.md § DNS-rebinding protection):
+    // without a tunnel, a validated loopback Origin is reflected exactly
+    // (with Vary: Origin) so a local MCP host can load the module graph…
+    const loopbackOrigin = "http://localhost:6274";
+    const loopbackResponse = await fetch(virtualUrl, {
+      headers: { origin: loopbackOrigin },
+    });
+    expect(loopbackResponse.status).toBe(200);
+    expect(loopbackResponse.headers.get("access-control-allow-origin")).toBe(
+      loopbackOrigin
+    );
+    expect(loopbackResponse.headers.get("vary")).toMatch(/Origin/i);
+
+    // …while foreign, opaque (`null`), and missing Origin get no ACAO…
+    const foreignResponse = await fetch(virtualUrl, {
+      headers: { origin: "https://host.example" },
+    });
+    expect(foreignResponse.status).toBe(200);
+    expect(
+      foreignResponse.headers.get("access-control-allow-origin")
+    ).toBeNull();
+
+    const nullOriginResponse = await fetch(virtualUrl, {
+      headers: { origin: "null" },
+    });
+    expect(nullOriginResponse.status).toBe(200);
+    expect(
+      nullOriginResponse.headers.get("access-control-allow-origin")
+    ).toBeNull();
+
+    const noOriginResponse = await fetch(virtualUrl);
+    expect(noOriginResponse.status).toBe(200);
+    expect(
+      noOriginResponse.headers.get("access-control-allow-origin")
+    ).toBeNull();
+
+    // …and `*` while a tunnel is active, since hosts rendering through it
+    // fetch modules in CORS mode from their own (or opaque) origins.
+    tunnelState.url = "https://fake.local.mcp-use.run";
+    const tunneledResponse = await fetch(virtualUrl, {
+      headers: { origin: "https://host.example" },
+    });
+    expect(tunneledResponse.status).toBe(200);
+    expect(tunneledResponse.headers.get("access-control-allow-origin")).toBe(
+      "*"
+    );
+
+    const viewModuleResponse = await fetch(
+      `${base}/resources/product-search-result/view.tsx`
+    );
+    expect(viewModuleResponse.status).toBe(200);
+
+    const assetImportResponse = await fetch(
+      `${base}/resources/product-search-result/badge.png?import`
+    );
+    expect(assetImportResponse.status).toBe(200);
+    const assetImportJs = await assetImportResponse.text();
+    // Vite `server.origin` is the browsable origin: `localhost`, not the
+    // 127.0.0.1 bind address (VIEWS_SPEC.md § Dev).
+    expect(assetImportJs).toMatch(
+      new RegExp(`http://localhost:${port}/resources/product-search-result/badge\\.png`)
+    );
+
+    const publicResponse = await fetch(
+      `${base}/mcp/_mcp-use/public/test.txt`
+    );
+    expect(publicResponse.status).toBe(200);
+    expect(publicResponse.headers.get("cache-control")).toBe(
+      "public, max-age=0, must-revalidate"
+    );
+    expect(await publicResponse.text()).toBe("public-fixture\n");
+
+    const docConfigMatch = /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(
+      docHtml
+    );
+    expect(docConfigMatch).not.toBeNull();
+    expect(docConfigMatch![1]).toBe(
+      `http://localhost:${port}/mcp/_mcp-use/public/`
+    );
+
+    const toolsBody = await mcpRequest(dev.url, "tools/list", {}, { ui: true });
+    const searchTool = (
+      toolsBody["result"] as {
+        tools: { name: string; _meta?: Record<string, unknown> }[];
+      }
+    ).tools.find((t) => t.name === "search-products");
+    expect(searchTool?._meta?.["ui"]).toMatchObject({
+      resourceUri: "ui://views/product-search-result.html",
+    });
+
+    const resourcesBody = await mcpRequest(
+      dev.url,
+      "resources/list",
+      {},
+      { ui: true }
+    );
+    const viewResource = (
+      resourcesBody["result"] as {
+        resources: {
+          uri: string;
+          _meta?: Record<string, unknown>;
+        }[];
+      }
+    ).resources.find((r) => r.uri === "ui://views/product-search-result.html");
+    const connectDomains = (
+      viewResource?._meta?.["ui"] as
+        | { csp?: { connectDomains?: string[] } }
+        | undefined
+    )?.csp?.connectDomains;
+    expect(connectDomains).toEqual(
+      expect.arrayContaining([`ws://localhost:${port}`])
+    );
+
+    mkdirSync(join(cwd, "resources", "extra-view"), { recursive: true });
+    writeFileSync(
+      join(cwd, "resources", "extra-view", "view.tsx"),
+      `export default function Extra() { return <div>extra</div>; }\n`
+    );
+
+    await waitFor(async () => {
+      const list = await mcpRequest(dev.url, "resources/list", {}, { ui: true });
+      const uris = (list["result"] as { resources: { uri: string }[] }).resources.map(
+        (r) => r.uri
+      );
+      return uris.includes("ui://views/extra-view.html") ? true : undefined;
+    });
+  }, 60_000);
+
+  it("hot-updates a view.tsx edit without a full document reload", async () => {
+    // Regression: without React Fast Refresh (auto-injected
+    // @vitejs/plugin-react + the refresh preamble in the virtual entry),
+    // every view.tsx edit fell back to Vite `full-reload` — reloading the
+    // srcdoc iframe document and wiping all view state.
+    const cwd = copyFixture("dev-views-hmr", "views");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+    const base = dev.url.replace(/\/mcp$/, "");
+
+    // The virtual entry pins the Fast Refresh contract: preamble first,
+    // self-accept last.
+    const entryResponse = await fetch(
+      `${base}/@id/__x00__virtual:mcp-use/views/product-search-result`
+    );
+    expect(entryResponse.status).toBe(200);
+    const entryJs = await entryResponse.text();
+    expect(entryJs).toContain("@vitejs/plugin-react/preamble");
+    expect(entryJs).toContain("import.meta.hot.accept()");
+    expect(entryJs).toContain("import * as viewModule from");
+    expect(entryJs).toContain("bootstrapView(viewModule)");
+
+    // Populate the client module graph the way a browser loading the view
+    // document would: fetch each module and, recursively, its static
+    // imports. A 504 is Vite's "outdated optimize dep" — retry like a
+    // browser reload of the request would.
+    const seen = new Set<string>();
+    const loadModule = async (url: string): Promise<void> => {
+      const abs = url.startsWith("http") ? url : `${base}${url}`;
+      if (seen.has(abs) || seen.size > 60) return;
+      seen.add(abs);
+      let response = await fetch(abs);
+      if (response.status === 504) {
+        response = await fetch(abs);
+      }
+      if (!response.ok) return;
+      const js = await response.text();
+      const imports = [...js.matchAll(/from\s+"([^"]+)"|import\s+"([^"]+)"/g)]
+        .map((m) => m[1] ?? m[2])
+        .filter((s): s is string => s !== undefined && s.startsWith("/"));
+      for (const specifier of imports) {
+        await loadModule(specifier);
+      }
+    };
+    await loadModule("/@id/__x00__virtual:mcp-use/views/product-search-result");
+    const viewModule = await fetch(
+      `${base}/resources/product-search-result/view.tsx`
+    );
+    // Fast Refresh wrapped the view component module.
+    expect(await viewModule.text()).toContain("RefreshRuntime");
+
+    const messages: { type: string; updates?: { path: string }[] }[] = [];
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+    ws.addEventListener("message", (event) => {
+      messages.push(
+        JSON.parse(String(event.data)) as (typeof messages)[number]
+      );
+    });
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve());
+      ws.addEventListener("error", () =>
+        reject(new Error("HMR websocket failed to connect"))
+      );
+    });
+    cleanups.push(() => ws.close());
+
+    // Let any dep-optimizer churn from the initial module loads settle so
+    // the assertion window only contains the edit's own messages.
+    await new Promise((r) => setTimeout(r, 1000));
+    messages.length = 0;
+
+    const viewPath = join(
+      cwd,
+      "resources",
+      "product-search-result",
+      "view.tsx"
+    );
+    const viewSource = readFileSync(viewPath, "utf8");
+    writeFileSync(viewPath, viewSource.replace("results", "hot-results"));
+
+    const update = await waitFor(async () =>
+      messages.find(
+        (m) =>
+          m.type === "update" &&
+          m.updates?.some((u) => u.path.endsWith("/view.tsx"))
+      )
+    );
+    expect(update).toBeDefined();
+    expect(messages.filter((m) => m.type === "full-reload")).toEqual([]);
+  }, 60_000);
+
+  it("runs two dev servers concurrently with HMR on each main port", async () => {
+    // Regression: the HMR websocket must ride the main HTTP listener
+    // (server.hmr.server), not a fixed side port — a hardcoded HMR port made
+    // the second concurrent `mcp-use dev` process fail to bind.
+    const cwdA = copyFixture("dev-views-a", "views");
+    const cwdB = copyFixture("dev-views-b", "views");
+    cleanups.push(() => removeDir(cwdA), () => removeDir(cwdB));
+
+    const portA = await getFreePort();
+    const devA = await startDev(cwdA, portA);
+    cleanups.push(devA.stop);
+    const portB = await getFreePort();
+    const devB = await startDev(cwdB, portB);
+    cleanups.push(devB.stop);
+
+    // Vite's HMR client speaks the `vite-hmr` subprotocol and greets with a
+    // `connected` message; an upgrade succeeding on the MAIN port proves the
+    // websocket shares the one listener.
+    const probeHmr = async (port: number): Promise<string> =>
+      new Promise((resolve, reject) => {
+        const ws = new WebSocket(`ws://127.0.0.1:${port}/`, "vite-hmr");
+        const timer = setTimeout(() => {
+          ws.close();
+          reject(new Error(`no HMR greeting on port ${port}`));
+        }, 10_000);
+        ws.addEventListener("message", (event) => {
+          clearTimeout(timer);
+          ws.close();
+          resolve(String(event.data));
+        });
+        ws.addEventListener("error", () => {
+          clearTimeout(timer);
+          reject(new Error(`websocket upgrade failed on port ${port}`));
+        });
+      });
+
+    expect(await probeHmr(portA)).toContain("connected");
+    expect(await probeHmr(portB)).toContain("connected");
+
+    // Both servers keep serving MCP + view documents side by side.
+    for (const dev of [devA, devB]) {
+      const readBody = await mcpRequest(dev.url, "resources/read", {
+        uri: "ui://views/product-search-result.html",
+      }, { ui: true });
+      const docHtml = (
+        readBody["result"] as { contents: { text: string }[] }
+      ).contents[0]!.text;
+      expect(docHtml).toContain("/@vite/client");
+    }
+  }, 90_000);
 });

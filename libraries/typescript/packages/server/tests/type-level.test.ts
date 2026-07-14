@@ -123,3 +123,70 @@ describe("template variable inference", () => {
     expect(true).toBe(true); // assertions above are compile-time
   });
 });
+
+describe("ToolRef inference", () => {
+  it("carries literal name and inferred input/output from zod schemas", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    const ref = server.tool(
+      {
+        name: "search-fruits",
+        inputSchema: z.object({ query: z.string().optional() }),
+        outputSchema: z.object({
+          query: z.string(),
+          items: z.array(z.object({ id: z.string() })),
+        }),
+      },
+      async () => ({
+        content: [{ type: "text", text: "ok" }],
+        structuredContent: { query: "", items: [] },
+      })
+    );
+    expectTypeOf(ref.name).toEqualTypeOf<"search-fruits">();
+    expect(ref.name).toBe("search-fruits");
+  });
+
+  it("infers input from the schema alias when inputSchema is omitted", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    const ref = server.tool(
+      {
+        name: "alias-input",
+        schema: z.object({ id: z.string() }),
+      },
+      async ({ id }) => ({
+        content: [{ type: "text", text: id }],
+      })
+    );
+    expectTypeOf(ref.name).toEqualTypeOf<"alias-input">();
+    expect(ref.name).toBe("alias-input");
+  });
+});
+
+describe("view-bound tool return-position checks", () => {
+  const outputSchema = z.object({ answer: z.number() });
+
+  it("accepts matching structuredContent and is assignable to ToolResult", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.tool({ name: "with-view", outputSchema }, async () => ({
+      content: [{ type: "text", text: "forty-two" }],
+      structuredContent: { answer: 42 },
+    }));
+    const result: ToolResult<{ answer: number }> = {
+      structuredContent: { answer: 1 },
+      content: [{ type: "text", text: "one" }],
+    };
+    expect(result.structuredContent).toEqual({ answer: 1 });
+  });
+
+  it("rejects structuredContent that disagrees with the tool outputSchema", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    server.tool(
+      { name: "mismatch", outputSchema },
+      // @ts-expect-error — structuredContent must match outputSchema at the return position
+      async () => ({
+        content: [{ type: "text", text: "bad" }],
+        structuredContent: { answer: "not a number" },
+      })
+    );
+    expect(true).toBe(true);
+  });
+});

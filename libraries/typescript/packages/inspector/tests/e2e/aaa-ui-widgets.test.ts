@@ -5,6 +5,7 @@ import {
   navigateToTools,
   warmWidgets,
 } from "./helpers/connection";
+import { getMcpAppsGuestFrame } from "./helpers/debugger-tools";
 import { getTestMatrix } from "./helpers/test-matrix";
 
 test.describe("Conformance UI widgets - Tools Tab", () => {
@@ -27,7 +28,7 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
     await warmWidgets(page, ["get-weather-delayed", "apps-sdk-only-card"]);
   });
 
-  test("get-weather-delayed - should show weather widget in both Apps SDK and MCP Apps tabs", async ({
+  test("get-weather-delayed - should show weather widget via MCP Apps", async ({
     page,
   }) => {
     await page.getByTestId("tool-item-get-weather-delayed").click();
@@ -43,44 +44,32 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
 
     await page.getByTestId("tool-execution-execute-button").click();
 
-    // Tab 1: MCP Apps (default active tab after execution)
+    // MCP Apps is the only component view (no ChatGPT/Apps SDK tab)
     await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
       timeout: 10000,
     });
+    await expect(
+      page.getByTestId("tool-result-view-chatgpt-app")
+    ).not.toBeVisible();
 
-    // Tab 2: Apps SDK - click to verify pending state while tool executes (10s delay)
-    await page.getByTestId("tool-result-view-chatgpt-app").click();
-    const appsSdkFrame = page.frameLocator(
-      'iframe[title^="OpenAI Component: get-weather-delayed"]'
-    );
+    const mcpAppsGuest = getMcpAppsGuestFrame(page, "get-weather-delayed");
 
-    // Test pending state: loader should be visible while tool is executing (10s delay)
-    const spinner = appsSdkFrame.locator('[class*="animate-spin"]').first();
+    // Pending state: guest widget shows spinner while tool executes (10s delay)
+    const spinner = mcpAppsGuest.locator('[class*="animate-spin"]').first();
     await expect(spinner).toBeVisible({ timeout: 10000 });
 
     // Wait for loader to disappear and content to appear (10s delay + buffer)
     await expect(spinner).not.toBeVisible({ timeout: 15000 });
-    await expect(appsSdkFrame.getByText(/tokyo/i)).toBeVisible();
-    await expect(appsSdkFrame.getByText("Partly Cloudy")).toBeVisible();
-    await expect(appsSdkFrame.getByText(/22/)).toBeVisible();
-
-    // Back to Tab 1: MCP Apps - double iframe (outer proxy, inner guest)
-    await page.getByTestId("tool-result-view-mcp-apps").click();
-    const mcpAppsOuter = page.frameLocator(
-      'iframe[title^="MCP App: get-weather-delayed"]'
-    );
-    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
-    await expect(mcpAppsGuest.getByText(/tokyo/i)).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(mcpAppsGuest.getByText(/tokyo/i)).toBeVisible();
     await expect(mcpAppsGuest.getByText("Partly Cloudy")).toBeVisible();
     await expect(mcpAppsGuest.getByText(/22/)).toBeVisible();
   });
 
-  test("apps-sdk-only-card - should show Apps SDK only widget", async ({
+  test("apps-sdk-only-card - should fall back to raw JSON (no MCP Apps widget)", async ({
     page,
   }) => {
-    // Tool name from resources/ may be apps-sdk-only-card (confirm at runtime)
+    // Fixture declares only openai/outputTemplate (no _meta.ui.resourceUri).
+    // Inspector must NOT emulate ChatGPT — show raw/JSON result only.
     const toolItem = page.getByTestId("tool-item-apps-sdk-only-card");
     await toolItem.click();
     await expect(
@@ -95,19 +84,29 @@ test.describe("Conformance UI widgets - Tools Tab", () => {
 
     await page.getByTestId("tool-execution-execute-button").click();
 
-    await expect(page.getByTestId("tool-result-maximize")).toBeVisible({
+    // Non-UI results show Formatted/Raw toggles (no maximize / no component tab)
+    await expect(page.getByRole("heading", { name: "Response" })).toBeVisible({
       timeout: 10000,
     });
+    await expect(page.getByRole("button", { name: "Formatted" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Raw" })).toBeVisible();
 
-    const widgetFrame = page.frameLocator(
-      'iframe[title^="OpenAI Component: apps-sdk-only-card"]'
-    );
-    // Default or custom message (regex can match multiple elements; assert first match)
+    // No MCP Apps frame and no ChatGPT tab
+    await expect(page.getByTestId("mcp-app-frame")).not.toBeVisible();
     await expect(
-      widgetFrame
-        .getByText(/ChatGPT-only widget|Custom|appsSdkMetadata only/)
-        .first()
-    ).toBeVisible({ timeout: 45000 });
+      page.getByTestId("tool-result-view-chatgpt-app")
+    ).not.toBeVisible();
+    await expect(
+      page.getByTestId("tool-result-view-mcp-apps")
+    ).not.toBeVisible();
+
+    // Formatted content shows the tool result (message from args)
+    await expect(
+      page.getByTestId("tool-execution-results-content")
+    ).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.getByTestId("tool-execution-results-content")
+    ).toContainText("Custom");
   });
 });
 
@@ -184,6 +183,10 @@ test.describe("Conformance UI widgets - Resources Tab", () => {
 test.describe("Conformance UI widgets - Chat Tab", () => {
   async function configureChatAPI(page: import("@playwright/test").Page) {
     const apiKey = process.env.OPENAI_API_KEY || "";
+    if (!apiKey) {
+      test.skip(true, "OPENAI_API_KEY required for chat widget tests");
+      return;
+    }
 
     await page.getByRole("tab", { name: /Chat/ }).first().click();
     await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible();
@@ -205,6 +208,11 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
   }
 
   test.beforeEach(async ({ page, context }) => {
+    test.skip(
+      !process.env.OPENAI_API_KEY,
+      "OPENAI_API_KEY required for chat widget tests"
+    );
+
     await context.clearCookies();
 
     const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
@@ -242,16 +250,13 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     });
 
     // MCP Apps uses double-nested iframe (outer proxy + inner guest)
-    const outerFrame = page.frameLocator(
-      'iframe[title*="get-weather-delayed"]'
-    );
-    const widgetFrame = outerFrame.frameLocator("iframe");
+    const widgetFrame = getMcpAppsGuestFrame(page, "get-weather-delayed");
     await expect(widgetFrame.getByText(/tokyo/i)).toBeVisible({
       timeout: 10000,
     });
   });
 
-  test("apps-sdk-only-card in chat - should render Apps SDK widget", async ({
+  test("apps-sdk-only-card in chat - should show raw result without widget", async ({
     page,
   }) => {
     await page
@@ -267,13 +272,12 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
       timeout: 45000,
     });
 
-    const widgetFrame = page
-      .frameLocator('iframe[title^="OpenAI Component: apps-sdk-only-card"]')
-      .first();
-    // Assert on stable heading text (message body can vary if LLM passes a custom arg)
-    await expect(
-      widgetFrame.getByText("ChatGPT-only widget (Apps SDK)")
-    ).toBeVisible({ timeout: 45000 });
+    // No ChatGPT emulation — no MCP Apps frame for apps-sdk-only tools
+    await expect(page.getByTestId("mcp-app-frame")).not.toBeVisible();
+
+    // Tool call completed; result text/JSON should be present in the chat
+    const toolCall = page.getByTestId("chat-tool-call-apps-sdk-only-card");
+    await expect(toolCall).toBeVisible();
   });
 
   test("widget pending state in chat - should show loading then content", async ({
@@ -291,10 +295,7 @@ test.describe("Conformance UI widgets - Chat Tab", () => {
     ).toBeVisible({ timeout: 25000 });
 
     // MCP Apps uses double-nested iframe (outer proxy + inner guest)
-    const outerFrame = page.frameLocator(
-      'iframe[title*="get-weather-delayed"]'
-    );
-    const widgetFrame = outerFrame.frameLocator("iframe");
+    const widgetFrame = getMcpAppsGuestFrame(page, "get-weather-delayed");
     const spinner = widgetFrame.locator('[class*="animate-spin"]').first();
     await expect(spinner).toBeVisible({ timeout: 20000 });
 

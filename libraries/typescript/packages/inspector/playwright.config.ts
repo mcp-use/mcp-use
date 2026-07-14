@@ -21,9 +21,9 @@ const serverMode = process.env.TEST_SERVER_MODE || "external-built";
 
 const { baseURL, webServer } = (() => {
   if (serverMode === "builtin-dev") {
-    // Config 3: Server dev with builtin inspector (same port 3000)
+    // Config 3: Server dev with builtin inspector (same port 3000, under /mcp)
     return {
-      baseURL: "http://localhost:3000/inspector",
+      baseURL: "http://localhost:3000/mcp/inspector",
       webServer: undefined, // Must start server manually
     };
   }

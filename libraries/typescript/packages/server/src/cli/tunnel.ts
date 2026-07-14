@@ -215,7 +215,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
         };
       }
 
-      let existingSubdomain = await loadSavedSubdomain();
+      const existingSubdomain = await loadSavedSubdomain();
       if (existingSubdomain !== undefined) {
         console.log(
           `[mcp-use] found existing subdomain: ${existingSubdomain}`

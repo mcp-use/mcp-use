@@ -118,7 +118,8 @@ export function parseArgs(argv: readonly string[]): ParsedArgs {
 }
 
 /**
- * Resolve the port `mcp-use start` serves on.
+ * Resolve the preferred port for `mcp-use start` and `mcp-use dev` (`dev`
+ * additionally probes upward from this value when it is taken).
  *
  * Precedence: `--port` flag, then the `PORT` environment variable, then
  * `3000`. A `PORT` value that is not a valid port number is ignored (the

@@ -27,11 +27,11 @@ function buildServer(config: Partial<ServerConfig> = {}): MCPServer {
     ...config,
   });
   server.tool(
-    { name: "greet", schema: z.object({ who: z.string() }) },
+    { name: "greet", inputSchema: z.object({ who: z.string() }) },
     async ({ who }) => ({ content: [{ type: "text", text: `hi ${who}` }] })
   );
   server.tool(
-    { name: "fail", schema: z.object({ reason: z.string() }) },
+    { name: "fail", inputSchema: z.object({ reason: z.string() }) },
     async ({ reason }) => ({
       content: [{ type: "text", text: `failed: ${reason}` }],
       isError: true,

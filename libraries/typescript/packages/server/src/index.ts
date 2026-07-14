@@ -8,6 +8,7 @@
 export { MCPServer } from "./server.js";
 export { mountMcp } from "./mount-mcp.js";
 export type { MountMcpOptions } from "./mount-mcp.js";
+export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";
 
@@ -29,7 +30,7 @@ export { completable } from "./completable.js";
 export type { CompletionCallback, CompletionContext } from "./completable.js";
 
 /**
- * Schema contracts accepted by `schema`/`outputSchema` fields (re-exported
+ * Schema contracts accepted by `inputSchema`/`outputSchema` fields (re-exported
  * from the SDK): `StandardSchemaWithJSON` requires validation plus JSON
  * Schema conversion; `completable()` needs only `StandardSchemaV1`.
  * Implemented by zod v4, ArkType, Valibot, …
@@ -40,14 +41,24 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export type { InspectorOptions, ServerConfig } from "./config.js";
-export type { RequestContext } from "./context.js";
+export type { OAuthAuth, RequestClientContext, RequestContext } from "./context.js";
 export type {
   InferToolInput,
+  InferToolName,
   InferToolOutput,
   ToolCallback,
   ToolDefinition,
+  ToolRef,
   ToolResult,
+  ToolViewConfig,
 } from "./tools.js";
+export type {
+  ExternalViewManifestEntry,
+  InlineViewManifestEntry,
+  UiPermissions,
+  ViewManifestEntry,
+  ViewsManifest,
+} from "./views/index.js";
 export type {
   InferTemplateParams,
   ResourceCallback,

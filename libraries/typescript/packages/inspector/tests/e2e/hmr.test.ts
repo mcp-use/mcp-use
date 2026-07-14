@@ -13,6 +13,7 @@ import {
   writeConformanceFile,
   writeConformanceResourceFile,
 } from "./helpers/file-utils";
+import { getMcpAppsGuestFrame } from "./helpers/debugger-tools";
 import { skipIfNotSupported } from "./helpers/test-matrix";
 
 test.describe("HMR (Hot Module Reload)", () => {
@@ -215,10 +216,7 @@ server.tool(
     });
 
     // Verify widget loads in MCP Apps iframe (default active tab)
-    const mcpAppsOuter = page.frameLocator(
-      'iframe[title^="MCP App: test_simple_text"]'
-    );
-    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+    const mcpAppsGuest = getMcpAppsGuestFrame(page, "test_simple_text");
     await expect(mcpAppsGuest.getByText("HMR Test")).toBeVisible({
       timeout: 10000,
     });
@@ -298,7 +296,10 @@ server.tool(
     await expect(page.getByText("Weather for tokyo: sunny")).toBeVisible({
       timeout: 10000,
     });
-    // Widget view tabs should not appear
+    // Widget component view should not appear (text-only result)
+    await expect(
+      page.getByTestId("tool-result-view-mcp-apps")
+    ).not.toBeVisible({ timeout: 3000 });
     await expect(
       page.getByTestId("tool-result-view-chatgpt-app")
     ).not.toBeVisible({ timeout: 3000 });
@@ -328,27 +329,18 @@ server.tool(
     await page.getByTestId("tool-param-label").fill("HMR Test");
     await page.getByTestId("tool-execution-execute-button").click();
 
-    // Verify widget loads in MCP Apps iframe (default active tab)
+    // Verify widget loads via MCP Apps (only component protocol)
     await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
       timeout: 5000,
     });
-    const mcpAppsOuter = page.frameLocator(
-      'iframe[title^="MCP App: get-weather-delayed"]'
-    );
-    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+    await expect(
+      page.getByTestId("tool-result-view-chatgpt-app")
+    ).not.toBeVisible();
+    const mcpAppsGuest = getMcpAppsGuestFrame(page, "get-weather-delayed");
     await expect(mcpAppsGuest.getByText(/tokyo/i)).toBeVisible({
       timeout: 10000,
     });
-
-    // Verify widget loads in Apps SDK iframe
-    await page.getByTestId("tool-result-view-chatgpt-app").click();
-    const appsSdkFrame = page.frameLocator(
-      'iframe[title^="OpenAI Component: get-weather-delayed"]'
-    );
-    await expect(appsSdkFrame.getByText(/tokyo/i)).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(appsSdkFrame.getByText("Partly Cloudy")).toBeVisible();
+    await expect(mcpAppsGuest.getByText("Partly Cloudy")).toBeVisible();
   });
 
   test("tool schema change - remove parameter and test execution", async ({
@@ -498,7 +490,7 @@ await server.listen();
     });
   });
 
-  test("widget content change - updated text visible in Apps SDK and MCP Apps after HMR", async ({
+  test("widget content change - updated text visible in MCP Apps after HMR", async ({
     page,
   }) => {
     originalWidgetContent = await backupFile(CONFORMANCE_WEATHER_WIDGET_PATH);
@@ -509,25 +501,13 @@ await server.listen();
     await page.getByTestId("tool-param-delay").fill("1500");
     await page.getByTestId("tool-execution-execute-button").click();
 
-    // Verify original text in MCP Apps (default active tab)
+    // Verify original text in MCP Apps
     await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
       timeout: 10000,
     });
-    const mcpAppsOuter = page.frameLocator(
-      'iframe[title^="MCP App: get-weather-delayed"]'
-    );
-    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+    const mcpAppsGuest = getMcpAppsGuestFrame(page, "get-weather-delayed");
     await expect(mcpAppsGuest.getByText("Host Context Settings")).toBeVisible({
       timeout: 8000,
-    });
-
-    // Verify original text in Apps SDK
-    await page.getByTestId("tool-result-view-chatgpt-app").click();
-    const appsSdkFrame = page.frameLocator(
-      'iframe[title^="OpenAI Component: get-weather-delayed"]'
-    );
-    await expect(appsSdkFrame.getByText("Host Context Settings")).toBeVisible({
-      timeout: 5000,
     });
 
     // Update widget content and wait for HMR to reload the widget
@@ -539,23 +519,15 @@ await server.listen();
     await writeConformanceFile(newContent, CONFORMANCE_WEATHER_WIDGET_PATH);
     await waitForHMRReload(page, { minMs: 3000 });
 
-    // Verify updated text appears live in Apps SDK (still on chatgpt-app tab, without re-executing)
-    await expect(
-      appsSdkFrame.getByText("Host Context Settings Updated")
-    ).toBeVisible({
-      timeout: 8000,
-    });
-
     // Verify updated text appears live in MCP Apps (without re-executing)
-    await page.getByTestId("tool-result-view-mcp-apps").click();
     await expect(
       mcpAppsGuest.getByText("Host Context Settings Updated")
     ).toBeVisible({
-      timeout: 5000,
+      timeout: 8000,
     });
   });
 
-  test("widget metadata preserved after HMR - dual protocol still works", async ({
+  test("widget metadata preserved after HMR - MCP Apps still works", async ({
     page,
   }) => {
     originalWidgetContent = await backupFile(CONFORMANCE_WEATHER_WIDGET_PATH);
@@ -577,27 +549,17 @@ await server.listen();
       timeout: 10000,
     });
 
-    // Verify widget loads in MCP Apps iframe (default active tab)
-    const mcpAppsOuter = page.frameLocator(
-      'iframe[title^="MCP App: get-weather-delayed"]'
-    );
-    const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+    // Verify widget loads via MCP Apps only
+    await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible();
+    await expect(
+      page.getByTestId("tool-result-view-chatgpt-app")
+    ).not.toBeVisible();
+    const mcpAppsGuest = getMcpAppsGuestFrame(page, "get-weather-delayed");
     await expect(mcpAppsGuest.getByText(/tokyo/i)).toBeVisible({
       timeout: 8000,
     });
     await expect(mcpAppsGuest.getByText("Partly Cloudy")).toBeVisible();
     await expect(mcpAppsGuest.getByText(/22/)).toBeVisible();
-
-    // Verify widget loads in Apps SDK iframe
-    await page.getByTestId("tool-result-view-chatgpt-app").click();
-    const appsSdkFrame = page.frameLocator(
-      'iframe[title^="OpenAI Component: get-weather-delayed"]'
-    );
-    await expect(appsSdkFrame.getByText(/tokyo/i)).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(appsSdkFrame.getByText("Partly Cloudy")).toBeVisible();
-    await expect(appsSdkFrame.getByText(/22/)).toBeVisible();
   });
 
   // ==========================================================================
@@ -1227,11 +1189,8 @@ server.tool(
         timeout: 15000,
       });
 
-      // Verify widget renders in MCP Apps iframe (default active tab)
-      const mcpAppsOuter = page.frameLocator(
-        'iframe[title^="MCP App: hmr-widget-tool"]'
-      );
-      const mcpAppsGuest = mcpAppsOuter.frameLocator("iframe");
+      // Verify widget renders via MCP Apps
+      const mcpAppsGuest = getMcpAppsGuestFrame(page, "hmr-widget-tool");
       await expect(
         mcpAppsGuest.getByText("HMR Widget: hello from HMR")
       ).toBeVisible({ timeout: 15000 });
@@ -1345,11 +1304,10 @@ export default function HmrReaddWidget() {
 
     const initialMeta = await getToolMeta("get-weather-delayed");
 
-    // Verify initial metadata has dual-protocol fields
+    // Verify initial metadata has MCP Apps fields (server may still emit Apps SDK keys)
     expect(initialMeta).toHaveProperty("ui");
-    expect(initialMeta).toHaveProperty("openai/widgetCSP");
+    expect(initialMeta.ui).toHaveProperty("resourceUri");
     expect(initialMeta).toHaveProperty("ui/resourceUri");
-    expect(initialMeta).toHaveProperty("openai/description");
 
     // Step 2: Trigger HMR by changing tool description
     const content = await readConformanceFile();
@@ -1363,9 +1321,8 @@ export default function HmrReaddWidget() {
     // Step 3: Check same session still has full metadata
     const afterHmrMeta = await getToolMeta("get-weather-delayed");
     expect(afterHmrMeta).toHaveProperty("ui");
-    expect(afterHmrMeta).toHaveProperty("openai/widgetCSP");
+    expect(afterHmrMeta.ui).toHaveProperty("resourceUri");
     expect(afterHmrMeta).toHaveProperty("ui/resourceUri");
-    expect(afterHmrMeta).toHaveProperty("openai/description");
 
     // Step 4: Simulate page reload by creating new MCP session
     await page.evaluate(async () => {
@@ -1389,9 +1346,8 @@ export default function HmrReaddWidget() {
     // Step 5: Fetch metadata in new session - THIS is the critical check
     const newSessionMeta = await getToolMeta("get-weather-delayed");
     expect(newSessionMeta).toHaveProperty("ui");
-    expect(newSessionMeta).toHaveProperty("openai/widgetCSP");
+    expect(newSessionMeta.ui).toHaveProperty("resourceUri");
     expect(newSessionMeta).toHaveProperty("ui/resourceUri");
-    expect(newSessionMeta).toHaveProperty("openai/description");
 
     // Step 6: Execute the tool to verify it still renders widgets correctly
     await page.getByTestId("tool-item-get-weather-delayed").click();
@@ -1399,12 +1355,16 @@ export default function HmrReaddWidget() {
     await page.getByTestId("tool-param-delay").fill("1500");
     await page.getByTestId("tool-execution-execute-button").click();
 
-    // Verify widget tabs appear (depends on metadata)
+    // Verify MCP Apps view appears (no ChatGPT tab)
     await expect(page.getByTestId("tool-result-view-mcp-apps")).toBeVisible({
       timeout: 10000,
     });
     await expect(
       page.getByTestId("tool-result-view-chatgpt-app")
-    ).toBeVisible();
+    ).not.toBeVisible();
+    const mcpAppsGuest = getMcpAppsGuestFrame(page, "get-weather-delayed");
+    await expect(mcpAppsGuest.getByText(/tokyo/i)).toBeVisible({
+      timeout: 10000,
+    });
   });
 });
