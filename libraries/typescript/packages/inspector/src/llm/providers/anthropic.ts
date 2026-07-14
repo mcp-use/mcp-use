@@ -19,6 +19,31 @@ const DEFAULT_ENDPOINT = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MAX_TOKENS = 4096;
 
+function buildEndpoint(config: ProviderConfig): string {
+  if (!config.baseUrl) return DEFAULT_ENDPOINT;
+  const baseUrl = config.baseUrl.endsWith("/")
+    ? config.baseUrl.slice(0, -1)
+    : config.baseUrl;
+  return `${baseUrl}/v1/messages`;
+}
+
+function buildHeaders(config: ProviderConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "anthropic-version": ANTHROPIC_VERSION,
+    "anthropic-dangerous-direct-browser-access": "true",
+    ...config.extraHeaders,
+  };
+  if (!headers.Authorization && !headers["x-api-key"] && config.apiKey) {
+    headers["x-api-key"] = config.apiKey;
+  }
+  return headers;
+}
+
+function getRequestLabel(config: ProviderConfig): string {
+  return config.provider === "minimax" ? "MiniMax" : "Anthropic";
+}
+
 function buildImageBlock(p: ContentPart) {
   if (p.type !== "image") return null;
   if (p.data && p.mimeType) {
@@ -154,21 +179,16 @@ export async function* streamChat(
   params: ChatParams
 ): AsyncGenerator<LlmStreamEvent, void, unknown> {
   const { config, signal } = params;
-  const res = await fetch(DEFAULT_ENDPOINT, {
+  const res = await fetch(buildEndpoint(config), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
+    headers: buildHeaders(config),
     body: JSON.stringify(buildBody(params, true)),
     signal,
   });
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `Anthropic request failed (${res.status} ${res.statusText}): ${text}`
+      `${getRequestLabel(config)} request failed (${res.status} ${res.statusText}): ${text}`
     );
   }
 
@@ -276,21 +296,16 @@ export async function chat(params: ChatParams): Promise<{
   toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
 }> {
   const { config, signal } = params;
-  const res = await fetch(DEFAULT_ENDPOINT, {
+  const res = await fetch(buildEndpoint(config), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": config.apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
+    headers: buildHeaders(config),
     body: JSON.stringify(buildBody(params, false)),
     signal,
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `Anthropic request failed (${res.status} ${res.statusText}): ${text}`
+      `${getRequestLabel(config)} request failed (${res.status} ${res.statusText}): ${text}`
     );
   }
   const json = await res.json();

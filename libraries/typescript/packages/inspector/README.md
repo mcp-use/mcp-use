@@ -237,12 +237,14 @@ The Chat tab provides an interactive interface to test the MCP server with an LL
 **Setup:**
 
 1. Click **"Configure API Key"** to open the configuration modal
-2. Select your **Provider** (OpenAI, Anthropic, Google, or Ollama)
+2. Select your **Provider** (OpenAI, Anthropic, Google, MiniMax, or Ollama)
 3. Choose the **Model** (gpt-4o, claude-3-5-sonnet, etc.)
 4. Enter your **API Key** (stored locally in browser)
 5. Click **"Save Configuration"**
 
 For **Ollama**, the API key is optional and you can point the inspector at a local or remote Ollama host by setting the **Base URL** (defaults to `http://localhost:11434`).
+
+For **MiniMax**, choose `MiniMax-M3` to send image attachments and image tool results to the model, then select the global or China endpoint for the compatible protocol you use. See the [global API reference](https://platform.minimax.io/docs/api-reference/api-overview) or [China API reference](https://platform.minimaxi.com/docs/api-reference/api-overview) for account-specific setup.
 
 **Using Chat:**
 

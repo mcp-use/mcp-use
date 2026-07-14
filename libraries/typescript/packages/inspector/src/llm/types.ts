@@ -13,6 +13,7 @@ export type ProviderName =
   | "openai-compatible"
   | "anthropic"
   | "google"
+  | "minimax"
   | "openrouter"
   | "ollama";
 

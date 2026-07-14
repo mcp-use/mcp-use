@@ -17,6 +17,8 @@ export function getProviderLabel(provider: ProviderName): string {
       return "Anthropic";
     case "google":
       return "Google";
+    case "minimax":
+      return "MiniMax";
     case "openrouter":
       return "OpenRouter";
     case "ollama":

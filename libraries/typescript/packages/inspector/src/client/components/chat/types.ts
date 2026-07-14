@@ -1,4 +1,8 @@
 import { DEFAULT_OLLAMA_BASE_URL } from "@/llm/providers/ollama/utils";
+import {
+  DEFAULT_MINIMAX_BASE_URL,
+  MINIMAX_MODELS,
+} from "@/llm/providers/minimax";
 import type { ProviderName } from "@/llm/types";
 
 export interface MessageAttachment {
@@ -77,11 +81,13 @@ export const DEFAULT_MODELS: Record<ProviderName, string> = {
   "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",
+  minimax: MINIMAX_MODELS[0],
   openrouter: "meta-llama/llama-3.1-8b-instruct:free",
   ollama: "qwen3",
 };
 
 const DEFAULT_BASE_URLS: Partial<Record<ProviderName, string>> = {
+  minimax: DEFAULT_MINIMAX_BASE_URL,
   ollama: DEFAULT_OLLAMA_BASE_URL,
 };
 
@@ -90,7 +96,11 @@ export function providerRequiresApiKey(provider: ProviderName): boolean {
 }
 
 export function providerSupportsBaseUrl(provider: ProviderName): boolean {
-  return provider === "ollama" || provider === "openai-compatible";
+  return (
+    provider === "minimax" ||
+    provider === "ollama" ||
+    provider === "openai-compatible"
+  );
 }
 
 export function getDefaultBaseUrl(provider: ProviderName): string {

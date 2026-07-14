@@ -33,8 +33,10 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
+import { MINIMAX_ENDPOINTS, MINIMAX_MODELS } from "@/llm/providers/minimax";
 import type { ProviderName } from "@/llm/types";
 import {
+  DEFAULT_MODELS,
   getDefaultBaseUrl,
   providerRequiresApiKey,
   providerSupportsBaseUrl,
@@ -352,6 +354,8 @@ export function ConfigurationDialog({
           fetchedModels = await fetchAnthropicModels(tempApiKey);
         } else if (tempProvider === "google") {
           fetchedModels = await fetchGoogleModels(tempApiKey);
+        } else if (tempProvider === "minimax") {
+          fetchedModels = MINIMAX_MODELS.map((id) => ({ id }));
         } else if (tempProvider === "openrouter") {
           fetchedModels = await fetchOpenRouterModels(tempApiKey);
         } else if (tempProvider === "ollama") {
@@ -381,7 +385,7 @@ export function ConfigurationDialog({
   // Reset model when provider changes
   useEffect(() => {
     if (open) {
-      onModelChange("");
+      onModelChange(tempProvider === "minimax" ? DEFAULT_MODELS.minimax : "");
     }
   }, [tempProvider, open, onModelChange]);
 
@@ -402,9 +406,11 @@ export function ConfigurationDialog({
       ? "http://localhost:11434/v1"
       : getDefaultBaseUrl(tempProvider);
   const baseUrlHelp =
-    tempProvider === "openai-compatible"
-      ? "Base URL of your OpenAI-compatible API. Local servers must have CORS enabled."
-      : null;
+    tempProvider === "minimax"
+      ? "Choose a global or China endpoint and compatible protocol."
+      : tempProvider === "openai-compatible"
+        ? "Base URL of your OpenAI-compatible API. Local servers must have CORS enabled."
+        : null;
   const apiKeyHelp =
     tempProvider === "ollama"
       ? "Optional for local Ollama. Stored locally and never sent to our servers."
@@ -474,6 +480,12 @@ export function ConfigurationDialog({
                     <span>{getProviderLabel("google")}</span>
                   </div>
                 </SelectItem>
+                <SelectItem value="minimax">
+                  <div className="flex items-center gap-2">
+                    <ProviderIcon provider="minimax" />
+                    <span>{getProviderLabel("minimax")}</span>
+                  </div>
+                </SelectItem>
                 <SelectItem value="ollama">
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="ollama" />
@@ -497,13 +509,30 @@ export function ConfigurationDialog({
 
           {showBaseUrlField && (
             <div className="space-y-2">
-              <Label>Base URL</Label>
-              <Input
-                value={tempBaseUrl}
-                onChange={(e) => onBaseUrlChange(e.target.value)}
-                placeholder={baseUrlPlaceholder}
-                data-testid="chat-config-base-url-input"
-              />
+              <Label>
+                {tempProvider === "minimax" ? "Endpoint" : "Base URL"}
+              </Label>
+              {tempProvider === "minimax" ? (
+                <Select value={tempBaseUrl} onValueChange={onBaseUrlChange}>
+                  <SelectTrigger data-testid="chat-config-base-url-select">
+                    <SelectValue placeholder="Select an endpoint" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MINIMAX_ENDPOINTS.map((endpoint) => (
+                      <SelectItem key={endpoint.id} value={endpoint.baseUrl}>
+                        {endpoint.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={tempBaseUrl}
+                  onChange={(e) => onBaseUrlChange(e.target.value)}
+                  placeholder={baseUrlPlaceholder}
+                  data-testid="chat-config-base-url-input"
+                />
+              )}
               {baseUrlHelp && (
                 <p className="text-xs text-muted-foreground">{baseUrlHelp}</p>
               )}

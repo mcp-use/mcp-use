@@ -35,6 +35,10 @@ function buildHeaders(config: ProviderConfig): Record<string, string> {
   return headers;
 }
 
+function getRequestLabel(config: ProviderConfig): string {
+  return config.provider === "minimax" ? "MiniMax" : "OpenAI";
+}
+
 function toOpenAIContent(content: string | ContentPart[]): unknown {
   if (typeof content === "string") return content;
   return content.map((p) => {
@@ -130,7 +134,7 @@ export async function* streamChat(
   if (!res.ok || !res.body) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `OpenAI request failed (${res.status} ${res.statusText}): ${text}`
+      `${getRequestLabel(config)} request failed (${res.status} ${res.statusText}): ${text}`
     );
   }
 
@@ -250,7 +254,7 @@ export async function chat(params: ChatParams): Promise<{
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(
-      `OpenAI request failed (${res.status} ${res.statusText}): ${text}`
+      `${getRequestLabel(config)} request failed (${res.status} ${res.statusText}): ${text}`
     );
   }
   const json = await res.json();
