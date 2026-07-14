@@ -9,13 +9,20 @@ import { registerInspectorRoutes } from "./shared-routes.js";
 import type { InspectorMode } from "./shared-static.js";
 import { registerStaticRoutes } from "./shared-static.js";
 import { setServerPort } from "./tunnel.js";
-import { findAvailablePort, isValidUrl } from "./utils.js";
+import {
+  findAvailablePort,
+  isValidUrl,
+  resolveInspectorPort,
+} from "./utils.js";
 import { getInspectorVersion } from "./version.js";
 
 // Parse command line arguments
 const args = process.argv.slice(2);
 let mcpUrl: string | undefined;
-let startPort = 8080;
+let startPort = resolveInspectorPort({
+  cliPort: null,
+  defaultPort: 8080,
+});
 let noOpen = false;
 
 for (let i = 0; i < args.length; i++) {
@@ -60,7 +67,7 @@ Usage:
 
 Options:
   --url <url>    MCP server URL to auto-connect to (e.g., http://localhost:3000/mcp)
-  --port <port>  Starting port to try (default: 8080, will find next available)
+  --port <port>  Starting port to try (default: $PORT or 8080, will find next available)
   --no-open      Do not auto-open inspector in browser
   --version, -v  Show the inspector version
   --help, -h     Show this help message

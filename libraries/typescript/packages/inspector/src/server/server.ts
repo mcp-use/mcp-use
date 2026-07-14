@@ -6,7 +6,12 @@ import open from "open";
 import { registerInspectorRoutes } from "./shared-routes.js";
 import { registerStaticRoutesWithDevProxy } from "./shared-static.js";
 import { setServerPort } from "./tunnel.js";
-import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
+import {
+  isPortAvailable,
+  parsePortFromArgs,
+  hasNoOpenFlag,
+  resolveInspectorPort,
+} from "./utils.js";
 
 const app = new Hono();
 
@@ -92,9 +97,12 @@ async function startServer() {
     const isDev =
       process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
-    // Check for port from command line arguments first
+    // Check for port from command line arguments first, then PORT env
     const cliPort = parsePortFromArgs();
-    let port = cliPort ?? (isDev ? 3001 : 3000);
+    let port = resolveInspectorPort({
+      cliPort,
+      defaultPort: isDev ? 3001 : 3000,
+    });
     const available = await isPortAvailable(port);
 
     if (!available) {

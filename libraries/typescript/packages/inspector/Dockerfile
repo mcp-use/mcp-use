@@ -19,5 +19,5 @@ ENV NODE_ENV=production
 # Note: The actual port is controlled by $PORT env var
 EXPOSE 8080
 
-# Start the inspector
-CMD ["npx", "@mcp-use/inspector", "--port", "8080"]
+# Start the inspector (--port omitted so $PORT is honored; defaults to 8080)
+CMD ["npx", "@mcp-use/inspector", "--no-open"]

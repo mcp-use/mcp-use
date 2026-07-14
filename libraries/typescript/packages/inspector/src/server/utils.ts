@@ -54,6 +54,35 @@ export async function isPortAvailable(port: number): Promise<boolean> {
 }
 
 /**
+ * Parses a TCP port number from the `PORT` environment variable.
+ *
+ * @returns The parsed port number if valid, `null` if unset or invalid.
+ */
+export function parsePortFromEnv(): number | null {
+  const rawPort = process.env.PORT;
+  if (!rawPort) {
+    return null;
+  }
+
+  const portValue = Number.parseInt(rawPort, 10);
+  if (!Number.isNaN(portValue) && portValue >= 1 && portValue <= 65535) {
+    return portValue;
+  }
+
+  return null;
+}
+
+/**
+ * Resolves the inspector listen port with precedence: CLI `--port`, then `PORT` env.
+ */
+export function resolveInspectorPort(options: {
+  cliPort: number | null;
+  defaultPort: number;
+}): number {
+  return options.cliPort ?? parsePortFromEnv() ?? options.defaultPort;
+}
+
+/**
  * Parses a TCP port number from command-line arguments using the `--port` flag.
  *
  * If `--port` is present and followed by an integer between 1 and 65535, returns that port.
