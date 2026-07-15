@@ -33,6 +33,8 @@
         <img src="https://img.shields.io/npm/v/mcp-use.svg"/></a>
     <a href="https://www.npmjs.com/package/mcp-use" alt="NPM Downloads">
         <img src="https://img.shields.io/npm/dw/mcp-use.svg"/></a>
+    <a href="https://gittokens.rsamf.com/badge/mcp-use/mcp-use" alt="Tokens">
+        <img src="https://img.shields.io/endpoint?url=https://gittokens.rsamf.com/badge/mcp-use/mcp-use" /></a>
     <br/>
 </p>
 </div>
