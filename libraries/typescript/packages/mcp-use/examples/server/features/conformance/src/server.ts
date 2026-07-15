@@ -588,4 +588,19 @@ server.tool(
   }
 );
 
+server.tool(
+  {
+    name: "report-client-capabilities",
+    description:
+      "Report client capabilities advertised on this connection (MCP Apps / UI extension).",
+    schema: z.object({}),
+  },
+  async (_params, ctx) => {
+    const supportsApps = ctx.client.supportsApps();
+    return object({
+      supportsApps,
+    });
+  }
+);
+
 await server.listen();

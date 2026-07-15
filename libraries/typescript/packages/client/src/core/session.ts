@@ -2,6 +2,7 @@ import type {
   CallToolResult,
   CompleteRequestParams,
   CompleteResult,
+  MetaObject,
   Notification,
   ProtocolEra,
   RequestOptions,
@@ -583,4 +584,4 @@ export class MCPConnection {
 export { MCPConnection as MCPSession };
 
 // Re-export types for convenience
-export type { CallToolResult, Notification, Root, Tool };
+export type { CallToolResult, MetaObject, Notification, Root, Tool };

@@ -134,6 +134,6 @@ async function waitForBrowserAuthComplete(
     case "error":
       throw new Error(result.error);
     default:
-      throw new Error(`Unexpected OAuth popup result: ${result.kind}`);
+      throw new Error("Unexpected OAuth popup result");
   }
 }

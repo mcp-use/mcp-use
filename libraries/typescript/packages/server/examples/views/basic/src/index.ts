@@ -249,7 +249,7 @@ export const reportClientCapabilities = server.tool(
     name: "report-client-capabilities",
     title: "Report client capabilities",
     description:
-      "Report request-scoped capabilities advertised by the modern MCP client.",
+      "Report client capabilities advertised on this connection (MCP Apps / UI extension).",
     inputSchema: z.object({}),
     outputSchema: z.object({ supportsApps: z.boolean() }),
   },

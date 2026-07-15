@@ -28,20 +28,17 @@ async function inspect(
     const tool = tools.find((candidate) => candidate.name === toolName);
     if (!tool) throw new Error(`${name}: missing ${toolName}`);
 
-    const metadata = (tool as { _meta?: Record<string, unknown> })._meta ?? {};
+    const metadata = tool._meta ?? {};
     const result = await connection.callTool(toolName, args);
-    if (connection.info.protocolEra === "modern") {
-      const report = await connection.callTool(
-        "report-client-capabilities",
-        {}
-      );
-      const supportsApps = (
-        report.structuredContent as { supportsApps?: boolean } | undefined
-      )?.supportsApps;
-      if (!supportsApps) {
-        throw new Error("Modern server did not receive MCP Apps capability");
-      }
+
+    const report = await connection.callTool("report-client-capabilities", {});
+    const supportsApps = (
+      report.structuredContent as { supportsApps?: boolean } | undefined
+    )?.supportsApps;
+    if (!supportsApps) {
+      throw new Error(`${name}: server did not receive MCP Apps capability`);
     }
+
     console.log(
       name,
       `era=${connection.info.protocolEra}`,
