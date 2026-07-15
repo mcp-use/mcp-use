@@ -64,12 +64,15 @@ magic links, or an OAuth provider.
 pnpm dev
 ```
 
-`pnpm dev` runs `tsx watch` on a standalone entry that owns the socket. The
-entry registers the consent routes on `server.app`, then starts that shared app
-with `server.listen()` so the consent UI and MCP endpoint use one port. When
-`MCP_URL` is absent, it defaults to `http://localhost:3000` (or the configured
-`PORT`) so OAuth resource metadata resolves locally. Public and tunnel
-deployments require `MCP_URL`. MCP serving uses `legacy: "stateless"`.
+`pnpm dev` runs `mcp-use dev`. The CLI loads `.env`, owns the development
+socket, reloads the default-exported server when source files change, and opens
+the inspector at `http://localhost:3000/mcp/inspector`. The consent routes
+registered on `server.app` share the same port with the MCP endpoint. When
+`MCP_URL` is absent, the CLI supplies the trusted local origin so OAuth resource
+metadata resolves locally. Public and tunnel deployments require `MCP_URL`.
+MCP serving uses `legacy: "stateless"`.
+
+Build and run the production bundle with `pnpm build` and `pnpm start`.
 
 ## Typecheck
 

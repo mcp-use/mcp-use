@@ -1,18 +1,7 @@
-import { existsSync } from "node:fs";
 import { MCPServer } from "@mcp-use/server";
 import { oauthSupabaseProvider } from "@mcp-use/server/oauth/supabase";
 import { z } from "zod";
 import { mountAuthRoutes } from "./auth-routes.js";
-
-if (existsSync(".env")) {
-  process.loadEnvFile(".env");
-}
-
-const port = Number(process.env.PORT ?? 3000);
-// Mirrors the old `mcp-use dev` CLI fallback: when MCP_URL is unset, inject a
-// trusted local canonical origin before constructing the OAuth provider /
-// MCPServer. Public deployments must set MCP_URL explicitly.
-process.env.MCP_URL ??= `http://localhost:${port}`;
 
 const getUserInfoOutputSchema = z.object({
   id: z.string(),
@@ -109,10 +98,7 @@ server.tool(
 
 mountAuthRoutes(server.app, { supabaseUrl, publishableKey });
 
-const info = await server.listen(port);
-const origin = new URL(info.url).origin;
-console.log(`MCP endpoint: ${info.url}`);
-console.log(`Consent UI:   ${origin}/auth/consent`);
+export default server;
 
 function environmentValue(name: string): string | undefined {
   const value = process.env[name]?.trim();

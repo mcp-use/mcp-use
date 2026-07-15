@@ -8,8 +8,9 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -19,7 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "tsx": "^4.21.0",
-    "typescript": "7.0.1-rc"
+    "typescript": "7.0.1-rc",
+    "vite": "^8.0.16"
   }
 }

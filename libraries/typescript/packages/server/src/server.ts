@@ -206,10 +206,6 @@ export class MCPServer<TUser = never> {
    * tool/resource/prompt/view registration; Hono also does not accept new
    * routes after its first dispatch.
    *
-   * Exposing the HTTP router does not change MCP statelessness: each MCP
-   * request still receives a fresh official SDK `McpServer` replayed from the
-   * frozen registry.
-   *
    * @example
    * ```ts
    * const server = new MCPServer({ name: "auth-server", version: "1.0.0" });
