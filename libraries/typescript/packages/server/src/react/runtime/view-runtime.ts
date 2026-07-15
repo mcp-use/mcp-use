@@ -69,7 +69,7 @@ export interface HostSnapshot {
   hostContext: McpUiHostContext | undefined;
   /** Whether the App handshake completed. */
   isConnected: boolean;
-  /** Last connection failure, if any; cleared on a successful connect. */
+  /** Terminal connection failure for this mount, if any. */
   connectionError: Error | undefined;
 }
 
@@ -140,9 +140,9 @@ export type ViewToolConfig = Parameters<App["registerTool"]>[1];
 export type ViewToolCallback = Parameters<App["registerTool"]>[2];
 
 /**
- * Per-document MCP Apps runtime: owns the guest {@link App}, connection retry
- * generations, tool-handler handoff, narrow external-store channels, one
- * {@link ModelContextStore}, and disposal.
+ * Per-document MCP Apps runtime: owns one guest {@link App}, one cached
+ * connection attempt, tool-handler handoff, narrow external-store channels,
+ * one {@link ModelContextStore}, and disposal.
  *
  * Created by {@link createMcpAppRuntime} / {@link bootstrapView}. Hooks obtain
  * the instance from {@link ViewRuntimeContext}.
@@ -162,12 +162,12 @@ export interface McpAppRuntime {
    */
   readonly modelContextStore: ModelContextStore;
 
-  /** Connect (or return the connected / in-flight App). Idempotent per generation. */
+  /** Connect once, or return the cached in-flight / settled connection promise. */
   connect(): Promise<App>;
   /**
-   * Invalidate the active generation, dispose the model-context store (so late
-   * in-flight completions are ignored), prevent late event delivery, clear
-   * listeners and snapshots, and close the App/transport.
+   * Dispose the model-context store (so late in-flight completions are
+   * ignored), prevent late event delivery, clear listeners and snapshots, and
+   * close the App/transport.
    *
    * Callers should unmount the view tree first (see `disposeView`) so hook
    * cleanup can run while the App connection still exists.
@@ -197,15 +197,8 @@ export interface McpAppRuntime {
    */
   getDisplaySnapshot(): DisplaySnapshot;
 
-  /** Guest {@link App} for the current generation, or `null` before connect starts. */
+  /** Runtime-owned guest {@link App}, or `null` after disposal. */
   getApp(): App | null;
-
-  /**
-   * Replace the transport used by the next {@link connect} generation.
-   *
-   * @internal
-   */
-  setTransport(transport: ViewRuntimeTransport | undefined): void;
 
   /** Call a server tool through the host. */
   callServerTool(params: CallToolParams): Promise<CallToolResult>;
@@ -348,7 +341,8 @@ function hostSnapshotChanged(
  */
 export interface CreateMcpAppRuntimeOptions {
   /**
-   * Transport injected before {@link McpAppRuntime.connect} (tests).
+   * Transport used by the runtime's single {@link McpAppRuntime.connect}
+   * attempt (tests).
    * Defaults to {@link PostMessageTransport} against `window.parent`.
    */
   transport?: ViewRuntimeTransport;
@@ -357,8 +351,9 @@ export interface CreateMcpAppRuntimeOptions {
 /**
  * Create a fresh {@link McpAppRuntime} for one iframe document / view mount.
  *
- * Does not construct the guest {@link App} until {@link McpAppRuntime.connect}
- * runs — keep App creation off the React render path.
+ * Constructs and configures the guest {@link App} eagerly so event handlers
+ * and view tools can be registered before or during initialization. The App is
+ * connected at most once and remains owned by the runtime until disposal.
  *
  * @param config - Normalized {@link NormalizedViewConfig} from bootstrap.
  * @param options - Optional transport injection for tests.
@@ -371,12 +366,9 @@ export function createMcpAppRuntime(
   options?: CreateMcpAppRuntimeOptions
 ): McpAppRuntime {
   let disposed = false;
-  let currentGeneration = 0;
-  let currentApp: App | null = null;
-  let connectedApp: App | null = null;
   let connectPromise: Promise<App> | null = null;
   let toolRegistryActivated = false;
-  let nextTransport: ViewRuntimeTransport | undefined = options?.transport;
+  const configuredTransport = options?.transport;
 
   let toolSnapshot: ToolSnapshot = { ...defaultToolSnapshot };
   let hostSnapshot: HostSnapshot = { ...defaultHostSnapshot };
@@ -391,26 +383,6 @@ export function createMcpAppRuntime(
   const hostChannel = createChannelStore();
   const themeChannel = createChannelStore();
   const displayChannel = createChannelStore();
-
-  // Declared before connect so the store host can close over it; connect is a
-  // function declaration and is initialized before any store method runs.
-  async function connect(): Promise<App> {
-    if (disposed) {
-      throw new Error("View runtime has been disposed");
-    }
-    if (connectedApp) return connectedApp;
-    if (connectPromise) return connectPromise;
-
-    const generation = ++currentGeneration;
-    const app = createAppGeneration();
-    currentApp = app;
-    toolRegistryActivated = false;
-
-    connectPromise = connectGeneration(app, generation);
-    return connectPromise;
-  }
-
-  const modelContextStore = new ModelContextStore({ connect });
 
   function patchTool(patch: Partial<ToolSnapshot>): void {
     if (!toolSnapshotChanged(toolSnapshot, patch)) {
@@ -488,7 +460,7 @@ export function createMcpAppRuntime(
     // hasToolResult/error are still unset and the mid-cycle pending→ready path
     // is unchanged.
     app.ontoolinput = (params) => {
-      if (app !== currentApp) return;
+      if (disposed) return;
       const clearResult =
         toolSnapshot.hasToolResult || toolSnapshot.error !== undefined;
       patchTool({
@@ -500,7 +472,7 @@ export function createMcpAppRuntime(
     };
 
     app.ontoolinputpartial = (params) => {
-      if (app !== currentApp) return;
+      if (disposed) return;
       patchTool({
         toolInput: params.arguments ?? {},
         isStreaming: true,
@@ -510,7 +482,7 @@ export function createMcpAppRuntime(
     };
 
     app.ontoolresult = (params) => {
-      if (app !== currentApp) return;
+      if (disposed) return;
       const content = Array.isArray(params.content)
         ? (params.content as ContentBlock[])
         : undefined;
@@ -568,7 +540,7 @@ export function createMcpAppRuntime(
     };
 
     app.ontoolcancelled = (params) => {
-      if (app !== currentApp) return;
+      if (disposed) return;
       patchTool({
         cancelled: {
           ...(params.reason !== undefined && { reason: params.reason }),
@@ -578,7 +550,7 @@ export function createMcpAppRuntime(
     };
 
     app.onhostcontextchanged = (params) => {
-      if (app !== currentApp) return;
+      if (disposed) return;
       applyHostContext({
         ...(hostSnapshot.hostContext ?? {}),
         ...params,
@@ -586,7 +558,7 @@ export function createMcpAppRuntime(
     };
   }
 
-  function createAppGeneration(): App {
+  function createApp(): App {
     const app = new App(
       { name: "mcp-use-view", version: APP_VERSION },
       {
@@ -600,34 +572,32 @@ export function createMcpAppRuntime(
     return app;
   }
 
+  const app = createApp();
+
   async function closeAppQuietly(app: App): Promise<void> {
     try {
       await app.close();
     } catch {
-      // Best-effort cleanup after a failed or superseded generation.
+      // Best-effort deterministic cleanup.
     }
   }
 
-  async function connectGeneration(
-    app: App,
-    generation: number
-  ): Promise<App> {
+  async function connectApp(): Promise<App> {
     try {
-      if (typeof window === "undefined" && nextTransport === undefined) {
-        throw new Error("View runtime can only connect in a browser environment");
+      if (typeof window === "undefined" && configuredTransport === undefined) {
+        throw new Error(
+          "View runtime can only connect in a browser environment"
+        );
       }
       const transport =
-        nextTransport ?? new PostMessageTransport(window.parent, window.parent);
-      // One-shot: a retry must supply a fresh transport via setTransport /
-      // bootstrap options, otherwise postMessage is used.
-      nextTransport = undefined;
+        configuredTransport ??
+        new PostMessageTransport(window.parent, window.parent);
       await app.connect(transport);
-      if (generation !== currentGeneration || disposed) {
+      if (disposed) {
         await closeAppQuietly(app);
-        throw new Error("View runtime connection superseded");
+        throw new Error("View runtime was disposed during connection");
       }
       const hostContext = app.getHostContext();
-      connectedApp = app;
       patchHost({
         isConnected: true,
         connectionError: undefined,
@@ -636,28 +606,28 @@ export function createMcpAppRuntime(
       // Always re-derive display (host omitting modes → ["inline"]).
       syncThemeFromHost(hostContext);
       syncDisplayFromHost(hostContext);
-      // Retry a dirty model-context payload after a successful (re)connect.
-      modelContextStore.notifyConnected();
       return app;
     } catch (error) {
-      const failure =
-        error instanceof Error ? error : new Error(String(error));
-      // Clear the rejected promise before awaiting cleanup so a retry can
-      // start a new generation while the old App finishes closing.
-      if (generation === currentGeneration && !disposed) {
-        currentApp = null;
-        connectedApp = null;
-        connectPromise = null;
-        toolRegistryActivated = false;
+      const failure = error instanceof Error ? error : new Error(String(error));
+      if (!disposed) {
         patchHost({
           isConnected: false,
           connectionError: failure,
         });
       }
-      await closeAppQuietly(app);
-      throw error;
+      throw failure;
     }
   }
+
+  function connect(): Promise<App> {
+    if (disposed) {
+      return Promise.reject(new Error("View runtime has been disposed"));
+    }
+    connectPromise ??= connectApp();
+    return connectPromise;
+  }
+
+  const modelContextStore = new ModelContextStore({ connect });
 
   function registerViewTool(
     name: string,
@@ -667,13 +637,6 @@ export function createMcpAppRuntime(
     if (disposed) {
       throw new Error("View runtime has been disposed");
     }
-    const app = currentApp;
-    if (!app) {
-      throw new Error(
-        "registerViewTool requires connect() to have started so an App exists"
-      );
-    }
-
     if (toolRegistryActivated) {
       return app.registerTool(name, toolConfig, callback);
     }
@@ -696,12 +659,7 @@ export function createMcpAppRuntime(
   async function dispose(): Promise<void> {
     if (disposed) return;
     disposed = true;
-    currentGeneration += 1;
     modelContextStore.dispose();
-    const app = currentApp;
-    currentApp = null;
-    connectedApp = null;
-    connectPromise = null;
     toolRegistryActivated = false;
     toolChannel.clear();
     hostChannel.clear();
@@ -717,9 +675,7 @@ export function createMcpAppRuntime(
     if (activeRuntime === runtime) {
       activeRuntime = null;
     }
-    if (app) {
-      await closeAppQuietly(app);
-    }
+    await closeAppQuietly(app);
   }
 
   async function callServerTool(
@@ -790,10 +746,7 @@ export function createMcpAppRuntime(
     getThemeSnapshot: () => themeSnapshot,
     subscribeDisplay: displayChannel.subscribe,
     getDisplaySnapshot: () => displaySnapshot,
-    getApp: () => currentApp,
-    setTransport(transport) {
-      nextTransport = transport;
-    },
+    getApp: () => (disposed ? null : app),
     callServerTool,
     sendMessage,
     openLink,
@@ -837,10 +790,10 @@ export function getActiveRuntime(): McpAppRuntime | null {
 }
 
 /**
- * Inject a transport before the next connect.
+ * Inject a transport before the next bootstrap-created runtime.
  *
- * When an active runtime exists, updates that runtime. Otherwise queues the
- * transport for the next {@link createMcpAppRuntime} via bootstrap.
+ * A mounted runtime has already started its sole connection attempt, so its
+ * transport cannot be replaced.
  *
  * @param transport - Guest-side paired transport, or `null` to clear.
  *
@@ -850,8 +803,9 @@ export function _setTransportForTesting(
   transport: ViewRuntimeTransport | null
 ): void {
   if (activeRuntime) {
-    activeRuntime.setTransport(transport ?? undefined);
-    return;
+    throw new Error(
+      "Cannot replace the transport after a view runtime has been mounted"
+    );
   }
   pendingTestTransport = transport;
 }

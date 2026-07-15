@@ -1,24 +1,52 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 
 import { useDisplayMode } from "../hooks/use-display-mode.js";
 import { useHostContext } from "../hooks/use-host-context.js";
 import { useToolContext } from "../hooks/use-tool-context.js";
 
 /**
- * Static styles for the debug overlay `<pre>`. Hoisted to module scope so the
- * object keeps a stable identity across renders (this runtime ships no
- * stylesheet, so a CSS class is not an option here).
+ * Static styles for the debug overlay. Hoisted to module scope so the objects
+ * keep stable identities across renders (this runtime ships no stylesheet, so
+ * CSS classes are not an option here).
  */
 const debugOverlayStyle: React.CSSProperties = {
   position: "fixed",
   inset: 0,
   zIndex: 10000,
-  margin: 0,
-  padding: 16,
+  boxSizing: "border-box",
+  padding: "56px 16px 16px",
   background: "#111",
   color: "#eee",
   overflow: "auto",
+};
+
+const debugContentStyle: React.CSSProperties = {
+  margin: 0,
   fontSize: 12,
+  whiteSpace: "pre-wrap",
+  overflowWrap: "anywhere",
+};
+
+const debugCloseButtonStyle: React.CSSProperties = {
+  position: "fixed",
+  top: 16,
+  right: 16,
+  zIndex: 10001,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 36,
+  height: 36,
+  padding: 0,
+  border: "2px solid #111",
+  borderRadius: 9999,
+  background: "#fff",
+  color: "#111",
+  boxShadow: "0 2px 12px rgba(0, 0, 0, 0.45)",
+  cursor: "pointer",
+  fontSize: 26,
+  fontWeight: 600,
+  lineHeight: 1,
 };
 
 interface ViewControlsProps {
@@ -39,11 +67,43 @@ export function ViewControls({
 }: ViewControlsProps) {
   const context = useToolContext();
   const host = useHostContext();
-  const { requestDisplayMode } = useDisplayMode();
+  const { displayMode, availableDisplayModes, requestDisplayMode } =
+    useDisplayMode();
   const [open, setOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const displayModeBeforeDebugRef = useRef(displayMode);
+  const restoreDisplayModeOnCloseRef = useRef(false);
 
   const showControls = enableDebugger || viewControls;
+
+  const openDebugger = () => {
+    displayModeBeforeDebugRef.current = displayMode;
+    setOpen(true);
+
+    const canExpand =
+      displayMode !== "fullscreen" &&
+      availableDisplayModes.includes("fullscreen");
+    restoreDisplayModeOnCloseRef.current = canExpand;
+
+    if (canExpand) {
+      void requestDisplayMode({ mode: "fullscreen" }).catch(() => {
+        // The overlay remains usable inline when the host denies expansion.
+        restoreDisplayModeOnCloseRef.current = false;
+      });
+    }
+  };
+
+  const closeDebugger = () => {
+    setOpen(false);
+
+    if (!restoreDisplayModeOnCloseRef.current) return;
+    restoreDisplayModeOnCloseRef.current = false;
+    void requestDisplayMode({
+      mode: displayModeBeforeDebugRef.current,
+    }).catch(() => {
+      // The host owns display mode; closing the overlay must never be blocked.
+    });
+  };
 
   return (
     <div
@@ -70,7 +130,9 @@ export function ViewControls({
                 <button
                   type="button"
                   aria-label="Fullscreen"
-                  onClick={() => void requestDisplayMode({ mode: "fullscreen" })}
+                  onClick={() =>
+                    void requestDisplayMode({ mode: "fullscreen" })
+                  }
                 >
                   FS
                 </button>
@@ -87,7 +149,7 @@ export function ViewControls({
             </>
           )}
           {enableDebugger && (
-            <button type="button" aria-label="Debug" onClick={() => setOpen((v) => !v)}>
+            <button type="button" aria-label="Debug" onClick={openDebugger}>
               Debug
             </button>
           )}
@@ -95,30 +157,46 @@ export function ViewControls({
       )}
       {children}
       {enableDebugger && open && (
-        <pre style={debugOverlayStyle}>
-          {JSON.stringify(
-            {
-              status: context.status,
-              toolOutput:
-                context.status === "ready" ? context.toolOutput : undefined,
-              content:
-                context.status === "ready" || context.status === "error"
-                  ? context.content
-                  : undefined,
-              toolInput: context.toolInput,
-              meta:
-                context.status === "ready" || context.status === "error"
-                  ? context.meta
-                  : undefined,
-              error: context.status === "error" ? context.error : undefined,
-              theme: host.theme,
-              displayMode: host.displayMode,
-              isAvailable: host.isAvailable,
-            },
-            null,
-            2
-          )}
-        </pre>
+        <div
+          style={debugOverlayStyle}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Debug info"
+        >
+          <button
+            type="button"
+            style={debugCloseButtonStyle}
+            aria-label="Close debug"
+            title="Close debug"
+            onClick={closeDebugger}
+          >
+            ×
+          </button>
+          <pre style={debugContentStyle}>
+            {JSON.stringify(
+              {
+                status: context.status,
+                toolOutput:
+                  context.status === "ready" ? context.toolOutput : undefined,
+                content:
+                  context.status === "ready" || context.status === "error"
+                    ? context.content
+                    : undefined,
+                toolInput: context.toolInput,
+                meta:
+                  context.status === "ready" || context.status === "error"
+                    ? context.meta
+                    : undefined,
+                error: context.status === "error" ? context.error : undefined,
+                theme: host.theme,
+                displayMode: host.displayMode,
+                isAvailable: host.isAvailable,
+              },
+              null,
+              2
+            )}
+          </pre>
+        </div>
       )}
     </div>
   );

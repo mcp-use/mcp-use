@@ -1,0 +1,34 @@
+{
+  "name": "@mcp-use/server-example-view-tool-debugger",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Diagnostic MCP Apps example that exposes the complete useViewTool lifecycle.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mcp-use/server": "workspace:*",
+    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
+    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@2501",
+    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712",
+    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@2501",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "typescript": "7.0.1-rc",
+    "vite": "^8.0.16"
+  }
+}
