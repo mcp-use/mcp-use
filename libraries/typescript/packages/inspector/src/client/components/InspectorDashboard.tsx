@@ -587,21 +587,24 @@ export function InspectorDashboard() {
       <div className="w-full px-3 pt-6 sm:px-6 sm:pt-3 overflow-visible lg:overflow-auto">
         <div className="flex mb-3 md:mb-0 flex-col sm:flex-row items-center sm:items-center gap-3 relative z-10">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href="https://github.com/mcp-use/mcp-use"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block order-1 sm:order-2"
-              >
-                <Badge
-                  variant="secondary"
-                  className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
+            <TooltipTrigger
+              render={
+                <a
+                  href="https://github.com/mcp-use/mcp-use"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block order-1 sm:order-2"
                 >
-                  v{getPackageVersion()}
-                </Badge>
-              </a>
-            </TooltipTrigger>
+                  <Badge
+                    variant="secondary"
+                    className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
+                  >
+                    v{getPackageVersion()}
+                  </Badge>
+                </a>
+              }
+              nativeButton={false}
+            />
             <TooltipContent>
               <p>Visit GitHub</p>
             </TooltipContent>
@@ -659,29 +662,32 @@ export function InspectorDashboard() {
                           ) : connection.error &&
                             connection.state !== "ready" ? (
                             <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  data-testid={`server-tile-status-${connection.state}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCopyError(connection.error!);
-                                  }}
-                                  className={`w-2 h-2 rounded-full transition-colors ${
-                                    (connection.error.includes("401") ||
+                              <TooltipTrigger
+                                render={
+                                  <button
+                                    type="button"
+                                    data-testid={`server-tile-status-${connection.state}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopyError(connection.error!);
+                                    }}
+                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                      (connection.error.includes("401") ||
+                                        connection.error.includes(
+                                          "Unauthorized"
+                                        )) &&
                                       connection.error.includes(
-                                        "Unauthorized"
-                                      )) &&
-                                    connection.error.includes(
-                                      "does not support OAuth"
-                                    )
-                                      ? "bg-yellow-500 animate-status-pulse-yellow hover:bg-yellow-600"
-                                      : "bg-rose-500 animate-status-pulse-red hover:bg-rose-600"
-                                  }`}
-                                  title="Click to copy error message"
-                                  aria-label="Copy error message to clipboard"
-                                />
-                              </TooltipTrigger>
+                                        "does not support OAuth"
+                                      )
+                                        ? "bg-yellow-500 animate-status-pulse-yellow hover:bg-yellow-600"
+                                        : "bg-rose-500 animate-status-pulse-red hover:bg-rose-600"
+                                    }`}
+                                    title="Click to copy error message"
+                                    aria-label="Copy error message to clipboard"
+                                  />
+                                }
+                                nativeButton
+                              />
                               <TooltipContent>
                                 <p className="max-w-xs">{connection.error}</p>
                               </TooltipContent>
@@ -705,24 +711,27 @@ export function InspectorDashboard() {
                           {connection.url}
                         </p>
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  await copyToClipboard(connection.url ?? "");
-                                  toast.success("URL copied to clipboard");
-                                } catch {
-                                  toast.error("Failed to copy URL");
-                                }
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
-                              title="Copy URL"
-                            >
-                              <Copy className="w-3 h-3 text-muted-foreground" />
-                            </button>
-                          </TooltipTrigger>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await copyToClipboard(connection.url ?? "");
+                                    toast.success("URL copied to clipboard");
+                                  } catch {
+                                    toast.error("Failed to copy URL");
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
+                                title="Copy URL"
+                              >
+                                <Copy className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            }
+                            nativeButton
+                          />
                           <TooltipContent>
                             <p>Copy URL</p>
                           </TooltipContent>
@@ -732,82 +741,94 @@ export function InspectorDashboard() {
                     {/* Desktop: Show all action buttons */}
                     <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-copy-config"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                handleCopyConnectionConfig(connection)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-copy-config"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  handleCopyConnectionConfig(connection)
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>Copy connection config</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-info"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () => {
-                                setInfoModalConnection(connection);
-                                setInfoModalOpen(true);
-                              })
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <Info className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-info"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () => {
+                                  setInfoModalConnection(connection);
+                                  setInfoModalOpen(true);
+                                })
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Info className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>View server info</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-settings"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                setEditingConnectionId(connection.id)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-settings"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  setEditingConnectionId(connection.id)
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>Edit connection settings</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-remove"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                handleRemoveConnection(connection.id)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <CircleMinus className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-remove"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  handleRemoveConnection(connection.id)
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <CircleMinus className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>Remove connection</p>
                         </TooltipContent>
@@ -816,21 +837,24 @@ export function InspectorDashboard() {
                         connection.state === "failed" ||
                         connection.state === "discovering") && (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              data-testid="server-tile-reconnect"
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) =>
-                                handleActionClick(e, () =>
-                                  handleReconnect(connection)
-                                )
-                              }
-                              className="h-8 w-8 p-0"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                data-testid="server-tile-reconnect"
+                                variant="secondary"
+                                size="sm"
+                                onClick={(e) =>
+                                  handleActionClick(e, () =>
+                                    handleReconnect(connection)
+                                  )
+                                }
+                                className="h-8 w-8 p-0"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </Button>
+                            }
+                            nativeButton
+                          />
                           <TooltipContent>
                             <p>
                               {connection.state === "failed"
@@ -846,16 +870,19 @@ export function InspectorDashboard() {
                     {/* Mobile: Show 3-dots overflow menu */}
                     <div className="lg:hidden flex-shrink-0">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={(e) => {
@@ -935,35 +962,36 @@ export function InspectorDashboard() {
                           size="sm"
                           className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
                           variant="outline"
-                          asChild
+                          render={
+                            <a
+                              href={connection.authUrl}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Store connection config so trySessionReconnect() can
+                                // resume after an OAuth redirect (when ?autoConnect is absent).
+                                try {
+                                  sessionStorage.setItem(
+                                    INSPECTOR_RECONNECT_STORAGE_KEY,
+                                    JSON.stringify({
+                                      url: connection.url,
+                                      name:
+                                        connection.name ||
+                                        "Auto-connected Server",
+                                      transportType:
+                                        (connection as any).transportType ||
+                                        "http",
+                                      connectionMode: "auto",
+                                    })
+                                  );
+                                } catch {
+                                  /* sessionStorage unavailable — best-effort */
+                                }
+                              }}
+                            />
+                          }
+                          nativeButton={false}
                         >
-                          <a
-                            href={connection.authUrl}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Store connection config so trySessionReconnect() can
-                              // resume after an OAuth redirect (when ?autoConnect is absent).
-                              try {
-                                sessionStorage.setItem(
-                                  INSPECTOR_RECONNECT_STORAGE_KEY,
-                                  JSON.stringify({
-                                    url: connection.url,
-                                    name:
-                                      connection.name ||
-                                      "Auto-connected Server",
-                                    transportType:
-                                      (connection as any).transportType ||
-                                      "http",
-                                    connectionMode: "auto",
-                                  })
-                                );
-                              } catch {
-                                /* sessionStorage unavailable — best-effort */
-                              }
-                            }}
-                          >
-                            Authenticate
-                          </a>
+                          Authenticate
                         </Button>
                       ) : null}
                     </div>
@@ -1012,24 +1040,27 @@ export function InspectorDashboard() {
           />
         </div>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={toggleMeshAnimationPaused}
-              aria-label={
-                meshAnimationPaused
-                  ? "Enable background shader animation"
-                  : "Disable background shader animation"
-              }
-              className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
-            >
-              {meshAnimationPaused ? (
-                <Play className="h-3 w-3 ml-px" fill="currentColor" />
-              ) : (
-                <Square className="h-2.5 w-2.5" fill="currentColor" />
-              )}
-            </button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={toggleMeshAnimationPaused}
+                aria-label={
+                  meshAnimationPaused
+                    ? "Enable background shader animation"
+                    : "Disable background shader animation"
+                }
+                className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
+              >
+                {meshAnimationPaused ? (
+                  <Play className="h-3 w-3 ml-px" fill="currentColor" />
+                ) : (
+                  <Square className="h-2.5 w-2.5" fill="currentColor" />
+                )}
+              </button>
+            }
+            nativeButton
+          />
           <TooltipContent side="left">
             <p>
               {meshAnimationPaused

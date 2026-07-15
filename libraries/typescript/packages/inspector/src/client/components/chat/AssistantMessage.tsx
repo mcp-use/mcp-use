@@ -1,18 +1,20 @@
 import { StreamingAssistantContent } from "./StreamingAssistantContent";
 import { ChatMessage } from "@/client/components/ui/chat-message";
-import { CopyButton } from "./CopyButton";
+import { MessageMetaActions } from "./MessageMetaActions";
 
 interface AssistantMessageProps {
   content: string;
   timestamp?: Date | number;
   /** Internal: indicates the message is currently being streamed */
   _isStreaming?: boolean;
+  outputTokens?: number;
 }
 
 export function AssistantMessage({
   content,
   timestamp,
   _isStreaming: isStreaming,
+  outputTokens,
 }: AssistantMessageProps) {
   if (!content || content.length === 0) {
     return null;
@@ -22,7 +24,13 @@ export function AssistantMessage({
     <div data-testid="chat-message-assistant">
       <ChatMessage
         from="assistant"
-        actions={<CopyButton text={content} />}
+        actions={
+          <MessageMetaActions
+            variant="assistant"
+            copyText={content}
+            outputTokens={outputTokens}
+          />
+        }
         data-testid="chat-message-content"
       >
         <StreamingAssistantContent

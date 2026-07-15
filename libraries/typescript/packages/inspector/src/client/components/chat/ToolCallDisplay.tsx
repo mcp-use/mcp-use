@@ -72,45 +72,48 @@ export function ToolCallDisplay({
 
   return (
     <Sheet>
-      <SheetTrigger asChild>
-        <div
-          className="flex max-w-min items-center gap-3 p-1 rounded-full border bg-card hover:bg-accent/50 transition-colors cursor-pointer my-4"
-          data-testid={`chat-tool-call-${toolName}`}
-        >
-          {/* Tool Icon */}
-          <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
-            <Wrench className="size-4 text-muted-foreground" />
-          </div>
+      <SheetTrigger
+        render={
+          <div
+            className="flex max-w-min items-center gap-3 p-1 rounded-full border bg-card hover:bg-accent/50 transition-colors cursor-pointer my-4"
+            data-testid={`chat-tool-call-${toolName}`}
+          >
+            {/* Tool Icon */}
+            <div className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-center shrink-0">
+              <Wrench className="size-4 text-muted-foreground" />
+            </div>
 
-          {/* Tool Name */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium truncate">
-                {toolName}(
-                {Object.keys(displayArgs).length > 0 ? (
-                  <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
-                    {Object.keys(displayArgs).length} args
-                  </span>
-                ) : (
-                  ""
-                )}
-                )
-              </span>
+            {/* Tool Name */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium truncate">
+                  {toolName}(
+                  {Object.keys(displayArgs).length > 0 ? (
+                    <span className="bg-muted-foreground/20 rounded-full px-1.5 mx-1 py-0.5 text-xs">
+                      {Object.keys(displayArgs).length} args
+                    </span>
+                  ) : (
+                    ""
+                  )}
+                  )
+                </span>
+              </div>
+            </div>
+
+            {/* Status Icon */}
+            <div
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center",
+                getStatusBg()
+              )}
+              data-testid={`chat-tool-call-status-${state}`}
+            >
+              {getStatusIcon()}
             </div>
           </div>
-
-          {/* Status Icon */}
-          <div
-            className={cn(
-              "w-8 h-8 rounded-full flex items-center justify-center",
-              getStatusBg()
-            )}
-            data-testid={`chat-tool-call-status-${state}`}
-          >
-            {getStatusIcon()}
-          </div>
-        </div>
-      </SheetTrigger>
+        }
+        nativeButton={false}
+      />
 
       <SheetContent
         side="right"

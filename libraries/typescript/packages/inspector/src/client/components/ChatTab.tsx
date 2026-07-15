@@ -465,13 +465,17 @@ export function ChatTab({
     onHistoryRefetch: bumpHistoryRefetch,
   });
 
-  const rateLimitInfo = effectiveClientSide
-    ? null
-    : (serverSideChat.rateLimitInfo ?? null);
+  const rateLimitInfo = effectiveClientSide && isManaged
+    ? (clientSideChat.rateLimitInfo ?? null)
+    : effectiveClientSide
+      ? null
+      : (serverSideChat.rateLimitInfo ?? null);
 
-  const clearRateLimitInfo = effectiveClientSide
-    ? undefined
-    : serverSideChat.clearRateLimitInfo;
+  const clearRateLimitInfo = effectiveClientSide && isManaged
+    ? clientSideChat.clearRateLimitInfo
+    : effectiveClientSide
+      ? undefined
+      : serverSideChat.clearRateLimitInfo;
 
   const mcpServerAuthRequired = effectiveClientSide
     ? null
@@ -1043,16 +1047,19 @@ export function ChatTab({
           {!showHistoryPanel && (
             <div className="absolute top-1/2 left-4 z-50 -translate-y-1/2">
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="size-10 aspect-square rounded-full"
-                    onClick={() => setShowHistoryPanel(true)}
-                  >
-                    <HistoryIcon size={16} />
-                  </Button>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="size-10 aspect-square rounded-full"
+                      onClick={() => setShowHistoryPanel(true)}
+                    >
+                      <HistoryIcon size={16} />
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <TooltipContent side="right">
                   <p>Chat History</p>
                 </TooltipContent>
@@ -1494,6 +1501,7 @@ export function ChatTab({
               sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
+              traceEvents={traceEvents}
             />
           ) : (
             <ChatRawView events={traceEvents} usage={tokenUsage} />

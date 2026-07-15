@@ -7,6 +7,7 @@ export interface NativeLLMConfig {
   maxTokens?: number;
   baseUrl?: string;
   extraHeaders?: Record<string, string>;
+  credentials?: RequestCredentials;
 }
 
 const PROVIDER_ENV: Record<string, string[]> = {
@@ -71,6 +72,7 @@ export function parseLLMStringToProviderConfig(
     maxTokens: config?.maxTokens,
     baseUrl: config?.baseUrl,
     extraHeaders: config?.extraHeaders,
+    credentials: config?.credentials,
   };
 }
 
@@ -87,5 +89,6 @@ export function providerConfigFromOptions(
     maxTokens: config?.maxTokens,
     baseUrl: config?.baseUrl,
     extraHeaders: config?.extraHeaders,
+    credentials: config?.credentials,
   };
 }

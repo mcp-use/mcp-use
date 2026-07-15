@@ -3,37 +3,15 @@
 import * as React from "react"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 
-import {
-  resolveAsChildFromChildren,
-  type AsChildCompatProps,
-} from "@/client/lib/as-child-compat"
 import { cn } from "@/client/lib/utils"
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />
 }
 
-function PopoverTrigger({
-  asChild,
-  render,
-  children,
-  nativeButton,
-  ...props
-}: PopoverPrimitive.Trigger.Props & AsChildCompatProps) {
-  const asChildResolved = resolveAsChildFromChildren({
-    asChild,
-    children,
-    nativeButton,
-  })
+function PopoverTrigger(props: PopoverPrimitive.Trigger.Props) {
   return (
-    <PopoverPrimitive.Trigger
-      data-slot="popover-trigger"
-      {...props}
-      render={render ?? asChildResolved?.render}
-      nativeButton={asChildResolved?.nativeButton ?? nativeButton}
-    >
-      {asChildResolved ? undefined : children}
-    </PopoverPrimitive.Trigger>
+    <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />
   )
 }
 

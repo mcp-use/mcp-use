@@ -247,7 +247,7 @@ export function JsonRpcLoggerView({
             onChange={(event) => setSearchQuery(event.target.value)}
             placeholder="Search"
             aria-label="Search RPC traffic"
-            className="h-8 pl-7 text-xs"
+            className="h-8 pl-7 text-xs shadow-none"
           />
         </div>
         <CheckboxGroup
@@ -347,28 +347,34 @@ function RpcLogRow({
         className="flex h-9 w-full items-center gap-2 px-3 py-2 text-left text-muted-foreground transition-colors hover:text-foreground"
       >
         <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="flex size-4 shrink-0 items-center justify-center">
-              {item.direction === "receive" ? (
-                <ArrowDownLeft className="size-3.5 text-blue-500" />
-              ) : (
-                <ArrowUpRight className="size-3.5 text-emerald-500" />
-              )}
-            </span>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <span className="flex size-4 shrink-0 items-center justify-center">
+                {item.direction === "receive" ? (
+                  <ArrowDownLeft className="size-3.5 text-blue-500" />
+                ) : (
+                  <ArrowUpRight className="size-3.5 text-emerald-500" />
+                )}
+              </span>
+            }
+            nativeButton={false}
+          />
           <TooltipContent side="left">{direction}</TooltipContent>
         </Tooltip>
 
         <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="flex size-3.5 shrink-0 items-center justify-center">
-              {item.source === "mcp" ? (
-                <McpIcon className="size-3" />
-              ) : (
-                <PanelsTopLeft className="size-3" />
-              )}
-            </span>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <span className="flex size-3.5 shrink-0 items-center justify-center">
+                {item.source === "mcp" ? (
+                  <McpIcon className="size-3" />
+                ) : (
+                  <PanelsTopLeft className="size-3" />
+                )}
+              </span>
+            }
+            nativeButton={false}
+          />
           <TooltipContent side="left">
             {item.source === "mcp" ? "MCP server" : "UI widget"}
           </TooltipContent>
@@ -382,14 +388,17 @@ function RpcLogRow({
         </span>
 
         <Tooltip>
-          <TooltipTrigger asChild>
-            <time
-              dateTime={item.timestamp}
-              className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
-            >
-              {new Date(item.timestamp).toLocaleTimeString()}
-            </time>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <time
+                dateTime={item.timestamp}
+                className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
+              >
+                {new Date(item.timestamp).toLocaleTimeString()}
+              </time>
+            }
+            nativeButton={false}
+          />
           <TooltipContent side="left">
             {new Date(item.timestamp).toLocaleString()}
           </TooltipContent>

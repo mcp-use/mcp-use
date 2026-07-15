@@ -39,6 +39,7 @@ export interface LLMConfig {
   model: string;
   temperature?: number;
   baseUrl?: string;
+  credentials?: RequestCredentials;
 }
 
 export interface AuthConfig {

@@ -18,10 +18,10 @@ export function useHostedChatMode({
   const effectiveClientSide = hostUsesServerManagedStream
     ? forceClientSide
     : useClientSide || forceClientSide || !!localLlmConfig;
-  const llmConfig = effectiveClientSide
-    ? localLlmConfig
-    : (managedLlmConfig ?? localLlmConfig);
-  const isManaged = !effectiveClientSide && !!managedLlmConfig;
+  const isManaged = !!managedLlmConfig && !forceClientSide;
+  const llmConfig = isManaged
+    ? managedLlmConfig
+    : (localLlmConfig ?? managedLlmConfig);
 
   return {
     forceClientSide,

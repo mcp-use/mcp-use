@@ -1,33 +1,11 @@
 import { Button } from "@/client/components/ui/button";
-import { GithubIcon } from "@/client/components/ui/github-icon";
 import { Tabs, TabsList, TabsTrigger } from "@/client/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/client/components/ui/dropdown-menu";
 import type { TabType } from "@/client/context/InspectorContext";
 import { useInspector } from "@/client/context/InspectorContext";
 import { cn } from "@/client/lib/utils";
 import { getServerHeaders } from "@/client/utils/connectionUpdates";
 import { getServerDisplayName } from "@/client/utils/servers";
-import {
-  Bug,
-  ChevronDown,
-  Command,
-  Monitor,
-  Moon,
-  Plus,
-  Settings,
-  SunDim,
-} from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -36,7 +14,6 @@ import {
   MCPDeployClickEvent,
   captureInspectorEvent,
 } from "@/client/telemetry";
-import { useTheme } from "@/client/context/ThemeContext";
 import { TabCountBadge } from "./shared/TabCountBadge";
 import { AddToClientDropdown } from "./AddToClientDropdown";
 import LogoAnimated from "./LogoAnimated";
@@ -52,7 +29,6 @@ interface LayoutHeaderProps {
   activeTab: string;
   onServerSelect: (serverId: string) => void;
   onTabChange: (tab: TabType) => void;
-  onCommandPaletteOpen: () => void;
   embedded?: boolean;
   sidebarCollapsed?: boolean;
 }
@@ -63,12 +39,10 @@ export function LayoutHeader({
   activeTab,
   onServerSelect,
   onTabChange,
-  onCommandPaletteOpen,
   embedded = false,
   sidebarCollapsed = false,
 }: LayoutHeaderProps) {
   const { tunnelUrl, embeddedConfig } = useInspector();
-  const { theme, setTheme } = useTheme();
   const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
   const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -200,84 +174,6 @@ export function LayoutHeader({
         >
           <span className="[text-box:trim-both_cap_alphabetic]">Deploy</span>
         </a>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="p-2 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-full transition-colors"
-              aria-label="Settings"
-            >
-              <Settings className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem
-              onClick={onCommandPaletteOpen}
-              data-testid="command-palette-trigger-button"
-            >
-              <Command className="size-4 mr-2" />
-              Command Palette
-              <span className="ml-auto text-xs text-muted-foreground">
-                {"\u2318"}K
-              </span>
-            </DropdownMenuItem>
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                {theme === "light" ? (
-                  <SunDim className="size-4 mr-2" />
-                ) : theme === "dark" ? (
-                  <Moon className="size-4 mr-2" />
-                ) : (
-                  <Monitor className="size-4 mr-2" />
-                )}
-                Theme
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                <DropdownMenuRadioGroup
-                  value={theme}
-                  onValueChange={(v) =>
-                    setTheme(v as "light" | "dark" | "system")
-                  }
-                >
-                  <DropdownMenuRadioItem value="light">
-                    <SunDim className="size-4 mr-2" />
-                    Light
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="dark">
-                    <Moon className="size-4 mr-2" />
-                    Dark
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="system">
-                    <Monitor className="size-4 mr-2" />
-                    System
-                  </DropdownMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a
-                href="https://github.com/mcp-use/mcp-use"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <GithubIcon className="h-4 w-4 mr-2" />
-                GitHub
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a
-                href="https://github.com/mcp-use/mcp-use/issues/new?labels=inspector&template=bug_report.md&title=%5BInspector%5D+"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Bug className="size-4 mr-2" />
-                Report a Bug
-              </a>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
         {embeddedConfig.chatApiUrl ? (
           <HostedUserMenu
             chatApiUrl={embeddedConfig.chatApiUrl}

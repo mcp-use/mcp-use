@@ -70,30 +70,36 @@ export function ToolSelector({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={disabled}
-              className={cn(
-                "h-auto gap-1 rounded-full px-2 py-2",
-                someDisabled
-                  ? "text-amber-500 dark:text-amber-400"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-              type="button"
-              data-testid="chat-tool-selector"
-            >
-              <Wrench className="h-4 w-4 shrink-0" />
-              {someDisabled && (
-                <span className="flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white">
-                  {enabledCount}
-                </span>
-              )}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled}
+                  className={cn(
+                    "h-auto gap-1 rounded-full px-2 py-2",
+                    someDisabled
+                      ? "text-amber-500 dark:text-amber-400"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                  type="button"
+                  data-testid="chat-tool-selector"
+                >
+                  <Wrench className="h-4 w-4 shrink-0" />
+                  {someDisabled && (
+                    <span className="flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-1 text-[9px] font-bold leading-none text-white">
+                      {enabledCount}
+                    </span>
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
+          }
+          nativeButton
+        />
         <TooltipContent side="top">
           <p>
             Tools ({enabledCount}/{tools.length})

@@ -72,18 +72,21 @@ export function SavedRequestsList({
           />
           <div className="absolute top-1/2 right-2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={(e) =>
-                    handleActionClick(e, () => onDeleteRequest(request.id))
-                  }
-                  className="h-8 w-8 p-0"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={(e) =>
+                      handleActionClick(e, () => onDeleteRequest(request.id))
+                    }
+                    className="h-8 w-8 p-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                }
+                nativeButton
+              />
               <TooltipContent>
                 <p>Delete saved request</p>
               </TooltipContent>

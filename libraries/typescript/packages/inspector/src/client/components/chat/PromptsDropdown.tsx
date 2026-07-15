@@ -44,31 +44,34 @@ export function PromptsDropdown({
         </div>
         {prompts.map((prompt, index) => (
           <Tooltip key={index}>
-            <TooltipTrigger asChild>
-              <Button
-                id={`prompt-${index}`}
-                type="button"
-                variant="ghost"
-                className={cn(
-                  "w-full flex items-center px-3 py-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-left justify-start",
-                  focusedIndex === index && "bg-zinc-200 dark:bg-zinc-700"
-                )}
-                onClick={() => onPromptSelect(prompt)}
-                data-testid={`chat-prompt-option-${index}`}
-              >
-                <div className="flex items-center justify-center shrink-0">
-                  <MessageSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    {prompt.name}
+            <TooltipTrigger
+              render={
+                <Button
+                  id={`prompt-${index}`}
+                  type="button"
+                  variant="ghost"
+                  className={cn(
+                    "w-full flex items-center px-3 py-2 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors text-left justify-start",
+                    focusedIndex === index && "bg-zinc-200 dark:bg-zinc-700"
+                  )}
+                  onClick={() => onPromptSelect(prompt)}
+                  data-testid={`chat-prompt-option-${index}`}
+                >
+                  <div className="flex items-center justify-center shrink-0">
+                    <MessageSquare className="h-4 w-4 text-zinc-600 dark:text-zinc-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                      {prompt.name}
                     {selectedPrompt?.name === prompt.name && (
                       <Spinner className="size-3 text-zinc-600 dark:text-zinc-400" />
                     )}
                   </div>
                 </div>
               </Button>
-            </TooltipTrigger>
+              }
+              nativeButton
+            />
             <TooltipContent>{prompt.description}</TooltipContent>
           </Tooltip>
         ))}

@@ -2,6 +2,7 @@ import { TextShimmer } from "@/client/components/ui/text-shimmer";
 import {
   memo,
   useCallback,
+  useMemo,
   type RefObject,
 } from "react";
 import type { MessageContentBlock } from "@/client/types/message-content-block";
@@ -11,6 +12,10 @@ import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
 import type { MessageAttachment } from "./types";
 import { isViewTool } from "@mcp-use/client/react";
+import {
+  buildMessageTokenMap,
+  type InspectorTraceEvent,
+} from "./trace";
 
 interface Message {
   id: string;
@@ -50,6 +55,8 @@ interface MessageListProps {
   serverBaseUrl?: string;
   /** Anchor at the end of the thread — owned by useChatScrollToBottom in ChatTab. */
   messagesEndRef?: RefObject<HTMLDivElement | null>;
+  /** Trace events used to derive per-message token counts on hover. */
+  traceEvents?: InspectorTraceEvent[];
 }
 
 export const MessageList = memo(
@@ -61,7 +68,13 @@ export const MessageList = memo(
     tools,
     sendMessage,
     messagesEndRef,
+    traceEvents = [],
   }: MessageListProps) => {
+    const messageTokenMap = useMemo(
+      () => buildMessageTokenMap(messages, traceEvents),
+      [messages, traceEvents]
+    );
+
     // Helper function to get tool metadata by name.
     // Normalizes hyphens/underscores because the Anthropic API converts
     // hyphenated tool names to underscores in tool_use responses while
@@ -191,11 +204,19 @@ export const MessageList = memo(
                 content={contentStr}
                 timestamp={message.timestamp}
                 attachments={message.attachments}
+                inputTokens={messageTokenMap.get(message.id)?.inputTokens}
               />
             );
           }
 
           if (message.role === "assistant") {
+            const outputTokens =
+              messageTokenMap.get(message.id)?.outputTokens;
+            const lastTextPartIndex =
+              message.parts && message.parts.length > 0
+                ? getLastTextPartIndex(message.parts)
+                : -1;
+
             return (
               <div key={message.id} className="space-y-4">
                 {/* Handle message parts if available (for proper ordering) */}
@@ -221,6 +242,11 @@ export const MessageList = memo(
                             partIndex,
                             message.parts!
                           )}
+                          outputTokens={
+                            partIndex === lastTextPartIndex
+                              ? outputTokens
+                              : undefined
+                          }
                         />
                       );
                     } else if (
@@ -284,6 +310,7 @@ export const MessageList = memo(
                       content={contentStr}
                       timestamp={message.timestamp}
                       _isStreaming={isMessageStreaming(message)}
+                      outputTokens={outputTokens}
                     />
 
                     {/* Tool Calls (fallback for non-parts messages) */}

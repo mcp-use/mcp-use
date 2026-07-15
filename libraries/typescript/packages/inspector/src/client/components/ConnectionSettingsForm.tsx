@@ -590,22 +590,25 @@ export function ConnectionSettingsForm({
         <div className="flex flex-row gap-3 @lg:flex-col">
         {/* Authentication Button */}
         <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-          <DialogTrigger asChild>
-            <div className="relative flex-1 ">
-              <Button
-                data-testid="connection-form-auth-button"
-                variant="outline"
-                className={cn(
-                  (clientId || clientSecret || scope) && "border-2",
-                  "w-full justify-center hover:text-white cursor-pointer",
-                  buttonClassName
-                )}
-              >
-                <Shield className="w-4 h-4 mr-0" />
-                Authentication
-              </Button>
-            </div>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <div className="relative flex-1 ">
+                <Button
+                  data-testid="connection-form-auth-button"
+                  variant="outline"
+                  className={cn(
+                    (clientId || clientSecret || scope) && "border-2",
+                    "w-full justify-center hover:text-white cursor-pointer",
+                    buttonClassName
+                  )}
+                >
+                  <Shield className="w-4 h-4 mr-0" />
+                  Authentication
+                </Button>
+              </div>
+            }
+            nativeButton={false}
+          />
           <DialogContent scrollable className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Authentication</DialogTitle>
@@ -621,21 +624,24 @@ export function ConnectionSettingsForm({
 
         {/* Custom Headers Button */}
         <Dialog open={headersDialogOpen} onOpenChange={setHeadersDialogOpen}>
-          <DialogTrigger asChild>
-            <div className="relative flex-1 ">
-              <Button
-                data-testid="connection-form-headers-button"
-                variant="outline"
-                className={cn(
-                  "w-full justify-center hover:text-white cursor-pointer",
-                  buttonClassName
-                )}
-              >
-                <FileText className="w-4 h-4" />
-                Custom Headers
-              </Button>
-            </div>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <div className="relative flex-1 ">
+                <Button
+                  data-testid="connection-form-headers-button"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-center hover:text-white cursor-pointer",
+                    buttonClassName
+                  )}
+                >
+                  <FileText className="w-4 h-4" />
+                  Custom Headers
+                </Button>
+              </div>
+            }
+            nativeButton={false}
+          />
           <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Custom Headers</DialogTitle>
@@ -653,19 +659,22 @@ export function ConnectionSettingsForm({
 
         {/* Configuration Button */}
         <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              data-testid="connection-form-config-button"
-              variant="outline"
-              className={cn(
-                "flex-1  justify-center hover:text-white cursor-pointer",
-                buttonClassName
-              )}
-            >
-              <Cog className="w-4 h-4" />
-              Configuration
-            </Button>
-          </DialogTrigger>
+          <DialogTrigger
+            render={
+              <Button
+                data-testid="connection-form-config-button"
+                variant="outline"
+                className={cn(
+                  "flex-1  justify-center hover:text-white cursor-pointer",
+                  buttonClassName
+                )}
+              >
+                <Cog className="w-4 h-4" />
+                Configuration
+              </Button>
+            }
+            nativeButton
+          />
           <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Configuration</DialogTitle>
@@ -687,9 +696,12 @@ export function ConnectionSettingsForm({
           data-testid="connection-form-connect-button"
           onClick={onConnect}
           disabled={!url.trim() || isConnecting}
+          size={isStyled ? "lg" : undefined}
           className={cn(
             "w-full font-semibold",
-            isStyled ? "bg-white text-black hover:bg-white/90" : ""
+            isStyled
+              ? "rounded-full text-black [&_[aria-hidden]]:bg-white hover:[&_[aria-hidden]]:bg-white/90 group-active:[&_[aria-hidden]]:bg-white/80"
+              : ""
           )}
         >
           {isConnecting ? (

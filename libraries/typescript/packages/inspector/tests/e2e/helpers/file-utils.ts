@@ -20,10 +20,15 @@ export const CONFORMANCE_WEATHER_WIDGET_PATH = path.join(
   conformanceRoot,
   "resources/weather-display/widget.tsx"
 );
+export const CONFORMANCE_WEATHER_VIEW_PATH = path.join(
+  conformanceRoot,
+  "resources/weather-display/view.tsx"
+);
 export const CONFORMANCE_RESOURCES_DIR = path.join(
   conformanceRoot,
   "resources"
 );
+export const CONFORMANCE_PUBLIC_DIR = path.join(conformanceRoot, "public");
 
 /**
  * Read file content. Used for backup and for tests that need to inspect content.
@@ -87,4 +92,24 @@ export async function removeConformanceResourceDir(
 ): Promise<void> {
   const widgetDir = path.join(CONFORMANCE_RESOURCES_DIR, widgetName);
   await rm(widgetDir, { recursive: true, force: true });
+}
+
+/** Write a public asset served by the v2 development server. */
+export async function writeConformancePublicFile(
+  fileName: string,
+  content: string
+): Promise<void> {
+  await mkdir(CONFORMANCE_PUBLIC_DIR, { recursive: true });
+  await writeFile(
+    path.join(CONFORMANCE_PUBLIC_DIR, fileName),
+    content,
+    "utf-8"
+  );
+}
+
+/** Remove a public asset created by an HMR test. */
+export async function removeConformancePublicFile(
+  fileName: string
+): Promise<void> {
+  await rm(path.join(CONFORMANCE_PUBLIC_DIR, fileName), { force: true });
 }

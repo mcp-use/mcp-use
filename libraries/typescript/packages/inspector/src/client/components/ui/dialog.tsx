@@ -71,35 +71,8 @@ function Dialog({
   );
 }
 
-import {
-  resolveAsChildFromChildren,
-  type AsChildCompatProps,
-} from "@/client/lib/as-child-compat";
-
-const DialogTriggerBase = DialogPrimitive.Trigger;
-
-function DialogTrigger({
-  asChild,
-  render,
-  children,
-  nativeButton,
-  ...props
-}: DialogPrimitive.Trigger.Props & AsChildCompatProps) {
-  const asChildResolved = resolveAsChildFromChildren({
-    asChild,
-    children,
-    nativeButton,
-  });
-
-  return (
-    <DialogTriggerBase
-      {...props}
-      render={render ?? asChildResolved?.render}
-      nativeButton={asChildResolved?.nativeButton ?? nativeButton}
-    >
-      {asChildResolved ? undefined : children}
-    </DialogTriggerBase>
-  );
+function DialogTrigger(props: DialogPrimitive.Trigger.Props) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
 const DialogClose = DialogPrimitive.Close;

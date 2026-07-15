@@ -12,6 +12,7 @@ import {
   type McpHttpHandler,
   type McpRequestContext,
   type PromptCallback as SdkPromptCallback,
+  type ServerEventBus,
   type ServerContext,
   type StandardSchemaWithJSON,
 } from "@modelcontextprotocol/server";
@@ -380,9 +381,23 @@ export class MCPServer<TUser = never> {
    * edges (Vercel, Cloudflare, …) only route hostnames assigned to the
    * deployment. Set `allowedHosts`/`allowedOrigins` to opt into validation
    * (additive — localhost-class values stay allowed).
+   *
+   * Pass the same `bus` to multiple server instances when their handlers
+   * replace one another while existing `subscriptions/listen` streams remain
+   * open. The bus is fixed when this instance first mounts.
+   *
+   * @param options - Optional handler wiring.
+   *
+   * @example
+   * ```ts
+   * const handler = server.getHandler();
+   * export default { fetch: handler };
+   * ```
    */
-  getHandler(): (request: Request) => Promise<Response> {
-    const { app } = this.#ensureMounted("handler");
+  getHandler(options: { bus?: ServerEventBus } = {}): (
+    request: Request
+  ) => Promise<Response> {
+    const { app } = this.#ensureMounted("handler", undefined, options.bus);
     return async (request) => app.fetch(request);
   }
 
@@ -628,7 +643,8 @@ export class MCPServer<TUser = never> {
 
   #ensureMounted(
     mode: "listen" | "handler",
-    listenPort?: number
+    listenPort?: number,
+    bus?: ServerEventBus
   ): {
     app: Hono;
     handler: McpHttpHandler;
@@ -744,8 +760,13 @@ export class MCPServer<TUser = never> {
       }
       const handler = mountMcp(mcpApp, (ctx) => this.#buildSdkServer(ctx), {
         path: this.#basePath(),
-        ...(this.#config.legacy !== undefined && {
-          handler: { legacy: this.#config.legacy },
+        ...((this.#config.legacy !== undefined || bus !== undefined) && {
+          handler: {
+            ...(this.#config.legacy !== undefined && {
+              legacy: this.#config.legacy,
+            }),
+            ...(bus !== undefined && { bus }),
+          },
         }),
         ...(resource !== undefined && {
           authInfo: (context) => context.get("authInfo"),
@@ -760,6 +781,10 @@ export class MCPServer<TUser = never> {
       this.#app = app;
       this.#handler = handler;
       this.#hostValidated = hosts !== undefined;
+    } else if (bus !== undefined && this.#handler.bus !== bus) {
+      throw new Error(
+        "Cannot change the MCP event bus after the server has started."
+      );
     } else if (
       mode === "listen" &&
       !this.#hostValidated &&
@@ -849,6 +874,11 @@ export class MCPServer<TUser = never> {
         ...(description !== undefined && { description }),
       },
       {
+        capabilities: {
+          tools: { listChanged: true },
+          prompts: { listChanged: true },
+          resources: { listChanged: true, subscribe: true },
+        },
         ...(instructions !== undefined && { instructions }),
         ...(authInfo !== undefined && { authInfo }),
       }

@@ -94,18 +94,21 @@ export function HostedUserMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="relative h-8 w-8 shrink-0 rounded-full p-0 mr-2"
-          aria-label="User menu"
-        >
-          <Avatar className="h-8 w-8 border border-zinc-300 dark:border-zinc-600">
-            <AvatarImage src={user.image ?? ""} alt={displayName} />
-            <AvatarFallback className="text-sm">{initial}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            className="relative h-8 w-8 shrink-0 rounded-full p-0 mr-2"
+            aria-label="User menu"
+          >
+            <Avatar className="h-8 w-8 border border-zinc-300 dark:border-zinc-600">
+              <AvatarImage src={user.image ?? ""} alt={displayName} />
+              <AvatarFallback className="text-sm">{initial}</AvatarFallback>
+            </Avatar>
+          </Button>
+        }
+        nativeButton
+      />
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
@@ -120,12 +123,18 @@ export function HostedUserMenu({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href={dashboardUrl} target="_blank" rel="noopener noreferrer">
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Go to dashboard
-          </a>
-        </DropdownMenuItem>
+        <DropdownMenuItem
+          render={
+            <a
+              href={dashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Go to dashboard
+            </a>
+          }
+        />
       </DropdownMenuContent>
     </DropdownMenu>
   );

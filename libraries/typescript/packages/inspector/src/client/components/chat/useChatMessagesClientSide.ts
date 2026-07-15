@@ -17,6 +17,28 @@ import {
 } from "./trace";
 import { DEFAULT_CHAT_SYSTEM_PROMPT } from "./system-prompt-default";
 
+function rateLimitFromLlmError(error: unknown): {
+  loginUrl: string;
+  creditsExhausted?: boolean;
+  billingUrl?: string;
+} | null {
+  if (!(error instanceof Error) || error.name !== "LlmRequestError") return null;
+  const status = (error as { status?: number }).status;
+  const body = (error as { body?: Record<string, unknown> }).body;
+  if (status !== 429 || !body) return null;
+  if (body.loginRequired && body.loginUrl) {
+    return { loginUrl: String(body.loginUrl) };
+  }
+  if (body.creditsExhausted) {
+    return {
+      loginUrl: String(body.billingUrl ?? ""),
+      creditsExhausted: true,
+      billingUrl: body.billingUrl ? String(body.billingUrl) : undefined,
+    };
+  }
+  return null;
+}
+
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
 
@@ -50,6 +72,11 @@ export function useChatMessagesClientSide({
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
+  const [rateLimitInfo, setRateLimitInfo] = useState<{
+    loginUrl: string;
+    creditsExhausted?: boolean;
+    billingUrl?: string;
+  } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const traceIdRef = useRef(0);
 
@@ -109,9 +136,9 @@ export function useChatMessagesClientSide({
       abortControllerRef.current = new AbortController();
       const startTime = Date.now();
       let toolCallsCount = 0;
+      const assistantMessageId = `assistant-${Date.now()}`;
 
       try {
-        const assistantMessageId = `assistant-${Date.now()}`;
         let currentTextPart = "";
         const parts: Array<{
           type: "text" | "tool-invocation";
@@ -200,6 +227,7 @@ export function useChatMessagesClientSide({
               apiKey: llmConfig.apiKey,
               temperature: llmConfig.temperature,
               baseUrl: llmConfig.baseUrl,
+              credentials: llmConfig.credentials,
             }
           ),
           mcpServers: [connection],
@@ -455,6 +483,16 @@ export function useChatMessagesClientSide({
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
         }
+
+        const rateLimit = rateLimitFromLlmError(error);
+        if (rateLimit) {
+          setRateLimitInfo(rateLimit);
+          setMessages((prev) =>
+            prev.filter((m) => m.id !== assistantMessageId)
+          );
+          return;
+        }
+
         console.error("Client-side agent error:", error);
 
         let errorDetail = "Unknown error occurred";
@@ -559,12 +597,18 @@ export function useChatMessagesClientSide({
     setAttachments([]);
   }, []);
 
+  const clearRateLimitInfo = useCallback(() => {
+    setRateLimitInfo(null);
+  }, []);
+
   return {
     messages,
     isLoading,
     attachments,
+    rateLimitInfo,
     sendMessage,
     clearMessages,
+    clearRateLimitInfo,
     setMessages,
     stop,
     addAttachment,

@@ -567,26 +567,29 @@ export function ConfigurationDialog({
                   modal={true}
                   onOpenChange={setComboboxOpen}
                 >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={comboboxOpen}
-                      className="w-full justify-between rounded-md"
-                      data-testid="chat-config-model-select"
-                    >
-                      <span className="truncate">
-                        {tempModel
-                          ? models.find((model) => model.id === tempModel)
-                              ?.displayName ||
-                            models.find((model) => model.id === tempModel)
-                              ?.id ||
-                            "Select a model..."
-                          : "Select a model..."}
-                      </span>
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={comboboxOpen}
+                        className="w-full justify-between rounded-md"
+                        data-testid="chat-config-model-select"
+                      >
+                        <span className="truncate">
+                          {tempModel
+                            ? models.find((model) => model.id === tempModel)
+                                ?.displayName ||
+                              models.find((model) => model.id === tempModel)
+                                ?.id ||
+                              "Select a model..."
+                            : "Select a model..."}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    }
+                    nativeButton
+                  />
                   <PopoverContent className="w-full p-0" align="start">
                     <Command>
                       <CommandInput

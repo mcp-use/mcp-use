@@ -563,5 +563,5 @@ export interface LLMConfig {
 }
 
 export { providerConfigFromOptions, parseLLMStringToProviderConfig };
-export { DEFAULT_OLLAMA_BASE_URL } from "../llm/providers/ollama/utils.js";
+export { LlmRequestError } from "../llm/providers/openai-chat-completions.js";
 export { convertMessagesToProvider } from "../llm/messageFormat.js";

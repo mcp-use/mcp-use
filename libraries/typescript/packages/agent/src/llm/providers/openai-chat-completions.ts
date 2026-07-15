@@ -12,6 +12,36 @@ import type {
 } from "../types.js";
 import { tokenUsageFromRecord } from "../usage.js";
 
+/** Structured HTTP error from an LLM provider fetch (preserves status + JSON body). */
+export class LlmRequestError extends Error {
+  readonly status: number;
+  readonly body?: unknown;
+
+  constructor(status: number, message: string, body?: unknown) {
+    super(message);
+    this.name = "LlmRequestError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+async function throwLlmRequestError(res: Response): Promise<never> {
+  const text = await res.text().catch(() => "");
+  let body: unknown = text;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // keep raw text
+    }
+  }
+  throw new LlmRequestError(
+    res.status,
+    `OpenAI request failed (${res.status} ${res.statusText}): ${text}`,
+    body
+  );
+}
+
 interface ChatParams {
   config: ProviderConfig;
   messages: ProviderMessage[];
@@ -131,14 +161,18 @@ export async function* streamChat(
     headers: buildHeaders(config),
     body: JSON.stringify(body),
     signal,
+    ...(config.credentials ? { credentials: config.credentials } : {}),
   });
 
-  if (!res.ok || !res.body) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `OpenAI request failed (${res.status} ${res.statusText}): ${text}`
-    );
+  const responseBody = res.body;
+  if (!res.ok) {
+    await throwLlmRequestError(res);
   }
+  if (!responseBody) {
+    await throwLlmRequestError(res);
+  }
+  // ponytail: TS doesn't narrow after awaited Promise<never>
+  const stream = responseBody!;
 
   // Track per-index buffered tool call info so we can emit a final
   // `tool-call-ready` with fully-parsed args.
@@ -147,7 +181,7 @@ export async function* streamChat(
     { id: string; name: string; argsJson: string; started: boolean }
   >();
 
-  for await (const ev of parseSSE(res.body, signal)) {
+  for await (const ev of parseSSE(stream, signal)) {
     if (!ev.data || ev.data === "[DONE]") continue;
     let parsed: any;
     try {
@@ -256,12 +290,10 @@ export async function chat(params: ChatParams): Promise<{
     headers: buildHeaders(config),
     body: JSON.stringify(body),
     signal,
+    ...(config.credentials ? { credentials: config.credentials } : {}),
   });
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(
-      `OpenAI request failed (${res.status} ${res.statusText}): ${text}`
-    );
+    await throwLlmRequestError(res);
   }
   const json = await res.json();
   const choice = json?.choices?.[0]?.message;

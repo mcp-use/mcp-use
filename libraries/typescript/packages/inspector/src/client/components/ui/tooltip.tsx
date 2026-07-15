@@ -222,8 +222,8 @@ export type { TooltipProps, TooltipProviderProps, TooltipSide };
 // ---------------------------------------------------------------------------
 
 type TooltipTriggerProps = {
-  asChild?: boolean;
-  children?: React.ReactNode;
+  render: React.ReactElement;
+  nativeButton?: boolean;
 };
 
 type TooltipContentProps = {
@@ -264,10 +264,7 @@ function TooltipCompound({
     if (!React.isValidElement(child)) return;
     if (child.type === TooltipTrigger) {
       const props = child.props as TooltipTriggerProps;
-      trigger =
-        props.asChild && React.isValidElement(props.children)
-          ? props.children
-          : React.createElement("button", { type: "button" }, props.children);
+      trigger = props.render;
     }
     if (child.type === TooltipContent) {
       const props = child.props as TooltipContentProps;

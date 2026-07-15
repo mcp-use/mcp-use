@@ -46,18 +46,21 @@ export function ServerUrlChip({ url, className }: ServerUrlChipProps) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "text-blue-500 hover:underline flex items-center gap-1 min-w-0 truncate text-left text-sm",
-            className
-          )}
-        >
-          <Globe className="size-3.5 shrink-0" />
-          <span className="truncate max-w-[min(24rem,30vw)]">{chipLabel}</span>
-        </button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className={cn(
+              "text-blue-500 hover:underline flex items-center gap-1 min-w-0 truncate text-left text-sm",
+              className
+            )}
+          >
+            <Globe className="size-3.5 shrink-0" />
+            <span className="truncate max-w-[min(24rem,30vw)]">{chipLabel}</span>
+          </button>
+        }
+        nativeButton
+      />
       <PopoverContent className="w-auto p-2" align="start" sideOffset={4}>
         <Button
           variant="ghost"

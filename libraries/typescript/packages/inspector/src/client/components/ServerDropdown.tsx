@@ -94,19 +94,22 @@ export function ServerDropdown({
       <div className="flex items-center gap-2">
         <div className="relative">
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="h-11 px-2 bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200 flex items-center gap-1.5"
-              >
-                {selectedServer ? (
-                  <ServerIcon server={selectedServer} size="md" />
-                ) : (
-                  <Server className="h-5 w-5" />
-                )}
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  className="h-11 px-2 bg-black dark:bg-white text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200 flex items-center gap-1.5"
+                >
+                  {selectedServer ? (
+                    <ServerIcon server={selectedServer} size="md" />
+                  ) : (
+                    <Server className="h-5 w-5" />
+                  )}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             {dropdownMenu}
           </DropdownMenu>
         </div>
@@ -118,28 +121,31 @@ export function ServerDropdown({
     return (
       <div className="flex items-center gap-2 min-w-0">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center gap-2 min-w-0 cursor-pointer text-foreground transition-opacity hover:opacity-80"
-            >
-              {selectedServer && (
-                <ServerIcon server={selectedServer} size="sm" />
-              )}
-              <span className="truncate text-sm">
-                {selectedServer
-                  ? getServerDisplayName(selectedServer)
-                  : "Select server"}
-              </span>
-              {selectedServer && (
-                <>
-                  <StatusDot status={selectedServer.state} />
-                  <ServerHeaderAuthButton server={selectedServer} />
-                </>
-              )}
-              <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="flex items-center gap-2 min-w-0 cursor-pointer text-foreground transition-opacity hover:opacity-80"
+              >
+                {selectedServer && (
+                  <ServerIcon server={selectedServer} size="sm" />
+                )}
+                <span className="truncate text-sm">
+                  {selectedServer
+                    ? getServerDisplayName(selectedServer)
+                    : "Select server"}
+                </span>
+                {selectedServer && (
+                  <>
+                    <StatusDot status={selectedServer.state} />
+                    <ServerHeaderAuthButton server={selectedServer} />
+                  </>
+                )}
+                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+              </button>
+            }
+            nativeButton
+          />
           {dropdownMenu}
         </DropdownMenu>
       </div>
@@ -150,61 +156,67 @@ export function ServerDropdown({
     <div className="flex items-center gap-2">
       <div className="relative">
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <ShimmerButton
-              className={cn(
-                "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
-                !selectedServer && "pl-4"
-              )}
-            >
-              {selectedServer && (
-                <ServerIcon
-                  server={selectedServer}
-                  size="md"
-                  className="mr-2"
-                />
-              )}
-              <div className="flex items-center gap-2 flex-1">
-                <span className="truncate lg:max-w-[120px] xl:max-w-none">
-                  {selectedServer
-                    ? getServerDisplayName(selectedServer)
-                    : "Select server to inspect"}
-                </span>
-                {selectedServer && (
-                  <div className="flex items-center gap-2">
-                    {selectedServer.error &&
-                    selectedServer.state !== "ready" ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                            }}
-                            className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
-                            title="Click to copy error message"
-                            aria-label="Copy error message to clipboard"
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">{selectedServer.error}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          selectedServer.state === "ready"
-                            ? "bg-emerald-600 animate-status-pulse"
-                            : selectedServer.state === "failed"
-                              ? "bg-rose-600 animate-status-pulse-red"
-                              : "bg-yellow-500 animate-status-pulse-yellow"
-                        }`}
-                      />
-                    )}
-                  </div>
+          <DropdownMenuTrigger
+            render={
+              <ShimmerButton
+                className={cn(
+                  "min-w-0 sm:min-w-[200px] p-0 px-1 text-sm h-11 justify-start text-white dark:text-black border-black dark:border-white hover:bg-gray-800 dark:hover:bg-zinc-100 hover:border-gray-800 dark:hover:border-zinc-200",
+                  !selectedServer && "pl-4"
                 )}
-              </div>
-            </ShimmerButton>
-          </DropdownMenuTrigger>
+              >
+                {selectedServer && (
+                  <ServerIcon
+                    server={selectedServer}
+                    size="md"
+                    className="mr-2"
+                  />
+                )}
+                <div className="flex items-center gap-2 flex-1">
+                  <span className="truncate lg:max-w-[120px] xl:max-w-none">
+                    {selectedServer
+                      ? getServerDisplayName(selectedServer)
+                      : "Select server to inspect"}
+                  </span>
+                  {selectedServer && (
+                    <div className="flex items-center gap-2">
+                      {selectedServer.error &&
+                      selectedServer.state !== "ready" ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                }}
+                                className="w-2 h-2 rounded-full bg-rose-500 animate-status-pulse-red hover:bg-rose-600 transition-colors"
+                                title="Click to copy error message"
+                                aria-label="Copy error message to clipboard"
+                              />
+                            }
+                            nativeButton
+                          />
+                          <TooltipContent>
+                            <p className="max-w-xs">{selectedServer.error}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <div
+                          className={`w-2 h-2 rounded-full ${
+                            selectedServer.state === "ready"
+                              ? "bg-emerald-600 animate-status-pulse"
+                              : selectedServer.state === "failed"
+                                ? "bg-rose-600 animate-status-pulse-red"
+                                : "bg-yellow-500 animate-status-pulse-yellow"
+                          }`}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              </ShimmerButton>
+            }
+            nativeButton
+          />
           {dropdownMenu}
         </DropdownMenu>
       </div>

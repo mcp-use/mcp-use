@@ -121,7 +121,7 @@ export function ChatHeader({
   return (
     <div
       className={cn(
-        "relative flex w-full items-center gap-2",
+        "relative flex w-full items-center gap-2 overflow-visible",
         inspectorTabHeaderPadding,
         elevatedHeader
           ? "pointer-events-none absolute top-0 right-0 z-50"
@@ -152,7 +152,7 @@ export function ChatHeader({
       {showViewToggle && onViewIndexChange && (
         <div
           className={cn(
-            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible px-1",
             elevatedHeader && "pointer-events-auto"
           )}
         >
@@ -160,7 +160,7 @@ export function ChatHeader({
             selectedIndex={viewIndex}
             onSelect={onViewIndexChange}
             idPrefix={CHAT_VIEW_TABS_ID}
-            className="shrink-0"
+            className="shrink-0 overflow-visible"
             data-testid="chat-view-tabs"
           >
             <TabsSubtleItem label="Conv" index={0} />
@@ -193,17 +193,20 @@ export function ChatHeader({
 
             {onExportChat && (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    data-testid="chat-export-button"
-                    variant="ghost"
-                    size="sm"
-                    className={chatBarActionButtonClass}
-                  >
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Export</span>
-                  </Button>
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      data-testid="chat-export-button"
+                      variant="ghost"
+                      size="sm"
+                      className={chatBarActionButtonClass}
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="hidden sm:inline">Export</span>
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     data-testid="chat-export-json"
@@ -224,13 +227,14 @@ export function ChatHeader({
             <div className="w-px h-4 bg-border mx-1" />
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={clearButtonVariant ?? "default"}
-                  size="default"
-                  className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
-                  onClick={onClearChat}
-                >
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant={clearButtonVariant ?? "default"}
+                    size="default"
+                    className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
+                    onClick={onClearChat}
+                  >
                   {!clearButtonHideIcon && (
                     <SquarePen className="h-4 w-4 sm:mr-2" />
                   )}
@@ -243,7 +247,9 @@ export function ChatHeader({
                     </span>
                   )}
                 </Button>
-              </TooltipTrigger>
+                }
+                nativeButton
+              />
               <TooltipContent>
                 <p>{clearButtonLabel ?? "New Chat"}</p>
               </TooltipContent>

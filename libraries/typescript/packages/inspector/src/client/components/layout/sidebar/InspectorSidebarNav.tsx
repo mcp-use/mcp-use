@@ -96,7 +96,7 @@ export function InspectorSidebarNav({
           >
             {collapsed ? (
               <Tooltip delayDuration={0}>
-                <TooltipTrigger asChild>{row}</TooltipTrigger>
+                <TooltipTrigger render={row} nativeButton />
                 <TooltipContent side="right">
                   {count > 0 ? `${tab.label} (${count})` : tab.label}
                 </TooltipContent>

@@ -25,6 +25,8 @@ export interface ProviderConfig {
   baseUrl?: string;
   /** Extra HTTP headers to merge into every request (e.g. OpenRouter's HTTP-Referer). */
   extraHeaders?: Record<string, string>;
+  /** Fetch credentials (e.g. `include` for session-cookie auth against a proxy). */
+  credentials?: RequestCredentials;
   /** Responses API reasoning effort (direct OpenAI provider). */
   reasoningEffort?: "none" | "low" | "medium" | "high";
 }

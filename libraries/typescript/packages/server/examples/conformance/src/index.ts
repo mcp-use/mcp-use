@@ -14,7 +14,8 @@ import {
 } from "@mcp-use/server";
 import { z } from "zod";
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const RED_PIXEL_PNG =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
@@ -38,6 +39,11 @@ const server = new MCPServer({
   description:
     "MCP Conformance Test Server implementing all supported features.",
   logging: { level: "debug" },
+  ...(process.env.INSPECTOR_CDN_BASE && {
+    inspector: {
+      assetsUrl: `${process.env.INSPECTOR_CDN_BASE}/inspector.js`,
+    },
+  }),
 });
 
 // =============================================================================
@@ -73,7 +79,11 @@ server.tool(
         .optional(),
     }),
   },
-  async ({ flag = false, tags = [], config = { mode: "default", count: 0 } }) => ({
+  async ({
+    flag = false,
+    tags = [],
+    config = { mode: "default", count: 0 },
+  }) => ({
     content: [
       {
         type: "text",
@@ -97,9 +107,7 @@ server.tool(
     description: "A tool that returns image content",
   },
   async () => ({
-    content: [
-      { type: "image", data: RED_PIXEL_PNG, mimeType: "image/png" },
-    ],
+    content: [{ type: "image", data: RED_PIXEL_PNG, mimeType: "image/png" }],
   })
 );
 
@@ -167,7 +175,9 @@ server.tool(
     await sleep(50);
     await ctx.sendLog("info", "Tool execution completed");
     return {
-      content: [{ type: "text", text: "Tool execution completed with logging" }],
+      content: [
+        { type: "text", text: "Tool execution completed with logging" },
+      ],
     };
   }
 );
@@ -299,7 +309,9 @@ server.tool(
     }
     if (form.status === "declined") {
       return {
-        content: [{ type: "text", text: "Elicitation completed: action=decline" }],
+        content: [
+          { type: "text", text: "Elicitation completed: action=decline" },
+        ],
       };
     }
     return {
@@ -340,7 +352,9 @@ server.tool(
     }
     if (form.status === "declined") {
       return {
-        content: [{ type: "text", text: "Elicitation completed: action=decline" }],
+        content: [
+          { type: "text", text: "Elicitation completed: action=decline" },
+        ],
       };
     }
     return {
@@ -643,7 +657,8 @@ server.tool(
     outputSchema: weatherOutputSchema,
     view: {
       name: "weather-display",
-      description: "Interactive weather card showing temperature and conditions",
+      description:
+        "Interactive weather card showing temperature and conditions",
     },
   },
   async ({ city, delay }) => {

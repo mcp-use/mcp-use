@@ -4,6 +4,10 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDev } from "../../src/cli/index.js";
@@ -191,6 +195,122 @@ export default server;`
         : undefined
     );
     expect(await listToolNames(dev.url)).toEqual(["add", "subtract"]);
+  });
+
+  it("notifies connected clients after server catalog reloads", async () => {
+    const cwd = copyFixture("dev-list-changed");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const changes = { tools: 0, prompts: 0, resources: 0 };
+    const catalogs: {
+      tools: { name: string; description?: string | undefined }[];
+      prompts: { name: string }[];
+      resources: { name: string }[];
+    } = { tools: [], prompts: [], resources: [] };
+    const errors: Error[] = [];
+    const client = new Client(
+      { name: "dev-list-changed-test", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        listChanged: {
+          tools: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: (error, tools) => {
+              if (error !== null) errors.push(error);
+              changes.tools += 1;
+              catalogs.tools = tools ?? [];
+            },
+          },
+          prompts: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: (error, prompts) => {
+              if (error !== null) errors.push(error);
+              changes.prompts += 1;
+              catalogs.prompts = prompts ?? [];
+            },
+          },
+          resources: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: (error, resources) => {
+              if (error !== null) errors.push(error);
+              changes.resources += 1;
+              catalogs.resources = resources ?? [];
+            },
+          },
+        },
+      }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
+    cleanups.push(() => client.close());
+    await Promise.all([
+      client.listTools(),
+      client.listPrompts(),
+      client.listResources(),
+    ]);
+
+    const entry = join(cwd, "src", "index.ts");
+    const source = readFileSync(entry, "utf8");
+    const withCatalog = source
+      .replace("Add two numbers", "Add numbers after reload")
+      .replace(
+        "export default server;",
+        `server.tool(
+  { name: "subtract", description: "Subtract two numbers", inputSchema: z.object({ a: z.number(), b: z.number() }) },
+  async ({ a, b }) => ({ content: [{ type: "text", text: String(a - b) }] })
+);
+server.prompt(
+  { name: "hello", description: "Say hello" },
+  async () => ({ messages: [{ role: "user", content: { type: "text", text: "Hello" } }] })
+);
+server.resource(
+  { name: "status", uri: "status://dev" },
+  async (uri) => ({ contents: [{ uri: uri.href, text: "ok" }] })
+);
+export default server;`
+      );
+    writeFileSync(entry, withCatalog);
+
+    await waitFor(async () =>
+      changes.tools > 0 && changes.prompts > 0 && changes.resources > 0
+        ? true
+        : undefined
+    );
+    expect(errors).toEqual([]);
+    expect(catalogs.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "add",
+          description: "Add numbers after reload",
+        }),
+        expect.objectContaining({ name: "subtract" }),
+      ])
+    );
+    expect(catalogs.prompts.map((prompt) => prompt.name)).toContain("hello");
+    expect(catalogs.resources.map((resource) => resource.name)).toContain(
+      "status"
+    );
+
+    const firstToolChange = changes.tools;
+    writeFileSync(
+      entry,
+      withCatalog.replace(
+        /server\.tool\(\n  \{ name: "subtract"[\s\S]*?\n\);\nserver\.prompt\(/,
+        "server.prompt("
+      )
+    );
+    await waitFor(async () =>
+      changes.tools > firstToolChange &&
+      !catalogs.tools.some((tool) => tool.name === "subtract")
+        ? true
+        : undefined
+    );
   });
 
   it("probes upward when the requested port is taken", async () => {

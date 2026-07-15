@@ -35,15 +35,18 @@ function getStatusTooltip(status: string): string {
 export function StatusDot({ status, className }: StatusDotProps) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <div
-          className={cn(
-            "w-2 h-2 rounded-full shrink-0",
-            getStatusDotClass(status),
-            className
-          )}
-        />
-      </TooltipTrigger>
+      <TooltipTrigger
+        render={
+          <div
+            className={cn(
+              "w-2 h-2 rounded-full shrink-0",
+              getStatusDotClass(status),
+              className
+            )}
+          />
+        }
+        nativeButton={false}
+      />
       <TooltipContent>
         <p>{getStatusTooltip(status)}</p>
       </TooltipContent>

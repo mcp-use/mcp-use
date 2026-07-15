@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { defineConfig } from "vite";
+import { hasNoOpenFlag, parsePortFromArgs } from "./src/server/utils.js";
+import { inspectorDevApiPlugin } from "./src/server/vite-dev-api-plugin.js";
 
 // Read version from package.json
 const packageJson = JSON.parse(
@@ -12,11 +14,32 @@ const clientPackageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
 );
 
+const devPort =
+  parsePortFromArgs() ??
+  (Number(process.env.INSPECTOR_PORT) || 3000);
+
 export default defineConfig({
   base: "/inspector",
   plugins: [
     react(),
     tailwindcss(),
+    inspectorDevApiPlugin(),
+    {
+      name: "inspector-dev-banner",
+      configureServer(server) {
+        server.httpServer?.once("listening", () => {
+          const addr = server.httpServer?.address();
+          const port =
+            typeof addr === "object" && addr ? addr.port : devPort;
+          console.log(
+            `\n🚀 MCP Inspector running on http://localhost:${port}/inspector`
+          );
+          console.log(
+            "📡 Proxy request logs appear below when you connect to an MCP server\n"
+          );
+        });
+      },
+    },
     // Custom plugin to inject version into HTML
     {
       name: "inject-version",
@@ -93,21 +116,9 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
-    host: true, // Allow external connections
-    proxy: {
-      // Proxy API requests to the backend server
-      "^/inspector/api/.*": {
-        target: "http://localhost:3001",
-        changeOrigin: true,
-        configure: (proxy, _options) => {
-          proxy.on("proxyReq", (proxyReq, req) => {
-            // Preserve the original host for OAuth resource URL rewriting
-            const originalHost = req.headers.host || "localhost:3000";
-            proxyReq.setHeader("X-Forwarded-Host", originalHost);
-          });
-        },
-      },
-    },
+    port: devPort,
+    strictPort: true,
+    host: true,
+    open: hasNoOpenFlag() ? false : "/inspector",
   },
 });

@@ -442,7 +442,7 @@ export function AddToClientDropdown({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>{triggerElement}</DropdownMenuTrigger>
+        <DropdownMenuTrigger render={triggerElement} nativeButton />
         <DropdownMenuContent align="end" className="w-auto min-w-[300px]">
           {/* Additional Items First */}
           {additionalItems.map((item) => (

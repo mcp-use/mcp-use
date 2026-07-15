@@ -159,105 +159,117 @@ export function ToolExecutionPanel({
             </h3>
             <div className="flex gap-2 shrink-0">
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    data-testid="tool-execution-metadata-button"
-                    variant={showMetadata ? "default" : "outline"}
-                    onClick={() => setShowMetadata(!showMetadata)}
-                    disabled={isExecuting}
-                    size="sm"
-                    className={cn(buttonToolbarClass, compactIconOnlyClass)}
-                    title="View tool metadata"
-                  >
-                    <Code />
-                    <span className={compactLabelClass}>Metadata</span>
-                  </Button>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      data-testid="tool-execution-metadata-button"
+                      variant={showMetadata ? "default" : "outline"}
+                      onClick={() => setShowMetadata(!showMetadata)}
+                      disabled={isExecuting}
+                      size="sm"
+                      className={cn(buttonToolbarClass, compactIconOnlyClass)}
+                      title="View tool metadata"
+                    >
+                      <Code />
+                      <span className={compactLabelClass}>Metadata</span>
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <TooltipContent>
                   <p>View tool definition metadata</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    data-testid="tool-execution-copy-payload-button"
-                    variant="outline"
-                    onClick={copyPayloadToClipboard}
-                    disabled={isExecuting}
-                    size="sm"
-                    className={cn(buttonToolbarClass, compactIconOnlyClass)}
-                    title="Copy payload as JSON"
-                  >
-                    {copiedPayload ? (
-                      <Check className="text-green-600" />
-                    ) : (
-                      <Copy />
-                    )}
-                    <span className={compactLabelClass}>
-                      {copiedPayload ? "Copied!" : "Payload"}
-                    </span>
-                  </Button>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      data-testid="tool-execution-copy-payload-button"
+                      variant="outline"
+                      onClick={copyPayloadToClipboard}
+                      disabled={isExecuting}
+                      size="sm"
+                      className={cn(buttonToolbarClass, compactIconOnlyClass)}
+                      title="Copy payload as JSON"
+                    >
+                      {copiedPayload ? (
+                        <Check className="text-green-600" />
+                      ) : (
+                        <Copy />
+                      )}
+                      <span className={compactLabelClass}>
+                        {copiedPayload ? "Copied!" : "Payload"}
+                      </span>
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <TooltipContent>
                   <p>Copy payload as JSON</p>
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    data-testid="tool-execution-save-button"
-                    variant="outline"
-                    onClick={onSave}
-                    disabled={isExecuting}
-                    size="sm"
-                    className={cn(buttonToolbarClass, compactIconOnlyClass)}
-                    title="Save request"
-                  >
-                    <Save />
-                    <span className={compactLabelClass}>Save</span>
-                  </Button>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      data-testid="tool-execution-save-button"
+                      variant="outline"
+                      onClick={onSave}
+                      disabled={isExecuting}
+                      size="sm"
+                      className={cn(buttonToolbarClass, compactIconOnlyClass)}
+                      title="Save request"
+                    >
+                      <Save />
+                      <span className={compactLabelClass}>Save</span>
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <TooltipContent>
                   <p>Save request</p>
                 </TooltipContent>
               </Tooltip>
               {isExecuting && onCancel ? (
                 <Tooltip open={showCancelButton ? undefined : false}>
-                  <TooltipTrigger asChild>
-                    <div
-                      onMouseEnter={() => setShowCancelButton(true)}
-                      onMouseLeave={() => setShowCancelButton(false)}
-                      className="relative"
-                    >
-                      <Button
-                        data-testid="tool-execution-cancel-button"
-                        onClick={onCancel}
-                        variant={showCancelButton ? "destructive" : "default"}
-                        size="sm"
-                        className={cn(
-                          buttonExecuteClass,
-                          compactIconOnlyClass,
-                          compactExecuteIconOnlyClass,
-                          "transition-all"
-                        )}
+                  <TooltipTrigger
+                    render={
+                      <div
+                        onMouseEnter={() => setShowCancelButton(true)}
+                        onMouseLeave={() => setShowCancelButton(false)}
+                        className="relative"
                       >
-                        {showCancelButton ? (
-                          <>
-                            <X />
-                            <span className={compactLabelClass}>Cancel</span>
-                            <span className={compactShortcutClass}>Esc</span>
-                          </>
-                        ) : (
-                          <>
-                            <Spinner />
-                            <span className={compactLabelClass}>
-                              Executing...
-                            </span>
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </TooltipTrigger>
+                        <Button
+                          data-testid="tool-execution-cancel-button"
+                          onClick={onCancel}
+                          variant={showCancelButton ? "destructive" : "default"}
+                          size="sm"
+                          className={cn(
+                            buttonExecuteClass,
+                            compactIconOnlyClass,
+                            compactExecuteIconOnlyClass,
+                            "transition-all"
+                          )}
+                        >
+                          {showCancelButton ? (
+                            <>
+                              <X />
+                              <span className={compactLabelClass}>Cancel</span>
+                              <span className={compactShortcutClass}>Esc</span>
+                            </>
+                          ) : (
+                            <>
+                              <Spinner />
+                              <span className={compactLabelClass}>
+                                Executing...
+                              </span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    }
+                    nativeButton={false}
+                  />
                   <TooltipContent>
                     <p>Hover to cancel (or press Esc)</p>
                   </TooltipContent>

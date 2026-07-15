@@ -10,7 +10,6 @@ export {
   convertMessagesToProvider,
   parseLLMStringToProviderConfig,
   providerConfigFromOptions,
-  DEFAULT_OLLAMA_BASE_URL,
   type MCPAgentOptions,
   type McpConnectionLike,
   type McpServersInput,
@@ -23,9 +22,11 @@ export {
   type TokenUsage,
   type LLMConfig,
 } from "./agents/mcp_agent.js";
+export { LlmRequestError } from "./llm/providers/openai-chat-completions.js";
 export { completeChat, completeChat as chat } from "./llm/chat.js";
 export {
   buildOllamaApiUrl,
+  DEFAULT_OLLAMA_BASE_URL,
   normalizeOllamaBaseUrl,
   OllamaCorsError,
 } from "./llm/providers/ollama/utils.js";

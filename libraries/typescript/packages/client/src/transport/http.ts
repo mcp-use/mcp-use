@@ -410,9 +410,15 @@ export class HttpConnector extends BaseConnector {
       });
       const baseFetch = this.customFetch ?? globalThis.fetch.bind(globalThis);
       const observedFetch: typeof fetch = async (input, init) => {
-        const response = this.observeSseProgress(await baseFetch(input, init));
+        const response = await baseFetch(input, init);
         const method =
           init?.method ?? (input instanceof Request ? input.method : "GET");
+        const requestHeaders = new Headers(
+          input instanceof Request ? input.headers : undefined
+        );
+        new Headers(init?.headers).forEach((value, key) => {
+          requestHeaders.set(key, value);
+        });
         if (
           method.toUpperCase() === "GET" &&
           response.ok &&
@@ -420,7 +426,12 @@ export class HttpConnector extends BaseConnector {
         ) {
           markPushStreamReady?.();
         }
-        return response;
+        // subscriptions/listen owns its SSE reader and acknowledgement state.
+        // Re-wrapping that response breaks the SDK's per-request stream hooks;
+        // the progress observer is only for ordinary request/response calls.
+        return requestHeaders.get("mcp-method") === "subscriptions/listen"
+          ? response
+          : this.observeSseProgress(response);
       };
 
       // Create StreamableHTTPClientTransport directly
@@ -478,13 +489,29 @@ export class HttpConnector extends BaseConnector {
       );
 
       try {
-        // Connect with timeout
         // The SDK's StreamableHTTPClientTransport should automatically:
         // 1. Send POST initialize request
         // 2. Extract mcp-session-id from response header
         // 3. Open GET SSE stream with that session ID in header
-        await this.client.connect(transport, {
-          timeout: this.timeout,
+        //
+        // Keep the connection timeout outside the SDK request options so it
+        // cannot leak onto streams opened during connection setup.
+        let connectTimeout: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          this.client.connect(transport),
+          new Promise<never>((_, reject) => {
+            connectTimeout = setTimeout(
+              () =>
+                reject(
+                  new Error(
+                    `MCP connection timed out after ${this.timeout}ms`
+                  )
+                ),
+              this.timeout
+            );
+          }),
+        ]).finally(() => {
+          if (connectTimeout !== undefined) clearTimeout(connectTimeout);
         });
 
         // The official SDK opens the v1 standalone GET stream in the

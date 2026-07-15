@@ -710,21 +710,22 @@ export function CommandPalette({
                 <span className="font-medium truncate flex-1 min-w-0">
                   {item.name}
                 </span>
-                {(item.metadata?.serverName || item.metadata?.serverId) &&
-                  item.category !== "Connected Servers" &&
-                  (() => {
-                    const server = connections.find(
-                      (c) => c.id === item.metadata?.serverId
-                    );
-                    return server ? (
-                      <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
-                        <ServerIcon server={server} size="sm" />
-                        <span className="text-xs font-base text-muted-foreground">
-                          {item.metadata?.serverName || item.metadata?.serverId}
-                        </span>
-                      </div>
-                    ) : null;
-                  })()}
+                {(() => {
+                  const serverId = item.metadata?.serverId;
+                  if (!serverId || item.category === "Connected Servers") {
+                    return null;
+                  }
+                  const server = connections.find((c) => c.id === serverId);
+                  if (!server) return null;
+                  return (
+                    <div className="flex items-center gap-1 shrink-0 text-muted-foreground">
+                      <ServerIcon server={server} size="xs" />
+                      <span className="text-xs truncate max-w-[9rem]">
+                        {getServerDisplayName(server)}
+                      </span>
+                    </div>
+                  );
+                })()}
               </button>
             ))
           )}

@@ -1,18 +1,26 @@
 import { GithubIcon } from "@/client/components/ui/github-icon";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/client/components/ui/dropdown-menu";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Switch } from "@/client/components/ui/switch";
 import { useInspector } from "@/client/context/InspectorContext";
+import { useTheme } from "@/client/context/ThemeContext";
 import { useHostedSession } from "@/client/hooks/useHostedSession";
 import { cn } from "@/client/lib/utils";
 import {
   MCPDeployClickEvent,
   captureInspectorEvent,
 } from "@/client/telemetry";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Command, Monitor, Moon, SunDim } from "lucide-react";
 
 function DiscordIcon({ className }: { className?: string }) {
   return (
@@ -45,14 +53,17 @@ interface InspectorSidebarFooterProps {
   collapsed: boolean;
   rpcLoggerOpen: boolean;
   onRpcLoggerOpenChange: (open: boolean) => void;
+  onCommandPaletteOpen: () => void;
 }
 
 export function InspectorSidebarFooter({
   collapsed,
   rpcLoggerOpen,
   onRpcLoggerOpenChange,
+  onCommandPaletteOpen,
 }: InspectorSidebarFooterProps) {
   const { embeddedConfig } = useInspector();
+  const { theme, setTheme } = useTheme();
   const { user } = useHostedSession(embeddedConfig.chatApiUrl);
 
   const manufactHref = user
@@ -81,16 +92,19 @@ export function InspectorSidebarFooter({
       >
         {collapsed ? (
           <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex size-8 items-center justify-center">
-                <Switch
-                  checked={rpcLoggerOpen}
-                  onCheckedChange={onRpcLoggerOpenChange}
-                  aria-label="RPC Panel"
-                  className={cn("scale-75", rpcSwitchUncheckedClass)}
-                />
-              </div>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <div className="flex size-8 items-center justify-center">
+                  <Switch
+                    checked={rpcLoggerOpen}
+                    onCheckedChange={onRpcLoggerOpenChange}
+                    aria-label="RPC Panel"
+                    className={cn("scale-75", rpcSwitchUncheckedClass)}
+                  />
+                </div>
+              }
+              nativeButton={false}
+            />
             <TooltipContent side="right">RPC Panel</TooltipContent>
           </Tooltip>
         ) : (
@@ -106,18 +120,21 @@ export function InspectorSidebarFooter({
 
         {collapsed ? (
           <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href={manufactHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={onManufactClick}
-                className={socialLinkClass}
-                aria-label="Deploying your MCP Server? Try manufact.com"
-              >
-                <ArrowUpRight className="size-4" />
-              </a>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <a
+                  href={manufactHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={onManufactClick}
+                  className={socialLinkClass}
+                  aria-label="Deploying your MCP Server? Try manufact.com"
+                >
+                  <ArrowUpRight className="size-4" />
+                </a>
+              }
+              nativeButton={false}
+            />
             <TooltipContent side="right">
               Deploying your MCP Server? Try manufact.com
             </TooltipContent>
@@ -155,35 +172,115 @@ export function InspectorSidebarFooter({
           )}
         >
           <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href="https://github.com/mcp-use/mcp-use"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={socialLinkClass}
-                aria-label="GitHub"
-              >
-                <GithubIcon className="size-4" />
-              </a>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <a
+                  href="https://github.com/mcp-use/mcp-use"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={socialLinkClass}
+                  aria-label="GitHub"
+                >
+                  <GithubIcon className="size-4" />
+                </a>
+              }
+              nativeButton={false}
+            />
             <TooltipContent side={collapsed ? "right" : "top"}>
               GitHub
             </TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href="https://discord.gg/XkNkSkMz3V"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={socialLinkClass}
-                aria-label="Discord"
-              >
-                <DiscordIcon className="size-4" />
-              </a>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <a
+                  href="https://discord.gg/XkNkSkMz3V"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={socialLinkClass}
+                  aria-label="Discord"
+                >
+                  <DiscordIcon className="size-4" />
+                </a>
+              }
+              nativeButton={false}
+            />
             <TooltipContent side={collapsed ? "right" : "top"}>
               Discord
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className={socialLinkClass}
+                        aria-label="Theme"
+                      >
+                        {theme === "light" ? (
+                          <SunDim className="size-4" />
+                        ) : theme === "dark" ? (
+                          <Moon className="size-4" />
+                        ) : (
+                          <Monitor className="size-4" />
+                        )}
+                      </button>
+                    }
+                    nativeButton
+                  />
+                }
+                nativeButton
+              />
+              <TooltipContent side={collapsed ? "right" : "top"}>
+                Theme
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent
+              side={collapsed ? "right" : "top"}
+              align={collapsed ? "start" : "center"}
+              className="w-40"
+            >
+              <DropdownMenuRadioGroup
+                value={theme}
+                onValueChange={(v) =>
+                  setTheme(v as "light" | "dark" | "system")
+                }
+              >
+                <DropdownMenuRadioItem value="light">
+                  <SunDim className="size-4 mr-2" />
+                  Light
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="dark">
+                  <Moon className="size-4 mr-2" />
+                  Dark
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="system">
+                  <Monitor className="size-4 mr-2" />
+                  System
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  onClick={onCommandPaletteOpen}
+                  className={socialLinkClass}
+                  aria-label="Command Palette"
+                  data-testid="command-palette-trigger-button"
+                >
+                  <Command className="size-4" />
+                </button>
+              }
+              nativeButton
+            />
+            <TooltipContent side={collapsed ? "right" : "top"}>
+              Command Palette ({"\u2318"}K)
             </TooltipContent>
           </Tooltip>
         </div>

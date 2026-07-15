@@ -1,9 +1,10 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
+import { INSPECTOR_FAVICON_ASSETS } from "./src/server/favicon-links";
 
 const clientPackageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
@@ -25,6 +26,17 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      name: "copy-favicon-assets",
+      closeBundle() {
+        const publicDir = path.resolve(__dirname, "public");
+        const outDir = path.resolve(__dirname, "dist/cdn");
+        mkdirSync(outDir, { recursive: true });
+        for (const file of INSPECTOR_FAVICON_ASSETS) {
+          copyFileSync(path.join(publicDir, file), path.join(outDir, file));
+        }
+      },
+    },
     process.env.ANALYZE === "true" &&
       visualizer({
         filename: "dist/cdn/stats.html",

@@ -26,7 +26,12 @@ export function ChatRawView({
 
   return (
     <div className="mx-auto max-w-4xl" data-testid="chat-raw-view">
-      <JSONDisplay data={payload} filename="chat-raw.json" />
+      <JSONDisplay
+        data={payload}
+        filename="chat-raw.json"
+        collapsible
+        defaultExpanded={false}
+      />
     </div>
   );
 }

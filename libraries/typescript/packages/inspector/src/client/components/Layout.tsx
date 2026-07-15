@@ -23,6 +23,7 @@ import {
   toMcpServerConfig,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
+import { getServerDisplayName } from "@/client/utils/servers";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -479,7 +480,7 @@ export function Layout({ children }: LayoutProps) {
           ? conn.tools.map((tool) => ({
               ...tool,
               _serverId: conn.id,
-              _serverName: conn.name,
+              _serverName: getServerDisplayName(conn),
             }))
           : []
       );
@@ -494,7 +495,7 @@ export function Layout({ children }: LayoutProps) {
           ? conn.prompts.map((prompt) => ({
               ...prompt,
               _serverId: conn.id,
-              _serverName: conn.name,
+              _serverName: getServerDisplayName(conn),
             }))
           : []
       );
@@ -509,7 +510,7 @@ export function Layout({ children }: LayoutProps) {
           ? conn.resources.map((resource) => ({
               ...resource,
               _serverId: conn.id,
-              _serverName: conn.name,
+              _serverName: getServerDisplayName(conn),
             }))
           : []
       );
@@ -780,7 +781,6 @@ export function Layout({ children }: LayoutProps) {
     activeTab,
     onServerSelect: handleServerSelect,
     onTabChange: handleTabChange,
-    onCommandPaletteOpen: () => handleCommandPaletteOpen("button"),
     embedded: isEmbedded,
     sidebarCollapsed,
   };
@@ -802,6 +802,7 @@ export function Layout({ children }: LayoutProps) {
               onCollapsedChange={setSidebarCollapsed}
               rpcLoggerOpen={rpcLoggerOpen}
               onRpcLoggerOpenChange={setRpcLoggerOpen}
+              onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
             />
           )}
           <main className={mainClassName}>

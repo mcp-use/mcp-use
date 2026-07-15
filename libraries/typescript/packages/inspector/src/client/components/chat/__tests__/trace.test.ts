@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   appendTraceEvent,
+  buildMessageTokenMap,
   buildRawChatPayload,
   EMPTY_TRACE_STATE,
   inspectorTokenUsageFromUnknown,
@@ -128,5 +129,27 @@ describe("trace accumulator", () => {
     ]);
     expect(payload.turns[1]?.request.request).toEqual({ model: "b" });
     expect(payload.tokenUsage).toMatchObject({ totalTokens: 3 });
+  });
+
+  it("maps per-turn usage onto user and assistant message ids", () => {
+    const events = [
+      event({ type: "request", request: { model: "a" } }, 1),
+      event(
+        {
+          type: "usage",
+          usage: { inputTokens: 100, outputTokens: 40, totalTokens: 140 },
+        },
+        2
+      ),
+      event({ type: "done" }, 3),
+    ];
+    const messages = [
+      { id: "user-1", role: "user" },
+      { id: "assistant-1", role: "assistant" },
+    ];
+    const map = buildMessageTokenMap(messages, events);
+
+    expect(map.get("user-1")).toEqual({ inputTokens: 100 });
+    expect(map.get("assistant-1")).toEqual({ outputTokens: 40 });
   });
 });

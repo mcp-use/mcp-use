@@ -85,16 +85,19 @@ export function SearchTabHeader({
               {count}
             </Badge>
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onSearchExpand}
-                  className="h-8 w-8 p-0"
-                >
-                  <Search className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onSearchExpand}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Search className="h-4 w-4" />
+                  </Button>
+                }
+                nativeButton
+              />
               <TooltipContent side="bottom" className="flex gap-2">
                 Search
                 <Kbd>F</Kbd>
@@ -102,19 +105,22 @@ export function SearchTabHeader({
             </Tooltip>
             {onRefresh && (
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={onRefresh}
-                    disabled={isRefreshing}
-                    className="h-8 w-8 p-0"
-                  >
-                    <RefreshCw
-                      className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
-                    />
-                  </Button>
-                </TooltipTrigger>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onRefresh}
+                      disabled={isRefreshing}
+                      className="h-8 w-8 p-0"
+                    >
+                      <RefreshCw
+                        className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}
+                      />
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <TooltipContent side="bottom" className="flex gap-2">
                   Refresh list
                   <Kbd>R</Kbd>
@@ -136,17 +142,20 @@ export function SearchTabHeader({
       {bulkAction && BulkIcon && (
         <div className="flex items-center gap-2">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={bulkAction.onClick}
-                disabled={bulkAction.disabled}
-                className="h-8 w-8 p-0"
-              >
-                <BulkIcon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={bulkAction.onClick}
+                  disabled={bulkAction.disabled}
+                  className="h-8 w-8 p-0"
+                >
+                  <BulkIcon className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent side="bottom">{bulkAction.label}</TooltipContent>
           </Tooltip>
         </div>

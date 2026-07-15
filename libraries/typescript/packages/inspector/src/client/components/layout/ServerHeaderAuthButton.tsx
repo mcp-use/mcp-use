@@ -75,18 +75,19 @@ export function ServerHeaderAuthButton({
         size="sm"
         variant="outline"
         className={cn(AUTH_BUTTON_CLASS, className)}
-        asChild
+        render={
+          <a
+            href={authUrl}
+            data-testid="server-header-authenticate"
+            onClick={(e) => {
+              e.stopPropagation();
+              storeReconnectSession(server);
+            }}
+          />
+        }
+        nativeButton={false}
       >
-        <a
-          href={authUrl}
-          data-testid="server-header-authenticate"
-          onClick={(e) => {
-            e.stopPropagation();
-            storeReconnectSession(server);
-          }}
-        >
-          Authenticate
-        </a>
+        Authenticate
       </Button>
     );
   }

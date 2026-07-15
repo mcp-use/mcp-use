@@ -91,7 +91,7 @@ export function SystemPromptButton({
     <Dialog open={open} onOpenChange={setOpen}>
       {compact ? (
         <Tooltip>
-          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipTrigger render={trigger} nativeButton />
           <TooltipContent side="top">
             <p>{isCustomized ? "Custom system prompt" : "System Prompt"}</p>
           </TooltipContent>

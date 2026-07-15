@@ -15,6 +15,7 @@ interface InspectorSidebarProps {
   onCollapsedChange: (collapsed: boolean) => void;
   rpcLoggerOpen: boolean;
   onRpcLoggerOpenChange: (open: boolean) => void;
+  onCommandPaletteOpen: () => void;
 }
 
 export function InspectorSidebar({
@@ -26,6 +27,7 @@ export function InspectorSidebar({
   onCollapsedChange,
   rpcLoggerOpen,
   onRpcLoggerOpenChange,
+  onCommandPaletteOpen,
 }: InspectorSidebarProps) {
   return (
     <aside
@@ -54,6 +56,7 @@ export function InspectorSidebar({
         collapsed={collapsed}
         rpcLoggerOpen={rpcLoggerOpen}
         onRpcLoggerOpenChange={onRpcLoggerOpenChange}
+        onCommandPaletteOpen={onCommandPaletteOpen}
       />
       <SidebarRail
         collapsed={collapsed}

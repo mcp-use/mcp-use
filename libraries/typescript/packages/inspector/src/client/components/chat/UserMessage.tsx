@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { ChatMessage } from "@/client/components/ui/chat-message";
-import { CopyButton } from "./CopyButton";
+import { MessageMetaActions } from "./MessageMetaActions";
 import type { MessageAttachment } from "./types";
 
 interface UserMessageProps {
   content: string;
   timestamp?: Date | number;
   attachments?: MessageAttachment[];
+  inputTokens?: number;
 }
 
 function attachmentToFile(attachment: MessageAttachment): File {
@@ -24,6 +25,7 @@ export function UserMessage({
   content,
   timestamp,
   attachments,
+  inputTokens,
 }: UserMessageProps) {
   const files = useMemo(
     () => attachments?.map(attachmentToFile),
@@ -50,7 +52,15 @@ export function UserMessage({
             ? new Date(timestamp).toLocaleTimeString()
             : undefined
         }
-        actions={content ? <CopyButton text={content} /> : undefined}
+        actions={
+          content || inputTokens != null ? (
+            <MessageMetaActions
+              variant="user"
+              copyText={content || undefined}
+              inputTokens={inputTokens}
+            />
+          ) : undefined
+        }
         data-testid="chat-message-content"
       >
         {content && content.length > 0 ? content : undefined}

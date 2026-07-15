@@ -110,14 +110,17 @@ export function ChatInputArea({
   const modelBadge =
     llmConfig && (!hideModelBadge || freeTierInfo) ? (
       <Tooltip>
-        <TooltipTrigger asChild>
-          <ModelConfigBadge
-            provider={llmConfig.provider}
-            model={llmConfig.model}
-            className="shrink-0"
-            onClick={() => onConfigDialogOpenChange(true)}
-          />
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <ModelConfigBadge
+              provider={llmConfig.provider}
+              model={llmConfig.model}
+              className="shrink-0"
+              onClick={() => onConfigDialogOpenChange(true)}
+            />
+          }
+          nativeButton
+        />
         <TooltipContent>
           <p>
             {freeTierInfo ? "Change model / upgrade" : "Change API Key"}

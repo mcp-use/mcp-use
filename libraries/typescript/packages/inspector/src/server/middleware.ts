@@ -30,6 +30,7 @@ export function mountInspector(
   app: Express | Hono,
   config?: {
     autoConnectUrl?: string | null;
+    manufactChatUrl?: string | null;
     /** Whether the server is running in development mode (enables same-origin sandbox) */
     devMode?: boolean;
     /** Override the sandbox origin for MCP Apps widgets (e.g., for production reverse proxies) */
@@ -62,6 +63,7 @@ export function mountInspector(
     inspectorMode: "embedded" as InspectorMode,
     basePath,
     proxyUrl: `${basePath}/inspector/api/proxy`,
+    manufactChatUrl: config?.manufactChatUrl,
   };
 
   if (isHonoApp(app)) {

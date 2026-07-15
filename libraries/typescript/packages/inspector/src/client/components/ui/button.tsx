@@ -62,8 +62,9 @@ interface ButtonProps
     Omit<VariantProps<typeof buttonVariants>, "variant" | "size"> {
   variant?: VariantProps<typeof buttonVariants>["variant"] | LegacyButtonVariant;
   size?: VariantProps<typeof buttonVariants>["size"] | LegacyButtonSize;
-  /** When true, the given single React-element child becomes the rendered element (slot-style). */
-  asChild?: boolean;
+  /** Render a different element (e.g. anchor) with button styling via Base UI `render`. */
+  render?: ReactElement;
+  nativeButton?: boolean;
   loading?: boolean;
   leadingIcon?: IconComponent;
   trailingIcon?: IconComponent;
@@ -190,7 +191,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       className,
       variant,
       size,
-      asChild = false,
+      render,
+      nativeButton = true,
       loading = false,
       leadingIcon: LeadingIcon,
       trailingIcon: TrailingIcon,
@@ -207,22 +209,20 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     size = normalized.size;
     className = normalized.className;
 
-    // asChild: the user's element becomes the root while the button's internal
-    // structure (bg layer, content wrapper, spinner, icons) survives as its
-    // children — the element's own children become the label. We clone the
-    // element directly instead of routing through ButtonPrimitive's `render`:
-    // Base UI would bolt button semantics (role="button", Space activation)
-    // onto e.g. a link, where plain-link output is wanted.
-    const asChildElement =
-      asChild && isValidElement(children)
-        ? (children as ReactElement<{
+    // Base UI `render`: user's element becomes the root; internals stay as children.
+    const renderElement =
+      render && isValidElement(render)
+        ? (render as ReactElement<{
             children?: ReactNode;
             className?: string;
             style?: React.CSSProperties;
             ref?: React.Ref<HTMLButtonElement>;
           }>)
         : null;
-    const label = asChildElement ? asChildElement.props.children : children;
+    const label =
+      renderElement && renderElement.props.children != null
+        ? renderElement.props.children
+        : children;
     const isIconOnly = size === "icon" || size === "icon-sm" || size === "icon-lg";
     const iconSize = size === "sm" ? 14 : size === "lg" ? 20 : 16;
     // Spinner box tracks the button height (sm is h-7, lg/icon are h-9, …) so
@@ -321,25 +321,26 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       className
     );
 
-    if (asChildElement) {
-      const childProps = asChildElement.props;
-      return cloneElement(
-        asChildElement,
-        {
-          ...props,
-          ref,
-          className: cn(rootClassName, childProps.className),
-          style: { ...style, ...childProps.style },
-        },
-        internals
+    if (renderElement) {
+      const childProps = renderElement.props;
+      return (
+        <ButtonPrimitive
+          ref={ref as never}
+          render={cloneElement(renderElement, {
+            className: cn(rootClassName, childProps.className),
+            style: { ...style, ...childProps.style },
+          })}
+          nativeButton={nativeButton}
+          disabled={disabled || loading}
+          {...props}
+        >
+          {internals}
+        </ButtonPrimitive>
       );
     }
 
     return (
       <ButtonPrimitive
-        // Base UI's `ButtonPrimitive` forwards to an HTMLButtonElement;
-        // keep the public ref type narrow so consumers see the right type.
-        // ponytail: Base UI trigger ref is HTMLElement; public API stays HTMLButtonElement.
         ref={ref as never}
         className={rootClassName}
         disabled={disabled || loading}

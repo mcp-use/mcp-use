@@ -18,23 +18,26 @@ export function SidebarRail({
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          tabIndex={-1}
-          aria-label={label}
-          onClick={onToggle}
-          className={cn(
-            "border-border absolute top-1/2 right-0 z-30 hidden size-7 min-h-7 min-w-7 -translate-y-1/2 translate-x-1/2 rounded-full border bg-background lg:flex",
-            "opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100 focus-visible:opacity-100"
-          )}
-        >
-          <PanelLeft className="size-4" />
-          <span className="sr-only">{label}</span>
-        </Button>
-      </TooltipTrigger>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            tabIndex={-1}
+            aria-label={label}
+            onClick={onToggle}
+            className={cn(
+              "border-border absolute top-1/2 right-0 z-30 hidden size-7 min-h-7 min-w-7 -translate-y-1/2 translate-x-1/2 rounded-full border bg-background lg:flex",
+              "opacity-0 transition-opacity duration-200 group-hover/sidebar:opacity-100 focus-visible:opacity-100"
+            )}
+          >
+            <PanelLeft className="size-4" />
+            <span className="sr-only">{label}</span>
+          </Button>
+        }
+        nativeButton
+      />
       <TooltipContent side="right" align="center">
         {label}
       </TooltipContent>

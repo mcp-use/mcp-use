@@ -52,6 +52,18 @@ function truncatePropertyValues(obj: any, maxLength: number): any {
 }
 
 /**
+ * Data object safe to render in the inspector (truncates large string values).
+ */
+export function getJsonDisplayData(data: unknown): unknown {
+  const full = JSON.stringify(data, null, 2);
+  const size = new TextEncoder().encode(full).length;
+  if (size > LARGE_JSON_THRESHOLD) {
+    return truncatePropertyValues(data, MAX_VALUE_LENGTH);
+  }
+  return data;
+}
+
+/**
  * Check if a JSON object is too large and get preview information
  */
 export function analyzeJSON(data: any): LargeJSONInfo {

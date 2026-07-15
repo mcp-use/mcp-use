@@ -23,6 +23,11 @@ export interface InspectorOptions {
    * pinned to the current version.
    */
   assetsUrl?: string;
+  /**
+   * Hosted managed-chat backend URL (injected as `window.__MANUFACT_CHAT_URL__`).
+   * Defaults to `process.env.MANUFACT_CHAT_URL` when the shell is mounted.
+   */
+  manufactChatUrl?: string;
 }
 
 /**

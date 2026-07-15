@@ -62,11 +62,14 @@ export function ToolsList({
             <div className="flex items-center gap-1.5">
               {protocol === "mcp-apps" && (
                 <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="inline-flex">
-                      <PanelsTopLeft className="h-3.5 w-3.5" />
-                    </span>
-                  </TooltipTrigger>
+                  <TooltipTrigger
+                    render={
+                      <span className="inline-flex">
+                        <PanelsTopLeft className="h-3.5 w-3.5" />
+                      </span>
+                    }
+                    nativeButton={false}
+                  />
                   <TooltipContent>
                     <p>UI widget</p>
                   </TooltipContent>

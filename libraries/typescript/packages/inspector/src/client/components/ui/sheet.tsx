@@ -1,10 +1,6 @@
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog"
 
-import {
-  resolveAsChildFromChildren,
-  type AsChildCompatProps,
-} from "@/client/lib/as-child-compat"
 import { cn } from "@/client/lib/utils"
 import { Button } from "@/client/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -13,28 +9,8 @@ function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />
 }
 
-function SheetTrigger({
-  asChild,
-  render,
-  children,
-  nativeButton,
-  ...props
-}: SheetPrimitive.Trigger.Props & AsChildCompatProps) {
-  const asChildResolved = resolveAsChildFromChildren({
-    asChild,
-    children,
-    nativeButton,
-  })
-  return (
-    <SheetPrimitive.Trigger
-      data-slot="sheet-trigger"
-      {...props}
-      render={render ?? asChildResolved?.render}
-      nativeButton={asChildResolved?.nativeButton ?? nativeButton}
-    >
-      {asChildResolved ? undefined : children}
-    </SheetPrimitive.Trigger>
-  )
+function SheetTrigger(props: SheetPrimitive.Trigger.Props) {
+  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
 }
 
 function SheetClose({ ...props }: SheetPrimitive.Close.Props) {

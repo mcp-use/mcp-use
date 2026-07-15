@@ -12,10 +12,6 @@ import {
   DropdownSeparator,
 } from "@/client/components/ui/dropdown";
 import { MenuItem } from "@/client/components/ui/menu-item";
-import {
-  resolveAsChildFromChildren,
-  type AsChildCompatProps,
-} from "@/client/lib/as-child-compat";
 import { cn } from "@/client/lib/utils";
 
 const DropdownMenuIndexContext = React.createContext<{
@@ -51,28 +47,9 @@ function DropdownMenu(
   return <FluidDropdownMenu data-slot="dropdown-menu" {...props} />;
 }
 
-function DropdownMenuTrigger({
-  asChild,
-  render,
-  children,
-  nativeButton,
-  ...props
-}: MenuPrimitive.Trigger.Props & AsChildCompatProps) {
-  const asChildResolved = resolveAsChildFromChildren({
-    asChild,
-    children,
-    nativeButton,
-  });
-
+function DropdownMenuTrigger(props: MenuPrimitive.Trigger.Props) {
   return (
-    <DropdownTrigger
-      data-slot="dropdown-menu-trigger"
-      {...props}
-      render={render ?? asChildResolved?.render}
-      nativeButton={asChildResolved?.nativeButton ?? nativeButton}
-    >
-      {asChildResolved ? undefined : children}
-    </DropdownTrigger>
+    <DropdownTrigger data-slot="dropdown-menu-trigger" {...props} />
   );
 }
 
@@ -138,7 +115,7 @@ function DropdownMenuItem({
   className,
   inset,
   variant = "default",
-  asChild,
+  render,
   children,
   onSelect,
   onClick,
@@ -147,19 +124,19 @@ function DropdownMenuItem({
 }: React.HTMLAttributes<HTMLDivElement> & {
   inset?: boolean;
   variant?: "default" | "destructive";
-  asChild?: boolean;
+  render?: React.ReactElement;
   onSelect?: (event: Event) => void;
   disabled?: boolean;
 }) {
   const index = useDropdownMenuIndex();
-  const label = extractMenuLabel(children);
+  const label = extractMenuLabel(render ?? children);
 
   const handleSelect = () => {
     onSelect?.(new Event("select"));
   };
 
-  if (asChild && React.isValidElement(children)) {
-    const child = children as React.ReactElement<{
+  if (render && React.isValidElement(render)) {
+    const child = render as React.ReactElement<{
       className?: string;
       onClick?: React.MouseEventHandler;
     }>;

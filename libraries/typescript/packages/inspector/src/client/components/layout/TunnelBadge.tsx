@@ -300,14 +300,17 @@ export function TunnelBadge({
 
   return (
     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-      <PopoverTrigger asChild>
-        <button className="flex items-center gap-2 h-9 px-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 border border-purple-500/30 dark:border-purple-500/40 rounded-full hover:from-purple-500/20 hover:to-pink-500/20 dark:hover:from-purple-500/30 dark:hover:to-pink-500/30 transition-colors cursor-pointer">
-          <ChevronsLeftRightEllipsis className="size-4 text-purple-600 dark:text-purple-400" />
-          <span className="text-sm font-medium text-purple-700 dark:text-purple-300 hidden lg:inline">
-            Tunnel
-          </span>
-        </button>
-      </PopoverTrigger>
+      <PopoverTrigger
+        render={
+          <button className="flex items-center gap-2 h-9 px-3 bg-gradient-to-r from-purple-500/10 to-pink-500/10 dark:from-purple-500/20 dark:to-pink-500/20 border border-purple-500/30 dark:border-purple-500/40 rounded-full hover:from-purple-500/20 hover:to-pink-500/20 dark:hover:from-purple-500/30 dark:hover:to-pink-500/30 transition-colors cursor-pointer">
+            <ChevronsLeftRightEllipsis className="size-4 text-purple-600 dark:text-purple-400" />
+            <span className="text-sm font-medium text-purple-700 dark:text-purple-300 hidden lg:inline">
+              Tunnel
+            </span>
+          </button>
+        }
+        nativeButton
+      />
       <PopoverContent
         className="w-[calc(100vw-2rem)] sm:w-96 overflow-hidden"
         align="end"

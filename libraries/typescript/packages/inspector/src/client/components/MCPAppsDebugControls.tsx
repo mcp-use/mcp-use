@@ -366,32 +366,38 @@ export function MCPAppsDebugControls({
       {!isFullscreen && !isPip && (
         <>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="debugger-fullscreen-button"
-                variant="outline"
-                size="sm"
-                className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                onClick={() => onDisplayModeChange("fullscreen")}
-              >
-                <Maximize2 className="size-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  data-testid="debugger-fullscreen-button"
+                  variant="outline"
+                  size="sm"
+                  className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                  onClick={() => onDisplayModeChange("fullscreen")}
+                >
+                  <Maximize2 className="size-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Enter fullscreen mode</TooltipContent>
           </Tooltip>
 
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-testid="debugger-pip-button"
-                variant="outline"
-                size="sm"
-                className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                onClick={() => onDisplayModeChange("pip")}
-              >
-                <PictureInPicture className="size-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  data-testid="debugger-pip-button"
+                  variant="outline"
+                  size="sm"
+                  className="bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                  onClick={() => onDisplayModeChange("pip")}
+                >
+                  <PictureInPicture className="size-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Picture-in-picture</TooltipContent>
           </Tooltip>
         </>
@@ -400,18 +406,24 @@ export function MCPAppsDebugControls({
       {/* Device Emulation */}
       <DropdownMenu>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                data-testid="debugger-device-button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-              >
-                {getDeviceIcon()}
-              </Button>
-            </DropdownMenuTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    data-testid="debugger-device-button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                  >
+                    {getDeviceIcon()}
+                  </Button>
+                }
+                nativeButton
+              />
+            }
+            nativeButton
+          />
           <TooltipContent>Device: {playground.deviceType}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent
@@ -441,24 +453,27 @@ export function MCPAppsDebugControls({
 
       {/* Theme Toggle */}
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            data-testid="debugger-theme-button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-            onClick={() => {
-              const newTheme = resolvedTheme === "dark" ? "light" : "dark";
-              setTheme(newTheme);
-            }}
-          >
-            {resolvedTheme === "dark" ? (
-              <Moon className="size-3.5" />
-            ) : (
-              <Sun className="size-3.5" />
-            )}
-          </Button>
-        </TooltipTrigger>
+        <TooltipTrigger
+          render={
+            <Button
+              data-testid="debugger-theme-button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+              onClick={() => {
+                const newTheme = resolvedTheme === "dark" ? "light" : "dark";
+                setTheme(newTheme);
+              }}
+            >
+              {resolvedTheme === "dark" ? (
+                <Moon className="size-3.5" />
+              ) : (
+                <Sun className="size-3.5" />
+              )}
+            </Button>
+          }
+          nativeButton
+        />
         <TooltipContent>
           Theme: {resolvedTheme === "dark" ? "Dark" : "Light"}
         </TooltipContent>
@@ -475,18 +490,24 @@ export function MCPAppsDebugControls({
         optionTestId={(value) => `debugger-locale-option-${value}`}
         trigger={
           <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  data-testid="debugger-locale-button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                >
-                  <span className="text-xs font-mono">{playground.locale}</span>
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      data-testid="debugger-locale-button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                    >
+                      <span className="text-xs font-mono">{playground.locale}</span>
+                    </Button>
+                  }
+                  nativeButton
+                />
+              }
+              nativeButton
+            />
             <TooltipContent>Locale</TooltipContent>
           </Tooltip>
         }
@@ -505,18 +526,24 @@ export function MCPAppsDebugControls({
         }
         trigger={
           <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  data-testid="debugger-timezone-button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                >
-                  <Clock className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      data-testid="debugger-timezone-button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                    >
+                      <Clock className="size-3.5" />
+                    </Button>
+                  }
+                  nativeButton
+                />
+              }
+              nativeButton
+            />
             <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
           </Tooltip>
         }
@@ -525,33 +552,39 @@ export function MCPAppsDebugControls({
       {/* CSP Mode */}
       <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-              <Button
-                data-testid="debugger-csp-button"
-                variant="outline"
-                size="sm"
-                className="relative h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-              >
-                {playground.cspMode === "permissive" ? (
-                  <ShieldOff className="size-3.5" />
-                ) : (
-                  <ShieldCheck className="size-3.5" />
-                )}
-                {cspViolations.length > 0 && (
-                  <span
-                    className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold text-white leading-none ${
-                      playground.cspMode === "permissive"
-                        ? "bg-yellow-500"
-                        : "bg-red-500"
-                    }`}
+          <TooltipTrigger
+            render={
+              <DialogTrigger
+                render={
+                  <Button
+                    data-testid="debugger-csp-button"
+                    variant="outline"
+                    size="sm"
+                    className="relative h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
                   >
-                    {cspViolations.length > 99 ? "99+" : cspViolations.length}
-                  </span>
-                )}
-              </Button>
-            </DialogTrigger>
-          </TooltipTrigger>
+                    {playground.cspMode === "permissive" ? (
+                      <ShieldOff className="size-3.5" />
+                    ) : (
+                      <ShieldCheck className="size-3.5" />
+                    )}
+                    {cspViolations.length > 0 && (
+                      <span
+                        className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold text-white leading-none ${
+                          playground.cspMode === "permissive"
+                            ? "bg-yellow-500"
+                            : "bg-red-500"
+                        }`}
+                      >
+                        {cspViolations.length > 99 ? "99+" : cspViolations.length}
+                      </span>
+                    )}
+                  </Button>
+                }
+                nativeButton
+              />
+            }
+            nativeButton
+          />
           <TooltipContent>
             CSP:{" "}
             {playground.cspMode === "permissive" ? "Permissive" : "Declared"}
@@ -752,35 +785,38 @@ export function MCPAppsDebugControls({
 
       {/* Capabilities - Touch */}
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            data-testid="debugger-touch-button"
-            variant="outline"
-            size="sm"
-            className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
-              playground.capabilities.touch
-                ? "border-blue-500 dark:border-blue-400"
-                : ""
-            }`}
-            onClick={() => {
-              const newCapabilities = {
-                ...playground.capabilities,
-                touch: !playground.capabilities.touch,
-              };
-              updatePlaygroundSettings({
-                capabilities: newCapabilities,
-              });
-            }}
-          >
-            <Pointer
-              className={`size-3.5 ${
+        <TooltipTrigger
+          render={
+            <Button
+              data-testid="debugger-touch-button"
+              variant="outline"
+              size="sm"
+              className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
                 playground.capabilities.touch
-                  ? "text-blue-600 dark:text-blue-400"
+                  ? "border-blue-500 dark:border-blue-400"
                   : ""
               }`}
-            />
-          </Button>
-        </TooltipTrigger>
+              onClick={() => {
+                const newCapabilities = {
+                  ...playground.capabilities,
+                  touch: !playground.capabilities.touch,
+                };
+                updatePlaygroundSettings({
+                  capabilities: newCapabilities,
+                });
+              }}
+            >
+              <Pointer
+                className={`size-3.5 ${
+                  playground.capabilities.touch
+                    ? "text-blue-600 dark:text-blue-400"
+                    : ""
+                }`}
+              />
+            </Button>
+          }
+          nativeButton
+        />
         <TooltipContent>
           Touch: {playground.capabilities.touch ? "Enabled" : "Disabled"}
         </TooltipContent>
@@ -788,35 +824,38 @@ export function MCPAppsDebugControls({
 
       {/* Capabilities - Hover */}
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            data-testid="debugger-hover-button"
-            variant="outline"
-            size="sm"
-            className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
-              playground.capabilities.hover
-                ? "border-blue-500 dark:border-blue-400"
-                : ""
-            }`}
-            onClick={() => {
-              const newCapabilities = {
-                ...playground.capabilities,
-                hover: !playground.capabilities.hover,
-              };
-              updatePlaygroundSettings({
-                capabilities: newCapabilities,
-              });
-            }}
-          >
-            <MousePointer2
-              className={`size-3.5 ${
+        <TooltipTrigger
+          render={
+            <Button
+              data-testid="debugger-hover-button"
+              variant="outline"
+              size="sm"
+              className={`h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900 ${
                 playground.capabilities.hover
-                  ? "text-blue-600 dark:text-blue-400"
+                  ? "border-blue-500 dark:border-blue-400"
                   : ""
               }`}
-            />
-          </Button>
-        </TooltipTrigger>
+              onClick={() => {
+                const newCapabilities = {
+                  ...playground.capabilities,
+                  hover: !playground.capabilities.hover,
+                };
+                updatePlaygroundSettings({
+                  capabilities: newCapabilities,
+                });
+              }}
+            >
+              <MousePointer2
+                className={`size-3.5 ${
+                  playground.capabilities.hover
+                    ? "text-blue-600 dark:text-blue-400"
+                    : ""
+                }`}
+              />
+            </Button>
+          }
+          nativeButton
+        />
         <TooltipContent>
           Hover: {playground.capabilities.hover ? "Enabled" : "Disabled"}
         </TooltipContent>
@@ -824,16 +863,19 @@ export function MCPAppsDebugControls({
 
       {/* Safe Area */}
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            data-testid="debugger-safe-area-button"
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-          >
-            <SquareDashedMousePointer className="size-3.5" />
-          </Button>
-        </PopoverTrigger>
+        <PopoverTrigger
+          render={
+            <Button
+              data-testid="debugger-safe-area-button"
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+            >
+              <SquareDashedMousePointer className="size-3.5" />
+            </Button>
+          }
+          nativeButton
+        />
         <PopoverContent
           className="w-64 p-3"
           data-testid="debugger-safe-area-dialog"
@@ -854,18 +896,24 @@ export function MCPAppsDebugControls({
       {propsContext === "tool" ? (
         <Dialog>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-                  data-testid="debugger-props-button"
-                >
-                  <Braces className="size-3.5" />
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <DialogTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                      data-testid="debugger-props-button"
+                    >
+                      <Braces className="size-3.5" />
+                    </Button>
+                  }
+                  nativeButton
+                />
+              }
+              nativeButton
+            />
             <TooltipContent>View Tool Props</TooltipContent>
           </Tooltip>
           <DialogContent
@@ -889,24 +937,30 @@ export function MCPAppsDebugControls({
       ) : (
         <Popover open={propsPopoverOpen} onOpenChange={setPropsPopoverOpen}>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className={`h-8 w-8 p-0 backdrop-blur-sm shadow-sm ${
-                    missingProps
-                      ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 animate-pulse"
-                      : "bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900"
-                  }`}
-                  data-testid="debugger-props-button"
-                >
-                  <Braces
-                    className={`size-3.5 ${missingProps ? "text-amber-500" : ""}`}
-                  />
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={`h-8 w-8 p-0 backdrop-blur-sm shadow-sm ${
+                        missingProps
+                          ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/50 animate-pulse"
+                          : "bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900"
+                      }`}
+                      data-testid="debugger-props-button"
+                    >
+                      <Braces
+                        className={`size-3.5 ${missingProps ? "text-amber-500" : ""}`}
+                      />
+                    </Button>
+                  }
+                  nativeButton
+                />
+              }
+              nativeButton
+            />
             <TooltipContent>
               Props:{" "}
               {selectValue === NO_PROPS_VALUE

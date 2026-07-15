@@ -283,3 +283,74 @@ export function buildRawChatPayload(
 
   return { turns, tokenUsage: usage ?? null };
 }
+
+type MessageRef = { id: string; role: string };
+
+export type MessageTokenUsage = {
+  inputTokens?: number;
+  outputTokens?: number;
+};
+
+export function usageFromTraceResponse(
+  response: InspectorTraceEvent[]
+): InspectorTokenUsage | undefined {
+  let usage: InspectorTokenUsage | undefined;
+  for (const event of response) {
+    if (event.type === "usage") {
+      usage = addUsage(usage, event.usage);
+    }
+  }
+  return usage;
+}
+
+function buildMessageTurns(messages: MessageRef[]) {
+  const turns: Array<{ userId: string; assistantId: string | null }> = [];
+  let index = 0;
+  while (index < messages.length) {
+    if (messages[index]?.role !== "user") {
+      index++;
+      continue;
+    }
+    const userId = messages[index]!.id;
+    index++;
+    let assistantId: string | null = null;
+    while (index < messages.length && messages[index]?.role === "assistant") {
+      assistantId = messages[index]!.id;
+      index++;
+    }
+    turns.push({ userId, assistantId });
+  }
+  return turns;
+}
+
+/** Map message ids to per-turn token counts derived from trace events. */
+export function buildMessageTokenMap(
+  messages: MessageRef[],
+  events: InspectorTraceEvent[]
+): Map<string, MessageTokenUsage> {
+  const { turns: traceTurns } = buildRawChatPayload(events);
+  const messageTurns = buildMessageTurns(messages);
+  const map = new Map<string, MessageTokenUsage>();
+  const pairCount = Math.min(traceTurns.length, messageTurns.length);
+
+  for (let turn = 0; turn < pairCount; turn++) {
+    const usage = usageFromTraceResponse(traceTurns[turn]!.response);
+    if (!usage) continue;
+    const { userId, assistantId } = messageTurns[turn]!;
+
+    if (usage.inputTokens != null) {
+      map.set(userId, {
+        ...map.get(userId),
+        inputTokens: usage.inputTokens,
+      });
+    }
+    if (assistantId != null && usage.outputTokens != null) {
+      map.set(assistantId, {
+        ...map.get(assistantId),
+        outputTokens: usage.outputTokens,
+      });
+    }
+  }
+
+  return map;
+}

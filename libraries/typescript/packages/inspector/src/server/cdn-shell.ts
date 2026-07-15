@@ -1,4 +1,5 @@
 import type { Context, Hono } from "hono";
+import { renderInspectorFaviconLinks } from "./favicon-links.js";
 import { getInspectorVersion } from "./version.js";
 
 const INSPECTOR_VERSION = getInspectorVersion();
@@ -69,9 +70,7 @@ function generateCdnShellHtml(config?: CdnShellConfig): string {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="${CDN_BASE}/favicon-black.svg" />
-    <link rel="icon" type="image/svg+xml" href="${CDN_BASE}/favicon-white.svg" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" type="image/svg+xml" href="${CDN_BASE}/favicon-black.svg" media="(prefers-color-scheme: light)" />
+    ${renderInspectorFaviconLinks(CDN_BASE)}
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
