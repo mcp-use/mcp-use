@@ -136,7 +136,6 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
     serverId,
     fetch: customFetch,
     clientOptions,
-    viewSupport = false,
     protocolNegotiation,
     onNotification,
     onSampling: onSamplingOption,
@@ -168,8 +167,8 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
 
   const headers = headersOption ?? {};
   const effectiveClientOptions = useMemo(
-    () => resolveClientOptions(clientOptions, viewSupport),
-    [clientOptions, viewSupport]
+    () => resolveClientOptions(clientOptions),
+    [clientOptions]
   );
 
   const onSampling = onSamplingOption;

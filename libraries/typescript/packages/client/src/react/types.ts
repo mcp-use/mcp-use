@@ -188,15 +188,9 @@ export type UseMcpOptions = {
     window: globalThis.Window | null
   ) => void;
   /**
-   * Advertise support for MCP Apps views.
-   *
-   * This is shorthand for the `io.modelcontextprotocol/ui` client capability.
-   * @default false
-   */
-  viewSupport?: boolean;
-  /**
    * Additional client options passed to the underlying MCP SDK Client.
-   * Use this to advertise custom capabilities (e.g., MCP Apps extension).
+   * Use `capabilities.views: true` as shorthand for the MCP Apps UI extension,
+   * or set `capabilities.extensions` directly.
    *
    * @example
    * ```typescript
@@ -204,18 +198,14 @@ export type UseMcpOptions = {
    *   url: '...',
    *   clientOptions: {
    *     capabilities: {
-   *       extensions: {
-   *         "io.modelcontextprotocol/ui": {
-   *           mimeTypes: ["text/html;profile=mcp-app"],
-   *         },
-   *       },
+   *       views: true,
    *     },
    *   },
    * })
    * ```
    */
   clientOptions?: {
-    capabilities?: Record<string, unknown>;
+    capabilities?: Record<string, unknown> & { views?: boolean };
   };
   /**
    * Protocol version negotiation mode passed to the underlying SDK `Client`.

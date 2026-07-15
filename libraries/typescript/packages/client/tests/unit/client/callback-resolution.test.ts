@@ -47,13 +47,13 @@ describe("callback configuration", () => {
     expect(options.capabilities.elicitation).toEqual({ form: {}, url: {} });
   });
 
-  it("forwards roots and expands viewSupport from HTTP server config", () => {
+  it("forwards roots and expands capabilities.views from HTTP server config", () => {
     const roots = [{ uri: "file:///tmp/example", name: "Example" }];
     const connector = createConnectorFromConfig({
       url: "https://example.com/mcp",
       roots,
       timeout: 1234,
-      viewSupport: true,
+      clientOptions: { capabilities: { views: true } },
     }) as HttpConnector;
 
     expect((connector as any).opts.roots).toBe(roots);
@@ -65,5 +65,8 @@ describe("callback configuration", () => {
         mimeTypes: ["text/html;profile=mcp-app"],
       },
     });
+    expect(
+      (connector as any).buildClientOptions().capabilities.views
+    ).toBeUndefined();
   });
 });

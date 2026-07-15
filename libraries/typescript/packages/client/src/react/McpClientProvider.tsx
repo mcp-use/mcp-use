@@ -494,6 +494,8 @@ export interface McpClientProviderProps {
      * @example
      * ```tsx
      * capabilities: {
+     *   views: true,
+     *   // or explicitly:
      *   extensions: {
      *     "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] },
      *   },

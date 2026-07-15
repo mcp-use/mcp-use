@@ -510,10 +510,7 @@ export class MCPClient extends BaseMCPClient {
         protocolNegotiation: stdioConfig.protocolNegotiation,
         clientInfo: normalizeClientInfo(merged.clientInfo),
         roots: stdioConfig.roots,
-        clientOptions: resolveClientOptions(
-          stdioConfig.clientOptions,
-          stdioConfig.viewSupport
-        ),
+        clientOptions: resolveClientOptions(stdioConfig.clientOptions),
         defaultRequestOptions: stdioConfig.defaultRequestOptions,
         onSampling: resolved.onSampling,
         onElicitation: resolved.onElicitation,

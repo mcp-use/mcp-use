@@ -15,7 +15,9 @@ async function inspect(
     mcpServers: {
       demo: {
         url,
-        viewSupport: true,
+        clientOptions: {
+          capabilities: { views: true },
+        },
       },
     },
   });

@@ -66,10 +66,7 @@ function connectionFor(protocolEra: "legacy" | "modern") {
   };
 }
 
-async function renderFor(
-  protocolEra: "legacy" | "modern",
-  viewSupport = false
-) {
+async function renderFor(protocolEra: "legacy" | "modern", views = false) {
   const connection = connectionFor(protocolEra);
   connect.mockResolvedValue(connection);
   let result:
@@ -84,7 +81,9 @@ async function renderFor(
       autoProxyFallback: false,
       autoReconnect: false,
       logLevel: "silent",
-      viewSupport,
+      ...(views && {
+        clientOptions: { capabilities: { views: true } },
+      }),
     });
     return null;
   }
@@ -133,7 +132,7 @@ describe("useMcp connection metadata", () => {
     }
   );
 
-  it("advertises MCP Apps capabilities through viewSupport", async () => {
+  it("advertises MCP Apps capabilities through capabilities.views", async () => {
     await renderFor("modern", true);
 
     expect(client.addServer).toHaveBeenCalledWith(

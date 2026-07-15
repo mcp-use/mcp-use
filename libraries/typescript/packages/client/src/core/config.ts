@@ -87,8 +87,6 @@ export function resolveCallbacks(
  */
 interface BaseServerConfig extends CallbackConfig {
   clientInfo?: ClientInfo;
-  /** Advertise support for MCP Apps views. */
-  viewSupport?: boolean;
   /** Initial roots advertised to the server. */
   roots?: Root[];
   /** Options forwarded to the official MCP SDK Client. */
@@ -241,19 +239,27 @@ export function normalizeClientInfo(input: unknown): ClientInfo {
   return { ...fallback, ...ci };
 }
 
-/** Resolve SDK client options, including the MCP Apps capability shorthand. */
+/** Resolve SDK client options, expanding the MCP Apps `views` capability shorthand. */
 export function resolveClientOptions(
-  clientOptions: ClientOptions | undefined,
-  viewSupport: boolean | undefined
+  clientOptions: ClientOptions | undefined
 ): ClientOptions | undefined {
-  if (!viewSupport) return clientOptions;
-  const capabilities = clientOptions?.capabilities ?? {};
+  const capabilities = clientOptions?.capabilities as
+    | Record<string, unknown>
+    | undefined;
+  if (!capabilities || capabilities.views !== true) return clientOptions;
+
+  const { views: _views, ...capsWithoutViews } = capabilities;
   const extensions =
-    (capabilities.extensions as Record<string, unknown> | undefined) ?? {};
+    capsWithoutViews.extensions &&
+    typeof capsWithoutViews.extensions === "object" &&
+    !Array.isArray(capsWithoutViews.extensions)
+      ? { ...(capsWithoutViews.extensions as Record<string, unknown>) }
+      : {};
+
   return {
     ...clientOptions,
     capabilities: {
-      ...capabilities,
+      ...capsWithoutViews,
       extensions: {
         ...extensions,
         "io.modelcontextprotocol/ui": {
@@ -287,10 +293,7 @@ export function createConnectorFromConfig(
       protocolNegotiation: serverConfig.protocolNegotiation,
       timeout: serverConfig.timeout,
       roots: serverConfig.roots,
-      clientOptions: resolveClientOptions(
-        serverConfig.clientOptions,
-        serverConfig.viewSupport
-      ),
+      clientOptions: resolveClientOptions(serverConfig.clientOptions),
       defaultRequestOptions: serverConfig.defaultRequestOptions,
       clientInfo,
       ...connectorOptions,

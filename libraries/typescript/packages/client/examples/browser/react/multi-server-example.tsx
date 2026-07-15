@@ -23,14 +23,14 @@ const ServerManager: React.FC = () => {
     addServer("mcp-use-v1", {
       url: "http://127.0.0.1:3103/mcp",
       roots: [{ uri: "file:///tmp/mcp-use-browser", name: "Browser demo" }],
-      viewSupport: true,
+      clientOptions: { capabilities: { views: true } },
     });
 
     addServer("mcp-use-v2", {
       // Same-origin Vite proxy: the v2 reference server intentionally owns
       // Origin validation but does not emit browser CORS headers.
       url: `${window.location.origin}/demo/mcp-use-v2`,
-      viewSupport: true,
+      clientOptions: { capabilities: { views: true } },
     });
   }, [addServer]);
 
