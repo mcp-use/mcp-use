@@ -4,6 +4,7 @@ import { NotFound } from "@/client/components/ui/not-found";
 import { Skeleton } from "@/client/components/ui/skeleton";
 import { Search } from "lucide-react";
 import * as React from "react";
+import { ChatTitleReveal } from "./ChatTitleReveal";
 import type { ChatSession } from "./types";
 
 export type { ChatSession };
@@ -116,7 +117,13 @@ export function ChatList({
           hideAgentName ? "flex-col" : "flex-col gap-1"
         )}
       >
-        <p className="text-sm font-medium truncate w-full">{chat.title}</p>
+        <p className="text-sm font-medium truncate w-full">
+          <ChatTitleReveal
+            key={`${chat.id}:${chat.title}`}
+            chatId={chat.id}
+            title={chat.title}
+          />
+        </p>
         {!hideAgentName && (
           <p className="text-xs text-muted-foreground truncate w-full">
             {chat.agent_name}

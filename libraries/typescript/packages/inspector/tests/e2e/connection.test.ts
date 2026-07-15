@@ -42,27 +42,6 @@ async function expectPendingRequestEnqueued(
   await expect(pendingBadge).toBeVisible({ timeout: 5000 });
 }
 
-function elicitationPanel(page: Page) {
-  return page.getByTestId("elicitation-ask-user");
-}
-
-async function submitElicitationFreeText(page: Page, value: string) {
-  const panel = elicitationPanel(page);
-  await panel.locator("textarea, input").first().fill(value);
-  await panel.getByRole("button", { name: /Continue|Finish/ }).click();
-}
-
-async function selectElicitationOption(page: Page, label: string | RegExp) {
-  const panel = elicitationPanel(page);
-  await panel.getByText(label, { exact: typeof label === "string" }).click();
-}
-
-async function continueElicitationQuestion(page: Page) {
-  await elicitationPanel(page)
-    .getByRole("button", { name: /Continue|Finish/ })
-    .click();
-}
-
 test.describe("Inspector MCP Server Connections", () => {
   test.beforeEach(async ({ page, context }) => {
     // Clear localStorage and cookies before each test
@@ -127,8 +106,20 @@ test.describe("Inspector MCP Server Connections", () => {
       "ConformanceTestServer"
     );
 
-    // Verify capabilities JSON is displayed
+    // Verify formatted capabilities list is displayed
     await expect(page.getByTestId("server-info-capabilities")).toBeVisible();
+    await expect(page.getByTestId("capability-tools")).toHaveAttribute(
+      "data-supported",
+      "true"
+    );
+    await expect(page.getByTestId("capability-tasks")).toHaveAttribute(
+      "data-supported",
+      "false"
+    );
+    await expect(page.getByTestId("capability-extensions")).toHaveAttribute(
+      "data-supported",
+      "true"
+    );
 
     // // Close the modal by clicking outside or ESC
     // await page.keyboard.press("Escape"); // for some reason the copy url tooltip is focused so we need to press ESC twice
@@ -706,9 +697,22 @@ test.describe("Inspector MCP Server Connections", () => {
     // Verify there's 1 elicitation request item in the sidebar
     await expect(page.getByTestId("elicitation-request-item-0")).toBeVisible();
 
-    await expect(elicitationPanel(page)).toBeVisible();
-    await submitElicitationFreeText(page, "TestUser");
-    await submitElicitationFreeText(page, "25");
+    // Wait for form fields to be visible and ready
+    const nameField = page.getByTestId("elicitation-field-name");
+    const ageField = page.getByTestId("elicitation-field-age");
+    await expect(nameField).toBeVisible();
+    await expect(ageField).toBeVisible();
+
+    // Fill in the form fields
+    await nameField.fill("TestUser");
+
+    // For number input, use keyboard to select all and replace
+    await ageField.click();
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.type("25");
+
+    // Click the Accept button
+    await page.getByTestId("elicitation-accept-button").click();
 
     // Wait for "View Tool Result" toast button and click it
     const viewToolResultButton = page.getByTestId(
@@ -760,13 +764,23 @@ test.describe("Inspector MCP Server Connections", () => {
     // Verify there's 1 elicitation request item in the sidebar
     await expect(page.getByTestId("elicitation-request-item-0")).toBeVisible();
 
-    await expect(elicitationPanel(page)).toBeVisible();
-    // Defaults are pre-filled for freeText fields — Continue through those.
-    await continueElicitationQuestion(page);
-    await continueElicitationQuestion(page);
-    await continueElicitationQuestion(page);
-    await selectElicitationOption(page, "active");
-    await selectElicitationOption(page, "Yes");
+    // Wait for form fields to be visible with default values
+    const nameField = page.getByTestId("elicitation-field-name");
+    const ageField = page.getByTestId("elicitation-field-age");
+    const scoreField = page.getByTestId("elicitation-field-score");
+    const statusField = page.getByTestId("elicitation-field-status");
+    const verifiedField = page.getByTestId("elicitation-field-verified");
+
+    await expect(nameField).toBeVisible();
+    await expect(ageField).toBeVisible();
+
+    await expect(nameField).toHaveValue("John Doe");
+    await expect(ageField).toHaveValue("30");
+    await expect(scoreField).toHaveValue("95.5");
+    await expect(statusField).toHaveValue("active");
+    await expect(verifiedField).toBeChecked();
+
+    await page.getByTestId("elicitation-accept-button").click();
 
     // Wait for "View Tool Result" toast button and click it
     const viewToolResultButton = page.getByTestId(
@@ -815,19 +829,32 @@ test.describe("Inspector MCP Server Connections", () => {
     });
     await expect(page.getByTestId("elicitation-request-item-0")).toBeVisible();
 
-    await expect(elicitationPanel(page)).toBeVisible();
+    const untitledSingle = page.getByTestId("elicitation-field-untitledSingle");
+    await expect(untitledSingle).toBeVisible();
+    await untitledSingle.selectOption("option2");
+    await expect(untitledSingle).toHaveValue("option2");
 
-    await selectElicitationOption(page, "option2");
-    await selectElicitationOption(page, "value1");
-    await selectElicitationOption(page, "opt1");
+    const titledSingle = page.getByTestId("elicitation-field-titledSingle");
+    await expect(titledSingle).toBeVisible();
+    await titledSingle.selectOption("value1");
+    await expect(titledSingle).toHaveValue("value1");
 
-    await selectElicitationOption(page, "option1");
-    await selectElicitationOption(page, "option3");
-    await continueElicitationQuestion(page);
+    const legacyEnum = page.getByTestId("elicitation-field-legacyEnum");
+    await expect(legacyEnum).toBeVisible();
+    await legacyEnum.selectOption("opt1");
+    await expect(legacyEnum).toHaveValue("opt1");
 
-    await selectElicitationOption(page, "value1");
-    await selectElicitationOption(page, "value3");
-    await continueElicitationQuestion(page);
+    const untitledMulti = page.getByTestId("elicitation-field-untitledMulti");
+    await expect(untitledMulti).toBeVisible();
+    await untitledMulti.getByLabel("option1").click();
+    await untitledMulti.getByLabel("option3").click();
+
+    const titledMulti = page.getByTestId("elicitation-field-titledMulti");
+    await expect(titledMulti).toBeVisible();
+    await titledMulti.getByLabel("value1").click();
+    await titledMulti.getByLabel("value3").click();
+
+    await page.getByTestId("elicitation-accept-button").click();
 
     const viewToolResultButton = page.getByTestId(
       "elicitation-view-tool-result"

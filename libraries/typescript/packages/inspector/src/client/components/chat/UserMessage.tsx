@@ -38,7 +38,10 @@ export function UserMessage({
   }
 
   return (
-    <div data-testid="chat-message-user">
+    <div
+      data-testid="chat-message-user"
+      className="flex flex-col items-end"
+    >
       <ChatMessage
         from="user"
         files={files}

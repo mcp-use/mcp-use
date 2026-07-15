@@ -37,4 +37,6 @@ export interface ChatStorageProvider {
   deleteChat(chatId: string): Promise<void>;
   /** Optional — local provider implements; cloud relies on /stream event writes */
   saveMessages?(chatId: string, messages: Message[]): Promise<void>;
+  /** Optional — cloud uses API; standalone may use built-in LLM fallback in ChatTab */
+  generateTitle?(chatId: string): Promise<string | null>;
 }

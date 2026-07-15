@@ -324,8 +324,8 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
         aria-controls={idPrefix ? `${idPrefix}-panel-${index}` : undefined}
         aria-label={collapseLabel && !showLabel ? label : undefined}
         className={cn(
-          "relative z-10 flex items-center px-3 cursor-pointer bg-transparent border-none outline-none",
-          collapseLabel ? "h-8" : "h-9 gap-2",
+          "relative z-10 flex items-center px-2 cursor-pointer bg-transparent border-none outline-none text-xs",
+          collapseLabel ? "h-7" : "h-7 gap-1.5",
           shape.bg,
           className
         )}
@@ -333,7 +333,7 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
       >
         {Icon && (
           <Icon
-            size={16}
+            size={14}
             strokeWidth={isActive ? 2 : 1.5}
             className={cn(
               "shrink-0 transition-[color,stroke-width] duration-80",
@@ -348,7 +348,7 @@ const TabsSubtleItem = forwardRef<HTMLButtonElement, TabsSubtleItemProps>(
                 key="label"
                 className="overflow-hidden"
                 initial={{ width: 0, opacity: 0, marginLeft: 0 }}
-                animate={{ width: "auto", opacity: 1, marginLeft: 8 }}
+                animate={{ width: "auto", opacity: 1, marginLeft: 6 }}
                 exit={{ width: 0, opacity: 0, marginLeft: 0 }}
                 transition={{
                   ...spring.fast,

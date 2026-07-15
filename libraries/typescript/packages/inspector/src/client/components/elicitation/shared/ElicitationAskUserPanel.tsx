@@ -8,7 +8,6 @@ import {
   type AskUserAnswer,
 } from "@/client/components/ui/ask-user-questions";
 import { Button } from "@/client/components/ui/button";
-import { Badge } from "@/client/components/ui/badge";
 import {
   answersToFormData,
   elicitationToAskUserQuestions,
@@ -20,23 +19,16 @@ interface ElicitationAskUserPanelProps {
   request: PendingElicitationRequest;
   onApprove: (requestId: string, result: ElicitResult) => void;
   onReject: (requestId: string, error?: string) => void;
-  /** Root `data-testid` for e2e hooks. */
   testId?: string;
-  /** Show decline/cancel actions below the question flow. */
-  showSecondaryActions?: boolean;
-  /** Prefix for secondary action test ids (panel vs inline). */
   actionTestIdPrefix?: string;
-  compact?: boolean;
 }
 
 export function ElicitationAskUserPanel({
   request,
   onApprove,
   onReject,
-  testId = "elicitation-ask-user",
-  showSecondaryActions = true,
-  actionTestIdPrefix = "elicitation",
-  compact = false,
+  testId = "inline-elicitation",
+  actionTestIdPrefix = "inline-elicitation",
 }: ElicitationAskUserPanelProps) {
   const [responded, setResponded] = useState(false);
   const [responseLabel, setResponseLabel] = useState("");
@@ -99,47 +91,17 @@ export function ElicitationAskUserPanel({
 
   if (responded) {
     return (
-      <div
-        className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground max-w-2xl"
-        data-testid={`${testId}-responded`}
-      >
+      <p className="text-sm text-muted-foreground" data-testid={`${testId}-responded`}>
         Elicitation {responseLabel} — the tool will continue executing.
-      </div>
+      </p>
     );
   }
 
-  return (
-    <div
-      className={
-        compact
-          ? "rounded-lg border bg-card shadow-sm p-4 space-y-4 max-w-2xl"
-          : "space-y-4"
-      }
-      data-testid={testId}
-    >
-      {compact && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm text-card-foreground">
-            Elicitation Request
-          </span>
-          <Badge
-            variant="outline"
-            className={
-              isUrlMode
-                ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30"
-                : "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30"
-            }
-          >
-            {mode}
-          </Badge>
-          <span className="text-xs text-muted-foreground">
-            {request.serverName}
-          </span>
-        </div>
-      )}
-
+  const intro = (
+    <div className="space-y-2">
+      <p className="text-foreground/90">{request.request.message}</p>
       {isUrlMode && url && (
-        <div className="flex items-center gap-2 p-2 bg-muted rounded border">
+        <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-2">
           <code className="flex-1 text-xs font-mono break-all">{url}</code>
           <Button
             size="sm"
@@ -152,46 +114,31 @@ export function ElicitationAskUserPanel({
           </Button>
         </div>
       )}
-
-      {!isUrlMode && !compact && (
-        <p className="text-sm text-muted-foreground">{request.request.message}</p>
-      )}
-
-      {compact && !isUrlMode && (
-        <p className="text-sm text-card-foreground">{request.request.message}</p>
-      )}
-
-      <AskUserQuestions
-        questions={questions}
-        defaultAnswers={defaultAnswers}
-        onComplete={handleComplete}
-        data-testid={`${testId}-questions`}
-      />
-
-      {showSecondaryActions && (
-        <div className="flex gap-2 pt-1">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => finish("declined", { action: "decline" })}
-            data-testid={`${actionTestIdPrefix}-decline-button`}
-          >
-            Decline
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              setResponded(true);
-              setResponseLabel("cancelled");
-              onReject(request.id, "User cancelled elicitation request");
-            }}
-            data-testid={`${actionTestIdPrefix}-cancel-button`}
-          >
-            Cancel
-          </Button>
-        </div>
-      )}
     </div>
+  );
+
+  return (
+    <AskUserQuestions
+      questions={questions}
+      defaultAnswers={defaultAnswers}
+      onComplete={handleComplete}
+      intro={intro}
+      onCancel={() =>
+        onReject(request.id, "User cancelled elicitation request")
+      }
+      cancelLabel="Cancel"
+      footerLeading={
+        <button
+          type="button"
+          className="shrink-0 cursor-pointer text-[12px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          onClick={() => finish("declined", { action: "decline" })}
+          data-testid={`${actionTestIdPrefix}-decline-button`}
+        >
+          Decline
+        </button>
+      }
+      className="w-full max-w-none shadow-lg"
+      data-testid={testId}
+    />
   );
 }

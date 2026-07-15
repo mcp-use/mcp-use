@@ -15,7 +15,14 @@ import {
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
 import type { ProviderName } from "@mcp-use/agent";
+import { ChatTitleReveal } from "@/client/chat-history/ChatTitleReveal";
+import { CHAT_TITLE_SIMPLE } from "@/client/chat-history/chat-title";
 import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
+import { cn } from "@/client/lib/utils";
+import {
+  chatBarActionButtonClass,
+  chatBarTitleFrostedClass,
+} from "./chat-bar-styles";
 
 interface ChatHeaderProps {
   llmConfig: LLMConfig | null;
@@ -59,6 +66,10 @@ interface ChatHeaderProps {
   clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
   /** When true, hides the "New Chat" / clear button entirely. */
   hideClearButton?: boolean;
+  /** Active chat id — enables animated title reveal in the header. */
+  activeChatId?: string | null;
+  /** Title for the active chat thread. */
+  chatTitle?: string;
 }
 
 export function ChatHeader({
@@ -87,14 +98,26 @@ export function ChatHeader({
   hideClearButton,
   onCopyChat,
   onExportChat,
+  activeChatId,
+  chatTitle,
 }: ChatHeaderProps) {
   return (
     <div
       className={`flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
     >
-      <div className="flex items-center gap-2 rounded-full">
+      <div className="flex min-w-0 items-center gap-2">
         {!hideTitle && (
-          <h2 className={inspectorTabTitleClass}>Chat</h2>
+          <h2 className={cn(inspectorTabTitleClass, chatBarTitleFrostedClass)}>
+            {activeChatId ? (
+              <ChatTitleReveal
+                key={activeChatId}
+                chatId={activeChatId}
+                title={chatTitle ?? CHAT_TITLE_SIMPLE}
+              />
+            ) : (
+              CHAT_TITLE_SIMPLE
+            )}
+          </h2>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
@@ -106,7 +129,7 @@ export function ChatHeader({
                 data-testid="chat-copy-button"
                 variant="ghost"
                 size="sm"
-                className="h-9 gap-1.5 px-3"
+                className={chatBarActionButtonClass}
                 onClick={onCopyChat}
               >
                 <Copy className="h-4 w-4" />
@@ -121,7 +144,7 @@ export function ChatHeader({
                     data-testid="chat-export-button"
                     variant="ghost"
                     size="sm"
-                    className="h-9 gap-1.5 px-3"
+                    className={chatBarActionButtonClass}
                   >
                     <Download className="h-4 w-4" />
                     <span className="hidden sm:inline">Export</span>

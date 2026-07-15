@@ -27,7 +27,7 @@ export function ServerCapabilitiesModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         scrollable
-        className="max-w-2xl max-h-[80vh]"
+        className="max-w-4xl max-h-[80vh]"
         data-testid="server-info-modal"
       >
         <DialogHeader sticky>

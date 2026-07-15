@@ -17,6 +17,12 @@ import { ChatHistoryPanel } from "@/client/chat-history/ChatHistoryPanel";
 import { ChatHistoryRail } from "@/client/chat-history/ChatHistoryRail";
 import { LocalChatStorageProvider } from "@/client/chat-history/providers/local-storage";
 import type { ChatStorageProvider } from "@/client/chat-history/types";
+import { useChatTitleGeneration } from "@/client/chat-history/useChatTitleGeneration";
+import {
+  CHAT_TITLE_PLACEHOLDER,
+  CHAT_TITLE_SIMPLE,
+  isPlaceholderTitle,
+} from "@/client/chat-history/chat-title";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MeshTabBackground } from "@/client/components/ui/mesh-tab-background";
 import { Button } from "./ui/button";
@@ -38,6 +44,8 @@ import { ChatLandingForm } from "./chat/ChatLandingForm";
 import { ConfigurationDialog } from "./chat/ConfigurationDialog";
 import { ConfigureEmptyState } from "./chat/ConfigureEmptyState";
 import { MessageList } from "./chat/MessageList";
+import { ChatScrollToBottomButton } from "./chat/ChatScrollToBottomButton";
+import { useChatScrollToBottom } from "./chat/useChatScrollToBottom";
 import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
@@ -130,6 +138,12 @@ export interface ChatTabProps {
   /** Controlled active chat thread id */
   activeChatId?: string;
   onActiveChatIdChange?: (chatId: string | null) => void;
+  /** When false, defer title generation until host signals persisted events (cloud embed). Default: true. */
+  titleGenerationReady?: boolean;
+  /** Known title for the active chat; skips generation when not the placeholder. */
+  activeChatTitle?: string;
+  /** Called after a title is generated and persisted via the storage provider. */
+  onChatTitleGenerated?: (chatId: string, title: string) => void;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -171,6 +185,9 @@ export function ChatTab({
   enableChatHistory,
   activeChatId: controlledActiveChatId,
   onActiveChatIdChange,
+  titleGenerationReady,
+  activeChatTitle,
+  onChatTitleGenerated,
 }: ChatTabProps) {
   const { isEmbedded } = useInspector();
   const localChatStorageRef = useRef(new LocalChatStorageProvider());
@@ -197,6 +214,7 @@ export function ChatTab({
 
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [historyRefetchKey, setHistoryRefetchKey] = useState(0);
+  const [internalChatTitle, setInternalChatTitle] = useState<string | undefined>();
   const [restoredMessages, setRestoredMessages] = useState<
     import("./chat/types").Message[] | undefined
   >(undefined);
@@ -296,20 +314,35 @@ export function ChatTab({
     removeAttachment,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
 
+  const { messagesEndRef, showScrollToBottom, scrollToBottom } =
+    useChatScrollToBottom(messagesAreaRef, {
+      messageCount: messages.length,
+      isLoading,
+      enabled: !!llmConfig,
+    });
+
   const handleSelectChat = useCallback(
     async (chatId: string) => {
       if (!effectiveChatStorage) return;
-      const msgs = await effectiveChatStorage.getMessages(chatId);
+      const [msgs, listed] = await Promise.all([
+        effectiveChatStorage.getMessages(chatId),
+        effectiveChatStorage.listChats({ agentId: serverId }),
+      ]);
       setRestoredMessages(msgs);
       setMessages(msgs);
       setActiveChatId(chatId);
+      setInternalChatTitle(
+        listed.items.find((session) => session.id === chatId)?.title
+      );
     },
-    [effectiveChatStorage, setMessages, setActiveChatId]
+    [effectiveChatStorage, setMessages, setActiveChatId, serverId]
   );
 
   const handleNewChat = useCallback(async () => {
     clearMessages();
     setRestoredMessages([]);
+    setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
+    setActiveChatId(null);
     if (effectiveChatStorage) {
       const session = await effectiveChatStorage.createChat({
         agentId: serverId,
@@ -318,7 +351,7 @@ export function ChatTab({
       setActiveChatId(session.id);
       setHistoryRefetchKey((k) => k + 1);
     } else {
-      setActiveChatId(null);
+      setInternalChatTitle(undefined);
     }
   }, [
     clearMessages,
@@ -336,6 +369,7 @@ export function ChatTab({
       agentName: connection.displayName || connection.name || "MCP Server",
     });
     setActiveChatId(session.id);
+    setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
     setHistoryRefetchKey((k) => k + 1);
     return session.id;
   }, [
@@ -351,6 +385,38 @@ export function ChatTab({
     if (!effectiveChatStorage?.saveMessages || !activeChatId) return;
     void effectiveChatStorage.saveMessages(activeChatId, messages);
   }, [effectiveChatStorage, activeChatId, messages]);
+
+  const bumpHistoryRefetch = useCallback(() => {
+    setHistoryRefetchKey((k) => k + 1);
+  }, []);
+
+  const handleTitleGenerated = useCallback(
+    (chatId: string, title: string) => {
+      setInternalChatTitle(title);
+      onChatTitleGenerated?.(chatId, title);
+    },
+    [onChatTitleGenerated]
+  );
+
+  const effectiveActiveChatTitle = activeChatTitle ?? internalChatTitle;
+  const headerDisplayTitle =
+    effectiveActiveChatTitle &&
+    !isPlaceholderTitle(effectiveActiveChatTitle)
+      ? effectiveActiveChatTitle
+      : CHAT_TITLE_SIMPLE;
+
+  useChatTitleGeneration({
+    activeChatId,
+    storage: effectiveChatStorage,
+    messages,
+    isLoading,
+    effectiveClientSide,
+    llmConfig,
+    activeChatTitle: effectiveActiveChatTitle,
+    titleGenerationReady,
+    onTitleGenerated: handleTitleGenerated,
+    onHistoryRefetch: bumpHistoryRefetch,
+  });
 
   const rateLimitInfo = effectiveClientSide
     ? null
@@ -1232,7 +1298,7 @@ export function ChatTab({
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
     return wrapWithHistory(
-      <div className="flex flex-col h-full">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="absolute top-4 right-4 z-10">
           <ConfigurationDialog
             open={configDialogOpen}
@@ -1288,6 +1354,9 @@ export function ChatTab({
           freeTierInfo={freeTierInfo}
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
+          pendingElicitationRequests={connection.pendingElicitationRequests}
+          onApproveElicitation={connection.approveElicitation}
+          onRejectElicitation={connection.rejectElicitation}
         />
         {reconnectBannerNode}
         {loginModalNode}
@@ -1296,7 +1365,7 @@ export function ChatTab({
   }
 
   return wrapWithHistory(
-    <div className="flex flex-col h-full relative">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header. In hosted-managed mode (`freeTierInfo`), the dialog always
           renders and the badge switches to a "Free tier" pill. */}
       <ChatHeader
@@ -1327,32 +1396,40 @@ export function ChatTab({
         clearButtonHideShortcut={clearButtonHideShortcut}
         clearButtonVariant={clearButtonVariant}
         hideClearButton={hideClearButton}
+        activeChatId={activeChatId}
+        chatTitle={headerDisplayTitle}
       />
 
       {/* Messages Area */}
-      <div
-        ref={messagesAreaRef}
-        data-testid="chat-messages-scroll-container"
-        className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
-      >
-        {!llmConfig ? (
-          <ConfigureEmptyState
-            onConfigureClick={() => setConfigDialogOpen(true)}
-            managedKeyUnavailable={managedKeyUnavailable}
-          />
-        ) : (
-          <MessageList
-            messages={messages}
-            isLoading={isLoading}
-            serverId={connection.url}
-            readResource={readResource}
-            tools={connection.tools}
-            sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
-            serverBaseUrl={connection.url}
-            pendingElicitationRequests={connection.pendingElicitationRequests}
-            onApproveElicitation={connection.approveElicitation}
-            onRejectElicitation={connection.rejectElicitation}
-            scrollContainerRef={messagesAreaRef}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          ref={messagesAreaRef}
+          data-testid="chat-messages-scroll-container"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
+        >
+          {!llmConfig ? (
+            <ConfigureEmptyState
+              onConfigureClick={() => setConfigDialogOpen(true)}
+              managedKeyUnavailable={managedKeyUnavailable}
+            />
+          ) : (
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              serverId={connection.url}
+              readResource={readResource}
+              tools={connection.tools}
+              sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
+              serverBaseUrl={connection.url}
+              messagesEndRef={messagesEndRef}
+            />
+          )}
+        </div>
+
+        {llmConfig && (
+          <ChatScrollToBottomButton
+            visible={showScrollToBottom}
+            onClick={() => scrollToBottom("smooth")}
           />
         )}
       </div>
@@ -1363,7 +1440,8 @@ export function ChatTab({
 
       {/* Input Area */}
       {llmConfig && (
-        <ChatInputArea
+        <div className="relative shrink-0">
+          <ChatInputArea
           inputValue={inputValue}
           isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
           isLoading={isLoading}
@@ -1395,7 +1473,11 @@ export function ChatTab({
           freeTierInfo={freeTierInfo}
           followups={followups}
           onFollowupSelect={handleFollowupSelect}
+          pendingElicitationRequests={connection.pendingElicitationRequests}
+          onApproveElicitation={connection.approveElicitation}
+          onRejectElicitation={connection.rejectElicitation}
         />
+        </div>
       )}
     </div>
   );

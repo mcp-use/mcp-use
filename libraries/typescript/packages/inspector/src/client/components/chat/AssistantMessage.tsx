@@ -1,4 +1,4 @@
-import { MarkdownRenderer } from "@/client/components/shared/MarkdownRenderer";
+import { StreamingAssistantContent } from "./StreamingAssistantContent";
 import { ChatMessage } from "@/client/components/ui/chat-message";
 import { CopyButton } from "./CopyButton";
 
@@ -12,7 +12,7 @@ interface AssistantMessageProps {
 export function AssistantMessage({
   content,
   timestamp,
-  _isStreaming: _,
+  _isStreaming: isStreaming,
 }: AssistantMessageProps) {
   if (!content || content.length === 0) {
     return null;
@@ -25,7 +25,10 @@ export function AssistantMessage({
         actions={<CopyButton text={content} />}
         data-testid="chat-message-content"
       >
-        <MarkdownRenderer content={content} />
+        <StreamingAssistantContent
+          content={content}
+          isStreaming={isStreaming}
+        />
       </ChatMessage>
       {timestamp != null && (
         <span className="sr-only">

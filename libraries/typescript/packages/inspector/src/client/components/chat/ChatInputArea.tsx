@@ -8,6 +8,8 @@ import { cn } from "@/client/lib/utils";
 import type { Prompt } from "@modelcontextprotocol/client";
 import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
+import type { ElicitResult } from "@modelcontextprotocol/client";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";
 import { ModelConfigBadge } from "./providerMeta";
@@ -15,6 +17,7 @@ import { PromptResultsList } from "./PromptResultsList";
 import { PromptsDropdown } from "./PromptsDropdown";
 import type { ToolInfo } from "./ToolSelector";
 import type { LLMConfig, MessageAttachment } from "./types";
+import { FloatingChatElicitation } from "./FloatingChatElicitation";
 
 interface ChatInputAreaProps {
   inputValue: string;
@@ -55,6 +58,10 @@ interface ChatInputAreaProps {
   followups?: string[];
   /** Called when a followup suggestion is selected. */
   onFollowupSelect?: (followup: string) => void;
+  /** Pending MCP elicitation requests — rendered floating above the composer. */
+  pendingElicitationRequests?: PendingElicitationRequest[];
+  onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
+  onRejectElicitation?: (requestId: string, error?: string) => void;
 }
 
 export function ChatInputArea({
@@ -87,9 +94,13 @@ export function ChatInputArea({
   freeTierInfo,
   followups = [],
   onFollowupSelect,
+  pendingElicitationRequests,
+  onApproveElicitation,
+  onRejectElicitation,
 }: ChatInputAreaProps) {
   const canSend =
     inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
+  const hasPendingElicitation = (pendingElicitationRequests?.length ?? 0) > 0;
 
   const modelBadge =
     llmConfig && (!hideModelBadge || freeTierInfo) ? (
@@ -111,8 +122,17 @@ export function ChatInputArea({
     ) : null;
 
   return (
-    <div className="w-full flex flex-col justify-center items-center p-2 sm:p-4 sm:pt-0 text-foreground">
+    <div className="w-full flex shrink-0 flex-col items-center px-2 pb-2 pt-0 sm:px-4 sm:pb-2 text-foreground">
       <div className="relative w-full max-w-3xl backdrop-blur-xl">
+        {hasPendingElicitation &&
+          onApproveElicitation &&
+          onRejectElicitation && (
+            <FloatingChatElicitation
+              requests={pendingElicitationRequests!}
+              onApprove={onApproveElicitation}
+              onReject={onRejectElicitation}
+            />
+          )}
         {followups.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {followups.map((followup) => (
@@ -173,7 +193,7 @@ export function ChatInputArea({
                   isLoading && "animate-spin",
                   !canSend && !isLoading && "bg-zinc-400"
                 )}
-                disabled={!isLoading && (!canSend || !isConnected)}
+                disabled={!isLoading && (!canSend || !isConnected || hasPendingElicitation)}
                 title={isLoading ? "Stop streaming" : "Send"}
                 onClick={isLoading ? onStopStreaming : onSendMessage}
                 data-testid="chat-send-button"

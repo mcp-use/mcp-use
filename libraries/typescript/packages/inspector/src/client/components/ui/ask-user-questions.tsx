@@ -10,6 +10,7 @@ import {
   useState,
   type HTMLAttributes,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RadioGroup as RadioGroupPrimitive } from "@base-ui/react/radio-group";
@@ -98,6 +99,13 @@ export interface AskUserQuestionsProps
   onComplete?: (answers: Record<string, AskUserAnswer>) => void;
   onSkip?: (questionId: string, currentIndex: number) => void;
   skipLabel?: string;
+  /** Optional lead-in copy shown inside the card, below the progress header. */
+  intro?: ReactNode;
+  /** When set, renders a Cancel control that aborts the flow (does not advance). */
+  onCancel?: () => void;
+  cancelLabel?: string;
+  /** Extra control on the footer's leading edge (e.g. a Decline link). */
+  footerLeading?: ReactNode;
 }
 
 function questionKey(q: AskUserQuestion, i: number) {
@@ -128,6 +136,10 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
       onComplete,
       onSkip,
       skipLabel = "Skip",
+      intro,
+      onCancel,
+      cancelLabel = "Cancel",
+      footerLeading,
       className,
       ...rest
     },
@@ -518,6 +530,10 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
       goNext(snapshot);
     }, [question, qId, writeAnswers, onSkip, safeIndex, goNext]);
 
+    const handleCancel = useCallback(() => {
+      onCancel?.();
+    }, [onCancel]);
+
     const handleMultiNext = useCallback(() => {
       goNext(answers);
     }, [goNext, answers]);
@@ -787,10 +803,12 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
     const blocks = useMergeSplitBlocks(selectedGroups, itemRects, shape.bgRadius);
 
     const showBack = total > 1 && safeIndex > 0;
-    const showSkip = total > 1 && isSkippable;
+    const showCancel = onCancel != null;
+    const showSkip = !showCancel && total > 1 && isSkippable;
     // freeText commits through the same bottom submit button as multi-select.
     const showSubmit = isMulti || isFreeText;
-    const showFooter = showBack || showSkip || showSubmit;
+    const showFooter =
+      showBack || showSkip || showSubmit || showCancel || footerLeading != null;
 
     // ── Roving tabindex ──────────────────────────────────────────
     // One tab stop for the whole group, single- AND multi-select alike: the
@@ -1230,6 +1248,12 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
           </span>
         </div>
 
+        {intro != null && (
+          <div className="px-4 sm:px-5 pb-3 text-[13px] leading-snug text-muted-foreground">
+            {intro}
+          </div>
+        )}
+
         {/* Field context for freeText validation — one Base UI Field spans
             both the textarea (Field.Control, in the morphing region) and the
             footer error (Field.Error), which is how the two get auto-wired:
@@ -1392,6 +1416,9 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                     error fills the row up to the right-hand buttons; min-w-0 lets
                     a long message wrap instead of overflowing. */}
                 <div className="relative flex flex-1 min-w-0 items-center gap-2">
+                  {footerLeading != null && (
+                    <div className="shrink-0 px-2 sm:px-3">{footerLeading}</div>
+                  )}
                   <AnimatePresence mode="popLayout" initial={false}>
                     {showBack && (
                       <motion.div
@@ -1453,6 +1480,29 @@ const AskUserQuestions = forwardRef<HTMLDivElement, AskUserQuestionsProps>(
                 </div>
                 <div className="relative flex items-center gap-2">
                   <AnimatePresence mode="popLayout" initial={false}>
+                    {showCancel && (
+                      <motion.div
+                        key="cancel"
+                        layout="position"
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.85 }}
+                        transition={{
+                          ...spring.fast,
+                          opacity: { duration: 0.1 },
+                        }}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          trailingIcon={ArrowRightKey}
+                          onClick={handleCancel}
+                          className="pr-3 sm:pr-[6px]"
+                        >
+                          {cancelLabel}
+                        </Button>
+                      </motion.div>
+                    )}
                     {showSkip && (
                       <motion.div
                         key="skip"

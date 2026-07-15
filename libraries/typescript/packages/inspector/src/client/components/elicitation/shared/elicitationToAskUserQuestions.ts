@@ -20,7 +20,7 @@ export function elicitationToAskUserQuestions(
     return [
       {
         id: "__url_confirm__",
-        title: request.message,
+        title: "Confirm completion",
         layout: "stacked",
         options: [
           {
@@ -41,10 +41,10 @@ export function elicitationToAskUserQuestions(
     return [
       {
         id: "__freeform__",
-        title: request.message,
+        title: "Your response",
         freeText: true,
         freeTextPlaceholder: "Type your response…",
-        skippable: true,
+        skippable: false,
       },
     ];
   }

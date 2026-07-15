@@ -1,6 +1,7 @@
 import { Button } from "@/client/components/ui/button";
 import { Textarea } from "@/client/components/ui/textarea";
 import { cn } from "@/client/lib/utils";
+import { useShape } from "@/client/lib/shape-context";
 import { Image as ImageIcon, Paperclip, X } from "lucide-react";
 import React, { useRef, type ReactNode } from "react";
 import type { ToolInfo } from "./ToolSelector";
@@ -53,6 +54,7 @@ export function ChatInput({
   inlineControls,
   trailingControls,
 }: ChatInputProps) {
+  const shape = useShape();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,7 +117,8 @@ export function ChatInput({
         onClick={onClick}
         placeholder={isConnected ? placeholder : "Server not connected"}
         className={cn(
-          "p-4 min-h-[150px] max-h-[300px] rounded-xl",
+          "p-4 min-h-[150px] max-h-[300px]",
+          shape.container,
           hasAttachments && "pt-20",
           className
         )}

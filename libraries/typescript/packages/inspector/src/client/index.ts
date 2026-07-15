@@ -51,6 +51,11 @@ export { ChatTab, type ChatTabProps } from "./components/ChatTab.js";
 // Chat sub-components (for consumers who want finer-grained control)
 export { MessageList } from "./components/chat/MessageList.js";
 export { ChatHeader } from "./components/chat/ChatHeader.js";
+export {
+  chatBarActionButtonClass,
+  chatBarFrostedPill,
+  chatBarTitleFrostedClass,
+} from "./components/chat/chat-bar-styles.js";
 export { ChatInputArea } from "./components/chat/ChatInputArea.js";
 export { ChatLandingForm } from "./components/chat/ChatLandingForm.js";
 export { ConfigurationDialog } from "./components/chat/ConfigurationDialog.js";
@@ -77,6 +82,7 @@ export { ChatHistoryPanel } from "./chat-history/ChatHistoryPanel.js";
 export { ChatHistoryHeader } from "./chat-history/ChatHistoryHeader.js";
 export { ChatHistoryRail } from "./chat-history/ChatHistoryRail.js";
 export { ChatList, type ChatSession } from "./chat-history/ChatList.js";
+export { ChatTitleReveal } from "./chat-history/ChatTitleReveal.js";
 export type {
   ChatStorageProvider,
   ListChatsParams,
@@ -85,6 +91,14 @@ export { LocalChatStorageProvider } from "./chat-history/providers/local-storage
 export { chatEventsToInspectorMessages } from "./chat-history/chat-events-to-inspector-messages.js";
 export type { ChatEventRowForMessages } from "./chat-history/chat-events-to-inspector-messages.js";
 export { useChatHistory } from "./chat-history/useChatHistory.js";
+export {
+  CHAT_TITLE_PLACEHOLDER,
+  CHAT_TITLE_SIMPLE,
+  firstUserMessageFromMessages,
+  generateChatTitleWithLlm,
+  isPlaceholderTitle,
+} from "./chat-history/chat-title.js";
+export { useChatTitleGeneration } from "./chat-history/useChatTitleGeneration.js";
 
 // MCP Prompts hook (used by ChatTab, useful standalone)
 export { useMCPPrompts, type PromptResult } from "./hooks/useMCPPrompts.js";

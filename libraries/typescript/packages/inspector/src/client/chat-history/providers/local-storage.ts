@@ -136,6 +136,7 @@ export class LocalChatStorageProvider implements ChatStorageProvider {
           session.updated_at = nowIso();
           if (session.title === DEFAULT_TITLE) {
             const title = autoTitleFromMessages(messages);
+            // ponytail: truncation fallback when LLM title gen did not run
             if (title) session.title = title;
           }
           store.sessions[idx] = session;
