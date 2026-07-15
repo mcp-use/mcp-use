@@ -2,10 +2,7 @@
  * Fire-and-forget telemetry HTTP request. Never surfaces network/HTTP failures
  * to the host app — telemetry must not log or throw into user code.
  */
-export async function telFetch(
-  url: string,
-  init?: RequestInit
-): Promise<void> {
+export async function telFetch(url: string, init?: RequestInit): Promise<void> {
   try {
     await fetch(url, init);
   } catch {

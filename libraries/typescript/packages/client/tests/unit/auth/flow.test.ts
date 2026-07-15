@@ -16,9 +16,9 @@ import { completeOAuthFlow, isUnauthorized } from "../../../src/auth/flow.js";
 describe("isUnauthorized", () => {
   it("detects UnauthorizedError, code 401, and message wrappers", () => {
     expect(isUnauthorized(new UnauthorizedError("nope"))).toBe(true);
-    expect(
-      isUnauthorized(Object.assign(new Error("x"), { code: 401 }))
-    ).toBe(true);
+    expect(isUnauthorized(Object.assign(new Error("x"), { code: 401 }))).toBe(
+      true
+    );
     expect(isUnauthorized(new Error("HTTP 401 from server"))).toBe(true);
     expect(isUnauthorized(new Error("other"))).toBe(false);
   });

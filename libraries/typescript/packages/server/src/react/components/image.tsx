@@ -11,11 +11,11 @@ import { publicAsset } from "../public-assets.js";
  * `${basePath}/_mcp-use/public/`. Absolute `http(s):` and `data:` URLs pass
  * through unchanged. Fully-relative paths are left as-is.
  */
-export const Image: React.FC<
-  React.ImgHTMLAttributes<HTMLImageElement>
-> = ({ src, ...props }) => {
-  const finalSrc =
-    typeof src === "string" ? publicAsset(src) : src;
+export const Image: React.FC<React.ImgHTMLAttributes<HTMLImageElement>> = ({
+  src,
+  ...props
+}) => {
+  const finalSrc = typeof src === "string" ? publicAsset(src) : src;
 
   return <img src={finalSrc} {...props} />;
 };

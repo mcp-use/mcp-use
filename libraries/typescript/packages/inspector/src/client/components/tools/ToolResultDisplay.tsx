@@ -889,12 +889,12 @@ export function ToolResultDisplay({
       </div>
 
       {activeUri && viewMode === "mcp-apps" && (
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-            <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">
-              {activeUri}
-            </span>
-          </div>
-        )}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">
+            {activeUri}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

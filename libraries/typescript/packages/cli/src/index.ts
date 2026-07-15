@@ -2044,7 +2044,9 @@ program
             console.log(chalk.whiteBright(`Network:  http://${host}:${port}`));
             console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
             if (tunnelUrl) {
-              console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`));
+              console.log(
+                chalk.whiteBright(`Tunnel:   ${tunnelUrl}${basePath}`)
+              );
             }
             console.log(chalk.whiteBright(`Inspector: ${inspectorUrl}\n`));
             await open(inspectorUrl);
@@ -2686,7 +2688,9 @@ program
         console.log(chalk.green.bold(`✓ Restarted`));
         console.log(chalk.whiteBright(`MCP:      ${mcpEndpoint}`));
         if (tunnelUrl) {
-          console.log(chalk.whiteBright(`Tunnel:   ${tunnelUrl}${liveBasePath}`));
+          console.log(
+            chalk.whiteBright(`Tunnel:   ${tunnelUrl}${liveBasePath}`)
+          );
         }
         console.log(
           chalk.whiteBright(

@@ -1,7 +1,4 @@
-import type {
-  ElicitResult,
-  Transport,
-} from "@modelcontextprotocol/client";
+import type { ElicitResult, Transport } from "@modelcontextprotocol/client";
 import type { SamplingCreateMessageResult } from "../core/config.js";
 import React, {
   createContext,
@@ -46,7 +43,10 @@ export interface McpServer extends UseMcpResult {
   clearNotifications: () => void;
   // Sampling management
   pendingSamplingRequests: PendingSamplingRequest[];
-  approveSampling: (requestId: string, result: SamplingCreateMessageResult) => void;
+  approveSampling: (
+    requestId: string,
+    result: SamplingCreateMessageResult
+  ) => void;
   rejectSampling: (requestId: string, error?: string) => void;
   // Elicitation management
   pendingElicitationRequests: PendingElicitationRequest[];
@@ -886,15 +886,14 @@ export function McpClientProvider({
           updatedServer.serverInfo &&
           storageProvider?.setServerMetadata
         ) {
-          const metadata: import("./storage.js").CachedServerMetadata =
-            {
-              name: updatedServer.serverInfo.name,
-              version: updatedServer.serverInfo.version,
-              title: updatedServer.serverInfo.title,
-              websiteUrl: updatedServer.serverInfo.websiteUrl,
-              icons: updatedServer.serverInfo.icons,
-              icon: updatedServer.serverInfo.icon,
-            };
+          const metadata: import("./storage.js").CachedServerMetadata = {
+            name: updatedServer.serverInfo.name,
+            version: updatedServer.serverInfo.version,
+            title: updatedServer.serverInfo.title,
+            websiteUrl: updatedServer.serverInfo.websiteUrl,
+            icons: updatedServer.serverInfo.icons,
+            icon: updatedServer.serverInfo.icon,
+          };
 
           // Update cached metadata ref
           cachedMetadataRef.current[updatedServer.id] = metadata;

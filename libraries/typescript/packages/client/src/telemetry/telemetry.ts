@@ -134,10 +134,7 @@ function detectRuntimeEnvironment(): RuntimeEnvironment {
 }
 
 function readSourceHint(): string | undefined {
-  if (
-    typeof process !== "undefined" &&
-    process.env?.MCP_USE_TELEMETRY_SOURCE
-  ) {
+  if (typeof process !== "undefined" && process.env?.MCP_USE_TELEMETRY_SOURCE) {
     return process.env.MCP_USE_TELEMETRY_SOURCE;
   }
   try {
@@ -235,8 +232,7 @@ export class Telemetry {
   private constructor() {
     this._runtimeEnvironment = detectRuntimeEnvironment();
     this._fsBacked = configuredStorage !== null;
-    this._storage =
-      configuredStorage ?? createLocalStorageBackend() ?? null;
+    this._storage = configuredStorage ?? createLocalStorageBackend() ?? null;
     this._storageCapability = this._storage ? "persistent" : "session-only";
     this._source = readSourceHint() || this._runtimeEnvironment;
 

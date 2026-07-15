@@ -58,13 +58,12 @@ function applySandboxSearchParams(
  * Returns a URL pointing at our sandbox-proxy with cache-buster + CSP query params.
  * Callers that receive a `blob:` URL must revoke it when replaced or on unmount.
  */
-export function buildMcpAppsSandboxUrl(
-  options: McpAppsSandboxUrlOptions
-): URL {
+export function buildMcpAppsSandboxUrl(options: McpAppsSandboxUrlOptions): URL {
   // Backend-less CDN shell: no inspector API routes — use a Blob URL proxy.
   if (
     typeof window !== "undefined" &&
-    (window as Window & { __MCP_USE_INSPECTOR__?: unknown }).__MCP_USE_INSPECTOR__
+    (window as Window & { __MCP_USE_INSPECTOR__?: unknown })
+      .__MCP_USE_INSPECTOR__
   ) {
     const searchUrl = new URL("https://sandbox.invalid/");
     applySandboxSearchParams(searchUrl, options);

@@ -393,9 +393,9 @@ throw new Error("startup failure after MCPServer construction");
     // Dev API routes sit in front of the MCP handler and must be covered by
     // the same check (starting a tunnel would expose the server publicly).
     const infoUrl = `${dev.url}/inspector/api/dev/info`;
-    expect(
-      await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")
-    ).toBe(403);
+    expect(await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")).toBe(
+      403
+    );
     expect(await rawStatus(infoUrl, {}, "GET")).toBe(200);
 
     // GET/HEAD are exempt from the Origin check (Host still validated):
@@ -457,19 +457,24 @@ describe("runDev (views)", () => {
 
     const base = dev.url.replace(/\/mcp$/, "");
 
-    const readBody = await mcpRequest(dev.url, "resources/read", {
-      uri: "ui://views/product-search-result.html",
-    }, { ui: true });
-    const docHtml = (
-      readBody["result"] as { contents: { text: string }[] }
-    ).contents[0]!.text;
+    const readBody = await mcpRequest(
+      dev.url,
+      "resources/read",
+      {
+        uri: "ui://views/product-search-result.html",
+      },
+      { ui: true }
+    );
+    const docHtml = (readBody["result"] as { contents: { text: string }[] })
+      .contents[0]!.text;
     expect(docHtml).toContain('id="root"');
     expect(docHtml).toContain("/@vite/client");
     expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
 
-    const virtualMatch = /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
-      docHtml
-    );
+    const virtualMatch =
+      /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
+        docHtml
+      );
     expect(virtualMatch).not.toBeNull();
     const virtualUrl = new URL(virtualMatch![1]!, base).href;
     const virtualResponse = await fetch(virtualUrl);
@@ -539,21 +544,20 @@ describe("runDev (views)", () => {
     // Vite `server.origin` is the browsable origin: `localhost`, not the
     // 127.0.0.1 bind address (VIEWS_SPEC.md § Dev).
     expect(assetImportJs).toMatch(
-      new RegExp(`http://localhost:${port}/resources/product-search-result/badge\\.png`)
+      new RegExp(
+        `http://localhost:${port}/resources/product-search-result/badge\\.png`
+      )
     );
 
-    const publicResponse = await fetch(
-      `${base}/mcp/_mcp-use/public/test.txt`
-    );
+    const publicResponse = await fetch(`${base}/mcp/_mcp-use/public/test.txt`);
     expect(publicResponse.status).toBe(200);
     expect(publicResponse.headers.get("cache-control")).toBe(
       "public, max-age=0, must-revalidate"
     );
     expect(await publicResponse.text()).toBe("public-fixture\n");
 
-    const docConfigMatch = /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(
-      docHtml
-    );
+    const docConfigMatch =
+      /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(docHtml);
     expect(docConfigMatch).not.toBeNull();
     expect(docConfigMatch![1]).toBe(
       `http://localhost:${port}/mcp/_mcp-use/public/`
@@ -599,10 +603,15 @@ describe("runDev (views)", () => {
     );
 
     await waitFor(async () => {
-      const list = await mcpRequest(dev.url, "resources/list", {}, { ui: true });
-      const uris = (list["result"] as { resources: { uri: string }[] }).resources.map(
-        (r) => r.uri
+      const list = await mcpRequest(
+        dev.url,
+        "resources/list",
+        {},
+        { ui: true }
       );
+      const uris = (
+        list["result"] as { resources: { uri: string }[] }
+      ).resources.map((r) => r.uri);
       return uris.includes("ui://views/extra-view.html") ? true : undefined;
     });
   }, 60_000);
@@ -707,7 +716,10 @@ describe("runDev (views)", () => {
     // the second concurrent `mcp-use dev` process fail to bind.
     const cwdA = copyFixture("dev-views-a", "views");
     const cwdB = copyFixture("dev-views-b", "views");
-    cleanups.push(() => removeDir(cwdA), () => removeDir(cwdB));
+    cleanups.push(
+      () => removeDir(cwdA),
+      () => removeDir(cwdB)
+    );
 
     const portA = await getFreePort();
     const devA = await startDev(cwdA, portA);
@@ -742,12 +754,16 @@ describe("runDev (views)", () => {
 
     // Both servers keep serving MCP + view documents side by side.
     for (const dev of [devA, devB]) {
-      const readBody = await mcpRequest(dev.url, "resources/read", {
-        uri: "ui://views/product-search-result.html",
-      }, { ui: true });
-      const docHtml = (
-        readBody["result"] as { contents: { text: string }[] }
-      ).contents[0]!.text;
+      const readBody = await mcpRequest(
+        dev.url,
+        "resources/read",
+        {
+          uri: "ui://views/product-search-result.html",
+        },
+        { ui: true }
+      );
+      const docHtml = (readBody["result"] as { contents: { text: string }[] })
+        .contents[0]!.text;
       expect(docHtml).toContain("/@vite/client");
     }
   }, 90_000);

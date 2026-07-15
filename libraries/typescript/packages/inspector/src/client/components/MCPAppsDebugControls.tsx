@@ -218,7 +218,7 @@ function buildAgentCspPrompt(
   if (suggestedFix) {
     lines.push("**Apply this CSP config to fix the violations:**");
     lines.push(
-      'Add these domains to the widget\'s CSP metadata (resource _meta.ui.csp). Use camelCase for MCP Apps (connectDomains, resourceDomains).'
+      "Add these domains to the widget's CSP metadata (resource _meta.ui.csp). Use camelCase for MCP Apps (connectDomains, resourceDomains)."
     );
     lines.push("");
     lines.push("```json");
@@ -568,7 +568,6 @@ export function MCPAppsDebugControls({
           </Command>
         </DialogContent>
       </Dialog>
-
 
       {/* Timezone */}
       <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>

@@ -79,10 +79,7 @@ function blobToBase64(blob: Blob): Promise<string> {
  * @returns The base64-encoded favicon data URL if detected, `null` otherwise
  */
 export async function detectFavicon(serverUrl: string): Promise<string | null> {
-  console.debug(
-    "[favicon] Starting favicon detection for:",
-    serverUrl
-  );
+  console.debug("[favicon] Starting favicon detection for:", serverUrl);
   try {
     // Extract domain from serverUrl
     let domain: string;

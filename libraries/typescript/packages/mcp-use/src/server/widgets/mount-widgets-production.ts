@@ -43,7 +43,8 @@ export async function mountWidgetsProduction(
   registerWidget: RegisterWidgetCallback,
   options?: MountWidgetsProductionOptions
 ): Promise<void> {
-  const baseRoute = options?.baseRoute || widgetAssetBase(serverConfig.basePath);
+  const baseRoute =
+    options?.baseRoute || widgetAssetBase(serverConfig.basePath);
   const widgetsDir = pathHelpers.join(
     serverConfig.buildDir,
     "resources",

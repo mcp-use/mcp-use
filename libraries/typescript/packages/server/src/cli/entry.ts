@@ -41,9 +41,7 @@ export function discoverEntry(cwd: string, override?: string): string {
   if (override !== undefined) {
     const entry = isAbsolute(override) ? override : resolve(cwd, override);
     if (!existsSync(entry)) {
-      throw new Error(
-        `Entry not found: ${entry} (from --entry "${override}")`
-      );
+      throw new Error(`Entry not found: ${entry} (from --entry "${override}")`);
     }
     return entry;
   }

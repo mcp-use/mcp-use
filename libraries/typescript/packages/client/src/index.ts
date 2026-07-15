@@ -8,21 +8,19 @@
 
 import "./telemetry/configure-node.js";
 
+export { auth, UnauthorizedError } from "@modelcontextprotocol/client";
+export { completeOAuthFlow, isUnauthorized } from "./auth/flow.js";
 export {
   createOAuthProvider,
-  type OAuthProviderOptions,
-} from "./auth/node.js";
-export {
   NodeOAuthClientProvider,
   OAuthFlowError,
   type NodeOAuthOptions,
+  type OAuthProviderOptions,
 } from "./auth/node.js";
-export { completeOAuthFlow, isUnauthorized } from "./auth/flow.js";
 export { FileKVStore } from "./auth/storage-file.js";
-export { auth, UnauthorizedError } from "@modelcontextprotocol/client";
+export * from "./core/config.js";
 export * from "./core/node.js";
 export * from "./core/session.js";
-export * from "./core/config.js";
 
 // Connectors
 export * from "./transport/base.js";
@@ -36,10 +34,10 @@ export * from "./utils/json-schema-validator.js";
 export * from "./code-mode/connector.js";
 
 // Logging + internal telemetry
-export { logger } from "./utils/logging.js";
 export {
+  setTelemetrySource,
   Tel,
   Telemetry,
-  setTelemetrySource,
   telFetch,
 } from "./telemetry/index.js";
+export { logger } from "./utils/logging.js";

@@ -37,7 +37,11 @@ type FruitItem = (typeof FRUITS)[number];
 
 const FRUIT_DETAILS: Record<
   string,
-  { name: string; producer: string; nutrition: { calories: number; fiber: string } }
+  {
+    name: string;
+    producer: string;
+    nutrition: { calories: number; fiber: string };
+  }
 > = {
   apple: {
     name: "Apple",

@@ -162,6 +162,7 @@
     "redis": "5.10.0"
   },
   "devDependencies": {
+    "@e2b/code-interpreter": "^2.6.1",
     "@mcp-use/client": "workspace:*",
     "@types/morgan": "^1.9.10",
     "@vitest/coverage-v8": "~4.1.0",

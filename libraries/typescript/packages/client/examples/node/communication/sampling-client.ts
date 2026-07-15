@@ -9,10 +9,7 @@
  * Run:
  *   pnpm exec tsx examples/node/communication/sampling-client.ts
  */
-import {
-  MCPClient,
-  type OnSamplingCallback,
-} from "@mcp-use/client";
+import { MCPClient, type OnSamplingCallback } from "@mcp-use/client";
 
 async function run(
   label: string,
@@ -22,7 +19,12 @@ async function run(
   let callbackInvoked = false;
   const onSampling: OnSamplingCallback = async (params) => {
     callbackInvoked = true;
-    console.log(label, "sampling request:", params.messages.length, "message(s)");
+    console.log(
+      label,
+      "sampling request:",
+      params.messages.length,
+      "message(s)"
+    );
     return {
       role: "assistant",
       content: { type: "text", text: "mock sampled response" },

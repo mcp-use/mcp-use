@@ -25,7 +25,11 @@ export function resolveRequestOrigin(request: Request): string {
   if (proto !== null && host !== null) {
     const firstHost = host.split(",")[0]?.trim();
     const firstProto = proto.split(",")[0]?.trim();
-    if (firstHost !== undefined && firstProto !== undefined && firstHost !== "") {
+    if (
+      firstHost !== undefined &&
+      firstProto !== undefined &&
+      firstHost !== ""
+    ) {
       return `${firstProto}://${firstHost}`;
     }
   }

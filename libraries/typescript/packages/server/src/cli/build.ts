@@ -29,10 +29,7 @@ import {
   virtualViewId,
   type DiscoveredView,
 } from "./views.js";
-import {
-  resolveWorkspacePaths,
-  type BuildManifest,
-} from "./workspace.js";
+import { resolveWorkspacePaths, type BuildManifest } from "./workspace.js";
 import { resolveUserViteConfig } from "./vite-config.js";
 import type { ViewsManifest } from "../views/types.js";
 
@@ -137,7 +134,9 @@ async function buildInlineView(
     base: "./",
   });
 
-  const clientOutput = Array.isArray(clientResult) ? clientResult[0] : clientResult;
+  const clientOutput = Array.isArray(clientResult)
+    ? clientResult[0]
+    : clientResult;
   if (clientOutput === undefined || !("output" in clientOutput)) {
     throw new Error(`Client build for view "${view.name}" produced no output.`);
   }

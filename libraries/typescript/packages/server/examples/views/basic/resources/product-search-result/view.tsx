@@ -102,7 +102,9 @@ function ResultsGrid({
               type="button"
               className={`${buttonClass} min-w-16 flex-1 px-2 py-1 text-xs`}
               onClick={() =>
-                onOpenProducer(`https://images.example.com/producers/${item.id}`)
+                onOpenProducer(
+                  `https://images.example.com/producers/${item.id}`
+                )
               }
             >
               Producer

@@ -28,7 +28,9 @@ function readMaxHeight(
   return undefined;
 }
 
-function readMaxWidth(hostContext: HostContext | undefined): number | undefined {
+function readMaxWidth(
+  hostContext: HostContext | undefined
+): number | undefined {
   const dims = hostContext?.containerDimensions;
   if (!dims) return undefined;
   if ("width" in dims && typeof dims.width === "number") return dims.width;

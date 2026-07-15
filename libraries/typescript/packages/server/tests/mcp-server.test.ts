@@ -118,7 +118,7 @@ function buildServer(): MCPServer {
       name: "echo",
       description: "Echo a message, uppercased",
       // `schema` is accepted as an alias for `inputSchema`.
-    schema: echoInput,
+      schema: echoInput,
     },
     // `message: string` is inferred from the hand-rolled schema's Output type.
     async ({ message }) => ({
@@ -560,11 +560,11 @@ describe("MCPServer legacy posture", () => {
     // Legacy serving answers over streamable-HTTP SSE framing; the initialize
     // result is the first `data:` line.
     const text = await response.text();
-    const dataLine = text
-      .split("\n")
-      .find((line) => line.startsWith("data:"));
+    const dataLine = text.split("\n").find((line) => line.startsWith("data:"));
     expect(dataLine).toBeDefined();
-    const body: unknown = JSON.parse((dataLine as string).slice("data:".length));
+    const body: unknown = JSON.parse(
+      (dataLine as string).slice("data:".length)
+    );
     expect(body).toMatchObject({
       result: {
         serverInfo: {
@@ -727,8 +727,9 @@ describe("MCPServer validation policy", () => {
 
   it("getHandler serves foreign Hosts when nothing is configured", async () => {
     const server = minimalServer();
-    const response = await server
-      .getHandler()(toolsListRequest({ host: "my-app.vercel.app" }));
+    const response = await server.getHandler()(
+      toolsListRequest({ host: "my-app.vercel.app" })
+    );
     expect(response.status).toBe(200);
     await server.close();
   });
@@ -749,11 +750,8 @@ describe("MCPServer validation policy", () => {
     const server = minimalServer({ allowedHosts: ["api.example.com"] });
     const handler = server.getHandler();
     const status = async (origin: string) =>
-      (
-        await handler(
-          toolsListRequest({ host: "api.example.com", origin })
-        )
-      ).status;
+      (await handler(toolsListRequest({ host: "api.example.com", origin })))
+        .status;
     expect(await status("https://api.example.com")).toBe(200);
     expect(await status("https://evil.example.com")).toBe(403);
     expect(await status("http://localhost:5173")).toBe(200);

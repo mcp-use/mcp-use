@@ -33,7 +33,9 @@ function trackBrowserClientInit(config: Record<string, any>): void {
       numServers: servers.length,
       isBrowser: true,
     })
-    .catch((e: unknown) => logger.debug(`Failed to track BrowserMCPClient init: ${e}`));
+    .catch((e: unknown) =>
+      logger.debug(`Failed to track BrowserMCPClient init: ${e}`)
+    );
 }
 
 export class BrowserMCPClient extends BaseMCPClient {

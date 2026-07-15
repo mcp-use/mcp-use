@@ -30,7 +30,10 @@ export interface ResourceDefinition {
  * })
  * ```
  */
-export type ResourceCallback<TUser = never, HasOAuth extends boolean = false> = (
+export type ResourceCallback<
+  TUser = never,
+  HasOAuth extends boolean = false,
+> = (
   uri: URL,
   ctx: RequestContext<TUser, HasOAuth>
 ) => ReadResourceResult | Promise<ReadResourceResult>;

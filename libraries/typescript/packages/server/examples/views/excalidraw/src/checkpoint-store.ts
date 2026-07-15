@@ -44,9 +44,7 @@ export class FileCheckpointStore implements CheckpointStore {
       );
     }
     const filePath = path.join(this.dir, `${id}.json`);
-    if (
-      !path.resolve(filePath).startsWith(path.resolve(this.dir) + path.sep)
-    ) {
+    if (!path.resolve(filePath).startsWith(path.resolve(this.dir) + path.sep)) {
       throw new Error("Invalid checkpoint path");
     }
     await fs.promises.writeFile(filePath, serialized);
@@ -55,9 +53,7 @@ export class FileCheckpointStore implements CheckpointStore {
   async load(id: string): Promise<{ elements: unknown[] } | null> {
     validateCheckpointId(id);
     const filePath = path.join(this.dir, `${id}.json`);
-    if (
-      !path.resolve(filePath).startsWith(path.resolve(this.dir) + path.sep)
-    ) {
+    if (!path.resolve(filePath).startsWith(path.resolve(this.dir) + path.sep)) {
       throw new Error("Invalid checkpoint path");
     }
     try {

@@ -4,7 +4,10 @@ import {
   type McpUiHostContext,
   type RegisteredAppTool,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server";
+import type {
+  CallToolResult,
+  ContentBlock,
+} from "@modelcontextprotocol/server";
 
 import type { DisplayMode } from "../types/host-types.js";
 import {
@@ -428,9 +431,7 @@ export function createMcpAppRuntime(
     hostChannel.emit();
   }
 
-  function syncThemeFromHost(
-    hostContext: McpUiHostContext | undefined
-  ): void {
+  function syncThemeFromHost(hostContext: McpUiHostContext | undefined): void {
     const next = resolveTheme(hostContext);
     if (next === themeSnapshot) {
       return;
@@ -608,13 +609,12 @@ export function createMcpAppRuntime(
     }
   }
 
-  async function connectGeneration(
-    app: App,
-    generation: number
-  ): Promise<App> {
+  async function connectGeneration(app: App, generation: number): Promise<App> {
     try {
       if (typeof window === "undefined" && nextTransport === undefined) {
-        throw new Error("View runtime can only connect in a browser environment");
+        throw new Error(
+          "View runtime can only connect in a browser environment"
+        );
       }
       const transport =
         nextTransport ?? new PostMessageTransport(window.parent, window.parent);
@@ -640,8 +640,7 @@ export function createMcpAppRuntime(
       modelContextStore.notifyConnected();
       return app;
     } catch (error) {
-      const failure =
-        error instanceof Error ? error : new Error(String(error));
+      const failure = error instanceof Error ? error : new Error(String(error));
       // Clear the rejected promise before awaiting cleanup so a retry can
       // start a new generation while the old App finishes closing.
       if (generation === currentGeneration && !disposed) {

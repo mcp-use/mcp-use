@@ -88,7 +88,9 @@ describe("DialectJsonSchemaValidator", () => {
       $schema: "https://example.com/my-schema",
     };
 
-    expect(() => validator.getValidator(schema)).toThrow(/unsupported dialect/i);
+    expect(() => validator.getValidator(schema)).toThrow(
+      /unsupported dialect/i
+    );
   });
 
   it("validates v1-era server outputSchema shapes", () => {

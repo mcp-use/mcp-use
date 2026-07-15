@@ -35,10 +35,7 @@ async function main(): Promise<void> {
     );
 
     const tools = await connection.listTools();
-    console.log(
-      "tools:",
-      tools.map((t) => t.name).join(", ")
-    );
+    console.log("tools:", tools.map((t) => t.name).join(", "));
 
     const echo = await connection.callTool("echo", { message: "hello" });
     console.log("echo ->", JSON.stringify(echo.content));

@@ -29,7 +29,10 @@ async function inspect(
     const metadata = (tool as { _meta?: Record<string, unknown> })._meta ?? {};
     const result = await connection.callTool(toolName, args);
     if (connection.info.protocolEra === "modern") {
-      const report = await connection.callTool("report-client-capabilities", {});
+      const report = await connection.callTool(
+        "report-client-capabilities",
+        {}
+      );
       const supportsApps = (
         report.structuredContent as { supportsApps?: boolean } | undefined
       )?.supportsApps;
@@ -55,9 +58,6 @@ await inspect(
   { city: "Tokyo", delay: 0 }
 );
 
-await inspect(
-  "mcp-use-v2",
-  "http://127.0.0.1:3104/mcp",
-  "search-fruits",
-  { query: "ap" }
-);
+await inspect("mcp-use-v2", "http://127.0.0.1:3104/mcp", "search-fruits", {
+  query: "ap",
+});

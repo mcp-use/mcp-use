@@ -7,7 +7,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { OAuthClientProvider } from "@modelcontextprotocol/client";
 import { BaseMCPClient } from "../../../src/core/base.js";
 import type { BaseConnector } from "../../../src/transport/base.js";
-import type { AutoOAuthOptions, ServerConfig } from "../../../src/core/config.js";
+import type {
+  AutoOAuthOptions,
+  ServerConfig,
+} from "../../../src/core/config.js";
 import { shouldAutoProvisionOAuth } from "../../../src/core/config.js";
 import * as flow from "../../../src/auth/flow.js";
 
@@ -47,18 +50,16 @@ class TestClient extends BaseMCPClient {
       }) as unknown as OAuthClientProvider
   );
 
-  createConnectorFromConfig = vi.fn(
-    (_config: ServerConfig): BaseConnector => {
-      throw new Error("override in test");
-    }
-  );
+  createConnectorFromConfig = vi.fn((_config: ServerConfig): BaseConnector => {
+    throw new Error("override in test");
+  });
 }
 
 describe("shouldAutoProvisionOAuth", () => {
   it("returns true for plain HTTP url configs", () => {
-    expect(
-      shouldAutoProvisionOAuth({ url: "https://example.com/mcp" })
-    ).toBe(true);
+    expect(shouldAutoProvisionOAuth({ url: "https://example.com/mcp" })).toBe(
+      true
+    );
   });
 
   it("returns false when authProvider, authToken, Authorization, or oauth:false", () => {

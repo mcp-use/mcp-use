@@ -11,10 +11,7 @@ import { createServer, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  auth,
-  NodeOAuthClientProvider,
-} from "@mcp-use/client";
+import { auth, NodeOAuthClientProvider } from "@mcp-use/client";
 
 function readBody(request: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {

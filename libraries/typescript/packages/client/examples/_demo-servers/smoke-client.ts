@@ -22,10 +22,7 @@ async function main() {
       conn.protocolVersion
     );
     const tools = await conn.listTools();
-    console.log(
-      "tools",
-      tools.map((t) => t.name).join(", ")
-    );
+    console.log("tools", tools.map((t) => t.name).join(", "));
     const echo = await conn.callTool("echo", { message: "hi" });
     console.log("echo", JSON.stringify(echo.content));
     const add = await conn.callTool("add", { a: 2, b: 40 });

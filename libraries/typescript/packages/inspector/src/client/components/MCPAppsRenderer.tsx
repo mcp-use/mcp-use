@@ -138,9 +138,7 @@ class InspectorAppBridge extends AppBridge {
   }
 
   override connect(transport: Transport): Promise<void> {
-    return super.connect(
-      wrapTransportWithLogging(transport, this.toolCallId)
-    );
+    return super.connect(wrapTransportWithLogging(transport, this.toolCallId));
   }
 }
 
@@ -693,8 +691,7 @@ function MCPAppsRendererBase({
     if (!sandboxOrigin && !isBlobSandbox) return;
 
     const handleMessage = (event: MessageEvent) => {
-      const iframe =
-        frameContainerRef.current?.querySelector("iframe") ?? null;
+      const iframe = frameContainerRef.current?.querySelector("iframe") ?? null;
       if (!iframe?.contentWindow) return;
       if (event.source !== iframe.contentWindow) return;
       if (

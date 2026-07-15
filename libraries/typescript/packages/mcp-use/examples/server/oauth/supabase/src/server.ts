@@ -22,12 +22,7 @@
  *                                            and by tools calling Supabase)
  */
 
-import {
-  MCPServer,
-  oauthSupabaseProvider,
-  error,
-  object,
-} from "mcp-use";
+import { MCPServer, oauthSupabaseProvider, error, object } from "mcp-use";
 import { createClient } from "@supabase/supabase-js";
 import { mountAuthRoutes } from "./auth-routes.js";
 

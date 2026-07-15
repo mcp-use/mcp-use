@@ -11,9 +11,7 @@ import { getTestMatrix } from "./helpers/test-matrix";
  * Fails distinctly when the session is disconnected before we can assert toasts.
  */
 async function expectCallbackToolReady(page: Page) {
-  await expect(
-    page.getByTestId("tool-execution-execute-button")
-  ).toBeEnabled();
+  await expect(page.getByTestId("tool-execution-execute-button")).toBeEnabled();
 }
 
 /**

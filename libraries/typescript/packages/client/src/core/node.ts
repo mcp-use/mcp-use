@@ -11,16 +11,11 @@ import type {
   ExecutionResult,
   ToolSearchResponse,
 } from "../code-mode/executor.js";
-import {
-  BaseCodeExecutor,
-} from "../code-mode/executor.js";
+import { BaseCodeExecutor } from "../code-mode/executor.js";
 import { E2BCodeExecutor } from "../code-mode/executor-e2b.js";
 import { VMCodeExecutor } from "../code-mode/executor-vm.js";
 import { CodeModeConnector } from "../code-mode/connector.js";
-import {
-  createOAuthProvider,
-  type NodeOAuthOptions,
-} from "../auth/node.js";
+import { createOAuthProvider, type NodeOAuthOptions } from "../auth/node.js";
 import {
   createConnectorFromConfig,
   normalizeClientInfo,
@@ -157,9 +152,7 @@ export interface MCPClientOptions {
 }
 
 // Export executor classes and utilities for external use
-export {
-  BaseCodeExecutor,
-} from "../code-mode/executor.js";
+export { BaseCodeExecutor } from "../code-mode/executor.js";
 export { E2BCodeExecutor } from "../code-mode/executor-e2b.js";
 export { isVMAvailable, VMCodeExecutor } from "../code-mode/executor-vm.js";
 

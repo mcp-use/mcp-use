@@ -10,8 +10,7 @@ import {
   type Root,
 } from "@mcp-use/client";
 
-const SERVER_URL =
-  process.env.MCP_SERVER_URL ?? "http://127.0.0.1:3103/mcp";
+const SERVER_URL = process.env.MCP_SERVER_URL ?? "http://127.0.0.1:3103/mcp";
 
 let resolveUpdated!: () => void;
 const resourceUpdated = new Promise<void>((resolve) => {
@@ -43,7 +42,10 @@ try {
     { uri: "file:///tmp/mcp-use-second", name: "Second root" },
   ];
   await connection.setRoots(roots);
-  console.log("roots:", connection.getRoots().map((root) => root.uri));
+  console.log(
+    "roots:",
+    connection.getRoots().map((root) => root.uri)
+  );
 
   await connection.subscribeToResource("test://subscribable");
   await connection.callTool("update_subscribable_resource", {

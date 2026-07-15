@@ -20,12 +20,10 @@ describe("buildSandboxProxyBlobHtml", () => {
   });
 
   it("JSON-escapes < so it cannot break out of the script tag", () => {
-    const search = '?x=<script>alert(1)</script>&csp_mode=permissive';
+    const search = "?x=<script>alert(1)</script>&csp_mode=permissive";
     const html = buildSandboxProxyBlobHtml(search);
     expect(html).toContain("\\u003c");
-    expect(html).not.toMatch(
-      /window\.__SANDBOX_SEARCH__ = "[^"]*<script>/
-    );
+    expect(html).not.toMatch(/window\.__SANDBOX_SEARCH__ = "[^"]*<script>/);
   });
 
   it("leaves the base SANDBOX_PROXY_HTML without a blob inject script", () => {

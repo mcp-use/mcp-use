@@ -34,7 +34,10 @@ function readSubdomainFromTunnelState(): string | undefined {
     // Tunnel state moved out of the build manifest into the workspace
     // (`.mcp-use/state/tunnel.json`) in the P2 rework, and the subdomain now
     // lives at the top level rather than nested under `.tunnel`.
-    const raw = readFileSync(resolveWorkspacePaths(projectPath).tunnel, "utf-8");
+    const raw = readFileSync(
+      resolveWorkspacePaths(projectPath).tunnel,
+      "utf-8"
+    );
     const state = JSON.parse(raw);
     return state?.subdomain || undefined;
   } catch {

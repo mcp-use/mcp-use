@@ -69,7 +69,10 @@ interface ServerLike {
   getHandler(): FetchHandler;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
-  __primeViews(views: ViewsManifest, options?: { dev?: boolean; projectRoot?: string }): void;
+  __primeViews(
+    views: ViewsManifest,
+    options?: { dev?: boolean; projectRoot?: string }
+  ): void;
 }
 
 /**

@@ -297,9 +297,9 @@ server.tool(
       timeout: 10000,
     });
     // Widget component view should not appear (text-only result)
-    await expect(
-      page.getByTestId("tool-result-view-mcp-apps")
-    ).not.toBeVisible({ timeout: 3000 });
+    await expect(page.getByTestId("tool-result-view-mcp-apps")).not.toBeVisible(
+      { timeout: 3000 }
+    );
     await expect(
       page.getByTestId("tool-result-view-chatgpt-app")
     ).not.toBeVisible({ timeout: 3000 });

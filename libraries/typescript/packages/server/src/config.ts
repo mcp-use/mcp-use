@@ -157,9 +157,7 @@ interface BaseServerConfig {
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace.
  */
-export function assertServerConfig(config: {
-  basePath?: unknown;
-}): void {
+export function assertServerConfig(config: { basePath?: unknown }): void {
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(
