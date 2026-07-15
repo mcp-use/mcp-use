@@ -1,7 +1,7 @@
 import { MCPChatMessageEvent, captureInspectorEvent } from "@/client/telemetry";
 import { MCPAgent, providerConfigFromOptions } from "@mcp-use/agent";
 import type { McpServer } from "@mcp-use/client/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import {
   convertMessagesToProvider,
@@ -25,6 +25,7 @@ interface UseChatMessagesClientSideProps {
   readResource?: (uri: string) => Promise<any>;
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   disabledTools?: Set<string>;
+  initialMessages?: Message[];
 }
 
 const SYSTEM_PROMPT =
@@ -37,11 +38,18 @@ export function useChatMessagesClientSide({
   readResource,
   widgetModelContexts,
   disabledTools,
+  initialMessages,
 }: UseChatMessagesClientSideProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (initialMessages !== undefined) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
 
   const sendMessage = useCallback(
     async (

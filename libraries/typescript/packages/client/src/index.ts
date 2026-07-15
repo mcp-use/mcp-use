@@ -40,5 +40,10 @@ export {
   Tel,
   Telemetry,
   telFetch,
+  capturePostHog,
+  captureScarf,
+  POSTHOG_HOST,
+  POSTHOG_API_KEY,
+  SCARF_GATEWAY_URL,
 } from "./telemetry/index.js";
 export { logger } from "./utils/logging.js";

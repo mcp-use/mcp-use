@@ -272,15 +272,6 @@ export default [
       "no-process-exit": "off",
     },
   },
-  // Inspector package
-  {
-    files: ["packages/inspector/**/*.ts", "packages/inspector/**/*.tsx"],
-    languageOptions: {
-      globals: {
-        __INSPECTOR_VERSION__: "readonly",
-      },
-    },
-  },
   // mcp-use package (source files only, excludes config/test files)
   {
     files: ["packages/mcp-use/src/**/*.ts", "packages/mcp-use/index.ts"],

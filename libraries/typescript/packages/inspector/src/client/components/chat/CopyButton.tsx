@@ -19,7 +19,8 @@ export function CopyButton({ text }: { text: string }) {
 
   return (
     <button
-      className="opacity-0 group-hover/message:opacity-100 transition-opacity text-muted-foreground hover:text-foreground text-xs flex items-center gap-1"
+      type="button"
+      className="text-muted-foreground hover:text-foreground flex items-center rounded p-0.5"
       onClick={handleCopy}
       title="Copy message content"
       data-testid="copy-button"

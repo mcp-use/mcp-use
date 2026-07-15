@@ -6,6 +6,8 @@ import type {
   ProviderTool,
   ProviderToolCall,
 } from "./types.js";
+import type { ToolLoopParams } from "./toolLoop.js";
+import { OpenAIResponsesDriver } from "./providers/openai-responses-driver.js";
 
 export interface LlmDriverStreamParams {
   messages: ProviderMessage[];
@@ -26,13 +28,32 @@ export interface LlmDriverCompleteResult {
 
 /** Pluggable LLM backend for the native tool loop. */
 export interface LlmDriver {
+  readonly managesToolLoop?: boolean;
   stream(
     params: LlmDriverStreamParams
   ): AsyncGenerator<LlmStreamEvent, void, unknown>;
   complete(params: LlmDriverCompleteParams): Promise<LlmDriverCompleteResult>;
+  streamToolLoop?(
+    params: ToolLoopParams
+  ): AsyncGenerator<LlmStreamEvent, void, unknown>;
+  runToolLoopNonStreaming?(params: ToolLoopParams): Promise<{
+    content: string;
+    toolCalls: {
+      toolName: string;
+      args: Record<string, unknown>;
+      result: unknown;
+    }[];
+  }>;
 }
 
-/** Raw fetch + SSE/NDJSON providers (default path). */
+export function createLlmDriver(config: ProviderConfig): LlmDriver {
+  if (config.provider === "openai") {
+    return new OpenAIResponsesDriver(config);
+  }
+  return new RestLlmDriver(config);
+}
+
+/** Raw fetch + SSE/NDJSON providers (non-OpenAI and legacy proxy paths). */
 export class RestLlmDriver implements LlmDriver {
   constructor(private readonly config: ProviderConfig) {}
 

@@ -72,5 +72,19 @@ export { useChatMessagesClientSide } from "./components/chat/useChatMessagesClie
 export { useChatMessages } from "./components/chat/useChatMessages.js";
 export { useConfig } from "./components/chat/useConfig.js";
 
+// Chat history
+export { ChatHistoryPanel } from "./chat-history/ChatHistoryPanel.js";
+export { ChatHistoryHeader } from "./chat-history/ChatHistoryHeader.js";
+export { ChatHistoryRail } from "./chat-history/ChatHistoryRail.js";
+export { ChatList, type ChatSession } from "./chat-history/ChatList.js";
+export type {
+  ChatStorageProvider,
+  ListChatsParams,
+} from "./chat-history/types.js";
+export { LocalChatStorageProvider } from "./chat-history/providers/local-storage.js";
+export { chatEventsToInspectorMessages } from "./chat-history/chat-events-to-inspector-messages.js";
+export type { ChatEventRowForMessages } from "./chat-history/chat-events-to-inspector-messages.js";
+export { useChatHistory } from "./chat-history/useChatHistory.js";
+
 // MCP Prompts hook (used by ChatTab, useful standalone)
 export { useMCPPrompts, type PromptResult } from "./hooks/useMCPPrompts.js";

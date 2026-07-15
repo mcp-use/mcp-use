@@ -451,41 +451,55 @@ export function ConfigurationDialog({
               value={tempProvider}
               onValueChange={(v: any) => onProviderChange(v)}
             >
-              <SelectTrigger className="flex items-center gap-2">
+              <SelectTrigger
+                className="rounded-md"
+                leading={
+                  <ProviderIcon provider={tempProvider} className="shrink-0" />
+                }
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="openai">
+                <SelectItem value="openai" label={getProviderLabel("openai")}>
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="openai" />
                     <span>{getProviderLabel("openai")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="anthropic">
+                <SelectItem
+                  value="anthropic"
+                  label={getProviderLabel("anthropic")}
+                >
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="anthropic" />
                     <span>{getProviderLabel("anthropic")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="google">
+                <SelectItem value="google" label={getProviderLabel("google")}>
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="google" />
                     <span>{getProviderLabel("google")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="ollama">
+                <SelectItem value="ollama" label={getProviderLabel("ollama")}>
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="ollama" />
                     <span>{getProviderLabel("ollama")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="openrouter">
+                <SelectItem
+                  value="openrouter"
+                  label={getProviderLabel("openrouter")}
+                >
                   <div className="flex items-center gap-2">
                     <ProviderIcon provider="openrouter" />
                     <span>{getProviderLabel("openrouter")}</span>
                   </div>
                 </SelectItem>
-                <SelectItem value="openai-compatible">
+                <SelectItem
+                  value="openai-compatible"
+                  label={getProviderLabel("openai-compatible")}
+                >
                   <div className="flex items-center gap-2">
                     <span>{getProviderLabel("openai-compatible")}</span>
                   </div>
@@ -561,12 +575,15 @@ export function ConfigurationDialog({
                       className="w-full justify-between rounded-md"
                       data-testid="chat-config-model-select"
                     >
-                      {tempModel
-                        ? models.find((model) => model.id === tempModel)
-                            ?.displayName ||
-                          models.find((model) => model.id === tempModel)?.id ||
-                          "Select a model..."
-                        : "Select a model..."}
+                      <span className="truncate">
+                        {tempModel
+                          ? models.find((model) => model.id === tempModel)
+                              ?.displayName ||
+                            models.find((model) => model.id === tempModel)
+                              ?.id ||
+                            "Select a model..."
+                          : "Select a model..."}
+                      </span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>

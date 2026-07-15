@@ -2,6 +2,7 @@ import { MCPAddToClientEvent, captureInspectorEvent } from "@/client/telemetry";
 import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -206,7 +207,7 @@ export function AddToClientDropdown({
               Claude Code.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <DialogBody className="space-y-4">
             <div>
               <h5 className="font-semibold text-sm mb-2">Instructions</h5>
               <ol className="space-y-2 text-xs text-muted-foreground">
@@ -263,7 +264,7 @@ export function AddToClientDropdown({
               using <code className="text-foreground">$&#123;VAR&#125;</code>{" "}
               syntax.
             </p>
-          </div>
+          </DialogBody>
         </>
       );
     }
@@ -281,7 +282,7 @@ export function AddToClientDropdown({
               Gemini CLI.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <DialogBody className="space-y-4">
             <div>
               <h5 className="font-semibold text-sm mb-2">Instructions</h5>
               <ol className="space-y-2 text-xs text-muted-foreground">
@@ -343,7 +344,7 @@ export function AddToClientDropdown({
             <p className="text-xs text-muted-foreground">
               Restart Gemini CLI to load the new configuration.
             </p>
-          </div>
+          </DialogBody>
         </>
       );
     }
@@ -361,7 +362,7 @@ export function AddToClientDropdown({
               file.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <DialogBody className="space-y-4">
             <div>
               <h5 className="font-semibold text-sm mb-2">Instructions</h5>
               <p className="text-xs text-muted-foreground">
@@ -405,7 +406,7 @@ export function AddToClientDropdown({
             <p className="text-xs text-muted-foreground">
               Restart Codex CLI to load the new configuration.
             </p>
-          </div>
+          </DialogBody>
         </>
       );
     }
@@ -570,7 +571,7 @@ export function AddToClientDropdown({
 
       {/* Modal for CLI instructions */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent scrollable className="max-w-3xl max-h-[80vh]">
           {renderModalContent()}
         </DialogContent>
       </Dialog>

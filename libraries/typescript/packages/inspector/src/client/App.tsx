@@ -14,6 +14,7 @@ import { Route, BrowserRouter as Router, Routes } from "react-router";
 import { toast } from "sonner";
 import { InspectorProvider, useInspector } from "./context/InspectorContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ShapeProvider } from "@/client/lib/shape-context";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
 import { getPackageVersion, initInspectorTelemetry } from "@/client/telemetry";
 import { getInspectorBase } from "./utils/basePath";
@@ -102,6 +103,7 @@ function App() {
 
   return (
     <ThemeProvider forcedTheme={forcedTheme || undefined}>
+      <ShapeProvider defaultShape="pill">
       <WidgetDebugProvider>
         <McpClientProvider
           storageProvider={storageProvider}
@@ -270,6 +272,7 @@ function App() {
           </InspectorProvider>
         </McpClientProvider>
       </WidgetDebugProvider>
+      </ShapeProvider>
     </ThemeProvider>
   );
 }

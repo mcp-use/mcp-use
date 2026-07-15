@@ -4,12 +4,16 @@ import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
 import { ChatTab } from "./ChatTab";
+import { ConnectionSettingsTab } from "./ConnectionSettingsTab";
 import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { PromptsTab } from "./PromptsTab";
 import { ResourcesTab } from "./ResourcesTab";
 import { SamplingTab } from "./SamplingTab";
+import { ServerMetadataTab } from "./ServerMetadataTab";
 import { ToolsTab } from "./ToolsTab";
+
+import type { EditableConnectionConfig } from "@/client/utils/connectionUpdates";
 
 interface LayoutContentProps {
   selectedServer: McpServer | undefined;
@@ -26,6 +30,7 @@ interface LayoutContentProps {
     focusSearch: () => void;
     blurSearch: () => void;
   } | null>;
+  onUpdateConnection?: (config: EditableConnectionConfig) => void;
   children: ReactNode;
 }
 
@@ -35,6 +40,7 @@ export function LayoutContent({
   toolsSearchRef,
   promptsSearchRef,
   resourcesSearchRef,
+  onUpdateConnection,
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
@@ -109,6 +115,8 @@ export function LayoutContent({
     "sampling",
     "elicitation",
     "notifications",
+    "server-metadata",
+    "connection-settings",
   ];
 
   // The hosted chat backend (`chatApiUrl`, e.g. cloud.manufact.com) runs
@@ -299,6 +307,33 @@ export function LayoutContent({
             clearNotifications={selectedServer.clearNotifications}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
+          />
+        </div>
+      )}
+      {isTabVisible("server-metadata") && (
+        <div
+          style={{
+            display: activeTab === "server-metadata" ? "block" : "none",
+          }}
+          className="h-full"
+        >
+          <ServerMetadataTab
+            key={`server-metadata-${selectedServer.id}`}
+            connection={selectedServer}
+          />
+        </div>
+      )}
+      {isTabVisible("connection-settings") && onUpdateConnection && (
+        <div
+          style={{
+            display: activeTab === "connection-settings" ? "block" : "none",
+          }}
+          className="h-full"
+        >
+          <ConnectionSettingsTab
+            key={`connection-settings-${selectedServer.id}`}
+            connection={selectedServer}
+            onSave={onUpdateConnection}
           />
         </div>
       )}

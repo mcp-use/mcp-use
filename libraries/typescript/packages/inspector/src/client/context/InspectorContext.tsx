@@ -9,7 +9,9 @@ export type TabType =
   | "chat"
   | "sampling"
   | "elicitation"
-  | "notifications";
+  | "notifications"
+  | "server-metadata"
+  | "connection-settings";
 
 /**
  * Configuration injected by a host application when the inspector runs in

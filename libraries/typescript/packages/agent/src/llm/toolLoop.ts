@@ -11,7 +11,7 @@ interface ToolCallFn {
   (name: string, args: Record<string, unknown>): Promise<unknown>;
 }
 
-interface ToolLoopParams {
+export interface ToolLoopParams {
   driver: LlmDriver;
   /** Initial conversation history + the user turn that triggers the run. */
   messages: ProviderMessage[];
@@ -35,6 +35,11 @@ interface ToolLoopParams {
 export async function* runToolLoop(
   params: ToolLoopParams
 ): AsyncGenerator<LlmStreamEvent, void, unknown> {
+  if (params.driver.managesToolLoop && params.driver.streamToolLoop) {
+    yield* params.driver.streamToolLoop(params);
+    return;
+  }
+
   const { driver, tools, callTool, signal } = params;
   const maxSteps = params.maxSteps ?? 10;
   const messages: ProviderMessage[] = [...params.messages];
@@ -136,6 +141,10 @@ export async function runToolLoopNonStreaming(params: ToolLoopParams): Promise<{
     result: unknown;
   }[];
 }> {
+  if (params.driver.managesToolLoop && params.driver.runToolLoopNonStreaming) {
+    return params.driver.runToolLoopNonStreaming(params);
+  }
+
   const { driver, tools, callTool, signal } = params;
   const maxSteps = params.maxSteps ?? 10;
   const messages: ProviderMessage[] = [...params.messages];

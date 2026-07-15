@@ -1,8 +1,10 @@
-import { Button } from "@/client/components/ui/button";
+import { Button, buttonExecuteClass, buttonShortcutClass, buttonToolbarClass } from "@/client/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
+  DialogJsonSection,
   DialogTitle,
 } from "@/client/components/ui/dialog";
 import { Spinner } from "@/client/components/ui/spinner";
@@ -24,6 +26,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/browser";
+import { cn } from "@/client/lib/utils";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { ToolInputForm } from "./ToolInputForm";
 
@@ -66,7 +69,6 @@ export function ToolExecutionPanel({
 }: ToolExecutionPanelProps) {
   const [showCancelButton, setShowCancelButton] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
-  const [copiedMetadata, setCopiedMetadata] = useState(false);
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
@@ -87,13 +89,7 @@ export function ToolExecutionPanel({
   // Copy metadata to clipboard
   const copyMetadataToClipboard = async () => {
     if (!selectedTool) return;
-    try {
-      await copyToClipboard(JSON.stringify(selectedTool, null, 2));
-      setCopiedMetadata(true);
-      setTimeout(() => setCopiedMetadata(false), 2000);
-    } catch {
-      // Silently fail - no toast in this component
-    }
+    await copyToClipboard(JSON.stringify(selectedTool, null, 2));
   };
 
   // Copy payload to clipboard (use payloadToSend when provided - reflects what will actually be sent)
@@ -164,10 +160,10 @@ export function ToolExecutionPanel({
                     onClick={() => setShowMetadata(!showMetadata)}
                     disabled={isExecuting}
                     size="sm"
-                    className="lg:size-default gap-2"
+                    className={cn(buttonToolbarClass, "gap-2")}
                     title="View tool metadata"
                   >
-                    <Code className="h-4 w-4" />
+                    <Code />
                     <span className="hidden sm:inline">Metadata</span>
                   </Button>
                 </TooltipTrigger>
@@ -183,13 +179,13 @@ export function ToolExecutionPanel({
                     onClick={copyPayloadToClipboard}
                     disabled={isExecuting}
                     size="sm"
-                    className="lg:size-default gap-2"
+                    className={cn(buttonToolbarClass, "gap-2")}
                     title="Copy payload as JSON"
                   >
                     {copiedPayload ? (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="text-green-600" />
                     ) : (
-                      <Copy className="h-4 w-4" />
+                      <Copy />
                     )}
                     <span className="hidden sm:inline">
                       {copiedPayload ? "Copied!" : "Payload"}
@@ -206,9 +202,9 @@ export function ToolExecutionPanel({
                 onClick={onSave}
                 disabled={isExecuting}
                 size="sm"
-                className="lg:size-default gap-2"
+                className={cn(buttonToolbarClass, "gap-2")}
               >
-                <Save className="h-4 w-4" />
+                <Save />
                 <span className="hidden sm:inline">Save</span>
               </Button>
               {isExecuting && onCancel ? (
@@ -224,19 +220,17 @@ export function ToolExecutionPanel({
                         onClick={onCancel}
                         variant={showCancelButton ? "destructive" : "default"}
                         size="sm"
-                        className="lg:size-default gap-2 transition-all"
+                        className={cn(buttonExecuteClass, "transition-all")}
                       >
                         {showCancelButton ? (
                           <>
-                            <X className="h-4 w-4" />
+                            <X />
                             <span className="hidden sm:inline">Cancel</span>
-                            <span className="hidden sm:inline text-[12px] border border-current p-1 rounded-full ml-2">
-                              Esc
-                            </span>
+                            <span className={buttonShortcutClass}>Esc</span>
                           </>
                         ) : (
                           <>
-                            <Spinner className="mr-2" />
+                            <Spinner />
                             <span className="hidden sm:inline">
                               Executing...
                             </span>
@@ -255,20 +249,18 @@ export function ToolExecutionPanel({
                   onClick={onExecute}
                   disabled={isExecuting || !isConnected}
                   size="sm"
-                  className="lg:size-default pr-1! gap-0"
+                  className={buttonExecuteClass}
                 >
                   {isExecuting ? (
                     <>
-                      <Spinner className="mr-2" />
+                      <Spinner />
                       <span className="hidden sm:inline">Executing...</span>
                     </>
                   ) : (
                     <>
-                      <Play className="h-4 w-4 sm:mr-2" />
+                      <Play />
                       <span className="hidden sm:inline">Execute</span>
-                      <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                        ⌘↵
-                      </span>
+                      <span className={buttonShortcutClass}>⌘↵</span>
                     </>
                   )}
                 </Button>
@@ -335,30 +327,19 @@ export function ToolExecutionPanel({
       </div>
 
       <Dialog open={showMetadata} onOpenChange={setShowMetadata}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between gap-3">
-              <span>Tool Definition</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={copyMetadataToClipboard}
-                className="h-7 w-7 p-0"
-                title="Copy metadata"
-              >
-                {copiedMetadata ? (
-                  <Check className="h-3.5 w-3.5 text-green-600" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5" />
-                )}
-              </Button>
-            </DialogTitle>
+        <DialogContent scrollable className="max-w-3xl max-h-[80vh]">
+          <DialogHeader sticky>
+            <DialogTitle>Tool Definition</DialogTitle>
           </DialogHeader>
 
-          <JSONDisplay
-            data={selectedTool}
-            filename={`tool-definition-${selectedTool.name}-${Date.now()}.json`}
-          />
+          <DialogBody>
+            <DialogJsonSection onCopy={copyMetadataToClipboard}>
+              <JSONDisplay
+                data={selectedTool}
+                filename={`tool-definition-${selectedTool.name}-${Date.now()}.json`}
+              />
+            </DialogJsonSection>
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </div>

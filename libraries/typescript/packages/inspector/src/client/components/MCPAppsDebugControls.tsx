@@ -45,8 +45,10 @@ import {
 } from "./ui/command";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
+  DialogJsonSection,
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
@@ -495,13 +497,14 @@ export function MCPAppsDebugControls({
           </TooltipContent>
         </Tooltip>
         <DialogContent
-          className="sm:max-w-[520px] max-h-[85vh] overflow-y-auto"
+          scrollable
+          className="sm:max-w-[520px] max-h-[85vh]"
           data-testid="debugger-csp-dialog"
         >
           <DialogHeader>
             <DialogTitle>CSP Mode</DialogTitle>
           </DialogHeader>
-          <div className="space-y-2">
+          <DialogBody className="space-y-2">
             <Button
               data-testid="debugger-csp-option-permissive"
               variant={
@@ -534,7 +537,6 @@ export function MCPAppsDebugControls({
                 <span>Widget-Declared</span>
               </div>
             </Button>
-          </div>
 
           {/* Current declared CSP */}
           <div className="mt-3 border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
@@ -748,6 +750,7 @@ export function MCPAppsDebugControls({
               </div>
             </div>
           )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
 
@@ -870,15 +873,18 @@ export function MCPAppsDebugControls({
             <TooltipContent>View Tool Props</TooltipContent>
           </Tooltip>
           <DialogContent
-            className="sm:max-w-[600px]"
+            scrollable
+            className="sm:max-w-[600px] max-h-[85vh]"
             data-testid="debugger-props-dialog"
           >
             <DialogHeader>
               <DialogTitle>Tool Props</DialogTitle>
             </DialogHeader>
-            <div className="overflow-auto max-h-[60vh] rounded-md bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-3">
-              <JSONDisplay data={toolInput ?? {}} filename="tool-props.json" />
-            </div>
+            <DialogBody>
+              <DialogJsonSection>
+                <JSONDisplay data={toolInput ?? {}} filename="tool-props.json" />
+              </DialogJsonSection>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       ) : (

@@ -22,6 +22,7 @@ export type {
   PendingElicitationRequest,
 } from "./types.js";
 export { useMcp } from "./useMcp.js";
+export { detectFavicon } from "../utils/favicon.js";
 
 // Re-export auth callback handler for the OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";

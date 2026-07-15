@@ -1,4 +1,6 @@
 import type { ProviderName } from "@mcp-use/agent";
+import type { ComponentProps } from "react";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/client/lib/utils";
 import { useTheme } from "@/client/context/ThemeContext";
 
@@ -6,6 +8,35 @@ import { useTheme } from "@/client/context/ThemeContext";
 // official mark as a data URL with a neutral gray fill.
 const OPENROUTER_ICON_SVG = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" fill="#94A3B8" stroke="#94A3B8"><g><path fill="none" d="M3 248.945C18 248.945 76 236 106 219C136 202 136 202 198 158C276.497 102.293 332 120.945 423 120.945" stroke-width="90"/><path d="M511 121.5L357.25 210.268L357.25 32.7324L511 121.5Z"/><path fill="none" d="M0 249C15 249 73 261.945 103 278.945C133 295.945 133 295.945 195 339.945C273.497 395.652 329 377 420 377" stroke-width="90"/><path d="M508 376.445L354.25 287.678L354.25 465.213L508 376.445Z"/></g></svg>`;
 const OPENROUTER_ICON_URL = `data:image/svg+xml,${encodeURIComponent(OPENROUTER_ICON_SVG)}`;
+
+export function ModelConfigBadge({
+  provider,
+  model,
+  className,
+  ...props
+}: {
+  provider: ProviderName;
+  model: string;
+  className?: string;
+} & Omit<ComponentProps<"button">, "children">) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "inline-flex items-center gap-1.5 min-w-0 border-0 bg-transparent p-1",
+        "font-mono text-[11px] text-muted-foreground cursor-pointer",
+        "hover:text-foreground transition-colors",
+        "rounded-md outline-none focus-visible:ring-1 focus-visible:ring-ring",
+        className
+      )}
+      {...props}
+    >
+      <ProviderIcon provider={provider} className="shrink-0" />
+      <span className="whitespace-nowrap">{model}</span>
+      <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
+    </button>
+  );
+}
 
 export function getProviderLabel(provider: ProviderName): string {
   switch (provider) {

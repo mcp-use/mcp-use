@@ -2,6 +2,7 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -64,7 +65,7 @@ export function SdkIntegrationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent scrollable className="max-w-[90vw] max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Add to {languageName} SDK</DialogTitle>
           <DialogDescription>
@@ -72,7 +73,7 @@ export function SdkIntegrationModal({
             {languageName} application using the mcp-use SDK.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
+        <DialogBody className="space-y-4">
           <div>
             <h5 className="font-semibold text-sm mb-2">Instructions</h5>
             <ol className="space-y-2 text-xs text-muted-foreground">
@@ -92,7 +93,7 @@ export function SdkIntegrationModal({
             </ol>
           </div>
 
-          <div className="relative w-full overflow-x-auto overflow-y-auto max-h-[60vh]">
+          <div className="relative w-full overflow-x-auto">
             <div className="absolute top-2 right-2 z-10">
               <Button
                 variant="ghost"
@@ -111,7 +112,7 @@ export function SdkIntegrationModal({
               <code>{code}</code>
             </pre>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

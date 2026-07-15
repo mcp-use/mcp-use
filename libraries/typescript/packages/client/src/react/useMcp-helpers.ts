@@ -1,7 +1,7 @@
 import { BrowserOAuthClientProvider } from "../auth/browser.js";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
 import type { MCPServerInfo } from "../core/session.js";
-import { detectFavicon } from "./favicon.js";
+import { detectFavicon } from "../utils/favicon.js";
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
 

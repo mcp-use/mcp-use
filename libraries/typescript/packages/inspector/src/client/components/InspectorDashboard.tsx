@@ -497,15 +497,11 @@ export function InspectorDashboard() {
   );
 
   const handleServerClick = (connection: any) => {
-    // Don't allow clicking failed connections - use the reload button instead
+    // Failed connections use the reload button on the dashboard tile instead.
     if (connection.state === "failed") {
       return;
     }
 
-    if (connection.state !== "ready") {
-      toast.error("Server is not connected and cannot be inspected");
-      return;
-    }
     // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");

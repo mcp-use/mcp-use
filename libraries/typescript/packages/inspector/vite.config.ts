@@ -67,31 +67,18 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@mcp-use/client/react": path.resolve(
-        __dirname,
-        "../client/src/react/index.ts"
-      ),
-      // The root client export selects the browser-safe build in Vite.
-      "@mcp-use/client": path.resolve(
-        __dirname,
-        "../client/dist/index-browser.js"
-      ),
-      "@mcp-use/agent": path.resolve(__dirname, "../agent/src/index.ts"),
     },
     conditions: ["browser", "module", "import", "default"],
   },
   define: {
     "process.env": "{}",
     "process.platform": '"browser"',
-    // Inject version from package.json at build time
-    __INSPECTOR_VERSION__: JSON.stringify(packageJson.version),
-    // @mcp-use/client/react resolves to source in dev; version.ts needs this.
     __MCP_USE_PACKAGE_VERSION__: JSON.stringify(clientPackageJson.version),
     // Ensure global is defined
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["@mcp-use/client"],
+    include: ["@mcp-use/client", "@mcp-use/client/react", "@mcp-use/agent"],
   },
   build: {
     minify: true,

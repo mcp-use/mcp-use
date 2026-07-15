@@ -1,93 +1,288 @@
-import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { XIcon } from "lucide-react";
-import * as React from "react";
+"use client";
 
+import { Button } from "@/client/components/ui/button";
+import { useIcon } from "@/client/lib/icon-context";
+import { useShape } from "@/client/lib/shape-context";
+import { spring } from "@/client/lib/springs";
+import { surfaceClasses } from "@/client/lib/surface-classes";
+import { SurfaceProvider, useSurface } from "@/client/lib/surface-context";
 import { cn } from "@/client/lib/utils";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+import { motion } from "motion/react";
+import {
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 
-function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
-}
+const DIALOG_OFFSET = 4;
+const STICKY_HEADER_H = "h-14";
 
-function DialogTrigger({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
+const DialogChromeContext = createContext<{
+  scrollable: boolean;
+  setStickyHeader: (value: boolean) => void;
+} | null>(null);
 
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
-}
-
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+function DialogCloseButton({ className }: { className?: string }) {
+  const XIcon = useIcon("x");
   return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
-        className
-      )}
-      {...props}
+    <DialogPrimitive.Close
+      render={
+        <Button variant="ghost" size="icon-sm" className={className}>
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </Button>
+      }
     />
   );
 }
 
-function DialogContent({
-  className,
+interface DialogProps {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  modal?: boolean;
+  children?: ReactNode;
+}
+
+function Dialog({
   children,
-  showCloseButton = true,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  showCloseButton?: boolean;
-}) {
+  open,
+  defaultOpen,
+  onOpenChange,
+  modal,
+}: DialogProps) {
+  // Base UI's Root handles controlled/uncontrolled state internally. We only
+  // narrow the (open, eventDetails) callback to (open) for our public prop.
   return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
+    <DialogPrimitive.Root
+      open={open}
+      defaultOpen={defaultOpen}
+      onOpenChange={(next) => onOpenChange?.(next)}
+      modal={modal}
+    >
+      {children}
+    </DialogPrimitive.Root>
+  );
+}
+
+import {
+  resolveAsChildFromChildren,
+  type AsChildCompatProps,
+} from "@/client/lib/as-child-compat";
+
+const DialogTriggerBase = DialogPrimitive.Trigger;
+
+function DialogTrigger({
+  asChild,
+  render,
+  children,
+  nativeButton,
+  ...props
+}: DialogPrimitive.Trigger.Props & AsChildCompatProps) {
+  const asChildResolved = resolveAsChildFromChildren({
+    asChild,
+    children,
+    nativeButton,
+  });
+
+  return (
+    <DialogTriggerBase
+      {...props}
+      render={render ?? asChildResolved?.render}
+      nativeButton={asChildResolved?.nativeButton ?? nativeButton}
+    >
+      {asChildResolved ? undefined : children}
+    </DialogTriggerBase>
+  );
+}
+
+const DialogClose = DialogPrimitive.Close;
+
+interface DialogContentProps extends HTMLAttributes<HTMLDivElement> {
+  size?: "sm" | "lg";
+  /** Scrollable panel: p-0 flex column; pad header/body/footer instead of the shell. */
+  scrollable?: boolean;
+  /** Portal target. When set, the overlay and panel render inside this element
+   *  (positioned `absolute`) instead of covering the viewport (`fixed`). Pair
+   *  with a `position: relative; overflow: hidden` container — and usually
+   *  `<Dialog modal={false}>` — to scope a dialog to a bounded region, e.g. a
+   *  docs preview. Defaults to the document body / full-viewport behaviour. */
+  container?: HTMLElement | null;
+}
+
+const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
+  ({ className, children, size = "sm", scrollable = false, container, ...props }, ref) => {
+    const shape = useShape();
+    const substrate = useSurface();
+    const dialogLevel = Math.min(substrate + DIALOG_OFFSET, 8);
+    const [hasStickyHeader, setHasStickyHeader] = useState(false);
+    const setStickyHeader = useCallback((value: boolean) => {
+      setHasStickyHeader(value);
+    }, []);
+
+    // No `if (!open) return null` here — Base UI's `<DialogPrimitive.Popup>`
+    // handles mount/unmount itself, and waits for the framer-motion opacity
+    // tween below to finish (via `element.getAnimations()`) before unmounting.
+    // Returning null early would short-circuit the closing animation.
+    return (
+      <DialogPrimitive.Portal container={container ?? undefined}>
+        <DialogPrimitive.Backdrop
+          render={(backdropProps, state) => {
+            const exiting = state.transitionStatus === "ending";
+            const {
+              style: _style,
+              onDrag: _onDrag,
+              onDragStart: _onDragStart,
+              onDragEnd: _onDragEnd,
+              onAnimationStart: _onAnimationStart,
+              onAnimationEnd: _onAnimationEnd,
+              onAnimationIteration: _onAnimationIteration,
+              ...rest
+            } = backdropProps as React.HTMLAttributes<HTMLDivElement>;
+            return (
+              <motion.div
+                {...rest}
+                className={cn(
+                  container ? "absolute" : "fixed",
+                  "inset-0 z-50 bg-black/40 dark:bg-black/80"
+                )}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: exiting ? 0 : 1 }}
+                transition={exiting ? spring.slow.exit : spring.slow}
+              />
+            );
+          }}
+        />
+        <DialogPrimitive.Popup
+          ref={ref}
+          render={(popupProps, state) => {
+            const exiting = state.transitionStatus === "ending";
+            const {
+              style: baseStyle,
+              onDrag: _onDrag,
+              onDragStart: _onDragStart,
+              onDragEnd: _onDragEnd,
+              onAnimationStart: _onAnimationStart,
+              onAnimationEnd: _onAnimationEnd,
+              onAnimationIteration: _onAnimationIteration,
+              ...rest
+            } = popupProps as React.HTMLAttributes<HTMLDivElement>;
+            return (
+              <motion.div
+                // Base UI's props first (data attrs, refs, role, etc.)…
+                {...rest}
+                // …then the consumer's `<DialogContent>` props (className,
+                // event handlers, data-*, etc.) land on the visible motion.div.
+                {...(props as Omit<
+                  React.HTMLAttributes<HTMLDivElement>,
+                  | "onDrag"
+                  | "onDragStart"
+                  | "onDragEnd"
+                  | "onAnimationStart"
+                  | "onAnimationEnd"
+                  | "onAnimationIteration"
+                >)}
+                className={cn(
+                  container ? "absolute" : "fixed",
+                  "left-1/2 top-1/2 z-50 w-[calc(100%-2rem)]",
+                  surfaceClasses(dialogLevel),
+                  "p-6 focus:outline-none",
+                  size === "sm" && "max-w-[400px]",
+                  size === "lg" && "max-w-[540px]",
+                  shape.container,
+                  scrollable && "flex flex-col overflow-hidden p-0",
+                  className
+                )}
+                style={{
+                  ...(baseStyle as React.CSSProperties | undefined),
+                  ...(props.style as React.CSSProperties | undefined),
+                }}
+                initial={{ opacity: 0, scale: 0.97, x: "-50%", y: "-50%" }}
+                animate={{
+                  opacity: exiting ? 0 : 1,
+                  scale: exiting ? 0.97 : 1,
+                  x: "-50%",
+                  y: "-50%",
+                }}
+                transition={exiting ? spring.slow.exit : spring.slow}
+              >
+                <SurfaceProvider value={dialogLevel}>
+                  <DialogChromeContext.Provider
+                    value={{ scrollable, setStickyHeader }}
+                  >
+                    {children}
+                    {!hasStickyHeader && (
+                      <DialogCloseButton className="absolute right-3 top-3 z-20" />
+                    )}
+                  </DialogChromeContext.Provider>
+                </SurfaceProvider>
+              </motion.div>
+            );
+          }}
+        />
+      </DialogPrimitive.Portal>
+    );
+  }
+);
+DialogContent.displayName = "DialogContent";
+
+interface DialogHeaderProps extends HTMLAttributes<HTMLDivElement> {
+  sticky?: boolean;
+}
+
+function DialogHeader({ className, sticky, children, ...props }: DialogHeaderProps) {
+  const chrome = useContext(DialogChromeContext);
+
+  useLayoutEffect(() => {
+    if (!sticky) return;
+    chrome?.setStickyHeader(true);
+    return () => chrome?.setStickyHeader(false);
+  }, [sticky, chrome]);
+
+  if (sticky) {
+    return (
+      <div
         className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          "sticky top-0 z-10 mb-0 flex shrink-0 items-center gap-2 border-b border-border/50 bg-white/50 px-6 backdrop-blur-xs dark:bg-black/50",
+          STICKY_HEADER_H,
           className
         )}
         {...props}
       >
         {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  );
-}
+        <DialogCloseButton className="ml-auto shrink-0" />
+      </div>
+    );
+  }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
-      {...props}
-    />
-  );
-}
-
-function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        "mb-4 flex flex-col gap-1.5",
+        chrome?.scrollable && "px-6 pt-6",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
+function DialogBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  const chrome = useContext(DialogChromeContext);
+
+  return (
+    <div
+      className={cn(
+        "flex-1 min-h-0 overflow-y-auto overscroll-none pt-2",
+        chrome?.scrollable ? "px-6 pb-6" : "-mx-6 px-6",
         className
       )}
       {...props}
@@ -95,38 +290,101 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function DialogTitle({
+interface DialogJsonSectionProps extends HTMLAttributes<HTMLDivElement> {
+  onCopy?: () => void | Promise<void>;
+}
+
+function DialogJsonSection({
   className,
+  onCopy,
+  children,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+}: DialogJsonSectionProps) {
+  const CopyIcon = useIcon("copy");
+  const CheckIcon = useIcon("check");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    if (!onCopy) return;
+    try {
+      await onCopy();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ponytail: caller handles toasts if needed
+    }
+  };
+
   return (
-    <DialogPrimitive.Title
-      data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+    <div
+      className={cn(
+        "group/json relative -mx-6 bg-muted/20 px-6 pt-6 pb-4",
+        className
+      )}
+      {...props}
+    >
+      {onCopy ? (
+        <div className="absolute top-2 right-2 z-10 opacity-0 transition-opacity group-hover/json:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleCopy}
+            title="Copy"
+          >
+            {copied ? (
+              <CheckIcon className="text-green-600" />
+            ) : (
+              <CopyIcon />
+            )}
+          </Button>
+        </div>
+      ) : null}
+      {children}
+    </div>
+  );
+}
+
+function DialogFooter({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  const chrome = useContext(DialogChromeContext);
+
+  return (
+    <div
+      className={cn(
+        "mt-6 flex justify-end gap-2",
+        chrome?.scrollable && "px-6 pb-6",
+        className
+      )}
       {...props}
     />
   );
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-  return (
-    <DialogPrimitive.Description
-      data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
-      {...props}
-    />
-  );
-}
+const DialogTitle = forwardRef<
+  HTMLHeadingElement,
+  HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Title
+    ref={ref}
+    className={cn("m-0 text-[16px] leading-none text-foreground", className)}
+    style={{ fontVariationSettings: "'wght' 700" }}
+    {...props}
+  />
+));
+DialogTitle.displayName = "DialogTitle";
+
+const DialogDescription = forwardRef<
+  HTMLParagraphElement,
+  HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Description
+    ref={ref}
+    className={cn("text-[13px] text-muted-foreground", className)}
+    {...props}
+  />
+));
+DialogDescription.displayName = "DialogDescription";
 
 export {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogJsonSection, DialogTitle, DialogTrigger
 };
+

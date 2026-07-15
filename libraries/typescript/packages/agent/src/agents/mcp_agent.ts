@@ -3,7 +3,7 @@ import type { BaseConnector } from "@mcp-use/client";
 import { logger } from "@mcp-use/client";
 import type { ZodSchema } from "zod";
 import { NativeAdapter } from "../adapters/native_adapter.js";
-import { RestLlmDriver, type LlmDriver } from "../llm/driver.js";
+import { createLlmDriver, type LlmDriver } from "../llm/driver.js";
 import {
   streamNativeAgent,
   streamNativeAgentSteps,
@@ -152,7 +152,7 @@ export class MCPAgent {
     if (this.hasLiveConnections() && this.explicitProviderConfig) {
       this.bindConnections(this.boundConnections!, this.explicitProviderConfig);
     } else if (this.hasLiveConnections() && this.llmString) {
-      this.driver = new RestLlmDriver(
+      this.driver = createLlmDriver(
         parseLLMStringToProviderConfig(this.llmString, this.llmConfig)
       );
       this.bindConnections(
@@ -189,12 +189,12 @@ export class MCPAgent {
         this.clientOwnedByAgent = true;
       }
       if (this.llmString) {
-        this.driver = new RestLlmDriver(
+        this.driver = createLlmDriver(
           parseLLMStringToProviderConfig(this.llmString, this.llmConfig)
         );
       }
     } else if (this.explicitProviderConfig) {
-      this.driver = new RestLlmDriver(this.explicitProviderConfig);
+      this.driver = createLlmDriver(this.explicitProviderConfig);
     }
 
     if (!this.driver) {
@@ -310,7 +310,7 @@ export class MCPAgent {
       }
       return route.connection.callTool(route.mcpName, args);
     };
-    this.driver = new RestLlmDriver(providerConfig);
+    this.driver = createLlmDriver(providerConfig);
     this.initialized = true;
   }
 

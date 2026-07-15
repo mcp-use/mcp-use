@@ -72,7 +72,7 @@ export interface MCPConfig {
 export type StreamProtocol = "sse" | "data-stream";
 
 export const DEFAULT_MODELS: Record<ProviderName, string> = {
-  openai: "gpt-4o",
+  openai: "gpt-5.6-terra",
   "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",

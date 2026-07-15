@@ -29,7 +29,7 @@ vi.mock("../../../src/telemetry/telemetry-browser.js", () => ({
   },
 }));
 
-vi.mock("../../../src/react/favicon.js", () => ({
+vi.mock("../../../src/utils/favicon.js", () => ({
   detectFavicon: vi.fn().mockResolvedValue(null),
 }));
 

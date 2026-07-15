@@ -1,6 +1,4 @@
 import { Button } from "@/client/components/ui/button";
-import { Label } from "@/client/components/ui/label";
-import { Checkbox } from "@/client/components/ui/checkbox";
 import type { ElicitResult } from "@modelcontextprotocol/client";
 import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
@@ -11,7 +9,6 @@ import {
   Download,
   Maximize2,
   X,
-  ExternalLink,
 } from "lucide-react";
 import {
   Tooltip,
@@ -19,8 +16,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Badge } from "@/client/components/ui/badge";
-import { ElicitationFormFields } from "./shared/ElicitationFormFields";
-import { useElicitationForm } from "./shared/useElicitationForm";
+import { ElicitationAskUserPanel } from "./shared/ElicitationAskUserPanel";
 
 interface ElicitationRequestDisplayProps {
   request: PendingElicitationRequest | null;
@@ -35,6 +31,53 @@ interface ElicitationRequestDisplayProps {
   onFullscreen: () => void;
 }
 
+function showElicitationSuccessToast() {
+  import("react").then((React) => {
+    const toastId = toast(
+      React.createElement(
+        "div",
+        { className: "space-y-3" },
+        React.createElement(
+          "div",
+          null,
+          React.createElement("strong", null, "Elicitation Response Sent"),
+          React.createElement(
+            "p",
+            { className: "text-sm text-muted-foreground mt-1" },
+            "The tool will continue executing."
+          )
+        ),
+        React.createElement(
+          "div",
+          { className: "flex gap-2" },
+          React.createElement(
+            "button",
+            {
+              "data-testid": "elicitation-view-tool-result",
+              className:
+                "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
+              onClick: () => {
+                const event = new globalThis.CustomEvent(
+                  "navigate-to-tool-result",
+                  {
+                    detail: { toolName: null },
+                  }
+                );
+                window.dispatchEvent(event);
+                toast.dismiss(toastId);
+              },
+            },
+            "View Tool Result"
+          )
+        )
+      ),
+      {
+        duration: 5000,
+      }
+    );
+  });
+}
+
 export function ElicitationRequestDisplay({
   request,
   onApprove,
@@ -47,106 +90,23 @@ export function ElicitationRequestDisplay({
   onDownload,
   onFullscreen,
 }: ElicitationRequestDisplayProps) {
-  const {
-    formData,
-    setFieldValue,
-    getMissingRequiredFields,
-    urlCompleted,
-    setUrlCompleted,
-    mode,
-    isFormMode,
-    isUrlMode,
-  } = useElicitationForm(request);
-
-  const handleAccept = () => {
-    if (!request) return;
-
-    if (isFormMode) {
-      const missingFields = getMissingRequiredFields();
-      if (missingFields.length > 0) {
-        toast.error("Missing required fields", {
-          description: `Please fill in: ${missingFields.join(", ")}`,
-        });
-        return;
-      }
-
-      onApprove(request.id, {
-        action: "accept",
-        content: formData,
-      });
-    } else if (isUrlMode) {
-      onApprove(request.id, {
-        action: "accept",
-      });
-    }
+  const handleApprove = (requestId: string, result: ElicitResult) => {
+    onApprove(requestId, result);
     onClose();
-
-    // Show success toast with navigation back to tools tab
-    import("react").then((React) => {
-      const toastId = toast(
-        React.createElement(
-          "div",
-          { className: "space-y-3" },
-          React.createElement(
-            "div",
-            null,
-            React.createElement("strong", null, "Elicitation Response Sent"),
-            React.createElement(
-              "p",
-              { className: "text-sm text-muted-foreground mt-1" },
-              "The tool will continue executing."
-            )
-          ),
-          React.createElement(
-            "div",
-            { className: "flex gap-2" },
-            React.createElement(
-              "button",
-              {
-                "data-testid": "elicitation-view-tool-result",
-                className:
-                  "px-3 py-1.5 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90",
-                onClick: () => {
-                  // Dispatch event to navigate to tools tab
-                  const event = new globalThis.CustomEvent(
-                    "navigate-to-tool-result",
-                    {
-                      detail: { toolName: null },
-                    }
-                  );
-                  window.dispatchEvent(event);
-                  // Dismiss the toast immediately
-                  toast.dismiss(toastId);
-                },
-              },
-              "View Tool Result"
-            )
-          )
-        ),
-        {
-          duration: 5000, // Auto-dismiss after 5 seconds
-        }
-      );
-    });
+    if (result.action === "accept" || result.action === "decline") {
+      showElicitationSuccessToast();
+    }
   };
 
   const handleDecline = () => {
     if (!request) return;
-    onApprove(request.id, { action: "decline" });
-    onClose();
+    handleApprove(request.id, { action: "decline" });
   };
 
   const handleCancel = () => {
     if (!request) return;
     onReject(request.id, "User cancelled elicitation request");
     onClose();
-  };
-
-  const handleOpenUrl = () => {
-    if (request && isUrlMode && "url" in request.request) {
-      window.open(request.request.url, "_blank");
-      setUrlCompleted(true);
-    }
   };
 
   if (!request) {
@@ -158,6 +118,10 @@ export function ElicitationRequestDisplay({
       </div>
     );
   }
+
+  const mode = request.request.mode || "form";
+  const isUrlMode = mode === "url";
+  const isFormMode = mode === "form";
 
   return (
     <div className="flex flex-col h-full">
@@ -238,80 +202,15 @@ export function ElicitationRequestDisplay({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Message Section */}
-        <div className="space-y-2">
-          <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            Message
-          </h4>
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            {request.request.message}
-          </p>
-        </div>
+        <ElicitationAskUserPanel
+          request={request}
+          onApprove={handleApprove}
+          onReject={onReject}
+          testId="elicitation-ask-user"
+          actionTestIdPrefix="elicitation"
+          showSecondaryActions={false}
+        />
 
-        {/* URL Mode Display */}
-        {isUrlMode && "url" in request.request && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              External Action Required
-            </h4>
-            <div className="bg-muted rounded-lg p-4 space-y-3">
-              <p className="text-sm text-muted-foreground">
-                This request requires you to complete an action at an external
-                URL:
-              </p>
-              <div className="flex items-center gap-2 p-2 bg-background rounded border">
-                <code className="flex-1 text-xs font-mono break-all">
-                  {request.request.url}
-                </code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleOpenUrl}
-                  className="flex items-center gap-2"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Open URL
-                </Button>
-              </div>
-              <div className="flex items-center space-x-2 pt-2">
-                <Checkbox
-                  id="url-completed"
-                  checked={urlCompleted}
-                  onCheckedChange={(checked) => setUrlCompleted(!!checked)}
-                />
-                <Label
-                  htmlFor="url-completed"
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  I have completed the required action
-                </Label>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Form Mode Display */}
-        {isFormMode && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Form Data
-            </h4>
-            <ElicitationFormFields
-              request={request}
-              formData={formData}
-              onFieldChange={setFieldValue}
-              idPrefix="field"
-              testIdPrefix="elicitation-field"
-              emptyFallback={
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  No form schema available
-                </div>
-              }
-            />
-          </div>
-        )}
-
-        {/* Schema Display (for debugging/reference) */}
         {isFormMode &&
           "requestedSchema" in request.request &&
           request.request.requestedSchema && (
@@ -328,13 +227,6 @@ export function ElicitationRequestDisplay({
 
       {/* Actions Footer */}
       <div className="flex gap-2 p-4 border-t dark:border-zinc-700">
-        <Button
-          onClick={handleAccept}
-          className="flex-1"
-          data-testid="elicitation-accept-button"
-        >
-          Accept
-        </Button>
         <Button
           onClick={handleDecline}
           variant="outline"

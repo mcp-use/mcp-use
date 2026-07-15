@@ -3,6 +3,7 @@ import { RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
+import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
 import { Kbd } from "@/client/components/ui/kbd";
 import {
   Tooltip,
@@ -51,14 +52,13 @@ export function SearchTabHeader({
   const BulkIcon = bulkAction?.icon;
 
   return (
-    <div className="flex flex-row items-center justify-between p-4 sm:p-4 py-3 gap-2">
+    <div
+      className={`flex flex-row items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
+    >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
           <>
-            <h2
-              className="text-lg font-medium text-gray-900 dark:text-gray-100"
-              data-testid={titleTestId}
-            >
+            <h2 className={inspectorTabTitleClass} data-testid={titleTestId}>
               {title}
             </h2>
             <Badge

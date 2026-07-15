@@ -1,6 +1,5 @@
 import type { LLMConfig } from "./types";
 
-import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import {
   Tooltip,
@@ -16,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
 import type { ProviderName } from "@mcp-use/agent";
-import { ProviderIcon } from "./providerMeta";
+import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
 
 interface ChatHeaderProps {
   llmConfig: LLMConfig | null;
@@ -90,48 +89,15 @@ export function ChatHeader({
   onExportChat,
 }: ChatHeaderProps) {
   return (
-    <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
-      <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4">
-        {!hideTitle && <h3 className="text-xl sm:text-3xl font-base">Chat</h3>}
-        {llmConfig && (!hideConfigButton || freeTierInfo) && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                variant="secondary"
-                className="hidden sm:flex ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
-                onClick={() => onConfigDialogOpenChange(true)}
-              >
-                <ProviderIcon provider={llmConfig.provider} className="mr-0" />
-                {llmConfig.provider}/{llmConfig.model}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
-              </p>
-            </TooltipContent>
-          </Tooltip>
+    <div
+      className={`flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
+    >
+      <div className="flex items-center gap-2 rounded-full">
+        {!hideTitle && (
+          <h2 className={inspectorTabTitleClass}>Chat</h2>
         )}
       </div>
-      <div className="flex items-center gap-2 pr-2 sm:pr-3 pt-0 sm:pt-2 shrink-0">
-        {/* Mobile: Show provider icon button when config exists (leftmost on mobile) */}
-        {llmConfig && (!hideConfigButton || freeTierInfo) && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="p-2 sm:hidden"
-                onClick={() => onConfigDialogOpenChange(true)}
-              >
-                <ProviderIcon provider={llmConfig.provider} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Change API Key</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
+      <div className="flex items-center gap-2 shrink-0">
         {/* New Chat / Clear button */}
         {!hideClearButton && hasMessages && (
           <div className="flex items-center gap-1">

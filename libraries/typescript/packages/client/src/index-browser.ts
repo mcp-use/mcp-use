@@ -43,3 +43,4 @@ export {
   SCARF_GATEWAY_URL,
 } from "./telemetry/tel-fetch.js";
 export { getPackageVersion, VERSION } from "./utils/version.js";
+export { detectFavicon } from "./utils/favicon.js";

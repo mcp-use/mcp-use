@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toAnthropicMessages } from "../providers/anthropic";
 import { toGeminiContents } from "../providers/google";
-import { toOpenAIMessages } from "../providers/openai";
+import { toOpenAIMessages } from "../providers/openai-chat-completions";
 import { toolResultToContent } from "../toolResultParts";
 import type { ProviderMessage } from "../types";
 

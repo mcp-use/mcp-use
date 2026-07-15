@@ -1,6 +1,7 @@
 import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -388,11 +389,11 @@ export function ConnectionSettingsForm({
               </Button>
             </div>
           </DialogTrigger>
-          <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent scrollable className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Authentication</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <DialogBody className="space-y-4">
               <h4 className="text-sm font-medium">OAuth 2.0 Flow</h4>
 
               {/* Client ID */}
@@ -434,7 +435,7 @@ export function ConnectionSettingsForm({
               <div className="flex justify-end">
                 <Button onClick={() => setAuthDialogOpen(false)}>Save</Button>
               </div>
-            </div>
+            </DialogBody>
           </DialogContent>
         </Dialog>
 
@@ -455,16 +456,18 @@ export function ConnectionSettingsForm({
               </Button>
             </div>
           </DialogTrigger>
-          <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Custom Headers</DialogTitle>
             </DialogHeader>
-            <CustomHeadersEditor
-              title={<></>}
-              headers={customHeaders}
-              onChange={setCustomHeaders}
-              onSave={() => setHeadersDialogOpen(false)}
-            />
+            <DialogBody>
+              <CustomHeadersEditor
+                title={<></>}
+                headers={customHeaders}
+                onChange={setCustomHeaders}
+                onSave={() => setHeadersDialogOpen(false)}
+              />
+            </DialogBody>
           </DialogContent>
         </Dialog>
 
@@ -483,11 +486,11 @@ export function ConnectionSettingsForm({
               Configuration
             </Button>
           </DialogTrigger>
-          <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Configuration</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <DialogBody className="space-y-4">
               {/* Connection Mode */}
               <div className="space-y-2">
                 <Label className="text-sm flex items-center gap-1">
@@ -582,7 +585,7 @@ export function ConnectionSettingsForm({
               <div className="flex justify-end">
                 <Button onClick={() => setConfigDialogOpen(false)}>Save</Button>
               </div>
-            </div>
+            </DialogBody>
           </DialogContent>
         </Dialog>
       </div>

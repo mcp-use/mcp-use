@@ -7,7 +7,7 @@ import type {
 import * as anthropic from "./anthropic.js";
 import * as google from "./google.js";
 import * as ollama from "./ollama/index.js";
-import * as openai from "./openai.js";
+import * as openaiCompletions from "./openai-chat-completions.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -41,14 +41,17 @@ export function streamChat(
 ): AsyncGenerator<LlmStreamEvent, void, unknown> {
   switch (params.config.provider) {
     case "openai":
+      throw new Error(
+        "provider 'openai' uses the Responses API via OpenAIResponsesDriver, not streamChat"
+      );
     case "openai-compatible":
-      return openai.streamChat(params);
+      return openaiCompletions.streamChat(params);
     case "anthropic":
       return anthropic.streamChat(params);
     case "google":
       return google.streamChat(params);
     case "openrouter":
-      return openai.streamChat(withOpenRouter(params));
+      return openaiCompletions.streamChat(withOpenRouter(params));
     case "ollama":
       return ollama.streamChat(params);
     default:
@@ -59,14 +62,17 @@ export function streamChat(
 export function chat(params: ChatParams): Promise<ChatResult> {
   switch (params.config.provider) {
     case "openai":
+      throw new Error(
+        "provider 'openai' uses the Responses API via OpenAIResponsesDriver, not chat"
+      );
     case "openai-compatible":
-      return openai.chat(params);
+      return openaiCompletions.chat(params);
     case "anthropic":
       return anthropic.chat(params);
     case "google":
       return google.chat(params);
     case "openrouter":
-      return openai.chat(withOpenRouter(params));
+      return openaiCompletions.chat(withOpenRouter(params));
     case "ollama":
       return ollama.chat(params);
     default:

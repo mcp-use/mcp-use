@@ -5,9 +5,6 @@ import path from "node:path";
 import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 
-const packageJson = JSON.parse(
-  readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
-);
 const clientPackageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
 );
@@ -34,38 +31,28 @@ export default defineConfig({
         gzipSize: true,
         brotliSize: true,
       }),
-    {
-      name: "inject-version",
-      // In lib mode transformIndexHtml is not called; inject via define instead.
-    },
   ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
       react: path.resolve(__dirname, "node_modules/react"),
       "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
-      "@mcp-use/client/react": path.resolve(
-        __dirname,
-        "../client/src/react/index.ts"
-      ),
-      // The root client export selects the browser-safe build in Vite.
-      "@mcp-use/client": path.resolve(
-        __dirname,
-        "../client/dist/index-browser.js"
-      ),
-      "@mcp-use/agent": path.resolve(__dirname, "../agent/src/index.ts"),
     },
     conditions: ["browser", "module", "import", "default"],
   },
   define: {
     "process.env": "{}",
     "process.platform": '"browser"',
-    __INSPECTOR_VERSION__: JSON.stringify(packageJson.version),
     __MCP_USE_PACKAGE_VERSION__: JSON.stringify(clientPackageJson.version),
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["@mcp-use/client", "react-dom"],
+    include: [
+      "@mcp-use/client",
+      "@mcp-use/client/react",
+      "@mcp-use/agent",
+      "react-dom",
+    ],
   },
   build: {
     lib: {

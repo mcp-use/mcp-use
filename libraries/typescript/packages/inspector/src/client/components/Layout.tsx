@@ -31,7 +31,7 @@ import { toast } from "sonner";
 import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
-import { ServerConnectionModal } from "./ServerConnectionModal";
+import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
 
 interface LayoutProps {
   children: ReactNode;
@@ -97,9 +97,24 @@ export function Layout({ children }: LayoutProps) {
   } = useInspector();
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null
-  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("inspector-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "inspector-sidebar-collapsed",
+        sidebarCollapsed ? "true" : "false"
+      );
+    } catch {
+      // ignore
+    }
+  }, [sidebarCollapsed]);
   const { savedRequests } = useSavedRequests();
 
   // Initialize embedded mode from URL params once on mount
@@ -147,6 +162,8 @@ export function Layout({ children }: LayoutProps) {
         "sampling",
         "elicitation",
         "notifications",
+        "server-metadata",
+        "connection-settings",
       ];
       if (validTabs.includes(tab as TabType)) {
         setActiveTab(tab as TabType);
@@ -325,10 +342,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleServerSelect = (serverId: string) => {
     const server = connections.find((c) => c.id === serverId);
-    if (!server || server.state !== "ready") {
-      toast.error("Server is not connected and cannot be inspected");
-      return;
-    }
+    if (!server) return;
     setSelectedServerId(serverId);
     // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
@@ -341,48 +355,35 @@ export function Layout({ children }: LayoutProps) {
     navigate(`/?${params.toString()}`);
   };
 
-  const handleOpenConnectionOptions = useCallback(
-    (connectionId: string | null) => {
-      setEditingConnectionId(connectionId);
-    },
-    []
-  );
-
   const handleUpdateConnection = useCallback(
     (config: EditableConnectionConfig) => {
-      if (!editingConnectionId) return;
+      if (!selectedServerId) return;
 
       const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(
-          editingConnectionId
-        ) ||
+        getStoredConnectionConfig<EditableConnectionConfig>(selectedServerId) ||
         connections.find(
-          (connection: McpServer) => connection.id === editingConnectionId
+          (connection: McpServer) => connection.id === selectedServerId
         );
 
-      // If the URL changed, we need to remove the old one and add a new one
-      if (config.url !== editingConnectionId) {
-        removeConnection(editingConnectionId);
+      if (config.url !== selectedServerId) {
+        removeConnection(selectedServerId);
         addServer(config.url, toMcpServerConfig(config));
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)
       ) {
-        updateConnectionMetadata(editingConnectionId, {
+        updateConnectionMetadata(selectedServerId, {
           name: config.name || config.url,
         });
-        saveStoredConnectionConfig(editingConnectionId, config);
+        saveStoredConnectionConfig(selectedServerId, config);
       } else {
-        updateConnectionConfig(editingConnectionId, config);
+        updateConnectionConfig(selectedServerId, config);
       }
-
-      // Close the modal
-      setEditingConnectionId(null);
 
       toast.success("Connection settings updated");
     },
     [
-      editingConnectionId,
+      selectedServerId,
       connections,
       removeConnection,
       addServer,
@@ -532,7 +533,7 @@ export function Layout({ children }: LayoutProps) {
     navigate,
   ]);
 
-  // Handle failed server connections - redirect to home
+  // Handle missing server connections - redirect to home when URL points at unknown server
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const serverId = searchParams.get("server");
@@ -540,18 +541,10 @@ export function Layout({ children }: LayoutProps) {
       return;
     }
 
-    // Note: searchParams.get() already URL-decodes, no need for decodeURIComponent
     const serverConnection = connections.find((conn) => conn.id === serverId);
 
-    // No connection found - wait for auto-connect, then redirect
     if (!serverConnection) {
       const timeoutId = setTimeout(() => navigate("/"), 3000);
-      return () => clearTimeout(timeoutId);
-    }
-
-    // Connection failed - redirect after short delay
-    if (serverConnection.state === "failed") {
-      const timeoutId = setTimeout(() => navigate("/"), 2000);
       return () => clearTimeout(timeoutId);
     }
   }, [location.search, navigate, connections]);
@@ -753,41 +746,57 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-2 py-2 sm:px-4 sm:py-4 gap-2 sm:gap-4";
+    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:px-0 pb-4";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"
-    : "flex-1 w-full mx-auto bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 p-0 overflow-auto";
+    : "flex-1 min-h-0 w-full bg-white dark:bg-black rounded-2xl border border-zinc-200 dark:border-zinc-700 overflow-auto lg:mr-4";
+
+  const bodyClassName = isSingleTab
+    ? "flex-1 min-h-0"
+    : "flex flex-1 min-h-0 min-w-0";
+
+  const headerProps = {
+    connections,
+    selectedServer,
+    activeTab,
+    onServerSelect: handleServerSelect,
+    onTabChange: handleTabChange,
+    onCommandPaletteOpen: () => handleCommandPaletteOpen("button"),
+    embedded: isEmbedded,
+    sidebarCollapsed,
+  };
 
   return (
     <TooltipProvider>
       <div className={containerClassName} style={containerStyle}>
         {/* Header - hidden in single-tab mode */}
-        {!isSingleTab && (
-          <LayoutHeader
-            connections={connections}
-            selectedServer={selectedServer}
-            activeTab={activeTab}
-            onServerSelect={handleServerSelect}
-            onTabChange={handleTabChange}
-            onCommandPaletteOpen={() => handleCommandPaletteOpen("button")}
-            onOpenConnectionOptions={handleOpenConnectionOptions}
-            embedded={isEmbedded}
-          />
-        )}
+        {!isSingleTab && <LayoutHeader {...headerProps} />}
 
-        {/* Main Content */}
-        <main className={mainClassName}>
-          <LayoutContent
-            selectedServer={selectedServer}
-            activeTab={activeTab}
-            toolsSearchRef={toolsSearchRef}
-            promptsSearchRef={promptsSearchRef}
-            resourcesSearchRef={resourcesSearchRef}
-          >
-            {children}
-          </LayoutContent>
-        </main>
+        <div className={bodyClassName}>
+          {selectedServer && !isSingleTab && (
+            <InspectorSidebar
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              selectedServer={selectedServer}
+              visibleTabs={embeddedConfig.visibleTabs}
+              collapsed={sidebarCollapsed}
+              onCollapsedChange={setSidebarCollapsed}
+            />
+          )}
+          <main className={mainClassName}>
+            <LayoutContent
+              selectedServer={selectedServer}
+              activeTab={activeTab}
+              toolsSearchRef={toolsSearchRef}
+              promptsSearchRef={promptsSearchRef}
+              resourcesSearchRef={resourcesSearchRef}
+              onUpdateConnection={handleUpdateConnection}
+            >
+              {children}
+            </LayoutContent>
+          </main>
+        </div>
 
         {/* Command Palette */}
         <CommandPalette
@@ -804,21 +813,6 @@ export function Layout({ children }: LayoutProps) {
           onServerSelect={handleServerSelect}
         />
 
-        {/* Connection Options Dialog */}
-        <ServerConnectionModal
-          connection={
-            editingConnectionId
-              ? connections.find((c) => c.id === editingConnectionId) || null
-              : null
-          }
-          open={editingConnectionId !== null}
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingConnectionId(null);
-            }
-          }}
-          onConnect={handleUpdateConnection}
-        />
       </div>
     </TooltipProvider>
   );
