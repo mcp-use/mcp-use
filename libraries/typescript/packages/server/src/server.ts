@@ -101,7 +101,12 @@ interface ToolEntry<TUser> {
   /** Declarative tool metadata and schemas supplied at registration time. */
   definition: ToolDefinition;
   /** Tool callback widened for heterogeneous storage in the registry. */
-  callback: ToolCallback<Record<string, unknown>, never, TUser, HasOAuth<TUser>>;
+  callback: ToolCallback<
+    Record<string, unknown>,
+    never,
+    TUser,
+    HasOAuth<TUser>
+  >;
 }
 
 /** Static resource definition and callback retained for per-request replay. */
@@ -157,10 +162,7 @@ export class MCPServer<TUser = never> {
   readonly #config: ServerConfig<TUser>;
   readonly #tools = new Map<string, ToolEntry<TUser>>();
   readonly #resources = new Map<string, ResourceEntry<TUser>>();
-  readonly #resourceTemplates = new Map<
-    string,
-    ResourceTemplateEntry<TUser>
-  >();
+  readonly #resourceTemplates = new Map<string, ResourceTemplateEntry<TUser>>();
   readonly #prompts = new Map<string, PromptEntry<TUser>>();
   readonly #views = new Map<string, ViewManifestEntry>();
   /**
@@ -303,7 +305,10 @@ export class MCPServer<TUser = never> {
    *
    * @internal
    */
-  __primeViews(views: ViewsManifest, options?: { dev?: boolean; projectRoot?: string }): void {
+  __primeViews(
+    views: ViewsManifest,
+    options?: { dev?: boolean; projectRoot?: string }
+  ): void {
     this[registerViews](views, options);
   }
 
@@ -328,7 +333,11 @@ export class MCPServer<TUser = never> {
    */
   resourceTemplate<const T extends ResourceTemplateDefinition>(
     definition: T,
-    callback: ResourceTemplateCallback<InferTemplateParams<T>, TUser, HasOAuth<TUser>>
+    callback: ResourceTemplateCallback<
+      InferTemplateParams<T>,
+      TUser,
+      HasOAuth<TUser>
+    >
   ): this {
     this.#assertNotStarted("resourceTemplate", definition.name);
     this.#resourceTemplates.set(definition.name, {
@@ -378,6 +387,56 @@ export class MCPServer<TUser = never> {
   }
 
   /**
+   * Publish a tools-list change to v2 clients with active subscriptions.
+   *
+   * @example
+   * ```ts
+   * await server.notifyToolsChanged();
+   * ```
+   */
+  async notifyToolsChanged(): Promise<void> {
+    await this.#ensureMounted("handler").handler.notify.toolsChanged();
+  }
+
+  /**
+   * Publish a prompts-list change to v2 clients with active subscriptions.
+   *
+   * @example
+   * ```ts
+   * await server.notifyPromptsChanged();
+   * ```
+   */
+  async notifyPromptsChanged(): Promise<void> {
+    await this.#ensureMounted("handler").handler.notify.promptsChanged();
+  }
+
+  /**
+   * Publish a resources-list change to v2 clients with active subscriptions.
+   *
+   * @example
+   * ```ts
+   * await server.notifyResourcesChanged();
+   * ```
+   */
+  async notifyResourcesChanged(): Promise<void> {
+    await this.#ensureMounted("handler").handler.notify.resourcesChanged();
+  }
+
+  /**
+   * Publish a resource update to subscribed v2 clients.
+   *
+   * @param uri - Resource URI whose representation changed.
+   *
+   * @example
+   * ```ts
+   * await server.notifyResourceUpdated("config://settings");
+   * ```
+   */
+  async notifyResourceUpdated(uri: string): Promise<void> {
+    await this.#ensureMounted("handler").handler.notify.resourceUpdated(uri);
+  }
+
+  /**
    * Serve over HTTP on Node. Pass port `0` for an ephemeral port.
    *
    * Binds `config.host` (default `127.0.0.1`). Localhost-class binds get
@@ -401,10 +460,12 @@ export class MCPServer<TUser = never> {
     return new Promise((resolve, reject) => {
       let resolveApp: ((app: Hono) => void) | undefined;
       let rejectApp: ((error: unknown) => void) | undefined;
-      const appReady = new Promise<Hono>((resolveAppPromise, rejectAppPromise) => {
-        resolveApp = resolveAppPromise;
-        rejectApp = rejectAppPromise;
-      });
+      const appReady = new Promise<Hono>(
+        (resolveAppPromise, rejectAppPromise) => {
+          resolveApp = resolveAppPromise;
+          rejectApp = rejectAppPromise;
+        }
+      );
       // A failed mount rejects pending requests; when none arrived, consume
       // that rejection here so a configuration error is reported only through
       // the listen() promise.
@@ -416,7 +477,9 @@ export class MCPServer<TUser = never> {
           reject(error);
         }
         rejectApp?.(error);
-        void new Promise<void>((closeResolve) => server.close(() => closeResolve()))
+        void new Promise<void>((closeResolve) =>
+          server.close(() => closeResolve())
+        )
           .catch(() => undefined)
           .finally(() => {
             if (this.#httpServer === server) {
@@ -563,7 +626,10 @@ export class MCPServer<TUser = never> {
     return { hosts, origins };
   }
 
-  #ensureMounted(mode: "listen" | "handler", listenPort?: number): {
+  #ensureMounted(
+    mode: "listen" | "handler",
+    listenPort?: number
+  ): {
     app: Hono;
     handler: McpHttpHandler;
   } {
@@ -576,14 +642,19 @@ export class MCPServer<TUser = never> {
         if ((c.var as Record<string, unknown>)["parsedBody"] !== undefined) {
           return await next();
         }
-        if (!(c.req.header("content-type") ?? "").includes("application/json")) {
+        if (
+          !(c.req.header("content-type") ?? "").includes("application/json")
+        ) {
           return await next();
         }
         try {
           const parsed: unknown = await c.req.raw.clone().json();
           // c.var is a read-only snapshot; c.set is the write path (untyped
           // here because the app runs on Hono's default Env).
-          (c.set as (key: string, value: unknown) => void)("parsedBody", parsed);
+          (c.set as (key: string, value: unknown) => void)(
+            "parsedBody",
+            parsed
+          );
         } catch {
           return c.text("Invalid JSON", 400);
         }
@@ -671,19 +742,15 @@ export class MCPServer<TUser = never> {
           await next();
         });
       }
-      const handler = mountMcp(
-        mcpApp,
-        (ctx) => this.#buildSdkServer(ctx),
-        {
-          path: this.#basePath(),
-          ...(this.#config.legacy !== undefined && {
-            handler: { legacy: this.#config.legacy },
-          }),
-          ...(resource !== undefined && {
-            authInfo: (context) => context.get("authInfo"),
-          }),
-        }
-      );
+      const handler = mountMcp(mcpApp, (ctx) => this.#buildSdkServer(ctx), {
+        path: this.#basePath(),
+        ...(this.#config.legacy !== undefined && {
+          handler: { legacy: this.#config.legacy },
+        }),
+        ...(resource !== undefined && {
+          authInfo: (context) => context.get("authInfo"),
+        }),
+      });
       // Inspector shell (default enabled, FastAPI /docs style) rides the
       // same app, so the validation middleware above covers it too.
       mountInspectorShell(app, this.#config.inspector, {
@@ -1018,10 +1085,15 @@ export class MCPServer<TUser = never> {
     }
   }
 
-  #toRequestContext(ctx: ServerContext): RequestContext<TUser, HasOAuth<TUser>> {
+  #toRequestContext(
+    ctx: ServerContext
+  ): RequestContext<TUser, HasOAuth<TUser>> {
     if (this.#config.oauth === undefined) {
       return toRequestContext(ctx) as RequestContext<TUser, HasOAuth<TUser>>;
     }
-    return toAuthenticatedRequestContext<TUser>(ctx) as RequestContext<TUser, HasOAuth<TUser>>;
+    return toAuthenticatedRequestContext<TUser>(ctx) as RequestContext<
+      TUser,
+      HasOAuth<TUser>
+    >;
   }
 }

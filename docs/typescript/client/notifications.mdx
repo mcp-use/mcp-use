@@ -16,7 +16,9 @@ MCP notifications are JSON-RPC messages without response requirements. They enab
 - **Progress tracking**: Monitor long-running operations
 
 <Info>
-**Bidirectional**: Both clients and servers can send notifications. Servers notify clients of changes, while clients notify servers of environment changes like root directories.
+  **Bidirectional**: Both clients and servers can send notifications. Servers
+  notify clients of changes, while clients notify servers of environment changes
+  like root directories.
 </Info>
 
 ## Notification Flow
@@ -26,7 +28,8 @@ MCP notifications are JSON-RPC messages without response requirements. They enab
 **Client → Server**: Environment notifications (roots changed, configuration updates)
 
 <Tip>
-For information on sending notifications from your MCP server, see the [Server Notifications](/typescript/server/notifications) guide.
+  For information on sending notifications from your MCP server, see the [Server
+  Notifications](/typescript/server/notifications) guide.
 </Tip>
 
 ## Receiving Notifications (Server → Client)
@@ -34,12 +37,12 @@ For information on sending notifications from your MCP server, see the [Server N
 You can set a default `onNotification` handler at the client level (root config or the second argument to `new MCPClient(config, options)`); all servers will use it unless they override it. You can also register a notification handler per session using the `on` method:
 
 ```typescript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {
-    myServer: { url: "http://localhost:3000/mcp" }
-  }
+    myServer: { url: "http://localhost:3000/mcp" },
+  },
 });
 
 const session = await client.createSession("myServer");
@@ -56,8 +59,8 @@ Notifications follow the JSON-RPC 2.0 format without an `id` field:
 
 ```typescript
 interface Notification {
-  method: string;           // The notification method name
-  params?: Record<string, any>;  // Optional parameters
+  method: string; // The notification method name
+  params?: Record<string, any>; // Optional parameters
 }
 ```
 
@@ -118,15 +121,15 @@ session.on("notification", async (notification) => {
     case "custom/heartbeat":
       console.log(`Heartbeat #${notification.params?.count}`);
       break;
-      
+
     case "custom/user-joined":
       console.log(`User joined: ${notification.params?.username}`);
       break;
-      
+
     case "custom/data-updated":
       console.log("Data updated:", notification.params);
       break;
-      
+
     default:
       console.log(`Unknown notification: ${notification.method}`);
   }
@@ -140,12 +143,12 @@ session.on("notification", async (notification) => {
 Roots represent directories or files that the client has access to. When you update roots, the client automatically sends a `notifications/roots/list_changed` notification to the server:
 
 ```typescript
-import { MCPClient, Root } from "mcp-use";
+import { MCPClient, Root } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {
-    myServer: { url: "http://localhost:3000/mcp" }
-  }
+    myServer: { url: "http://localhost:3000/mcp" },
+  },
 });
 
 const session = await client.createSession("myServer");
@@ -153,7 +156,7 @@ const session = await client.createSession("myServer");
 // Set roots - this sends notifications/roots/list_changed to the server
 await session.setRoots([
   { uri: "file:///home/user/project", name: "My Project" },
-  { uri: "file:///home/user/data", name: "Data Directory" }
+  { uri: "file:///home/user/data", name: "Data Directory" },
 ]);
 
 // Get current roots
@@ -166,12 +169,10 @@ console.log(`Current roots: ${roots.length}`);
 You can provide initial roots when creating the connector:
 
 ```typescript
-import { HttpConnector, MCPSession } from "mcp-use";
+import { HttpConnector, MCPSession } from "@mcp-use/client";
 
 const connector = new HttpConnector("http://localhost:3000/mcp", {
-  roots: [
-    { uri: "file:///workspace", name: "Workspace" }
-  ]
+  roots: [{ uri: "file:///workspace", name: "Workspace" }],
 });
 
 const session = new MCPSession(connector);
@@ -181,17 +182,16 @@ await session.initialize();
 // Later, update roots
 await session.setRoots([
   { uri: "file:///workspace", name: "Workspace" },
-  { uri: "file:///tmp/scratch", name: "Scratch" }
+  { uri: "file:///tmp/scratch", name: "Scratch" },
 ]);
 ```
-
 
 ## TypeScript Types
 
 Import the `Notification` type for type-safe handlers:
 
 ```typescript
-import { MCPClient, Notification, NotificationHandler } from "mcp-use";
+import { MCPClient, Notification, NotificationHandler } from "@mcp-use/client";
 
 // Type-safe handler
 const handler: NotificationHandler = async (notification: Notification) => {
@@ -206,8 +206,8 @@ session.on("notification", handler);
 
 ```typescript
 interface Root {
-  uri: string;      // Must start with "file://"
-  name?: string;    // Optional human-readable name
+  uri: string; // Must start with "file://"
+  name?: string; // Optional human-readable name
 }
 ```
 
@@ -217,10 +217,11 @@ Notifications require:
 
 1. **Stateful Connection**: The server must maintain sessions (stateful mode)
 2. **Active Session**: The client must have an active, initialized session
-3. **Streaming Transport**: Either SSE or Streamable HTTP transport
+3. **Streaming Transport**: Streamable HTTP transport
 
 <Note>
-Notifications don't work in stateless edge environments where sessions aren't maintained between requests.
+  Notifications don't work in stateless edge environments where sessions aren't
+  maintained between requests.
 </Note>
 
 ## Next Steps

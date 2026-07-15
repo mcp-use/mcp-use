@@ -746,23 +746,17 @@ export class MCPAgent {
             const config = this.client.getServerConfig(serverName);
             if (config) {
               // Determine server type based on configuration
-              let serverType = "unknown";
-              if (config.command) {
-                serverType = "command";
-              } else if (config.url) {
-                serverType = "http";
-              } else if (config.ws_url) {
-                serverType = "websocket";
-              }
+              const isStdio = "command" in config;
+              const serverType = isStdio ? "command" : "http";
 
               serverConfigs[serverName] = {
                 type: serverType,
                 // Include safe configuration details (avoid sensitive data)
-                has_args: !!config.args,
-                has_env: !!config.env,
-                has_headers: !!config.headers,
-                url: config.url || null,
-                command: config.command || null,
+                has_args: isStdio && !!config.args,
+                has_env: isStdio && !!config.env,
+                has_headers: !isStdio && !!config.headers,
+                url: isStdio ? null : config.url,
+                command: isStdio ? config.command : null,
               };
             }
           } catch (error) {

@@ -37,6 +37,7 @@ export default defineConfig([
   splitting: true,
   sourcemap: true,
   clean: true,
+  external: ["@mcp-use/client"],
   },
   // Browser-only view runtime (`@mcp-use/server/react`). Must not be reachable
   // from the `.` export or `bin` graphs — same invariant as the cli chunk above.

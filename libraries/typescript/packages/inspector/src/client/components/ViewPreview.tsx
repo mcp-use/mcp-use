@@ -299,7 +299,7 @@ function ViewPreviewLive({ view }: { view: string }) {
     if (!storageLoaded) return;
     addServer(PREVIEW_SERVER_ID, {
       url: serverUrl,
-      name: "Preview",
+      displayName: "Preview",
       protocolNegotiation: "auto",
       ...(previewHeaders ? { headers: previewHeaders } : {}),
     });

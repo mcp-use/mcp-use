@@ -1,9 +1,6 @@
 import { logger } from "../logging.js";
 import type {
   BaseTelemetryEvent,
-  ConnectorInitEventData,
-  MCPAgentExecutionEventData,
-  MCPClientInitEventData,
   MCPServerTelemetryInfo,
   ServerContextEventData,
   ServerInitializeEventData,
@@ -12,12 +9,7 @@ import type {
   ServerToolCallEventData,
 } from "./events.js";
 import {
-  ClientAddServerEvent,
-  ClientRemoveServerEvent,
-  ConnectorInitEvent,
   createServerRunEventData,
-  MCPAgentExecutionEvent,
-  MCPClientInitEvent,
   ServerContextEvent,
   ServerInitializeEvent,
   ServerPromptCallEvent,
@@ -183,7 +175,7 @@ type PostHogBrowserClient = {
  * Uses posthog-js for telemetry, window.crypto for secure random strings,
  * and localStorage for user ID persistence.
  *
- * Usage: Tel.getInstance().trackMCPClientInit(...)
+ * Usage: Tel.getInstance().trackServerToolCall(...)
  */
 export class Telemetry {
   private static instance: Telemetry | null = null;
@@ -458,16 +450,6 @@ export class Telemetry {
   }
 
   // ============================================================================
-  // Agent Events
-  // ============================================================================
-
-  async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPAgentExecutionEvent(data);
-    await this.capture(event);
-  }
-
-  // ============================================================================
   // Server Events
   // ============================================================================
 
@@ -514,104 +496,6 @@ export class Telemetry {
     if (!this.isEnabled) return;
     const event = new ServerContextEvent(data);
     await this.capture(event);
-  }
-
-  // ============================================================================
-  // Client Events
-  // ============================================================================
-
-  async trackMCPClientInit(data: MCPClientInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPClientInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackConnectorInit(data: ConnectorInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ConnectorInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackClientAddServer(
-    serverName: string,
-    serverConfig: Record<string, any>
-  ): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientAddServerEvent({ serverName, serverConfig });
-    await this.capture(event);
-  }
-
-  async trackClientRemoveServer(serverName: string): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientRemoveServerEvent({ serverName });
-    await this.capture(event);
-  }
-
-  // ============================================================================
-  // React Hook / Browser specific events
-  // ============================================================================
-
-  async trackUseMcpConnection(data: {
-    url: string;
-    transportType: string;
-    success: boolean;
-    errorType?: string | null;
-    connectionTimeMs?: number | null;
-    hasOAuth: boolean;
-    hasSampling: boolean;
-    hasElicitation: boolean;
-  }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_connection",
-      properties: {
-        url_domain: new URL(data.url).hostname, // Only domain for privacy
-        transport_type: data.transportType,
-        success: data.success,
-        error_type: data.errorType ?? null,
-        connection_time_ms: data.connectionTimeMs ?? null,
-        has_oauth: data.hasOAuth,
-        has_sampling: data.hasSampling,
-        has_elicitation: data.hasElicitation,
-      },
-    });
-  }
-
-  async trackUseMcpToolCall(data: {
-    toolName: string;
-    success: boolean;
-    errorType?: string | null;
-    executionTimeMs?: number | null;
-  }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_tool_call",
-      properties: {
-        tool_name: data.toolName,
-        success: data.success,
-        error_type: data.errorType ?? null,
-        execution_time_ms: data.executionTimeMs ?? null,
-      },
-    });
-  }
-
-  async trackUseMcpResourceRead(data: {
-    resourceUri: string;
-    success: boolean;
-    errorType?: string | null;
-  }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_resource_read",
-      properties: {
-        resource_uri_scheme: data.resourceUri.split(":")[0], // Only scheme for privacy
-        success: data.success,
-        error_type: data.errorType ?? null,
-      },
-    });
   }
 
   // ============================================================================

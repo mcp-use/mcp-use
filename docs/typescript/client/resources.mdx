@@ -16,15 +16,19 @@ In the MCP protocol, resources are content sources that clients can read via URI
 - **Template support**: Parameterized resources for dynamic content generation
 
 <Tip>
-**Think of resources as endpoints**: Just like REST APIs have endpoints, MCP servers expose resources via URIs. The key difference is that resources are designed for AI context and can include rich metadata.
+  **Think of resources as endpoints**: Just like REST APIs have endpoints, MCP
+  servers expose resources via URIs. The key difference is that resources are
+  designed for AI context and can include rich metadata.
 </Tip>
 
 ## Types of Resources
 
 ### Direct Resources
+
 Static resources with fixed URIs that always return the same type of content.
 
 ### Resource Templates
+
 Dynamic resources that accept parameters to generate different content based on input.
 
 ## Listing Available Resources
@@ -33,12 +37,12 @@ To see what resources are available from a connected MCP server:
 
 <CodeGroup>
 ```typescript TypeScript highlight=[15,16]
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from '@mcp-use/client'
 
 const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
+mcpServers: {
+// Your server definitions here
+}
 })
 
 // Connect to servers
@@ -51,15 +55,16 @@ const session = client.getSession('my_server')
 const resources = await session.listResources()
 
 for (const resource of resources) {
-    console.log(`Resource: ${resource.name}`)
-    console.log(`URI: ${resource.uri}`)
-    console.log(`Description: ${resource.description}`)
-    console.log(`MIME Type: ${resource.mimeType}`)
-    console.log('---')
+console.log(`Resource: ${resource.name}`)
+console.log(`URI: ${resource.uri}`)
+console.log(`Description: ${resource.description}`)
+console.log(`MIME Type: ${resource.mimeType}`)
+console.log('---')
 }
 
 await client.closeAllSessions()
-```
+
+````
 </CodeGroup>
 
 ## Reading Resources
@@ -68,7 +73,7 @@ Resources are accessed using the `readResource` method with their URI:
 
 <CodeGroup>
 ```typescript TypeScript highlight=[13,14]
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from '@mcp-use/client'
 
 const client = new MCPClient({
     mcpServers: {
@@ -95,7 +100,8 @@ for (const content of result.contents) {
 }
 
 await client.closeAllSessions()
-```
+````
+
 </CodeGroup>
 
 ## Working with Resource Templates
@@ -104,12 +110,12 @@ Resource templates allow dynamic content generation based on parameters:
 
 <CodeGroup>
 ```typescript TypeScript highlight={12-15}
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from '@mcp-use/client'
 
 const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
+mcpServers: {
+// Your server definitions here
+}
 })
 await client.createAllSessions()
 
@@ -122,11 +128,12 @@ const result = await session.readResource(resourceUri)
 
 // Process the user profile data
 for (const content of result.contents) {
-    console.log(`User profile: ${content.text}`)
+console.log(`User profile: ${content.text}`)
 }
 
 await client.closeAllSessions()
-```
+
+````
 </CodeGroup>
 
 ## Resource Content Types
@@ -146,7 +153,8 @@ for (const content of result.contents) {
         console.log(`MIME type: ${content.mimeType}`)
     }
 }
-```
+````
+
 </CodeGroup>
 
 ### Binary Content
@@ -159,11 +167,13 @@ import { writeFileSync } from 'fs'
 const result = await session.readResource('file:///image.png')
 
 for (const content of result.contents) {
-    if ('blob' in content && content.blob) {
-        console.log(`Binary data size: ${content.blob.length} bytes`)
-        // Save or process binary data
-        writeFileSync('downloaded_image.png', Buffer.from(content.blob))
-    }
+if ('blob' in content && content.blob) {
+console.log(`Binary data size: ${content.blob.length} bytes`)
+// Save or process binary data
+writeFileSync('downloaded_image.png', Buffer.from(content.blob))
 }
+}
+
 ```
 </CodeGroup>
+```

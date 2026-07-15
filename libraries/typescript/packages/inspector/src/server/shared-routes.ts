@@ -3,10 +3,7 @@ import { telFetch } from "mcp-use/telemetry/tel-fetch";
 import { mountMcpProxy, mountOAuthProxy } from "mcp-use";
 import { registerMcpAppsRoutes } from "./routes/mcp-apps.js";
 import { rpcLogBus, type RpcLogEvent } from "./rpc-log-bus.js";
-import {
-  handleChatRequest,
-  handleChatRequestStream,
-} from "./shared-utils.js";
+import { handleChatRequest, handleChatRequestStream } from "./shared-utils.js";
 import {
   getTunnelStatus,
   setServerPort,
@@ -22,6 +19,10 @@ export type InspectorRoutesConfig = {
   autoConnectUrl?: string | null;
   /** HTTP port the app listens on (embedded inspector); required for tunnel start */
   serverPort?: number;
+  /** Explicit cross-origin callers of the OAuth BFF. Same-origin is implicit. */
+  oauthProxyAllowedOrigins?: readonly string[];
+  /** Allow the OAuth BFF to reach loopback servers in local development. */
+  oauthProxyAllowLoopback?: boolean;
 };
 
 export function registerInspectorRoutes(
@@ -45,12 +46,15 @@ export function registerInspectorRoutes(
   // Mount MCP proxy middleware at the inspector's (relocated) proxy path
   mountMcpProxy(app, {
     path: p("/inspector/api/proxy"),
+    allowLoopback: config?.oauthProxyAllowLoopback ?? false,
   });
 
   // Mount OAuth proxy middleware at the inspector's (relocated) OAuth path
   mountOAuthProxy(app, {
     basePath: p("/inspector/api/oauth"),
     enableLogging: true,
+    allowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
+    allowLoopback: config?.oauthProxyAllowLoopback ?? false,
   });
 
   // Mount MCP Apps routes at ${basePath}/inspector/api/mcp-apps

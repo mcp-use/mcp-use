@@ -9,6 +9,7 @@ Completions enable autocomplete suggestions for prompt arguments and resource te
 ## Overview
 
 The completion feature allows clients to request suggestions for:
+
 - **Prompt arguments** - Arguments marked with `completable()` in the server's prompt schema
 - **Resource template URI variables** - Variables in resource template URIs with completion support
 
@@ -20,29 +21,30 @@ Request completions for a prompt argument:
 
 <CodeGroup>
 ```typescript TypeScript highlight={12-16}
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from '@mcp-use/client'
 
 const client = new MCPClient({
-  mcpServers: {
-    'my-server': {
-      command: 'node',
-      args: ['./my-server.js']
-    }
-  }
+mcpServers: {
+'my-server': {
+command: 'node',
+args: ['./my-server.js']
+}
+}
 })
 await client.createAllSessions()
 
 const session = client.getSession('my-server')
 const result = await session.complete({
-  ref: { type: 'ref/prompt', name: 'code-review' },
-  argument: { name: 'language', value: 'py' }
+ref: { type: 'ref/prompt', name: 'code-review' },
+argument: { name: 'language', value: 'py' }
 })
 
 console.log('Suggestions:', result.completion.values)
 // Output: ['python', 'pytorch', ...]
 
 await client.closeAllSessions()
-```
+
+````
 </CodeGroup>
 
 ## Using with useMcp Hook
@@ -51,7 +53,7 @@ The `useMcp` hook exposes a `complete()` method for requesting completions in Re
 
 <CodeGroup>
 ```typescript React highlight={8-11}
-import { useMcp } from 'mcp-use/react'
+import { useMcp } from '@mcp-use/client/react'
 
 function AutocompleteExample() {
   const mcp = useMcp({ url: 'http://localhost:3000/sse' })
@@ -74,7 +76,8 @@ function AutocompleteExample() {
     />
   )
 }
-```
+````
+
 </CodeGroup>
 
 ## Using with McpClientProvider
@@ -84,39 +87,41 @@ When using `McpClientProvider` with multiple servers, get completions via `useMc
 <CodeGroup>
 ```typescript React
 import { useState } from 'react'
-import { McpClientProvider, useMcpServer } from 'mcp-use/react'
+import { McpClientProvider, useMcpServer } from '@mcp-use/client/react'
 
 function AutocompleteWithProvider() {
-  const server = useMcpServer('my-server-id')
-  const [suggestions, setSuggestions] = useState<string[]>([])
+const server = useMcpServer('my-server-id')
+const [suggestions, setSuggestions] = useState<string[]>([])
 
-  const handleInputChange = async (value: string) => {
-    if (server?.state === 'ready' && value.length > 0) {
-      const result = await server.complete({
-        ref: { type: 'ref/prompt', name: 'code-review' },
-        argument: { name: 'language', value }
-      })
-      setSuggestions(result.completion.values)
-    }
-  }
+const handleInputChange = async (value: string) => {
+if (server?.state === 'ready' && value.length > 0) {
+const result = await server.complete({
+ref: { type: 'ref/prompt', name: 'code-review' },
+argument: { name: 'language', value }
+})
+setSuggestions(result.completion.values)
+}
+}
 
-  return (
-    <input onChange={(e) => handleInputChange(e.target.value)} />
-  )
+return (
+
+<input onChange={(e) => handleInputChange(e.target.value)} />
+)
 }
 
 function App() {
-  return (
-    <McpClientProvider
-      mcpServers={{
+return (
+
+<McpClientProvider
+mcpServers={{
         'my-server-id': { url: 'http://localhost:3000/sse' }
-      }}
-    >
-      <AutocompleteWithProvider />
-    </McpClientProvider>
-  )
+      }} >
+<AutocompleteWithProvider />
+</McpClientProvider>
+)
 }
-```
+
+````
 </CodeGroup>
 
 ## Completion Request Parameters
@@ -136,7 +141,7 @@ type CompleteRequestParams = {
     value: string
   }
 }
-```
+````
 
 ### Completing Prompt Arguments
 
@@ -151,7 +156,8 @@ const result = await session.complete({
 
 console.log(result.completion.values)
 // Output: ['.ts', '.tsx', '.txt', ...]
-```
+
+````
 </CodeGroup>
 
 ### Completing Resource Template URIs
@@ -167,7 +173,8 @@ const result = await session.complete({
 
 console.log(result.completion.values)
 // Output: ['/home/user/documents', '/home/user/downloads', ...]
-```
+````
+
 </CodeGroup>
 
 ## Completion Response
@@ -178,15 +185,15 @@ The completion result contains:
 type CompleteResult = {
   completion: {
     // Array of suggested values (max 100 per MCP spec)
-    values: string[]
+    values: string[];
 
     // Total number of available completions
-    total?: number
+    total?: number;
 
     // Whether more completions exist beyond the returned values
-    hasMore?: boolean
-  }
-}
+    hasMore?: boolean;
+  };
+};
 ```
 
 ## Contextual Completions
@@ -210,21 +217,21 @@ Here's a complete example of building an autocomplete dropdown:
 
 <CodeGroup>
 ```typescript React
-import { useMcp } from 'mcp-use/react'
+import { useMcp } from '@mcp-use/client/react'
 import { useState, useCallback } from 'react'
 import { debounce } from 'lodash'
 
 function SmartAutocomplete({ promptName, argumentName }) {
-  const mcp = useMcp({ url: process.env.MCP_SERVER_URL })
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [loading, setLoading] = useState(false)
+const mcp = useMcp({ url: process.env.MCP_SERVER_URL })
+const [suggestions, setSuggestions] = useState<string[]>([])
+const [loading, setLoading] = useState(false)
 
-  const fetchCompletions = useCallback(
-    debounce(async (value: string) => {
-      if (mcp.state !== 'ready' || !value) {
-        setSuggestions([])
-        return
-      }
+const fetchCompletions = useCallback(
+debounce(async (value: string) => {
+if (mcp.state !== 'ready' || !value) {
+setSuggestions([])
+return
+}
 
       setLoading(true)
       try {
@@ -241,26 +248,29 @@ function SmartAutocomplete({ promptName, argumentName }) {
       }
     }, 300), // Debounce requests by 300ms
     [mcp, promptName, argumentName]
-  )
 
-  return (
-    <div>
-      <input
-        onChange={(e) => fetchCompletions(e.target.value)}
-        placeholder="Start typing..."
-      />
-      {loading && <span>Loading...</span>}
-      {suggestions.length > 0 && (
-        <ul>
-          {suggestions.map(suggestion => (
-            <li key={suggestion}>{suggestion}</li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
+)
+
+return (
+
+<div>
+<input
+onChange={(e) => fetchCompletions(e.target.value)}
+placeholder="Start typing..."
+/>
+{loading && <span>Loading...</span>}
+{suggestions.length > 0 && (
+<ul>
+{suggestions.map(suggestion => (
+<li key={suggestion}>{suggestion}</li>
+))}
+</ul>
+)}
+</div>
+)
 }
-```
+
+````
 </CodeGroup>
 
 ## Server Implementation
@@ -292,24 +302,31 @@ server.prompt({
     { role: 'user', content: { type: 'text', text: `Review ${language} code` }}
   ]
 }))
-```
+````
 
 ```typescript Server (Dynamic Callback)
-server.prompt({
-  name: 'file-search',
-  schema: z.object({
-    // Dynamic completions based on input
-    extension: completable(z.string(), async (value: string) => {
-      const extensions = ['.ts', '.tsx', '.js', '.jsx', '.py', '.go']
-      return extensions.filter(ext => ext.startsWith(value))
-    })
-  })
-}, async ({ extension }) => ({
-  messages: [
-    { role: 'user', content: { type: 'text', text: `Find ${extension} files` }}
-  ]
-}))
+server.prompt(
+  {
+    name: "file-search",
+    schema: z.object({
+      // Dynamic completions based on input
+      extension: completable(z.string(), async (value: string) => {
+        const extensions = [".ts", ".tsx", ".js", ".jsx", ".py", ".go"];
+        return extensions.filter((ext) => ext.startsWith(value));
+      }),
+    }),
+  },
+  async ({ extension }) => ({
+    messages: [
+      {
+        role: "user",
+        content: { type: "text", text: `Find ${extension} files` },
+      },
+    ],
+  }),
+);
 ```
+
 </CodeGroup>
 
 ## Best Practices
@@ -319,15 +336,15 @@ server.prompt({
 Always debounce completion requests to avoid overwhelming the server:
 
 ```typescript
-import { debounce } from 'lodash'
+import { debounce } from "lodash";
 
 const fetchCompletions = debounce(async (value) => {
   const result = await mcp.complete({
-    ref: { type: 'ref/prompt', name: 'my-prompt' },
-    argument: { name: 'arg', value }
-  })
-  setSuggestions(result.completion.values)
-}, 300) // Wait 300ms after user stops typing
+    ref: { type: "ref/prompt", name: "my-prompt" },
+    argument: { name: "arg", value },
+  });
+  setSuggestions(result.completion.values);
+}, 300); // Wait 300ms after user stops typing
 ```
 
 ### Handle Errors Gracefully
@@ -336,13 +353,13 @@ Completion requests may fail if the server doesn't support completions for a spe
 
 ```typescript
 try {
-  const result = await session.complete(params)
-  setSuggestions(result.completion.values)
+  const result = await session.complete(params);
+  setSuggestions(result.completion.values);
 } catch (error) {
   // Server may not support completions for this argument
   // Gracefully degrade to no autocomplete
-  console.warn('Completions not available:', error)
-  setSuggestions([])
+  console.warn("Completions not available:", error);
+  setSuggestions([]);
 }
 ```
 
@@ -351,12 +368,12 @@ try {
 Before requesting completions, verify the server supports the feature:
 
 ```typescript
-const session = client.getSession('my-server')
-const capabilities = session.connector.serverCapabilities
+const session = client.getSession("my-server");
+const capabilities = session.connector.serverCapabilities;
 
 if (capabilities?.completions) {
   // Server supports completions
-  const result = await session.complete(params)
+  const result = await session.complete(params);
 }
 ```
 
@@ -365,21 +382,21 @@ if (capabilities?.completions) {
 The MCP spec enforces a maximum of 100 values per response, but you may want to show fewer in the UI:
 
 ```typescript
-const result = await session.complete(params)
-const topSuggestions = result.completion.values.slice(0, 10)
-setSuggestions(topSuggestions)
+const result = await session.complete(params);
+const topSuggestions = result.completion.values.slice(0, 10);
+setSuggestions(topSuggestions);
 ```
 
 ## Error Handling
 
 Common errors and how to handle them:
 
-| Error | Cause | Solution |
-|-------|-------|----------|
-| `Client not ready` | Calling `complete()` before connection | Wait for `state === 'ready'` |
-| `Method not found (-32601)` | Server doesn't support completions | Check `serverCapabilities?.completions` |
-| `Invalid argument` | Argument not defined in schema | Verify argument name matches server schema |
-| `Not completable` | Argument doesn't have `completable()` | Only request completions for completable arguments |
+| Error                       | Cause                                  | Solution                                           |
+| --------------------------- | -------------------------------------- | -------------------------------------------------- |
+| `Client not ready`          | Calling `complete()` before connection | Wait for `state === 'ready'`                       |
+| `Method not found (-32601)` | Server doesn't support completions     | Check `serverCapabilities?.completions`            |
+| `Invalid argument`          | Argument not defined in schema         | Verify argument name matches server schema         |
+| `Not completable`           | Argument doesn't have `completable()`  | Only request completions for completable arguments |
 
 ## Run the Example
 
@@ -390,7 +407,15 @@ A full Node.js example is available in the mcp-use repository:
 pnpm run example:completion
 ```
 
-This starts the completion server and runs the client, demonstrating prompt and resource template completions. See `examples/server/features/completion/` and `examples/client/node/communication/completion-client.ts`.
+The four-server example matrix runs this client against mcp-use v1 and v2,
+demonstrating prompt and resource-template completion:
+
+```bash
+cd libraries/typescript/packages/client
+./examples/run-with-demo-servers.sh
+```
+
+See `examples/node/communication/completion-client.ts`.
 
 ## Related
 

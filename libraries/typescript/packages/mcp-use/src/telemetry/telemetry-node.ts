@@ -1,30 +1,22 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import type {
   BaseTelemetryEvent,
-  MCPAgentExecutionEventData,
   ServerInitializeEventData,
   ServerToolCallEventData,
   ServerResourceCallEventData,
   ServerPromptCallEventData,
   ServerContextEventData,
-  MCPClientInitEventData,
-  ConnectorInitEventData,
   MCPServerTelemetryInfo,
 } from "./events.js";
 import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
 import {
-  MCPAgentExecutionEvent,
   ServerRunEvent,
   ServerInitializeEvent,
   ServerToolCallEvent,
   ServerResourceCallEvent,
   ServerPromptCallEvent,
   ServerContextEvent,
-  MCPClientInitEvent,
-  ConnectorInitEvent,
-  ClientAddServerEvent,
-  ClientRemoveServerEvent,
   createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "../version.js";
@@ -188,7 +180,7 @@ type PostHogNodeClient = {
  * Uses posthog-node for telemetry, require("crypto") for secure random strings,
  * and filesystem for user ID persistence.
  *
- * Usage: Tel.getInstance().trackMCPClientInit(...)
+ * Usage: Tel.getInstance().trackServerToolCall(...)
  */
 export class Telemetry {
   private static instance: Telemetry | null = null;
@@ -621,16 +613,6 @@ export class Telemetry {
   }
 
   // ============================================================================
-  // Agent Events
-  // ============================================================================
-
-  async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPAgentExecutionEvent(data);
-    await this.capture(event);
-  }
-
-  // ============================================================================
   // Server Events
   // ============================================================================
 
@@ -677,71 +659,6 @@ export class Telemetry {
     if (!this.isEnabled) return;
     const event = new ServerContextEvent(data);
     await this.capture(event);
-  }
-
-  // ============================================================================
-  // Client Events
-  // ============================================================================
-
-  async trackMCPClientInit(data: MCPClientInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPClientInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackConnectorInit(data: ConnectorInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ConnectorInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackClientAddServer(
-    serverName: string,
-    serverConfig: Record<string, any>
-  ): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientAddServerEvent({ serverName, serverConfig });
-    await this.capture(event);
-  }
-
-  async trackClientRemoveServer(serverName: string): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientRemoveServerEvent({ serverName });
-    await this.capture(event);
-  }
-
-  // ============================================================================
-  // React Hook / Browser specific events (no-ops in Node.js)
-  // ============================================================================
-
-  async trackUseMcpConnection(data: {
-    url: string;
-    transportType: string;
-    success: boolean;
-    errorType?: string | null;
-    connectionTimeMs?: number | null;
-    hasOAuth: boolean;
-    hasSampling: boolean;
-    hasElicitation: boolean;
-  }): Promise<void> {
-    // No-op in Node.js - this is browser-specific
-  }
-
-  async trackUseMcpToolCall(data: {
-    toolName: string;
-    success: boolean;
-    errorType?: string | null;
-    executionTimeMs?: number | null;
-  }): Promise<void> {
-    // No-op in Node.js - this is browser-specific
-  }
-
-  async trackUseMcpResourceRead(data: {
-    resourceUri: string;
-    success: boolean;
-    errorType?: string | null;
-  }): Promise<void> {
-    // No-op in Node.js - this is browser-specific
   }
 
   // ============================================================================

@@ -120,7 +120,9 @@ mcp-use servers update <id-or-slug> --watch-paths ""
 ```
 
 <Note>
-Watch paths and branch patterns are also editable from the dashboard — see [Deployments](https://docs.manufact.com/dashboard/deployments) and [Server settings](https://docs.manufact.com/dashboard/settings).
+  Watch paths and branch patterns are also editable from the dashboard — see
+  [Deployments](https://docs.manufact.com/dashboard/deployments) and [Server
+  settings](https://docs.manufact.com/dashboard/settings).
 </Note>
 
 ### Branch URLs and sessions
@@ -159,7 +161,7 @@ Use the hosted MCP URL in clients that support remote MCP servers:
 You can also connect from the mcp-use TypeScript SDK:
 
 ```ts
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {

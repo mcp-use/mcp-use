@@ -4,28 +4,28 @@ description: "Use MCP client in Node.js, browser, and React applications"
 icon: "container"
 ---
 
-The mcp-use client works across JavaScript environments, each with its own library entry point and capabilities. This guide shows you how to use the client in Node.js, browser, and React applications.
+The root `@mcp-use/client` import works across JavaScript runtimes. Package
+conditions select Node capabilities or the browser-safe HTTP implementation;
+React remains a separate integration because React is an optional peer.
 
 ## Overview
 
 The library provides three main entry points:
 
-| Env         | Import               | Connection  | Use Cases                                        |
-| ----------- | -------------------- | ----------- | ------------------------------------------------ |
-| **Node.js** | `mcp-use`            | HTTP, Standard I/O | Servers, automation scripts, programmatic access |
-| **Browser** | `mcp-use/browser`    | HTTP        | Web apps, browser extensions                     |
-| **React**   | `mcp-use/react`      | HTTP        | React applications with hooks                    |
+| Env         | Import                  | Connection         | Use Cases                                        |
+| ----------- | ----------------------- | ------------------ | ------------------------------------------------ |
+| **Node.js** | `@mcp-use/client`       | HTTP, Standard I/O | Servers, automation scripts, programmatic access |
+| **Browser** | `@mcp-use/client`       | HTTP               | Web apps, browser extensions                     |
+| **React**   | `@mcp-use/client/react` | HTTP               | React applications with hooks                    |
 
 ## Node.js
 
 The Node.js environment provides the full feature set, including HTTP connections to remote servers, Standard I/O connections to local servers, file system operations, and code execution mode.
 
-<Note>
-  **Node.js 20.19 or higher, or 22.12 or higher required**.
-</Note>
+<Note>**Node.js 20.19 or higher, or 22.12 or higher required**.</Note>
 
 ```typescript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {
@@ -42,15 +42,21 @@ const client = new MCPClient({
   },
 });
 
-const sessions = await client.createAllSessions();
+const connections = await client.connectAll();
 
-const remoteTools = await sessions.remoteApi.listTools();
-const filesystemTools = await sessions.filesystem.listTools();
+const remoteTools = await connections.remoteApi.listTools();
+const filesystemTools = await connections.filesystem.listTools();
 
-console.log("Remote tools:", remoteTools.map((tool) => tool.name));
-console.log("Filesystem tools:", filesystemTools.map((tool) => tool.name));
+console.log(
+  "Remote tools:",
+  remoteTools.map((tool) => tool.name),
+);
+console.log(
+  "Filesystem tools:",
+  filesystemTools.map((tool) => tool.name),
+);
 
-await client.closeAllSessions();
+await client.close();
 ```
 
 ### Loading from Config File
@@ -58,12 +64,12 @@ await client.closeAllSessions();
 Node.js supports loading configuration from JSON files:
 
 ```typescript
-import { MCPClient, loadConfigFile } from "mcp-use";
+import { MCPClient, loadConfigFile } from "@mcp-use/client";
 
 const config = await loadConfigFile("mcp-config.json");
 const client = new MCPClient(config);
 
-await client.createAllSessions();
+await client.connectAll();
 ```
 
 #### Config File Structure
@@ -88,8 +94,8 @@ The configuration file should be a JSON file with an `mcpServers` object contain
 ```
 
 <Tip>
-  For every configuration field and constructor option, see the
-  [`MCPClient` API reference](/typescript/api-reference/client/mcp-client).
+  For every configuration field and constructor option, see the [`MCPClient` API
+  reference](/typescript/api-reference/client/mcp-client).
 </Tip>
 
 ### Supported Connection Types
@@ -98,22 +104,23 @@ Node.js supports HTTP and Standard I/O connections:
 
 <CodeGroup>
 ```typescript HTTP
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      url: "https://api.example.com/mcp",
-      headers: {
-        Authorization: "Bearer YOUR_TOKEN",
-      },
-    },
-  },
+mcpServers: {
+myServer: {
+url: "https://api.example.com/mcp",
+headers: {
+Authorization: "Bearer YOUR_TOKEN",
+},
+},
+},
 });
-```
+
+````
 
 ```typescript Standard I/O
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {
@@ -123,7 +130,7 @@ const client = new MCPClient({
     },
   },
 });
-```
+````
 
 </CodeGroup>
 
@@ -141,7 +148,7 @@ Node.js environment includes additional capabilities:
 The browser version is optimized for client-side JavaScript, excluding Node.js-specific APIs like file system and child processes.
 
 ```typescript
-import { MCPClient } from "mcp-use/browser";
+import { MCPClient } from "@mcp-use/client";
 
 // Create client with HTTP server
 const client = new MCPClient({
@@ -170,17 +177,16 @@ await client.closeAllSessions();
 ### Supported Connection Types
 
 <Warning>
-  **HTTP only**: Browser environments connect to MCP servers over HTTP.
-  Standard I/O connections require child processes, which browsers cannot spawn.
+  **HTTP only**: Browser environments connect to MCP servers over HTTP. Standard
+  I/O connections require child processes, which browsers cannot spawn.
 </Warning>
 
 ```typescript
-// HTTP with automatic SSE fallback
+// Streamable HTTP
 const client = new MCPClient({
   mcpServers: {
     myServer: {
       url: "https://api.example.com/mcp",
-      preferSse: false, // Set to true to force SSE
     },
   },
 });
@@ -198,31 +204,10 @@ The browser client has some limitations compared to Node.js:
 
 ### OAuth in Browser
 
-The browser client fully supports OAuth authentication:
-
-```typescript
-import { MCPClient, BrowserOAuthClientProvider } from "mcp-use/browser";
-
-// Create OAuth provider
-const authProvider = new BrowserOAuthClientProvider({
-  clientId: "your-client-id",
-  authorizationUrl: "https://api.example.com/oauth/authorize",
-  tokenUrl: "https://api.example.com/oauth/token",
-  callbackUrl: window.location.origin + "/oauth/callback",
-});
-
-// Create client with OAuth
-const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      url: "https://api.example.com/mcp",
-      authProvider: authProvider,
-    },
-  },
-});
-
-await client.createAllSessions();
-```
+OAuth works the same as in Node: connect to a protected server and the SDK
+creates the right provider and runs the flow. See
+[Authentication](/docs/typescript/client/authentication) for options like
+`callbackUrl`, pre-registered clients, and CIMD.
 
 ## React
 
@@ -231,13 +216,13 @@ The React integration provides a hook-based API that automatically manages conne
 ### Installation
 
 ```bash
-yarn add mcp-use react
+yarn add @mcp-use/client react
 ```
 
 The `useMcp` hook is the simplest way to integrate MCP in React applications:
 
 ```typescript
-import { useMcp } from "mcp-use/react";
+import { useMcp } from "@mcp-use/client/react";
 
 function MyComponent() {
   const mcp = useMcp({

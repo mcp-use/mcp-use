@@ -69,6 +69,7 @@ function App() {
   // Read the proxy path injected by the inspector server. Missing injection
   // falls back to the standard Inspector route; explicit null disables proxy.
   const proxyAddress = getDefaultInspectorProxyAddress();
+  const oauthProxyUrl = proxyAddress?.replace(/\/proxy\/?$/, "/oauth");
 
   // The inspector's own mount path, `${basePath}/inspector` (default
   // `/mcp/inspector`; root-mount `/inspector`). Derived at runtime from
@@ -103,6 +104,7 @@ function App() {
           storageProvider={storageProvider}
           enableRpcLogging={true}
           defaultCallbackUrl={`${window.location.origin}${inspectorBase}/oauth/callback`}
+          defaultOAuthProxyUrl={oauthProxyUrl}
           defaultAutoProxyFallback={
             proxyAddress ? { enabled: true, proxyAddress } : false
           }

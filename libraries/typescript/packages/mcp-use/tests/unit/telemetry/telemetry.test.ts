@@ -127,17 +127,14 @@ describe("Telemetry", () => {
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
-      const { MCPClientInitEvent } =
+      const { ServerToolCallEvent } =
         await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
 
-      const event = new MCPClientInitEvent({
-        codeMode: false,
-        sandbox: false,
-        allCallbacks: false,
-        verify: false,
-        servers: [],
-        numServers: 0,
+      const event = new ServerToolCallEvent({
+        toolName: "disabled_tool",
+        lengthInputArgument: 0,
+        success: true,
       });
 
       // Should not throw and should complete silently
@@ -150,28 +147,24 @@ describe("Telemetry", () => {
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
-      const { MCPClientInitEvent } =
+      const { ServerToolCallEvent } =
         await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
 
-      const event = new MCPClientInitEvent({
-        codeMode: true,
-        sandbox: false,
-        allCallbacks: true,
-        verify: false,
-        servers: ["server1", "server2"],
-        numServers: 2,
+      const event = new ServerToolCallEvent({
+        toolName: "test_tool",
+        lengthInputArgument: 2,
+        success: true,
       });
 
       await telemetry.capture(event);
 
       expect(mockCapture).toHaveBeenCalledWith(
         expect.objectContaining({
-          event: "mcpclient_init",
+          event: "server_tool_call",
           properties: expect.objectContaining({
-            code_mode: true,
-            all_callbacks: true,
-            num_servers: 2,
+            tool_name: "test_tool",
+            length_input_argument: 2,
             language: "typescript",
           }),
         })
@@ -188,49 +181,13 @@ describe("Telemetry", () => {
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture");
 
-      await telemetry.trackMCPClientInit({
-        codeMode: false,
-        sandbox: false,
-        allCallbacks: false,
-        verify: false,
-        servers: [],
-        numServers: 0,
+      await telemetry.trackServerToolCall({
+        toolName: "disabled_tool",
+        lengthInputArgument: 0,
+        success: true,
       });
 
       expect(captureSpy).not.toHaveBeenCalled();
-    });
-
-    it("should call capture for trackAgentExecution when enabled", async () => {
-      delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-
-      const { Telemetry } =
-        await import("../../../src/telemetry/telemetry-node.js");
-      const telemetry = Telemetry.getInstance();
-      const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
-
-      await telemetry.trackAgentExecution({
-        executionMethod: "run",
-        query: "test query",
-        success: true,
-        modelProvider: "openai",
-        modelName: "gpt-4",
-        serverCount: 1,
-        serverIdentifiers: [],
-        totalToolsAvailable: 5,
-        toolsAvailableNames: ["tool1", "tool2"],
-        maxStepsConfigured: 10,
-        memoryEnabled: true,
-        useServerManager: false,
-        maxStepsUsed: 3,
-        manageConnector: true,
-        externalHistoryUsed: false,
-      });
-
-      expect(captureSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "mcp_agent_execution",
-        })
-      );
     });
 
     it("should call capture for trackServerToolCall when enabled", async () => {
@@ -313,26 +270,6 @@ describe("Telemetry", () => {
       expect(captureSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "server_context_sample",
-        })
-      );
-    });
-
-    it("should call capture for trackConnectorInit when enabled", async () => {
-      delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-
-      const { Telemetry } =
-        await import("../../../src/telemetry/telemetry-node.js");
-      const telemetry = Telemetry.getInstance();
-      const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
-
-      await telemetry.trackConnectorInit({
-        connectorType: "HttpConnector",
-        serverUrl: "http://localhost:3000",
-      });
-
-      expect(captureSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "connector_init",
         })
       );
     });

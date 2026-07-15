@@ -4,7 +4,7 @@ description: "React hooks and providers for MCP client connections"
 icon: "react"
 ---
 
-mcp-use provides comprehensive React integration through `McpClientProvider` and the `useMcp` hook. The provider-based approach is recommended for managing multiple MCP server connections in your application.
+`@mcp-use/client/react` provides comprehensive React integration through `McpClientProvider` and the `useMcp` hook. The provider-based approach is recommended for managing multiple MCP server connections in your application.
 
 ## Features
 
@@ -13,6 +13,8 @@ mcp-use provides comprehensive React integration through `McpClientProvider` and
 - **OAuth support**: Complete OAuth flow with token management
 - **Notification management**: Track and handle server notifications per server
 - **Sampling/Elicitation**: Built-in handling for interactive server requests
+- **v1/v2 negotiation**: One hook for legacy sessionful and modern sessionless servers
+- **Normalized metadata**: Protocol version, capabilities, instructions, and extensions
 - **Type safety**: Full TypeScript support with automatic type inference
 
 <Tip>
@@ -25,7 +27,7 @@ mcp-use provides comprehensive React integration through `McpClientProvider` and
 ## Quick Start with Provider
 
 ```typescript
-import { McpClientProvider, useMcpClient, useMcpServer } from "mcp-use/react";
+import { McpClientProvider, useMcpClient, useMcpServer } from "@mcp-use/client/react";
 
 // 1. Wrap your app with the provider
 function App() {
@@ -70,14 +72,17 @@ function ServerCard({ server }) {
   if (server.state !== "ready") {
     return (
       <div>
-        {server.name}: {server.state}...
+        {server.displayName}: {server.state}...
       </div>
     );
   }
 
   return (
     <div>
-      <h3>{server.serverInfo?.name || server.name}</h3>
+      <h3>{server.serverInfo?.name || server.displayName}</h3>
+      <p>
+        Protocol: {server.protocolEra} ({server.protocolVersion})
+      </p>
       <p>Tools: {server.tools.length}</p>
       <button onClick={() => server.callTool("my-tool", {})}>Call Tool</button>
     </div>
@@ -87,12 +92,16 @@ function ServerCard({ server }) {
 
 ## Automatic Proxy Fallback
 
-The provider includes intelligent automatic proxy fallback for FastMCP and CORS-restricted servers:
+Proxy fallback is opt-in and requires an explicit MCP proxy URL. OAuth uses a
+separate BFF URL so transport routing never changes OAuth resource identity:
 
 ```typescript
 <McpClientProvider
-  defaultAutoProxyFallback={true} // Enabled by default
-  // Uses https://inspector.mcp-use.com/inspector/api/proxy by default
+  defaultProxyConfig={{
+    proxyAddress: "https://inspector.example.com/inspector/api/proxy",
+  }}
+  defaultOAuthProxyUrl="https://inspector.example.com/inspector/api/oauth"
+  defaultAutoProxyFallback={true}
 >
   <MyApp />
 </McpClientProvider>
@@ -104,6 +113,10 @@ The provider includes intelligent automatic proxy fallback for FastMCP and CORS-
 2. **Detects FastMCP or CORS errors** automatically
 3. **Retries with proxy** seamlessly
 4. **Success!** Connection established through proxy
+
+The SDK still sees the upstream MCP URL. Only the injected fetch routes MCP
+request bytes through `proxyAddress`; OAuth metadata, registration, and token
+requests use `defaultOAuthProxyUrl`.
 
 **Custom proxy configuration:**
 
@@ -206,7 +219,9 @@ function ServerCard({ serverId }) {
 
   if (server.state === "pending_auth") {
     return (
-      <button onClick={server.authenticate}>Sign in to {server.name}</button>
+      <button onClick={() => void server.authenticate()}>
+        Sign in to {server.displayName}
+      </button>
     );
   }
 
@@ -249,9 +264,11 @@ addServer("linear", {
 });
 ```
 
-**Pre-registered OAuth Client** (for servers without Dynamic Client Registration)
+**CIMD or pre-registered OAuth client**
 
-Some MCP servers strip the `registration_endpoint` from their auth-server metadata, so Dynamic Client Registration is unavailable. Pre-register a client with the upstream provider and pass the credentials via `oauth`:
+Prefer an HTTPS Client ID Metadata Document when the authorization server
+advertises CIMD. Keep a pre-registered public client ID for providers with an
+existing client relationship:
 
 ```typescript
 addServer("slack", {
@@ -259,13 +276,16 @@ addServer("slack", {
   name: "Slack",
   oauth: {
     clientId: "my-preregistered-client-id",
-    clientSecret: "my-preregistered-client-secret", // optional  -  for confidential clients without PKCE
+    clientMetadataUrl:
+      "https://app.example.com/.well-known/oauth-client-metadata.json",
     scope: "openid profile email",
   },
 });
 ```
 
-When `clientSecret` is set alongside `clientId`, the SDK switches token-endpoint authentication from `none` to `client_secret_basic` or `client_secret_post`, depending on what the auth server advertises in `token_endpoint_auth_methods_supported`. See [Authentication](/typescript/client/authentication#pre-registered-client-credentials) for details.
+Browser clients are public PKCE clients. Confidential client secrets belong on a
+backend and are rejected by the browser provider. See
+[Authentication](/typescript/client/authentication#registration-strategy).
 
 ### OAuth Callback Page
 
@@ -287,8 +307,7 @@ Per-server `callbackUrl` in `addServer()` takes precedence over the provider def
 ```typescript
 // app/oauth/callback/page.tsx (Next.js App Router)
 // or pages/oauth/callback.tsx (Next.js Pages Router)
-import { onMcpAuthorization } from "mcp-use/auth";
-// Also available from: import { onMcpAuthorization } from 'mcp-use/react'
+import { onMcpAuthorization } from "@mcp-use/client";
 import { useEffect } from "react";
 
 export default function OAuthCallback() {
@@ -376,7 +395,7 @@ function ResourceViewer({ serverId, uri }: { serverId: string; uri: string }) {
   return (
     <div>
       <h3>
-        {server.name} - Resource: {uri}
+        {server.displayName} - Resource: {uri}
       </h3>
       <pre>{content}</pre>
     </div>
@@ -413,7 +432,7 @@ function ServerManager() {
       <h3>Connected Servers ({servers.length})</h3>
       {servers.map((server) => (
         <div key={server.id}>
-          <h4>{server.serverInfo?.name || server.name}</h4>
+          <h4>{server.serverInfo?.name || server.displayName}</h4>
           <p>State: {server.state}</p>
           <p>Tools: {server.tools.length}</p>
           <p>Resources: {server.resources.length}</p>
@@ -431,7 +450,7 @@ function ServerManager() {
 Save server configurations to localStorage:
 
 ```typescript
-import { McpClientProvider, LocalStorageProvider } from "mcp-use/react";
+import { McpClientProvider, LocalStorageProvider } from "@mcp-use/client/react";
 
 function App() {
   return (
@@ -497,7 +516,7 @@ function NotificationPanel({ serverId }: { serverId: string }) {
 
 ## Sampling & Elicitation
 
-Handle interactive server requests (AI sampling, form elicitation). For elicitation, you can use helpers from `mcp-use` (e.g. `acceptWithDefaults`, `validate`) inside your callback; see [Elicitation](/typescript/client/elicitation).
+Handle interactive server requests (AI sampling, form elicitation). For elicitation, you can use helpers from `@mcp-use/client` (e.g. `acceptWithDefaults`, `validate`) inside your callback; see [Elicitation](/typescript/client/elicitation).
 
 ```typescript
 function SamplingHandler() {
@@ -509,7 +528,7 @@ function SamplingHandler() {
         <div key={server.id}>
           {server.pendingSamplingRequests.map((request) => (
             <div key={request.id}>
-              <h4>{server.name} needs AI assistance</h4>
+              <h4>{server.displayName} needs AI assistance</h4>
               <pre>{JSON.stringify(request.request.params, null, 2)}</pre>
               <button
                 onClick={() =>
@@ -544,7 +563,7 @@ function ServerMonitor() {
     <div>
       {servers.map((server) => (
         <div key={server.id}>
-          <h3>{server.name}</h3>
+          <h3>{server.displayName}</h3>
 
           {server.state === "failed" && (
             <div className="error">
@@ -608,21 +627,21 @@ When `autoReconnect` is enabled (the default), the hook monitors connection heal
 
 ```typescript
 // Boolean: enable with defaults (3s reconnect delay, 10s health check interval)
-useMcp({ url: '...', autoReconnect: true })
+useMcp({ url: "...", autoReconnect: true });
 
 // Number: custom reconnect delay in ms
-useMcp({ url: '...', autoReconnect: 5000 })
+useMcp({ url: "...", autoReconnect: 5000 });
 
 // Object: full control over reconnection and health checks
 useMcp({
-  url: '...',
+  url: "...",
   autoReconnect: {
     enabled: true,
-    initialDelay: 5000,         // Wait 5s before reconnecting
+    initialDelay: 5000, // Wait 5s before reconnecting
     healthCheckInterval: 30000, // Poll every 30s instead of 10s
-    healthCheckTimeout: 60000,  // Wait 60s before declaring dead
+    healthCheckTimeout: 60000, // Wait 60s before declaring dead
   },
-})
+});
 ```
 
 ### Disabling health checks
@@ -631,11 +650,11 @@ You can disable health check polling entirely while still reconnecting on transp
 
 ```typescript
 useMcp({
-  url: '...',
+  url: "...",
   autoReconnect: {
     healthCheckInterval: false, // No HEAD request polling
   },
-})
+});
 ```
 
 ### SDK-level reconnection options
@@ -643,23 +662,24 @@ useMcp({
 The `reconnectionOptions` prop controls the underlying `StreamableHTTPClientTransport` retry behavior, separate from the health check system:
 
 ```typescript
-import type { ReconnectionOptions } from 'mcp-use/react'
+import type { ReconnectionOptions } from "@mcp-use/client/react";
 
 useMcp({
-  url: '...',
+  url: "...",
   reconnectionOptions: {
-    initialReconnectionDelay: 2000,        // Start with 2s delay (default: 1000)
-    maxReconnectionDelay: 60000,           // Cap at 60s (default: 30000)
-    reconnectionDelayGrowFactor: 2,        // Double each retry (default: 1.5)
-    maxRetries: 5,                         // Retry up to 5 times (default: 2)
+    initialReconnectionDelay: 2000, // Start with 2s delay (default: 1000)
+    maxReconnectionDelay: 60000, // Cap at 60s (default: 30000)
+    reconnectionDelayGrowFactor: 2, // Double each retry (default: 1.5)
+    maxRetries: 5, // Retry up to 5 times (default: 2)
   },
-})
+});
 ```
 
 <Note>
-  `autoReconnect` controls the **application-level** health monitoring (HEAD request polling and reconnect triggers).
-  `reconnectionOptions` controls the **transport-level** retry behavior within the MCP SDK when the SSE stream drops.
-  Both can be used together for robust connection handling.
+  `autoReconnect` controls the **application-level** health monitoring (HEAD
+  request polling and reconnect triggers). `reconnectionOptions` controls the
+  **transport-level** retry behavior within the MCP SDK when the SSE stream
+  drops. Both can be used together for robust connection handling.
 </Note>
 
 ## Standalone useMcp Hook
@@ -667,7 +687,7 @@ useMcp({
 For simple single-server applications, you can use `useMcp` directly without the provider:
 
 ```typescript
-import { useMcp } from "mcp-use/react";
+import { useMcp } from "@mcp-use/client/react";
 
 function SimpleApp() {
   const mcp = useMcp({
@@ -692,8 +712,8 @@ function SimpleApp() {
 With elicitation (same pattern as the Node client):
 
 ```typescript
-import { useMcp } from "mcp-use/react";
-import { acceptWithDefaults } from "mcp-use";
+import { useMcp } from "@mcp-use/client/react";
+import { acceptWithDefaults } from "@mcp-use/client";
 
 const mcp = useMcp({
   url: "http://localhost:3000/mcp",

@@ -1,20 +1,30 @@
 ---
-title: "MCPSession"
-description: "Call tools, read resources, and fetch prompts from TypeScript MCP sessions"
+title: "MCPConnection"
+description: "Use one connection API with legacy sessionful and modern sessionless MCP servers"
 icon: "cable"
-github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/session.ts"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/session.ts"
 ---
 
 <Callout type="info" title="Source Code">
-View the source code for this module on GitHub: <a href='https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/session.ts' target='_blank' rel='noopener noreferrer'>https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/mcp-use/src/session.ts</a>
+  View the source code for this module on GitHub:{" "}
+  <a
+    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/session.ts"
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/session.ts
+  </a>
 </Callout>
 
-`MCPSession` represents one live connection to one MCP server. It wraps a connector and exposes high-level methods for lifecycle, tools, resources, prompts, completion, roots, notifications, and raw requests.
+`MCPConnection` is the protocol-neutral interface to one MCP server. Legacy v1
+session lifecycle remains internal, while modern v2 requests stay sessionless.
+Both expose the same tools, resources, prompts, completion, roots, notifications,
+and metadata APIs.
 
-Sessions are usually created with [`MCPClient.createSession()`](/typescript/api-reference/client/mcp-client#createsession).
+Connections are created with `MCPClient.connect()`.
 
 ```ts
-import { MCPClient, type MCPSession } from "mcp-use";
+import { MCPClient, type MCPConnection } from "@mcp-use/client";
 ```
 
 ```ts wrap
@@ -24,19 +34,27 @@ const client = new MCPClient({
   },
 });
 
-const session = await client.createSession("api");
-const result = await session.callTool("search", { query: "mcp" });
+const connection = await client.connect("api");
+console.log(connection.info.protocolVersion);
+const result = await connection.callTool("search", { query: "mcp" });
 ```
 
 ## Constructor
 
-Creates a session around a connector. This is an advanced path; most applications should create sessions through `MCPClient`.
+Creates a connection around a connector. This is an advanced path; applications
+should normally use `MCPClient.connect()`.
 
 **Parameters**
-><ParamField body="connector" type="BaseConnector" required="true">Connector that owns the transport and protocol client.</ParamField>
-><ParamField body="autoConnect" type="boolean" default="true">When `true`, `initialize()` connects before running the MCP initialize handshake.</ParamField>
+
+> <ParamField body="connector" type="BaseConnector" required="true">
+>   Connector that owns the transport and protocol client.
+> </ParamField>
+> <ParamField body="autoConnect" type="boolean" default="true">
+>   When `true`, the connection negotiates the protocol automatically.
+> </ParamField>
 
 **Signature**
+
 ```ts wrap
 constructor(connector: BaseConnector, autoConnect?: boolean)
 ```
@@ -45,31 +63,37 @@ constructor(connector: BaseConnector, autoConnect?: boolean)
 
 ### connect
 
-Starts the underlying transport without running the MCP initialize handshake.
+Starts the underlying transport. Prefer `MCPClient.connect()`, which returns a
+ready connection after negotiation.
 
 **Returns**
-><ResponseField name="returns" type="Promise<void>" />
+
+> <ResponseField name="returns" type="Promise<void>" />
 
 **Signature**
+
 ```ts wrap
 connect(): Promise<void>
 ```
 
 ### initialize
 
-Runs the MCP initialize handshake. If `autoConnect` is `true` and the session is not connected, this method connects first.
+Finalizes connector setup and metadata caching. The SDK performs either the
+legacy `initialize` handshake or modern `server/discover` negotiation internally.
 
 **Returns**
-><ResponseField name="returns" type="Promise<void>" />
+
+> <ResponseField name="returns" type="Promise<void>" />
 
 **Example**
+
 ```ts wrap
-const session = await client.createSession("api", false);
-await session.connect();
-await session.initialize();
+const connection = await client.connect("api");
+console.log(connection.info.protocolEra); // "legacy" or "modern"
 ```
 
 **Signature**
+
 ```ts wrap
 initialize(): Promise<void>
 ```
@@ -79,9 +103,11 @@ initialize(): Promise<void>
 Closes the underlying transport and releases connection resources.
 
 **Returns**
-><ResponseField name="returns" type="Promise<void>" />
+
+> <ResponseField name="returns" type="Promise<void>" />
 
 **Signature**
+
 ```ts wrap
 disconnect(): Promise<void>
 ```
@@ -91,9 +117,11 @@ disconnect(): Promise<void>
 Returns whether the underlying connector is connected.
 
 **Returns**
-><ResponseField name="returns" type="boolean" />
+
+> <ResponseField name="returns" type="boolean" />
 
 **Signature**
+
 ```ts wrap
 get isConnected(): boolean
 ```
@@ -105,9 +133,11 @@ get isConnected(): boolean
 Returns the connector's cached tool list.
 
 **Returns**
-><ResponseField name="returns" type="Tool[]" />
+
+> <ResponseField name="returns" type="Tool[]" />
 
 **Signature**
+
 ```ts wrap
 get tools(): Tool[]
 ```
@@ -117,12 +147,21 @@ get tools(): Tool[]
 Fetches the current tool list from the server.
 
 **Parameters**
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<Tool[]>" />
+
+> <ResponseField name="returns" type="Promise<Tool[]>" />
 
 **Signature**
+
 ```ts wrap
 listTools(options?: RequestOptions): Promise<Tool[]>
 ```
@@ -132,20 +171,34 @@ listTools(options?: RequestOptions): Promise<Tool[]>
 Calls a tool on the server.
 
 **Parameters**
-><ParamField body="name" type="string" required="true">Tool name.</ParamField>
-><ParamField body="args" type="Record<string, any>" default="{}">Tool arguments.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options, such as timeout and progress handling.</ParamField>
+
+> <ParamField body="name" type="string" required="true">
+>   Tool name.
+> </ParamField>
+> <ParamField body="args" type="Record<string, any>" default="{}">
+>   Tool arguments.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options, such as timeout and progress handling.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<CallToolResult>" />
+
+> <ResponseField name="returns" type="Promise<CallToolResult>" />
 
 **Example**
+
 ```ts wrap
 const result = await session.callTool("add", { a: 5, b: 3 });
 console.log(result.content);
 ```
 
 **Signature**
+
 ```ts wrap
 callTool(
   name: string,
@@ -161,13 +214,24 @@ callTool(
 Lists resources from the server with optional pagination.
 
 **Parameters**
-><ParamField body="cursor" type="string | undefined" default="undefined">Pagination cursor returned by a previous response.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField body="cursor" type="string | undefined" default="undefined">
+>   Pagination cursor returned by a previous response.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<ListResourcesResult>" />
+
+> <ResponseField name="returns" type="Promise<ListResourcesResult>" />
 
 **Signature**
+
 ```ts wrap
 listResources(cursor?: string, options?: RequestOptions): Promise<ListResourcesResult>
 ```
@@ -177,12 +241,21 @@ listResources(cursor?: string, options?: RequestOptions): Promise<ListResourcesR
 Lists every resource from the server by following pagination.
 
 **Parameters**
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<ListResourcesResult>" />
+
+> <ResponseField name="returns" type="Promise<ListResourcesResult>" />
 
 **Signature**
+
 ```ts wrap
 listAllResources(options?: RequestOptions): Promise<ListResourcesResult>
 ```
@@ -192,12 +265,21 @@ listAllResources(options?: RequestOptions): Promise<ListResourcesResult>
 Lists parameterized resource templates exposed by the server.
 
 **Parameters**
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<ListResourceTemplatesResult>" />
+
+> <ResponseField name="returns" type="Promise<ListResourceTemplatesResult>" />
 
 **Signature**
+
 ```ts wrap
 listResourceTemplates(options?: RequestOptions): Promise<ListResourceTemplatesResult>
 ```
@@ -207,19 +289,31 @@ listResourceTemplates(options?: RequestOptions): Promise<ListResourceTemplatesRe
 Reads a resource by URI.
 
 **Parameters**
-><ParamField body="uri" type="string" required="true">Resource URI.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField body="uri" type="string" required="true">
+>   Resource URI.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<ReadResourceResult>" />
+
+> <ResponseField name="returns" type="Promise<ReadResourceResult>" />
 
 **Example**
+
 ```ts wrap
 const resource = await session.readResource("file:///tmp/report.txt");
 console.log(resource.contents);
 ```
 
 **Signature**
+
 ```ts wrap
 readResource(uri: string, options?: RequestOptions): Promise<ReadResourceResult>
 ```
@@ -229,13 +323,24 @@ readResource(uri: string, options?: RequestOptions): Promise<ReadResourceResult>
 Subscribes to resource update notifications for a URI.
 
 **Parameters**
-><ParamField body="uri" type="string" required="true">Resource URI to subscribe to.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField body="uri" type="string" required="true">
+>   Resource URI to subscribe to.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<SubscribeResult>" />
+
+> <ResponseField name="returns" type="Promise<SubscribeResult>" />
 
 **Signature**
+
 ```ts wrap
 subscribeToResource(uri: string, options?: RequestOptions): Promise<SubscribeResult>
 ```
@@ -245,13 +350,24 @@ subscribeToResource(uri: string, options?: RequestOptions): Promise<SubscribeRes
 Unsubscribes from resource update notifications for a URI.
 
 **Parameters**
-><ParamField body="uri" type="string" required="true">Resource URI to unsubscribe from.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField body="uri" type="string" required="true">
+>   Resource URI to unsubscribe from.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<UnsubscribeResult>" />
+
+> <ResponseField name="returns" type="Promise<UnsubscribeResult>" />
 
 **Signature**
+
 ```ts wrap
 unsubscribeFromResource(uri: string, options?: RequestOptions): Promise<UnsubscribeResult>
 ```
@@ -263,9 +379,11 @@ unsubscribeFromResource(uri: string, options?: RequestOptions): Promise<Unsubscr
 Lists prompt templates exposed by the server.
 
 **Returns**
-><ResponseField name="returns" type="Promise<ListPromptsResult>" />
+
+> <ResponseField name="returns" type="Promise<ListPromptsResult>" />
 
 **Signature**
+
 ```ts wrap
 listPrompts(): Promise<ListPromptsResult>
 ```
@@ -275,13 +393,20 @@ listPrompts(): Promise<ListPromptsResult>
 Fetches a prompt by name with arguments.
 
 **Parameters**
-><ParamField body="name" type="string" required="true">Prompt name.</ParamField>
-><ParamField body="args" type="Record<string, any>" required="true">Prompt arguments.</ParamField>
+
+> <ParamField body="name" type="string" required="true">
+>   Prompt name.
+> </ParamField>
+> <ParamField body="args" type="Record<string, any>" required="true">
+>   Prompt arguments.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<GetPromptResult>" />
+
+> <ResponseField name="returns" type="Promise<GetPromptResult>" />
 
 **Signature**
+
 ```ts wrap
 getPrompt(name: string, args: Record<string, any>): Promise<GetPromptResult>
 ```
@@ -291,13 +416,24 @@ getPrompt(name: string, args: Record<string, any>): Promise<GetPromptResult>
 Requests completion suggestions for a prompt or resource template argument.
 
 **Parameters**
-><ParamField body="params" type="CompleteRequestParams" required="true">Completion request parameters.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField body="params" type="CompleteRequestParams" required="true">
+>   Completion request parameters.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<CompleteResult>" />
+
+> <ResponseField name="returns" type="Promise<CompleteResult>" />
 
 **Example**
+
 ```ts wrap
 const result = await session.complete({
   ref: { type: "ref/prompt", name: "translate" },
@@ -306,6 +442,7 @@ const result = await session.complete({
 ```
 
 **Signature**
+
 ```ts wrap
 complete(
   params: CompleteRequestParams,
@@ -320,12 +457,17 @@ complete(
 Sets the roots advertised to the server and sends the corresponding notification.
 
 **Parameters**
-><ParamField body="roots" type="Root[]" required="true">Roots with `file://` URIs and optional names.</ParamField>
+
+> <ParamField body="roots" type="Root[]" required="true">
+>   Roots with `file://` URIs and optional names.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<void>" />
+
+> <ResponseField name="returns" type="Promise<void>" />
 
 **Example**
+
 ```ts wrap
 await session.setRoots([
   { uri: "file:///Users/alex/project", name: "Project" },
@@ -333,6 +475,7 @@ await session.setRoots([
 ```
 
 **Signature**
+
 ```ts wrap
 setRoots(roots: Root[]): Promise<void>
 ```
@@ -342,9 +485,11 @@ setRoots(roots: Root[]): Promise<void>
 Returns the roots currently advertised to the server.
 
 **Returns**
-><ResponseField name="returns" type="Root[]" />
+
+> <ResponseField name="returns" type="Root[]" />
 
 **Signature**
+
 ```ts wrap
 getRoots(): Root[]
 ```
@@ -354,13 +499,20 @@ getRoots(): Root[]
 Registers a session event handler. The current public event is `"notification"`.
 
 **Parameters**
-><ParamField body="event" type='"notification"' required="true">Event name.</ParamField>
-><ParamField body="handler" type="NotificationHandler" required="true">Handler called with each notification.</ParamField>
+
+> <ParamField body="event" type='"notification"' required="true">
+>   Event name.
+> </ParamField>
+> <ParamField body="handler" type="NotificationHandler" required="true">
+>   Handler called with each notification.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="void" />
+
+> <ResponseField name="returns" type="void" />
 
 **Example**
+
 ```ts wrap
 session.on("notification", async (notification) => {
   if (notification.method === "notifications/tools/list_changed") {
@@ -370,6 +522,7 @@ session.on("notification", async (notification) => {
 ```
 
 **Signature**
+
 ```ts wrap
 on(event: "notification", handler: NotificationHandler): void
 ```
@@ -381,9 +534,11 @@ on(event: "notification", handler: NotificationHandler): void
 Returns server capabilities from the initialize response.
 
 **Returns**
-><ResponseField name="returns" type="Record<string, unknown>" />
+
+> <ResponseField name="returns" type="Record<string, unknown>" />
 
 **Signature**
+
 ```ts wrap
 get serverCapabilities(): Record<string, unknown>
 ```
@@ -393,9 +548,14 @@ get serverCapabilities(): Record<string, unknown>
 Returns server name and version from the initialize response, or `null` when unavailable.
 
 **Returns**
-><ResponseField name="returns" type="{ name: string; version?: string } | null" />
+
+> <ResponseField
+>   name="returns"
+>   type="{ name: string; version?: string } | null"
+> />
 
 **Signature**
+
 ```ts wrap
 get serverInfo(): { name: string; version?: string } | null
 ```
@@ -407,14 +567,27 @@ get serverInfo(): { name: string; version?: string } | null
 Sends a raw JSON-RPC request through the connector. Use this for custom MCP methods when no helper exists.
 
 **Parameters**
-><ParamField body="method" type="string" required="true">MCP method name.</ParamField>
-><ParamField body="params" type="Record<string, any> | null" default="null">Request parameters.</ParamField>
-><ParamField body="options" type="RequestOptions | undefined" default="undefined">Optional MCP SDK request options.</ParamField>
+
+> <ParamField body="method" type="string" required="true">
+>   MCP method name.
+> </ParamField>
+> <ParamField body="params" type="Record<string, any> | null" default="null">
+>   Request parameters.
+> </ParamField>
+> <ParamField
+>   body="options"
+>   type="RequestOptions | undefined"
+>   default="undefined"
+> >
+>   Optional MCP SDK request options.
+> </ParamField>
 
 **Returns**
-><ResponseField name="returns" type="Promise<unknown>" />
+
+> <ResponseField name="returns" type="Promise<unknown>" />
 
 **Signature**
+
 ```ts wrap
 request(
   method: string,
@@ -430,8 +603,13 @@ request(
 Directory or file root advertised to a server.
 
 **Fields**
-><ResponseField name="uri" type="string">Root URI. Use `file://` URIs.</ResponseField>
-><ResponseField name="name" type="string">Optional display name.</ResponseField>
+
+> <ResponseField name="uri" type="string">
+>   Root URI. Use `file://` URIs.
+> </ResponseField>
+> <ResponseField name="name" type="string">
+>   Optional display name.
+> </ResponseField>
 
 ### Tool
 

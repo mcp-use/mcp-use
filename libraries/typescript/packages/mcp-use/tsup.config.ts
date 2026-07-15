@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 import type { Options } from "tsup";
 import type { Plugin } from "esbuild";
+
+const { version } = JSON.parse(readFileSync("./package.json", "utf-8"));
 
 /**
  * Browser build: substitute any import of telemetry-node.{ts,js} with telemetry-browser.
@@ -28,6 +31,9 @@ const sharedConfig: Partial<Options> = {
   outDir: "dist",
   keepNames: true,
   dts: false, // We run tsc separately for declarations
+  define: {
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(version),
+  },
   external: [
     // Keep MCP SDK external (peer dependency)
     "@modelcontextprotocol/sdk",

@@ -31,6 +31,10 @@ export function mountInspector(
     sandboxOrigin?: string | null;
     /** Port the host app listens on (embedded inspector); required for tunnel start */
     serverPort?: number;
+    /** Explicit cross-origin callers of the OAuth BFF. Same-origin is implicit. */
+    oauthProxyAllowedOrigins?: readonly string[];
+    /** Allow OAuth discovery against loopback targets. Use only for local development. */
+    oauthProxyAllowLoopback?: boolean;
     /**
      * Normalized server-wide path prefix the embedding server mounts its whole
      * framework surface under (default `/mcp`; `""` = root). The inspector
@@ -55,6 +59,12 @@ export function mountInspector(
 
   // Normalize basePath: a single leading slash, no trailing slash; "" = root.
   const basePath = normalizeInspectorBasePath(config?.basePath);
+  const routesConfig = {
+    ...config,
+    oauthProxyAllowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
+    oauthProxyAllowLoopback:
+      config?.oauthProxyAllowLoopback ?? config?.devMode === true,
+  };
 
   // Build runtime config to inject into the HTML
   const runtimeConfig = {
@@ -79,7 +89,7 @@ export function mountInspector(
   // Every Hono instance exposes `.fetch`, and Express apps don't, so the
   // duck-type check alone covers both shapes unambiguously.
   if (isHonoApp(app)) {
-    registerInspectorRoutes(app, config, basePath);
+    registerInspectorRoutes(app, routesConfig, basePath);
     registerStaticRoutes(app, clientDistPath, runtimeConfig, basePath);
     return;
   }
@@ -88,7 +98,7 @@ export function mountInspector(
   const honoApp = new Hono();
 
   // Register routes on Hono app
-  registerInspectorRoutes(honoApp, config, basePath);
+  registerInspectorRoutes(honoApp, routesConfig, basePath);
   registerStaticRoutes(honoApp, clientDistPath, runtimeConfig, basePath);
 
   // Convert all Hono routes to Express middleware
@@ -146,7 +156,10 @@ function isHonoApp(app: Express | Hono): app is Hono {
  */
 function normalizeInspectorBasePath(raw: string | undefined): string {
   if (raw === undefined) return "/mcp";
-  let value = raw.trim().replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+  let value = raw
+    .trim()
+    .replace(/\/{2,}/g, "/")
+    .replace(/\/+$/, "");
   if (value === "" || value === "/") return "";
   if (!value.startsWith("/")) value = `/${value}`;
   return value;

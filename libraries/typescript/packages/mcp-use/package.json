@@ -70,8 +70,7 @@
     "access": "public"
   },
   "scripts": {
-    "generate:version": "node scripts/generate-version.mjs",
-    "build": "npm run generate:version && rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "test": "vitest",
     "test:run": "vitest run",
     "test:types": "tsc -p tsconfig.test-types.json",

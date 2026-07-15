@@ -2,11 +2,11 @@
  * Unit tests for FileKVStore.
  *
  * Run with:
- *   pnpm --filter mcp-use test:unit -- tests/unit/auth/file-kv-store.test.ts
+ *   pnpm --filter mcp-use test:unit -- tests/unit/auth/storage.test.ts
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { FileKVStore } from "../../../src/auth/file-kv-store.js";
+import { FileKVStore } from "../../../src/auth/storage-file.js";
 import { mkdtempSync, rmSync, statSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

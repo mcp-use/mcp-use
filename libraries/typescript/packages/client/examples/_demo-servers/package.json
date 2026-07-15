@@ -1,0 +1,25 @@
+{
+  "name": "@mcp-use/client-demo-servers",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "official:v1": "tsx v1-http.ts",
+    "official:v2": "tsx v2-http.ts",
+    "ours:v1": "pnpm --dir ../../../mcp-use/examples/server/features/conformance dev --port ${PORT:-3103} --no-open",
+    "ours:v2": "pnpm --dir ../../../server/examples/views/basic dev",
+    "v1": "pnpm official:v1",
+    "v2": "pnpm official:v2"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@modelcontextprotocol/sdk": "^1.25.0",
+    "@modelcontextprotocol/server": "2.0.0-beta.3",
+    "express": "^5.1.0",
+    "hono": "^4.12.0",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "tsx": "^4.20.0"
+  }
+}

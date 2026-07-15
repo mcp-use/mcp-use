@@ -53,7 +53,7 @@ Direct users to external URLs. Required for:
 Provide an `onElicitation` function when initializing the MCPClient. The `elicitationCallback` name is still supported but deprecated; use `onElicitation`.
 
 ```typescript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
@@ -61,7 +61,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 
 async function onElicitation(
-  params: ElicitRequestFormParams | ElicitRequestURLParams
+  params: ElicitRequestFormParams | ElicitRequestURLParams,
 ): Promise<ElicitResult> {
   if (params.mode === "url") {
     // URL mode: Direct user to external URL
@@ -87,11 +87,11 @@ async function onElicitation(
     // Collect data based on schema properties
     if (schema.type === "object" && schema.properties) {
       for (const [fieldName, fieldSchema] of Object.entries(
-        schema.properties
+        schema.properties,
       )) {
         const value = await promptUser(
           `Enter ${fieldSchema.title || fieldName}:`,
-          fieldSchema.default
+          fieldSchema.default,
         );
         userData[fieldName] = value;
       }
@@ -116,7 +116,7 @@ import {
   acceptWithDefaults,
   MCPClient,
   type OnElicitationCallback,
-} from "mcp-use";
+} from "@mcp-use/client";
 
 const terminalElicitation: OnElicitationCallback = async (params) => {
   if (params.mode === "url") {
@@ -133,7 +133,9 @@ const webElicitation: OnElicitationCallback = async (params) => {
     return { action: "accept" };
   }
   const formData = await showWebForm(params.message, params.requestedSchema);
-  return formData ? { action: "accept", content: formData } : { action: "cancel" };
+  return formData
+    ? { action: "accept", content: formData }
+    : { action: "cancel" };
 };
 
 const client = new MCPClient(
@@ -152,25 +154,25 @@ const client = new MCPClient(
       },
     },
   },
-  { onElicitation: async (params) => acceptWithDefaults(params) }
+  { onElicitation: async (params) => acceptWithDefaults(params) },
 );
 ```
 
 **Precedence order** (first match wins):
 
-| Priority | Source |
-|----------|--------|
-| 1 | Per-server `onElicitation` |
-| 2 | Per-server `elicitationCallback` (deprecated) |
-| 3 | Global `onElicitation` (second MCPClient arg) |
-| 4 | Global `elicitationCallback` (deprecated) |
+| Priority | Source                                        |
+| -------- | --------------------------------------------- |
+| 1        | Per-server `onElicitation`                    |
+| 2        | Per-server `elicitationCallback` (deprecated) |
+| 3        | Global `onElicitation` (second MCPClient arg) |
+| 4        | Global `elicitationCallback` (deprecated)     |
 
 ### With React Hook
 
 Use the `onElicitation` prop in the `useMcp` hook:
 
 ```typescript
-import { useMcp } from "mcp-use/react";
+import { useMcp } from "@mcp-use/client/react";
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
@@ -184,7 +186,7 @@ function MyComponent() {
       if (params.mode === "url") {
         // URL mode: Open external URL
         const confirmed = window.confirm(
-          `${params.message}\n\nOpen ${params.url}?`
+          `${params.message}\n\nOpen ${params.url}?`,
         );
 
         if (confirmed) {
@@ -202,7 +204,7 @@ function MyComponent() {
         // Form mode: Show form to collect data
         const formData = await showElicitationForm(
           params.message,
-          params.requestedSchema
+          params.requestedSchema,
         );
 
         return {
@@ -219,9 +221,9 @@ function MyComponent() {
 
 ### Client helpers
 
-mcp-use provides helpers so you don't have to hand-roll defaults, validation, or result building. Import them (and types) from `mcp-use` or `mcp-use/client`. For a typed callback without importing the SDK, use `OnElicitationCallback` from `mcp-use`.
+`@mcp-use/client` provides helpers so you don't have to hand-roll defaults, validation, or result building. Import the helpers and types from `@mcp-use/client`.
 
-- **Defaults**: `getDefaults(params)`  -  default values from the request schema; `applyDefaults(params, partial?)`  -  merge partial content with defaults; `acceptWithDefaults(params)`  -  return an accept result using schema defaults.
+- **Defaults**: `getDefaults(params)` - default values from the request schema; `applyDefaults(params, partial?)` - merge partial content with defaults; `acceptWithDefaults(params)` - return an accept result using schema defaults.
 - **Result builders**: `accept(content)`, `decline(reason?)`, `cancel()`, `reject(reason?)` (reject is an alias for decline).
 - **Validation**: `validate(params, content)` returns `{ valid: boolean; errors?: string[] }` (Zod-based; uses `requestedSchema`). Types: `ElicitContent`, `ElicitValidationResult`.
 
@@ -232,7 +234,7 @@ import {
   acceptWithDefaults,
   type OnElicitationCallback,
   MCPClient,
-} from "mcp-use";
+} from "@mcp-use/client";
 
 const onElicitation: OnElicitationCallback = async (params) => {
   return acceptWithDefaults(params);
@@ -250,7 +252,7 @@ import {
   validate,
   type OnElicitationCallback,
   MCPClient,
-} from "mcp-use";
+} from "@mcp-use/client";
 
 const onElicitation: OnElicitationCallback = async (params) => {
   const formData = await collectFormFromUser(params);
@@ -301,10 +303,10 @@ Form mode collects structured data from users with JSON schema validation.
 
 ### Client-Side Validation (Optional but Recommended)
 
-While the server always validates data, implementing client-side validation improves UX by catching errors before the round-trip. You can use the built-in `validate(params, content)` helper from `mcp-use` (Zod-based); no need to implement `validateAgainstSchema` yourself unless you need custom logic.
+While the server always validates data, implementing client-side validation improves UX by catching errors before the round-trip. You can use the built-in `validate(params, content)` helper from `@mcp-use/client` (Zod-based); no need to implement `validateAgainstSchema` yourself unless you need custom logic.
 
 ```typescript
-import { validate, accept, cancel } from "mcp-use";
+import { validate, accept, cancel } from "@mcp-use/client";
 
 // After collecting formData from the user:
 const { valid, errors } = validate(params, formData);
@@ -325,13 +327,13 @@ return accept(formData);
 
 For form-mode elicitation, clients should support these enum schema shapes:
 
-| Variant | Schema Shape | Recommended UI |
-|---|---|---|
-| Untitled single-select | `type: "string"` + `enum` | Single-select dropdown |
-| Titled single-select | `type: "string"` + `oneOf[{ const, title }]` | Single-select dropdown with labels from `title` |
-| Legacy titled enum | `type: "string"` + `enum` + `enumNames` | Single-select dropdown using `enumNames` as labels |
-| Untitled multi-select | `type: "array"` + `items.enum` | Multi-select checkbox group |
-| Titled multi-select | `type: "array"` + `items.anyOf[{ const, title }]` | Multi-select checkbox group with labels from `title` |
+| Variant                | Schema Shape                                      | Recommended UI                                       |
+| ---------------------- | ------------------------------------------------- | ---------------------------------------------------- |
+| Untitled single-select | `type: "string"` + `enum`                         | Single-select dropdown                               |
+| Titled single-select   | `type: "string"` + `oneOf[{ const, title }]`      | Single-select dropdown with labels from `title`      |
+| Legacy titled enum     | `type: "string"` + `enum` + `enumNames`           | Single-select dropdown using `enumNames` as labels   |
+| Untitled multi-select  | `type: "array"` + `items.enum`                    | Multi-select checkbox group                          |
+| Titled multi-select    | `type: "array"` + `items.anyOf[{ const, title }]` | Multi-select checkbox group with labels from `title` |
 
 When returning accepted form values:
 
@@ -340,7 +342,9 @@ When returning accepted form values:
 - Use the `const`/`enum` values as submitted data, even when displaying a different label.
 
 ```typescript
-function getChoices(field: Record<string, any>): Array<{ value: string; label: string }> {
+function getChoices(
+  field: Record<string, any>,
+): Array<{ value: string; label: string }> {
   if (Array.isArray(field.oneOf)) {
     return field.oneOf
       .filter((x) => typeof x?.const === "string")
@@ -387,7 +391,7 @@ URL mode directs users to external URLs for sensitive operations. **This mode MU
 
 ```typescript
 async function handleUrlElicitation(
-  params: ElicitRequestURLParams
+  params: ElicitRequestURLParams,
 ): Promise<ElicitResult> {
   // Display the URL to the user
   const userMessage = `
@@ -406,7 +410,7 @@ async function handleUrlElicitation(
 
   // Wait for user confirmation
   const completed = await confirmWithUser(
-    "Have you completed the authorization?"
+    "Have you completed the authorization?",
   );
 
   if (completed) {
@@ -432,11 +436,11 @@ interface ElicitResult {
 
 ### Response Actions
 
-| Action      | When to Use                                        | Field                                         |
-| ----------- | -------------------------------------------------- | --------------------------------------------- |
+| Action      | When to Use                                        | Field                                           |
+| ----------- | -------------------------------------------------- | ----------------------------------------------- |
 | **accept**  | User provided valid input                          | `content` required for form mode when accepting |
-| **decline** | User explicitly declined to provide information   | Omit                                          |
-| **cancel**  | User dismissed the request without making a choice | Omit                                          |
+| **decline** | User explicitly declined to provide information    | Omit                                            |
+| **cancel**  | User dismissed the request without making a choice | Omit                                            |
 
 ## Error Handling
 

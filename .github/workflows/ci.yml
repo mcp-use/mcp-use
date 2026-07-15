@@ -269,11 +269,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const transports = ['stdio', 'sse', 'streamable_http'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const transport of transports) {
               const xmlPath = path.join('test-results', `transport-test-results-${transport}`, `test-results-${transport}.xml`);
               let status = '⏭️ Skipped';
@@ -315,30 +315,30 @@ jobs:
               
               tableRows.push(`| ${transport} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All transport tests passed!' : '❌ Some transport tests failed';
-            
+
             const comment = `## Python Transport Tests Results
-            
+
             ${overallStatus}
-            
+
             | Transport | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(c => 
               c.user.type === 'Bot' && 
               c.body.includes('## Python Transport Tests Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -434,11 +434,11 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            
+
             const primitives = ['sampling', 'tools', 'resources', 'prompts', 'elicitation', 'notifications', 'auth', 'roots'];
             let tableRows = [];
             let allPassed = true;
-            
+
             for (const primitive of primitives) {
               const xmlPath = path.join('test-results', `primitive-test-results-${primitive}`, `test-results-${primitive}.xml`);
               let status = '⏭️ Skipped';
@@ -480,30 +480,30 @@ jobs:
               
               tableRows.push(`| ${primitive} | ${status} | ${tests} | ${passed} | ${failed} | ${errors} | ${time} |`);
             }
-            
+
             const overallStatus = allPassed ? '✅ All primitive tests passed!' : '❌ Some primitive tests failed';
-            
+
             const comment = `## Python Primitive Tests Results
-            
+
             ${overallStatus}
-            
+
             | Primitive | Status | Tests | Passed | Failed | Errors | Time |
             |-----------|--------|-------|--------|--------|--------|------|
             ${tableRows.join('\n')}
             `;
-            
+
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            
+
             const botComment = comments.find(c => 
               c.user.type === 'Bot' && 
               c.body.includes('## Python Primitive Tests Results')
             );
-            
+
             if (botComment) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,
@@ -681,6 +681,10 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build Packages
         run: pnpm build
+      - name: Run client Unit Tests
+        env:
+          MCP_USE_ANONYMIZED_TELEMETRY: false
+        run: pnpm --filter @mcp-use/client test:run
       - name: Run mcp-use Unit Tests
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
@@ -719,7 +723,7 @@ jobs:
       - name: Generate version file
         # src/version.ts is gitignored and produced at build time; knip needs it
         # to resolve the `./version.js` imports in packages/mcp-use.
-        run: pnpm --filter mcp-use generate:version
+        run: pnpm --filter mcp-use generate:version && pnpm --filter @mcp-use/client generate:version
       - name: Run Knip
         run: |
           set -o pipefail
@@ -956,7 +960,7 @@ jobs:
           [ -f "test-app/package.json" ] || exit 1
           [ -f "test-app/index.ts" ] || exit 1
           echo "✅ Project created successfully"
-      
+
       - name: Test dev command (non --dev flag only)
         if: matrix.flag == ''
         shell: bash
@@ -974,12 +978,12 @@ jobs:
               pnpm dev &
               ;;
           esac
-          
+
           DEV_PID=$!
-          
+
           # Wait for server to start (10 seconds should be enough)
           sleep 10
-          
+
           # Kill the dev server
           if [ "${{ runner.os }}" == "Windows" ]; then
             # On Windows, kill by port is more reliable than DEV_PID
@@ -993,8 +997,8 @@ jobs:
           else
             kill $DEV_PID 2>/dev/null || true
           fi
-          
+
           # Wait for process to exit
           wait $DEV_PID 2>/dev/null || true
-          
+
           echo "✅ Dev server started and stopped successfully"

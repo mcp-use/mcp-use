@@ -4,7 +4,8 @@ description: "List and call MCP server tools from a TypeScript client session."
 icon: "wrench"
 ---
 
-Tools are functions exposed by an MCP server. In the TypeScript client, you use an initialized `MCPSession` to list available tools and call a tool by name.
+Tools are functions exposed by an MCP server. Use a ready `MCPConnection` to
+list and call them on either a v1 or v2 server.
 
 If you want to define tools on a server, see [Server tools](/typescript/server/tools).
 
@@ -13,7 +14,7 @@ If you want to define tools on a server, see [Server tools](/typescript/server/t
 Call `session.listTools()` after you open a session. It fetches the current tool list from the server.
 
 ```typescript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
   mcpServers: {
@@ -72,18 +73,18 @@ const result = await session.callTool(
     timeout: 300_000,
     resetTimeoutOnProgress: true,
     maxTotalTimeout: 900_000,
-  }
+  },
 );
 ```
 
 Use these options for long-running tools:
 
-| Option | What it does |
-| --- | --- |
-| `timeout` | Maximum time, in milliseconds, for a request before it times out. |
-| `resetTimeoutOnProgress` | Resets the timeout when the server sends progress notifications. |
-| `maxTotalTimeout` | Sets an overall maximum time even when progress resets the timeout. |
-| `signal` | Cancels the request with an `AbortSignal`. |
+| Option                   | What it does                                                        |
+| ------------------------ | ------------------------------------------------------------------- |
+| `timeout`                | Maximum time, in milliseconds, for a request before it times out.   |
+| `resetTimeoutOnProgress` | Resets the timeout when the server sends progress notifications.    |
+| `maxTotalTimeout`        | Sets an overall maximum time even when progress resets the timeout. |
+| `signal`                 | Cancels the request with an `AbortSignal`.                          |
 
 ## Handle missing sessions
 
@@ -104,10 +105,18 @@ const result = await session.callTool("echo", {
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="MCPClient reference" icon="router" href="/typescript/api-reference/client/mcp-client">
+  <Card
+    title="MCPClient reference"
+    icon="router"
+    href="/typescript/api-reference/client/mcp-client"
+  >
     Configure HTTP and Standard I/O servers before opening sessions.
   </Card>
-  <Card title="MCPSession reference" icon="cable" href="/typescript/api-reference/client/mcp-session">
+  <Card
+    title="MCPConnection reference"
+    icon="cable"
+    href="/typescript/api-reference/client/mcp-session"
+  >
     Exact signatures for `listTools()`, `callTool()`, and request options.
   </Card>
 </CardGroup>

@@ -155,7 +155,7 @@ export function InspectorDashboard() {
       url: string,
       name?: string,
       proxyConfig?: any,
-      transportType?: "http" | "sse",
+      _transportType?: "http" | "sse",
       oauth?: OAuthStaticConfig,
       connectionMode: ConnectionMode = proxyConfig?.proxyAddress
         ? "proxy"
@@ -169,10 +169,9 @@ export function InspectorDashboard() {
     ) => {
       addServer(url, {
         url,
-        name,
+        displayName: name,
         connectionMode,
         proxyConfig,
-        transportType,
         preventAutoAuth: true,
         useRedirectFlow: true,
         autoProxyFallback,
@@ -268,7 +267,6 @@ export function InspectorDashboard() {
         // Trigger reconnection by updating with the same config (forces disconnect/reconnect)
         await updateServer(id, {
           url: server.url,
-          name: server.name,
         });
       } catch (error) {
         console.error(
@@ -452,8 +450,7 @@ export function InspectorDashboard() {
     // Build server configuration with proper typing
     const serverConfig: McpServerOptions = {
       url: normalizedUrl,
-      name: alias.trim() || normalizedUrl,
-      transportType: "http",
+      displayName: alias.trim() || normalizedUrl,
       preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
       useRedirectFlow: true,
       // Probe for modern (2026-07-28) servers, falling back to the classic

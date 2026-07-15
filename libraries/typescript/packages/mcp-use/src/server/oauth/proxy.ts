@@ -1,510 +1,837 @@
 /**
- * OAuth Proxy Routes
+ * Server-side OAuth BFF for browser MCP clients.
  *
- * Provides CORS-free OAuth flow for browser clients by proxying OAuth requests.
- *
- * This middleware handles:
- * - OAuth metadata discovery (/.well-known/ endpoints)
- * - Token exchange requests (/token endpoints)
- * - Dynamic client registration (/register endpoints)
- * - Authorization requests (/authorize endpoints)
- *
- * @module oauth-proxy
+ * The browser identifies the logical MCP server and the exact OAuth request it
+ * wants to make. The BFF independently binds protected-resource metadata to
+ * that server, authorization-server metadata to the advertised issuers, and
+ * POST requests to endpoints advertised by that metadata.
  */
 
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import type { Context, Hono } from "hono";
-import { cors } from "hono/cors";
 
-/**
- * Options for configuring the OAuth proxy
- */
+type OAuthEndpointKind =
+  | "registration"
+  | "token"
+  | "revocation"
+  | "introspection";
+
+type Binding = {
+  authorizationServers: Set<string>;
+  endpoints: Map<string, OAuthEndpointKind>;
+  updatedAt: number;
+};
+
+type ProxyRequest = {
+  serverUrl?: unknown;
+  url?: unknown;
+  method?: unknown;
+  headers?: unknown;
+  body?: unknown;
+};
+
 export interface OAuthProxyOptions {
-  /**
-   * Base path for OAuth proxy routes
-   * @default "/oauth"
-   */
+  /** @default "/oauth" */
   basePath?: string;
-
-  /**
-   * Enable request logging
-   * @default true
-   */
+  /** Cross-origin browser origins allowed to call the BFF. Same-origin calls are always allowed. */
+  allowedOrigins?: readonly string[];
+  /** Permit HTTP(S) loopback MCP/OAuth targets. Intended only for explicit local development. */
+  allowLoopback?: boolean;
+  /** @default 10000 */
+  timeoutMs?: number;
+  /** @default 65536 */
+  maxRequestBodyBytes?: number;
+  /** @default 1048576 */
+  maxResponseBodyBytes?: number;
+  /** @default true */
   enableLogging?: boolean;
-
-  /**
-   * Optional authentication function to validate requests
-   * Return true to allow the request, false to reject with 401
-   */
+  /** Optional authentication applied before any outbound request. */
   authenticate?: (c: Context) => Promise<boolean> | boolean;
-
-  /**
-   * Optional validator to check if target URL is allowed
-   * Return true to allow, false to reject with 403
-   */
-  validateTarget?: (
-    targetUrl: string,
+  /** Optional deployment policy applied after built-in URL and network checks. */
+  validateServerUrl?: (
+    serverUrl: string,
     c: Context
   ) => Promise<boolean> | boolean;
 }
 
-/**
- * Mount OAuth proxy routes on a Hono app
- *
- * This creates endpoints for proxying OAuth requests to bypass CORS restrictions.
- *
- * Creates the following routes:
- * - POST /oauth/proxy - General OAuth request proxy
- * - GET /oauth/metadata - OAuth metadata discovery proxy
- *
- * @param app - Hono application instance
- * @param options - Configuration options for the proxy
- *
- * @example
- * ```typescript
- * import { Hono } from "hono";
- * import { mountOAuthProxy } from "mcp-use";
- *
- * const app = new Hono();
- *
- * // Basic usage
- * mountOAuthProxy(app);
- *
- * // With custom path
- * mountOAuthProxy(app, {
- *   basePath: "/inspector/api/oauth"
- * });
- * ```
- */
+const SAFE_REQUEST_HEADERS = new Set([
+  "accept",
+  "authorization",
+  "content-type",
+  "dpop",
+]);
+const SAFE_RESPONSE_HEADERS = new Set([
+  "cache-control",
+  "content-type",
+  "dpop-nonce",
+  "expires",
+  "pragma",
+  "retry-after",
+  "www-authenticate",
+]);
+const ENDPOINT_FIELDS: ReadonlyArray<readonly [string, OAuthEndpointKind]> = [
+  ["registration_endpoint", "registration"],
+  ["token_endpoint", "token"],
+  ["revocation_endpoint", "revocation"],
+  ["introspection_endpoint", "introspection"],
+];
+const BINDING_TTL_MS = 10 * 60 * 1000;
+const MAX_BINDINGS = 100;
+
 export function mountOAuthProxy(
   app: Hono,
   options: OAuthProxyOptions = {}
 ): void {
   const {
     basePath = "/oauth",
+    allowedOrigins = [],
+    allowLoopback = false,
+    timeoutMs = 10_000,
+    maxRequestBodyBytes = 64 * 1024,
+    maxResponseBodyBytes = 1024 * 1024,
     enableLogging = true,
     authenticate,
-    validateTarget,
+    validateServerUrl,
   } = options;
+  const origins = new Set(allowedOrigins.map(normalizeOrigin));
+  const bindings = new Map<string, Binding>();
 
-  // Enable CORS for all OAuth proxy routes
-  app.use(
-    `${basePath}/*`,
-    cors({
-      origin: "*",
-      allowMethods: ["GET", "POST", "OPTIONS"],
-      allowHeaders: ["*"],
-      exposeHeaders: ["*"],
-      maxAge: 86400,
-    })
-  );
+  app.use(`${basePath}/*`, async (c, next) => {
+    const origin = c.req.header("Origin");
+    if (origin && !isAllowedOrigin(origin, c.req.url, origins)) {
+      return c.json({ error: "Origin not allowed" }, 403);
+    }
+    if (c.req.method === "OPTIONS") {
+      return corsResponse(origin);
+    }
+    await next();
+    if (origin) setCorsHeaders(c.res.headers, origin);
+  });
 
-  /**
-   * OAuth Metadata Discovery Proxy
-   * GET /oauth/metadata?url=<encoded_metadata_url>
-   *
-   * Proxies requests to OAuth metadata endpoints (/.well-known/*) to bypass CORS.
-   */
-  app.get(`${basePath}/metadata`, async (c: Context) => {
-    try {
-      // Optional authentication
-      if (authenticate) {
-        const isAuthenticated = await authenticate(c);
-        if (!isAuthenticated) {
-          return c.json({ error: "Unauthorized" }, 401);
-        }
-      }
+  app.get(`${basePath}/metadata`, async (c) => {
+    if (!(await isAuthenticated(c, authenticate))) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
 
-      const url = c.req.query("url");
-      if (!url) {
-        return c.json({ error: "Missing url parameter" }, 400);
-      }
+    const serverUrlResult = await validateUrl(
+      c.req.query("serverUrl"),
+      allowLoopback
+    );
+    if ("error" in serverUrlResult) {
+      return c.json({ error: serverUrlResult.error }, 400);
+    }
+    const serverUrl = serverUrlResult.url;
+    if (
+      validateServerUrl &&
+      !(await validateServerUrl(serverUrl.toString(), c))
+    ) {
+      return c.json({ error: "MCP server URL not allowed" }, 403);
+    }
 
-      // Validate URL format
-      let metadataUrl: URL;
+    const targetResult = await validateUrl(c.req.query("url"), allowLoopback);
+    if ("error" in targetResult) {
+      return c.json({ error: targetResult.error }, 400);
+    }
+    const target = targetResult.url;
+    const key = canonicalUrl(serverUrl);
+    const binding = getBinding(bindings, key);
+    let metadataKind = classifyMetadataTarget(serverUrl, target, binding);
+    if (!metadataKind && binding.authorizationServers.size === 0) {
       try {
-        metadataUrl = new URL(url);
-        if (
-          metadataUrl.protocol !== "https:" &&
-          metadataUrl.protocol !== "http:"
-        ) {
-          return c.json({ error: "Invalid protocol" }, 400);
-        }
+        await hydrateBinding(
+          serverUrl,
+          binding,
+          allowLoopback,
+          timeoutMs,
+          maxResponseBodyBytes
+        );
+        bindings.set(key, binding);
+        metadataKind = classifyMetadataTarget(serverUrl, target, binding);
       } catch {
-        return c.json({ error: "Invalid URL format" }, 400);
+        // The requested target remains unauthorized below.
       }
+    }
+    if (!metadataKind) {
+      return c.json(
+        { error: "Metadata target is not bound to this MCP server" },
+        403
+      );
+    }
 
-      // Optional target validation
-      if (validateTarget) {
-        const isValid = await validateTarget(url, c);
-        if (!isValid) {
-          return c.json({ error: "Target URL not allowed" }, 403);
-        }
-      }
-
-      if (enableLogging) {
-        console.log(`[OAuth Proxy] Fetching metadata: ${url}`);
-      }
-
-      let response: Response | null = null;
-      let discoveredFromWWWAuth = false;
-
-      // FIRST: Try to discover metadata URL from WWW-Authenticate header
-      // This is the authoritative source per OAuth spec and handles non-standard paths
-      // ONLY apply this for oauth-protected-resource requests (not oauth-authorization-server)
-      if (url.includes("/.well-known/oauth-protected-resource")) {
-        const mcpServerUrl = c.req.query("mcp_url");
-
-        if (mcpServerUrl) {
-          try {
-            if (enableLogging) {
-              console.log(
-                `[OAuth Proxy] Attempting metadata discovery from WWW-Authenticate header for: ${mcpServerUrl}`
-              );
-            }
-
-            // Make a request to the MCP endpoint to get WWW-Authenticate header
-            const mcpResponse = await fetch(mcpServerUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-              },
-              // Send minimal MCP request to trigger 401 with WWW-Authenticate
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                method: "initialize",
-                id: 1,
-              }),
-            });
-
-            // Extract WWW-Authenticate header
-            const wwwAuth = mcpResponse.headers.get("WWW-Authenticate");
-            if (wwwAuth) {
-              if (enableLogging) {
-                console.log(
-                  `[OAuth Proxy] WWW-Authenticate header: ${wwwAuth}`
-                );
-              }
-
-              // Parse resource_metadata from header
-              // Format: Bearer error="...", resource_metadata="https://..."
-              const resourceMetadataMatch = wwwAuth.match(
-                /resource_metadata="([^"]+)"/
-              );
-
-              if (resourceMetadataMatch && resourceMetadataMatch[1]) {
-                const discoveredMetadataUrl = resourceMetadataMatch[1];
-                if (enableLogging) {
-                  console.log(
-                    `[OAuth Proxy] Discovered metadata URL from WWW-Authenticate: ${discoveredMetadataUrl}`
-                  );
-                }
-
-                // Fetch from the discovered URL
-                response = await fetch(discoveredMetadataUrl, {
-                  method: "GET",
-                  headers: {
-                    Accept: "application/json",
-                    "User-Agent": "mcp-use/1.0",
-                  },
-                });
-
-                if (response.ok) {
-                  discoveredFromWWWAuth = true;
-                  if (enableLogging) {
-                    console.log(
-                      `[OAuth Proxy] Successfully fetched metadata from discovered URL`
-                    );
-                  }
-                }
-              }
-            }
-          } catch (discoveryError) {
-            if (enableLogging) {
-              console.log(
-                `[OAuth Proxy] WWW-Authenticate discovery failed, falling back to standard path:`,
-                discoveryError instanceof Error
-                  ? discoveryError.message
-                  : discoveryError
-              );
-            }
-            // Continue to fallback
-          }
-        }
-      }
-
-      // FALLBACK: Try the standard .well-known path if discovery failed
-      if (!response || !response.ok) {
-        if (enableLogging && !discoveredFromWWWAuth) {
-          console.log(`[OAuth Proxy] Trying standard metadata path: ${url}`);
-        }
-        const fallbackUrls: string[] = [metadataUrl.toString()];
-        const mcpServerUrl = c.req.query("mcp_url");
-
-        // If the incoming metadata URL points to our own host (proxy/gateway URL),
-        // also try deriving well-known metadata from the actual MCP server URL.
-        // This handles servers that don't send resource_metadata in WWW-Authenticate.
-        if (mcpServerUrl) {
-          try {
-            const parsedMcpUrl = new URL(mcpServerUrl);
-            const requestHost = new URL(c.req.url).host;
-            const metadataLooksLocal =
-              metadataUrl.host === requestHost ||
-              metadataUrl.host === "localhost:3000" ||
-              metadataUrl.pathname.includes("/inspector/api/");
-
-            if (metadataLooksLocal) {
-              const mcpPath = parsedMcpUrl.pathname.replace(/\/+$/, "");
-              if (url.includes("/.well-known/oauth-protected-resource")) {
-                const scoped = `${parsedMcpUrl.origin}/.well-known/oauth-protected-resource${mcpPath}`;
-                const root = `${parsedMcpUrl.origin}/.well-known/oauth-protected-resource`;
-                if (!fallbackUrls.includes(scoped)) fallbackUrls.push(scoped);
-                if (!fallbackUrls.includes(root)) fallbackUrls.push(root);
-              } else if (
-                url.includes("/.well-known/oauth-authorization-server")
-              ) {
-                const authServer = `${parsedMcpUrl.origin}/.well-known/oauth-authorization-server`;
-                if (!fallbackUrls.includes(authServer))
-                  fallbackUrls.push(authServer);
-              } else if (url.includes("/.well-known/openid-configuration")) {
-                const openid = `${parsedMcpUrl.origin}/.well-known/openid-configuration`;
-                if (!fallbackUrls.includes(openid)) fallbackUrls.push(openid);
-              }
-            }
-          } catch {
-            // Ignore malformed mcp_url and continue with default fallback.
-          }
-        }
-
-        const attempted: Array<{ url: string; status: number; ok: boolean }> =
-          [];
-        for (const fallbackUrl of fallbackUrls) {
-          response = await fetch(fallbackUrl, {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              "User-Agent": "mcp-use/1.0",
-            },
-          });
-          attempted.push({
-            url: fallbackUrl,
-            status: response.status,
-            ok: response.ok,
-          });
-          if (response.ok) {
-            break;
-          }
-        }
-      }
-
-      if (!response) {
+    try {
+      log(enableLogging, `GET ${target}`);
+      const upstream = await safeFetch(target, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        redirect: "manual",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (isRedirect(upstream.status)) {
         return c.json(
-          { error: "Failed to fetch OAuth metadata: no response" },
+          { error: "OAuth metadata redirects are not allowed" },
           502
         );
       }
+      const raw = await readCapped(upstream, maxResponseBodyBytes);
+      if (!upstream.ok) {
+        return c.body(raw, upstream.status as never, {
+          "Content-Type":
+            upstream.headers.get("content-type") ?? "application/json",
+        });
+      }
+      const metadata = parseObject(raw);
 
-      if (!response.ok) {
-        if (enableLogging) {
-          console.error(
-            `[OAuth Proxy] Metadata fetch failed: ${response.status} ${response.statusText}`
-          );
-        }
-        return c.json(
-          {
-            error: `Failed to fetch OAuth metadata: ${response.status} ${response.statusText}`,
-          },
-          response.status as any
+      if (metadataKind.type === "protected-resource") {
+        await bindProtectedResource(
+          metadata,
+          serverUrl,
+          binding,
+          allowLoopback
+        );
+      } else {
+        await bindAuthorizationServer(
+          metadata,
+          metadataKind.issuer,
+          binding,
+          allowLoopback
         );
       }
+      binding.updatedAt = Date.now();
+      bindings.set(key, binding);
+      pruneBindings(bindings);
 
-      let metadata = await response.json();
-
-      // If this is an oauth-protected-resource response and we're using MCP proxy,
-      // we need to temporarily rewrite the resource field to pass SDK validation.
-      // The browser fetch interceptor will rewrite it back to the actual resource
-      // when making the authorization request to the OAuth server.
-      if (metadata.resource && metadata.authorization_servers) {
-        // Check if request includes X-Connection-URL header (set by client when using MCP proxy)
-        const connectionUrl = c.req.header("X-Connection-URL");
-
-        // IMPORTANT: only rewrite when client explicitly passes X-Connection-URL.
-        // Inferring from /oauth route can break callback flows where resource must
-        // remain the original MCP endpoint for SDK resource matching.
-
-        if (connectionUrl) {
-          // Store the original resource URL in a custom field
-          metadata = {
-            ...metadata,
-            resource: connectionUrl, // SDK validation requires this to match connection URL
-            _original_resource: metadata.resource, // Store original for client to use in OAuth request
-          };
-          if (enableLogging) {
-            console.log(
-              `[OAuth Proxy] Rewrote resource field to ${connectionUrl} for SDK validation (original: ${metadata._original_resource})`
-            );
-          }
-        }
-      }
-
-      return c.json(metadata);
+      return c.body(raw, 200, {
+        "Content-Type":
+          upstream.headers.get("content-type") ?? "application/json",
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      if (enableLogging) {
-        console.error("[OAuth Proxy] Metadata error:", message);
-      }
-      return c.json(
-        {
-          error: "OAuth metadata proxy failed",
-          details: message,
-        },
-        500
-      );
+      return proxyError(c, error, enableLogging);
     }
   });
 
-  /**
-   * General OAuth Request Proxy
-   * POST /oauth/proxy
-   *
-   * Proxies OAuth requests (token exchange, registration, etc.) to bypass CORS.
-   * Request body: { url: string, method?: string, body?: object, headers?: object }
-   */
-  app.post(`${basePath}/proxy`, async (c: Context) => {
+  app.post(`${basePath}/proxy`, async (c) => {
+    if (!(await isAuthenticated(c, authenticate))) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    let request: ProxyRequest;
     try {
-      // Optional authentication
-      if (authenticate) {
-        const isAuthenticated = await authenticate(c);
-        if (!isAuthenticated) {
-          return c.json({ error: "Unauthorized" }, 401);
-        }
-      }
-
-      const {
-        url,
-        method = "GET",
-        body,
-        headers: customHeaders,
-      } = await c.req.json();
-
-      if (!url) {
-        return c.json({ error: "Missing url parameter" }, 400);
-      }
-
-      // Validate URL format
-      let targetUrl: URL;
-      try {
-        targetUrl = new URL(url);
-        if (targetUrl.protocol !== "https:" && targetUrl.protocol !== "http:") {
-          return c.json({ error: "Invalid protocol" }, 400);
-        }
-      } catch {
-        return c.json({ error: "Invalid URL format" }, 400);
-      }
-
-      // Optional target validation
-      if (validateTarget) {
-        const isValid = await validateTarget(targetUrl.toString(), c);
-        if (!isValid) {
-          return c.json({ error: "Target URL not allowed" }, 403);
-        }
-      }
-
-      if (enableLogging) {
-        console.log(`[OAuth Proxy] ${method} ${url}`);
-      }
-
-      // Build request headers
-      const requestHeaders: Record<string, string> = {
-        "User-Agent": "mcp-use/1.0",
-        ...customHeaders,
-      };
-
-      // Determine content type from custom headers or default to JSON
-      const contentType =
-        customHeaders?.["Content-Type"] || customHeaders?.["content-type"];
-      const isFormUrlEncoded = contentType?.includes(
-        "application/x-www-form-urlencoded"
+      request = JSON.parse(
+        await readRequestCapped(c.req.raw, maxRequestBodyBytes)
+      ) as ProxyRequest;
+    } catch (error) {
+      return c.json(
+        {
+          error:
+            error instanceof BodyTooLargeError
+              ? "Request body too large"
+              : "Invalid JSON request body",
+        },
+        error instanceof BodyTooLargeError ? 413 : 400
       );
+    }
 
-      if (method === "POST" && body && !contentType) {
-        requestHeaders["Content-Type"] = "application/json";
+    const serverUrlResult = await validateUrl(request.serverUrl, allowLoopback);
+    if ("error" in serverUrlResult) {
+      return c.json({ error: serverUrlResult.error }, 400);
+    }
+    const serverUrl = serverUrlResult.url;
+    if (
+      validateServerUrl &&
+      !(await validateServerUrl(serverUrl.toString(), c))
+    ) {
+      return c.json({ error: "MCP server URL not allowed" }, 403);
+    }
+
+    const targetResult = await validateUrl(request.url, allowLoopback);
+    if ("error" in targetResult) {
+      return c.json({ error: targetResult.error }, 400);
+    }
+    const target = targetResult.url;
+    if (request.method !== undefined && request.method !== "POST") {
+      return c.json({ error: "Only OAuth endpoint POST is allowed" }, 405);
+    }
+
+    const bindingKey = canonicalUrl(serverUrl);
+    const binding = getBinding(bindings, bindingKey);
+    if (binding.endpoints.size === 0) {
+      try {
+        await hydrateBinding(
+          serverUrl,
+          binding,
+          allowLoopback,
+          timeoutMs,
+          maxResponseBodyBytes
+        );
+        bindings.set(bindingKey, binding);
+        pruneBindings(bindings);
+      } catch (error) {
+        return proxyError(c, error, enableLogging);
+      }
+    }
+    const endpointKind = binding.endpoints.get(canonicalUrl(target));
+    if (!endpointKind) {
+      return c.json(
+        { error: "OAuth endpoint is not bound to this MCP server" },
+        403
+      );
+    }
+
+    try {
+      const headers = filterRequestHeaders(request.headers);
+      const body = serializeBody(request.body, headers);
+      if (
+        new TextEncoder().encode(body ?? "").byteLength > maxRequestBodyBytes
+      ) {
+        return c.json({ error: "OAuth request body too large" }, 413);
       }
 
-      // Make request to target server
-      const fetchOptions: RequestInit = {
-        method,
-        headers: requestHeaders,
-      };
-
-      if (method === "POST" && body) {
-        if (isFormUrlEncoded && typeof body === "object") {
-          // Convert object to URL-encoded string
-          const params = new URLSearchParams();
-          for (const [key, value] of Object.entries(body)) {
-            params.append(key, String(value));
-          }
-          fetchOptions.body = params.toString();
-        } else if (typeof body === "string") {
-          // Body is already a string, use as-is
-          fetchOptions.body = body;
-        } else {
-          // Body is an object, stringify it
-          fetchOptions.body = JSON.stringify(body);
-        }
-      }
-
-      const response = await fetch(targetUrl.toString(), fetchOptions);
-
-      // Capture ALL response headers (no CORS restrictions on backend)
-      const headers: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-
-      let responseBody: any = null;
-      const contentTypeHeader = headers["content-type"] || "";
-
-      // Handle different response types
-      if (contentTypeHeader.includes("application/json")) {
-        try {
-          responseBody = await response.json();
-        } catch {
-          responseBody = await response.text();
-        }
-      } else {
-        try {
-          responseBody = await response.text();
-        } catch {
-          responseBody = null;
-        }
-      }
-
-      // Return full response with headers
-      return c.json({
-        status: response.status,
-        statusText: response.statusText,
+      log(enableLogging, `POST ${endpointKind} ${target}`);
+      const upstream = await safeFetch(target, {
+        method: "POST",
         headers,
+        body,
+        redirect: "manual",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (isRedirect(upstream.status)) {
+        return c.json(
+          { error: "OAuth endpoint redirects are not allowed" },
+          502
+        );
+      }
+      const raw = await readCapped(upstream, maxResponseBodyBytes);
+      const responseHeaders = filterResponseHeaders(upstream.headers);
+      const contentType = upstream.headers.get("content-type") ?? "";
+      let responseBody: unknown = raw;
+      if (contentType.includes("json")) {
+        try {
+          responseBody = JSON.parse(raw);
+        } catch {
+          // Preserve malformed upstream bodies; the OAuth client will reject them.
+        }
+      }
+      return c.json({
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers: responseHeaders,
         body: responseBody,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      if (enableLogging) {
-        console.error("[OAuth Proxy] Request error:", message);
-      }
-      return c.json(
-        {
-          error: "OAuth proxy request failed",
-          details: message,
-        },
-        500
-      );
+      return proxyError(c, error, enableLogging);
     }
   });
 
-  if (enableLogging) {
-    console.log(
-      `[OAuth Proxy] Mounted OAuth proxy routes at ${basePath}/metadata and ${basePath}/proxy`
+  log(enableLogging, `Mounted at ${basePath}/metadata and ${basePath}/proxy`);
+}
+
+async function validateUrl(
+  value: unknown,
+  allowLoopback: boolean
+): Promise<{ url: URL } | { error: string }> {
+  if (typeof value !== "string" || !value) {
+    return { error: "Missing or invalid URL" };
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { error: "Invalid URL" };
+  }
+  if (url.username || url.password || url.hash) {
+    return { error: "URL credentials and fragments are not allowed" };
+  }
+
+  const loopback = isLoopbackHostname(url.hostname);
+  if (url.protocol !== "https:") {
+    if (!(allowLoopback && loopback && url.protocol === "http:")) {
+      return { error: "HTTPS is required" };
+    }
+  }
+  if (loopback) {
+    return allowLoopback ? { url } : { error: "Loopback URL not allowed" };
+  }
+  if (isLocalHostname(url.hostname)) {
+    return { error: "Local network URL not allowed" };
+  }
+
+  try {
+    const addresses = isIP(url.hostname)
+      ? [url.hostname]
+      : (await lookup(url.hostname, { all: true, verbatim: true })).map(
+          ({ address }) => address
+        );
+    if (
+      addresses.length === 0 ||
+      addresses.some((address) => !isPublicAddress(address))
+    ) {
+      return { error: "Private or non-routable URL not allowed" };
+    }
+  } catch {
+    return { error: "URL hostname could not be resolved" };
+  }
+  return { url };
+}
+
+/** Validate a proxy target against the BFF's HTTPS and SSRF policy. */
+export async function isSafeProxyTarget(
+  value: string,
+  allowLoopback = false
+): Promise<boolean> {
+  return !("error" in (await validateUrl(value, allowLoopback)));
+}
+
+function classifyMetadataTarget(
+  serverUrl: URL,
+  target: URL,
+  binding: Binding
+):
+  | { type: "protected-resource" }
+  | { type: "authorization-server"; issuer: string }
+  | undefined {
+  const targetUrl = canonicalUrl(target);
+  if (
+    protectedResourceMetadataUrls(serverUrl).some(
+      (candidate) => canonicalUrl(candidate) === targetUrl
+    )
+  ) {
+    return { type: "protected-resource" };
+  }
+  for (const issuer of binding.authorizationServers) {
+    if (
+      authorizationServerMetadataUrls(new URL(issuer)).some(
+        (candidate) => canonicalUrl(candidate) === targetUrl
+      )
+    ) {
+      return { type: "authorization-server", issuer };
+    }
+  }
+  return undefined;
+}
+
+function protectedResourceMetadataUrls(serverUrl: URL): URL[] {
+  const path = serverUrl.pathname === "/" ? "" : serverUrl.pathname;
+  return [
+    new URL(`/.well-known/oauth-protected-resource${path}`, serverUrl.origin),
+    new URL("/.well-known/oauth-protected-resource", serverUrl.origin),
+  ];
+}
+
+function authorizationServerMetadataUrls(issuer: URL): URL[] {
+  const path = issuer.pathname === "/" ? "" : issuer.pathname;
+  return [
+    new URL(`/.well-known/oauth-authorization-server${path}`, issuer.origin),
+    new URL(`/.well-known/openid-configuration${path}`, issuer.origin),
+    new URL(`${path || ""}/.well-known/openid-configuration`, issuer.origin),
+  ];
+}
+
+async function bindProtectedResource(
+  metadata: Record<string, unknown>,
+  serverUrl: URL,
+  binding: Binding,
+  allowLoopback: boolean
+): Promise<void> {
+  if (
+    typeof metadata.resource !== "string" ||
+    canonicalUrl(new URL(metadata.resource)) !== canonicalUrl(serverUrl)
+  ) {
+    throw new InvalidUpstreamError(
+      "Protected-resource metadata does not match serverUrl"
     );
   }
+  if (
+    !Array.isArray(metadata.authorization_servers) ||
+    metadata.authorization_servers.length === 0
+  ) {
+    throw new InvalidUpstreamError(
+      "Protected-resource metadata has no authorization servers"
+    );
+  }
+
+  const issuers = new Set<string>();
+  for (const value of metadata.authorization_servers) {
+    const result = await validateUrl(value, allowLoopback);
+    if ("error" in result) {
+      throw new InvalidUpstreamError(
+        `Unsafe authorization server: ${result.error}`
+      );
+    }
+    issuers.add(canonicalUrl(result.url));
+  }
+  binding.authorizationServers = issuers;
+  binding.endpoints.clear();
 }
+
+async function bindAuthorizationServer(
+  metadata: Record<string, unknown>,
+  expectedIssuer: string,
+  binding: Binding,
+  allowLoopback: boolean
+): Promise<void> {
+  if (
+    typeof metadata.issuer !== "string" ||
+    canonicalUrl(new URL(metadata.issuer)) !== expectedIssuer
+  ) {
+    throw new InvalidUpstreamError(
+      "Authorization-server metadata issuer mismatch"
+    );
+  }
+  binding.endpoints.clear();
+  for (const [field, kind] of ENDPOINT_FIELDS) {
+    const value = metadata[field];
+    if (value === undefined) continue;
+    const result = await validateUrl(value, allowLoopback);
+    if ("error" in result) {
+      throw new InvalidUpstreamError(`Unsafe ${field}: ${result.error}`);
+    }
+    binding.endpoints.set(canonicalUrl(result.url), kind);
+  }
+}
+
+async function hydrateBinding(
+  serverUrl: URL,
+  binding: Binding,
+  allowLoopback: boolean,
+  timeoutMs: number,
+  maxResponseBodyBytes: number
+): Promise<void> {
+  for (const metadataUrl of protectedResourceMetadataUrls(serverUrl)) {
+    const response = await safeFetch(metadataUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (isRedirect(response.status)) {
+      throw new InvalidUpstreamError(
+        "OAuth metadata redirects are not allowed"
+      );
+    }
+    if (!response.ok) continue;
+    await bindProtectedResource(
+      parseObject(await readCapped(response, maxResponseBodyBytes)),
+      serverUrl,
+      binding,
+      allowLoopback
+    );
+    break;
+  }
+  if (binding.authorizationServers.size === 0) {
+    throw new InvalidUpstreamError(
+      "Protected-resource metadata could not be discovered"
+    );
+  }
+
+  for (const issuer of binding.authorizationServers) {
+    let bound = false;
+    for (const metadataUrl of authorizationServerMetadataUrls(
+      new URL(issuer)
+    )) {
+      const response = await safeFetch(metadataUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        redirect: "manual",
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (isRedirect(response.status)) {
+        throw new InvalidUpstreamError(
+          "OAuth metadata redirects are not allowed"
+        );
+      }
+      if (!response.ok) continue;
+      await bindAuthorizationServer(
+        parseObject(await readCapped(response, maxResponseBodyBytes)),
+        issuer,
+        binding,
+        allowLoopback
+      );
+      bound = true;
+      break;
+    }
+    if (bound) break;
+  }
+  if (binding.endpoints.size === 0) {
+    throw new InvalidUpstreamError(
+      "Authorization-server metadata could not be discovered"
+    );
+  }
+  binding.updatedAt = Date.now();
+}
+
+async function safeFetch(url: URL, init: RequestInit): Promise<Response> {
+  return fetch(url, init);
+}
+
+function filterRequestHeaders(value: unknown): Headers {
+  const result = new Headers();
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    return result;
+  for (const [name, rawValue] of Object.entries(value)) {
+    const lower = name.toLowerCase();
+    if (SAFE_REQUEST_HEADERS.has(lower) && typeof rawValue === "string") {
+      result.set(lower, rawValue);
+    }
+  }
+  return result;
+}
+
+function filterResponseHeaders(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {};
+  headers.forEach((value, name) => {
+    if (SAFE_RESPONSE_HEADERS.has(name.toLowerCase())) result[name] = value;
+  });
+  return result;
+}
+
+function serializeBody(body: unknown, headers: Headers): string | undefined {
+  if (body === undefined || body === null) return undefined;
+  if (typeof body === "string") return body;
+  const contentType = headers.get("content-type") ?? "";
+  if (
+    contentType.includes("application/x-www-form-urlencoded") &&
+    typeof body === "object" &&
+    !Array.isArray(body)
+  ) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(
+      body as Record<string, unknown>
+    )) {
+      params.append(key, String(value));
+    }
+    return params.toString();
+  }
+  if (!headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
+  return JSON.stringify(body);
+}
+
+async function readRequestCapped(
+  request: Request,
+  maxBytes: number
+): Promise<string> {
+  const declared = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new BodyTooLargeError();
+  }
+  return readStreamCapped(request.body, maxBytes);
+}
+
+async function readCapped(
+  response: Response,
+  maxBytes: number
+): Promise<string> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    throw new BodyTooLargeError();
+  }
+  return readStreamCapped(response.body, maxBytes);
+}
+
+async function readStreamCapped(
+  stream: ReadableStream<Uint8Array> | null,
+  maxBytes: number
+): Promise<string> {
+  if (!stream) return "";
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      throw new BodyTooLargeError();
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function parseObject(value: string): Record<string, unknown> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new InvalidUpstreamError("OAuth metadata is not valid JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new InvalidUpstreamError("OAuth metadata is not an object");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function getBinding(bindings: Map<string, Binding>, key: string): Binding {
+  const existing = bindings.get(key);
+  if (existing && Date.now() - existing.updatedAt <= BINDING_TTL_MS) {
+    return existing;
+  }
+  bindings.delete(key);
+  return {
+    authorizationServers: new Set(),
+    endpoints: new Map(),
+    updatedAt: Date.now(),
+  };
+}
+
+function pruneBindings(bindings: Map<string, Binding>): void {
+  const now = Date.now();
+  for (const [key, binding] of bindings) {
+    if (now - binding.updatedAt > BINDING_TTL_MS) bindings.delete(key);
+  }
+  while (bindings.size > MAX_BINDINGS) {
+    const oldest = bindings.keys().next().value as string | undefined;
+    if (!oldest) break;
+    bindings.delete(oldest);
+  }
+}
+
+function canonicalUrl(url: URL): string {
+  const copy = new URL(url);
+  copy.hash = "";
+  if (
+    (copy.protocol === "https:" && copy.port === "443") ||
+    (copy.protocol === "http:" && copy.port === "80")
+  ) {
+    copy.port = "";
+  }
+  return copy.toString().replace(/\/$/, "");
+}
+
+function normalizeOrigin(origin: string): string {
+  const url = new URL(origin);
+  if (url.pathname !== "/" || url.search || url.hash) {
+    throw new Error(`OAuth proxy allowed origin must be an origin: ${origin}`);
+  }
+  return url.origin;
+}
+
+function isAllowedOrigin(
+  origin: string,
+  requestUrl: string,
+  allowed: Set<string>
+): boolean {
+  try {
+    const normalized = normalizeOrigin(origin);
+    return normalized === new URL(requestUrl).origin || allowed.has(normalized);
+  } catch {
+    return false;
+  }
+}
+
+function corsResponse(origin: string | undefined): Response {
+  const headers = new Headers();
+  if (origin) setCorsHeaders(headers, origin);
+  headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  headers.set(
+    "Access-Control-Allow-Headers",
+    "Accept, Authorization, Content-Type"
+  );
+  headers.set("Access-Control-Max-Age", "600");
+  return new Response(null, { status: 204, headers });
+}
+
+function setCorsHeaders(headers: Headers, origin: string): void {
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.append("Vary", "Origin");
+}
+
+async function isAuthenticated(
+  c: Context,
+  authenticate: OAuthProxyOptions["authenticate"]
+): Promise<boolean> {
+  return authenticate ? authenticate(c) : true;
+}
+
+function isRedirect(status: number): boolean {
+  return status >= 300 && status < 400;
+}
+
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    normalized === "localhost" ||
+    normalized.endsWith(".localhost") ||
+    normalized === "::1" ||
+    normalized.startsWith("127.")
+  );
+}
+
+function isLocalHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized.endsWith(".local") ||
+    normalized.endsWith(".internal") ||
+    normalized.endsWith(".home.arpa")
+  );
+}
+
+function isPublicAddress(address: string): boolean {
+  if (address.includes(":")) {
+    const lower = address.toLowerCase();
+    if (lower.startsWith("::ffff:")) {
+      return isPublicAddress(lower.slice(7));
+    }
+    return !(
+      lower === "::" ||
+      lower === "::1" ||
+      lower.startsWith("fc") ||
+      lower.startsWith("fd") ||
+      /^fe[89ab]/.test(lower) ||
+      lower.startsWith("ff") ||
+      lower.startsWith("2001:db8:")
+    );
+  }
+  const parts = address.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
+    return false;
+  }
+  const [a, b, c] = parts;
+  return !(
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0 && c === 0) ||
+    (a === 192 && b === 0 && c === 2) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    (a === 198 && b === 51 && c === 100) ||
+    (a === 203 && b === 0 && c === 113) ||
+    a >= 224
+  );
+}
+
+function log(enabled: boolean, message: string): void {
+  if (enabled) console.log(`[OAuth BFF] ${message}`);
+}
+
+function proxyError(c: Context, error: unknown, logging: boolean): Response {
+  const message = error instanceof Error ? error.message : "Unknown error";
+  if (logging) console.error("[OAuth BFF]", message);
+  if (error instanceof BodyTooLargeError) {
+    return c.json({ error: "Upstream response too large" }, 502);
+  }
+  if (error instanceof InvalidUpstreamError) {
+    return c.json({ error: error.message }, 502);
+  }
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return c.json({ error: "OAuth upstream timed out" }, 504);
+  }
+  return c.json({ error: "OAuth upstream request failed" }, 502);
+}
+
+class BodyTooLargeError extends Error {}
+class InvalidUpstreamError extends Error {}

@@ -6,32 +6,32 @@ icon: "message-square"
 
 Prompts are reusable, parameterized templates that MCP servers provide for AI interactions. They standardize common workflows, enable consistent communication patterns, and help structure complex requests with well-defined parameters.
 
-
 ## Listing Available Prompts
 
 To see what prompts are available from a connected MCP server:
 
 <CodeGroup>
 ```typescript TypeScript highlight={12-16}
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from '@mcp-use/client'
 
 const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
+mcpServers: {
+// Your server definitions here
+}
 })
 await client.createAllSessions()
 
 const session = client.getSession('my_server')
 
 const prompts = await session.listPrompts()
-    for (const prompt of prompts) {
-    console.log(`Prompt: ${prompt.name}`)
-    console.log(`Description: ${prompt.description}`)
+for (const prompt of prompts) {
+console.log(`Prompt: ${prompt.name}`)
+console.log(`Description: ${prompt.description}`)
 }
 
 await client.closeAllSessions()
-```
+
+````
 </CodeGroup>
 
 ## Retrieving Prompts
@@ -40,7 +40,7 @@ Prompts are retrieved using the `getPrompt` method:
 
 <CodeGroup>
 ```typescript TypeScript highlight={10-15}
-import { MCPClient } from 'mcp-use'
+import { MCPClient } from '@mcp-use/client'
 
 const client = new MCPClient({
     mcpServers: {
@@ -63,7 +63,8 @@ for (const message of result.messages) {
 }
 
 await client.closeAllSessions()
-```
+````
+
 </CodeGroup>
 
 ## Prompt Structure
@@ -76,8 +77,8 @@ Prompts return structured content with messages:
 const result = await session.getPrompt('code_review', { language: 'python' })
 
 for (const message of result.messages) {
-    // Messages have roles (e.g., "user", "assistant", "system")
-    const role = message.role
+// Messages have roles (e.g., "user", "assistant", "system")
+const role = message.role
 
     // Content can be text or other formats
     if ('text' in message.content) {
@@ -89,6 +90,9 @@ for (const message of result.messages) {
     if ('image' in message.content) {
         console.log(`${role}: [Image content]`)
     }
+
 }
+
 ```
 </CodeGroup>
+```

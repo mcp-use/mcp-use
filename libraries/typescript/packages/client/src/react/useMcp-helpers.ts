@@ -1,7 +1,80 @@
-import { BrowserOAuthClientProvider } from "../auth/browser-provider.js";
+import { BrowserOAuthClientProvider } from "../auth/browser.js";
 import type { OAuthClientInformation } from "@modelcontextprotocol/client";
+import type { MCPServerInfo } from "../core/session.js";
+import { detectFavicon } from "./favicon.js";
 
 export const USE_MCP_SERVER_NAME = "inspector-server";
+
+/** Asserts that a condition is true, throwing an error if not. */
+export function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+type ServerInfoWithIcon = MCPServerInfo & { icon?: string };
+type AddLog = (
+  level: "debug" | "info" | "warn" | "error",
+  message: string,
+  ...args: unknown[]
+) => void;
+
+/** Resolve a server-provided icon, then fall back to domain favicon discovery. */
+export async function loadServerIcon(params: {
+  serverInfo: MCPServerInfo;
+  url?: string;
+  isMounted: () => boolean;
+  setServerInfo: (
+    update: (previous?: ServerInfoWithIcon) => ServerInfoWithIcon | undefined
+  ) => void;
+  addLog: AddLog;
+}): Promise<string | null> {
+  try {
+    const iconUrl = params.serverInfo.icons?.[0]?.src;
+    if (iconUrl) {
+      params.addLog("info", "Server provided icon:", iconUrl);
+      const response = await fetch(iconUrl);
+      const blob = await response.blob();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      if (params.isMounted()) {
+        params.setServerInfo((previous) =>
+          previous ? { ...previous, icon: base64 } : undefined
+        );
+        params.addLog("debug", "Server icon converted to base64");
+      }
+      return base64;
+    }
+
+    if (params.url) {
+      const favicon = await detectFavicon(params.url);
+      if (!params.isMounted()) {
+        params.addLog(
+          "debug",
+          "Connection aborted after favicon detection - component unmounted"
+        );
+        return null;
+      }
+      if (favicon) {
+        params.setServerInfo((previous) =>
+          previous ? { ...previous, icon: favicon } : undefined
+        );
+        params.addLog("debug", "Favicon detected and added to serverInfo");
+        return favicon;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    params.addLog("debug", "Icon loading failed (non-critical):", error);
+    return null;
+  }
+}
 
 /** Human-readable reason when MCP operations run before the client is usable. */
 export function formatMcpNotReadyReason(
@@ -55,13 +128,26 @@ export function isOAuthDiscoveryFailure(error: Error | unknown): boolean {
   );
 }
 
-function deriveOAuthProxyUrl(gatewayUrl?: string): string | undefined {
-  if (!gatewayUrl) {
+/**
+ * Derive the companion OAuth proxy endpoint from an MCP proxy endpoint.
+ *
+ * The Inspector proxy convention is `/proxy` for MCP traffic and `/oauth` for
+ * OAuth metadata/token requests. An explicit OAuth URL always takes priority.
+ */
+export function deriveOAuthProxyUrl(
+  gatewayUrl: string | undefined,
+  explicitOAuthProxyUrl: string | undefined
+): string | undefined {
+  if (explicitOAuthProxyUrl) return explicitOAuthProxyUrl;
+  if (!gatewayUrl) return undefined;
+
+  try {
+    const url = new URL(gatewayUrl);
+    url.pathname = url.pathname.replace(/\/proxy\/?$/, "/oauth");
+    return url.toString();
+  } catch {
     return undefined;
   }
-  const gatewayUrlObj = new URL(gatewayUrl);
-  const basePath = gatewayUrlObj.pathname.replace(/\/proxy\/?$/, "");
-  return `${gatewayUrlObj.origin}${basePath}/oauth`;
 }
 
 export function createBrowserOAuthProvider(params: {
@@ -71,6 +157,7 @@ export function createBrowserOAuthProvider(params: {
   callbackUrl: string;
   preventAutoAuth: boolean;
   useRedirectFlow: boolean;
+  /** MCP proxy URL used to derive the companion OAuth proxy when needed. */
   gatewayUrl?: string;
   /**
    * Explicit OAuth proxy base URL. Takes precedence over the URL derived from
@@ -90,13 +177,16 @@ export function createBrowserOAuthProvider(params: {
    */
   proxyOAuthRequests: boolean;
   staticClientInfo?: OAuthClientInformation;
+  clientMetadataUrl?: string;
   scope?: string;
 }): {
   provider: BrowserOAuthClientProvider;
   oauthProxyUrl?: string;
 } {
-  const oauthProxyUrl =
-    params.oauthProxyUrl ?? deriveOAuthProxyUrl(params.gatewayUrl);
+  const oauthProxyUrl = deriveOAuthProxyUrl(
+    params.gatewayUrl,
+    params.oauthProxyUrl
+  );
   const provider = new BrowserOAuthClientProvider(params.effectiveOAuthUrl, {
     storageKeyPrefix: params.storageKeyPrefix,
     clientName: params.oauthClientConfig.name,
@@ -107,10 +197,10 @@ export function createBrowserOAuthProvider(params: {
     preventAutoAuth: params.preventAutoAuth,
     useRedirectFlow: params.useRedirectFlow,
     oauthProxyUrl,
-    connectionUrl: params.gatewayUrl,
     onPopupWindow: params.onPopupWindow,
     proxyOAuthRequests: params.proxyOAuthRequests,
     staticClientInfo: params.staticClientInfo,
+    clientMetadataUrl: params.clientMetadataUrl,
     scope: params.scope,
   });
 

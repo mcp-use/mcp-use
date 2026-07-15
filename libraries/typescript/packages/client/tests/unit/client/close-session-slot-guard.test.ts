@@ -10,12 +10,16 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { BaseMCPClient } from "../../../src/client/base.js";
-import type { BaseConnector } from "../../../src/connectors/base.js";
-import type { MCPSession } from "../../../src/session.js";
+import { BaseMCPClient } from "../../../src/core/base.js";
+import type { BaseConnector } from "../../../src/transport/base.js";
+import type { MCPSession } from "../../../src/core/session.js";
 
 class TestMCPClient extends BaseMCPClient {
   protected createConnectorFromConfig(): BaseConnector {
+    throw new Error("not needed for these tests");
+  }
+
+  protected async createDefaultOAuthProvider(): Promise<never> {
     throw new Error("not needed for these tests");
   }
 
@@ -98,5 +102,20 @@ describe("BaseMCPClient.closeSession slot guard", () => {
 
     expect(client.getSessionSlot("server")).toBeUndefined();
     expect(client.activeSessions).not.toContain("server");
+  });
+
+  it("closes an active session before removing its server configuration", async () => {
+    const client = new TestMCPClient({
+      mcpServers: { server: { url: "https://example.com/mcp" } },
+    });
+    const session = makeSession(() => Promise.resolve());
+    client.setSession("server", session);
+    client.activeSessions = ["server"];
+
+    await client.removeServer("server");
+
+    expect(session.disconnect).toHaveBeenCalledTimes(1);
+    expect(client.getSession("server")).toBeNull();
+    expect(client.getServerNames()).not.toContain("server");
   });
 });

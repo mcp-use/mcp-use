@@ -4,7 +4,12 @@
  * Follows the CLI entry contract: default-export the MCPServer instance;
  * `mcp-use dev` / `build` / `start` own the socket and view priming.
  */
-import { MCPServer } from "@mcp-use/server";
+import {
+  completable,
+  inputRequired,
+  inputResponse,
+  MCPServer,
+} from "@mcp-use/server";
 import { z } from "zod";
 
 const BASE_PATH = "/mcp";
@@ -233,6 +238,182 @@ export const getFruitDetails = server.tool(
       structuredContent: details,
     };
   }
+);
+
+export const reportClientCapabilities = server.tool(
+  {
+    name: "report-client-capabilities",
+    title: "Report client capabilities",
+    description:
+      "Report request-scoped capabilities advertised by the modern MCP client.",
+    inputSchema: z.object({}),
+    outputSchema: z.object({ supportsApps: z.boolean() }),
+  },
+  async (_input, ctx) => {
+    const supportsApps = ctx.client.supportsViews();
+    return {
+      content: [
+        {
+          type: "text",
+          text: supportsApps
+            ? "Client advertises MCP Apps support"
+            : "Client does not advertise MCP Apps support",
+        },
+      ],
+      structuredContent: { supportsApps },
+    };
+  }
+);
+
+export const collectUserInfo = server.tool(
+  {
+    name: "collect-user-info",
+    title: "Collect user information",
+    description:
+      "Request typed user input through modern multi-round-trip elicitation.",
+    inputSchema: z.object({}),
+    outputSchema: z.object({ name: z.string(), age: z.number() }),
+  },
+  async (_input, ctx) => {
+    const form = await ctx.input.form({
+      key: "profile",
+      message: "Provide a profile for the client example",
+      schema: z.object({
+        name: z.string().default("Anonymous"),
+        age: z.number().default(0),
+      }),
+    });
+    if (form.status === "required") return form.result;
+    if (form.status === "accepted") {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Received ${form.value.name}, age ${form.value.age}`,
+          },
+        ],
+        structuredContent: form.value,
+      };
+    }
+    return {
+      isError: true,
+      content: [{ type: "text", text: `Input ${form.status}` }],
+    };
+  }
+);
+
+export const sampleText = server.tool(
+  {
+    name: "sample-text",
+    title: "Sample text",
+    description:
+      "Request an LLM sample through modern multi-round-trip client input.",
+    inputSchema: z.object({
+      prompt: z.string().describe("Prompt sent to the client sampling handler"),
+    }),
+  },
+  async ({ prompt }, ctx) => {
+    const response = inputResponse(ctx.inputResponses, "sample");
+    if (response.kind === "missing") {
+      return inputRequired({
+        inputRequests: {
+          sample: inputRequired.createMessage({
+            messages: [
+              { role: "user", content: { type: "text", text: prompt } },
+            ],
+            maxTokens: 100,
+          }),
+        },
+      });
+    }
+    if (response.kind === "sampling") {
+      const blocks = Array.isArray(response.result.content)
+        ? response.result.content
+        : [response.result.content];
+      const text = blocks
+        .map((block) =>
+          block.type === "text" ? block.text : JSON.stringify(block)
+        )
+        .join("\n");
+      return { content: [{ type: "text", text }] };
+    }
+    return {
+      isError: true,
+      content: [{ type: "text", text: "Expected a sampling response" }],
+    };
+  }
+);
+
+server.resource(
+  {
+    name: "client-showcase-info",
+    uri: "demo://client-showcase",
+    title: "Client showcase information",
+    description: "Static data used by the client resource example.",
+    mimeType: "application/json",
+  },
+  async (uri) => ({
+    contents: [
+      {
+        uri: uri.href,
+        mimeType: "application/json",
+        text: JSON.stringify({
+          server: "mcp-use-v2",
+          era: "modern",
+          transport: "stateless",
+        }),
+      },
+    ],
+  })
+);
+
+server.resourceTemplate(
+  {
+    name: "fruit-by-id",
+    uriTemplate: "fruit://{id}",
+    title: "Fruit by ID",
+    description: "Read one fruit record by ID.",
+    mimeType: "application/json",
+  },
+  async (uri, params) => {
+    const id = String(params.id);
+    const details = FRUIT_DETAILS[id];
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(details ?? { id, found: false }),
+        },
+      ],
+    };
+  }
+);
+
+server.prompt(
+  {
+    name: "review-fruit",
+    title: "Review fruit",
+    description: "Generate a reusable fruit review prompt.",
+    schema: z.object({
+      fruit: completable(z.string().describe("Fruit to review"), [
+        "apple",
+        "banana",
+        "mango",
+      ]),
+    }),
+  },
+  async ({ fruit }) => ({
+    messages: [
+      {
+        role: "user",
+        content: {
+          type: "text",
+          text: `Review ${fruit} for taste, nutrition, and typical uses.`,
+        },
+      },
+    ],
+  })
 );
 
 export default server;

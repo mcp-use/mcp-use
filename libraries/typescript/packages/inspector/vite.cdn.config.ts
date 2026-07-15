@@ -38,14 +38,14 @@ export default defineConfig({
         __dirname,
         "../mcp-use/dist/src/react/index.js"
       ),
-      // Browser MCP client lives in @mcp-use/client after the client split
-      "mcp-use/browser": path.resolve(
+      "@mcp-use/client/react": path.resolve(
         __dirname,
-        "../client/dist/browser.js"
+        "../client/dist/react/index.js"
       ),
-      "@mcp-use/client/browser": path.resolve(
+      // The root client export selects the browser-safe build in Vite.
+      "@mcp-use/client": path.resolve(
         __dirname,
-        "../client/dist/browser.js"
+        "../client/dist/index-browser.js"
       ),
       "posthog-node": path.resolve(stubDir, "posthog-node.js"),
       "@scarf/scarf": path.resolve(stubDir, "@scarf/scarf.js"),
@@ -85,12 +85,7 @@ export default defineConfig({
     global: "globalThis",
   },
   optimizeDeps: {
-    include: [
-      "mcp-use/react",
-      "mcp-use/browser",
-      "@mcp-use/client/browser",
-      "react-syntax-highlighter",
-    ],
+    include: ["mcp-use/react", "@mcp-use/client", "react-syntax-highlighter"],
     exclude: ["posthog-node", "tar", "path-scurry"],
   },
   build: {

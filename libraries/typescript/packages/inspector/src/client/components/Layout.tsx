@@ -65,7 +65,7 @@ export function Layout({ children }: LayoutProps) {
       url: string,
       name?: string,
       proxyConfig?: any,
-      transportType?: "http" | "sse",
+      _transportType?: "http" | "sse",
       oauth?: OAuthStaticConfig,
       connectionMode: ConnectionMode = proxyConfig?.proxyAddress
         ? "proxy"
@@ -79,10 +79,9 @@ export function Layout({ children }: LayoutProps) {
     ) => {
       addServer(url, {
         url,
-        name,
+        displayName: name,
         connectionMode,
         proxyConfig,
-        transportType,
         preventAutoAuth: true,
         useRedirectFlow: true,
         autoProxyFallback,

@@ -6,7 +6,18 @@ icon: "code"
 
 Code Mode enables AI agents to interact with MCP tools by writing and executing JavaScript/TypeScript code instead of making individual tool calls. This dramatically improves efficiency for complex tasks, data processing, and multi-step workflows.
 
-<video alt="Code Mode Example" style={{maxWidth: '600px', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 2px 12px rgba(0,0,0,0.08)'}} muted autoPlay loop>
+<video
+  alt="Code Mode Example"
+  style={{
+    maxWidth: "600px",
+    borderRadius: "8px",
+    marginBottom: "1.5rem",
+    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+  }}
+  muted
+  autoPlay
+  loop
+>
   <source src="/images/code_mode.mp4" type="video/mp4" />
 </video>
 
@@ -20,9 +31,10 @@ Based on [Anthropic's research on code execution with MCP](https://www.anthropic
 - **Natural workflow**: Agents write code the way developers do
 
 <Warning>
-**Security Considerations**: Code Mode executes user-generated code. Always use appropriate sandboxing:
-- **VM Executor**: Basic local sandboxing for trusted environments
-- **E2B Executor**: Strong cloud-based isolation for production use
+  **Security Considerations**: Code Mode executes user-generated code. Always
+  use appropriate sandboxing: - **VM Executor**: Basic local sandboxing for
+  trusted environments - **E2B Executor**: Strong cloud-based isolation for
+  production use
 </Warning>
 
 ## Executor Types
@@ -51,9 +63,8 @@ Local execution using Node.js `vm` module. Fast and simple, suitable for trusted
 The simplest way to enable Code Mode with local execution:
 
 ```typescript
-import { MCPClient } from "mcp-use";
-import { MCPAgent } from "mcp-use/agent";
-import { PROMPTS } from "mcp-use/client/prompts";
+import { MCPClient } from "@mcp-use/client";
+import { MCPAgent, PROMPTS } from "@mcp-use/agent";
 
 const client = new MCPClient(
   {
@@ -64,7 +75,7 @@ const client = new MCPClient(
       },
     },
   },
-  { codeMode: true } // Enable code mode with default VM executor
+  { codeMode: true }, // Enable code mode with default VM executor
 );
 
 const agent = new MCPAgent({
@@ -95,7 +106,7 @@ const client = new MCPClient(
         memoryLimitMb: 512, // Optional memory limit
       },
     },
-  }
+  },
 );
 ```
 
@@ -146,7 +157,7 @@ const client = new MCPClient(
         timeoutMs: 300000, // 5 minutes (default)
       },
     },
-  }
+  },
 );
 ```
 
@@ -184,7 +195,7 @@ const client = new MCPClient(config, {
 **Custom Class:**
 
 ```typescript
-import { BaseCodeExecutor } from "mcp-use";
+import { BaseCodeExecutor } from "@mcp-use/client";
 
 class MyExecutor extends BaseCodeExecutor {
   async execute(code: string, timeout?: number): Promise<ExecutionResult> {
@@ -209,7 +220,6 @@ const client = new MCPClient(config, {
 ```
 
 ## How Agent Code Works
-
 
 Code Mode uses a layered architecture to provide flexible code execution with MCP tool access:
 
@@ -245,7 +255,9 @@ Use `search_tools()` to discover available tools at runtime:
 // Find all tools (returns full schemas)
 const allResult = await search_tools();
 const allTools = allResult.results;
-console.log(`Found ${allResult.meta.result_count} tools out of ${allResult.meta.total_tools} total`);
+console.log(
+  `Found ${allResult.meta.result_count} tools out of ${allResult.meta.total_tools} total`,
+);
 
 // Search for specific tools
 const githubResult = await search_tools("github");
@@ -267,7 +279,7 @@ Full access to JavaScript built-ins for data processing:
 ```javascript
 // Filter and map data
 const openBugs = prs.filter(
-  (pr) => pr.labels.some((l) => l.name === "bug") && pr.state === "open"
+  (pr) => pr.labels.some((l) => l.name === "bug") && pr.state === "open",
 );
 
 // Aggregate results
@@ -279,7 +291,6 @@ const summary = {
 
 return summary;
 ```
-
 
 ## Advanced Topics
 
@@ -395,9 +406,7 @@ try {
 
 ## Complete Examples
 
-
 **VM Executor Example:** See [`examples/agent/code-mode/code_mode_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/agent/code-mode/code_mode_example.ts) for a complete working example using the default VM executor with the filesystem MCP server.
-
 
 **E2B Executor Example:** See [`examples/agent/code-mode/code_mode_e2b_example.ts`](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/agent/code-mode/code_mode_e2b_example.ts) for a complete working example using E2B cloud sandboxes.
 
@@ -407,4 +416,4 @@ try {
 - [Anthropic: Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) - Research and motivation
 - [MCP Specification](https://modelcontextprotocol.io/specification) - MCP protocol details
 - [E2B Documentation](https://e2b.dev/docs) - E2B sandbox platform
-- [Executor Architecture](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/src/client/executors/README.md) - Technical implementation details
+- [Executor Architecture](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/client/src/client/executors/README.md) - Technical implementation details

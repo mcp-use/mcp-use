@@ -1,45 +1,46 @@
 // useMcp.ts
-import { auth, SdkError } from "@modelcontextprotocol/client";
+import { auth } from "@modelcontextprotocol/client";
 import type {
-  CompleteRequestParams,
-  CompleteResult,
   OAuthClientProvider,
   Prompt,
+  ProtocolEra,
   Resource,
   ResourceTemplateType as ResourceTemplate,
   Tool,
+  Transport,
 } from "@modelcontextprotocol/client";
-import { probeAuthParams } from "../auth/probe-www-auth.js";
 import {
   runAuthPopup,
   MCP_AUTH_BROADCAST_CHANNEL,
   MCP_AUTH_CALLBACK_MESSAGE_TYPE,
   type McpAuthCallbackMessage,
-} from "../auth/popup-runner.js";
+} from "../auth/popup.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BrowserMCPClient } from "../client/browser.js";
-import { Logger, type LogLevel, logger } from "../logging.js";
+import { BrowserMCPClient } from "../core/browser.js";
+import { resolveClientOptions } from "../core/config.js";
+import { Logger, type LogLevel } from "../utils/logging.js";
+import type { MCPConnection } from "../core/session.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
-import { assert } from "./assert.js";
-import { detectFavicon } from "./favicon-detector.js";
-import { applyProxyConfig, type ProxyConfig } from "./proxy-config.js";
-import { sanitizeUrl } from "../auth/url-sanitize.js";
-import { getPackageVersion } from "../version.js";
+import { assert } from "./useMcp-helpers.js";
+import type { ProxyConfig } from "./types.js";
+import { sanitizeUrl } from "../auth/url.js";
+import { getPackageVersion } from "../utils/version.js";
 import {
   createBrowserOAuthProvider,
   deriveOAuthClientConfigFromClientInfo,
   isOAuthDiscoveryFailure,
   startConnectionHealthMonitoring,
-  formatMcpNotReadyReason,
   USE_MCP_SERVER_NAME,
 } from "./useMcp-helpers.js";
 import type { UseMcpOptions, UseMcpResult } from "./types.js";
+import { loadServerIcon } from "./useMcp-helpers.js";
+import { useMcpOperations } from "./useMcp-operations.js";
 
 const DEFAULT_RECONNECT_DELAY = 3000;
 const DEFAULT_RETRY_DELAY = 5000;
 
-// Define Transport types literal for clarity
-type TransportType = "http" | "sse";
+// Streamable HTTP is the only supported remote transport.
+type TransportType = "http";
 
 type UseMcpAuthProvider = OAuthClientProvider & {
   tokens?: () => Promise<
@@ -66,6 +67,17 @@ type UseMcpAuthProvider = OAuthClientProvider & {
   serverUrlHash?: string;
 };
 
+type UseMcpInternalOptions = UseMcpOptions & {
+  _initialServerInfo?: {
+    name?: string;
+    version?: string;
+    title?: string;
+    websiteUrl?: string;
+    icons?: Array<{ src: string; mimeType?: string }>;
+    icon?: string;
+  };
+};
+
 /**
  * React hook for connecting to and interacting with MCP servers
  *
@@ -74,7 +86,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
  * - OAuth authentication with automatic token refresh
  * - Tool, resource, and prompt access
  * - AI chat functionality with conversation memory
- * - Multi-transport support (HTTP, SSE) with automatic fallback
+ * - Streamable HTTP transport
  *
  * @param options - Configuration options for the MCP connection
  * @returns MCP connection state and methods
@@ -97,7 +109,7 @@ type UseMcpAuthProvider = OAuthClientProvider & {
  * const result = await mcp.callTool('send-email', { to: 'user@example.com' })
  * ```
  */
-export function useMcp(options: UseMcpOptions): UseMcpResult {
+export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
   const {
     url,
     enabled = true,
@@ -107,48 +119,39 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         )
       : "/oauth/callback",
     storageKeyPrefix = "mcp:auth",
-    clientConfig = {},
     authProvider: providedAuthProvider,
     headers: headersOption,
-    customHeaders: customHeadersOption,
     proxyConfig,
     oauthProxyUrl: oauthProxyUrlOption,
-    autoProxyFallback = true,
-    debug: _debug = false,
-    logLevel: logLevelOption,
+    autoProxyFallback = false,
+    logLevel: logLevelOption = "silent",
     autoRetry = false,
-    autoReconnect = DEFAULT_RECONNECT_DELAY,
+    autoReconnect = true,
     reconnectionOptions,
-    transportType = "auto",
     preventAutoAuth = true, // Default to true - require explicit user action for OAuth
     useRedirectFlow = false, // Default to false for backward compatibility (use popup)
     onPopupWindow,
     timeout = 30000, // 30 seconds default for connection timeout
-    sseReadTimeout = 300000, // 5 minutes default for SSE read timeout
     wrapTransport,
+    serverId,
     fetch: customFetch,
     clientOptions,
+    viewSupport = false,
     protocolNegotiation,
     onNotification,
     onSampling: onSamplingOption,
-    samplingCallback: samplingCallbackOption,
     onElicitation: onElicitationOption,
-    elicitationCallback: elicitationCallbackOption,
     oauth: oauthOptions,
   } = options;
+  const transportType: TransportType = "http";
 
   const oauthClientId = oauthOptions?.clientId?.trim() || undefined;
-  const oauthClientSecret = oauthOptions?.clientSecret?.trim() || undefined;
+  const oauthClientMetadataUrl =
+    oauthOptions?.clientMetadataUrl?.trim() || undefined;
   const oauthScope = oauthOptions?.scope?.trim() || undefined;
   const staticClientInfo = useMemo(
-    () =>
-      oauthClientId
-        ? {
-            client_id: oauthClientId,
-            ...(oauthClientSecret ? { client_secret: oauthClientSecret } : {}),
-          }
-        : undefined,
-    [oauthClientId, oauthClientSecret]
+    () => (oauthClientId ? { client_id: oauthClientId } : undefined),
+    [oauthClientId]
   );
 
   // Create a per-instance logger so multiple useMcp instances don't clobber each other's log level.
@@ -156,36 +159,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   const instanceLogger = useMemo(() => {
     const name = `useMcp:${url || "no-url"}`;
     const inst = Logger.get(name);
-    // Determine effective level: logLevel > debug > default ('info')
+    // Configure the per-instance level when requested.
     if (logLevelOption) {
       inst.level = logLevelOption as LogLevel;
-    } else if (_debug) {
-      inst.level = "debug";
     }
     return inst;
-  }, [url, logLevelOption, _debug]);
+  }, [url, logLevelOption]);
 
-  // Support both new and deprecated names with deprecation warnings
-  const headers = headersOption ?? customHeadersOption ?? {};
-  if (customHeadersOption && !headersOption) {
-    instanceLogger.warn(
-      '[useMcp] The "customHeaders" option is deprecated. Use "headers" instead.'
-    );
-  }
+  const headers = headersOption ?? {};
+  const effectiveClientOptions = useMemo(
+    () => resolveClientOptions(clientOptions, viewSupport),
+    [clientOptions, viewSupport]
+  );
 
-  const onSampling = onSamplingOption ?? samplingCallbackOption;
-  if (samplingCallbackOption && !onSamplingOption) {
-    instanceLogger.warn(
-      '[useMcp] The "samplingCallback" option is deprecated. Use "onSampling" instead.'
-    );
-  }
-
-  const onElicitation = onElicitationOption ?? elicitationCallbackOption;
-  if (elicitationCallbackOption && !onElicitationOption) {
-    logger.warn(
-      '[useMcp] The "elicitationCallback" option is deprecated. Use "onElicitation" instead.'
-    );
-  }
+  const onSampling = onSamplingOption;
+  const onElicitation = onElicitationOption;
   // Build clientInfo with defaults, merging with provided clientInfo
   const defaultClientInfo = useMemo(
     () => ({
@@ -218,18 +206,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     [mergedClientInfo]
   );
 
-  // Use explicit clientConfig if provided (with deprecation warning), otherwise use derived.
-  const oauthClientConfig = useMemo(() => {
-    if (clientConfig && Object.keys(clientConfig).length > 0) {
-      instanceLogger.warn(
-        "[useMcp] The 'clientConfig' option is deprecated and will be removed in a future version. " +
-          "Use 'clientInfo' instead. The clientConfig will be automatically derived from clientInfo."
-      );
-      // Merge derived config with explicit config (explicit takes precedence for backward compatibility)
-      return { ...derivedOAuthClientConfig, ...clientConfig };
-    }
-    return derivedOAuthClientConfig;
-  }, [clientConfig, derivedOAuthClientConfig]);
+  const oauthClientConfig = derivedOAuthClientConfig;
 
   // Parse autoProxyFallback configuration
   const autoProxyFallbackConfig = useMemo(() => {
@@ -237,18 +214,19 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       return { enabled: false, proxyAddress: undefined };
     }
     if (typeof autoProxyFallback === "boolean") {
+      const proxyAddress = proxyConfig?.proxyAddress;
       return {
-        enabled: autoProxyFallback,
-        proxyAddress: "https://inspector.mcp-use.com/inspector/api/proxy",
+        enabled: autoProxyFallback && Boolean(proxyAddress),
+        proxyAddress,
       };
     }
+    const proxyAddress =
+      autoProxyFallback.proxyAddress ?? proxyConfig?.proxyAddress;
     return {
-      enabled: autoProxyFallback.enabled !== false,
-      proxyAddress:
-        autoProxyFallback.proxyAddress ||
-        "https://inspector.mcp-use.com/inspector/api/proxy",
+      enabled: autoProxyFallback.enabled !== false && Boolean(proxyAddress),
+      proxyAddress,
     };
-  }, [autoProxyFallback]);
+  }, [autoProxyFallback, proxyConfig]);
 
   // Normalize autoReconnect into a consistent config object
   const autoReconnectConfig = useMemo(() => {
@@ -299,29 +277,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       return proxyConfig;
     }
 
-    const latestHeaders =
-      proxyConfig?.headers ?? proxyConfig?.customHeaders ?? {};
+    const latestHeaders = proxyConfig?.headers ?? {};
     return {
       ...effectiveProxyConfig,
       headers: {
         ...latestHeaders,
-        ...(effectiveProxyConfig.headers ??
-          effectiveProxyConfig.customHeaders ??
-          {}),
+        ...(effectiveProxyConfig.headers ?? {}),
       },
     };
   }, [effectiveProxyConfig, proxyConfig]);
 
-  // Extract gateway URL and headers from proxy configuration
-  // Use the runtime proxy after automatic fallback, while still merging in
-  // the latest requested headers from proxyConfig.
-  const { gatewayUrl, proxyHeaders } = useMemo(() => {
-    const result = applyProxyConfig(url || "", activeProxyConfig);
-    return {
-      gatewayUrl: activeProxyConfig?.proxyAddress,
-      proxyHeaders: result.headers,
-    };
-  }, [url, activeProxyConfig]);
+  const gatewayUrl = activeProxyConfig?.proxyAddress;
+  const proxyHeaders = activeProxyConfig?.headers ?? {};
 
   // OAuth provider should ALWAYS use the original target URL for OAuth discovery,
   // not the proxy URL. The proxy is only used for making the actual HTTP requests.
@@ -349,12 +316,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       : undefined
   );
   const [capabilities, setCapabilities] = useState<Record<string, any>>();
-  const [protocolEra, setProtocolEra] = useState<
-    "legacy" | "modern" | undefined
-  >(undefined);
+  const [protocolEra, setProtocolEra] = useState<ProtocolEra | undefined>(
+    undefined
+  );
   const [protocolVersion, setProtocolVersion] = useState<string | undefined>(
     undefined
   );
+  const [instructions, setInstructions] = useState<string | undefined>();
+  const [extensions, setExtensions] = useState<Record<string, unknown>>({});
   const [error, setError] = useState<string | undefined>(undefined);
   const [log, setLog] = useState<UseMcpResult["log"]>([]);
   const [authUrl, setAuthUrl] = useState<string | undefined>(undefined);
@@ -362,6 +331,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     useState<UseMcpResult["authTokens"]>(undefined);
 
   const clientRef = useRef<BrowserMCPClient | null>(null);
+  const connectionRef = useRef<MCPConnection | null>(null);
   const authProviderRef = useRef<UseMcpAuthProvider | null>(
     (providedAuthProvider as UseMcpAuthProvider | undefined) ?? null
   );
@@ -397,7 +367,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   // Presence and implementation are tracked separately for reverse requests:
   // the current presence refs determine capabilities on the next normal
   // connect, while implementation refs retain the last defined handler so an
-  // already-advertised live session does not start failing merely because its
+  // already-advertised live connection does not start failing merely because its
   // callback prop was removed before that reconnect.
   const onSamplingRef = useRef(onSampling);
   const onElicitationRef = useRef(onElicitation);
@@ -414,14 +384,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   hasElicitationCallbackRef.current = onElicitation !== undefined;
   onNotificationRef.current = onNotification;
 
-  // Stable proxies passed to addServer / session notification wiring. Capability
+  // Stable proxies passed to addServer notification wiring. Capability
   // advertisement uses current presence at connect time; once wired, reverse
   // requests dispatch to the latest defined implementation retained above.
   const stableOnSampling = useCallback<
     NonNullable<UseMcpOptions["onSampling"]>
   >(async (params) => {
     // This proxy is only wired when a callback exists, and the implementation
-    // ref is intentionally never cleared during that live session.
+    // ref is intentionally never cleared during that live connection.
     return onSamplingRef.current!(params);
   }, []);
   const stableOnElicitation = useCallback<
@@ -496,6 +466,18 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     [instanceLogger]
   );
 
+  const connectionOperations = useMcpOperations({
+    stateRef,
+    connectionRef,
+    hasClient: () => clientRef.current !== null,
+    isMounted: () => isMountedRef.current,
+    setTools,
+    setResources,
+    setResourceTemplates,
+    setPrompts,
+    addLog,
+  });
+
   /**
    * Disconnect from the MCP server and clean up resources
    * @param quiet - If true, suppresses log messages
@@ -512,20 +494,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       if (clientToClose) {
         try {
           const serverName = USE_MCP_SERVER_NAME;
-          const session = clientToClose.getSession(serverName);
+          const connection =
+            clientToClose === clientRef.current ? connectionRef.current : null;
 
           // Clean up health check monitoring if it exists
-          if (session && (session as any)._healthCheckCleanup) {
-            (session as any)._healthCheckCleanup();
-            (session as any)._healthCheckCleanup = null;
+          if (connection && (connection as any)._healthCheckCleanup) {
+            (connection as any)._healthCheckCleanup();
+            (connection as any)._healthCheckCleanup = null;
           }
 
-          // Only try to close if session exists (avoids noisy warning logs)
-          if (session) {
+          // Only try to close if a connection exists (avoids noisy warning logs)
+          if (connection) {
             await clientToClose.closeSession(serverName);
           }
         } catch (err) {
-          if (!quiet) addLog("warn", "Error closing session:", err);
+          if (!quiet) addLog("warn", "Error closing connection:", err);
         }
       }
       // A newer connect() (e.g. dashboard environment / URL change) may have
@@ -536,6 +519,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
 
       if (clientRef.current === clientToClose && !supersededByNewerConnect) {
         clientRef.current = null;
+        connectionRef.current = null;
       }
 
       if (isMountedRef.current && !quiet && !supersededByNewerConnect) {
@@ -546,6 +530,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setPrompts([]);
         setError(undefined);
         setAuthUrl(undefined);
+        setAuthTokens(undefined);
+        setServerInfo(undefined);
+        setCapabilities(undefined);
+        setProtocolEra(undefined);
+        setProtocolVersion(undefined);
+        setInstructions(undefined);
+        setExtensions({});
       }
     },
     [addLog]
@@ -680,8 +671,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
   );
 
   /**
-   * Connect to the MCP server
-   * Automatically retries with transport fallback (HTTP → SSE)
+   * Connect to the MCP server over streamable HTTP.
    * @internal
    */
   const connect = useCallback(async () => {
@@ -712,6 +702,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     setAuthUrl(undefined);
     successfulTransportRef.current = null;
     setState("discovering");
+    setTools([]);
+    setResources([]);
+    setResourceTemplates([]);
+    setPrompts([]);
+    setServerInfo(undefined);
+    setCapabilities(undefined);
+    setProtocolEra(undefined);
+    setProtocolVersion(undefined);
+    setInstructions(undefined);
+    setExtensions({});
     addLog(
       "info",
       `Connecting attempt #${connectAttemptRef.current} to ${url}...`
@@ -735,19 +735,16 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
-        gatewayUrl,
         oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
+        clientMetadataUrl: oauthClientMetadataUrl,
         scope: oauthScope,
       });
       authProviderRef.current = provider;
       if (oauthProxyUrl) {
-        addLog(
-          "debug",
-          `OAuth proxy URL derived from gateway: ${oauthProxyUrl}`
-        );
+        addLog("debug", `OAuth BFF enabled: ${oauthProxyUrl}`);
       }
       addLog(
         "debug",
@@ -785,14 +782,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         // Build server config
         const serverConfig: any = {
           url: url, // Use original URL, not transformed proxy URL
-          transport: transportTypeParam === "sse" ? "http" : transportTypeParam,
           timeout,
-          sseReadTimeout,
-          // Only disable SSE fallback when user explicitly set transportType: "http"
-          // Don't disable it when we're in auto mode and just trying HTTP first
-          disableSseFallback: transportType === "http",
-          // Use SSE transport when explicitly requested
-          preferSse: transportTypeParam === "sse",
           clientInfo: mergedClientInfo,
           // Pass a fetch that scopes OAuth-proxy routing to this server's
           // transport/auth calls. getProxyFetch wraps `customFetch` (e.g. the
@@ -805,12 +795,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             return scopedFetch ? { fetch: scopedFetch } : {};
           })(),
           // Pass clientOptions for custom capabilities (e.g., MCP Apps extension)
-          ...(clientOptions && { clientOptions }),
+          ...(effectiveClientOptions && {
+            clientOptions: effectiveClientOptions,
+          }),
           // Protocol era negotiation mode ("legacy" | "auto" | { pin }); the
-          // connector defaults to "legacy" when omitted
+          // connector defaults to automatic v1/v2 negotiation.
           ...(protocolNegotiation !== undefined && { protocolNegotiation }),
           // Pass user-configurable reconnection options, or when autoReconnect
-          // is disabled, disable SDK transport SSE reconnection to prevent
+          // is disabled, disable SDK transport reconnection to prevent
           // unwanted GET polling requests
           ...(reconnectionOptions
             ? { reconnectionOptions }
@@ -867,8 +859,46 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           onElicitation: hasElicitationCallbackRef.current
             ? stableOnElicitation
             : undefined,
+          onNotification: (
+            notification: Parameters<typeof stableOnNotification>[0]
+          ) => {
+            addLog(
+              "debug",
+              "Notification received:",
+              notification.method,
+              notification
+            );
+            stableOnNotification(notification);
+
+            if (notification.method === "notifications/tools/list_changed") {
+              addLog("info", "Tools list changed, auto-refreshing...");
+              connectionOperations
+                .refreshTools()
+                .catch((err) =>
+                  addLog("warn", "Auto-refresh tools failed:", err)
+                );
+            } else if (
+              notification.method === "notifications/resources/list_changed"
+            ) {
+              addLog("info", "Resources list changed, auto-refreshing...");
+              connectionOperations
+                .refreshResources()
+                .catch((err) =>
+                  addLog("warn", "Auto-refresh resources failed:", err)
+                );
+            } else if (
+              notification.method === "notifications/prompts/list_changed"
+            ) {
+              addLog("info", "Prompts list changed, auto-refreshing...");
+              connectionOperations
+                .refreshPrompts()
+                .catch((err) =>
+                  addLog("warn", "Auto-refresh prompts failed:", err)
+                );
+            }
+          },
           wrapTransport: wrapTransport
-            ? (transport: any) => {
+            ? (transport: Transport) => {
                 addLog(
                   "debug",
                   "Applying transport wrapper for server:",
@@ -876,86 +906,27 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                   "url:",
                   url
                 );
-                return wrapTransport(transport, url);
+                return wrapTransport(transport, serverId ?? url);
               }
             : undefined,
         });
 
-        // Create session WITHOUT auto-initialization
-        // This allows us to register the notification handler BEFORE connecting
-        const session = await clientRef.current!.createSession(
-          serverName,
-          false
-        );
+        // MCPClient owns protocol negotiation and any legacy initialization.
+        // Modern connections remain stateless and are not initialized twice.
+        const connection = await clientRef.current.connect(serverName);
+        connectionRef.current = connection;
 
         if (!isMountedRef.current) {
           addLog(
             "debug",
-            "Connection aborted after session creation - component unmounted"
-          );
-          return "failed";
-        }
-
-        // Wire up notification handler BEFORE initializing
-        // This ensures the handler is registered before setupNotificationHandler() is called during connect()
-        session.on("notification", (notification) => {
-          addLog(
-            "debug",
-            "Notification received:",
-            notification.method,
-            notification
-          );
-          // Call user's callback first (stable proxy → latest ref)
-          stableOnNotification(notification);
-
-          // Auto-refresh lists on list_changed notifications
-          if (notification.method === "notifications/tools/list_changed") {
-            addLog("info", "Tools list changed, auto-refreshing...");
-            refreshTools().catch((err) => {
-              addLog("warn", "Auto-refresh tools failed:", err);
-            });
-          } else if (
-            notification.method === "notifications/resources/list_changed"
-          ) {
-            addLog("info", "Resources list changed, auto-refreshing...");
-            refreshResources().catch((err) =>
-              addLog("warn", "Auto-refresh resources failed:", err)
-            );
-          } else if (
-            notification.method === "notifications/prompts/list_changed"
-          ) {
-            addLog("info", "Prompts list changed, auto-refreshing...");
-            refreshPrompts().catch((err) =>
-              addLog("warn", "Auto-refresh prompts failed:", err)
-            );
-          }
-        });
-
-        // Now initialize the session (this connects to server and caches tools, resources, prompts)
-        await session.initialize();
-
-        if (!isMountedRef.current) {
-          addLog(
-            "debug",
-            "Connection completed but component unmounted, aborting"
+            "Connection aborted after connection creation - component unmounted"
           );
           return "failed";
         }
 
         addLog("info", "✅ Successfully connected to MCP server");
-        addLog("info", "Server info:", session.connector.serverInfo);
-        addLog(
-          "info",
-          "Server capabilities:",
-          session.connector.serverCapabilities
-        );
-
-        if (!isMountedRef.current) {
-          addLog("debug", "Skipping state update - component unmounted");
-          return "failed";
-        }
-        setState("ready");
-        successfulTransportRef.current = transportTypeParam;
+        addLog("info", "Server info:", connection.info.server);
+        addLog("info", "Server capabilities:", connection.info.capabilities);
 
         // Only set up monitoring if autoReconnect is enabled and health checks are not disabled
         if (
@@ -992,7 +963,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           });
 
           // Store cleanup function for later
-          (session as any)._healthCheckCleanup = cleanup;
+          (connection as any)._healthCheckCleanup = cleanup;
         }
 
         // Track successful connection
@@ -1007,9 +978,9 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           })
           .catch(() => {});
 
-        // Get tools, resources, prompts from session connector
-        setTools(session.connector.tools || []);
-        const resourcesResult = await session.connector.listAllResources();
+        // Get tools, resources, and prompts through the protocol-neutral connection.
+        setTools(connection.tools || []);
+        const resourcesResult = await connection.listAllResources();
         if (!isMountedRef.current) {
           addLog(
             "debug",
@@ -1018,7 +989,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           return "failed";
         }
         setResources(resourcesResult.resources || []);
-        const promptsResult = await session.connector.listPrompts();
+        const promptsResult = await connection.listPrompts();
         if (!isMountedRef.current) {
           addLog(
             "debug",
@@ -1029,9 +1000,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         setPrompts(promptsResult.prompts || []);
 
         // Fetch resource templates if server supports them
-        if (session.connector.serverCapabilities?.resourceTemplates) {
-          const templatesResult =
-            await session.connector.listResourceTemplates();
+        if (connection.supports("resources")) {
+          const templatesResult = await connection.listResourceTemplates();
           if (!isMountedRef.current) {
             addLog(
               "debug",
@@ -1044,15 +1014,21 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           setResourceTemplates([]);
         }
 
-        // Get serverInfo and capabilities from the connector (populated during initialize)
-        const serverInfo = session.connector.serverInfo;
-        const capabilities = session.connector.serverCapabilities;
+        const {
+          server: serverInfo,
+          capabilities,
+          protocolEra,
+          protocolVersion,
+          instructions,
+          extensions,
+        } = connection.info;
 
-        // Surface the negotiated protocol era/version (v1 "legacy" vs v2
-        // "modern" 2026-07-28) so consumers (e.g. the inspector) can display it.
+        // Surface normalized metadata identically for v1 and v2 servers.
         if (isMountedRef.current) {
-          setProtocolEra(session.connector.protocolEra);
-          setProtocolVersion(session.connector.negotiatedProtocolVersion);
+          setProtocolEra(protocolEra);
+          setProtocolVersion(protocolVersion);
+          setInstructions(instructions);
+          setExtensions(extensions);
         }
 
         if (serverInfo) {
@@ -1063,70 +1039,13 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           }
           setServerInfo(serverInfo);
 
-          // Start icon loading in background and store the promise
-          const loadIconPromise = (async () => {
-            try {
-              // Check if server provided icons in the serverInfo
-              const serverIcons = (serverInfo as any).icons;
-              if (
-                serverIcons &&
-                Array.isArray(serverIcons) &&
-                serverIcons.length > 0
-              ) {
-                // Server provided icons - use the first one
-                const iconUrl = serverIcons[0].src || serverIcons[0].url;
-                if (iconUrl) {
-                  addLog("info", "Server provided icon:", iconUrl);
-                  // Fetch and convert to base64 for storage
-                  const res = await fetch(iconUrl);
-                  const blob = await res.blob();
-                  const base64 = await new Promise<string>(
-                    (resolve, reject) => {
-                      const reader = new FileReader();
-                      reader.onloadend = () => resolve(reader.result as string);
-                      reader.onerror = reject;
-                      reader.readAsDataURL(blob);
-                    }
-                  );
-
-                  if (isMountedRef.current) {
-                    setServerInfo((prev) =>
-                      prev ? { ...prev, icon: base64 } : undefined
-                    );
-                    addLog("debug", "Server icon converted to base64");
-                  }
-                  return base64;
-                }
-              }
-
-              // No server-provided icons - try auto-detection
-              if (url) {
-                const faviconBase64 = await detectFavicon(url);
-                if (!isMountedRef.current) {
-                  addLog(
-                    "debug",
-                    "Connection aborted after favicon detection - component unmounted"
-                  );
-                  return null;
-                }
-                if (faviconBase64) {
-                  setServerInfo((prev) =>
-                    prev ? { ...prev, icon: faviconBase64 } : undefined
-                  );
-                  addLog("debug", "Favicon detected and added to serverInfo");
-                  return faviconBase64;
-                }
-              }
-
-              return null;
-            } catch (err) {
-              addLog("debug", "Icon loading failed (non-critical):", err);
-              return null;
-            }
-          })();
-
-          // Store the promise so ensureIconLoaded() can await it
-          iconLoadingPromiseRef.current = loadIconPromise;
+          iconLoadingPromiseRef.current = loadServerIcon({
+            serverInfo,
+            url,
+            isMounted: () => isMountedRef.current,
+            setServerInfo,
+            addLog,
+          });
         }
 
         if (capabilities) {
@@ -1197,6 +1116,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           }
         }
 
+        successfulTransportRef.current = transportTypeParam;
+        setState("ready");
         return "success";
       } catch (err: unknown) {
         const error = err as Error & { code?: number; message?: string };
@@ -1297,15 +1218,10 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
               );
 
               try {
-                // Probe for WWW-Authenticate params (scope, resource_metadata) from 401
-                const { resourceMetadataUrl, scope } =
-                  await probeAuthParams(url);
-
-                // Step 1: Call auth() to trigger redirectToAuthorization and OAuth discovery
+                // The SDK owns protected-resource discovery and parses the
+                // original transport 401. Do not issue a duplicate probe.
                 const authResult = await auth(authProviderRef.current, {
                   serverUrl: url,
-                  ...(resourceMetadataUrl && { resourceMetadataUrl }),
-                  ...(scope && { scope }),
                   fetchFn: authProviderRef.current.getProxyFetch?.(),
                 });
 
@@ -1323,8 +1239,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
                   // Step 3: Complete the OAuth flow by exchanging code for tokens
                   await auth(authProviderRef.current, {
                     serverUrl: url,
-                    ...(resourceMetadataUrl && { resourceMetadataUrl }),
-                    ...(scope && { scope }),
                     authorizationCode: authCode,
                     fetchFn: authProviderRef.current.getProxyFetch?.(),
                   });
@@ -1372,8 +1286,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
           errorMessage,
           error instanceof Error ? error : new Error(String(error))
         );
-        // If failConnection triggered automatic proxy fallback, return a special status
-        // to prevent the auto-transport SSE fallback logic from running
+        // If failConnection triggered automatic proxy fallback, return a special
+        // status so the caller does not treat this as a hard connection failure
         return isRetryingWithProxy ? "auth_redirect" : "failed";
       }
     };
@@ -1381,28 +1295,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     let finalStatus: "success" | "auth_redirect" | "failed" | "fallback" =
       "failed";
 
-    if (transportType === "sse") {
-      addLog("debug", "Using SSE-only transport mode");
-      finalStatus = await tryConnectWithTransport("sse");
-    } else if (transportType === "http") {
-      addLog("debug", "Using HTTP-only transport mode");
-      finalStatus = await tryConnectWithTransport("http");
-    } else {
-      addLog("debug", "Using auto transport mode (HTTP with SSE fallback)");
-      const httpResult = await tryConnectWithTransport("http");
-
-      if (
-        httpResult === "fallback" &&
-        isMountedRef.current &&
-        stateRef.current !== "authenticating"
-      ) {
-        addLog("info", "HTTP failed, attempting SSE fallback...");
-        const sseResult = await tryConnectWithTransport("sse");
-        finalStatus = sseResult;
-      } else {
-        finalStatus = httpResult;
-      }
-    }
+    addLog("debug", "Connecting via streamable HTTP");
+    finalStatus = await tryConnectWithTransport("http");
 
     // Reset connecting flag for all terminal states and auth_redirect
     // auth_redirect needs to reset the flag so the auth callback can reconnect
@@ -1427,6 +1321,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
     staticClientInfo,
+    oauthClientMetadataUrl,
     oauthScope,
     headers,
     transportType,
@@ -1435,8 +1330,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     onPopupWindow,
     enabled,
     timeout,
-    sseReadTimeout,
     mergedClientInfo,
+    effectiveClientOptions,
     protocolNegotiation,
     // IMPORTANT: Include proxy-related dependencies so connect() uses updated values after fallback
     gatewayUrl,
@@ -1458,91 +1353,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     connectRef.current = connect;
     failConnectionRef.current = failConnection;
   }, [connect, failConnection]);
-
-  /**
-   * Call a tool on the connected MCP server
-   *
-   * @param name - Name of the tool to call
-   * @param args - Arguments to pass to the tool
-   * @param options - Optional request options for timeout configuration
-   * @returns Tool execution result
-   * @throws {Error} If client is not ready or tool call fails
-   *
-   * @example
-   * ```typescript
-   * // Simple tool call
-   * const result = await mcp.callTool('send-email', {
-   *   to: 'user@example.com',
-   *   subject: 'Hello',
-   *   body: 'Test message'
-   * })
-   *
-   * // Tool call with extended timeout (e.g., for tools that trigger sampling)
-   * const result = await mcp.callTool('analyze-sentiment', { text: 'Hello' }, {
-   *   timeout: 300000, // 5 minutes
-   *   resetTimeoutOnProgress: true
-   * })
-   * ```
-   */
-  const callTool = useCallback(
-    async (
-      name: string,
-      args?: Record<string, unknown>,
-      options?: {
-        timeout?: number;
-        maxTotalTimeout?: number;
-        resetTimeoutOnProgress?: boolean;
-        signal?: AbortSignal;
-      }
-    ) => {
-      if (stateRef.current !== "ready" || !clientRef.current) {
-        throw new Error(
-          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot call tool "${name}".`
-        );
-      }
-      addLog("info", `Calling tool: ${name}`, args);
-      const startTime = Date.now();
-      try {
-        const serverName = USE_MCP_SERVER_NAME;
-        const session = clientRef.current.getSession(serverName);
-        if (!session) {
-          throw new Error("No active session found");
-        }
-        const result = await session.connector.callTool(
-          name,
-          args || {},
-          options
-        );
-        addLog("info", `Tool "${name}" call successful:`, result);
-
-        // Track successful tool call
-        Tel.getInstance()
-          .trackUseMcpToolCall({
-            toolName: name,
-            success: true,
-            executionTimeMs: Date.now() - startTime,
-          })
-          .catch(() => {});
-
-        return result;
-      } catch (err) {
-        addLog("error", `Tool "${name}" call failed:`, err);
-
-        // Track failed tool call
-        Tel.getInstance()
-          .trackUseMcpToolCall({
-            toolName: name,
-            success: false,
-            errorType: err instanceof Error ? err.name : "UnknownError",
-            executionTimeMs: Date.now() - startTime,
-          })
-          .catch(() => {});
-
-        throw err;
-      }
-    },
-    [state]
-  );
 
   /**
    * Retry connection after failure
@@ -1653,11 +1463,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
             callbackUrl,
             preventAutoAuth: false,
             useRedirectFlow,
-            gatewayUrl,
             oauthProxyUrl: oauthProxyUrlOption,
             onPopupWindow: captureOnPopupWindow,
             proxyOAuthRequests: true,
             staticClientInfo,
+            clientMetadataUrl: oauthClientMetadataUrl,
             scope: oauthScope,
           });
 
@@ -1805,6 +1615,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
     staticClientInfo,
+    oauthClientMetadataUrl,
     oauthScope,
     callbackUrl,
     mergedClientInfo,
@@ -1832,364 +1643,6 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     }
   }, [url, addLog, disconnect]);
 
-  /**
-   * Refresh the list of available resources from the server
-   *
-   * Updates the `resources` state with the latest resource list.
-   * Gracefully handles servers that don't support resources.
-   *
-   * @throws {Error} If client is not ready
-   *
-   * @example
-   * ```typescript
-   * await mcp.listResources()
-   * console.log(mcp.resources)  // Updated resource list
-   * ```
-   */
-  const listResources = useCallback(async () => {
-    if (stateRef.current !== "ready" || !clientRef.current) {
-      throw new Error(
-        `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot list resources.`
-      );
-    }
-    addLog("info", "Listing resources");
-    try {
-      const serverName = USE_MCP_SERVER_NAME;
-      const session = clientRef.current.getSession(serverName);
-      if (!session) {
-        throw new Error("No active session found");
-      }
-      const resourcesResult = await session.connector.listAllResources();
-      setResources(resourcesResult.resources || []);
-      addLog("info", "Resources listed successfully");
-    } catch (err) {
-      addLog("error", "List resources failed:", err);
-      throw err;
-    }
-  }, [state]);
-
-  /**
-   * Read a resource from the MCP server by URI
-   *
-   * @param uri - Resource URI to read
-   * @returns Resource contents
-   * @throws {Error} If client is not ready or resource read fails
-   *
-   * @example
-   * ```typescript
-   * const resource = await mcp.readResource('file:///path/to/file.txt')
-   * console.log(resource.contents[0].text)
-   * ```
-   */
-  const readResource = useCallback(
-    async (uri: string) => {
-      if (stateRef.current !== "ready" || !clientRef.current) {
-        throw new Error(
-          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot read resource.`
-        );
-      }
-      addLog("info", `Reading resource: ${uri}`);
-      try {
-        const serverName = USE_MCP_SERVER_NAME;
-        const session = clientRef.current.getSession(serverName);
-        if (!session) {
-          throw new Error("No active session found");
-        }
-        const result = await session.connector.readResource(uri);
-        addLog("info", "Resource read successful:", result);
-
-        // Track successful resource read
-        Tel.getInstance()
-          .trackUseMcpResourceRead({
-            resourceUri: uri,
-            success: true,
-          })
-          .catch(() => {});
-
-        return result;
-      } catch (err) {
-        addLog("error", "Resource read failed:", err);
-
-        // Track failed resource read
-        Tel.getInstance()
-          .trackUseMcpResourceRead({
-            resourceUri: uri,
-            success: false,
-            errorType: err instanceof Error ? err.name : "UnknownError",
-          })
-          .catch(() => {});
-
-        throw err;
-      }
-    },
-    [state]
-  );
-
-  /**
-   * Refresh the list of available prompts from the server
-   *
-   * Updates the `prompts` state with the latest prompt templates.
-   * Gracefully handles servers that don't support prompts.
-   *
-   * @throws {Error} If client is not ready
-   *
-   * @example
-   * ```typescript
-   * await mcp.listPrompts()
-   * console.log(mcp.prompts)  // Updated prompt list
-   * ```
-   */
-  const listPrompts = useCallback(async () => {
-    if (stateRef.current !== "ready" || !clientRef.current) {
-      throw new Error(
-        `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot list prompts.`
-      );
-    }
-    addLog("info", "Listing prompts");
-    try {
-      const serverName = USE_MCP_SERVER_NAME;
-      const session = clientRef.current.getSession(serverName);
-      if (!session) {
-        throw new Error("No active session found");
-      }
-      const promptsResult = await session.connector.listPrompts();
-      setPrompts(promptsResult.prompts || []);
-      addLog("info", "Prompts listed successfully");
-    } catch (err) {
-      addLog("error", "List prompts failed:", err);
-      throw err;
-    }
-  }, [state]);
-
-  /**
-   * Refresh the tools list from the server
-   * Called automatically on notifications/tools/list_changed or manually by user
-   */
-  const refreshTools = useCallback(async () => {
-    if (stateRef.current !== "ready" || !clientRef.current) {
-      addLog(
-        "debug",
-        "Cannot refresh tools - client not ready. State:",
-        stateRef.current
-      );
-      return;
-    }
-    addLog("debug", "Refreshing tools list");
-    try {
-      const serverName = USE_MCP_SERVER_NAME;
-      const session = clientRef.current.getSession(serverName);
-      if (!session) {
-        addLog("warn", "No active session found for tools refresh");
-        return;
-      }
-      // Re-fetch tools from the server
-      addLog("debug", "Calling listTools...");
-      const toolsResult = await session.connector.listTools();
-      addLog("debug", "listTools returned:", toolsResult?.length, "tools");
-      setTools(toolsResult || []);
-      addLog("info", "Tools list refreshed successfully");
-    } catch (err) {
-      addLog("error", "Failed to refresh tools:", err);
-    }
-  }, [addLog]);
-
-  /**
-   * Refresh the resources list from the server
-   * Called automatically on notifications/resources/list_changed or manually by user
-   */
-  const refreshResources = useCallback(async () => {
-    if (stateRef.current !== "ready" || !clientRef.current) {
-      addLog("debug", "Cannot refresh resources - client not ready");
-      return;
-    }
-    addLog("debug", "Refreshing resources list");
-    try {
-      const serverName = USE_MCP_SERVER_NAME;
-      const session = clientRef.current.getSession(serverName);
-      if (!session) {
-        addLog("warn", "No active session found for resources refresh");
-        return;
-      }
-      const resourcesResult = await session.connector.listAllResources();
-      setResources(resourcesResult.resources || []);
-      addLog("info", "Resources list refreshed successfully");
-    } catch (err) {
-      addLog("warn", "Failed to refresh resources:", err);
-    }
-  }, [addLog]);
-
-  /**
-   * Refresh the prompts list from the server
-   * Called automatically on notifications/prompts/list_changed or manually by user
-   */
-  const refreshPrompts = useCallback(async () => {
-    if (stateRef.current !== "ready" || !clientRef.current) {
-      addLog("debug", "Cannot refresh prompts - client not ready");
-      return;
-    }
-    addLog("debug", "Refreshing prompts list");
-    try {
-      const serverName = USE_MCP_SERVER_NAME;
-      const session = clientRef.current.getSession(serverName);
-      if (!session) {
-        addLog("warn", "No active session found for prompts refresh");
-        return;
-      }
-      const promptsResult = await session.connector.listPrompts();
-      setPrompts(promptsResult.prompts || []);
-      addLog("info", "Prompts list refreshed successfully");
-    } catch (err) {
-      addLog("warn", "Failed to refresh prompts:", err);
-    }
-  }, [addLog]);
-
-  /**
-   * Refresh the resource templates list from the server
-   * Called manually by user when needed
-   */
-  const refreshResourceTemplates = useCallback(async () => {
-    if (stateRef.current !== "ready" || !clientRef.current) {
-      addLog("debug", "Cannot refresh resource templates - client not ready");
-      return;
-    }
-    addLog("debug", "Refreshing resource templates list");
-    try {
-      const serverName = USE_MCP_SERVER_NAME;
-      const session = clientRef.current.getSession(serverName);
-      if (!session) throw new Error("No active session found");
-
-      const result = await session.connector.listResourceTemplates();
-      if (isMountedRef.current) {
-        setResourceTemplates(result.resourceTemplates || []);
-        addLog(
-          "info",
-          `Resource templates refreshed: ${result.resourceTemplates?.length || 0} templates`
-        );
-      }
-    } catch (err) {
-      addLog("error", "Failed to refresh resource templates:", err);
-      throw err;
-    }
-  }, [addLog]);
-
-  /**
-   * Refresh all lists (tools, resources, resource templates, prompts) from the server
-   * Useful after reconnection or for manual refresh
-   */
-  const refreshAll = useCallback(async () => {
-    addLog(
-      "info",
-      "Refreshing all lists (tools, resources, resource templates, prompts)"
-    );
-    await Promise.all([
-      refreshTools(),
-      refreshResources(),
-      refreshResourceTemplates(),
-      refreshPrompts(),
-    ]);
-  }, [
-    refreshTools,
-    refreshResources,
-    refreshResourceTemplates,
-    refreshPrompts,
-    addLog,
-  ]);
-
-  /**
-   * Get a prompt template with arguments
-   *
-   * @param name - Name of the prompt template
-   * @param args - Arguments to fill in the template
-   * @returns Prompt result with messages
-   * @throws {Error} If client is not ready or prompt retrieval fails
-   *
-   * @example
-   * ```typescript
-   * const prompt = await mcp.getPrompt('code-review', {
-   *   language: 'typescript',
-   *   focus: 'performance'
-   * })
-   * console.log(prompt.messages)
-   * ```
-   */
-  const getPrompt = useCallback(
-    async (name: string, args?: Record<string, unknown>) => {
-      if (stateRef.current !== "ready" || !clientRef.current) {
-        throw new Error(
-          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot get prompt.`
-        );
-      }
-      addLog("info", `Getting prompt: ${name}`, args);
-      try {
-        const serverName = USE_MCP_SERVER_NAME;
-        const session = clientRef.current.getSession(serverName);
-        if (!session) {
-          throw new Error("No active session found");
-        }
-        const result = await session.connector.getPrompt(name, args || {});
-        addLog("info", `Prompt "${name}" retrieved successfully:`, result);
-        return result;
-      } catch (err) {
-        addLog("error", `Prompt "${name}" retrieval failed:`, err);
-        throw err;
-      }
-    },
-    [state, addLog]
-  );
-
-  /**
-   * Request completion suggestions for a prompt or resource template argument
-   *
-   * @param params - Completion request parameters
-   * @returns Completion suggestions from the server
-   * @throws {Error} If client is not ready or completion request fails
-   *
-   * @example
-   * ```typescript
-   * // Complete a prompt argument
-   * const result = await mcp.complete({
-   *   ref: { type: "ref/prompt", name: "code-review" },
-   *   argument: { name: "language", value: "py" }
-   * });
-   * console.log(result.completion.values); // ["python"]
-   * ```
-   */
-  const complete = useCallback(
-    async (params: CompleteRequestParams): Promise<CompleteResult> => {
-      if (stateRef.current !== "ready" || !clientRef.current) {
-        throw new Error(
-          `MCP client is not ready (${formatMcpNotReadyReason(stateRef.current, !!clientRef.current)}). Cannot request completion.`
-        );
-      }
-
-      const refType =
-        params.ref.type === "ref/prompt" ? "prompt" : "resource template";
-      const refId =
-        params.ref.type === "ref/prompt"
-          ? (params.ref as any).name
-          : (params.ref as any).uri;
-
-      addLog("info", `Requesting completions for ${refType} "${refId}"`);
-
-      try {
-        const serverName = USE_MCP_SERVER_NAME;
-        const session = clientRef.current.getSession(serverName);
-        if (!session) throw new Error("No active session found");
-
-        const result = await session.complete(params);
-        addLog(
-          "info",
-          `Received ${result.completion.values.length} completion suggestions`
-        );
-        return result;
-      } catch (err) {
-        addLog("error", "Completion request failed:", err);
-        throw err;
-      }
-    },
-    [state, addLog]
-  );
-
   // ===== Effects =====
 
   /**
@@ -2208,6 +1661,8 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
    * listeners don't double-fire on a single auth completion.
    */
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
     const handleCallbackPayload = (
       payload: McpAuthCallbackMessage | undefined,
       source: "postMessage" | "BroadcastChannel"
@@ -2375,11 +1830,11 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
         callbackUrl,
         preventAutoAuth,
         useRedirectFlow,
-        gatewayUrl,
         oauthProxyUrl: oauthProxyUrlOption,
         onPopupWindow,
         proxyOAuthRequests: true,
         staticClientInfo,
+        clientMetadataUrl: oauthClientMetadataUrl,
         scope: oauthScope,
       });
       authProviderRef.current = provider;
@@ -2397,7 +1852,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
       addLog("debug", "useMcp unmounting, disconnecting.");
 
       // NOTE: We intentionally do NOT clear OAuth storage on unmount, even
-      // mid-flow. Wrapper remounts (provider `_updateVersion` bumps, route
+      // mid-flow. Wrapper remounts (provider revision changes, route
       // churn, StrictMode double-mounting) would otherwise destroy the
       // in-flight authorization state record + PKCE verifier and strand a
       // popup that completes after the remount. Stale state records carry a
@@ -2420,6 +1875,7 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     oauthClientConfig.uri,
     oauthClientConfig.logo_uri,
     staticClientInfo,
+    oauthClientMetadataUrl,
     oauthScope,
     useRedirectFlow,
     mergedClientInfo,
@@ -2516,22 +1972,14 @@ export function useMcp(options: UseMcpOptions): UseMcpResult {
     capabilities,
     protocolEra,
     protocolVersion,
+    instructions,
+    extensions,
     error,
     log,
     authUrl,
     authTokens,
     client: clientRef.current,
-    callTool,
-    readResource,
-    listResources,
-    listPrompts,
-    getPrompt,
-    complete,
-    refreshTools,
-    refreshResources,
-    refreshResourceTemplates,
-    refreshPrompts,
-    refreshAll,
+    ...connectionOperations,
     retry,
     disconnect,
     authenticate,

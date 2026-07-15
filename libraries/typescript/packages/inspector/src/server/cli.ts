@@ -96,8 +96,6 @@ app.use(
 // Apply logger middleware only to proxy routes
 app.use("/inspector/api/proxy/*", logger());
 
-registerInspectorRoutes(app, { autoConnectUrl: mcpUrl });
-
 // Detect the deployment mode. The same CLI binary powers both local standalone
 // usage (`npx @mcp-use/inspector`) and the cloud-hosted Railway deployment at
 // inspector.mcpus.com — Railway sets RAILWAY_ENVIRONMENT_NAME, so we use that
@@ -106,6 +104,12 @@ registerInspectorRoutes(app, { autoConnectUrl: mcpUrl });
 const inspectorMode: InspectorMode =
   (process.env.MCP_INSPECTOR_MODE as InspectorMode | undefined) ??
   (process.env.RAILWAY_ENVIRONMENT_NAME ? "cloud" : "standalone");
+
+registerInspectorRoutes(app, {
+  autoConnectUrl: mcpUrl,
+  oauthProxyAllowedOrigins: [],
+  oauthProxyAllowLoopback: inspectorMode === "standalone",
+});
 
 // Register static file serving (must be last as it includes catch-all route).
 // Runtime env vars here override what was baked in at `vite build` time — this

@@ -9,6 +9,8 @@ import { setServerPort } from "./tunnel.js";
 import { isPortAvailable, parsePortFromArgs, hasNoOpenFlag } from "./utils.js";
 
 const app = new Hono();
+const isDev =
+  process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
 
 // Middleware - expose mcp-session-id for cross-origin requests (FastMCP session management)
 // NOTE: Authorization must be listed explicitly in allowHeaders — the wildcard * does NOT cover it
@@ -28,7 +30,6 @@ app.use(
       "mcp-protocol-version",
       "X-Server-Id",
       "X-Requested-With",
-      "X-Connection-URL",
     ],
     exposeHeaders: ["*"],
   })
@@ -50,7 +51,12 @@ app.use(
 );
 
 // Register all API routes
-registerInspectorRoutes(app);
+registerInspectorRoutes(app, {
+  oauthProxyAllowedOrigins: isDev
+    ? ["http://localhost:3000", "http://127.0.0.1:3000"]
+    : [],
+  oauthProxyAllowLoopback: isDev,
+});
 
 // OAuth popup self-close page — used as the `callbackURL` passed to
 // better-auth's /api/auth/sign-in/social. Better-auth redirects the OAuth
@@ -89,9 +95,6 @@ async function startServer() {
   try {
     // In development mode, use port 3001 for API server
     // In production/standalone mode, try 3001 first, then 3002 as fallback
-    const isDev =
-      process.env.NODE_ENV === "development" || process.env.VITE_DEV === "true";
-
     // Check for port from command line arguments first
     const cliPort = parsePortFromArgs();
     let port = cliPort ?? (isDev ? 3001 : 3000);

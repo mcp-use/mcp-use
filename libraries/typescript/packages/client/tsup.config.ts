@@ -1,18 +1,18 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
 
+const { version } = JSON.parse(readFileSync("./package.json", "utf-8"));
+
 export default defineConfig({
-  // Object entries for the auth/ and react/ subpaths. Output paths mirror tsc's
-  // rootDir:src layout (dist/auth/index.js, dist/react/index.js) so the emitted
-  // .js and .d.ts line up and match the package.json "exports" map.
+  // The React entry remains separate because React is optional. Root entries
+  // select their platform implementation through package export conditions.
   entry: {
     index: "src/index.ts",
-    browser: "src/browser.ts",
-    "auth/index": "src/auth/index.ts",
-    "auth/index-node": "src/auth/index-node.ts",
+    "index-browser": "src/index-browser.ts",
     "react/index": "src/react/index.ts",
   },
-  // ESM-only: @modelcontextprotocol/client v2 is ESM-only, so @mcp-use/client
-  // follows suit (Node 20+).
+  // ESM-only: @mcp-use/client targets Node 20+ ESM natively and the package exports
+  // map has no "require" condition, so CJS output is unnecessary.
   format: ["esm"],
   dts: false,
   splitting: false,
@@ -21,4 +21,7 @@ export default defineConfig({
   // React is an optional peer dependency — never bundle it into the react
   // subpath (a second copy would break hooks).
   external: ["react", "react-dom"],
+  define: {
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(version),
+  },
 });

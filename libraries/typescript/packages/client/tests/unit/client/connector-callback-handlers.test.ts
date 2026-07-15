@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { BaseConnector } from "../../../src/connectors/base.js";
+import { BaseConnector } from "../../../src/transport/base.js";
 
 type MockClient = {
   handlers: Map<string, (request: { params: unknown }) => Promise<unknown>>;

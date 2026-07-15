@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JsonSchemaType } from "@modelcontextprotocol/client";
-import { DialectJsonSchemaValidator } from "../../../src/validators/dialect-json-schema-validator.js";
+import { DialectJsonSchemaValidator } from "../../../src/utils/json-schema-validator.js";
 
 describe("DialectJsonSchemaValidator", () => {
   const validator = new DialectJsonSchemaValidator();

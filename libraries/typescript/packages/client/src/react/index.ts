@@ -11,6 +11,10 @@ export type {
   UseMcpOptions,
   UseMcpResult,
   ReconnectionOptions,
+  McpServerOptions,
+  McpNotification,
+  PendingSamplingRequest,
+  PendingElicitationRequest,
 } from "./types.js";
 export { useMcp } from "./useMcp.js";
 
@@ -24,17 +28,11 @@ export {
   setTelemetrySource,
 } from "../telemetry/telemetry-browser.js";
 
-// Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "../telemetry/telemetry-browser.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/telemetry-browser.js";
-
 // Re-export core types for convenience when using the hook result
 export type {
   Prompt,
   Resource,
-  // v2 exports the resource-template type as `ResourceTemplateType`; re-export
-  // it under the historical `ResourceTemplate` name for API compatibility.
-  ResourceTemplateType as ResourceTemplate,
+  ResourceTemplateType,
   Tool,
 } from "@modelcontextprotocol/client";
 
@@ -46,12 +44,8 @@ export {
 } from "./McpClientProvider.js";
 export type {
   McpServer,
-  McpServerOptions,
   McpClientContextType,
   McpClientProviderProps,
-  McpNotification,
-  PendingSamplingRequest,
-  PendingElicitationRequest,
 } from "./McpClientProvider.js";
 
 // Storage providers
@@ -60,7 +54,7 @@ export {
   MemoryStorageProvider,
   type CachedServerMetadata,
   type StorageProvider,
-} from "./storage/index.js";
+} from "./storage.js";
 
 // RPC logger utilities
 export {
