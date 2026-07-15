@@ -10,7 +10,7 @@ let page: Page;
 
 test.describe("Inspector Command Palette Tests", () => {
   // Note: To run these tests with a real MCP server:
-  // 1. cd packages/mcp-use/examples/server/features/conformance
+  // 1. cd packages/server/examples/conformance
   // 2. pnpm build && pnpm start --port 3002
   // Then run: pnpm test:e2e tests/e2e/command-palette.test.ts
 

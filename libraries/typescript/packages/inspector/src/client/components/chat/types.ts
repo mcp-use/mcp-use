@@ -1,5 +1,4 @@
-import { DEFAULT_OLLAMA_BASE_URL } from "@/llm/providers/ollama/utils";
-import type { ProviderName } from "@/llm/types";
+import { DEFAULT_OLLAMA_BASE_URL, type ProviderName } from "@mcp-use/agent";
 
 export interface MessageAttachment {
   type: "image" | "file";

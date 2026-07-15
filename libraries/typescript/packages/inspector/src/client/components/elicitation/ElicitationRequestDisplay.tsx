@@ -2,7 +2,7 @@ import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import type { ElicitResult } from "@modelcontextprotocol/client";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { toast } from "sonner";
 import {
@@ -19,7 +19,8 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { Badge } from "@/client/components/ui/badge";
-import { ElicitationFormFields, useElicitationForm } from "./shared";
+import { ElicitationFormFields } from "./shared/ElicitationFormFields";
+import { useElicitationForm } from "./shared/useElicitationForm";
 
 interface ElicitationRequestDisplayProps {
   request: PendingElicitationRequest | null;

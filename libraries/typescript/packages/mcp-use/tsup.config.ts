@@ -62,8 +62,6 @@ const sharedConfig: Partial<Options> = {
     // Keep Redis external (optional dependency, uses Node.js built-ins)
     "redis",
     "@redis/client",
-    // Keep posthog-node external for browser builds (browser uses posthog-js)
-    "posthog-node",
     // Keep the MCP client external — the server reaches it only via a lazy
     // dynamic import in proxy(), so it must never be bundled into the server.
     "@mcp-use/client",

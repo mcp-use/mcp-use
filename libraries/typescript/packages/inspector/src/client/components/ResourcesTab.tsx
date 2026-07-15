@@ -5,7 +5,7 @@ import {
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
-import { MCPResourceReadEvent, Telemetry } from "@/client/telemetry";
+import { MCPResourceReadEvent, captureInspectorEvent } from "@/client/telemetry";
 import type { Resource } from "@modelcontextprotocol/client";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft } from "lucide-react";
@@ -17,15 +17,13 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ResourceResult } from "./resources";
-import {
-  ResourceResultDisplay,
-  ResourcesList,
-  ResourcesTabHeader,
-} from "./resources";
+import type { ResourceResult } from "./resources/ResourceResultDisplay";
+import { ResourceResultDisplay } from "./resources/ResourceResultDisplay";
+import { ResourcesList } from "./resources/ResourcesList";
+import { SearchTabHeader } from "@/client/components/shared";
 import { RpcPanel } from "./shared";
 import { useConfig } from "./chat/useConfig";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 
 export interface ResourcesTabRef {
   focusSearch: () => void;
@@ -167,9 +165,7 @@ export function ResourcesTab({
           const result = await readResource(resource.uri);
 
           // Track successful resource read
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
+          captureInspectorEvent(
               new MCPResourceReadEvent({
                 resourceUri: resource.uri,
                 serverId,
@@ -191,9 +187,7 @@ export function ResourcesTab({
           });
         } catch (error) {
           // Track failed resource read
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
+          captureInspectorEvent(
               new MCPResourceReadEvent({
                 resourceUri: resource.uri,
                 serverId,
@@ -424,15 +418,15 @@ export function ResourcesTab({
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="absolute inset-0 flex flex-col bg-background z-0"
               >
-                <ResourcesTabHeader
-                  activeTab={activeTab}
+                <SearchTabHeader
+                  title="Resources"
+                  count={filteredResources.length}
                   isSearchExpanded={isSearchExpanded}
                   searchQuery={searchQuery}
-                  filteredResourcesCount={filteredResources.length}
+                  searchPlaceholder="Search resources..."
                   onSearchExpand={() => setIsSearchExpanded(true)}
                   onSearchChange={setSearchQuery}
                   onSearchBlur={handleSearchBlur}
-                  onTabSwitch={() => {}}
                   searchInputRef={
                     searchInputRef as React.RefObject<HTMLInputElement>
                   }
@@ -492,15 +486,15 @@ export function ResourcesTab({
         >
           <ResizablePanel minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
-              <ResourcesTabHeader
-                activeTab={activeTab}
+              <SearchTabHeader
+                title="Resources"
+                count={filteredResources.length}
                 isSearchExpanded={isSearchExpanded}
                 searchQuery={searchQuery}
-                filteredResourcesCount={filteredResources.length}
+                searchPlaceholder="Search resources..."
                 onSearchExpand={() => setIsSearchExpanded(true)}
                 onSearchChange={setSearchQuery}
                 onSearchBlur={handleSearchBlur}
-                onTabSwitch={() => {}}
                 searchInputRef={
                   searchInputRef as React.RefObject<HTMLInputElement>
                 }

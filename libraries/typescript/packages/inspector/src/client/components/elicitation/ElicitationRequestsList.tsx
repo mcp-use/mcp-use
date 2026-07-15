@@ -1,4 +1,4 @@
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { ListItem } from "@/client/components/shared/ListItem";
 import { NotFound } from "@/client/components/ui/not-found";
 import { Badge } from "@/client/components/ui/badge";

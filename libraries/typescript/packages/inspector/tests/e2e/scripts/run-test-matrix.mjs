@@ -47,7 +47,7 @@ if (additionalArgs.length > 0) {
 const inspectorDir = resolve(__dirname, "../../..");
 const conformanceServerDir = resolve(
   inspectorDir,
-  "../mcp-use/examples/server/features/conformance"
+  "../server/examples/conformance"
 );
 
 // Track child processes and servers for cleanup

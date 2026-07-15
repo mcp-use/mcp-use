@@ -1,5 +1,5 @@
-import { chat } from "@/llm/providers";
-import type { ProviderMessage } from "@/llm/types";
+import { completeChat } from "@mcp-use/agent";
+import type { ProviderMessage } from "@mcp-use/agent";
 import type { Resource } from "@modelcontextprotocol/client";
 import { useCallback } from "react";
 import type { LLMConfig } from "../components/chat/types";
@@ -97,7 +97,7 @@ Example: {"query": "example search term", "results": [{"fruit": "Apple", "color"
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ];
-        const { text } = await chat({
+        const text = await completeChat({
           config: {
             provider: llmConfig.provider,
             model: llmConfig.model,
@@ -138,7 +138,7 @@ Based on this information, suggest 3-5 common customizable properties like theme
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ];
-      const { text } = await chat({
+      const text = await completeChat({
         config: {
           provider: llmConfig.provider,
           model: llmConfig.model,

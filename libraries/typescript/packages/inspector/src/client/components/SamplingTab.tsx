@@ -1,20 +1,17 @@
 import type { CreateMessageResult } from "@modelcontextprotocol/client";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type { PendingSamplingRequest } from "@/client/types/pending-requests";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Hash } from "lucide-react";
+import { Hash, Trash2 } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
-import {
-  SamplingTabHeader,
-  SamplingRequestsList,
-  SamplingRequestDisplay,
-} from "./sampling";
+import { SamplingRequestsList } from "./sampling/SamplingRequestsList";
+import { SamplingRequestDisplay } from "./sampling/SamplingRequestDisplay";
+import { SearchTabHeader } from "@/client/components/shared";
 import { useInspector } from "@/client/context/InspectorContext";
-import { copyToClipboard } from "@/client/utils/clipboard";
-import { formatRelativeTime } from "@/client/utils/time";
+import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 import { useConfig } from "./chat/useConfig";
 
 interface SamplingTabProps {
@@ -354,15 +351,21 @@ export function SamplingTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <SamplingTabHeader
+            <SearchTabHeader
+              title="Sampling"
+              count={filteredRequests.length}
               isSearchExpanded={isSearchExpanded}
               searchQuery={searchQuery}
-              filteredRequestsCount={filteredRequests.length}
-              requestsCount={pendingRequests.length}
+              searchPlaceholder="Search requests..."
               onSearchExpand={() => setIsSearchExpanded(true)}
               onSearchChange={setSearchQuery}
               onSearchBlur={handleSearchBlur}
-              onRejectAll={handleRejectAll}
+              bulkAction={{
+                icon: Trash2,
+                label: "Reject all",
+                onClick: handleRejectAll,
+                disabled: pendingRequests.length === 0,
+              }}
               searchInputRef={
                 searchInputRef as React.RefObject<HTMLInputElement>
               }

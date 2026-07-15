@@ -103,6 +103,12 @@ type RequestContextBase = {
     total?: number,
     message?: string
   ): Promise<boolean>;
+  /** Send a log message notification to the client during tool execution. */
+  sendLog(
+    level: "debug" | "info" | "notice" | "warning" | "error" | "critical" | "alert" | "emergency",
+    data: unknown,
+    logger?: string
+  ): Promise<void>;
 };
 
 /**
@@ -224,6 +230,16 @@ export function toRequestContext(
         },
       });
       return true;
+    },
+    async sendLog(level, data, logger): Promise<void> {
+      await ctx.mcpReq.notify({
+        method: "notifications/message",
+        params: {
+          level,
+          data,
+          ...(logger !== undefined && { logger }),
+        },
+      });
     },
   };
 }

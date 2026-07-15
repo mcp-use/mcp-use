@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { cn } from "@/client/lib/utils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { Cog, Copy, FileText, Shield } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";

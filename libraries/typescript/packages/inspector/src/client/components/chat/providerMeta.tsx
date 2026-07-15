@@ -1,4 +1,4 @@
-import type { ProviderName } from "@/llm/types";
+import type { ProviderName } from "@mcp-use/agent";
 import { cn } from "@/client/lib/utils";
 import { useTheme } from "@/client/context/ThemeContext";
 

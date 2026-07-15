@@ -12,7 +12,7 @@ import {
   MCPCommandPaletteOpenEvent,
   MCPTabNavigationEvent,
   MCPSessionDurationEvent,
-  Telemetry,
+  captureInspectorEvent,
 } from "@/client/telemetry";
 import {
   getDefaultInspectorProxyAddress,
@@ -100,7 +100,7 @@ export function Layout({ children }: LayoutProps) {
   const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
     null
   );
-  const savedRequests = useSavedRequests();
+  const { savedRequests } = useSavedRequests();
 
   // Initialize embedded mode from URL params once on mount
   useEffect(() => {
@@ -176,8 +176,7 @@ export function Layout({ children }: LayoutProps) {
         const durationSeconds = Math.round(
           (Date.now() - sessionStartRef.current) / 1000
         );
-        Telemetry.getInstance()
-          .capture(
+        captureInspectorEvent(
             new MCPSessionDurationEvent({
               durationSeconds,
               tabsVisited: tabsVisitedRef.current.size,
@@ -197,8 +196,7 @@ export function Layout({ children }: LayoutProps) {
   const handleTabChange = useCallback(
     (tab: TabType) => {
       try {
-        Telemetry.getInstance()
-          .capture(
+        captureInspectorEvent(
             new MCPTabNavigationEvent({
               tab,
               previousTab: previousTabRef.current,
@@ -312,9 +310,7 @@ export function Layout({ children }: LayoutProps) {
   // Track command palette open
   const handleCommandPaletteOpen = useCallback(
     (trigger: "keyboard" | "button") => {
-      const telemetry = Telemetry.getInstance();
-      telemetry
-        .capture(
+      captureInspectorEvent(
           new MCPCommandPaletteOpenEvent({
             trigger,
           })

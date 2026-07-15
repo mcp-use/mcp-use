@@ -1,6 +1,5 @@
-import { MCPChatMessageEvent, Telemetry } from "@/client/telemetry";
-import { runToolLoop } from "@/llm/toolLoop";
-import type { ProviderTool } from "@/llm/types";
+import { MCPChatMessageEvent, captureInspectorEvent } from "@/client/telemetry";
+import { MCPAgent, providerConfigFromOptions } from "@mcp-use/agent";
 import type { McpServer } from "@mcp-use/client/react";
 import { useCallback, useRef, useState } from "react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
@@ -126,20 +125,6 @@ export function useChatMessagesClientSide({
           },
         ]);
 
-        // Discover + filter tools from the live MCP connection.
-        const allTools = connection.tools ?? [];
-        const toolList: ProviderTool[] = allTools
-          .filter((t) => !disabledTools?.has(t.name))
-          .map((t) => ({
-            name: t.name,
-            description: t.description,
-            inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
-              type: "object",
-            },
-          }));
-
-        // Build the provider-neutral message stream (system + history + widget
-        // state context + optional multimodal user turn).
         const widgetContextMessages: Message[] = [];
         if (widgetModelContexts && widgetModelContexts.size > 0) {
           const widgetParts: string[] = [];
@@ -170,9 +155,22 @@ export function useChatMessagesClientSide({
         ];
 
         const providerMessages = convertMessagesToProvider(historyMessages);
-        providerMessages.unshift({
-          role: "system",
-          content: SYSTEM_PROMPT,
+
+        const agent = new MCPAgent({
+          llm: providerConfigFromOptions(
+            llmConfig.provider,
+            llmConfig.model,
+            {
+              apiKey: llmConfig.apiKey,
+              temperature: llmConfig.temperature,
+              baseUrl: llmConfig.baseUrl,
+            }
+          ),
+          mcpServers: [connection],
+          systemPrompt: SYSTEM_PROMPT,
+          disallowedTools: disabledTools ? [...disabledTools] : undefined,
+          maxSteps: 10,
+          autoInitialize: true,
         });
 
         // Helper: best-effort parse of accumulated tool-args JSON so the UI
@@ -233,22 +231,8 @@ export function useChatMessagesClientSide({
           );
         };
 
-        for await (const ev of runToolLoop({
-          config: {
-            provider: llmConfig.provider,
-            model: llmConfig.model,
-            apiKey: llmConfig.apiKey,
-            temperature: llmConfig.temperature,
-            baseUrl: llmConfig.baseUrl,
-          },
+        for await (const ev of agent.streamEvents({
           messages: providerMessages,
-          tools: toolList,
-          callTool: async (name, args) => {
-            return await connection.callTool(name, args, {
-              signal: abortControllerRef.current?.signal,
-            });
-          },
-          maxSteps: 10,
           signal: abortControllerRef.current?.signal,
         })) {
           if (abortControllerRef.current?.signal.aborted) break;
@@ -375,9 +359,7 @@ export function useChatMessagesClientSide({
         );
 
         if (llmConfig) {
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
+          captureInspectorEvent(
               new MCPChatMessageEvent({
                 serverId: connection.url,
                 provider: llmConfig.provider,
@@ -416,9 +398,7 @@ export function useChatMessagesClientSide({
         }
 
         if (llmConfig) {
-          const telemetry = Telemetry.getInstance();
-          telemetry
-            .capture(
+          captureInspectorEvent(
               new MCPChatMessageEvent({
                 serverId: connection.url,
                 provider: llmConfig.provider,

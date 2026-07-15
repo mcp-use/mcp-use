@@ -8,7 +8,7 @@ import {
 } from "@/client/components/ui/dropdown-menu";
 import { NotFound } from "@/client/components/ui/not-found";
 import { MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL } from "@/client/components/ui/random-gradient-background";
-import { MeshGradient } from "@paper-design/shaders-react";
+import { MeshGradientCanvas } from "@/client/components/ui/MeshGradientCanvas";
 import {
   Tooltip,
   TooltipContent,
@@ -19,7 +19,8 @@ import {
   MCPServerAddedEvent,
   MCPServerConnectionEvent,
   MCPServerRemovedEvent,
-  Telemetry,
+  captureInspectorEvent,
+  trackInspectorOpen,
 } from "@/client/telemetry";
 import {
   CircleMinus,
@@ -38,7 +39,7 @@ import {
   type McpServerConfig,
 } from "@mcp-use/client/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import {
   buildOAuthStaticConfig,
   getDefaultInspectorProxyAddress,
@@ -52,7 +53,7 @@ import {
 } from "@/client/utils/connectionUpdates";
 import {
   getServerDisplayName,
-} from "@/client/utils/serverNames";
+} from "@/client/utils/servers";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
@@ -64,6 +65,13 @@ import { ServerIcon } from "./ServerIcon";
 
 const CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY =
   "mcp-inspector-connect-panel-mesh-animation-paused";
+
+const CONNECT_PANEL_MESH_COLORS: string[] = [
+  "#e0eaff",
+  "#f9ffbd",
+  "#dedede",
+  "#ffffff",
+];
 
 /**
  * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
@@ -99,8 +107,7 @@ export function InspectorDashboard() {
       ) {
         reportedConnectionsRef.current.add(connection.id);
         try {
-          Telemetry.getInstance()
-            .capture(
+          captureInspectorEvent(
               new MCPServerConnectionEvent({
                 serverId: connection.id,
                 serverUrl: connection.url ?? "",
@@ -125,8 +132,7 @@ export function InspectorDashboard() {
   const handleRemoveConnection = useCallback(
     (connectionId: string) => {
       try {
-        Telemetry.getInstance()
-          .capture(new MCPServerRemovedEvent({ serverId: connectionId }))
+        captureInspectorEvent(new MCPServerRemovedEvent({ serverId: connectionId }))
           .catch(() => {});
       } catch {
         // ignore telemetry errors
@@ -249,9 +255,7 @@ export function InspectorDashboard() {
 
   // Track inspector open on mount
   useEffect(() => {
-    const telemetry = Telemetry.getInstance();
-    telemetry
-      .trackInspectorOpen({
+    trackInspectorOpen({
         connectionCount: connections.length,
       })
       .catch(() => {
@@ -276,35 +280,6 @@ export function InspectorDashboard() {
   const [scope, setScope] = useState("");
 
   const connectFormGradientRef = useRef<HTMLDivElement>(null);
-  const [connectFormGradientSize, setConnectFormGradientSize] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
-
-  const measureConnectFormGradient = useCallback(() => {
-    if (connectFormGradientRef.current) {
-      const { width, height } =
-        connectFormGradientRef.current.getBoundingClientRect();
-      setConnectFormGradientSize({
-        width: Math.round(width),
-        height: Math.round(height),
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    const raf = requestAnimationFrame(measureConnectFormGradient);
-    const ro = new ResizeObserver(measureConnectFormGradient);
-    if (connectFormGradientRef.current) {
-      ro.observe(connectFormGradientRef.current);
-    }
-    window.addEventListener("resize", measureConnectFormGradient);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      window.removeEventListener("resize", measureConnectFormGradient);
-    };
-  }, [measureConnectFormGradient]);
 
   const [meshAnimationPaused, setMeshAnimationPaused] = useState(() => {
     try {
@@ -410,9 +385,7 @@ export function InspectorDashboard() {
     addServer(normalizedUrl, serverConfig);
 
     // Track server added
-    const telemetry = Telemetry.getInstance();
-    telemetry
-      .capture(
+    captureInspectorEvent(
         new MCPServerAddedEvent({
           serverId: url.trim(),
           serverUrl: url.trim(),
@@ -1020,10 +993,9 @@ export function InspectorDashboard() {
         className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex"
       >
         <div className="absolute inset-0 z-0 overflow-hidden dark:opacity-60 pointer-events-none">
-          <MeshGradient
-            width={connectFormGradientSize?.width ?? 1280}
-            height={connectFormGradientSize?.height ?? 720}
-            colors={["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"]}
+          <MeshGradientCanvas
+            className="h-full w-full"
+            colors={CONNECT_PANEL_MESH_COLORS}
             distortion={0.8}
             swirl={0.1}
             grainMixer={0}

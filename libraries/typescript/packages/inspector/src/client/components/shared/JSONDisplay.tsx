@@ -1,8 +1,7 @@
 import { Button } from "@/client/components/ui/button";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import { analyzeJSON, downloadJSON } from "@/client/utils/jsonUtils";
+import { highlightJson } from "@/client/utils/highlightJson";
 import { Download } from "lucide-react";
-import { LightAsync as SyntaxHighlighter } from "react-syntax-highlighter";
 
 interface JSONDisplayProps {
   data: any;
@@ -10,13 +9,15 @@ interface JSONDisplayProps {
   className?: string;
 }
 
+const codeClassName =
+  "font-mono text-[0.8rem] text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words [overflow-wrap:anywhere]";
+
 export function JSONDisplay({
   data,
   filename,
   className,
   ...props
 }: JSONDisplayProps) {
-  const { prismStyle } = usePrismTheme();
   const jsonInfo = analyzeJSON(data);
 
   const handleDownload = () => {
@@ -49,61 +50,18 @@ export function JSONDisplay({
           </div>
         </div>
 
-        <SyntaxHighlighter
-          language="json"
-          style={prismStyle}
-          wrapLongLines
-          codeTagProps={{
-            style: {
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-              overflowWrap: "anywhere",
-              fontSize: "0.8rem",
-            },
-          }}
-          customStyle={{
-            margin: 0,
-            padding: 0,
-            border: "none",
-            borderRadius: 0,
-            fontSize: "0.8rem",
-            background: "transparent",
-            overflowX: "hidden",
-          }}
-          className="text-gray-900 dark:text-gray-100"
-        >
-          {jsonInfo.preview}
-        </SyntaxHighlighter>
+        <pre className={codeClassName}>
+          <code>{highlightJson(jsonInfo.preview)}</code>
+        </pre>
       </div>
     );
   }
 
   return (
     <div className={className} {...props}>
-      <SyntaxHighlighter
-        language="json"
-        style={prismStyle}
-        wrapLongLines
-        codeTagProps={{
-          style: {
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            overflowWrap: "anywhere",
-          },
-        }}
-        customStyle={{
-          margin: 0,
-          padding: 0,
-          border: "none",
-          borderRadius: 0,
-          fontSize: "0.8rem",
-          background: "transparent",
-          overflowX: "hidden",
-        }}
-        className="text-gray-900 dark:text-gray-100"
-      >
-        {jsonInfo.preview}
-      </SyntaxHighlighter>
+      <pre className={codeClassName}>
+        <code>{highlightJson(jsonInfo.preview)}</code>
+      </pre>
     </div>
   );
 }

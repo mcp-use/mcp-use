@@ -6,15 +6,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Root of the inspector package (tests/e2e/helpers -> packages/inspector) */
 const inspectorRoot = path.resolve(__dirname, "../../..");
-/** Conformance server root (sibling package mcp-use in monorepo) */
+/** Conformance server root (@mcp-use/server v2 example). */
 const conformanceRoot = path.resolve(
   inspectorRoot,
-  "../mcp-use/examples/server/features/conformance"
+  "../server/examples/conformance"
 );
 
 export const CONFORMANCE_SERVER_PATH = path.join(
   conformanceRoot,
-  "src/server.ts"
+  "src/index.ts"
 );
 export const CONFORMANCE_WEATHER_WIDGET_PATH = path.join(
   conformanceRoot,

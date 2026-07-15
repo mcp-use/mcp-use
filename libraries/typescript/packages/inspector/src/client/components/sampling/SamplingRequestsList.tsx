@@ -1,4 +1,4 @@
-import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type { PendingSamplingRequest } from "@/client/types/pending-requests";
 import { ListItem } from "@/client/components/shared/ListItem";
 import { NotFound } from "@/client/components/ui/not-found";
 

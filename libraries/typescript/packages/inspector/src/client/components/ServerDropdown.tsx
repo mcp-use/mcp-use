@@ -20,7 +20,7 @@ import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { getServerDisplayName } from "@/client/utils/serverNames";
+import { getServerDisplayName } from "@/client/utils/servers";
 import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
 import { ServerIcon } from "./ServerIcon";
 

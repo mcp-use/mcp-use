@@ -2,7 +2,7 @@ import { BlurFade } from "@/client/components/ui/blur-fade";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
-import { getServerDisplayName } from "@/client/utils/serverNames";
+import { getServerDisplayName } from "@/client/utils/servers";
 import type { UseMcpResult } from "@mcp-use/client/react";
 import { useEffect, useState } from "react";
 

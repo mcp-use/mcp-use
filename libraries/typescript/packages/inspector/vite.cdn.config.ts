@@ -2,13 +2,15 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
 
 const packageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
 );
-
-const stubDir = path.resolve(__dirname, "src/client/stubs");
+const clientPackageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
+);
 
 /**
  * CDN bundle build config.
@@ -26,67 +28,44 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    process.env.ANALYZE === "true" &&
+      visualizer({
+        filename: "dist/cdn/stats.html",
+        gzipSize: true,
+        brotliSize: true,
+      }),
     {
       name: "inject-version",
       // In lib mode transformIndexHtml is not called; inject via define instead.
     },
-  ],
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "mcp-use/react": path.resolve(
-        __dirname,
-        "../mcp-use/dist/src/react/index.js"
-      ),
+      react: path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
       "@mcp-use/client/react": path.resolve(
         __dirname,
-        "../client/dist/react/index.js"
+        "../client/src/react/index.ts"
       ),
       // The root client export selects the browser-safe build in Vite.
       "@mcp-use/client": path.resolve(
         __dirname,
         "../client/dist/index-browser.js"
       ),
-      "posthog-node": path.resolve(stubDir, "posthog-node.js"),
-      "@scarf/scarf": path.resolve(stubDir, "@scarf/scarf.js"),
-      dotenv: path.resolve(stubDir, "dotenv.js"),
-      util: path.resolve(stubDir, "util.js"),
-      path: path.resolve(stubDir, "path.js"),
-      process: path.resolve(stubDir, "process.js"),
-      "node:fs/promises": path.resolve(stubDir, "fs-promises.js"),
-      "fs/promises": path.resolve(stubDir, "fs-promises.js"),
-      "node:fs": path.resolve(stubDir, "fs.js"),
-      fs: path.resolve(stubDir, "fs.js"),
-      "node:async_hooks": path.resolve(stubDir, "async_hooks.js"),
-      "node:stream": path.resolve(stubDir, "stream.js"),
-      "node:process": path.resolve(stubDir, "process.js"),
-      "node:child_process": path.resolve(stubDir, "child_process.js"),
-      child_process: path.resolve(stubDir, "child_process.js"),
-      "@modelcontextprotocol/sdk/client/stdio.js": path.resolve(
-        stubDir,
-        "stdio-transport.js"
-      ),
-      "@modelcontextprotocol/sdk/client/stdio": path.resolve(
-        stubDir,
-        "stdio-transport.js"
-      ),
-      // v2: @mcp-use/client's stdio connector imports the stdio transport from
-      // @modelcontextprotocol/client/stdio — stub it out of the browser bundle.
-      "@modelcontextprotocol/client/stdio": path.resolve(
-        stubDir,
-        "stdio-transport.js"
-      ),
+      "@mcp-use/agent": path.resolve(__dirname, "../agent/src/index.ts"),
     },
+    conditions: ["browser", "module", "import", "default"],
   },
   define: {
     "process.env": "{}",
     "process.platform": '"browser"',
     __INSPECTOR_VERSION__: JSON.stringify(packageJson.version),
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(clientPackageJson.version),
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["mcp-use/react", "@mcp-use/client", "react-syntax-highlighter"],
-    exclude: ["posthog-node", "tar", "path-scurry"],
+    include: ["@mcp-use/client", "react-dom"],
   },
   build: {
     lib: {
@@ -108,18 +87,6 @@ export default defineConfig({
         "@e2b/code-interpreter",
         "os",
       ],
-      onwarn(warning, warn) {
-        if (
-          warning.code === "UNRESOLVED_IMPORT" &&
-          warning.exporter?.includes("refractor")
-        ) {
-          return;
-        }
-        warn(warning);
-      },
     },
-  },
-  ssr: {
-    noExternal: ["react-syntax-highlighter", "refractor"],
   },
 });

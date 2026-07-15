@@ -2,7 +2,7 @@ import type { McpServer } from "@mcp-use/client/react";
 import type { ReactNode, RefObject } from "react";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
-import { isLocalhostServerUrl } from "@/client/utils/serverUrl";
+import { isLocalhostServerUrl } from "@/client/utils/servers";
 import { ChatTab } from "./ChatTab";
 import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";

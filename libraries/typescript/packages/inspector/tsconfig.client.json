@@ -18,8 +18,7 @@
   },
   "include": [
     "src/client/index.ts",
-    "src/types/**/*",
-    "src/llm/**/*"
+    "src/types/**/*"
   ],
   "exclude": ["src/client/**/*.test.*", "src/client/**/*.spec.*"]
 }

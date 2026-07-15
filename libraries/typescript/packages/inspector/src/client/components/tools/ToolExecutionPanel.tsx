@@ -23,7 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { ToolInputForm } from "./ToolInputForm";
 

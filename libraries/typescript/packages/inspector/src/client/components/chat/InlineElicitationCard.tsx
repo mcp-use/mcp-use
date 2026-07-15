@@ -1,17 +1,15 @@
 // libraries/typescript/packages/inspector/src/client/components/chat/InlineElicitationCard.tsx
 import { useState } from "react";
 import type { ElicitResult } from "@modelcontextprotocol/client";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";
 import { Checkbox } from "@/client/components/ui/checkbox";
 import { Badge } from "@/client/components/ui/badge";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import {
-  ElicitationFormFields,
-  useElicitationForm,
-} from "@/client/components/elicitation/shared";
+import { ElicitationFormFields } from "@/client/components/elicitation/shared/ElicitationFormFields";
+import { useElicitationForm } from "@/client/components/elicitation/shared/useElicitationForm";
 
 interface InlineElicitationCardProps {
   request: PendingElicitationRequest;

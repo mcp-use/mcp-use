@@ -23,10 +23,10 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
-import type { MessageContentBlock } from "mcp-use/react";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
+import type { MessageContentBlock } from "@/client/types/message-content-block";
+import { ViewRenderer, getViewResourceUri, isViewTool } from "@mcp-use/client/react";
+import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
 import { Spinner } from "../ui/spinner";
@@ -381,6 +381,72 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
   );
 }
 
+function ToolResultViewPanel({
+  serverId,
+  viewId,
+  toolName,
+  resourceUri,
+  toolInput,
+  toolOutput,
+  toolMetadata,
+  readResource,
+  customProps,
+  displayMode,
+  onDisplayModeChange,
+  onSendFollowUp,
+}: {
+  serverId: string;
+  viewId: string;
+  toolName: string;
+  resourceUri: string;
+  toolInput?: Record<string, unknown>;
+  toolOutput?: unknown;
+  toolMetadata?: Record<string, unknown>;
+  readResource: (uri: string) => Promise<unknown>;
+  customProps?: Record<string, string>;
+  displayMode: "inline" | "pip" | "fullscreen";
+  onDisplayModeChange: (mode: "inline" | "pip" | "fullscreen") => void;
+  onSendFollowUp?: (content: MessageContentBlock[]) => void;
+}) {
+  const hostProps = useViewHostProps({
+    serverId,
+    viewId,
+    resourceUri,
+    toolName,
+    toolInput,
+    toolOutput,
+    toolMetadata,
+    readResource,
+    displayMode,
+    onDisplayModeChange,
+  });
+
+  if (!hostProps) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <Spinner className="size-5" />
+      </div>
+    );
+  }
+
+  return (
+    <ViewRenderer
+      viewId={viewId}
+      toolName={toolName}
+      toolInput={toolInput}
+      toolOutput={toolOutput}
+      customProps={customProps}
+      className="w-full h-full relative p-4"
+      onMessage={(content) => {
+        if (content.length > 0 && onSendFollowUp) {
+          onSendFollowUp(content as MessageContentBlock[]);
+        }
+      }}
+      {...hostProps}
+    />
+  );
+}
+
 export function ToolResultDisplay({
   results,
   copiedResult,
@@ -494,15 +560,15 @@ export function ToolResultDisplay({
   // IMPORTANT: These hooks must be called before any early returns
   const widgetProtocol = useMemo(
     () =>
-      result ? detectWidgetProtocol(result.toolMeta, result.result) : null,
+      result ? (isViewTool(result.toolMeta) ? "mcp-apps" : null) : null,
     [result]
   );
 
   // Check for MCP Apps (SEP-1865) - BEFORE early return
   const mcpAppsResourceUri = useMemo(() => {
-    if (!result) return null;
-    return result.toolMeta?.ui?.resourceUri || null;
-  }, [result]);
+    if (!result?.toolMeta) return null;
+    return getViewResourceUri(result.toolMeta);
+  }, [result?.toolMeta]);
 
   const hasMcpAppsResource = useMemo(
     () => widgetProtocol === "mcp-apps" && !!mcpAppsResourceUri,
@@ -803,22 +869,20 @@ export function ToolResultDisplay({
                         />
                       </div>
 
-                      <MCPAppsRenderer
+                      <ToolResultViewPanel
                         key={`mcp-apps-${result.timestamp}`}
                         serverId={serverId}
-                        toolCallId={`tool-${result.timestamp}`}
+                        viewId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
                         toolInput={memoizedArgs}
                         toolOutput={memoizedResult}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
                         readResource={memoizedReadResource}
-                        className="w-full h-full relative p-4"
                         customProps={activeProps || undefined}
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}
-                        onRerun={onRerunTool}
                       />
                     </div>
                   );

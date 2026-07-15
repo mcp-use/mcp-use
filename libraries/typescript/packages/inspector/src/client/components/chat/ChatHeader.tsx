@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
-import type { ProviderName } from "@/llm/types";
+import type { ProviderName } from "@mcp-use/agent";
 import { ProviderIcon } from "./providerMeta";
 
 interface ChatHeaderProps {

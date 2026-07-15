@@ -8,7 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import { detectWidgetProtocol } from "@/client/utils/widget-detection";
+import { isViewTool } from "@mcp-use/client/react";
 
 interface ToolsListProps {
   tools: Tool[];
@@ -42,10 +42,11 @@ export function ToolsList({
     <div className="overflow-y-auto flex-1 overscroll-contain">
       {tools.map((tool, index) => {
         const toolMeta = (tool as { _meta?: Record<string, unknown> })._meta;
-        const protocol = detectWidgetProtocol(
-          toolMeta as Record<string, unknown> | undefined,
-          undefined
-        );
+        const protocol = isViewTool(
+          toolMeta as Record<string, unknown> | undefined
+        )
+          ? "mcp-apps"
+          : null;
         const properties = tool.inputSchema?.properties;
         const paramCount = properties ? Object.keys(properties).length : 0;
         const paramsBadge = atLeastOneToolHasParams && paramCount > 0 && (

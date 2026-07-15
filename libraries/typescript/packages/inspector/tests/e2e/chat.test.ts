@@ -10,7 +10,7 @@ import { getTestMatrix } from "./helpers/test-matrix";
 
 test.describe("Inspector Chat Tests", () => {
   // Note: To run these tests with a real MCP server:
-  // 1. cd packages/mcp-use/examples/server/features/conformance
+  // 1. cd packages/server/examples/conformance
   // 2. pnpm build && pnpm start --port 3002
   // 3. Ensure you have OPENAI_API_KEY in your .env file
   // Then run: pnpm test:e2e tests/e2e/chat.test.ts

@@ -11,21 +11,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
+const mockCapturePostHog = vi.fn().mockResolvedValue(undefined);
+const mockCaptureScarf = vi.fn().mockResolvedValue(undefined);
 
-// Mock PostHog before importing Telemetry
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+vi.mock("../../../src/telemetry/tel-fetch.js", () => ({
+  capturePostHog: (...args: unknown[]) => mockCapturePostHog(...args),
+  captureScarf: (...args: unknown[]) => mockCaptureScarf(...args),
+  SCARF_GATEWAY_URL: "https://mcpuse.gateway.scarf.sh/events-ts",
+}));
 
 // Mock fs module
 vi.mock("node:fs", () => ({
@@ -143,7 +136,7 @@ describe("Telemetry", () => {
 
     it("should capture events with correct properties when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockCapture.mockClear();
+      mockCapturePostHog.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
@@ -159,7 +152,7 @@ describe("Telemetry", () => {
 
       await telemetry.capture(event);
 
-      expect(mockCapture).toHaveBeenCalledWith(
+      expect(mockCapturePostHog).toHaveBeenCalledWith(
         expect.objectContaining({
           event: "server_tool_call",
           properties: expect.objectContaining({
@@ -298,36 +291,24 @@ describe("Telemetry", () => {
   });
 
   describe("flush and shutdown", () => {
-    it("should call PostHog flush when telemetry is enabled", async () => {
+    it("should no-op flush with fetch-based telemetry", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockFlush.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
-      // Wait for PostHog to initialize (it's async)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      telemetry.flush();
-
-      expect(mockFlush).toHaveBeenCalled();
+      expect(() => telemetry.flush()).not.toThrow();
     });
 
-    it("should call PostHog shutdown when telemetry is enabled", async () => {
+    it("should no-op shutdown with fetch-based telemetry", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockShutdown.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
-      // Wait for PostHog to initialize (it's async)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      telemetry.shutdown();
-
-      expect(mockShutdown).toHaveBeenCalled();
+      await expect(telemetry.shutdown()).resolves.toBeUndefined();
     });
   });
 });

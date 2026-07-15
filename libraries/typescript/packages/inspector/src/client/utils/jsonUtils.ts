@@ -2,6 +2,8 @@
  * Utility functions for handling large JSON objects in the inspector
  */
 
+import { formatBytes } from "./format";
+
 // Size threshold in bytes (100KB)
 const LARGE_JSON_THRESHOLD = 100 * 1024;
 
@@ -77,17 +79,6 @@ export function analyzeJSON(data: any): LargeJSONInfo {
     preview,
     full,
   };
-}
-
-/**
- * Format bytes to human-readable string
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
 }
 
 /**

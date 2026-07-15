@@ -33,19 +33,18 @@ import {
 } from "@/client/components/ui/select";
 
 import { cn } from "@/client/lib/utils";
-import type { ProviderName } from "@/llm/types";
+import {
+  buildOllamaApiUrl,
+  normalizeOllamaBaseUrl,
+  OllamaCorsError,
+  type ProviderName,
+} from "@mcp-use/agent";
 import {
   getDefaultBaseUrl,
   providerRequiresApiKey,
   providerSupportsBaseUrl,
 } from "./types";
 import { getProviderLabel, ProviderIcon } from "./providerMeta";
-
-import {
-  buildOllamaApiUrl,
-  normalizeOllamaBaseUrl,
-  OllamaCorsError,
-} from "@/llm/providers/ollama/utils";
 
 interface ModelOption {
   id: string;
@@ -584,6 +583,7 @@ export function ConfigurationDialog({
                             <CommandItem
                               key={model.id}
                               value={model.id}
+                              keywords={model.displayName}
                               onSelect={(currentValue) => {
                                 onModelChange(
                                   currentValue === tempModel ? "" : currentValue

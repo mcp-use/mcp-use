@@ -1,6 +1,5 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
   Dialog,
   DialogContent,
@@ -8,12 +7,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/client/components/ui/dialog";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import {
   generatePythonSDKCode,
   generateTypeScriptSDKCode,
 } from "@/client/utils/mcpClientUtils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { Button } from "./ui/button";
 
 interface SdkIntegrationModalProps {
@@ -47,7 +45,6 @@ export function SdkIntegrationModal({
   headers,
   language,
 }: SdkIntegrationModalProps) {
-  const { prismStyle } = usePrismTheme();
   const [copied, setCopied] = useState(false);
 
   const code =
@@ -110,26 +107,9 @@ export function SdkIntegrationModal({
                 )}
               </Button>
             </div>
-            <SyntaxHighlighter
-              language={language}
-              style={prismStyle}
-              customStyle={{
-                margin: 0,
-                padding: "1rem",
-                paddingRight: "3rem",
-                borderRadius: "0.5rem",
-                fontSize: "0.75rem",
-                background: "var(--muted)",
-                width: "100%",
-                maxWidth: "100%",
-                overflow: "auto",
-              }}
-              wrapLines={true}
-              wrapLongLines={true}
-              PreTag="div"
-            >
-              {code}
-            </SyntaxHighlighter>
+            <pre className="m-0 p-4 pr-12 rounded-lg text-xs font-mono overflow-auto w-full max-w-full bg-muted">
+              <code>{code}</code>
+            </pre>
           </div>
         </div>
       </DialogContent>

@@ -18,7 +18,7 @@ import {
   MCPAgentExecutionEvent,
   MCPClientInitEvent,
 } from "./events.js";
-import { capturePostHog } from "./tel-fetch.js";
+import { capturePostHog, captureScarf } from "./tel-fetch.js";
 
 function generateUUID(): string {
   return globalThis.crypto.randomUUID();
@@ -69,7 +69,6 @@ type StorageCapability = "persistent" | "session-only";
 const USER_ID_STORAGE_KEY = "mcp_use_user_id";
 const PROJECT_API_KEY = "phc_lyTtbYwvkdSbrcMQNPiKiiRWrrM1seyKIMjycSvItEI";
 const HOST = "https://eu.i.posthog.com";
-const SCARF_GATEWAY_URL = "https://mcpuse.gateway.scarf.sh/events-ts";
 
 /** Install before first `getInstance()` — node entry wires fs storage here. */
 let configuredStorage: TelemetryStorage | null = null;
@@ -192,31 +191,6 @@ function isTelemetryDisabled(): boolean {
   return false;
 }
 
-class ScarfEventLogger {
-  constructor(
-    private endpoint: string,
-    private timeout = 3000
-  ) {}
-
-  async logEvent(properties: Record<string, unknown>): Promise<void> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-      const response = await fetch(this.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(properties),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-    } catch (error) {
-      logger.debug(`Failed to send Scarf event: ${error}`);
-    }
-  }
-}
 
 function sessionId(): string {
   try {
@@ -239,13 +213,14 @@ export class Telemetry {
   private _currUserId: string | null = null;
   private _telemetryEnabled = false;
   private _pending = new Set<Promise<void>>();
-  private _scarfClient: ScarfEventLogger | null = null;
+  private _scarfEnabled = false;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
   private _storage: TelemetryStorage | null;
   /** True when node entry installed fs storage (package-download dedup). */
   private _fsBacked: boolean;
   private _source: string;
+  private _productVersion?: string;
 
   private constructor() {
     this._runtimeEnvironment = detectRuntimeEnvironment();
@@ -270,7 +245,7 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
       this._telemetryEnabled = true;
-      this._scarfClient = new ScarfEventLogger(SCARF_GATEWAY_URL, 3000);
+      this._scarfEnabled = true;
 
       // Package-download is Scarf/fs-backed (node entry only).
       if (this._fsBacked) {
@@ -314,8 +289,12 @@ export class Telemetry {
     return this._source;
   }
 
+  setProductVersion(version: string): void {
+    this._productVersion = version;
+  }
+
   get isEnabled(): boolean {
-    return this._telemetryEnabled || this._scarfClient !== null;
+    return this._telemetryEnabled || this._scarfEnabled;
   }
 
   get userId(): string {
@@ -341,12 +320,12 @@ export class Telemetry {
   }
 
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    if (!this._telemetryEnabled && !this._scarfClient) return;
+    if (!this._telemetryEnabled && !this._scarfEnabled) return;
 
     const currentUserId = this.userId;
     const properties: Record<string, unknown> = {
       ...event.properties,
-      mcp_use_version: getPackageVersion(),
+      mcp_use_version: this._productVersion ?? getPackageVersion(),
       language: "typescript",
       source: this._source,
       runtime: this._runtimeEnvironment,
@@ -364,16 +343,14 @@ export class Telemetry {
       void p.finally(() => this._pending.delete(p));
     }
 
-    if (this._scarfClient) {
-      try {
-        await this._scarfClient.logEvent({
-          ...properties,
-          user_id: currentUserId,
-          event: event.name,
-        });
-      } catch (e) {
-        logger.debug(`Failed to track Scarf event ${event.name}: ${e}`);
-      }
+    if (this._scarfEnabled) {
+      const p = captureScarf({
+        ...properties,
+        user_id: currentUserId,
+        event: event.name,
+      });
+      this._pending.add(p);
+      void p.finally(() => this._pending.delete(p));
     }
   }
 
@@ -381,7 +358,7 @@ export class Telemetry {
     properties?: Record<string, unknown>
   ): Promise<void> {
     // Requires fs-backed storage from the node entry.
-    if (!this._scarfClient || !this._fsBacked || !this._storage) return;
+    if (!this._scarfEnabled || !this._fsBacked || !this._storage) return;
 
     const currentVersion = getPackageVersion();
     const saved = this._storage.getDownloadedVersion();
@@ -399,20 +376,16 @@ export class Telemetry {
 
     if (!shouldTrack) return;
 
-    try {
-      await this._scarfClient.logEvent({
-        ...(properties || {}),
-        mcp_use_version: currentVersion,
-        user_id: this.userId,
-        event: "package_download",
-        first_download: firstDownload,
-        language: "typescript",
-        source: this._source,
-        runtime: this._runtimeEnvironment,
-      });
-    } catch (e) {
-      logger.debug(`Failed to track Scarf package_download event: ${e}`);
-    }
+    await captureScarf({
+      ...(properties || {}),
+      mcp_use_version: currentVersion,
+      user_id: this.userId,
+      event: "package_download",
+      first_download: firstDownload,
+      language: "typescript",
+      source: this._source,
+      runtime: this._runtimeEnvironment,
+    });
   }
 
   async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
@@ -540,4 +513,8 @@ export const Tel = Telemetry;
 
 export function setTelemetrySource(source: string): void {
   Tel.getInstance().setSource(source);
+}
+
+export function setProductVersion(version: string): void {
+  Tel.getInstance().setProductVersion(version);
 }

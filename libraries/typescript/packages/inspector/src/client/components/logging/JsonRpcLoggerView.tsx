@@ -15,7 +15,7 @@ import {
 } from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 
 interface RenderableRpcItem {
   id: string;
@@ -70,7 +70,7 @@ export function JsonRpcLoggerView({
     setExpanded(new Set());
     onCountChange?.(0);
 
-    // Clear from mcp-use/react RPC logger
+    // Clear RPC logger state on the shared @mcp-use/client provider
     if (serverIds && serverIds.length > 0) {
       serverIds.forEach((serverId) => clearRpcLogs(serverId));
     } else {

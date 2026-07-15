@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 
 /**
  * Shared state + lifecycle for elicitation form/url requests.

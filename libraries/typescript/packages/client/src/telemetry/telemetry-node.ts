@@ -8,6 +8,7 @@ import {
   configureTelemetryStorage,
   Tel,
   Telemetry,
+  setProductVersion,
   setTelemetrySource,
   type TelemetryStorage,
 } from "./telemetry.js";
@@ -92,4 +93,4 @@ function createFsStorage(): TelemetryStorage {
 
 configureTelemetryStorage(createFsStorage());
 
-export { Telemetry, Tel, setTelemetrySource };
+export { Telemetry, Tel, setTelemetrySource, setProductVersion };

@@ -1,4 +1,4 @@
-import { MCPAddToClientEvent, Telemetry } from "@/client/telemetry";
+import { MCPAddToClientEvent, captureInspectorEvent } from "@/client/telemetry";
 import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
@@ -24,7 +24,7 @@ import {
   generateVSCodeInsidersDeepLink,
   getEnvVarInstructions,
 } from "@/client/utils/mcpClientUtils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { Check, ChevronDown, Copy, Plus } from "lucide-react";
 import { useState } from "react";
 import { VSCodeIcon } from "./ui/client-icons";
@@ -105,8 +105,7 @@ export function AddToClientDropdown({
 
   const trackAddToClient = (client: string) => {
     try {
-      Telemetry.getInstance()
-        .capture(new MCPAddToClientEvent({ client }))
+      captureInspectorEvent(new MCPAddToClientEvent({ client }))
         .catch(() => {});
     } catch {
       // ignore telemetry errors

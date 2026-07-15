@@ -19,14 +19,13 @@
  * signals readiness + fonts have loaded + two animation frames have elapsed.
  */
 
-import { useMcpClient } from "@mcp-use/client/react";
+import { ViewRenderer, useMcpClient } from "@mcp-use/client/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { getBasePath } from "@/client/utils/basePath";
-import { MCPAppsRenderer } from "./MCPAppsRenderer";
 
 const PREVIEW_SERVER_ID = "preview-default";
-const PREVIEW_BUNDLE_SERVER_ID = "preview-bundle";
 
 interface PreviewProps {
   toolInput?: Record<string, unknown>;
@@ -239,19 +238,27 @@ function ViewPreviewBundle({
 
   return (
     <div ref={containerRef} style={{ width: "100vw", height: "100vh" }}>
-      <MCPAppsRenderer
-        serverId={PREVIEW_BUNDLE_SERVER_ID}
-        toolCallId={toolCallId}
+      <ViewRenderer
+        viewId={toolCallId}
         toolName={view}
         toolInput={bundle.toolInput}
         toolOutput={bundle.toolOutput}
-        resourceUri={bundle.resourceUri}
-        readResource={readResource}
         displayMode="inline"
-        inlineWidthOverride={widthOverride}
-        noWrapper
+        inlineMaxWidth={widthOverride}
         chromeless
         onReady={() => setRendererReady(true)}
+        source={{
+          kind: "live",
+          connection: {
+            callTool: async () => {
+              throw new Error("Preview bundle mode has no server connection");
+            },
+            readResource,
+          },
+          resourceUri: bundle.resourceUri,
+        }}
+        cspMode="permissive"
+        hostInfo={{ name: "mcp-use-inspector", version: "11.0.0" }}
       />
     </div>
   );
@@ -331,6 +338,19 @@ function ViewPreviewLive({ view }: { view: string }) {
   usePreviewReadinessSignal(rendererReady);
   usePreviewViewport();
 
+  const hostProps = useViewHostProps({
+    serverId: PREVIEW_SERVER_ID,
+    viewId: toolCallId,
+    resourceUri: resourceUri ?? "",
+    toolName: view,
+    toolInput: previewProps.toolInput,
+    toolOutput: previewProps.toolOutput,
+    readResource,
+    displayMode: "fullscreen",
+    chromeless: true,
+    onReady: () => setRendererReady(true),
+  });
+
   if (failed) {
     return (
       <div style={{ padding: 16, fontFamily: "monospace", color: "#b00" }}>
@@ -366,19 +386,17 @@ function ViewPreviewLive({ view }: { view: string }) {
 
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
-      <MCPAppsRenderer
-        serverId={PREVIEW_SERVER_ID}
-        toolCallId={toolCallId}
-        toolName={view}
-        toolInput={previewProps.toolInput}
-        toolOutput={previewProps.toolOutput}
-        resourceUri={resourceUri}
-        readResource={readResource}
-        displayMode="fullscreen"
-        noWrapper
-        chromeless
-        onReady={() => setRendererReady(true)}
-      />
+      {hostProps && resourceUri ? (
+        <ViewRenderer
+          viewId={toolCallId}
+          toolName={view}
+          toolInput={previewProps.toolInput}
+          toolOutput={previewProps.toolOutput}
+          displayMode="fullscreen"
+          chromeless
+          {...hostProps}
+        />
+      ) : null}
     </div>
   );
 }

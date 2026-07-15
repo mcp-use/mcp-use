@@ -8,6 +8,9 @@ import { defineConfig } from "vite";
 const packageJson = JSON.parse(
   readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
 );
+const clientPackageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
+);
 
 export default defineConfig({
   base: "/inspector",
@@ -64,79 +67,31 @@ export default defineConfig({
     dedupe: ["react", "react-dom"],
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      // Use require.resolve to get the actual module path from node_modules
-      // This works in both dev (with workspace links) and production
-      "mcp-use/react": path.resolve(
-        __dirname,
-        "../mcp-use/dist/src/react/index.js"
-      ),
       "@mcp-use/client/react": path.resolve(
         __dirname,
-        "../client/dist/react/index.js"
+        "../client/src/react/index.ts"
       ),
       // The root client export selects the browser-safe build in Vite.
       "@mcp-use/client": path.resolve(
         __dirname,
         "../client/dist/index-browser.js"
       ),
-      "posthog-node": path.resolve(
-        __dirname,
-        "./src/client/stubs/posthog-node.js"
-      ),
-      "@scarf/scarf": path.resolve(
-        __dirname,
-        "./src/client/stubs/@scarf/scarf.js"
-      ),
-      dotenv: path.resolve(__dirname, "./src/client/stubs/dotenv.js"),
-      util: path.resolve(__dirname, "./src/client/stubs/util.js"),
-      path: path.resolve(__dirname, "./src/client/stubs/path.js"),
-      process: path.resolve(__dirname, "./src/client/stubs/process.js"),
-      // More specific aliases must come first
-      "node:fs/promises": path.resolve(
-        __dirname,
-        "./src/client/stubs/fs-promises.js"
-      ),
-      "fs/promises": path.resolve(
-        __dirname,
-        "./src/client/stubs/fs-promises.js"
-      ),
-      "node:fs": path.resolve(__dirname, "./src/client/stubs/fs.js"),
-      fs: path.resolve(__dirname, "./src/client/stubs/fs.js"),
-      "node:async_hooks": path.resolve(
-        __dirname,
-        "./src/client/stubs/async_hooks.js"
-      ),
-      "node:stream": path.resolve(__dirname, "./src/client/stubs/stream.js"),
-      "node:process": path.resolve(__dirname, "./src/client/stubs/process.js"),
-      "node:child_process": path.resolve(
-        __dirname,
-        "./src/client/stubs/child_process.js"
-      ),
-      child_process: path.resolve(
-        __dirname,
-        "./src/client/stubs/child_process.js"
-      ),
+      "@mcp-use/agent": path.resolve(__dirname, "../agent/src/index.ts"),
     },
+    conditions: ["browser", "module", "import", "default"],
   },
   define: {
-    // Define process.env for browser compatibility
     "process.env": "{}",
     "process.platform": '"browser"',
     // Inject version from package.json at build time
     __INSPECTOR_VERSION__: JSON.stringify(packageJson.version),
+    // @mcp-use/client/react resolves to source in dev; version.ts needs this.
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(clientPackageJson.version),
     // Ensure global is defined
     global: "globalThis",
   },
   optimizeDeps: {
-    include: ["mcp-use/react", "@mcp-use/client", "react-syntax-highlighter"],
-    exclude: [
-      "posthog-node",
-      "tar", // Node.js file system package
-      "path-scurry", // Node.js path utilities
-    ], // Exclude Node.js-only packages
-  },
-  ssr: {
-    noExternal: ["react-syntax-highlighter", "refractor"],
+    include: ["@mcp-use/client"],
   },
   build: {
     minify: true,
@@ -148,15 +103,6 @@ export default defineConfig({
         "@e2b/code-interpreter",
         "os",
       ],
-      onwarn(warning, warn) {
-        if (
-          warning.code === "UNRESOLVED_IMPORT" &&
-          warning.exporter?.includes("refractor")
-        ) {
-          return;
-        }
-        warn(warning);
-      },
     },
   },
   server: {

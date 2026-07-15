@@ -10,15 +10,15 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { MessageContentBlock } from "mcp-use/react";
+import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
 import type { MessageAttachment } from "./types";
-import { detectWidgetProtocol } from "@/client/utils/widget-detection";
+import { isViewTool } from "@mcp-use/client/react";
 import { InlineElicitationCard } from "./InlineElicitationCard";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import type { ElicitResult } from "@modelcontextprotocol/client";
 
 interface Message {
@@ -75,7 +75,6 @@ export const MessageList = memo(
     readResource,
     tools,
     sendMessage,
-    serverBaseUrl,
     pendingElicitationRequests,
     onApproveElicitation,
     onRejectElicitation,
@@ -122,7 +121,7 @@ export const MessageList = memo(
     // Helper function to check if a tool has widget support
     const isWidgetTool = (toolName: string): boolean => {
       const toolMeta = getToolMeta(toolName);
-      return detectWidgetProtocol(toolMeta, undefined) === "mcp-apps";
+      return isViewTool(toolMeta);
     };
 
     // Convert a ui/message content array to a text string + image attachments,
@@ -302,7 +301,6 @@ export const MessageList = memo(
                                 result={part.toolInvocation.result || null}
                                 serverId={serverId}
                                 readResource={readResource}
-                                serverBaseUrl={serverBaseUrl}
                                 toolMeta={getToolMeta(
                                   part.toolInvocation.toolName
                                 )}
@@ -356,7 +354,6 @@ export const MessageList = memo(
                                     result={toolCall.result || null}
                                     serverId={serverId}
                                     readResource={readResource}
-                                    serverBaseUrl={serverBaseUrl}
                                     toolMeta={getToolMeta(toolCall.toolName)}
                                     onSendFollowUp={handleFollowUp}
                                   />

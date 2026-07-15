@@ -6,7 +6,7 @@ import {
 } from "@/client/components/ui/dialog";
 import type { McpServer } from "@mcp-use/client/react";
 import { Copy } from "lucide-react";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -14,7 +14,7 @@ import { JSONDisplay } from "./shared/JSONDisplay";
 import {
   getConfiguredServerAlias,
   getServerDisplayName,
-} from "@/client/utils/serverNames";
+} from "@/client/utils/servers";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;

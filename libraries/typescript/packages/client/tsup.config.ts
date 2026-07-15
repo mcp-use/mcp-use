@@ -20,7 +20,13 @@ export default defineConfig({
   clean: true,
   // React is an optional peer dependency — never bundle it into the react
   // subpath (a second copy would break hooks).
-  external: ["react", "react-dom"],
+  external: [
+    "react",
+    "react-dom",
+    "@modelcontextprotocol/client",
+    "@modelcontextprotocol/ext-apps",
+    "@modelcontextprotocol/ext-apps/app-bridge",
+  ],
   define: {
     __MCP_USE_PACKAGE_VERSION__: JSON.stringify(version),
   },

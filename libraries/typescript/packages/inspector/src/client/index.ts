@@ -17,13 +17,9 @@ export {
   type ToolResult,
 } from "./components/tools/ToolResultDisplay.js";
 
-// Widget renderers & detection
-export { MCPAppsRenderer } from "./components/MCPAppsRenderer.js";
+// Chat tool result rendering (MCP Apps views)
 export { ToolResultRenderer } from "./components/chat/ToolResultRenderer.js";
-export {
-  detectWidgetProtocol,
-  type WidgetProtocol,
-} from "./utils/widget-detection.js";
+export { ViewRenderer, isViewTool, getViewResourceUri } from "@mcp-use/client/react";
 
 // Context providers
 export { ThemeProvider } from "./context/ThemeContext.js";

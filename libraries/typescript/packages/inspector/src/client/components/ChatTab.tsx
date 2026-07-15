@@ -12,7 +12,7 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
-import { copyToClipboard } from "../utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { downloadJSON } from "../utils/jsonUtils";
 import { shouldShowFreeTierUpgrade } from "./chat/freeTier";
 import { useHostedSession } from "../hooks/useHostedSession";
@@ -28,6 +28,7 @@ import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
+import { useHostedChatMode } from "./chat/useHostedChatMode";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { LoginModal } from "./LoginModal";
@@ -185,43 +186,16 @@ export function ChatTab({
     clearConfig,
   } = useConfig({ mcpServerUrl: connection.url ?? "" });
 
-  // ── Hosted-mode / client-side override ──────────────────────────────────
-  // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
-  // to the Manufact backend (inspector.manufact.com/api/v1/inspector/chat/stream).
-  // We *still* want client-side mode in two situations:
-  //
-  //  a) User already has their own API key stored in localStorage → auto-detect
-  //     on mount via `localLlmConfig`. The model selector is then naturally
-  //     visible (ChatLandingForm / ConfigurationDialog take over).
-  //
-  //  b) User clicks "Use your own API key" in LoginModal (shown on 429) →
-  //     `handleUseApiKey` sets forceClientSide=true and opens ConfigurationDialog.
-  //
-  // Host embeds (e.g. cloud dashboard) pass `useClientSide={false}` + `managedLlmConfig`
-  // and set `chatApiUrl` to the org chat stream. They must not fall back to
-  // client-side streaming just because `localLlmConfig` exists from a past visit
-  // to the standalone inspector — that would use the wrong LLM (e.g. Gemini in
-  // localStorage) while the host shows a different model in the shell.
-  // `hostUsesServerManagedStream`: only `forceClientSide` (user explicitly
-  // chose BYOK) turns client-side back on.
-  const hostUsesServerManagedStream =
-    !useClientSide && managedLlmConfig != null;
-  const [forceClientSide, setForceClientSide] = useState(() =>
-    hostUsesServerManagedStream ? false : !!localLlmConfig
-  );
-  const effectiveClientSide = hostUsesServerManagedStream
-    ? forceClientSide
-    : useClientSide || forceClientSide || !!localLlmConfig;
-
-  // When the user has opted into client-side mode (own API key), ignore the
-  // externally-provided managed config — we want the config dialog, model
-  // selector, and local llmConfig to take over. Without this, clicking "Use
-  // your own API key" in the LoginModal would leave `isManaged=true`, hiding
-  // the ConfigurationDialog and config button.
-  const llmConfig = effectiveClientSide
-    ? localLlmConfig
-    : (managedLlmConfig ?? localLlmConfig);
-  const isManaged = !effectiveClientSide && !!managedLlmConfig;
+  const {
+    setForceClientSide,
+    effectiveClientSide,
+    llmConfig,
+    isManaged,
+  } = useHostedChatMode({
+    useClientSide,
+    managedLlmConfig,
+    localLlmConfig,
+  });
 
   const { getAllModelContexts } = useWidgetDebug();
 

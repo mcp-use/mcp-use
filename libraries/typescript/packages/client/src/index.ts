@@ -36,6 +36,7 @@ export * from "./code-mode/connector.js";
 // Logging + internal telemetry
 export {
   setTelemetrySource,
+  setProductVersion,
   Tel,
   Telemetry,
   telFetch,

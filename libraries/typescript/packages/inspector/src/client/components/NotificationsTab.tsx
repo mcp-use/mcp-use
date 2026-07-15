@@ -3,20 +3,17 @@ import type { McpNotification } from "@mcp-use/client/react";
 // Type alias for backward compatibility
 type MCPNotification = McpNotification;
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Trash2 } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
-import {
-  NotificationsTabHeader,
-  NotificationsList,
-  NotificationResultDisplay,
-  type NotificationResult,
-} from "./notifications";
-import { copyToClipboard } from "@/client/utils/clipboard";
-import { formatRelativeTime } from "@/client/utils/time";
+import { NotificationsList } from "./notifications/NotificationsList";
+import { NotificationResultDisplay } from "./notifications/NotificationResultDisplay";
+import type { NotificationResult } from "./notifications/NotificationResultDisplay";
+import { SearchTabHeader } from "@/client/components/shared";
+import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 
 interface NotificationsTabProps {
   notifications: MCPNotification[];
@@ -296,15 +293,21 @@ export function NotificationsTab({
           className="h-full border-r dark:border-zinc-700"
         >
           <ResizablePanel defaultSize={75} minSize={30}>
-            <NotificationsTabHeader
+            <SearchTabHeader
+              title="Notifications"
+              count={filteredNotifications.length}
               isSearchExpanded={isSearchExpanded}
               searchQuery={searchQuery}
-              filteredNotificationsCount={filteredNotifications.length}
-              notificationsCount={notifications.length}
+              searchPlaceholder="Search notifications..."
               onSearchExpand={() => setIsSearchExpanded(true)}
               onSearchChange={setSearchQuery}
               onSearchBlur={handleSearchBlur}
-              onClearAll={handleClearAll}
+              bulkAction={{
+                icon: Trash2,
+                label: "Clear all",
+                onClick: handleClearAll,
+                disabled: notifications.length === 0,
+              }}
               searchInputRef={
                 searchInputRef as React.RefObject<HTMLInputElement>
               }

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import type { Prompt, GetPromptResult } from "@modelcontextprotocol/client";
-import { MCPPromptCallEvent, Telemetry } from "@/client/telemetry";
+import { MCPPromptCallEvent, captureInspectorEvent } from "@/client/telemetry";
 
 export interface PromptResult {
   promptName: string;
@@ -76,9 +76,7 @@ export function useMCPPrompts({
         const duration = Date.now() - startTime;
 
         // Track successful prompt call
-        const telemetry = Telemetry.getInstance();
-        telemetry
-          .capture(
+        captureInspectorEvent(
             new MCPPromptCallEvent({
               promptName: prompt.name,
               serverId,
@@ -101,9 +99,7 @@ export function useMCPPrompts({
         ]);
       } catch (error) {
         // Track failed prompt call
-        const telemetry = Telemetry.getInstance();
-        telemetry
-          .capture(
+        captureInspectorEvent(
             new MCPPromptCallEvent({
               promptName: prompt.name,
               serverId,

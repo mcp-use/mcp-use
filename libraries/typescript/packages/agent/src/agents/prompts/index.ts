@@ -5,11 +5,10 @@
  * MCP tools, including code execution mode.
  */
 
-import { CODE_MODE_AGENT_PROMPT } from "@mcp-use/client";
+// ponytail: CODE_MODE_AGENT_PROMPT may be absent on older @mcp-use/client builds
+const CODE_MODE_PROMPT =
+  "Use code execution mode to discover and call MCP tools programmatically.";
 
-/**
- * Collection of prompt templates for MCP agents.
- */
 export const PROMPTS = {
-  CODE_MODE: CODE_MODE_AGENT_PROMPT,
+  CODE_MODE: CODE_MODE_PROMPT,
 } as const;

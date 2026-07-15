@@ -1,5 +1,4 @@
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/client";
-import { Command } from "cmdk";
 import {
   BrushCleaning,
   ExternalLink,
@@ -13,7 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import type { SavedRequest } from "./tools";
+import type { SavedRequest } from "./tools/SavedRequestsList";
 
 import {
   downloadMcpbFile,
@@ -24,9 +23,9 @@ import {
   generateVSCodeDeepLink,
   generateVSCodeInsidersDeepLink,
 } from "@/client/utils/mcpClientUtils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { toast } from "sonner";
-import { getServerDisplayName } from "@/client/utils/serverNames";
+import { getServerDisplayName } from "@/client/utils/servers";
 import { getServerHeaders } from "@/client/utils/connectionUpdates";
 import { McpUseLogo } from "./McpUseLogo";
 import { ServerIcon } from "./ServerIcon";
@@ -112,7 +111,9 @@ export function CommandPalette({
   onServerSelect,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   // Get server URL for "Open in..." commands
@@ -414,6 +415,13 @@ export function CommandPalette({
     })),
   ];
 
+  const filteredItems = commandItems.filter((item) => {
+    if (!search.trim()) return true;
+    const haystack =
+      `${item.name} ${item.description || ""} ${item.category}`.toLowerCase();
+    return haystack.includes(search.trim().toLowerCase());
+  });
+
   const handleSelect = useCallback(
     (item: CommandItem) => {
       console.warn("[CommandPalette] Item selected:", {
@@ -615,73 +623,114 @@ export function CommandPalette({
   useEffect(() => {
     if (isOpen) {
       setSearch("");
+      setActiveIndex(0);
+      requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [isOpen, setSearch]);
+  }, [isOpen]);
 
-  // Scroll to top when search changes
+  // Scroll to top and clamp selection when search changes
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = 0;
     }
+    setActiveIndex(0);
   }, [search]);
 
-  return (
-    <Command.Dialog
-      open={isOpen}
-      onOpenChange={onOpenChange}
-      label="Command Palette"
-      className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[51] max-w-[640px] w-[calc(100vw-2rem)] sm:w-full p-2 bg-white dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl overflow-hidden border border-border shadow-[var(--cmdk-shadow)] transition-transform duration-100 ease-out outline-none"
-      overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
-      data-testid="command-palette-dialog"
-    >
-      <Command.Input
-        placeholder="What do you need?"
-        value={search}
-        onValueChange={setSearch}
-        className="border-none w-full text-[17px] px-4 pt-2 pb-4 outline-none bg-transparent text-foreground border-b border-border mb-0 rounded-none placeholder:text-muted-foreground"
-        data-testid="command-palette-input"
-      />
-      <Command.List
-        ref={listRef}
-        className="min-h-[200px] sm:min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out"
-        data-testid="command-palette-list"
-      >
-        <Command.Empty className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
-          No results found.
-        </Command.Empty>
-        {commandItems.map((item) => (
-          <Command.Item
-            key={item.id}
-            data-testid={`command-palette-item-${item.id}`}
-            value={`${item.name} ${item.description || ""} ${item.category}`}
-            onSelect={() => handleSelect(item)}
-            className="[content-visibility:auto] cursor-pointer h-12 rounded-lg text-sm flex items-center gap-3 px-4 text-foreground select-none will-change-[background,color] transition-all duration-150 data-[selected=true]:bg-accent data-[selected=true]:text-foreground data-[disabled=true]:text-muted-foreground/50 data-[disabled=true]:cursor-not-allowed active:bg-accent/80 mt-1 first:mt-0"
-          >
-            {getIcon(item.type, item.category, item.name)}
-            <span className="font-medium truncate flex-1 min-w-0">
-              {item.name}
-            </span>
-            {(item.metadata?.serverName || item.metadata?.serverId) &&
-              item.category !== "Connected Servers" &&
-              (() => {
-                // Find the actual server object from metadata.serverId
-                const server = connections.find(
-                  (c) => c.id === item.metadata?.serverId
-                );
-                return server ? (
-                  <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
-                    <ServerIcon server={server} size="sm" />
-                    <span className="text-xs font-base text-muted-foreground">
-                      {item.metadata?.serverName || item.metadata?.serverId}
-                    </span>
-                  </div>
-                ) : null;
-              })()}
-          </Command.Item>
-        ))}
-      </Command.List>
+  useEffect(() => {
+    if (activeIndex >= filteredItems.length) {
+      setActiveIndex(Math.max(0, filteredItems.length - 1));
+    }
+  }, [activeIndex, filteredItems.length]);
 
-      {/* Keyboard Shortcuts Footer */}
+  if (!isOpen) return null;
+
+  const onPaletteKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, filteredItems.length - 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (event.key === "Enter" && filteredItems[activeIndex]) {
+      event.preventDefault();
+      handleSelect(filteredItems[activeIndex]);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onOpenChange(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm"
+        aria-label="Close command palette"
+        onClick={() => onOpenChange(false)}
+      />
+      <div
+        role="dialog"
+        aria-label="Command Palette"
+        data-testid="command-palette-dialog"
+        className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[51] max-w-[640px] w-[calc(100vw-2rem)] sm:w-full p-2 bg-white dark:bg-zinc-900/90 backdrop-blur-xl rounded-xl overflow-hidden border border-border shadow-[var(--cmdk-shadow)] transition-transform duration-100 ease-out outline-none"
+        onKeyDown={onPaletteKeyDown}
+      >
+        <input
+          ref={inputRef}
+          placeholder="What do you need?"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="border-none w-full text-[17px] px-4 pt-2 pb-4 outline-none bg-transparent text-foreground border-b border-border mb-0 rounded-none placeholder:text-muted-foreground"
+          data-testid="command-palette-input"
+        />
+        <div
+          ref={listRef}
+          className="min-h-[200px] sm:min-h-[330px] max-h-[400px] overflow-auto overscroll-contain transition-[height] duration-100 ease-out"
+          data-testid="command-palette-list"
+        >
+          {filteredItems.length === 0 ? (
+            <div className="text-sm flex items-center justify-center h-12 whitespace-pre-wrap text-muted-foreground">
+              No results found.
+            </div>
+          ) : (
+            filteredItems.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                data-testid={`command-palette-item-${item.id}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => handleSelect(item)}
+                className={`[content-visibility:auto] cursor-pointer h-12 rounded-lg text-sm flex items-center gap-3 px-4 text-foreground select-none w-full text-left transition-all duration-150 mt-1 first:mt-0 ${
+                  index === activeIndex
+                    ? "bg-accent text-foreground"
+                    : "bg-transparent"
+                }`}
+              >
+                {getIcon(item.type, item.category, item.name)}
+                <span className="font-medium truncate flex-1 min-w-0">
+                  {item.name}
+                </span>
+                {(item.metadata?.serverName || item.metadata?.serverId) &&
+                  item.category !== "Connected Servers" &&
+                  (() => {
+                    const server = connections.find(
+                      (c) => c.id === item.metadata?.serverId
+                    );
+                    return server ? (
+                      <div className="flex items-center gap-1.5 px-1 pr-2 py-1 rounded-full bg-zinc-200 dark:bg-zinc-800 shrink-0">
+                        <ServerIcon server={server} size="sm" />
+                        <span className="text-xs font-base text-muted-foreground">
+                          {item.metadata?.serverName || item.metadata?.serverId}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Keyboard Shortcuts Footer */}
       <div className="border-t border-border px-4 py-3 pb-1 flex items-center justify-between text-xs text-muted-foreground ">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
@@ -724,6 +773,7 @@ export function CommandPalette({
           </div>
         </div>
       </div>
-    </Command.Dialog>
+      </div>
+    </>
   );
 }

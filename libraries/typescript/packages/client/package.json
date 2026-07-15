@@ -56,7 +56,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/client": "2.0.0-beta.3"
+    "@modelcontextprotocol/client": "2.0.0-beta.3",
+    "@modelcontextprotocol/ext-apps": "^1.7.4"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.6.1",

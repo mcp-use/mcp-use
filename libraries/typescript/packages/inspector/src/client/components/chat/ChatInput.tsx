@@ -6,7 +6,7 @@ import React, { useRef } from "react";
 import type { ToolInfo } from "./ToolSelector";
 import { ToolSelector } from "./ToolSelector";
 import type { MessageAttachment } from "./types";
-import { formatFileSize } from "./utils";
+import { formatFileSize } from "@/client/utils/format";
 
 interface ChatInputProps {
   inputValue: string;

@@ -9,7 +9,7 @@ import {
   SheetTrigger,
 } from "@/client/components/ui/sheet";
 import { cn } from "@/client/lib/utils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { analyzeJSON } from "@/client/utils/jsonUtils";
 import { JSONDisplay } from "../shared/JSONDisplay";
 

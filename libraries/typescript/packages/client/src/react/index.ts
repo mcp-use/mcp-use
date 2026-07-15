@@ -3,8 +3,7 @@
  *
  * Provides the `useMcp` hook, the multi-server `McpClientProvider`, and the
  * supporting storage / logging utilities for connecting to MCP servers from a
- * React app. The widget/view runtime (useWidget, useCallTool, ...) lives in the
- * server package at `mcp-use/react`.
+ * React app. MCP Apps host rendering lives in {@link ViewRenderer}.
  */
 
 export type {
@@ -69,3 +68,24 @@ export {
   clearRpcLogs,
   type RpcLogEntry,
 } from "./rpc-logger.js";
+
+// MCP Apps host renderer
+export {
+  ViewRenderer,
+  resolveViewResource,
+  getViewResourceUri,
+  isViewResource,
+  isViewTool,
+  parseCustomProps,
+  buildViewSandboxBlobUrl,
+  type ViewRendererProps,
+  type ViewConnection,
+  type ViewDisplayMode,
+  type ViewCspMode,
+  type ViewRendererSource,
+  type ResolvedViewResource,
+  type ViewCspViolation,
+  type McpUiHostContext,
+  type McpUiResourceCsp,
+  type McpUiResourcePermissions,
+} from "./view/ViewRenderer.js";

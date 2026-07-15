@@ -8,7 +8,7 @@ import {
 import { useInspector } from "@/client/context/InspectorContext";
 import type { Prompt } from "@modelcontextprotocol/client";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Clock, MessageSquare } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -16,17 +16,14 @@ import {
   useRef,
   useState,
 } from "react";
-import type { SavedPrompt } from "./prompts";
-import {
-  PromptExecutionPanel,
-  PromptResultDisplay,
-  PromptsList,
-  PromptsTabHeader,
-  SavedPromptsList,
-} from "./prompts";
+import type { SavedPrompt } from "./prompts/SavedPromptsList";
+import { PromptExecutionPanel } from "./prompts/PromptExecutionPanel";
+import { PromptResultDisplay } from "./prompts/PromptResultDisplay";
+import { PromptsList } from "./prompts/PromptsList";
+import { SavedPromptsList } from "./prompts/SavedPromptsList";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
-import { copyToClipboard } from "@/client/utils/clipboard";
-import { RpcPanel } from "./shared";
+import { copyToClipboard } from "@/client/utils/browser";
+import { ListTabHeader, RpcPanel } from "./shared";
 
 export interface PromptsTabRef {
   focusSearch: () => void;
@@ -483,12 +480,19 @@ export function PromptsTab({
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="absolute inset-0 flex flex-col bg-background z-0"
               >
-                <PromptsTabHeader
+                <ListTabHeader
                   activeTab={activeTab}
                   isSearchExpanded={isSearchExpanded}
                   searchQuery={searchQuery}
-                  filteredPromptsCount={filteredPrompts.length}
-                  savedPromptsCount={savedPrompts.length}
+                  primaryTabName="prompts"
+                  secondaryTabName="saved"
+                  primaryTabTitle="Prompts"
+                  secondaryTabTitle="History"
+                  primaryCount={filteredPrompts.length}
+                  secondaryCount={savedPrompts.length}
+                  primaryIcon={MessageSquare}
+                  secondaryIcon={Clock}
+                  searchPlaceholder="Search prompts..."
                   onSearchExpand={() => setIsSearchExpanded(true)}
                   onSearchChange={setSearchQuery}
                   onSearchBlur={handleSearchBlur}
@@ -580,12 +584,19 @@ export function PromptsTab({
         >
           <ResizablePanel defaultSize="75%" minSize="30%">
             <div className="flex flex-col h-full overflow-hidden">
-              <PromptsTabHeader
+              <ListTabHeader
                 activeTab={activeTab}
                 isSearchExpanded={isSearchExpanded}
                 searchQuery={searchQuery}
-                filteredPromptsCount={filteredPrompts.length}
-                savedPromptsCount={savedPrompts.length}
+                primaryTabName="prompts"
+                secondaryTabName="saved"
+                primaryTabTitle="Prompts"
+                secondaryTabTitle="History"
+                primaryCount={filteredPrompts.length}
+                secondaryCount={savedPrompts.length}
+                primaryIcon={MessageSquare}
+                secondaryIcon={Clock}
+                searchPlaceholder="Search prompts..."
                 onSearchExpand={() => setIsSearchExpanded(true)}
                 onSearchChange={setSearchQuery}
                 onSearchBlur={handleSearchBlur}

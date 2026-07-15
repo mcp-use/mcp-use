@@ -2,7 +2,7 @@
   "name": "@mcp-use/agent",
   "type": "module",
   "version": "2.0.0-alpha.0",
-  "description": "LangChain-based MCP agent (MCPAgent), adapters, manager tools, and observability. Part of the mcp-use v2 framework.",
+  "description": "Native cross-platform MCP agent. Inspector → MCPAgent → loop → fetch + @mcp-use/client. LangChain bridge at @mcp-use/agent/langchain.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
@@ -32,6 +32,11 @@
       "types": "./dist/browser-agent.d.ts",
       "import": "./dist/browser-agent.js",
       "require": "./dist/browser-agent.cjs"
+    },
+    "./langchain": {
+      "types": "./dist/langchain.d.ts",
+      "import": "./dist/langchain.js",
+      "require": "./dist/langchain.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -80,13 +85,22 @@
     "@langchain/anthropic": {
       "optional": true
     },
+    "@langchain/core": {
+      "optional": true
+    },
     "@langchain/openai": {
+      "optional": true
+    },
+    "langchain": {
       "optional": true
     },
     "langfuse": {
       "optional": true
     },
     "langfuse-langchain": {
+      "optional": true
+    },
+    "zod": {
       "optional": true
     }
   },
