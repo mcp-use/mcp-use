@@ -43,13 +43,13 @@ export interface McpAuthCallbackMessage {
 }
 
 /** Terminal outcome of an opener-owned popup flow. */
-export type AuthPopupResult =
+type AuthPopupResult =
   | { kind: "success" }
   | { kind: "error"; error: string }
   | { kind: "cancelled" }
   | { kind: "timeout" };
 
-export interface RunAuthPopupOptions {
+interface RunAuthPopupOptions {
   /**
    * The popup window handle returned by `window.open`. May be `null` when the
    * popup was blocked or opened out-of-band (e.g. a manual fallback link); the

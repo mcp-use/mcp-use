@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { StoredState } from "../../../src/auth/types.js";
+import type { StoredState } from "../../../src/auth/session-store.js";
 
 const mocks = vi.hoisted(() => ({
   finishAuth: vi.fn(),

@@ -11,7 +11,7 @@ import {
   type OAuthSessionStoreOptions,
 } from "../../../src/auth/session-store.js";
 import type { KVStore } from "../../../src/auth/storage.js";
-import type { StoredState } from "../../../src/auth/types.js";
+import type { StoredState } from "../../../src/auth/session-store.js";
 
 // ---- In-memory KVStore for tests ----
 
