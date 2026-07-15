@@ -1,3 +1,6 @@
+/** Bust Chrome's aggressive favicon cache when the asset changes. */
+export const FAVICON_CACHE_VERSION = "4";
+
 /** Static favicon assets copied to CDN / public alongside the inspector bundle. */
 export const INSPECTOR_FAVICON_ASSETS = [
   "favicon.svg",
@@ -7,22 +10,18 @@ export const INSPECTOR_FAVICON_ASSETS = [
   "site.webmanifest",
   "web-app-manifest-192x192.png",
   "web-app-manifest-512x512.png",
-  // Legacy dual-SVG pair — keep for backward-compatible CDN consumers.
   "favicon-black.svg",
   "favicon-white.svg",
 ] as const;
 
 /**
- * Render `<link>` tags for inspector favicons, matching the website's
- * RealFaviconGenerator setup in `website.mcp-use/src/app/layout.tsx`.
+ * Render `<link>` tags for inspector favicons.
+ *
+ * Uses same-origin `favicon-black.svg` (light icon in all color schemes).
+ * Do not point at inspector-cdn — production CDN still ships a dark-mode SVG.
  */
-export function renderInspectorFaviconLinks(baseUrl: string): string {
-  const base = baseUrl.replace(/\/$/, "");
-  return [
-    `<link rel="icon" type="image/svg+xml" href="${base}/favicon.svg" />`,
-    `<link rel="icon" type="image/png" sizes="96x96" href="${base}/favicon-96x96.png" />`,
-    `<link rel="icon" href="${base}/favicon.ico" sizes="any" />`,
-    `<link rel="apple-touch-icon" sizes="180x180" href="${base}/apple-touch-icon.png" />`,
-    `<link rel="manifest" href="${base}/site.webmanifest" />`,
-  ].join("\n    ");
+export function renderInspectorFaviconLinks(basePath = ""): string {
+  const prefix = basePath.replace(/\/$/, "");
+  const href = `${prefix}/favicon-black.svg?v=${FAVICON_CACHE_VERSION}`;
+  return `<link rel="icon" type="image/svg+xml" href="${href}" />`;
 }

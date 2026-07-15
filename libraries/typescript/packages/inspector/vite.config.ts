@@ -66,6 +66,24 @@ export default defineConfig({
         ];
       },
     },
+    // Mirror MANUFACT_CHAT_URL / VITE_MANUFACT_CHAT_URL into window for parity
+    // with the CDN shell (cli.ts injects the same flag at runtime).
+    {
+      name: "inject-manufact-chat-url",
+      transformIndexHtml() {
+        const url =
+          process.env.MANUFACT_CHAT_URL ??
+          process.env.VITE_MANUFACT_CHAT_URL;
+        if (!url) return [];
+        return [
+          {
+            tag: "script",
+            children: `window.__MANUFACT_CHAT_URL__ = ${JSON.stringify(url)};`,
+            injectTo: "head-prepend",
+          },
+        ];
+      },
+    },
     // Custom plugin to handle OAuth callback redirects in dev mode
     {
       name: "oauth-callback-redirect",

@@ -10,6 +10,7 @@ import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";
+import { LoginModal } from "@/client/components/LoginModal";
 import {
   MCPDeployClickEvent,
   captureInspectorEvent,
@@ -46,6 +47,7 @@ export function LayoutHeader({
   const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
   const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [mobileTabsCollapsed] = useState(true);
 
   if (embeddedConfig.singleTab) {
@@ -178,11 +180,20 @@ export function LayoutHeader({
           <HostedUserMenu
             chatApiUrl={embeddedConfig.chatApiUrl}
             onUserResolved={(u) => setIsLoggedIn(!!u)}
+            onLoginClick={() => setShowLoginModal(true)}
           />
         ) : null}
       </div>
     );
   };
+
+  const loginModalNode =
+    showLoginModal && embeddedConfig.chatApiUrl ? (
+      <LoginModal
+        authOrigin={new URL(embeddedConfig.chatApiUrl).origin}
+        onDismiss={() => setShowLoginModal(false)}
+      />
+    ) : null;
 
   return (
     <header className="w-full shrink-0">
@@ -298,6 +309,7 @@ export function LayoutHeader({
           </div>
         )}
       </div>
+      {loginModalNode}
     </header>
   );
 }

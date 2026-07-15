@@ -1,5 +1,6 @@
 import type { Context, Hono } from "hono";
 import { renderInspectorFaviconLinks } from "./favicon-links.js";
+import { registerInspectorFaviconStatic } from "./favicon-static.js";
 import { getInspectorVersion } from "./version.js";
 
 const INSPECTOR_VERSION = getInspectorVersion();
@@ -29,7 +30,7 @@ const OAUTH_POPUP_CLOSED_HTML = `<!doctype html>
 <script>try{if(window.opener&&!window.opener.closed)window.opener.postMessage({type:"manufact:oauth-complete"},"*")}catch(e){}try{window.close()}catch(e){}</script>
 </body></html>`;
 
-function generateCdnShellHtml(config?: CdnShellConfig): string {
+function generateCdnShellHtml(config?: CdnShellConfig, basePath = ""): string {
   const scripts: string[] = [];
   if (config?.basePath !== undefined) {
     scripts.push(
@@ -70,7 +71,7 @@ function generateCdnShellHtml(config?: CdnShellConfig): string {
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    ${renderInspectorFaviconLinks(CDN_BASE)}
+    ${renderInspectorFaviconLinks(basePath)}
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -123,7 +124,9 @@ export function registerInspectorCdnShell(
   };
 
   const serveShell = (c: Context) =>
-    c.html(generateCdnShellHtml(effectiveConfig));
+    c.html(generateCdnShellHtml(effectiveConfig, basePath));
+
+  registerInspectorFaviconStatic(app, basePath);
 
   app.get(p("/inspector/oauth-popup-closed.html"), (c) =>
     c.html(OAUTH_POPUP_CLOSED_HTML)

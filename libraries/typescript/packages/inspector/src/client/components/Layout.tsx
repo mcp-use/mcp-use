@@ -765,7 +765,9 @@ export function Layout({ children }: LayoutProps) {
     ? isSingleTab
       ? "h-screen flex flex-col"
       : "h-screen flex flex-col gap-2 sm:gap-4"
-    : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:px-0 pb-4";
+    : selectedServer
+      ? "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:px-0 pb-4"
+      : "h-screen bg-[#f3f3f3] dark:bg-black flex flex-col px-4 lg:pl-4 lg:pr-0 pb-4";
 
   const mainClassName = isSingleTab
     ? "flex-1 w-full bg-white dark:bg-black p-0 overflow-auto"

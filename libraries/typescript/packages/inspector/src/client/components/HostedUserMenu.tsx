@@ -54,6 +54,8 @@ interface HostedUserMenuProps {
   chatApiUrl: string;
   /** URL to navigate to when "Go to dashboard" is clicked. Defaults to https://manufact.com/cloud */
   dashboardUrl?: string;
+  /** Opens the hosted login modal. When set, anonymous visitors see a Sign in button. */
+  onLoginClick?: () => void;
   /** Rendered when the session has been checked and the user is not authenticated. */
   fallback?: React.ReactNode;
   /** Called once the session check resolves with the authenticated user or null. */
@@ -69,6 +71,7 @@ interface HostedUserMenuProps {
 export function HostedUserMenu({
   chatApiUrl,
   dashboardUrl = "https://manufact.com/cloud",
+  onLoginClick,
   fallback = null,
   onUserResolved,
 }: HostedUserMenuProps) {
@@ -87,7 +90,21 @@ export function HostedUserMenu({
   // While the session check is still in-flight render nothing to avoid a flash.
   if (!loaded) return null;
 
-  if (!user) return <>{fallback}</>;
+  if (!user) {
+    if (onLoginClick) {
+      return (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full px-4 text-[13px]"
+          onClick={onLoginClick}
+        >
+          Sign in
+        </Button>
+      );
+    }
+    return <>{fallback}</>;
+  }
 
   const initial = getInitial(user.name, user.email);
   const displayName = user.name ?? user.email ?? "User";
