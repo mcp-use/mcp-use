@@ -365,6 +365,15 @@ export abstract class BaseMCPClient {
       ) {
         throw err;
       }
+      if (
+        (
+          oauthProvider as OAuthClientProvider & {
+            preventAutoAuth?: boolean;
+          }
+        ).preventAutoAuth
+      ) {
+        throw err;
+      }
       logger.info(
         `[MCPClient] Unauthorized connecting to '${serverName}'; completing OAuth…`
       );

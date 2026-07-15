@@ -28,7 +28,7 @@ Routes:
 |------|----------------|
 | `/` | `useMcp` → `http://127.0.0.1:3102/mcp` |
 | `/multi-server` | all four servers; legacy + modern features and MCP Apps |
-| `/dynamic-server` | addServer after mount → v2 demo |
+| `/dynamic-server` | add servers via URL input; OAuth Authenticate / Disconnect |
 | `/oauth/callback` | OAuth redirect handler |
 
 Override URL:

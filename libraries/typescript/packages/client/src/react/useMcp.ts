@@ -21,6 +21,7 @@ import { resolveClientOptions } from "../core/config.js";
 import { Logger, type LogLevel } from "../utils/logging.js";
 import type { MCPConnection } from "../core/session.js";
 import { Tel } from "../telemetry/telemetry-browser.js";
+import { isUnauthorized } from "../auth/flow.js";
 import { assert } from "./useMcp-helpers.js";
 import type { ProxyConfig } from "./types.js";
 import { sanitizeUrl } from "../auth/url.js";
@@ -1127,10 +1128,7 @@ export function useMcp(options: UseMcpInternalOptions): UseMcpResult {
         const oauthDiscoveryFailed = isOAuthDiscoveryFailure(err);
 
         // Check if this is a 401 error
-        const is401Error =
-          error.code === 401 ||
-          errorMessage.includes("401") ||
-          errorMessage.includes("Unauthorized");
+        const is401Error = isUnauthorized(err);
 
         // If OAuth discovery failed with custom headers provided, this was likely a 401 with wrong credentials
         // The error message might say "404" (from OAuth endpoint attempts) but the root cause was 401

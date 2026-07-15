@@ -70,7 +70,7 @@ export class BrowserOAuthClientProvider implements OAuthClientProvider {
   private session: OAuthSessionStore;
 
   // Browser-only state
-  private preventAutoAuth?: boolean;
+  readonly preventAutoAuth?: boolean;
   private useRedirectFlow?: boolean;
   private oauthProxyUrl?: string;
   private proxyOAuthRequests: boolean;
