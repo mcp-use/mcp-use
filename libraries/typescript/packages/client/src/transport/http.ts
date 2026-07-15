@@ -11,7 +11,6 @@ import { logger } from "../utils/logging.js";
 import { DialectJsonSchemaValidator } from "../utils/json-schema-validator.js";
 import type { ConnectorInitOptions } from "./base.js";
 import { BaseConnector } from "./base.js";
-import { ConnectionManager } from "./connection-manager.js";
 
 /**
  * Detect a 401 anywhere in an error / cause chain. Under `versionNegotiation:
