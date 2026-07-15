@@ -1,12 +1,10 @@
 import { serve, type ServerType } from "@hono/node-server";
 import {
-  hostHeaderValidation,
-  originValidation,
-} from "@modelcontextprotocol/hono";
-import {
+  hostHeaderValidationResponse,
   localhostAllowedHostnames,
   localhostAllowedOrigins,
   McpServer as SdkMcpServer,
+  originValidationResponse,
   ResourceTemplate,
   type AuthInfo,
   type McpHttpHandler,
@@ -87,7 +85,7 @@ type HasOAuth<TUser> = [TUser] extends [never] ? false : true;
  * The per-request Hono variable used to carry verified identity through the
  * MCP adapter.
  *
- * `createMcpHonoApp` currently returns an unparameterized `Hono`, so this is
+ * The public app intentionally exposes an unparameterized `Hono`, so this is
  * the narrow type boundary that describes the variable added by this class.
  */
 interface OAuthHonoEnv extends Env {
@@ -181,7 +179,6 @@ export class MCPServer<TUser = never> {
   /** Project root for filesystem-backed view routes (dev `public/`). */
   #viewsProjectRoot = process.cwd();
 
-  #app: Hono | undefined;
   #handler: McpHttpHandler | undefined;
   #httpServer: ServerType | undefined;
   #oauthResource: URL | undefined;
@@ -189,18 +186,65 @@ export class MCPServer<TUser = never> {
   #oauthResourceConfigurationAbsent = false;
   /** Whether the mounted app validates Host headers (fixed at first mount). */
   #hostValidated = false;
+  #allowedHosts: string[] | undefined;
+  #allowedOrigins: string[] | undefined;
+  #oauthMetadataResponse:
+    | ((request: Request) => Response | undefined)
+    | undefined;
+  #oauthGate: ((request: Request) => Promise<AuthInfo | Response>) | undefined;
+
+  /**
+   * The long-lived Hono application that serves custom HTTP routes and the
+   * framework's views, OAuth, MCP, and inspector routes.
+   *
+   * @remarks
+   * Register custom routes and middleware before calling
+   * {@link MCPServer.listen}, {@link MCPServer.getHandler}, or dispatching the
+   * first request with `app.fetch()` / `app.request()`. Reading this property
+   * alone has no lifecycle side effects. The first startup or direct dispatch
+   * mounts the framework routes on this same app and freezes MCP
+   * tool/resource/prompt/view registration; Hono also does not accept new
+   * routes after its first dispatch.
+   *
+   * Exposing the HTTP router does not change MCP statelessness: each MCP
+   * request still receives a fresh official SDK `McpServer` replayed from the
+   * frozen registry.
+   *
+   * @example
+   * ```ts
+   * const server = new MCPServer({ name: "auth-server", version: "1.0.0" });
+   * server.app.on(["GET", "POST"], "/api/auth/**", (c) =>
+   *   auth.handler(c.req.raw)
+   * );
+   * const fetch = server.getHandler();
+   * ```
+   */
+  public readonly app: Hono;
 
   /**
    * Create a server. `config.name` and `config.version` identify the server
    * to clients during initialization. `config.basePath` (default `"/mcp"`)
    * is both the MCP route and the path of the OAuth protected-resource
    * identity, so any explicit OAuth resource URL must use that exact path.
-   * Nothing binds or listens until {@link MCPServer.listen} or
-   * {@link MCPServer.getHandler} is called.
+   * Nothing binds until {@link MCPServer.listen} is called. Custom HTTP
+   * routes can be registered through {@link MCPServer.app} before startup.
    */
   constructor(config: ServerConfig<TUser>) {
     assertServerConfig(config);
     this.#config = config;
+    this.app = new Hono();
+    this.#installBootstrapMiddleware();
+    this.#guardAppRegistrationMethods();
+
+    // Hono freezes its matcher as soon as dispatch starts. Mount the
+    // framework synchronously before delegating to Hono so a direct first
+    // app.fetch()/app.request() cannot freeze out the MCP routes.
+    const honoFetch = this.app.fetch;
+    this.app.fetch = async (request, env, executionCtx) => {
+      this.#ensureMounted("handler");
+      return await honoFetch(request, env, executionCtx);
+    };
+
     if (config.oauth !== undefined) {
       const mcpUrl =
         typeof process === "undefined" ? undefined : process.env["MCP_URL"];
@@ -373,8 +417,8 @@ export class MCPServer<TUser = never> {
    * (additive — localhost-class values stay allowed).
    */
   getHandler(): (request: Request) => Promise<Response> {
-    const { app } = this.#ensureMounted("handler");
-    return async (request) => app.fetch(request);
+    this.#ensureMounted("handler");
+    return async (request) => this.app.fetch(request);
   }
 
   /**
@@ -393,7 +437,8 @@ export class MCPServer<TUser = never> {
    * requests accepted before then are queued. Public/wildcard listeners must
    * configure the resource before calling this method.
    *
-   * @throws If called on a localhost-class bind after {@link MCPServer.getHandler}
+   * @throws If called on a localhost-class bind after
+   * {@link MCPServer.getHandler} or direct {@link MCPServer.app} dispatch
    * already mounted the app without Host validation.
    */
   async listen(port = 3000): Promise<{ port: number; url: string }> {
@@ -434,8 +479,8 @@ export class MCPServer<TUser = never> {
         },
         (info) => {
           try {
-            const { app } = this.#ensureMounted("listen", info.port);
-            resolveApp?.(app);
+            this.#ensureMounted("listen", info.port);
+            resolveApp?.(this.app);
             if (!settled) {
               settled = true;
               resolve({
@@ -527,9 +572,116 @@ export class MCPServer<TUser = never> {
       throw new Error(
         `Cannot register ${kind} "${name}" after the server has started: ` +
           `registrations are replayed per request from the registry, ` +
-          `so register everything before listen()/getHandler().`
+          `so register everything before listen()/getHandler()/direct app dispatch.`
       );
     }
+  }
+
+  /** Guard Hono's registration surface once framework mounting completes. */
+  #guardAppRegistrationMethods(): void {
+    const guard = <T>(registrationMethod: T): T => {
+      if (typeof registrationMethod !== "function") {
+        return registrationMethod;
+      }
+      return ((...args: unknown[]) => {
+        if (this.#handler !== undefined) {
+          throw new Error(
+            "Cannot register Hono routes or middleware after the server has " +
+              "started: register app routes before listen()/getHandler()/" +
+              "direct app dispatch."
+          );
+        }
+        return Reflect.apply(registrationMethod, this.app, args) as unknown;
+      }) as unknown as T;
+    };
+
+    this.app.get = guard(this.app.get);
+    this.app.post = guard(this.app.post);
+    this.app.put = guard(this.app.put);
+    this.app.delete = guard(this.app.delete);
+    this.app.options = guard(this.app.options);
+    this.app.patch = guard(this.app.patch);
+    this.app.all = guard(this.app.all);
+    this.app.on = guard(this.app.on);
+    this.app.use = guard(this.app.use);
+    this.app.route = guard(this.app.route);
+    this.app.mount = guard(this.app.mount);
+    this.app.basePath = guard(this.app.basePath);
+    this.app.onError = guard(this.app.onError);
+    this.app.notFound = guard(this.app.notFound);
+  }
+
+  /** Install framework-wide middleware before consumers can add routes. */
+  #installBootstrapMiddleware(): void {
+    // JSON body parsing (same semantics as the official Hono adapter): stash
+    // parsed bodies in context vars for mountMcp and requestLogger.
+    this.app.use("*", async (c, next) => {
+      if ((c.var as Record<string, unknown>)["parsedBody"] !== undefined) {
+        return await next();
+      }
+      if (!(c.req.header("content-type") ?? "").includes("application/json")) {
+        return await next();
+      }
+      try {
+        const parsed: unknown = await c.req.raw.clone().json();
+        // c.var is a read-only snapshot; c.set is the write path (untyped
+        // here because the app runs on Hono's default Env).
+        (c.set as (key: string, value: unknown) => void)("parsedBody", parsed);
+      } catch {
+        return c.text("Invalid JSON", 400);
+      }
+      return await next();
+    });
+
+    this.app.use("*", async (c, next) => {
+      const allowedHosts = this.#allowedHosts;
+      if (allowedHosts !== undefined) {
+        const response = hostHeaderValidationResponse(c.req.raw, allowedHosts);
+        if (response !== undefined) {
+          return response;
+        }
+      }
+      return await next();
+    });
+    this.app.use("*", async (c, next) => {
+      if (c.req.method === "GET" || c.req.method === "HEAD") {
+        return await next();
+      }
+      const allowedOrigins = this.#allowedOrigins;
+      if (allowedOrigins !== undefined) {
+        const response = originValidationResponse(c.req.raw, allowedOrigins);
+        if (response !== undefined) {
+          return response;
+        }
+      }
+      return await next();
+    });
+
+    // Logging wraps both custom routes and framework routes.
+    this.app.use("*", requestLogger(this.#config.logging));
+
+    // OAuth metadata and the protected MCP route must precede user routes so
+    // a custom route cannot bypass framework authentication.
+    this.app.use("*", async (c, next) => {
+      const response = this.#oauthMetadataResponse?.(c.req.raw);
+      if (response !== undefined) {
+        return response;
+      }
+      return await next();
+    });
+    const mcpApp = this.app as unknown as Hono<OAuthHonoEnv>;
+    mcpApp.use(this.#basePath(), async (c, next) => {
+      const gate = this.#oauthGate;
+      if (gate === undefined) {
+        return await next();
+      }
+      const result = await gate(c.req.raw);
+      if (result instanceof Response) {
+        return result;
+      }
+      c.set("authInfo", result);
+      return await next();
+    });
   }
 
   /**
@@ -563,80 +715,16 @@ export class MCPServer<TUser = never> {
     return { hosts, origins };
   }
 
-  #ensureMounted(mode: "listen" | "handler", listenPort?: number): {
-    app: Hono;
-    handler: McpHttpHandler;
-  } {
-    if (this.#app === undefined || this.#handler === undefined) {
+  #ensureMounted(mode: "listen" | "handler", listenPort?: number): void {
+    if (this.#handler === undefined) {
       const { hosts, origins } = this.#validationPolicy(mode);
-      const app = new Hono();
-      // JSON body parsing (same semantics as createMcpHonoApp): stash parsed
-      // bodies in context vars for mountMcp and requestLogger.
-      app.use("*", async (c, next) => {
-        if ((c.var as Record<string, unknown>)["parsedBody"] !== undefined) {
-          return await next();
-        }
-        if (!(c.req.header("content-type") ?? "").includes("application/json")) {
-          return await next();
-        }
-        try {
-          const parsed: unknown = await c.req.raw.clone().json();
-          // c.var is a read-only snapshot; c.set is the write path (untyped
-          // here because the app runs on Hono's default Env).
-          (c.set as (key: string, value: unknown) => void)("parsedBody", parsed);
-        } catch {
-          return c.text("Invalid JSON", 400);
-        }
-        return await next();
-      });
-      if (hosts !== undefined) {
-        app.use("*", hostHeaderValidation(hosts));
-        // Origin on side-effect methods only: sandboxed view iframes send
-        // `Origin: null` on asset GETs; external hosts fetch with their own
-        // origins. The MCP wire is POST; read rebinding is covered by Host.
-        app.use("*", async (c, next) => {
-          if (c.req.method === "GET" || c.req.method === "HEAD") {
-            return await next();
-          }
-          return originValidation(origins ?? hosts)(c, next);
-        });
-      } else {
-        // Host validation off: the SDK handler parses JSON itself when
-        // parsedBody is absent (see mountMcp).
-        if (origins !== undefined) {
-          app.use("*", async (c, next) => {
-            if (c.req.method === "GET" || c.req.method === "HEAD") {
-              return await next();
-            }
-            return originValidation(origins)(c, next);
-          });
-        }
-        if (mode === "listen") {
-          console.warn(
-            `[mcp-use] listen() is serving on ${this.#config.host} without ` +
-              `Host validation. Behind a platform edge that only routes your ` +
-              `own domains this is expected; if this process is reachable ` +
-              `directly, set allowedHosts to restrict it.`
-          );
-        }
-      }
-      // Logging first so view document/asset routes are observed too.
-      app.use("*", requestLogger(this.#config.logging));
       this.#validateViewBindingsAtMount();
-      mountViewRoutes(app, this.#basePath(), this.#views, {
-        dev: this.#viewsDevMode,
-        projectRoot: this.#viewsProjectRoot,
-      });
-      // The official adapter returns an unparameterized Hono app. Its
-      // runtime Context supports request-scoped variables, so narrow the
-      // type only at the OAuth composition seam we own.
-      const mcpApp = app as unknown as Hono<OAuthHonoEnv>;
       const resource = this.#resolveOAuthResource(mode, listenPort);
       if (resource !== undefined) {
         const provider = this.#config.oauth!;
         const providerOptions = getOAuthProviderOptions(provider);
-        app.use("*", async (c, next) => {
-          const response = oauthMetadataResponse(c.req.raw, {
+        this.#oauthMetadataResponse = (request) =>
+          oauthMetadataResponse(request, {
             oauthMetadata: providerOptions.oauthMetadata,
             resourceServerUrl: resource,
             ...(providerOptions.scopesSupported !== undefined && {
@@ -649,28 +737,34 @@ export class MCPServer<TUser = never> {
               serviceDocumentationUrl: providerOptions.serviceDocumentationUrl,
             }),
           });
-          if (response !== undefined) {
-            return response;
-          }
-          await next();
-        });
-
-        const gate = requireBearerAuth({
+        this.#oauthGate = requireBearerAuth({
           verifier: wrapOAuthTokenVerifier(provider, resource),
           resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(resource),
           ...(providerOptions.requiredScopes !== undefined && {
             requiredScopes: providerOptions.requiredScopes,
           }),
         });
-        mcpApp.use(this.#basePath(), async (c, next) => {
-          const result = await gate(c.req.raw);
-          if (result instanceof Response) {
-            return result;
-          }
-          c.set("authInfo", result);
-          await next();
-        });
       }
+
+      this.#allowedHosts = hosts;
+      this.#allowedOrigins = origins;
+      if (hosts === undefined && mode === "listen") {
+        console.warn(
+          `[mcp-use] listen() is serving on ${this.#config.host} without ` +
+            `Host validation. Behind a platform edge that only routes your ` +
+            `own domains this is expected; if this process is reachable ` +
+            `directly, set allowedHosts to restrict it.`
+        );
+      }
+
+      mountViewRoutes(this.app, this.#basePath(), this.#views, {
+        dev: this.#viewsDevMode,
+        projectRoot: this.#viewsProjectRoot,
+      });
+      // The public app is intentionally unparameterized. Its runtime Context
+      // supports request-scoped variables, so narrow the type only at the
+      // OAuth composition seam we own.
+      const mcpApp = this.app as unknown as Hono<OAuthHonoEnv>;
       const handler = mountMcp(
         mcpApp,
         (ctx) => this.#buildSdkServer(ctx),
@@ -686,11 +780,10 @@ export class MCPServer<TUser = never> {
       );
       // Inspector shell (default enabled, FastAPI /docs style) rides the
       // same app, so the validation middleware above covers it too.
-      mountInspectorShell(app, this.#config.inspector, {
+      mountInspectorShell(this.app, this.#config.inspector, {
         serverName: this.#config.name,
         basePath: this.#basePath(),
       });
-      this.#app = app;
       this.#handler = handler;
       this.#hostValidated = hosts !== undefined;
     } else if (
@@ -701,12 +794,12 @@ export class MCPServer<TUser = never> {
       // getHandler() mounted without Host validation; a localhost listen()
       // on that app would silently lose DNS-rebinding protection.
       throw new Error(
-        "Cannot listen() on a localhost bind after getHandler(): the app is " +
-          "already mounted without Host validation (getHandler() expects a " +
-          "platform edge in front). Call listen() first, or set allowedHosts."
+        "Cannot listen() on a localhost bind after getHandler() or direct app " +
+          "dispatch: the app is already mounted without Host validation " +
+          "(fetch-handler mode expects a platform edge in front). Call " +
+          "listen() first, or set allowedHosts."
       );
     }
-    return { app: this.#app, handler: this.#handler };
   }
 
   #validateToolViewBinding(definition: ToolDefinition): void {

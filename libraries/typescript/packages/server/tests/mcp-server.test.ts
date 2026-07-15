@@ -676,6 +676,189 @@ describe("MCPServer getHandler (no network)", () => {
   });
 });
 
+describe("MCPServer app", () => {
+  /** Synthetic modern tools/list request for direct fetch-handler tests. */
+  function toolsListRequest(
+    url = "http://localhost/mcp",
+    headers: Record<string, string> = {}
+  ): Request {
+    return new Request(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "mcp-protocol-version": "2026-07-28",
+        "mcp-method": "tools/list",
+        ...headers,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/list",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {
+              name: "app-test",
+              version: "0.0.0",
+            },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      }),
+    });
+  }
+
+  it("serves multi-method custom routes alongside MCP through getHandler", async () => {
+    const server = new MCPServer({
+      name: "app-handler-test",
+      version: "1.0.0",
+    });
+    server.app.on(["GET", "POST"], "/api/auth/**", (c) =>
+      c.json({ method: c.req.method, path: c.req.path })
+    );
+    server.tool({ name: "ping" }, async () => ({
+      content: [{ type: "text", text: "pong" }],
+    }));
+
+    const handler = server.getHandler();
+    expect(() => server.app.get("/late", (c) => c.text("late"))).toThrow(
+      /Hono routes or middleware after the server has started/
+    );
+    for (const method of ["GET", "POST"]) {
+      const response = await handler(
+        new Request("http://localhost/api/auth/session", { method })
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        method,
+        path: "/api/auth/session",
+      });
+    }
+
+    const mcpResponse = await handler(toolsListRequest());
+    expect(mcpResponse.status).toBe(200);
+    expect(await mcpResponse.json()).toMatchObject({
+      result: { tools: [{ name: "ping" }] },
+    });
+    await server.close();
+  });
+
+  it("serves custom routes and MCP from the same listening app", async () => {
+    const server = new MCPServer({
+      name: "app-listen-test",
+      version: "1.0.0",
+    });
+    server.app.on(["GET", "POST"], "/api/auth/**", (c) => c.text(c.req.method));
+    server.tool({ name: "listening-tool" }, async () => ({
+      content: [{ type: "text", text: "ok" }],
+    }));
+
+    const started = await server.listen(0);
+    try {
+      const origin = new URL(started.url).origin;
+      for (const method of ["GET", "POST"]) {
+        const response = await fetch(`${origin}/api/auth/session`, { method });
+        expect(await response.text()).toBe(method);
+      }
+      const mcpResponse = await fetch(toolsListRequest(started.url));
+      expect(mcpResponse.status).toBe(200);
+      expect(await mcpResponse.json()).toMatchObject({
+        result: { tools: [{ name: "listening-tool" }] },
+      });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("runs framework parsing and security middleware before custom routes", async () => {
+    const customHandler = vi.fn((method: string) => method);
+    const server = new MCPServer({
+      name: "app-security-test",
+      version: "1.0.0",
+      allowedHosts: ["api.example.com"],
+    });
+    server.app.on(["GET", "POST"], "/custom", (c) => {
+      customHandler(c.req.method);
+      return c.text("custom");
+    });
+    const handler = server.getHandler();
+
+    const badHost = await handler(
+      new Request("https://api.example.com/custom", {
+        headers: { host: "evil.example.com" },
+      })
+    );
+    expect(badHost.status).toBe(403);
+    expect(customHandler).not.toHaveBeenCalled();
+
+    const badOrigin = await handler(
+      new Request("https://api.example.com/custom", {
+        method: "POST",
+        headers: {
+          host: "api.example.com",
+          origin: "https://evil.example.com",
+        },
+      })
+    );
+    expect(badOrigin.status).toBe(403);
+    expect(customHandler).not.toHaveBeenCalled();
+
+    const invalidJson = await handler(
+      new Request("https://api.example.com/custom", {
+        method: "POST",
+        headers: {
+          host: "api.example.com",
+          origin: "https://api.example.com",
+          "content-type": "application/json",
+        },
+        body: "{",
+      })
+    );
+    expect(invalidJson.status).toBe(400);
+    expect(customHandler).not.toHaveBeenCalled();
+
+    const ok = await handler(
+      new Request("https://api.example.com/custom", {
+        headers: { host: "api.example.com" },
+      })
+    );
+    expect(ok.status).toBe(200);
+    expect(customHandler).toHaveBeenCalledOnce();
+    await server.close();
+  });
+
+  it("mounts before a direct first app fetch and then freezes registration", async () => {
+    const server = new MCPServer({
+      name: "app-direct-fetch-test",
+      version: "1.0.0",
+    });
+    const app = server.app;
+    server.tool({ name: "before-dispatch" }, async () => ({
+      content: [{ type: "text", text: "ok" }],
+    }));
+    app.get("/health", (c) => c.text("healthy"));
+
+    const health = await app.fetch(new Request("http://localhost/health"));
+    expect(await health.text()).toBe("healthy");
+
+    const mcpResponse = await app.fetch(toolsListRequest());
+    expect(mcpResponse.status).toBe(200);
+    expect(await mcpResponse.json()).toMatchObject({
+      result: { tools: [{ name: "before-dispatch" }] },
+    });
+    expect(() =>
+      server.tool({ name: "after-dispatch" }, async () => ({
+        content: [{ type: "text", text: "late" }],
+      }))
+    ).toThrow(/after the server has started/);
+    expect(() => app.get("/late", (c) => c.text("late"))).toThrow(
+      /Hono routes or middleware after the server has started/
+    );
+    await server.close();
+  });
+});
+
 /*
  * Host/Origin validation policy: listen() on a localhost bind validates by
  * default (DNS-rebinding protection), getHandler() applies no validation

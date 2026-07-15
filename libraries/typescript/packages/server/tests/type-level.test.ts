@@ -6,12 +6,25 @@
  * fails that typecheck, so a regression in strictness cannot land silently.
  */
 import { describe, expect, expectTypeOf, it } from "vitest";
+import type { Hono } from "hono";
 import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
 import type { CallToolResult, ToolResult } from "../src/index.js";
 
 const outputSchema = z.object({ answer: z.number() });
+
+describe("MCPServer app typing", () => {
+  it("exposes Hono including multi-method on() registration", () => {
+    const server = new MCPServer({ name: "types", version: "0.0.0" });
+    expectTypeOf(server.app).toEqualTypeOf<Hono>();
+    server.app.on(["GET", "POST"], "/api/auth/**", (c) => {
+      expectTypeOf(c.req.raw).toEqualTypeOf<Request>();
+      return new Response(c.req.method);
+    });
+    expect(true).toBe(true); // assertions above are compile-time
+  });
+});
 
 describe("ToolResult resolution", () => {
   it("is the raw CallToolResult when no output type is declared", () => {

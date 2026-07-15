@@ -138,11 +138,15 @@ describe("OAuth HTTP route acceptance", () => {
   });
 
   it("keeps discovery public and gates only the exact MCP endpoint", async () => {
-    const handler = server({
+    const oauthServer = server({
       basePath: "/api/mcp",
       resource: "https://canonical.example.test/api/mcp",
       scopesSupported: ["tools:read"],
-    }).getHandler();
+    });
+    // Even a conflicting user route cannot bypass the constructor-installed
+    // OAuth gate on the exact MCP endpoint.
+    oauthServer.app.post("/api/mcp", (c) => c.text("unguarded"));
+    const handler = oauthServer.getHandler();
     const protectedMetadata = "/.well-known/oauth-protected-resource/api/mcp";
     const authorizationMetadata = "/.well-known/oauth-authorization-server";
 
@@ -214,7 +218,15 @@ describe("OAuth HTTP route acceptance", () => {
 
   it("allows no configured resource for localhost listen but not getHandler", () => {
     delete process.env["MCP_URL"];
-    expect(() => server().getHandler()).toThrow(
+    const oauthServer = server();
+    const app = oauthServer.app;
+    expect(app).toBe(oauthServer.app);
+    expect(() =>
+      oauthServer.tool({ name: "after-app-access" }, async () => ({
+        content: [{ type: "text", text: "ok" }],
+      }))
+    ).not.toThrow();
+    expect(() => oauthServer.getHandler()).toThrow(
       "OAuth requires an explicit resource or MCP_URL"
     );
     expect(() => server()).not.toThrow();
