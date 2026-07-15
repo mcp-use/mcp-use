@@ -27,6 +27,7 @@ import {
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { toast } from "sonner";
 import { getServerDisplayName } from "@/client/utils/serverNames";
+import { getServerHeaders } from "@/client/utils/connectionUpdates";
 import { McpUseLogo } from "./McpUseLogo";
 import { ServerIcon } from "./ServerIcon";
 import { VSCodeIcon } from "./ui/client-icons";
@@ -121,7 +122,9 @@ export function CommandPalette({
       : selectedServer.url
     : null;
   const serverName = selectedServer?.name || "MCP Server";
-  const serverHeaders = selectedServer?.customHeaders;
+  const serverHeaders = selectedServer
+    ? getServerHeaders(selectedServer)
+    : undefined;
 
   // Create "Open in..." command items
   const openInItems: CommandItem[] = selectedServer

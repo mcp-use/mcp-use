@@ -11,11 +11,8 @@ import { ResourcesTab } from "./ResourcesTab";
 import { SamplingTab } from "./SamplingTab";
 import { ToolsTab } from "./ToolsTab";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
-
 interface LayoutContentProps {
-  selectedServer: MCPConnection | undefined;
+  selectedServer: McpServer | undefined;
   activeTab: string;
   toolsSearchRef: RefObject<{
     focusSearch: () => void;
@@ -51,12 +48,13 @@ export function LayoutContent({
     const stubConnection = {
       id: "force-connected",
       url: "",
+      displayName: "",
       name: "",
       state: "ready" as const,
       tools: [],
       prompts: [],
       resources: [],
-    } as unknown as MCPConnection;
+    } as unknown as McpServer;
 
     return (
       <ChatTab
@@ -266,7 +264,7 @@ export function LayoutContent({
             onReject={selectedServer.rejectSampling}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
-            mcpServerUrl={selectedServer.url}
+            mcpServerUrl={selectedServer.url ?? ""}
           />
         </div>
       )}

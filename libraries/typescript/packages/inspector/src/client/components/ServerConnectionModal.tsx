@@ -2,29 +2,12 @@ import type { McpServer } from "@mcp-use/client/react";
 import {
   buildOAuthStaticConfig,
   getDefaultInspectorProxyAddress,
-  normalizeConnectionMode,
+  getStoredConnectionConfig,
+  toEditableConnectionConfig,
   type ConnectionMode,
-  type OAuthStaticConfig,
+  type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
-type MCPConnectionWithConfig = MCPConnection & {
-  proxyConfig?: {
-    proxyAddress?: string;
-    headers?: Record<string, string>;
-    customHeaders?: Record<string, string>;
-  };
-  headers?: Record<string, string>;
-  customHeaders?: Record<string, string>;
-  oauth?: OAuthStaticConfig;
-  autoProxyFallback?:
-    | boolean
-    | {
-        enabled?: boolean;
-        proxyAddress?: string;
-      };
-};
 import type { CustomHeader } from "./CustomHeadersEditor";
 import { useEffect, useState } from "react";
 import {
@@ -33,31 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/client/components/ui/dialog";
-import { getConfiguredServerAlias } from "@/client/utils/serverNames";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import { toast } from "sonner";
 
 interface ServerConnectionModalProps {
-  connection: MCPConnection | null;
+  connection: McpServer | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConnect: (config: {
-    url: string;
-    name?: string;
-    transportType: "http" | "sse";
-    proxyConfig?: {
-      proxyAddress?: string;
-      headers?: Record<string, string>;
-    };
-    connectionMode?: ConnectionMode;
-    autoProxyFallback?:
-      | boolean
-      | {
-          enabled?: boolean;
-          proxyAddress?: string;
-        };
-    oauth?: OAuthStaticConfig;
-  }) => void;
+  onConnect: (config: EditableConnectionConfig) => void;
 }
 
 /**
@@ -94,69 +60,25 @@ export function ServerConnectionModal({
   // Prefill form when connection changes
   useEffect(() => {
     if (connection && open) {
-      const connectionWithConfig = connection as MCPConnectionWithConfig;
-
-      // Try to get the original stored config from localStorage
-      // This contains the headers and proxyConfig that were originally saved
-      let storedConfig: any = null;
-      try {
-        const stored = localStorage.getItem("mcp-inspector-connections");
-        if (stored) {
-          const allServers = JSON.parse(stored);
-          storedConfig = allServers[connection.id];
-        }
-      } catch (e) {
-        // If we can't read from localStorage, fall back to connection object
-        console.warn(
-          "[ServerConnectionModal] Could not read from localStorage:",
-          e
-        );
-      }
-
-      setUrl(connection.url);
-      setAlias(getConfiguredServerAlias(storedConfig || connection));
-
-      // Transport type is always HTTP now (SSE is deprecated)
-      // No need to set transportType from connection
-
-      // Determine connection mode based on modern config, legacy connectionType, or proxyConfig
-      const fallbackProxyAddress =
-        typeof storedConfig?.autoProxyFallback === "object"
-          ? storedConfig.autoProxyFallback.proxyAddress
-          : typeof connectionWithConfig.autoProxyFallback === "object"
-            ? connectionWithConfig.autoProxyFallback.proxyAddress
-            : undefined;
-      const proxyAddress =
-        storedConfig?.proxyConfig?.proxyAddress ||
-        connectionWithConfig.proxyConfig?.proxyAddress ||
-        fallbackProxyAddress;
-      const mode = normalizeConnectionMode(
-        storedConfig?.connectionMode ||
-          (connectionWithConfig as any).connectionMode,
-        storedConfig?.connectionType ||
-          (connectionWithConfig as any).connectionType,
-        !!proxyAddress
+      const storedConfig = getStoredConnectionConfig<EditableConnectionConfig>(
+        connection.id
       );
-      setConnectionMode(mode);
-      if (proxyAddress) {
-        setProxyAddress(proxyAddress);
-      } else {
-        setProxyAddress(getDefaultInspectorProxyAddress());
-      }
+      const editable = toEditableConnectionConfig(connection, storedConfig);
 
-      // Convert headers from Record<string, string> to CustomHeader[]
-      // Check both 'headers' and 'customHeaders' for backwards compatibility
-      // Prioritize stored config over connection object
-      const headersToConvert =
-        storedConfig?.proxyConfig?.headers ||
-        storedConfig?.proxyConfig?.customHeaders ||
-        storedConfig?.headers ||
-        storedConfig?.customHeaders ||
-        connectionWithConfig.proxyConfig?.headers ||
-        connectionWithConfig.proxyConfig?.customHeaders ||
-        connectionWithConfig.headers ||
-        connectionWithConfig.customHeaders ||
-        {};
+      setUrl(editable.url);
+      setAlias(editable.name || editable.url);
+
+      const proxyAddress =
+        editable.proxyConfig?.proxyAddress ||
+        (typeof editable.autoProxyFallback === "object"
+          ? editable.autoProxyFallback.proxyAddress
+          : undefined);
+      setConnectionMode(editable.connectionMode || "auto");
+      setProxyAddress(
+        proxyAddress || getDefaultInspectorProxyAddress()
+      );
+
+      const headersToConvert = editable.headers || {};
       const headerArray: CustomHeader[] = Object.entries(headersToConvert).map(
         ([name, value], index) => ({
           id: `header-${index}`,
@@ -166,10 +88,21 @@ export function ServerConnectionModal({
       );
       setCustomHeaders(headerArray);
 
-      const storedOauth = storedConfig?.oauth ?? connectionWithConfig.oauth;
-      setClientId(storedOauth?.clientId || "");
-      setClientSecret(storedOauth?.clientSecret || "");
-      setScope(storedOauth?.scope || "");
+      setClientId(editable.oauth?.clientId || "");
+      setClientSecret(editable.oauth?.clientSecret || "");
+      setScope(editable.oauth?.scope || "");
+
+      if (editable.requestTimeout !== undefined) {
+        setRequestTimeout(String(editable.requestTimeout));
+      }
+      if (editable.resetTimeoutOnProgress !== undefined) {
+        setResetTimeoutOnProgress(
+          editable.resetTimeoutOnProgress ? "True" : "False"
+        );
+      }
+      if (editable.maxTotalTimeout !== undefined) {
+        setMaxTotalTimeout(String(editable.maxTotalTimeout));
+      }
     }
   }, [connection, open]);
 
@@ -223,9 +156,7 @@ export function ServerConnectionModal({
             proxyAddress: proxyAddress.trim(),
             headers,
           }
-        : Object.keys(headers).length > 0
-          ? { headers }
-          : undefined;
+        : undefined;
 
     const autoProxyFallback =
       connectionMode === "auto"
@@ -234,19 +165,26 @@ export function ServerConnectionModal({
           : false
         : false;
 
-    // Always use HTTP transport (SSE is deprecated)
-    const actualTransportType = "http";
-
     const oauth = buildOAuthStaticConfig(clientId, clientSecret, scope);
+    const parsedRequestTimeout = Number.parseInt(requestTimeout, 10);
+    const parsedMaxTotalTimeout = Number.parseInt(maxTotalTimeout, 10);
 
     onConnect({
       url: normalizedUrl,
       name: alias.trim() || normalizedUrl,
-      transportType: actualTransportType,
+      transportType: "http",
       connectionMode,
       proxyConfig,
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
       autoProxyFallback,
       ...(oauth ? { oauth } : {}),
+      ...(Number.isFinite(parsedRequestTimeout)
+        ? { requestTimeout: parsedRequestTimeout }
+        : {}),
+      resetTimeoutOnProgress: resetTimeoutOnProgress === "True",
+      ...(Number.isFinite(parsedMaxTotalTimeout)
+        ? { maxTotalTimeout: parsedMaxTotalTimeout }
+        : {}),
     });
 
     onOpenChange(false);

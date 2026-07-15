@@ -11,7 +11,13 @@ export type {
   UseMcpOptions,
   UseMcpResult,
   ReconnectionOptions,
+  McpServer,
+  McpServerConfig,
+  /** @deprecated Use McpServerConfig */
   McpServerOptions,
+  PersistedMcpServerConfig,
+  pickPersistedServerConfig,
+  toPersistedServerConfig,
   McpNotification,
   PendingSamplingRequest,
   PendingElicitationRequest,
@@ -43,7 +49,6 @@ export {
   useMcpServer,
 } from "./McpClientProvider.js";
 export type {
-  McpServer,
   McpClientContextType,
   McpClientProviderProps,
 } from "./McpClientProvider.js";

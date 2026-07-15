@@ -11,7 +11,7 @@ import {
   AppBridge,
   type McpUiHostCapabilities,
 } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import type { Transport } from "@modelcontextprotocol/client";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { X } from "lucide-react";
 import { useMcpClient } from "@mcp-use/client/react";

@@ -35,7 +35,7 @@ import {
 import {
   useMcpClient,
   type McpServer,
-  type McpServerOptions,
+  type McpServerConfig,
 } from "@mcp-use/client/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { copyToClipboard } from "@/client/utils/clipboard";
@@ -44,13 +44,13 @@ import {
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
-  normalizeConnectionMode,
+  saveStoredConnectionConfig,
+  toEditableConnectionConfig,
+  toMcpServerConfig,
   type ConnectionMode,
   type EditableConnectionConfig,
-  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 import {
-  getConfiguredServerAlias,
   getServerDisplayName,
 } from "@/client/utils/serverNames";
 import { useLocation, useNavigate } from "react-router";
@@ -103,7 +103,7 @@ export function InspectorDashboard() {
             .capture(
               new MCPServerConnectionEvent({
                 serverId: connection.id,
-                serverUrl: connection.url,
+                serverUrl: connection.url ?? "",
                 success: true,
                 connectionType: "http",
               })
@@ -149,59 +149,8 @@ export function InspectorDashboard() {
     updatingConnectionsRef.current = updatingConnections;
   }, [updatingConnections]);
 
-  // Adapter functions for backward compatibility
-  const addConnection = useCallback(
-    (
-      url: string,
-      name?: string,
-      proxyConfig?: any,
-      _transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig,
-      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
-        ? "proxy"
-        : "auto",
-      autoProxyFallback:
-        | boolean
-        | {
-            enabled?: boolean;
-            proxyAddress?: string;
-          } = proxyConfig?.proxyAddress ? false : false
-    ) => {
-      addServer(url, {
-        url,
-        displayName: name,
-        connectionMode,
-        proxyConfig,
-        preventAutoAuth: true,
-        useRedirectFlow: true,
-        autoProxyFallback,
-        protocolNegotiation: "auto",
-        ...(oauth ? { oauth } : {}),
-      });
-    },
-    [addServer]
-  );
-
   const updateConnectionConfig = useCallback(
-    async (
-      id: string,
-      config: {
-        name?: string;
-        proxyConfig?: {
-          proxyAddress?: string;
-          headers?: Record<string, string>;
-        };
-        connectionMode?: ConnectionMode;
-        transportType?: "http" | "sse";
-        oauth?: OAuthStaticConfig;
-        autoProxyFallback?:
-          | boolean
-          | {
-              enabled?: boolean;
-              proxyAddress?: string;
-            };
-      }
-    ) => {
+    async (id: string, config: EditableConnectionConfig) => {
       // Check if already updating this connection
       if (updatingConnectionsRef.current.has(id)) {
         console.warn(
@@ -214,8 +163,8 @@ export function InspectorDashboard() {
       setUpdatingConnections((prev) => new Set(prev).add(id));
 
       try {
-        // Use the new updateServer method for atomic updates
-        await updateServer(id, config);
+        await updateServer(id, toMcpServerConfig(config));
+        saveStoredConnectionConfig(id, config);
       } catch (error) {
         console.error(
           `[InspectorDashboard] Failed to update connection ${id}:`,
@@ -264,10 +213,7 @@ export function InspectorDashboard() {
       setUpdatingConnections((prev) => new Set(prev).add(id));
 
       try {
-        // Trigger reconnection by updating with the same config (forces disconnect/reconnect)
-        await updateServer(id, {
-          url: server.url,
-        });
+        await server.reconnect();
       } catch (error) {
         console.error(
           `[InspectorDashboard] Failed to reconnect server ${id}:`,
@@ -448,23 +394,9 @@ export function InspectorDashboard() {
     const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
 
     // Build server configuration with proper typing
-    const serverConfig: McpServerOptions = {
+    const serverConfig: McpServerConfig = {
       url: normalizedUrl,
       displayName: alias.trim() || normalizedUrl,
-      preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
-      useRedirectFlow: true,
-      // Probe for modern (2026-07-28) servers, falling back to the classic
-      // 2025 handshake against legacy servers.
-      protocolNegotiation: "auto",
-      clientOptions: {
-        capabilities: {
-          extensions: {
-            "io.modelcontextprotocol/ui": {
-              mimeTypes: ["text/html;profile=mcp-app"],
-            },
-          },
-        },
-      },
       connectionMode,
       autoProxyFallback,
       ...(proxyConfig ? { proxyConfig } : {}),
@@ -530,82 +462,12 @@ export function InspectorDashboard() {
     }
   };
 
-  const handleCopyConnectionConfig = async (connection: any) => {
+  const handleCopyConnectionConfig = async (connection: McpServer) => {
     try {
-      // Try to get the original stored config from localStorage
-      // This contains the proxyConfig and customHeaders that were originally saved
-      let storedConfig: any = null;
-      try {
-        const stored = localStorage.getItem("mcp-inspector-connections");
-        if (stored) {
-          const allServers = JSON.parse(stored);
-          storedConfig = allServers[connection.id];
-        }
-      } catch (e) {
-        // If we can't read from localStorage, fall back to connection object
-        console.warn(
-          "[InspectorDashboard] Could not read from localStorage:",
-          e
-        );
-      }
-
-      // Extract headers from stored config (which has the original proxyConfig)
-      // Check both 'headers' and 'customHeaders' for backwards compatibility
-      const customHeaders =
-        storedConfig?.proxyConfig?.headers ||
-        storedConfig?.proxyConfig?.customHeaders ||
-        storedConfig?.headers ||
-        storedConfig?.customHeaders ||
-        connection.proxyConfig?.headers ||
-        connection.proxyConfig?.customHeaders ||
-        connection.headers ||
-        connection.customHeaders ||
-        {};
-
-      // Determine connection mode and proxyConfig
-      const fallbackProxyAddress =
-        typeof storedConfig?.autoProxyFallback === "object"
-          ? storedConfig.autoProxyFallback.proxyAddress
-          : typeof connection.autoProxyFallback === "object"
-            ? connection.autoProxyFallback.proxyAddress
-            : undefined;
-      const hasProxyAddress =
-        storedConfig?.proxyConfig?.proxyAddress ||
-        connection.proxyConfig?.proxyAddress ||
-        fallbackProxyAddress;
-      const connectionMode = normalizeConnectionMode(
-        storedConfig?.connectionMode || (connection as any).connectionMode,
-        storedConfig?.connectionType || (connection as any).connectionType,
-        !!hasProxyAddress
+      const storedConfig = getStoredConnectionConfig<EditableConnectionConfig>(
+        connection.id
       );
-      const proxyConfig = hasProxyAddress
-        ? storedConfig?.proxyConfig || connection.proxyConfig
-        : undefined;
-
-      const config = {
-        url: connection.url,
-        ...(getConfiguredServerAlias(storedConfig || connection)
-          ? { name: getConfiguredServerAlias(storedConfig || connection) }
-          : {}),
-        transportType: connection.transportType || "http",
-        connectionMode,
-        connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
-        proxyConfig,
-        autoProxyFallback:
-          connectionMode === "auto"
-            ? (storedConfig?.autoProxyFallback ??
-              connection.autoProxyFallback ??
-              (fallbackProxyAddress
-                ? { enabled: true, proxyAddress: fallbackProxyAddress }
-                : undefined))
-            : undefined,
-        customHeaders,
-        requestTimeout: connection.requestTimeout || 10000,
-        resetTimeoutOnProgress: connection.resetTimeoutOnProgress !== false,
-        maxTotalTimeout: connection.maxTotalTimeout || 60000,
-        oauth: connection.oauth,
-      };
-
+      const config = toEditableConnectionConfig(connection, storedConfig);
       await copyToClipboard(JSON.stringify(config, null, 2));
       toast.success("Connection configuration copied to clipboard");
     } catch {
@@ -633,23 +495,7 @@ export function InspectorDashboard() {
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
         removeConnection(editingConnectionId);
-        addConnection(
-          config.url,
-          config.name,
-          config.proxyConfig,
-          config.transportType,
-          config.oauth,
-          config.connectionMode,
-          config.connectionMode === "auto"
-            ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-            : false
-        );
+        addServer(config.url, toMcpServerConfig(config));
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)
@@ -657,25 +503,9 @@ export function InspectorDashboard() {
         updateConnectionMetadata(editingConnectionId, {
           name: config.name || config.url,
         });
+        saveStoredConnectionConfig(editingConnectionId, config);
       } else {
-        // Otherwise just update the existing connection
-        updateConnectionConfig(editingConnectionId, {
-          name: config.name,
-          connectionMode: config.connectionMode,
-          proxyConfig: config.proxyConfig,
-          transportType: config.transportType,
-          oauth: config.oauth,
-          autoProxyFallback:
-            config.connectionMode === "auto"
-              ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-              : false,
-        });
+        updateConnectionConfig(editingConnectionId, config);
       }
 
       // Close the modal
@@ -687,7 +517,7 @@ export function InspectorDashboard() {
       editingConnectionId,
       connections,
       removeConnection,
-      addConnection,
+      addServer,
       updateConnectionMetadata,
       updateConnectionConfig,
     ]
@@ -912,7 +742,7 @@ export function InspectorDashboard() {
                               onClick={async (e) => {
                                 e.stopPropagation();
                                 try {
-                                  await copyToClipboard(connection.url);
+                                  await copyToClipboard(connection.url ?? "");
                                   toast.success("URL copied to clipboard");
                                 } catch {
                                   toast.error("Failed to copy URL");

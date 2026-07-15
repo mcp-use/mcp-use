@@ -19,9 +19,9 @@ import {
   getStoredConnectionConfig,
   isAliasOnlyConnectionUpdate,
   normalizeConnectionMode,
-  type ConnectionMode,
+  saveStoredConnectionConfig,
+  toMcpServerConfig,
   type EditableConnectionConfig,
-  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 import { useMcpClient, type McpServer } from "@mcp-use/client/react";
 import type { ReactNode } from "react";
@@ -41,8 +41,7 @@ interface LayoutProps {
  * Render the application layout that orchestrates header, main content, command palette, and server connection modal.
  *
  * This component wires MCP client and inspector state, synchronizes URL query parameters (server, tab, tunnelUrl, embedded),
- * manages keyboard shortcuts, auto-connect flow, aggregated tool/prompt/resource lists, and provides adapters for legacy
- * connection APIs while preserving backward compatibility.
+ * manages keyboard shortcuts, auto-connect flow, aggregated tool/prompt/resource lists.
  *
  * @param children - The main content to render within the layout's content area.
  * @returns The React element representing the application layout.
@@ -59,54 +58,11 @@ export function Layout({ children }: LayoutProps) {
     storageLoaded: configLoaded,
   } = useMcpClient();
 
-  // Adapter functions for backward compatibility
-  const addConnection = useCallback(
-    (
-      url: string,
-      name?: string,
-      proxyConfig?: any,
-      _transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig,
-      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
-        ? "proxy"
-        : "auto",
-      autoProxyFallback:
-        | boolean
-        | {
-            enabled?: boolean;
-            proxyAddress?: string;
-          } = proxyConfig?.proxyAddress ? false : false
-    ) => {
-      addServer(url, {
-        url,
-        displayName: name,
-        connectionMode,
-        proxyConfig,
-        preventAutoAuth: true,
-        useRedirectFlow: true,
-        autoProxyFallback,
-        // Probe for modern (2026-07-28) servers, falling back to the classic
-        // 2025 handshake against legacy servers.
-        protocolNegotiation: "auto",
-        clientOptions: {
-          capabilities: {
-            extensions: {
-              "io.modelcontextprotocol/ui": {
-                mimeTypes: ["text/html;profile=mcp-app"],
-              },
-            },
-          },
-        },
-        ...(oauth ? { oauth } : {}),
-      });
-    },
-    [addServer]
-  );
-
   const updateConnectionConfig = useCallback(
-    async (id: string, config: any) => {
+    async (id: string, config: EditableConnectionConfig) => {
       try {
-        await updateServer(id, config);
+        await updateServer(id, toMcpServerConfig(config));
+        saveStoredConnectionConfig(id, config);
       } catch (error) {
         console.error(`[Layout] Failed to update connection ${id}:`, error);
       }
@@ -347,7 +303,7 @@ export function Layout({ children }: LayoutProps) {
   // Auto-connect handling extracted to custom hook
   const { isAutoConnecting } = useAutoConnect({
     connections,
-    addConnection,
+    addServer,
     removeConnection,
     configLoaded,
     embedded: isEmbedded,
@@ -411,23 +367,7 @@ export function Layout({ children }: LayoutProps) {
       // If the URL changed, we need to remove the old one and add a new one
       if (config.url !== editingConnectionId) {
         removeConnection(editingConnectionId);
-        addConnection(
-          config.url,
-          config.name,
-          config.proxyConfig,
-          config.transportType,
-          config.oauth,
-          config.connectionMode,
-          config.connectionMode === "auto"
-            ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-            : false
-        );
+        addServer(config.url, toMcpServerConfig(config));
       } else if (
         currentConnection &&
         isAliasOnlyConnectionUpdate(currentConnection, config)
@@ -435,25 +375,9 @@ export function Layout({ children }: LayoutProps) {
         updateConnectionMetadata(editingConnectionId, {
           name: config.name || config.url,
         });
+        saveStoredConnectionConfig(editingConnectionId, config);
       } else {
-        // Otherwise just update the existing connection
-        updateConnectionConfig(editingConnectionId, {
-          name: config.name,
-          connectionMode: config.connectionMode,
-          proxyConfig: config.proxyConfig,
-          transportType: config.transportType,
-          oauth: config.oauth,
-          autoProxyFallback:
-            config.connectionMode === "auto"
-              ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-              : false,
-        });
+        updateConnectionConfig(editingConnectionId, config);
       }
 
       // Close the modal
@@ -465,7 +389,7 @@ export function Layout({ children }: LayoutProps) {
       editingConnectionId,
       connections,
       removeConnection,
-      addConnection,
+      addServer,
       updateConnectionMetadata,
       updateConnectionConfig,
     ]
@@ -655,17 +579,15 @@ export function Layout({ children }: LayoutProps) {
 
         const url: string = srv.url;
         const name: string = srv.name ?? "Server";
-        const transportType: "http" | "sse" = srv.transportType ?? "http";
 
-        // Build custom headers from auth config (same logic as useAutoConnect)
-        const customHeaders: Record<string, string> = {
+        const headers: Record<string, string> = {
           ...(srv.headers ?? {}),
         };
         if (srv.auth?.access_token) {
           const tokenType = srv.auth.token_type || "bearer";
           const formatted =
             tokenType.charAt(0).toUpperCase() + tokenType.slice(1);
-          customHeaders.Authorization = `${formatted} ${srv.auth.access_token}`;
+          headers.Authorization = `${formatted} ${srv.auth.access_token}`;
         }
 
         const explicitProxyAddress =
@@ -687,34 +609,30 @@ export function Layout({ children }: LayoutProps) {
           srv.connectionType,
           !!explicitProxyAddress
         );
-        const proxyConfig =
-          connectionMode === "proxy" && proxyAddress
-            ? {
-                proxyAddress,
-                ...(Object.keys(customHeaders).length > 0 && {
-                  headers: customHeaders,
-                }),
-              }
-            : Object.keys(customHeaders).length > 0
-              ? { headers: customHeaders }
-              : undefined;
-        const autoProxyFallback =
-          connectionMode === "auto" && proxyAddress
-            ? { enabled: true, proxyAddress }
-            : false;
+        const serverOptions = toMcpServerConfig({
+          url,
+          name,
+          transportType: "http",
+          connectionMode,
+          connectionType:
+            connectionMode === "proxy" ? "Via Proxy" : "Direct",
+          proxyConfig:
+            connectionMode === "proxy" && proxyAddress
+              ? {
+                  proxyAddress,
+                  ...(Object.keys(headers).length > 0 ? { headers } : {}),
+                }
+              : undefined,
+          headers,
+          autoProxyFallback:
+            connectionMode === "auto" && proxyAddress
+              ? { enabled: true, proxyAddress }
+              : false,
+        });
 
-        // Avoid duplicates
         const existing = connections.find((c) => c.url === url);
         if (!existing) {
-          addConnection(
-            url,
-            name,
-            proxyConfig,
-            transportType,
-            undefined,
-            connectionMode,
-            autoProxyFallback
-          );
+          addServer(url, serverOptions);
         }
 
         if (!firstServerId) {
@@ -736,7 +654,7 @@ export function Layout({ children }: LayoutProps) {
 
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [isEmbedded, connections, addConnection]);
+  }, [isEmbedded, connections, addServer]);
 
   // Auto-select the first ready server when new servers connect via postMessage.
   // This handles the case where connect_servers adds servers and we need to

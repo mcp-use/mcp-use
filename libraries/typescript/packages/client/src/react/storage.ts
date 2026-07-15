@@ -1,4 +1,4 @@
-import type { McpServerOptions } from "./types.js";
+import type { McpServerConfig } from "./types.js";
 
 export interface CachedServerMetadata {
   name?: string;
@@ -15,10 +15,10 @@ export interface CachedServerMetadata {
 
 export interface StorageProvider {
   getServers():
-    | Promise<Record<string, McpServerOptions>>
-    | Record<string, McpServerOptions>;
-  setServers(servers: Record<string, McpServerOptions>): Promise<void> | void;
-  setServer(id: string, config: McpServerOptions): Promise<void> | void;
+    | Promise<Record<string, McpServerConfig>>
+    | Record<string, McpServerConfig>;
+  setServers(servers: Record<string, McpServerConfig>): Promise<void> | void;
+  setServer(id: string, config: McpServerConfig): Promise<void> | void;
   removeServer(id: string): Promise<void> | void;
   clear(): Promise<void> | void;
   getServerMetadata?(
@@ -41,7 +41,7 @@ export class LocalStorageProvider implements StorageProvider {
     this.metadataKey = `${storageKey}-metadata`;
   }
 
-  getServers(): Record<string, McpServerOptions> {
+  getServers(): Record<string, McpServerConfig> {
     try {
       const stored = localStorage.getItem(this.storageKey);
       return stored ? JSON.parse(stored) : {};
@@ -51,7 +51,7 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
-  setServers(servers: Record<string, McpServerOptions>): void {
+  setServers(servers: Record<string, McpServerConfig>): void {
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(servers));
     } catch (error) {
@@ -59,7 +59,7 @@ export class LocalStorageProvider implements StorageProvider {
     }
   }
 
-  setServer(id: string, config: McpServerOptions): void {
+  setServer(id: string, config: McpServerConfig): void {
     const servers = this.getServers();
     servers[id] = config;
     this.setServers(servers);
@@ -117,18 +117,18 @@ export class LocalStorageProvider implements StorageProvider {
 }
 
 export class MemoryStorageProvider implements StorageProvider {
-  private storage: Record<string, McpServerOptions> = {};
+  private storage: Record<string, McpServerConfig> = {};
   private metadata: Record<string, CachedServerMetadata> = {};
 
-  getServers(): Record<string, McpServerOptions> {
+  getServers(): Record<string, McpServerConfig> {
     return { ...this.storage };
   }
 
-  setServers(servers: Record<string, McpServerOptions>): void {
+  setServers(servers: Record<string, McpServerConfig>): void {
     this.storage = { ...servers };
   }
 
-  setServer(id: string, config: McpServerOptions): void {
+  setServer(id: string, config: McpServerConfig): void {
     this.storage[id] = config;
   }
 

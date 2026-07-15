@@ -6,7 +6,6 @@ import { SamplingRequestToast } from "@/client/components/sampling/SamplingReque
 import { ViewPreview } from "@/client/components/ViewPreview";
 import { Toaster } from "@/client/components/ui/sonner";
 import {
-  LocalStorageProvider,
   McpClientProvider,
   type McpServer,
 } from "@mcp-use/client/react";
@@ -18,7 +17,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { WidgetDebugProvider } from "./context/WidgetDebugContext";
 import { getPackageVersion } from "@/client/telemetry";
 import { getInspectorBase } from "./utils/basePath";
-import { getDefaultInspectorProxyAddress } from "./utils/connectionUpdates";
+import { getDefaultInspectorProxyAddress, InspectorConnectionStorageProvider } from "./utils/connectionUpdates";
 
 /**
  * Syncs the active tab from InspectorContext into a ref readable by
@@ -62,7 +61,7 @@ function App() {
     () =>
       isEmbedded
         ? undefined
-        : new LocalStorageProvider("mcp-inspector-connections"),
+        : new InspectorConnectionStorageProvider("mcp-inspector-connections"),
     [isEmbedded]
   );
 
@@ -108,6 +107,10 @@ function App() {
           defaultAutoProxyFallback={
             proxyAddress ? { enabled: true, proxyAddress } : false
           }
+          defaultServerConfig={{
+            preventAutoAuth: true,
+            useRedirectFlow: true,
+          }}
           clientInfo={{
             name: "mcp-use Inspector",
             version: getPackageVersion(),

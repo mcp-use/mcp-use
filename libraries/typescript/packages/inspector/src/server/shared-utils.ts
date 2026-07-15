@@ -6,6 +6,7 @@
 import { convertMessagesToProvider } from "../llm/messageFormat";
 import { runToolLoop, runToolLoopNonStreaming } from "../llm/toolLoop";
 import type { ProviderMessage, ProviderName, ProviderTool } from "../llm/types";
+import type { Tool } from "@modelcontextprotocol/client";
 
 interface LLMConfig {
   provider: ProviderName;
@@ -56,7 +57,7 @@ interface ToolCall {
 interface ServerConfig {
   url: string;
   headers?: Record<string, string>;
-  [key: string]: unknown;
+  preventAutoAuth?: boolean;
 }
 
 /**
@@ -75,28 +76,10 @@ function toBase64(str: string): string {
   throw new Error("No base64 encoding method available");
 }
 
-/**
- * Handle chat API request with MCP agent (streaming)
- */
-export async function* handleChatRequestStream(requestBody: {
-  mcpServerUrl: string;
-  llmConfig: LLMConfig;
-  authConfig?: AuthConfig;
-  messages: ChatMessage[];
-}): AsyncGenerator<string, void, void> {
-  const { mcpServerUrl, llmConfig, authConfig, messages } = requestBody;
-
-  if (!mcpServerUrl || !llmConfig || !messages) {
-    throw new Error(
-      "Missing required fields: mcpServerUrl, llmConfig, messages"
-    );
-  }
-
-  const { MCPClient } = await import("@mcp-use/client");
-
-  const client = new MCPClient() as any;
-  const serverName = `inspector-${Date.now()}`;
-
+function buildServerConfig(
+  mcpServerUrl: string,
+  authConfig?: AuthConfig
+): ServerConfig {
   const serverConfig: ServerConfig = {
     url: mcpServerUrl,
     preventAutoAuth: true,
@@ -140,24 +123,50 @@ export async function* handleChatRequestStream(requestBody: {
     console.warn("Failed to parse MCP server URL for auth:", error);
   }
 
-  client.addServer(serverName, serverConfig);
+  return serverConfig;
+}
+
+function toProviderTools(tools: Tool[]): ProviderTool[] {
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    inputSchema: (tool.inputSchema as Record<string, unknown>) ?? {
+      type: "object",
+    },
+  }));
+}
+
+/**
+ * Handle chat API request with MCP agent (streaming)
+ */
+export async function* handleChatRequestStream(requestBody: {
+  mcpServerUrl: string;
+  llmConfig: LLMConfig;
+  authConfig?: AuthConfig;
+  messages: ChatMessage[];
+}): AsyncGenerator<string, void, void> {
+  const { mcpServerUrl, llmConfig, authConfig, messages } = requestBody;
+
+  if (!mcpServerUrl || !llmConfig || !messages) {
+    throw new Error(
+      "Missing required fields: mcpServerUrl, llmConfig, messages"
+    );
+  }
+
+  const { MCPClient } = await import("@mcp-use/client");
+
+  const serverName = `inspector-${Date.now()}`;
+  const serverConfig = buildServerConfig(mcpServerUrl, authConfig);
+  const client = new MCPClient({
+    mcpServers: {
+      [serverName]: serverConfig,
+    },
+  });
 
   try {
-    // Open a session to the MCP server so we can enumerate + call tools.
-    await client.createAllSessions();
-    const session = client.getAllActiveSessions()[serverName];
-    if (!session) {
-      throw new Error(`Failed to create MCP session for ${serverName}`);
-    }
-
-    const mcpTools = session.connector.tools ?? [];
-    const tools: ProviderTool[] = mcpTools.map((t: any) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
-        type: "object",
-      },
-    }));
+    const connection = await client.connect(serverName);
+    const mcpTools = await connection.listTools();
+    const tools = toProviderTools(mcpTools);
 
     const providerMessages: ProviderMessage[] = [
       {
@@ -165,13 +174,12 @@ export async function* handleChatRequestStream(requestBody: {
         content:
           "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
       },
-      ...convertMessagesToProvider(messages as any),
+      ...convertMessagesToProvider(messages as Parameters<typeof convertMessagesToProvider>[0]),
     ];
 
     const messageId = `msg-${Date.now()}`;
     yield `data: ${JSON.stringify({ type: "message", id: messageId, role: "assistant" })}\n\n`;
 
-    // Track in-flight tool calls so we can pair start/result events.
     const toolCallIdByIndex = new Map<
       number,
       { toolCallId: string; toolName: string; argsBuffer: string }
@@ -187,9 +195,7 @@ export async function* handleChatRequestStream(requestBody: {
       },
       messages: providerMessages,
       tools,
-      callTool: async (name, args) => {
-        return await session.connector.callTool(name, args);
-      },
+      callTool: async (name, args) => connection.callTool(name, args),
       maxSteps: 10,
     })) {
       if (ev.type === "text-delta") {
@@ -234,20 +240,12 @@ export async function* handleChatRequestStream(requestBody: {
 
     yield `data: ${JSON.stringify({ type: "done", id: messageId })}\n\n`;
   } finally {
-    await client.closeAllSessions();
+    await client.close();
   }
 }
 
 /**
  * Execute a non-streaming chat turn using an MCP agent and the specified LLM configuration.
- *
- * @param requestBody - Request parameters
- * @param requestBody.mcpServerUrl - Base URL of the MCP server to connect to
- * @param requestBody.llmConfig - LLM provider configuration (provider, model, apiKey, etc.)
- * @param requestBody.authConfig - Optional authentication configuration for the MCP server
- * @param requestBody.messages - Array of chat messages; only the last message with role "user" is used as the query
- * @returns An object containing `content` with the agent's response text and `toolCalls` with recorded tool invocations (empty for this non-streaming implementation)
- * @throws If required fields are missing, if the LLM provider is unsupported, or if no user message is found
  */
 export async function handleChatRequest(requestBody: {
   mcpServerUrl: string;
@@ -265,69 +263,18 @@ export async function handleChatRequest(requestBody: {
 
   const { MCPClient } = await import("@mcp-use/client");
 
-  const client = new MCPClient() as any;
   const serverName = `inspector-${Date.now()}`;
-
-  const serverConfig: ServerConfig = {
-    url: mcpServerUrl,
-    preventAutoAuth: true,
-  };
-
-  if (authConfig && authConfig.type !== "none") {
-    serverConfig.headers = {};
-    if (
-      authConfig.type === "basic" &&
-      authConfig.username &&
-      authConfig.password
-    ) {
-      const auth = toBase64(`${authConfig.username}:${authConfig.password}`);
-      serverConfig.headers.Authorization = `Basic ${auth}`;
-    } else if (authConfig.type === "bearer" && authConfig.token) {
-      serverConfig.headers.Authorization = `Bearer ${authConfig.token}`;
-    } else if (authConfig.type === "oauth") {
-      if (authConfig.oauthTokens?.access_token) {
-        const tokenType = authConfig.oauthTokens.token_type
-          ? authConfig.oauthTokens.token_type.charAt(0).toUpperCase() +
-            authConfig.oauthTokens.token_type.slice(1)
-          : "Bearer";
-        serverConfig.headers.Authorization = `${tokenType} ${authConfig.oauthTokens.access_token}`;
-      }
-    }
-  }
+  const serverConfig = buildServerConfig(mcpServerUrl, authConfig);
+  const client = new MCPClient({
+    mcpServers: {
+      [serverName]: serverConfig,
+    },
+  });
 
   try {
-    const url = new URL(mcpServerUrl);
-    if (
-      url.username &&
-      url.password &&
-      (!authConfig || authConfig.type === "none")
-    ) {
-      const auth = toBase64(`${url.username}:${url.password}`);
-      serverConfig.headers = serverConfig.headers || {};
-      serverConfig.headers.Authorization = `Basic ${auth}`;
-      serverConfig.url = `${url.protocol}//${url.host}${url.pathname}${url.search}`;
-    }
-  } catch (error) {
-    console.warn("Failed to parse MCP server URL for auth:", error);
-  }
-
-  client.addServer(serverName, serverConfig);
-
-  try {
-    await client.createAllSessions();
-    const session = client.getAllActiveSessions()[serverName];
-    if (!session) {
-      throw new Error(`Failed to create MCP session for ${serverName}`);
-    }
-
-    const mcpTools = session.connector.tools ?? [];
-    const tools: ProviderTool[] = mcpTools.map((t: any) => ({
-      name: t.name,
-      description: t.description,
-      inputSchema: (t.inputSchema as Record<string, unknown>) ?? {
-        type: "object",
-      },
-    }));
+    const connection = await client.connect(serverName);
+    const mcpTools = await connection.listTools();
+    const tools = toProviderTools(mcpTools);
 
     const providerMessages: ProviderMessage[] = [
       {
@@ -335,7 +282,7 @@ export async function handleChatRequest(requestBody: {
         content:
           "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.",
       },
-      ...convertMessagesToProvider(messages as any),
+      ...convertMessagesToProvider(messages as Parameters<typeof convertMessagesToProvider>[0]),
     ];
 
     const { content, toolCalls } = await runToolLoopNonStreaming({
@@ -348,9 +295,7 @@ export async function handleChatRequest(requestBody: {
       },
       messages: providerMessages,
       tools,
-      callTool: async (name, args) => {
-        return await session.connector.callTool(name, args);
-      },
+      callTool: async (name, args) => connection.callTool(name, args),
       maxSteps: 10,
     });
 
@@ -363,6 +308,6 @@ export async function handleChatRequest(requestBody: {
       })),
     };
   } finally {
-    await client.closeAllSessions();
+    await client.close();
   }
 }

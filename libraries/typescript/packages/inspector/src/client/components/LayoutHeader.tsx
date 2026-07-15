@@ -61,6 +61,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";
 import { getServerDisplayName } from "@/client/utils/serverNames";
+import { getServerHeaders } from "@/client/utils/connectionUpdates";
 import { copyToClipboard } from "@/client/utils/clipboard";
 import { useTheme } from "@/client/context/ThemeContext";
 import {
@@ -74,12 +75,9 @@ import LogoAnimated from "./LogoAnimated";
 import { SdkIntegrationModal } from "./SdkIntegrationModal";
 import { ServerDropdown } from "./ServerDropdown";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
-
 interface LayoutHeaderProps {
-  connections: MCPConnection[];
-  selectedServer: MCPConnection | undefined;
+  connections: McpServer[];
+  selectedServer: McpServer | undefined;
   activeTab: string;
   onServerSelect: (serverId: string) => void;
   onTabChange: (tab: TabType) => void;
@@ -99,7 +97,7 @@ const tabs = [
   { id: "notifications", label: "Notifications", icon: Bell },
 ] as const;
 
-function getTabCount(tabId: string, server: MCPConnection): number {
+function getTabCount(tabId: string, server: McpServer): number {
   if (tabId === "tools") {
     return server.tools.length;
   } else if (tabId === "prompts") {
@@ -582,8 +580,8 @@ export function LayoutHeader({
   const { theme, setTheme } = useTheme();
   const showTunnelBadge =
     !!selectedServer &&
-    (isLocalhostServerUrl(selectedServer.url) ||
-      isMcpUseTunnelUrl(selectedServer.url) ||
+    (isLocalhostServerUrl(selectedServer.url ?? "") ||
+      isMcpUseTunnelUrl(selectedServer.url ?? "") ||
       !!tunnelUrl);
   const [copied, setCopied] = useState(false);
   const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
@@ -658,9 +656,9 @@ export function LayoutHeader({
                         serverConfig={{
                           url: tunnelUrl
                             ? `${tunnelUrl}/mcp`
-                            : selectedServer.url,
+                            : selectedServer.url ?? "",
                           name: displayName,
-                          headers: (selectedServer as any).customHeaders,
+                          headers: getServerHeaders(selectedServer),
                           serverId: selectedServer.id,
                         }}
                         onSuccess={(client: string) =>
@@ -716,22 +714,22 @@ export function LayoutHeader({
                         open={tsSdkModalOpen}
                         onOpenChange={setTsSdkModalOpen}
                         serverUrl={
-                          tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                          tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url ?? ""
                         }
                         serverName={displayName}
                         serverId={undefined}
-                        headers={(selectedServer as any).customHeaders}
+                        headers={getServerHeaders(selectedServer)}
                         language="typescript"
                       />
                       <SdkIntegrationModal
                         open={pySdkModalOpen}
                         onOpenChange={setPySdkModalOpen}
                         serverUrl={
-                          tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                          tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url ?? ""
                         }
                         serverName={displayName}
                         serverId={undefined}
-                        headers={(selectedServer as any).customHeaders}
+                        headers={getServerHeaders(selectedServer)}
                         language="python"
                       />
                     </>
@@ -993,9 +991,9 @@ export function LayoutHeader({
                       serverConfig={{
                         url: tunnelUrl
                           ? `${tunnelUrl}/mcp`
-                          : selectedServer.url,
+                          : selectedServer.url ?? "",
                         name: displayName,
-                        headers: (selectedServer as any).customHeaders,
+                        headers: getServerHeaders(selectedServer),
                         serverId: selectedServer.id,
                       }}
                       onSuccess={(client: string) =>
@@ -1051,22 +1049,22 @@ export function LayoutHeader({
                       open={tsSdkModalOpen}
                       onOpenChange={setTsSdkModalOpen}
                       serverUrl={
-                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url ?? ""
                       }
                       serverName={displayName}
                       serverId={undefined}
-                      headers={(selectedServer as any).customHeaders}
+                      headers={getServerHeaders(selectedServer)}
                       language="typescript"
                     />
                     <SdkIntegrationModal
                       open={pySdkModalOpen}
                       onOpenChange={setPySdkModalOpen}
                       serverUrl={
-                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url
+                        tunnelUrl ? `${tunnelUrl}/mcp` : selectedServer.url ?? ""
                       }
                       serverName={displayName}
                       serverId={undefined}
-                      headers={(selectedServer as any).customHeaders}
+                      headers={getServerHeaders(selectedServer)}
                       language="python"
                     />
                   </>

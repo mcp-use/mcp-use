@@ -321,11 +321,9 @@ export type UseMcpOptions = {
 
 /**
  * Serializable configuration for one server managed by `McpClientProvider`.
- *
- * Reverse-request and notification callbacks are owned by the provider, so
- * they are intentionally excluded from this persisted configuration.
+ * Pass this to `addServer` / `updateServer`.
  */
-export interface McpServerOptions extends Omit<
+export interface McpServerConfig extends Omit<
   UseMcpOptions,
   "onSampling" | "onElicitation" | "onNotification"
 > {
@@ -338,6 +336,22 @@ export interface McpServerOptions extends Omit<
   /** Optional callback invoked when the provider receives a notification. */
   onNotificationReceived?: (notification: McpNotification) => void;
 }
+
+/** @deprecated Use {@link McpServerConfig} */
+export type McpServerOptions = McpServerConfig;
+
+/** Persisted connection config (callbacks and runtime wiring stripped). */
+export type PersistedMcpServerConfig = Omit<
+  McpServerConfig,
+  | "authProvider"
+  | "fetch"
+  | "wrapTransport"
+  | "onPopupWindow"
+  | "onSamplingRequest"
+  | "onElicitationRequest"
+  | "onNotificationReceived"
+  | "serverId"
+>;
 
 /** Notification received from one managed MCP server. */
 export interface McpNotification {
@@ -615,3 +629,82 @@ export type UseMcpResult = {
    */
   client: BaseMCPClient | null;
 };
+
+/**
+ * Connected MCP server: flat persisted config + live connection state.
+ * Returned from `useMcpClient().servers`.
+ */
+export interface McpServer extends PersistedMcpServerConfig, UseMcpResult {
+  id: string;
+  notifications: McpNotification[];
+  unreadNotificationCount: number;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
+  pendingSamplingRequests: PendingSamplingRequest[];
+  approveSampling: (
+    requestId: string,
+    result: SamplingCreateMessageResult
+  ) => void;
+  rejectSampling: (requestId: string, error?: string) => void;
+  pendingElicitationRequests: PendingElicitationRequest[];
+  approveElicitation: (requestId: string, result: ElicitResult) => void;
+  rejectElicitation: (requestId: string, error?: string) => void;
+  /**
+   * Merge connection-affecting config and reconnect when it changed.
+   * Prefer this over context `updateServer(id, …)` when you already hold the server.
+   */
+  updateConfig: (config: Partial<McpServerConfig>) => Promise<void>;
+  /** Set HTTP headers on the connection config and reconnect. */
+  setHeaders: (headers: Record<string, string> | undefined) => Promise<void>;
+  /** Rename the server without disconnecting. */
+  setDisplayName: (displayName: string) => Promise<void>;
+  /** Disconnect and reconnect with the current config. */
+  reconnect: () => Promise<void>;
+}
+
+const PERSISTED_SERVER_CONFIG_KEYS = [
+  "url",
+  "displayName",
+  "enabled",
+  "proxyConfig",
+  "oauthProxyUrl",
+  "connectionMode",
+  "autoProxyFallback",
+  "callbackUrl",
+  "storageKeyPrefix",
+  "headers",
+  "logLevel",
+  "autoRetry",
+  "autoReconnect",
+  "reconnectionOptions",
+  "popupFeatures",
+  "preventAutoAuth",
+  "useRedirectFlow",
+  "clientOptions",
+  "protocolNegotiation",
+  "timeout",
+  "clientInfo",
+  "oauth",
+] as const satisfies readonly (keyof PersistedMcpServerConfig)[];
+
+/** Extract the persisted config subset from input or a connected server. */
+export function pickPersistedServerConfig(
+  source: McpServerConfig | McpServer
+): PersistedMcpServerConfig {
+  const out: PersistedMcpServerConfig = {};
+  for (const key of PERSISTED_SERVER_CONFIG_KEYS) {
+    const value = source[key];
+    if (value !== undefined) {
+      (out as Record<string, unknown>)[key] = value;
+    }
+  }
+  return out;
+}
+
+/** Strip non-persisted fields from a server config before storage / exposure. */
+export function toPersistedServerConfig(
+  config: McpServerConfig
+): PersistedMcpServerConfig {
+  return pickPersistedServerConfig(config);
+}

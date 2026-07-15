@@ -5,8 +5,7 @@
  * wrap the transport in `connect()` so send/receive logging still works.
  */
 
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
+import type { JSONRPCMessage, Transport } from "@modelcontextprotocol/client";
 import { rpcLogBus } from "../../server/rpc-log-bus.js";
 
 /**

@@ -183,7 +183,7 @@ export function ChatTab({
     setTempBaseUrl,
     saveLLMConfig,
     clearConfig,
-  } = useConfig({ mcpServerUrl: connection.url });
+  } = useConfig({ mcpServerUrl: connection.url ?? "" });
 
   // ── Hosted-mode / client-side override ──────────────────────────────────
   // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
@@ -238,7 +238,7 @@ export function ChatTab({
   };
 
   const serverSideChat = useChatMessages({
-    mcpServerUrl: connection.url,
+    mcpServerUrl: connection.url ?? "",
     llmConfig,
     authConfig: userAuthConfig,
     isConnected,
@@ -1097,7 +1097,7 @@ export function ChatTab({
 
         {/* Landing Form */}
         <ChatLandingForm
-          mcpServerUrl={connection.url}
+          mcpServerUrl={connection.url ?? ""}
           inputValue={inputValue}
           isConnected={isConnected}
           isLoading={isLoading}
