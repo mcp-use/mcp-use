@@ -9,7 +9,7 @@ import {
 } from "@/client/components/ui/resizable";
 import { SamplingRequestsList } from "./sampling/SamplingRequestsList";
 import { SamplingRequestDisplay } from "./sampling/SamplingRequestDisplay";
-import { SearchTabHeader } from "@/client/components/shared";
+import { InspectorScrollArea, SearchTabHeader } from "@/client/components/shared";
 import { useInspector } from "@/client/context/InspectorContext";
 import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 import { useConfig } from "./chat/useConfig";
@@ -350,37 +350,42 @@ export function SamplingTab({
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
-            <SearchTabHeader
-              title="Sampling"
-              count={filteredRequests.length}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              searchPlaceholder="Search requests..."
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              bulkAction={{
-                icon: Trash2,
-                label: "Reject all",
-                onClick: handleRejectAll,
-                disabled: pendingRequests.length === 0,
-              }}
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+          <ResizablePanel defaultSize={75} minSize={30} className="h-full overflow-hidden">
+            <InspectorScrollArea scrollRef={listRef}>
+              {(isScrolled) => (
+                <>
+                  <SearchTabHeader
+                    isScrolled={isScrolled}
+                    title="Sampling"
+                    icon={Hash}
+                    count={filteredRequests.length}
+                    isSearchExpanded={isSearchExpanded}
+                    searchQuery={searchQuery}
+                    searchPlaceholder="Search requests..."
+                    onSearchExpand={() => setIsSearchExpanded(true)}
+                    onSearchChange={setSearchQuery}
+                    onSearchBlur={handleSearchBlur}
+                    bulkAction={{
+                      icon: Trash2,
+                      label: "Reject all",
+                      onClick: handleRejectAll,
+                      disabled: pendingRequests.length === 0,
+                    }}
+                    searchInputRef={
+                      searchInputRef as React.RefObject<HTMLInputElement>
+                    }
+                  />
 
-            <div className="flex flex-col h-full">
-              <SamplingRequestsList
-                requests={filteredRequests}
-                selectedRequest={selectedRequest}
-                onRequestSelect={handleRequestSelect}
-                focusedIndex={focusedIndex}
-                formatRelativeTime={formatRelativeTime}
-                listRef={listRef}
-              />
-            </div>
+                  <SamplingRequestsList
+                    requests={filteredRequests}
+                    selectedRequest={selectedRequest}
+                    onRequestSelect={handleRequestSelect}
+                    focusedIndex={focusedIndex}
+                    formatRelativeTime={formatRelativeTime}
+                  />
+                </>
+              )}
+            </InspectorScrollArea>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>

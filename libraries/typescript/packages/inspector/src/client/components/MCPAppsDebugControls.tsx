@@ -20,12 +20,10 @@ import {
   Tablet,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { LOCALE_OPTIONS, TIMEZONE_OPTIONS } from "../constants/debug-options";
-import {
-  useWidgetDebug,
-} from "../context/WidgetDebugContext";
+import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { useResourceProps, type PropPreset } from "../hooks/useResourceProps";
 import type { LLMConfig } from "./chat/types";
 import { copyToClipboard } from "@/client/utils/browser";
@@ -36,13 +34,12 @@ import { JSONDisplay } from "./shared/JSONDisplay";
 import { SafeAreaInsetsEditor } from "./ui-playground/shared/SafeAreaInsetsEditor";
 import { Button } from "./ui/button";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "./ui/command";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Input } from "./ui/input";
+import { MenuItem } from "./ui/menu-item";
 import {
   Dialog,
   DialogBody,
@@ -52,6 +49,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
+import {
+  computeSuggestedFix,
+  buildAgentCspPrompt,
+} from "@/client/mcp-apps/debug/csp-suggestions";
+import {
+  diagnoseCsp,
+  diffCspPolicies,
+  getEffectiveCspPolicy,
+  getRequestedCspPolicy,
+} from "@/client/mcp-apps/csp";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
@@ -75,10 +82,104 @@ const NO_PROPS_VALUE = "__no_props__";
 const TOOL_PROPS_VALUE = "__tool_props__";
 const CREATE_PRESET_VALUE = "__create_preset__";
 
-import {
-  computeSuggestedFix,
-  buildAgentCspPrompt,
-} from "@/client/mcp-apps/debug/csp-suggestions";
+const DEVICE_OPTIONS = [
+  { value: "desktop", label: "Desktop", icon: Monitor },
+  { value: "mobile", label: "Mobile", icon: Smartphone },
+  { value: "tablet", label: "Tablet", icon: Tablet },
+] as const;
+
+type PickerOption = { value: string; label: string };
+
+function DebuggerSearchableDropdown({
+  options,
+  value,
+  onValueChange,
+  placeholder,
+  contentTestId,
+  searchTestId,
+  optionTestId,
+  trigger,
+}: {
+  options: readonly PickerOption[];
+  value: string;
+  onValueChange: (value: string) => void;
+  placeholder: string;
+  contentTestId: string;
+  searchTestId: string;
+  optionTestId: (value: string) => string;
+  trigger: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      return;
+    }
+    const id = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [...options];
+    return options.filter(
+      (option) =>
+        option.label.toLowerCase().includes(q) ||
+        option.value.toLowerCase().includes(q)
+    );
+  }, [options, query]);
+
+  const checkedIndex = filtered.findIndex((option) => option.value === value);
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      {trigger}
+      <DropdownMenuContent
+        data-testid={contentTestId}
+        checkedIndex={checkedIndex >= 0 ? checkedIndex : undefined}
+        className="w-80 overflow-hidden"
+      >
+        <div
+          className="border-b border-border p-2"
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <Input
+            ref={searchRef}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={placeholder}
+            data-testid={searchTestId}
+            className="h-8"
+          />
+        </div>
+        <div className="max-h-64 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-4 text-xs text-muted-foreground">
+              No results found.
+            </p>
+          ) : (
+            filtered.map((option, index) => (
+              <MenuItem
+                key={option.value}
+                index={index}
+                label={option.label}
+                checked={value === option.value}
+                data-testid={optionTestId(option.value)}
+                onSelect={() => {
+                  onValueChange(option.value);
+                  setOpen(false);
+                }}
+              />
+            ))
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function MCPAppsDebugControls({
   displayMode,
@@ -136,13 +237,32 @@ export function MCPAppsDebugControls({
     if (missingProps) setPropsPopoverOpen(true);
   }, [missingProps]);
   const [editingPreset, setEditingPreset] = useState<PropPreset | null>(null);
-  const [deviceDialogOpen, setDeviceDialogOpen] = useState(false);
-  const [localeDialogOpen, setLocaleDialogOpen] = useState(false);
-  const [timezoneDialogOpen, setTimezoneDialogOpen] = useState(false);
   const [cspDialogOpen, setCspDialogOpen] = useState(false);
-  const [cspDeclaredExpanded, setCspDeclaredExpanded] = useState(true);
-  const [cspPolicyExpanded, setCspPolicyExpanded] = useState(true);
+  const [cspTab, setCspTab] = useState<"mode" | "diff" | "findings">("mode");
   const [cspSuggestedExpanded, setCspSuggestedExpanded] = useState(true);
+
+  const requestedPolicy = useMemo(
+    () => getRequestedCspPolicy(declaredCsp),
+    [declaredCsp]
+  );
+  const parsedEffectivePolicy = useMemo(
+    () => getEffectiveCspPolicy(effectivePolicy),
+    [effectivePolicy]
+  );
+  const policyDiff = useMemo(
+    () => diffCspPolicies(requestedPolicy, parsedEffectivePolicy),
+    [requestedPolicy, parsedEffectivePolicy]
+  );
+  const cspFindings = useMemo(
+    () =>
+      diagnoseCsp({
+        mode: playground.cspMode,
+        declared: declaredCsp,
+        effectivePolicy,
+        violations: cspViolations,
+      }),
+    [playground.cspMode, declaredCsp, effectivePolicy, cspViolations]
+  );
 
   // Determine default select value based on context
   const getDefaultSelectValue = useCallback(() => {
@@ -236,6 +356,10 @@ export function MCPAppsDebugControls({
     }
   };
 
+  const deviceCheckedIndex = DEVICE_OPTIONS.findIndex(
+    (device) => device.value === playground.deviceType
+  );
+
   return (
     <div className="flex items-center gap-2">
       {/* Display mode buttons */}
@@ -274,10 +398,10 @@ export function MCPAppsDebugControls({
       )}
 
       {/* Device Emulation */}
-      <Dialog open={deviceDialogOpen} onOpenChange={setDeviceDialogOpen}>
+      <DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
-            <DialogTrigger asChild>
+            <DropdownMenuTrigger asChild>
               <Button
                 data-testid="debugger-device-button"
                 variant="outline"
@@ -286,49 +410,34 @@ export function MCPAppsDebugControls({
               >
                 {getDeviceIcon()}
               </Button>
-            </DialogTrigger>
+            </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>Device: {playground.deviceType}</TooltipContent>
         </Tooltip>
-        <DialogContent
-          className="sm:max-w-[300px]"
+        <DropdownMenuContent
           data-testid="debugger-device-dialog"
+          checkedIndex={
+            deviceCheckedIndex >= 0 ? deviceCheckedIndex : undefined
+          }
+          className="w-56"
         >
-          <DialogHeader>
-            <DialogTitle>Device Type</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            {[
-              { value: "desktop", label: "Desktop", icon: Monitor },
-              { value: "mobile", label: "Mobile", icon: Smartphone },
-              { value: "tablet", label: "Tablet", icon: Tablet },
-            ].map((device) => {
-              const Icon = device.icon;
-              return (
-                <Button
-                  key={device.value}
-                  data-testid={`debugger-device-option-${device.value}`}
-                  variant={
-                    playground.deviceType === device.value
-                      ? "default"
-                      : "outline"
-                  }
-                  className="w-full justify-start"
-                  onClick={() => {
-                    updatePlaygroundSettings({
-                      deviceType: device.value as any,
-                    });
-                    setDeviceDialogOpen(false);
-                  }}
-                >
-                  <Icon className="size-4 mr-2" />
-                  {device.label}
-                </Button>
-              );
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
+          {DEVICE_OPTIONS.map((device, index) => (
+            <MenuItem
+              key={device.value}
+              index={index}
+              icon={device.icon}
+              label={device.label}
+              checked={playground.deviceType === device.value}
+              data-testid={`debugger-device-option-${device.value}`}
+              onSelect={() =>
+                updatePlaygroundSettings({
+                  deviceType: device.value as (typeof DEVICE_OPTIONS)[number]["value"],
+                })
+              }
+            />
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {/* Theme Toggle */}
       <Tooltip>
@@ -356,108 +465,62 @@ export function MCPAppsDebugControls({
       </Tooltip>
 
       {/* Locale */}
-      <Dialog open={localeDialogOpen} onOpenChange={setLocaleDialogOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-              <Button
-                data-testid="debugger-locale-button"
-                variant="outline"
-                size="sm"
-                className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-              >
-                <span className="text-xs font-mono">{playground.locale}</span>
-              </Button>
-            </DialogTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Locale</TooltipContent>
-        </Tooltip>
-        <DialogContent
-          className="sm:max-w-[400px]"
-          data-testid="debugger-locale-dialog"
-        >
-          <DialogHeader>
-            <DialogTitle>Select Locale</DialogTitle>
-          </DialogHeader>
-          <Command>
-            <CommandInput
-              placeholder="Search locales..."
-              data-testid="debugger-locale-search"
-            />
-            <CommandList>
-              <CommandEmpty>No locale found.</CommandEmpty>
-              <CommandGroup>
-                {LOCALE_OPTIONS.map((locale) => (
-                  <CommandItem
-                    key={locale.value}
-                    value={locale.value}
-                    keywords={locale.label}
-                    data-testid={`debugger-locale-option-${locale.value}`}
-                    onSelect={() => {
-                      updatePlaygroundSettings({ locale: locale.value });
-                      setLocaleDialogOpen(false);
-                    }}
-                  >
-                    {locale.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </DialogContent>
-      </Dialog>
+      <DebuggerSearchableDropdown
+        options={LOCALE_OPTIONS}
+        value={playground.locale}
+        onValueChange={(locale) => updatePlaygroundSettings({ locale })}
+        placeholder="Search locales..."
+        contentTestId="debugger-locale-dialog"
+        searchTestId="debugger-locale-search"
+        optionTestId={(value) => `debugger-locale-option-${value}`}
+        trigger={
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  data-testid="debugger-locale-button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 min-w-[50px] px-2 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                >
+                  <span className="text-xs font-mono">{playground.locale}</span>
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Locale</TooltipContent>
+          </Tooltip>
+        }
+      />
 
       {/* Timezone */}
-      <Dialog open={timezoneDialogOpen} onOpenChange={setTimezoneDialogOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <DialogTrigger asChild>
-              <Button
-                data-testid="debugger-timezone-button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-              >
-                <Clock className="size-3.5" />
-              </Button>
-            </DialogTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
-        </Tooltip>
-        <DialogContent
-          className="sm:max-w-[400px]"
-          data-testid="debugger-timezone-dialog"
-        >
-          <DialogHeader>
-            <DialogTitle>Select Timezone</DialogTitle>
-          </DialogHeader>
-          <Command>
-            <CommandInput
-              placeholder="Search timezones..."
-              data-testid="debugger-timezone-search"
-            />
-            <CommandList>
-              <CommandEmpty>No timezone found.</CommandEmpty>
-              <CommandGroup>
-                {TIMEZONE_OPTIONS.map((tz) => (
-                  <CommandItem
-                    key={tz.value}
-                    value={tz.value}
-                    keywords={tz.label}
-                    data-testid={`debugger-timezone-option-${tz.value.replace(/\//g, "-")}`}
-                    onSelect={() => {
-                      updatePlaygroundSettings({ timeZone: tz.value });
-                      setTimezoneDialogOpen(false);
-                    }}
-                  >
-                    {tz.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </DialogContent>
-      </Dialog>
+      <DebuggerSearchableDropdown
+        options={TIMEZONE_OPTIONS}
+        value={playground.timeZone}
+        onValueChange={(timeZone) => updatePlaygroundSettings({ timeZone })}
+        placeholder="Search timezones..."
+        contentTestId="debugger-timezone-dialog"
+        searchTestId="debugger-timezone-search"
+        optionTestId={(value) =>
+          `debugger-timezone-option-${value.replace(/\//g, "-")}`
+        }
+        trigger={
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  data-testid="debugger-timezone-button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                >
+                  <Clock className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Timezone: {playground.timeZone}</TooltipContent>
+          </Tooltip>
+        }
+      />
 
       {/* CSP Mode */}
       <Dialog open={cspDialogOpen} onOpenChange={setCspDialogOpen}>
@@ -504,252 +567,185 @@ export function MCPAppsDebugControls({
           <DialogHeader>
             <DialogTitle>CSP Mode</DialogTitle>
           </DialogHeader>
-          <DialogBody className="space-y-2">
-            <Button
-              data-testid="debugger-csp-option-permissive"
-              variant={
-                playground.cspMode === "permissive" ? "default" : "outline"
-              }
-              className="w-full justify-start"
-              onClick={() => {
-                updatePlaygroundSettings({ cspMode: "permissive" });
-                setCspDialogOpen(false);
-              }}
+          <DialogBody className="space-y-3">
+            <div
+              role="tablist"
+              aria-label="CSP diagnostics"
+              className="grid grid-cols-3 rounded-md border border-zinc-200 dark:border-zinc-700 p-1"
             >
-              <ShieldOff className="size-4 mr-2" />
-              <div className="flex flex-col items-start">
-                <span>Permissive</span>
-              </div>
-            </Button>
-            <Button
-              data-testid="debugger-csp-option-widget-declared"
-              variant={
-                playground.cspMode === "widget-declared" ? "default" : "outline"
-              }
-              className="w-full justify-start"
-              onClick={() => {
-                updatePlaygroundSettings({ cspMode: "widget-declared" });
-                setCspDialogOpen(false);
-              }}
-            >
-              <ShieldCheck className="size-4 mr-2" />
-              <div className="flex flex-col items-start">
-                <span>Widget-Declared</span>
-              </div>
-            </Button>
-
-          {/* Current declared CSP */}
-          <div className="mt-3 border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
-            <button
-              type="button"
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm font-medium bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors"
-              onClick={() => setCspDeclaredExpanded((v) => !v)}
-            >
-              {cspDeclaredExpanded ? (
-                <ChevronDown className="size-3.5 shrink-0" />
-              ) : (
-                <ChevronRight className="size-3.5 shrink-0" />
-              )}
-              Current declared CSP
-            </button>
-            {cspDeclaredExpanded && (
-              <div className="px-3 pb-3 pt-0 space-y-1.5 text-xs">
-                {declaredCsp ? (
-                  <>
-                    <div>
-                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
-                        connectDomains:
-                      </span>{" "}
-                      {declaredCsp.connectDomains?.length
-                        ? JSON.stringify(declaredCsp.connectDomains)
-                        : "Not declared"}
-                    </div>
-                    <div>
-                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
-                        resourceDomains:
-                      </span>{" "}
-                      {declaredCsp.resourceDomains?.length
-                        ? JSON.stringify(declaredCsp.resourceDomains)
-                        : "Not declared"}
-                    </div>
-                    <div>
-                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
-                        frameDomains:
-                      </span>{" "}
-                      {declaredCsp.frameDomains?.length
-                        ? JSON.stringify(declaredCsp.frameDomains)
-                        : "Not declared"}
-                    </div>
-                    <div>
-                      <span className="font-mono text-zinc-500 dark:text-zinc-400">
-                        baseUriDomains:
-                      </span>{" "}
-                      {declaredCsp.baseUriDomains?.length
-                        ? JSON.stringify(declaredCsp.baseUriDomains)
-                        : "Not declared"}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-zinc-500 dark:text-zinc-400">
-                    {playground.cspMode === "permissive"
-                      ? "Widget-declared (would apply in Widget-Declared mode)"
-                      : "No CSP declared"}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Policy string (originalPolicy / effectivePolicy) */}
-          <div className="mt-3 border border-zinc-200 dark:border-zinc-700 rounded-md overflow-hidden">
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-zinc-50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors">
-              <button
-                type="button"
-                className="flex-1 flex items-center gap-2 text-left text-sm font-medium min-w-0"
-                onClick={() => setCspPolicyExpanded((v) => !v)}
-              >
-                {cspPolicyExpanded ? (
-                  <ChevronDown className="size-3.5 shrink-0" />
-                ) : (
-                  <ChevronRight className="size-3.5 shrink-0" />
-                )}
-                originalPolicy
-              </button>
-              {effectivePolicy && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 shrink-0"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          await copyToClipboard(effectivePolicy);
-                          toast.success("Policy copied to clipboard");
-                        } catch {
-                          toast.error("Failed to copy");
-                        }
-                      }}
-                      aria-label="Copy policy"
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy policy</TooltipContent>
-                </Tooltip>
-              )}
-            </div>
-            {cspPolicyExpanded && (
-              <div className="px-3 pb-3 pt-0">
-                {effectivePolicy ? (
-                  <pre className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all bg-zinc-50 dark:bg-zinc-900 p-2 rounded border border-zinc-100 dark:border-zinc-800">
-                    {effectivePolicy}
-                  </pre>
-                ) : (
-                  <span className="text-zinc-500 dark:text-zinc-400 text-xs">
-                    No policy data yet (load widget in Widget-Declared mode)
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Prompt for Agents - only when there are blocked requests */}
-          {cspViolations.length > -1 && (
-            <div className="mt-3 border border-amber-200 dark:border-amber-800 rounded-md overflow-hidden">
-              <div className="flex items-center justify-between gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
+              {[
+                ["mode", "Mode"],
+                ["diff", "Policy Diff"],
+                ["findings", "Findings"],
+              ].map(([value, label]) => (
                 <button
+                  key={value}
                   type="button"
-                  className="flex-1 flex items-center gap-2 text-left text-sm font-medium min-w-0 text-amber-800 dark:text-amber-200"
-                  onClick={() => setCspSuggestedExpanded((v) => !v)}
-                >
-                  {cspSuggestedExpanded ? (
-                    <ChevronDown className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                  ) : (
-                    <ChevronRight className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-                  )}
-                  Prompt for Agents
-                </button>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 shrink-0 text-amber-600 dark:text-amber-400 hover:bg-amber-200/50 dark:hover:bg-amber-800/30"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          await copyToClipboard(agentPrompt);
-                          toast.success("Prompt copied to clipboard");
-                        } catch {
-                          toast.error("Failed to copy");
-                        }
-                      }}
-                      aria-label="Copy prompt for agents"
-                    >
-                      <Copy className="size-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy prompt for agents</TooltipContent>
-                </Tooltip>
-              </div>
-              {cspSuggestedExpanded && (
-                <div className="px-3 pb-3 pt-0">
-                  <pre
-                    className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap bg-zinc-50 dark:bg-zinc-900 p-2 rounded border border-zinc-100 dark:border-zinc-800 overflow-x-auto max-h-48 overflow-y-auto"
-                    data-testid="debugger-csp-prompt-for-agents"
-                  >
-                    {agentPrompt}
-                  </pre>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* CSP Violations panel */}
-          {cspViolations.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span
-                  className={`text-xs font-semibold uppercase tracking-wide ${
-                    playground.cspMode === "permissive"
-                      ? "text-yellow-600 dark:text-yellow-400"
-                      : "text-red-600 dark:text-red-400"
+                  role="tab"
+                  aria-selected={cspTab === value}
+                  onClick={() => setCspTab(value as typeof cspTab)}
+                  className={`rounded px-2 py-1.5 text-xs font-medium ${
+                    cspTab === value
+                      ? "bg-zinc-100 dark:bg-zinc-800"
+                      : "text-muted-foreground"
                   }`}
                 >
-                  {cspViolations.length}{" "}
-                  {playground.cspMode === "permissive"
-                    ? "would-be-blocked"
-                    : "blocked"}{" "}
-                  request{cspViolations.length !== 1 ? "s" : ""}
-                </span>
-                <button
-                  className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 underline"
-                  onClick={() => clearCspViolations(toolCallId)}
-                >
-                  Clear
+                  {label}
                 </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto space-y-1 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 p-2">
-                {cspViolations.map((v, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-col gap-0.5 py-1 border-b border-zinc-100 dark:border-zinc-800 last:border-0"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="shrink-0 rounded bg-red-100 dark:bg-red-900/40 px-1 py-0.5 text-[10px] font-mono font-semibold text-red-700 dark:text-red-300">
-                        {v.effectiveDirective || v.directive}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-mono text-zinc-600 dark:text-zinc-400 break-all leading-snug">
-                      {v.blockedUri || "(inline)"}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
-          )}
+
+            {cspTab === "mode" && (
+              <div role="tabpanel" className="space-y-2">
+                <Button
+                  data-testid="debugger-csp-option-permissive"
+                  variant={
+                    playground.cspMode === "permissive" ? "default" : "outline"
+                  }
+                  className="w-full justify-start"
+                  onClick={() =>
+                    updatePlaygroundSettings({ cspMode: "permissive" })
+                  }
+                >
+                  <ShieldOff className="size-4 mr-2" />
+                  Permissive
+                </Button>
+                <Button
+                  data-testid="debugger-csp-option-widget-declared"
+                  variant={
+                    playground.cspMode === "widget-declared"
+                      ? "default"
+                      : "outline"
+                  }
+                  className="w-full justify-start"
+                  onClick={() =>
+                    updatePlaygroundSettings({ cspMode: "widget-declared" })
+                  }
+                >
+                  <ShieldCheck className="size-4 mr-2" />
+                  Widget-Declared
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Permissive records would-be blocks; Widget-Declared enforces
+                  the resource metadata policy.
+                </p>
+              </div>
+            )}
+
+            {cspTab === "diff" && (
+              <div role="tabpanel" className="space-y-2">
+                {policyDiff.length ? (
+                  <div className="max-h-64 overflow-y-auto rounded border border-zinc-200 dark:border-zinc-700">
+                    {policyDiff.map((diff) => (
+                      <div
+                        key={diff.directive}
+                        className="border-b border-zinc-100 dark:border-zinc-800 p-2 text-xs last:border-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <code>{diff.directive}</code>
+                          <span className="text-[10px] uppercase text-muted-foreground">
+                            {diff.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 font-mono text-[10px] text-muted-foreground break-all">
+                          requested: {diff.requested.join(" ") || "—"}
+                          <br />
+                          effective: {diff.effective.join(" ") || "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No requested or effective policy data yet.
+                  </p>
+                )}
+                {effectivePolicy && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await copyToClipboard(effectivePolicy);
+                        toast.success("Policy copied to clipboard");
+                      } catch {
+                        toast.error("Failed to copy");
+                      }
+                    }}
+                  >
+                    <Copy className="size-3.5 mr-2" />
+                    Copy effective policy
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {cspTab === "findings" && (
+              <div role="tabpanel" className="space-y-2">
+                <div className="space-y-1.5">
+                  {cspFindings.map((finding, index) => (
+                    <div
+                      key={`${finding.title}-${index}`}
+                      className="rounded border border-zinc-200 dark:border-zinc-700 p-2"
+                    >
+                      <div className="text-xs font-medium">{finding.title}</div>
+                      <div className="text-[11px] text-muted-foreground break-all">
+                        {finding.detail}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {cspViolations.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">
+                        {cspViolations.length} observed request
+                        {cspViolations.length === 1 ? "" : "s"}
+                      </span>
+                      <button
+                        className="text-xs text-muted-foreground underline"
+                        onClick={() => clearCspViolations(toolCallId)}
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    <div className="border border-amber-200 dark:border-amber-800 rounded-md overflow-hidden">
+                      <div className="flex items-center justify-between bg-amber-50 dark:bg-amber-950/30 px-3 py-2">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-200"
+                          onClick={() => setCspSuggestedExpanded((v) => !v)}
+                        >
+                          {cspSuggestedExpanded ? (
+                            <ChevronDown className="size-3.5" />
+                          ) : (
+                            <ChevronRight className="size-3.5" />
+                          )}
+                          Prompt for Agents
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => void copyToClipboard(agentPrompt)}
+                          aria-label="Copy prompt for agents"
+                        >
+                          <Copy className="size-3.5" />
+                        </Button>
+                      </div>
+                      {cspSuggestedExpanded && (
+                        <pre
+                          className="max-h-48 overflow-auto whitespace-pre-wrap p-2 text-[11px]"
+                          data-testid="debugger-csp-prompt-for-agents"
+                        >
+                          {agentPrompt}
+                        </pre>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </DialogBody>
         </DialogContent>
       </Dialog>
@@ -882,7 +878,10 @@ export function MCPAppsDebugControls({
             </DialogHeader>
             <DialogBody>
               <DialogJsonSection>
-                <JSONDisplay data={toolInput ?? {}} filename="tool-props.json" />
+                <JSONDisplay
+                  data={toolInput ?? {}}
+                  filename="tool-props.json"
+                />
               </DialogJsonSection>
             </DialogBody>
           </DialogContent>

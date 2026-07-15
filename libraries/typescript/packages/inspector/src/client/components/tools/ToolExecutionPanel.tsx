@@ -1,4 +1,4 @@
-import { Button, buttonExecuteClass, buttonShortcutClass, buttonToolbarClass } from "@/client/components/ui/button";
+import { Button, buttonExecuteClass, buttonToolbarClass } from "@/client/components/ui/button";
 import {
   Dialog,
   DialogBody,
@@ -67,6 +67,12 @@ export function ToolExecutionPanel({
   sendEmptyFields,
   onToggleEmpty,
 }: ToolExecutionPanelProps) {
+  const compactLabelClass = "hidden @[700px]/tool-exec:inline";
+  const compactShortcutClass =
+    "hidden @[700px]/tool-exec:inline shrink-0 text-[10px] leading-none border border-current/30 p-1 rounded-full";
+  const compactIconOnlyClass =
+    "max-[699px]/tool-exec:size-8 max-[699px]/tool-exec:min-w-8 max-[699px]/tool-exec:shrink-0 max-[699px]/tool-exec:gap-0 max-[699px]/tool-exec:rounded-full max-[699px]/tool-exec:px-0 max-[699px]/tool-exec:py-0";
+  const compactExecuteIconOnlyClass = "max-[699px]/tool-exec:!pr-0";
   const [showCancelButton, setShowCancelButton] = useState(false);
   const [showMetadata, setShowMetadata] = useState(false);
   const [copiedPayload, setCopiedPayload] = useState(false);
@@ -141,8 +147,8 @@ export function ToolExecutionPanel({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-4 sm:pr-4">
+    <div className="flex flex-col h-full @container/tool-exec">
+      <div className="shrink-0 p-3 sm:p-5 pt-3 sm:pt-4 pb-2 sm:pb-2 sm:pr-4">
         <div>
           <div className="flex flex-row items-center justify-between mb-0 gap-2">
             <h3
@@ -160,11 +166,11 @@ export function ToolExecutionPanel({
                     onClick={() => setShowMetadata(!showMetadata)}
                     disabled={isExecuting}
                     size="sm"
-                    className={cn(buttonToolbarClass, "gap-2")}
+                    className={cn(buttonToolbarClass, compactIconOnlyClass)}
                     title="View tool metadata"
                   >
                     <Code />
-                    <span className="hidden sm:inline">Metadata</span>
+                    <span className={compactLabelClass}>Metadata</span>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -179,7 +185,7 @@ export function ToolExecutionPanel({
                     onClick={copyPayloadToClipboard}
                     disabled={isExecuting}
                     size="sm"
-                    className={cn(buttonToolbarClass, "gap-2")}
+                    className={cn(buttonToolbarClass, compactIconOnlyClass)}
                     title="Copy payload as JSON"
                   >
                     {copiedPayload ? (
@@ -187,7 +193,7 @@ export function ToolExecutionPanel({
                     ) : (
                       <Copy />
                     )}
-                    <span className="hidden sm:inline">
+                    <span className={compactLabelClass}>
                       {copiedPayload ? "Copied!" : "Payload"}
                     </span>
                   </Button>
@@ -196,17 +202,25 @@ export function ToolExecutionPanel({
                   <p>Copy payload as JSON</p>
                 </TooltipContent>
               </Tooltip>
-              <Button
-                data-testid="tool-execution-save-button"
-                variant="outline"
-                onClick={onSave}
-                disabled={isExecuting}
-                size="sm"
-                className={cn(buttonToolbarClass, "gap-2")}
-              >
-                <Save />
-                <span className="hidden sm:inline">Save</span>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    data-testid="tool-execution-save-button"
+                    variant="outline"
+                    onClick={onSave}
+                    disabled={isExecuting}
+                    size="sm"
+                    className={cn(buttonToolbarClass, compactIconOnlyClass)}
+                    title="Save request"
+                  >
+                    <Save />
+                    <span className={compactLabelClass}>Save</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Save request</p>
+                </TooltipContent>
+              </Tooltip>
               {isExecuting && onCancel ? (
                 <Tooltip open={showCancelButton ? undefined : false}>
                   <TooltipTrigger asChild>
@@ -220,18 +234,23 @@ export function ToolExecutionPanel({
                         onClick={onCancel}
                         variant={showCancelButton ? "destructive" : "default"}
                         size="sm"
-                        className={cn(buttonExecuteClass, "transition-all")}
+                        className={cn(
+                          buttonExecuteClass,
+                          compactIconOnlyClass,
+                          compactExecuteIconOnlyClass,
+                          "transition-all"
+                        )}
                       >
                         {showCancelButton ? (
                           <>
                             <X />
-                            <span className="hidden sm:inline">Cancel</span>
-                            <span className={buttonShortcutClass}>Esc</span>
+                            <span className={compactLabelClass}>Cancel</span>
+                            <span className={compactShortcutClass}>Esc</span>
                           </>
                         ) : (
                           <>
                             <Spinner />
-                            <span className="hidden sm:inline">
+                            <span className={compactLabelClass}>
                               Executing...
                             </span>
                           </>
@@ -249,18 +268,22 @@ export function ToolExecutionPanel({
                   onClick={onExecute}
                   disabled={isExecuting || !isConnected}
                   size="sm"
-                  className={buttonExecuteClass}
+                  className={cn(
+                    buttonExecuteClass,
+                    compactIconOnlyClass,
+                    compactExecuteIconOnlyClass
+                  )}
                 >
                   {isExecuting ? (
                     <>
                       <Spinner />
-                      <span className="hidden sm:inline">Executing...</span>
+                      <span className={compactLabelClass}>Executing...</span>
                     </>
                   ) : (
                     <>
                       <Play />
-                      <span className="hidden sm:inline">Execute</span>
-                      <span className={buttonShortcutClass}>⌘↵</span>
+                      <span className={compactLabelClass}>Execute</span>
+                      <span className={compactShortcutClass}>⌘↵</span>
                     </>
                   )}
                 </Button>
@@ -272,7 +295,7 @@ export function ToolExecutionPanel({
 
       <div className="flex-1 overflow-y-auto px-3 sm:px-5 pb-4 pr-3">
         {selectedTool.description && (
-          <div className="relative mb-4">
+          <div className="relative mb-6">
             <div className="relative">
               <p
                 ref={descriptionRef}

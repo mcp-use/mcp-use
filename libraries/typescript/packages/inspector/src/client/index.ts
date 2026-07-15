@@ -60,6 +60,14 @@ export { ChatInputArea } from "./components/chat/ChatInputArea.js";
 export { ChatLandingForm } from "./components/chat/ChatLandingForm.js";
 export { ConfigurationDialog } from "./components/chat/ConfigurationDialog.js";
 export { ConfigureEmptyState } from "./components/chat/ConfigureEmptyState.js";
+export { DEFAULT_CHAT_SYSTEM_PROMPT } from "./components/chat/system-prompt-default.js";
+export type { ChatSystemPromptProvider } from "./components/chat/system-prompt/types.js";
+export {
+  getSystemPromptStorageKey,
+  readStoredSystemPrompt,
+  resolveSystemPrompt,
+  writeStoredSystemPrompt,
+} from "./components/chat/system-prompt/local-storage.js";
 
 // Chat types
 export type {
@@ -71,6 +79,13 @@ export type {
   MCPConfig,
   StreamProtocol,
 } from "./components/chat/types.js";
+export type { ChatView } from "./components/chat/ChatTraceView.js";
+export type {
+  InspectorTokenUsage,
+  InspectorTraceEvent,
+  InspectorTraceSpan,
+  InspectorTraceState,
+} from "./components/chat/trace.js";
 
 // Chat hooks
 export { useChatMessagesClientSide } from "./components/chat/useChatMessagesClientSide.js";

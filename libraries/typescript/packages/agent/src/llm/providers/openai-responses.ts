@@ -17,6 +17,7 @@ import {
   buildHeaders,
   readOpenAIError,
 } from "./openai-shared.js";
+import { tokenUsageFromRecord } from "../usage.js";
 
 export interface ResponsesSeed {
   instructions?: string;
@@ -359,6 +360,10 @@ export async function* streamResponsesTurn(
       const response = parsed.response as Record<string, unknown> | undefined;
       if (response && Array.isArray(response.output)) {
         completedOutput = response.output;
+      }
+      const usage = tokenUsageFromRecord(response?.usage);
+      if (usage) {
+        yield { type: "usage", usage };
       }
       continue;
     }

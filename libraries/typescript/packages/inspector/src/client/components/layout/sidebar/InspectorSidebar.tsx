@@ -13,6 +13,8 @@ interface InspectorSidebarProps {
   visibleTabs?: TabType[];
   collapsed: boolean;
   onCollapsedChange: (collapsed: boolean) => void;
+  rpcLoggerOpen: boolean;
+  onRpcLoggerOpenChange: (open: boolean) => void;
 }
 
 export function InspectorSidebar({
@@ -22,6 +24,8 @@ export function InspectorSidebar({
   visibleTabs,
   collapsed,
   onCollapsedChange,
+  rpcLoggerOpen,
+  onRpcLoggerOpenChange,
 }: InspectorSidebarProps) {
   return (
     <aside
@@ -46,7 +50,11 @@ export function InspectorSidebar({
           />
         </SidebarProximityNav>
       </div>
-      <InspectorSidebarFooter collapsed={collapsed} />
+      <InspectorSidebarFooter
+        collapsed={collapsed}
+        rpcLoggerOpen={rpcLoggerOpen}
+        onRpcLoggerOpenChange={onRpcLoggerOpenChange}
+      />
       <SidebarRail
         collapsed={collapsed}
         onToggle={() => onCollapsedChange(!collapsed)}

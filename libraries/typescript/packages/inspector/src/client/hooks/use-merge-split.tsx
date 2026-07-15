@@ -36,9 +36,17 @@ export interface SelBlock extends Rect {
   opacity?: number; // override the hover-derived opacity (commit ghost = 0)
   // State a fresh block animates *from* on mount, so it springs into place
   // instead of snapping when continuity is lost (fast toggling) or the block is
-  // inherently new (a split's lower half). Continuous blocks ignore it.
-  enterFrom?: { top: number; height: number; radii: [number, number, number, number] };
+  // inherently new (a split's trailing half). Continuous blocks ignore it.
+  enterFrom?: {
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+    radii: [number, number, number, number];
+  };
 }
+
+export type MergeSplitAxis = "x" | "y";
 
 // A contiguous run of selected/checked rows, with a stable id so framer-motion
 // can morph it across renders rather than exit+re-enter.
@@ -66,6 +74,95 @@ function bridgePair(outer: Run, runs: Run[]) {
   return lo.start === up.end + 2 ? { up, lo, gap: up.end + 1 } : null;
 }
 
+function unionRunRect(
+  start: number,
+  end: number,
+  itemRects: ItemRect[],
+  axis: MergeSplitAxis
+): Rect | null {
+  const s = itemRects[start];
+  const e = itemRects[end];
+  if (!s || !e) return null;
+
+  if (axis === "y") {
+    return {
+      top: s.top,
+      left: Math.min(s.left, e.left),
+      width: Math.max(s.width, e.width),
+      height: e.top + e.height - s.top,
+    };
+  }
+
+  const left = Math.min(s.left, e.left);
+  const right = Math.max(s.left + s.width, e.left + e.width);
+  return {
+    top: Math.min(s.top, e.top),
+    left,
+    width: right - left,
+    height: Math.max(s.height, e.height),
+  };
+}
+
+function gapMidpoint(gap: ItemRect, axis: MergeSplitAxis): number {
+  return axis === "y" ? gap.top + gap.height / 2 : gap.left + gap.width / 2;
+}
+
+function startHalfRadii(R: number, axis: MergeSplitAxis): [number, number, number, number] {
+  return axis === "y" ? [R, R, 0, 0] : [R, 0, 0, R];
+}
+
+function endHalfRadii(R: number, axis: MergeSplitAxis): [number, number, number, number] {
+  return axis === "y" ? [0, 0, R, R] : [0, R, R, 0];
+}
+
+function fullRadii(R: number): [number, number, number, number] {
+  return [R, R, R, R];
+}
+
+function pinSplitHalves(
+  startBlock: SelBlock,
+  endBlock: SelBlock,
+  gap: ItemRect,
+  axis: MergeSplitAxis,
+  R: number
+) {
+  const mid = gapMidpoint(gap, axis);
+  if (axis === "y") {
+    const bottom = endBlock.top + endBlock.height;
+    startBlock.height = mid - startBlock.top;
+    startBlock.radii = startHalfRadii(R, axis);
+    startBlock.instant = true;
+    endBlock.top = mid;
+    endBlock.height = bottom - mid;
+    endBlock.radii = endHalfRadii(R, axis);
+    endBlock.instant = true;
+    endBlock.enterFrom = {
+      top: mid,
+      left: endBlock.left,
+      width: endBlock.width,
+      height: bottom - mid,
+      radii: endHalfRadii(R, axis),
+    };
+    return;
+  }
+
+  const right = endBlock.left + endBlock.width;
+  startBlock.width = mid - startBlock.left;
+  startBlock.radii = startHalfRadii(R, axis);
+  startBlock.instant = true;
+  endBlock.left = mid;
+  endBlock.width = right - mid;
+  endBlock.radii = endHalfRadii(R, axis);
+  endBlock.instant = true;
+  endBlock.enterFrom = {
+    top: endBlock.top,
+    left: mid,
+    width: right - mid,
+    height: endBlock.height,
+    radii: endHalfRadii(R, axis),
+  };
+}
+
 // ── Merge / split boundary animation ─────────────────────────────
 // When one unselected row bridges two selected runs, their inner edges glide to
 // the bridging row's midpoint (facing corners straightening to sharp), then swap
@@ -80,7 +177,8 @@ function bridgePair(outer: Run, runs: Run[]) {
 export function useMergeSplitBlocks(
   runs: Run[],
   itemRects: ItemRect[],
-  R: number
+  R: number,
+  axis: MergeSplitAxis = "y"
 ): SelBlock[] {
   const [boundaries, setBoundaries] = useState<Boundary[]>([]);
   const prevRunsRef = useRef<Run[]>([]);
@@ -189,25 +287,14 @@ export function useMergeSplitBlocks(
 
   // Build the blocks to paint: one per run, overridden into abutting halves for
   // any run in an in-flight boundary.
-  const rectOf = (start: number, end: number): Rect | null => {
-    const s = itemRects[start];
-    const e = itemRects[end];
-    if (!s || !e) return null;
-    return {
-      top: s.top,
-      left: Math.min(s.left, e.left),
-      width: Math.max(s.width, e.width),
-      height: e.top + e.height - s.top,
-    };
-  };
   const blocks: SelBlock[] = [];
   for (const run of runs) {
-    const r = rectOf(run.start, run.end);
+    const r = unionRunRect(run.start, run.end, itemRects, axis);
     if (r)
       blocks.push({
         key: `sel-${run.id}`,
         ...r,
-        radii: [R, R, R, R],
+        radii: fullRadii(R),
         instant: false,
         exitInstant: false,
         delayCorners: false,
@@ -218,97 +305,115 @@ export function useMergeSplitBlocks(
     const gap = itemRects[b.gapIndex];
     const sv = byId.get(`sel-${b.survivorId}`);
     if (!gap || !sv) continue;
-    const midY = gap.top + gap.height / 2;
+    const mid = gapMidpoint(gap, axis);
     if (b.kind === "merge") {
       if (b.phase === "commit") {
-        // Zero-shift swap: survivor jumps to the full union (already covered by
-        // its top half + the absorbed bottom half). The absorbed half is held
-        // one render at opacity 0 so removing it next render can't flash a
-        // one-frame overlap with the now-full survivor.
         sv.instant = true;
-        blocks.push({
-          key: `sel-${b.otherId}`,
-          top: midY,
-          left: sv.left,
-          width: sv.width,
-          height: sv.top + sv.height - midY,
-          radii: [0, 0, R, R],
-          instant: true,
-          exitInstant: true,
-          delayCorners: false,
-          opacity: 0,
-        });
+        if (axis === "y") {
+          blocks.push({
+            key: `sel-${b.otherId}`,
+            top: mid,
+            left: sv.left,
+            width: sv.width,
+            height: sv.top + sv.height - mid,
+            radii: endHalfRadii(R, axis),
+            instant: true,
+            exitInstant: true,
+            delayCorners: false,
+            opacity: 0,
+          });
+        } else {
+          blocks.push({
+            key: `sel-${b.otherId}`,
+            top: sv.top,
+            left: mid,
+            width: sv.left + sv.width - mid,
+            height: sv.height,
+            radii: endHalfRadii(R, axis),
+            instant: true,
+            exitInstant: true,
+            delayCorners: false,
+            opacity: 0,
+          });
+        }
         continue;
       }
-      // converge: survivor → top half, absorbed run → bottom-half ghost, inner
-      // corners straightening to sharp.
-      // Slightly trail lower merges while keeping a baseline and small cap.
+
       const mergeCornerDelay = Math.min(
         cornerDelay + 0.03,
-        Math.max(cornerDelay, cornerDelay + (midY / Math.max(gap.height, 1)) * 0.002)
+        Math.max(
+          cornerDelay,
+          cornerDelay +
+            (mid / Math.max(axis === "y" ? gap.height : gap.width, 1)) * 0.002
+        )
       );
-      const bottom = sv.top + sv.height;
-      sv.height = midY - sv.top;
-      sv.radii = [R, R, 0, 0];
-      sv.delayCorners = true;
-      sv.cornerDelay = mergeCornerDelay;
-      blocks.push({
-        key: `sel-${b.otherId}`,
-        top: midY,
-        left: sv.left,
-        width: sv.width,
-        height: bottom - midY,
-        radii: [0, 0, R, R],
-        // Mount at full corners so a fresh ghost still animates the
-        // straightening with the same delay as the survivor.
-        enterFrom: { top: midY, height: bottom - midY, radii: [R, R, R, R] },
-        instant: false,
-        exitInstant: true,
-        delayCorners: true,
-        cornerDelay: mergeCornerDelay,
-      });
+
+      if (axis === "y") {
+        const bottom = sv.top + sv.height;
+        sv.height = mid - sv.top;
+        sv.radii = startHalfRadii(R, axis);
+        sv.delayCorners = true;
+        sv.cornerDelay = mergeCornerDelay;
+        blocks.push({
+          key: `sel-${b.otherId}`,
+          top: mid,
+          left: sv.left,
+          width: sv.width,
+          height: bottom - mid,
+          radii: endHalfRadii(R, axis),
+          enterFrom: {
+            top: mid,
+            left: sv.left,
+            width: sv.width,
+            height: bottom - mid,
+            radii: fullRadii(R),
+          },
+          instant: false,
+          exitInstant: true,
+          delayCorners: true,
+          cornerDelay: mergeCornerDelay,
+        });
+      } else {
+        const right = sv.left + sv.width;
+        sv.width = mid - sv.left;
+        sv.radii = startHalfRadii(R, axis);
+        sv.delayCorners = true;
+        sv.cornerDelay = mergeCornerDelay;
+        blocks.push({
+          key: `sel-${b.otherId}`,
+          top: sv.top,
+          left: mid,
+          width: right - mid,
+          height: sv.height,
+          radii: endHalfRadii(R, axis),
+          enterFrom: {
+            top: sv.top,
+            left: mid,
+            width: right - mid,
+            height: sv.height,
+            radii: fullRadii(R),
+          },
+          instant: false,
+          exitInstant: true,
+          delayCorners: true,
+          cornerDelay: mergeCornerDelay,
+        });
+      }
     } else if (b.phase === "splitIn") {
       const lo = byId.get(`sel-${b.otherId}`);
       if (!lo) continue;
-      // Pin both halves at the seam (identical to the single block); the
-      // diverge render then springs them to their real rects.
-      const bottom = lo.top + lo.height;
-      sv.height = midY - sv.top;
-      sv.radii = [R, R, 0, 0];
-      sv.instant = true;
-      lo.top = midY;
-      lo.height = bottom - midY;
-      lo.radii = [0, 0, R, R];
-      lo.instant = true;
-      lo.enterFrom = { top: midY, height: bottom - midY, radii: [0, 0, R, R] };
+      pinSplitHalves(sv, lo, gap, axis, R);
     }
-    // diverge: nothing to override — the steady blocks spring to their real
-    // rects from the seam; the timer drops the boundary.
   }
 
-  // Split safety net, pinned synchronously. The split boundary above is created
-  // in a layout effect that runs *after* this render, so on the very frame a
-  // split first appears its fresh lower half would mount at its final rect and
-  // snap. Detecting the split here (previous runs vs current) and pinning both
-  // halves at the seam guarantees the lower mounts on the seam regardless of
-  // render/paint timing (the cause of the rapid-toggle snap).
   for (const p of prevRunsRef.current) {
     const c = bridgePair(p, runs);
     const gap = c && itemRects[c.gap];
     if (!c || !gap) continue;
-    const midY = gap.top + gap.height / 2;
     const up = byId.get(`sel-${c.up.id}`);
     const lo = byId.get(`sel-${c.lo.id}`);
     if (!up || !lo) continue;
-    const bottom = lo.top + lo.height;
-    up.height = midY - up.top;
-    up.radii = [R, R, 0, 0];
-    up.instant = true;
-    lo.top = midY;
-    lo.height = bottom - midY;
-    lo.radii = [0, 0, R, R];
-    lo.instant = true;
-    lo.enterFrom = { top: midY, height: bottom - midY, radii: [0, 0, R, R] };
+    pinSplitHalves(up, lo, gap, axis, R);
   }
 
   return blocks;
@@ -344,8 +449,8 @@ export function SelectionBackgrounds({
                 ? {
                     opacity,
                     top: b.enterFrom.top,
-                    left: b.left,
-                    width: b.width,
+                    left: b.enterFrom.left,
+                    width: b.enterFrom.width,
                     height: b.enterFrom.height,
                     borderTopLeftRadius: b.enterFrom.radii[0],
                     borderTopRightRadius: b.enterFrom.radii[1],

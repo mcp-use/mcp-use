@@ -32,6 +32,7 @@ import { CommandPalette } from "./CommandPalette";
 import { LayoutContent } from "./LayoutContent";
 import { LayoutHeader } from "./LayoutHeader";
 import { InspectorSidebar } from "./layout/sidebar/InspectorSidebar";
+import { SidebarRpcPanel } from "./layout/sidebar/SidebarRpcPanel";
 
 interface LayoutProps {
   children: ReactNode;
@@ -104,6 +105,13 @@ export function Layout({ children }: LayoutProps) {
       return false;
     }
   });
+  const [rpcLoggerOpen, setRpcLoggerOpen] = useState(() => {
+    try {
+      return localStorage.getItem("inspector-rpc-logger-open") !== "false";
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     try {
@@ -115,6 +123,16 @@ export function Layout({ children }: LayoutProps) {
       // ignore
     }
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "inspector-rpc-logger-open",
+        String(rpcLoggerOpen)
+      );
+    } catch {
+      // Storage is optional.
+    }
+  }, [rpcLoggerOpen]);
   const { savedRequests } = useSavedRequests();
 
   // Initialize embedded mode from URL params once on mount
@@ -782,6 +800,8 @@ export function Layout({ children }: LayoutProps) {
               visibleTabs={embeddedConfig.visibleTabs}
               collapsed={sidebarCollapsed}
               onCollapsedChange={setSidebarCollapsed}
+              rpcLoggerOpen={rpcLoggerOpen}
+              onRpcLoggerOpenChange={setRpcLoggerOpen}
             />
           )}
           <main className={mainClassName}>
@@ -796,6 +816,12 @@ export function Layout({ children }: LayoutProps) {
               {children}
             </LayoutContent>
           </main>
+          {selectedServer && !isSingleTab && (
+            <SidebarRpcPanel
+              serverId={selectedServer.id}
+              open={rpcLoggerOpen}
+            />
+          )}
         </div>
 
         {/* Command Palette */}

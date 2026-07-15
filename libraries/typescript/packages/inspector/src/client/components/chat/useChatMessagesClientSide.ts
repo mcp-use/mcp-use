@@ -9,6 +9,13 @@ import {
 } from "./conversion";
 import type { LLMConfig, Message, MessageAttachment } from "./types";
 import { fileToAttachment, isValidTotalSize } from "./utils";
+import {
+  appendTraceEvent,
+  EMPTY_TRACE_STATE,
+  type InspectorTraceEvent,
+  type InspectorTraceEventInput,
+} from "./trace";
+import { DEFAULT_CHAT_SYSTEM_PROMPT } from "./system-prompt-default";
 
 // Type alias for backward compatibility
 type MCPConnection = McpServer;
@@ -26,10 +33,8 @@ interface UseChatMessagesClientSideProps {
   widgetModelContexts?: Map<string, WidgetModelContext | undefined>;
   disabledTools?: Set<string>;
   initialMessages?: Message[];
+  systemPrompt?: string;
 }
-
-const SYSTEM_PROMPT =
-  "You are a helpful assistant with access to MCP tools. Help users interact with the MCP server.";
 
 export function useChatMessagesClientSide({
   connection,
@@ -39,11 +44,26 @@ export function useChatMessagesClientSide({
   widgetModelContexts,
   disabledTools,
   initialMessages,
+  systemPrompt = DEFAULT_CHAT_SYSTEM_PROMPT,
 }: UseChatMessagesClientSideProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [isLoading, setIsLoading] = useState(false);
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
+  const [traceState, setTraceState] = useState(EMPTY_TRACE_STATE);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const traceIdRef = useRef(0);
+
+  const recordTrace = useCallback(
+    (event: InspectorTraceEventInput) => {
+      const next = {
+        ...event,
+        id: `trace-${++traceIdRef.current}`,
+        timestamp: Date.now(),
+      } as InspectorTraceEvent;
+      setTraceState((state) => appendTraceEvent(state, next));
+    },
+    []
+  );
 
   useEffect(() => {
     if (initialMessages !== undefined) {
@@ -163,6 +183,14 @@ export function useChatMessagesClientSide({
         ];
 
         const providerMessages = convertMessagesToProvider(historyMessages);
+        recordTrace({
+          type: "request",
+          request: {
+            provider: llmConfig.provider,
+            model: llmConfig.model,
+            messages: providerMessages,
+          },
+        });
 
         const agent = new MCPAgent({
           llm: providerConfigFromOptions(
@@ -175,7 +203,7 @@ export function useChatMessagesClientSide({
             }
           ),
           mcpServers: [connection],
-          systemPrompt: SYSTEM_PROMPT,
+          systemPrompt,
           disallowedTools: disabledTools ? [...disabledTools] : undefined,
           maxSteps: 10,
           autoInitialize: true,
@@ -245,7 +273,23 @@ export function useChatMessagesClientSide({
         })) {
           if (abortControllerRef.current?.signal.aborted) break;
 
+          // Keep inspector compatible with an older installed agent build while
+          // the additive usage event rolls through workspace package outputs.
+          if ((ev as { type: string }).type === "usage") {
+            const usageEvent = ev as unknown as {
+              type: "usage";
+              usage: import("./trace").InspectorTokenUsage;
+            };
+            recordTrace({
+              type: "usage",
+              usage: usageEvent.usage,
+              raw: usageEvent,
+            });
+            continue;
+          }
+
           if (ev.type === "text-delta") {
+            recordTrace({ type: "text-delta", delta: ev.delta, raw: ev });
             currentTextPart += ev.delta;
             const lastPart = parts[parts.length - 1];
             if (lastPart && lastPart.type === "text") {
@@ -255,6 +299,12 @@ export function useChatMessagesClientSide({
             }
             commitMessageParts();
           } else if (ev.type === "tool-call-start") {
+            recordTrace({
+              type: "tool-call-start",
+              toolCallId: ev.toolCallId,
+              toolName: ev.toolName,
+              raw: ev,
+            });
             if (currentTextPart) currentTextPart = "";
             toolCallArgBuffers.set(ev.toolCallId, {
               name: ev.toolName,
@@ -306,6 +356,13 @@ export function useChatMessagesClientSide({
               }
             }
           } else if (ev.type === "tool-call-ready") {
+            recordTrace({
+              type: "tool-call-args",
+              toolCallId: ev.toolCallId,
+              toolName: ev.toolName,
+              args: ev.args,
+              raw: ev,
+            });
             toolCallsCount++;
             if (currentTextPart) currentTextPart = "";
             const streamingPart = parts.find(
@@ -329,6 +386,14 @@ export function useChatMessagesClientSide({
             }
             commitMessageParts();
           } else if (ev.type === "tool-result") {
+            recordTrace({
+              type: "tool-result",
+              toolCallId: ev.toolCallId,
+              toolName: ev.toolName,
+              result: ev.result,
+              isError: ev.isError,
+              raw: ev,
+            });
             const toolPart = parts.find(
               (p) =>
                 p.type === "tool-invocation" &&
@@ -341,7 +406,10 @@ export function useChatMessagesClientSide({
                 ev.isError || (ev.result as any)?.isError ? "error" : "result";
               commitMessageParts();
             }
+          } else if (ev.type === "done") {
+            recordTrace({ type: "done", raw: ev });
           } else if (ev.type === "error") {
+            recordTrace({ type: "error", message: ev.message, raw: ev });
             throw new Error(ev.message);
           }
         }
@@ -445,12 +513,16 @@ export function useChatMessagesClientSide({
       attachments,
       disabledTools,
       widgetModelContexts,
+      recordTrace,
+      systemPrompt,
     ]
   );
 
   const clearMessages = useCallback(() => {
     setMessages([]);
+    setTraceState(EMPTY_TRACE_STATE);
   }, []);
+  const clearTrace = useCallback(() => setTraceState(EMPTY_TRACE_STATE), []);
 
   const stop = useCallback(() => {
     if (abortControllerRef.current) {
@@ -498,5 +570,8 @@ export function useChatMessagesClientSide({
     addAttachment,
     removeAttachment,
     clearAttachments,
+    clearTrace,
+    traceEvents: traceState.events,
+    tokenUsage: traceState.usage,
   };
 }

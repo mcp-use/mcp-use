@@ -24,7 +24,10 @@ import {
   isPlaceholderTitle,
 } from "@/client/chat-history/chat-title";
 import { useInspector } from "@/client/context/InspectorContext";
-import { MeshTabBackground } from "@/client/components/ui/mesh-tab-background";
+import {
+  MeshTabBackground,
+  type ShaderPhase,
+} from "@/client/components/ui/mesh-tab-background";
 import { Button } from "./ui/button";
 import {
   Tooltip,
@@ -52,6 +55,13 @@ import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
 import { useHostedChatMode } from "./chat/useHostedChatMode";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
+import {
+  ChatRawView,
+  type ChatView,
+} from "./chat/ChatTraceView";
+import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt";
+import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
+import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
 import { LoginModal } from "./LoginModal";
 
@@ -144,6 +154,12 @@ export interface ChatTabProps {
   activeChatTitle?: string;
   /** Called after a title is generated and persisted via the storage provider. */
   onChatTitleGenerated?: (chatId: string, title: string) => void;
+  /** Initial focused chat view. Default: "conv". */
+  defaultView?: ChatView;
+  /** Pluggable system prompt source. Defaults to localStorage per serverId. */
+  systemPromptProvider?: ChatSystemPromptProvider;
+  /** Raise ChatHeader above host chrome (cloud embed). */
+  elevatedHeader?: boolean;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -188,8 +204,18 @@ export function ChatTab({
   titleGenerationReady,
   activeChatTitle,
   onChatTitleGenerated,
+  defaultView = "conv",
+  systemPromptProvider: externalSystemPromptProvider,
+  elevatedHeader,
 }: ChatTabProps) {
   const { isEmbedded } = useInspector();
+  const localSystemPromptProvider = useLocalSystemPrompt(serverId);
+  const effectiveSystemPromptProvider =
+    externalSystemPromptProvider ?? localSystemPromptProvider;
+  const resolvedSystemPrompt = useMemo(
+    () => resolveSystemPrompt(effectiveSystemPromptProvider.prompt),
+    [effectiveSystemPromptProvider.prompt]
+  );
   const localChatStorageRef = useRef(new LocalChatStorageProvider());
   const effectiveChatStorage =
     chatStorageProvider ??
@@ -224,6 +250,7 @@ export function ChatTab({
   const [quickQuestions, setQuickQuestions] =
     useState<string[]>(chatQuickQuestions);
   const [followups, setFollowups] = useState<string[]>(chatFollowups);
+  const [activeView, setActiveView] = useState<ChatView>(defaultView);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
@@ -300,6 +327,7 @@ export function ChatTab({
   const clientSideChat = useChatMessagesClientSide({
     ...chatHookParams,
     initialMessages: restoredMessages ?? initialMessages,
+    systemPrompt: resolvedSystemPrompt,
   });
 
   const {
@@ -312,7 +340,23 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
+    clearTrace,
+    traceEvents,
+    tokenUsage,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
+
+  const [shaderPhase, setShaderPhase] = useState<ShaderPhase>(() =>
+    messages.length === 0 ? "visible" : "hidden"
+  );
+
+  const dismissLandingShader = useCallback(() => {
+    setShaderPhase((p) => (p === "visible" ? "fading" : p));
+  }, []);
+
+  const clearChatToLanding = useCallback(() => {
+    clearMessages();
+    setShaderPhase("visible");
+  }, [clearMessages]);
 
   const { messagesEndRef, showScrollToBottom, scrollToBottom } =
     useChatScrollToBottom(messagesAreaRef, {
@@ -329,18 +373,21 @@ export function ChatTab({
         effectiveChatStorage.listChats({ agentId: serverId }),
       ]);
       setRestoredMessages(msgs);
+      clearTrace();
       setMessages(msgs);
+      setShaderPhase(msgs.length === 0 ? "visible" : "hidden");
       setActiveChatId(chatId);
       setInternalChatTitle(
         listed.items.find((session) => session.id === chatId)?.title
       );
     },
-    [effectiveChatStorage, setMessages, setActiveChatId, serverId]
+    [effectiveChatStorage, clearTrace, setMessages, setActiveChatId, serverId]
   );
 
   const handleNewChat = useCallback(async () => {
     clearMessages();
     setRestoredMessages([]);
+    setShaderPhase("visible");
     setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
     setActiveChatId(null);
     if (effectiveChatStorage) {
@@ -705,6 +752,9 @@ export function ChatTab({
           postResult(false, { error: "Chat is not ready to send messages" });
           return;
         }
+        if (messages.length === 0) {
+          dismissLandingShader();
+        }
         void sendMessage(text, [])
           .then(() => {
             postBridgeEvent("mcp-inspector:chat:message_sent", {
@@ -723,7 +773,7 @@ export function ChatTab({
       }
 
       if (data.type === "mcp-inspector:chat:clear") {
-        clearMessages();
+        clearChatToLanding();
         postBridgeEvent("mcp-inspector:chat:cleared", { requestId });
         postResult(true);
         return;
@@ -921,7 +971,8 @@ export function ChatTab({
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [
-    clearMessages,
+    clearChatToLanding,
+    dismissLandingShader,
     setMessages,
     followups,
     getSerializedMessages,
@@ -939,13 +990,21 @@ export function ChatTab({
   // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
   useKeyboardShortcuts(
     enableKeyboardShortcuts
-      ? { onNewChat: effectiveChatStorage ? handleNewChat : clearMessages }
+      ? {
+          onNewChat: effectiveChatStorage ? handleNewChat : clearChatToLanding,
+        }
       : {}
   );
 
   const wrapWithHistory = (content: React.ReactNode) => {
     const framed = (
-      <MeshTabBackground className="h-full w-full">{content}</MeshTabBackground>
+      <MeshTabBackground
+        className="h-full w-full"
+        shaderPhase={shaderPhase}
+        onShaderFadeComplete={() => setShaderPhase("hidden")}
+      >
+        {content}
+      </MeshTabBackground>
     );
 
     if (!effectiveChatStorage) return framed;
@@ -1100,6 +1159,9 @@ export function ChatTab({
     if (!hasContent) {
       return;
     }
+    if (messages.length === 0) {
+      dismissLandingShader();
+    }
     void ensureActiveChat().then(() => {
       sendMessage(inputValue, results);
       setInputValue("");
@@ -1112,6 +1174,8 @@ export function ChatTab({
     clearPromptResults,
     attachments,
     ensureActiveChat,
+    messages.length,
+    dismissLandingShader,
   ]);
 
   const handlePromptKeyDown = useCallback(
@@ -1256,6 +1320,7 @@ export function ChatTab({
     (question: string) => {
       if (!question.trim()) return;
       if (!llmConfig || !isConnected) return;
+      dismissLandingShader();
       void sendMessage(question, []).then(() => {
         postBridgeEvent("mcp-inspector:chat:message_sent", {
           message: question,
@@ -1263,7 +1328,7 @@ export function ChatTab({
         });
       });
     },
-    [postBridgeEvent, sendMessage, llmConfig, isConnected]
+    [postBridgeEvent, sendMessage, llmConfig, isConnected, dismissLandingShader]
   );
 
   const handleFollowupSelect = useCallback(
@@ -1357,6 +1422,7 @@ export function ChatTab({
           pendingElicitationRequests={connection.pendingElicitationRequests}
           onApproveElicitation={connection.approveElicitation}
           onRejectElicitation={connection.rejectElicitation}
+          systemPromptProvider={effectiveSystemPromptProvider}
         />
         {reconnectBannerNode}
         {loginModalNode}
@@ -1373,7 +1439,7 @@ export function ChatTab({
         hasMessages={messages.length > 0}
         configDialogOpen={configDialogOpen}
         onConfigDialogOpenChange={setConfigDialogOpen}
-        onClearChat={effectiveChatStorage ? handleNewChat : clearMessages}
+        onClearChat={effectiveChatStorage ? handleNewChat : clearChatToLanding}
         tempProvider={tempProvider}
         tempModel={tempModel}
         tempApiKey={tempApiKey}
@@ -1398,6 +1464,12 @@ export function ChatTab({
         hideClearButton={hideClearButton}
         activeChatId={activeChatId}
         chatTitle={headerDisplayTitle}
+        showViewToggle={!!llmConfig}
+        viewIndex={activeView === "raw" ? 1 : 0}
+        onViewIndexChange={(index) =>
+          setActiveView(index === 1 ? "raw" : "conv")
+        }
+        elevatedHeader={elevatedHeader}
       />
 
       {/* Messages Area */}
@@ -1412,7 +1484,7 @@ export function ChatTab({
               onConfigureClick={() => setConfigDialogOpen(true)}
               managedKeyUnavailable={managedKeyUnavailable}
             />
-          ) : (
+          ) : activeView === "conv" ? (
             <MessageList
               messages={messages}
               isLoading={isLoading}
@@ -1423,6 +1495,8 @@ export function ChatTab({
               serverBaseUrl={connection.url}
               messagesEndRef={messagesEndRef}
             />
+          ) : (
+            <ChatRawView events={traceEvents} usage={tokenUsage} />
           )}
         </div>
 
@@ -1476,6 +1550,7 @@ export function ChatTab({
           pendingElicitationRequests={connection.pendingElicitationRequests}
           onApproveElicitation={connection.approveElicitation}
           onRejectElicitation={connection.rejectElicitation}
+          systemPromptProvider={effectiveSystemPromptProvider}
         />
         </div>
       )}

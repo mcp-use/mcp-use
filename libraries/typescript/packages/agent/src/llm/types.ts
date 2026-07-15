@@ -77,6 +77,14 @@ export interface ProviderTool {
   inputSchema: Record<string, unknown>;
 }
 
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
+}
+
 /**
  * Stream events emitted by the tool loop. These replace LangChain's
  * `on_chat_model_stream`, `on_tool_start`, `on_tool_end` events. The shape
@@ -113,5 +121,6 @@ export type LlmStreamEvent =
       result: unknown;
       isError: boolean;
     }
+  | { type: "usage"; usage: TokenUsage }
   | { type: "error"; message: string }
   | { type: "done" };

@@ -21,6 +21,7 @@ import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { Spinner } from "../ui/spinner";
+import { WidgetWrapper } from "../ui/WidgetWrapper";
 
 export interface ResourceResult {
   uri: string;
@@ -115,22 +116,29 @@ function ResourceViewPanel({
 
   if (!hostProps) {
     return (
-      <div className="flex items-center justify-center w-full h-full">
+      <WidgetWrapper className="w-full h-full min-h-[240px]">
         <Spinner className="size-5" />
-      </div>
+      </WidgetWrapper>
     );
   }
 
+  const viewRendererClassName =
+    displayMode === "inline"
+      ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
+      : "w-full h-full relative p-4";
+
   return (
-    <ViewRenderer
-      viewId={viewId}
-      toolName={resourceUri}
-      toolInput={emptyToolInput}
-      toolOutput={toolOutput}
-      customProps={customProps}
-      className="w-full h-full relative flex p-4"
-      {...hostProps}
-    />
+    <WidgetWrapper className="w-full h-full min-h-[240px]">
+      <ViewRenderer
+        viewId={viewId}
+        toolName={resourceUri}
+        toolInput={emptyToolInput}
+        toolOutput={toolOutput}
+        customProps={customProps}
+        className={viewRendererClassName}
+        {...hostProps}
+      />
+    </WidgetWrapper>
   );
 }
 
@@ -335,7 +343,7 @@ export function ResourceResultDisplay({
               // MCP Apps mode
               return (
                 <div
-                  className="flex-1 h-full relative"
+                  className="flex flex-1 h-full relative flex-col min-h-0"
                   data-testid="resource-widget-preview"
                 >
                   {/* Floating controls in top-right */}

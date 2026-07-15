@@ -106,20 +106,14 @@ test.describe("Inspector MCP Server Connections", () => {
       "ConformanceTestServer"
     );
 
-    // Verify formatted capabilities list is displayed
+    // Verify capabilities JSON is displayed
     await expect(page.getByTestId("server-info-capabilities")).toBeVisible();
-    await expect(page.getByTestId("capability-tools")).toHaveAttribute(
-      "data-supported",
-      "true"
-    );
-    await expect(page.getByTestId("capability-tasks")).toHaveAttribute(
-      "data-supported",
-      "false"
-    );
-    await expect(page.getByTestId("capability-extensions")).toHaveAttribute(
-      "data-supported",
-      "true"
-    );
+    await expect(
+      page.getByTestId("server-info-capabilities-json")
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("server-info-capabilities-json")
+    ).toContainText('"tools"');
 
     // // Close the modal by clicking outside or ESC
     // await page.keyboard.press("Escape"); // for some reason the copy url tooltip is focused so we need to press ESC twice

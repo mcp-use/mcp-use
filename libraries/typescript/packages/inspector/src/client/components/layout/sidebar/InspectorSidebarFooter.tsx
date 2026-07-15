@@ -4,6 +4,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
+import { Switch } from "@/client/components/ui/switch";
 import { useInspector } from "@/client/context/InspectorContext";
 import { useHostedSession } from "@/client/hooks/useHostedSession";
 import { cn } from "@/client/lib/utils";
@@ -33,12 +34,23 @@ function DiscordIcon({ className }: { className?: string }) {
 const socialLinkClass =
   "flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 
+const rpcSwitchUncheckedTrack =
+  "color-mix(in oklab, var(--sidebar-foreground) 22%, var(--sidebar))";
+const rpcSwitchUncheckedTrackHover =
+  "color-mix(in oklab, var(--sidebar-foreground) 30%, var(--sidebar))";
+const rpcSwitchUncheckedClass =
+  "data-unchecked:!bg-zinc-300 dark:data-unchecked:!bg-zinc-600";
+
 interface InspectorSidebarFooterProps {
   collapsed: boolean;
+  rpcLoggerOpen: boolean;
+  onRpcLoggerOpenChange: (open: boolean) => void;
 }
 
 export function InspectorSidebarFooter({
   collapsed,
+  rpcLoggerOpen,
+  onRpcLoggerOpenChange,
 }: InspectorSidebarFooterProps) {
   const { embeddedConfig } = useInspector();
   const { user } = useHostedSession(embeddedConfig.chatApiUrl);
@@ -67,6 +79,31 @@ export function InspectorSidebarFooter({
             : "gap-3 px-(--sidebar-nav-inset-x) py-4"
         )}
       >
+        {collapsed ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex size-8 items-center justify-center">
+                <Switch
+                  checked={rpcLoggerOpen}
+                  onCheckedChange={onRpcLoggerOpenChange}
+                  aria-label="RPC Panel"
+                  className={cn("scale-75", rpcSwitchUncheckedClass)}
+                />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">RPC Panel</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Switch
+            label="RPC Panel"
+            checked={rpcLoggerOpen}
+            onToggle={() => onRpcLoggerOpenChange(!rpcLoggerOpen)}
+            uncheckedTrackColor={rpcSwitchUncheckedTrack}
+            uncheckedTrackColorHovered={rpcSwitchUncheckedTrackHover}
+            className="w-full flex-row-reverse justify-between"
+          />
+        )}
+
         {collapsed ? (
           <Tooltip>
             <TooltipTrigger asChild>

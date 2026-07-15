@@ -20,6 +20,7 @@ export {
   type ProviderConfig,
   type ProviderMessage,
   type LlmStreamEvent,
+  type TokenUsage,
   type LLMConfig,
 } from "./agents/mcp_agent.js";
 export { completeChat, completeChat as chat } from "./llm/chat.js";

@@ -141,9 +141,10 @@ export function useViewHostProps(options: {
   );
 
   const wrapTransport = useCallback(
-    (transport: Parameters<NonNullable<ViewRendererProps["wrapTransport"]>>[0]) =>
-      wrapTransportWithLogging(transport, viewId),
-    [viewId]
+    (
+      transport: Parameters<NonNullable<ViewRendererProps["wrapTransport"]>>[0]
+    ) => wrapTransportWithLogging(transport, serverId, viewId),
+    [serverId, viewId]
   );
 
   const onResourceResolved = useCallback(
@@ -183,11 +184,12 @@ export function useViewHostProps(options: {
   }, [viewId, removeWidget]);
 
   const onCspViolation = useCallback(
-    (violation: Parameters<NonNullable<ViewRendererProps["onCspViolation"]>>[0]) => {
+    (
+      violation: Parameters<NonNullable<ViewRendererProps["onCspViolation"]>>[0]
+    ) => {
       addCspViolation(viewId, {
         directive: violation.directive,
-        effectiveDirective:
-          violation.effectiveDirective ?? violation.directive,
+        effectiveDirective: violation.effectiveDirective ?? violation.directive,
         blockedUri: violation.blockedUri,
         sourceFile: violation.sourceFile ?? undefined,
         lineNumber: violation.lineNumber ?? undefined,
@@ -203,7 +205,9 @@ export function useViewHostProps(options: {
     ({
       content,
       structuredContent,
-    }: Parameters<NonNullable<ViewRendererProps["onModelContextUpdate"]>>[0]) => {
+    }: Parameters<
+      NonNullable<ViewRendererProps["onModelContextUpdate"]>
+    >[0]) => {
       setWidgetModelContext(viewId, {
         content: content as any[] | undefined,
         structuredContent: structuredContent as
@@ -223,7 +227,10 @@ export function useViewHostProps(options: {
   );
 
   const onLog = useCallback(
-    ({ level, data }: Parameters<NonNullable<ViewRendererProps["onLog"]>>[0]) => {
+    ({
+      level,
+      data,
+    }: Parameters<NonNullable<ViewRendererProps["onLog"]>>[0]) => {
       const mappedLevel =
         level === "warning" ? "warn" : level === "error" ? "error" : "log";
       consoleLogBus.publish({

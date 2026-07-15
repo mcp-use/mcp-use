@@ -1,8 +1,17 @@
 import { useConnectionFormState } from "@/client/hooks/useConnectionFormState";
 import type { EditableConnectionConfig } from "@/client/utils/connectionUpdates";
 import type { McpServer } from "@mcp-use/client/react";
-import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
+import {
+  inspectorStickyTabHeaderClass,
+  inspectorTabHeaderPadding,
+  inspectorTabTitleClass,
+} from "@/client/lib/font-weight";
+import { inspectorSettingsContentClass } from "@/client/lib/inspector-settings-layout";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
+import { tabHeaderIconClass } from "./shared/ListTabHeader";
+import { Settings } from "lucide-react";
+import { Button } from "./ui/button";
+import { useState } from "react";
 
 interface ConnectionSettingsTabProps {
   connection: McpServer;
@@ -14,6 +23,7 @@ export function ConnectionSettingsTab({
   onSave,
 }: ConnectionSettingsTabProps) {
   const form = useConnectionFormState(connection, true);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const handleSave = () => {
     const config = form.buildConfig();
@@ -21,11 +31,27 @@ export function ConnectionSettingsTab({
   };
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className={`${inspectorTabHeaderPadding} sm:pb-6 max-w-2xl`}>
-        <h2 className={`${inspectorTabTitleClass} mb-6`}>
+    <div
+      className="h-full overflow-y-auto overscroll-none"
+      onScroll={(event) => setIsScrolled(event.currentTarget.scrollTop > 0)}
+    >
+      <div
+        className={`${inspectorStickyTabHeaderClass(isScrolled)} flex flex-row items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
+      >
+        <h2 className={`${inspectorTabTitleClass} flex items-center gap-1.5`}>
+          <Settings className={tabHeaderIconClass} aria-hidden />
           Connection Settings
         </h2>
+        <Button
+          data-testid="connection-form-save-button"
+          size="sm"
+          onClick={handleSave}
+        >
+          Save
+        </Button>
+      </div>
+
+      <div className={inspectorSettingsContentClass}>
         <ConnectionSettingsForm
           alias={form.alias}
           setAlias={form.setAlias}
@@ -49,10 +75,10 @@ export function ConnectionSettingsTab({
           setClientSecret={form.setClientSecret}
           scope={form.scope}
           setScope={form.setScope}
-          onSave={handleSave}
-          showSaveButton
           showConnectButton={false}
           showExportButton={false}
+          inlineSections
+          cardSections
         />
       </div>
     </div>

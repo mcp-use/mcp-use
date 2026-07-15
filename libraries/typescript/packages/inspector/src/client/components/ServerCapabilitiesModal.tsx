@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@/client/components/ui/dialog";
 import type { McpServer } from "@mcp-use/client/react";
+import { inspectorSettingsContentClass } from "@/client/lib/inspector-settings-layout";
 import { ServerMetadataPanel } from "./ServerMetadataPanel";
 
 type MCPConnection = McpServer;
@@ -37,7 +38,9 @@ export function ServerCapabilitiesModal({
         </DialogHeader>
 
         <DialogBody>
-          <ServerMetadataPanel connection={connection} inDialog />
+          <div className={inspectorSettingsContentClass}>
+            <ServerMetadataPanel connection={connection} inDialog />
+          </div>
         </DialogBody>
       </DialogContent>
     </Dialog>

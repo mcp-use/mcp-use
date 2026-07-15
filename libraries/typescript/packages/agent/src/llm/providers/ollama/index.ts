@@ -6,8 +6,10 @@ import type {
   ProviderConfig,
   ProviderMessage,
   ProviderTool,
+  TokenUsage,
 } from "../../types.js";
 import { buildOllamaApiUrl } from "./utils";
+import { tokenUsageFromRecord } from "../../usage.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -191,6 +193,7 @@ export async function* streamChat(
   // forks have been seen to repeat them across chunks — gate emission on
   // first observation so downstream consumers can't fire the same tool twice.
   let toolCallsEmitted = false;
+  let usage: TokenUsage | undefined;
 
   for await (const chunk of parseNDJSON(res.body, signal)) {
     const message =
@@ -249,8 +252,10 @@ export async function* streamChat(
         message: String((chunk as { error: unknown }).error),
       };
     }
+    usage = tokenUsageFromRecord(chunk) ?? usage;
   }
 
+  if (usage) yield { type: "usage", usage };
   yield { type: "done" };
 }
 

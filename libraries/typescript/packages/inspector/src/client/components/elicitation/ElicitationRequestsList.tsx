@@ -9,9 +9,6 @@ interface ElicitationRequestsListProps {
   onRequestSelect: (request: PendingElicitationRequest) => void;
   focusedIndex: number;
   formatRelativeTime: (timestamp: number) => string;
-  listRef?:
-    | React.RefObject<HTMLDivElement>
-    | React.MutableRefObject<HTMLDivElement | null>;
 }
 
 export function ElicitationRequestsList({
@@ -20,18 +17,17 @@ export function ElicitationRequestsList({
   onRequestSelect,
   focusedIndex,
   formatRelativeTime,
-  listRef,
 }: ElicitationRequestsListProps) {
   if (requests.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
         <NotFound vertical noBorder message="No elicitation requests" />
       </div>
     );
   }
 
   return (
-    <div ref={listRef} className="overflow-y-auto flex-1 overscroll-contain">
+    <div>
       {requests.map((request, index) => {
         const mode = request.request.mode || "form";
         const hasSchema =

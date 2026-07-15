@@ -18,6 +18,8 @@ import { PromptsDropdown } from "./PromptsDropdown";
 import type { ToolInfo } from "./ToolSelector";
 import type { LLMConfig, MessageAttachment } from "./types";
 import { FloatingChatElicitation } from "./FloatingChatElicitation";
+import { SystemPromptButton } from "./SystemPromptButton";
+import type { ChatSystemPromptProvider } from "./system-prompt/types";
 
 interface ChatInputAreaProps {
   inputValue: string;
@@ -62,6 +64,8 @@ interface ChatInputAreaProps {
   pendingElicitationRequests?: PendingElicitationRequest[];
   onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
   onRejectElicitation?: (requestId: string, error?: string) => void;
+  /** Pluggable system prompt source (localStorage or host API). */
+  systemPromptProvider?: ChatSystemPromptProvider;
 }
 
 export function ChatInputArea({
@@ -97,6 +101,7 @@ export function ChatInputArea({
   pendingElicitationRequests,
   onApproveElicitation,
   onRejectElicitation,
+  systemPromptProvider,
 }: ChatInputAreaProps) {
   const canSend =
     inputValue.trim() || promptResults.length > 0 || attachments.length > 0;
@@ -182,6 +187,21 @@ export function ChatInputArea({
           onClick={onClick}
           onAttachmentAdd={onAttachmentAdd}
           onAttachmentRemove={onAttachmentRemove}
+          inlineControls={
+            llmConfig && systemPromptProvider ? (
+              <SystemPromptButton
+                compact
+                value={systemPromptProvider.prompt}
+                onSave={systemPromptProvider.savePrompt}
+                disabled={
+                  !isConnected ||
+                  isLoading ||
+                  systemPromptProvider.disabled
+                }
+                isSaving={systemPromptProvider.isSaving}
+              />
+            ) : null
+          }
           trailingControls={
             <>
               {modelBadge}

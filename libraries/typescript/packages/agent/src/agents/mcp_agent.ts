@@ -19,6 +19,7 @@ import type {
   ProviderConfig,
   ProviderMessage,
   ProviderName,
+  TokenUsage,
 } from "../llm/types.js";
 import { getPackageVersion } from "../version.js";
 import type { MCPAgentOptions, McpConnectionLike, McpServersInput } from "./agent_options.js";
@@ -27,7 +28,13 @@ import type { RunOptions } from "./run_options.js";
 import { RemoteAgent } from "./remote.js";
 import type { MCPServerConfig } from "./types.js";
 
-export type { ProviderName, ProviderConfig, ProviderMessage, LlmStreamEvent };
+export type {
+  ProviderName,
+  ProviderConfig,
+  ProviderMessage,
+  LlmStreamEvent,
+  TokenUsage,
+};
 export type { MCPAgentOptions, McpConnectionLike, McpServersInput } from "./agent_options.js";
 export type { RunOptions } from "./run_options.js";
 

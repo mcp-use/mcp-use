@@ -10,6 +10,7 @@ import type {
   ProviderMessage,
   ProviderTool,
 } from "../types.js";
+import { tokenUsageFromRecord } from "../usage.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -106,6 +107,11 @@ export async function* streamChat(
     messages: toOpenAIMessages(messages),
     stream: true,
   };
+  // ponytail: generic OpenAI-compatible servers may reject stream_options;
+  // request usage only on the known-compatible OpenRouter path.
+  if (config.provider === "openrouter") {
+    body.stream_options = { include_usage: true };
+  }
   if (config.temperature !== undefined) body.temperature = config.temperature;
   if (config.maxTokens !== undefined) body.max_tokens = config.maxTokens;
   if (tools && tools.length > 0) {
@@ -148,6 +154,10 @@ export async function* streamChat(
       parsed = JSON.parse(ev.data);
     } catch {
       continue;
+    }
+    const usage = tokenUsageFromRecord(parsed?.usage);
+    if (usage) {
+      yield { type: "usage", usage };
     }
     const choice = parsed?.choices?.[0];
     if (!choice) continue;

@@ -8,8 +8,15 @@ import {
 } from "@/client/components/ui/tooltip";
 import type { LucideIcon } from "lucide-react";
 import { RefreshCw, Search } from "lucide-react";
-import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
+import {
+  inspectorStickyTabHeaderClass,
+  inspectorTabHeaderPadding,
+  inspectorTabTitleClass,
+} from "@/client/lib/font-weight";
 import { Kbd } from "../ui/kbd";
+
+export const tabHeaderIconClass =
+  "h-3.5 w-3.5 shrink-0 text-muted-foreground";
 
 interface ListTabHeaderProps {
   /** Current active tab name */
@@ -50,6 +57,8 @@ interface ListTabHeaderProps {
   onRefresh?: () => void;
   /** Whether a refresh is in progress */
   isRefreshing?: boolean;
+  /** Whether the parent scroll area has been scrolled */
+  isScrolled?: boolean;
 }
 
 export function ListTabHeader({
@@ -71,18 +80,22 @@ export function ListTabHeader({
   primaryTabName,
   onRefresh,
   isRefreshing = false,
+  isScrolled = false,
 }: ListTabHeaderProps) {
   const isPrimaryTab = activeTab === primaryTabName;
+  const ActiveIcon = isPrimaryTab ? PrimaryIcon : SecondaryIcon;
+  const activeTitle = isPrimaryTab ? primaryTabTitle : secondaryTabTitle;
 
   return (
     <div
-      className={`flex flex-row items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
+      className={`flex flex-row items-center justify-between gap-2 ${inspectorStickyTabHeaderClass(isScrolled)} ${inspectorTabHeaderPadding}`}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
           <>
-            <h2 className={inspectorTabTitleClass}>
-              {isPrimaryTab ? primaryTabTitle : secondaryTabTitle}
+            <h2 className={`${inspectorTabTitleClass} flex items-center gap-1.5`}>
+              <ActiveIcon className={tabHeaderIconClass} aria-hidden />
+              {activeTitle}
             </h2>
             {isPrimaryTab && (
               <>
@@ -149,7 +162,6 @@ export function ListTabHeader({
         onClick={onTabSwitch}
         className="gap-2 flex-shrink-0"
       >
-        {isPrimaryTab ? <SecondaryIcon /> : <PrimaryIcon />}
         <span className="hidden sm:inline">
           {isPrimaryTab ? secondaryTabTitle : primaryTabTitle}
         </span>

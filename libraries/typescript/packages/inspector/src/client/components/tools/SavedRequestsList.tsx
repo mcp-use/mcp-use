@@ -1,4 +1,4 @@
-import { Database, History, Trash2 } from "lucide-react";
+import { Database, Trash2 } from "lucide-react";
 import { ListItem } from "@/client/components/shared";
 import { Button } from "@/client/components/ui/button";
 import {
@@ -34,7 +34,7 @@ export function SavedRequestsList({
 }: SavedRequestsListProps) {
   if (savedRequests.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
         <Database className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
         <p className="text-gray-500 dark:text-gray-400 mb-2">
           No saved requests yet
@@ -52,14 +52,13 @@ export function SavedRequestsList({
   };
 
   return (
-    <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
+    <div>
       {savedRequests.map((request, index) => (
         <div key={request.id} className="relative group">
           <ListItem
             id={`saved-${request.id}`}
             isSelected={selectedRequest?.id === request.id}
             isFocused={focusedIndex === index}
-            icon={<History className="h-4 w-4" />}
             title={request.name}
             description={request.toolName}
             metadata={

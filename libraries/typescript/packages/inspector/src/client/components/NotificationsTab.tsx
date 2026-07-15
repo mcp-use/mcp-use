@@ -12,7 +12,7 @@ import {
 import { NotificationsList } from "./notifications/NotificationsList";
 import { NotificationResultDisplay } from "./notifications/NotificationResultDisplay";
 import type { NotificationResult } from "./notifications/NotificationResultDisplay";
-import { SearchTabHeader } from "@/client/components/shared";
+import { InspectorScrollArea, SearchTabHeader } from "@/client/components/shared";
 import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 
 interface NotificationsTabProps {
@@ -292,37 +292,42 @@ export function NotificationsTab({
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
-            <SearchTabHeader
-              title="Notifications"
-              count={filteredNotifications.length}
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              searchPlaceholder="Search notifications..."
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              bulkAction={{
-                icon: Trash2,
-                label: "Clear all",
-                onClick: handleClearAll,
-                disabled: notifications.length === 0,
-              }}
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+          <ResizablePanel defaultSize={75} minSize={30} className="h-full overflow-hidden">
+            <InspectorScrollArea scrollRef={listRef}>
+              {(isScrolled) => (
+                <>
+                  <SearchTabHeader
+                    isScrolled={isScrolled}
+                    title="Notifications"
+                    icon={Bell}
+                    count={filteredNotifications.length}
+                    isSearchExpanded={isSearchExpanded}
+                    searchQuery={searchQuery}
+                    searchPlaceholder="Search notifications..."
+                    onSearchExpand={() => setIsSearchExpanded(true)}
+                    onSearchChange={setSearchQuery}
+                    onSearchBlur={handleSearchBlur}
+                    bulkAction={{
+                      icon: Trash2,
+                      label: "Clear all",
+                      onClick: handleClearAll,
+                      disabled: notifications.length === 0,
+                    }}
+                    searchInputRef={
+                      searchInputRef as React.RefObject<HTMLInputElement>
+                    }
+                  />
 
-            <div className="flex flex-col h-full">
-              <NotificationsList
-                notifications={filteredNotifications}
-                selectedNotification={selectedNotification}
-                onNotificationSelect={handleNotificationSelect}
-                focusedIndex={focusedIndex}
-                formatRelativeTime={formatRelativeTime}
-                listRef={listRef}
-              />
-            </div>
+                  <NotificationsList
+                    notifications={filteredNotifications}
+                    selectedNotification={selectedNotification}
+                    onNotificationSelect={handleNotificationSelect}
+                    focusedIndex={focusedIndex}
+                    formatRelativeTime={formatRelativeTime}
+                  />
+                </>
+              )}
+            </InspectorScrollArea>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>

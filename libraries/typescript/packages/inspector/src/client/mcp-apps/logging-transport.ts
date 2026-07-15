@@ -6,18 +6,17 @@
  */
 
 import type { JSONRPCMessage, Transport } from "@modelcontextprotocol/client";
-import { rpcLogBus } from "../../server/rpc-log-bus.js";
+import { rpcTrafficStore } from "../rpc-traffic-store.js";
 
 /**
  * Wrap a transport so every outbound `send` and inbound `onmessage` is logged
- * under `widget-${toolCallId}` on the RPC log bus.
+ * under its real MCP server and widget call IDs in the inspector traffic store.
  */
 export function wrapTransportWithLogging(
   transport: Transport,
+  serverId: string,
   toolCallId: string
 ): Transport {
-  const serverId = `widget-${toolCallId}`;
-
   const wrapper: Transport = {
     get sessionId() {
       return transport.sessionId;
@@ -32,8 +31,10 @@ export function wrapTransportWithLogging(
       return transport.start();
     },
     async send(message, options) {
-      rpcLogBus.publish({
+      rpcTrafficStore.publish({
+        source: "widget",
         serverId,
+        widgetId: toolCallId,
         direction: "send",
         timestamp: new Date().toISOString(),
         message: message as JSONRPCMessage,
@@ -61,8 +62,10 @@ export function wrapTransportWithLogging(
         return;
       }
       transport.onmessage = (message, extra) => {
-        rpcLogBus.publish({
+        rpcTrafficStore.publish({
+          source: "widget",
           serverId,
+          widgetId: toolCallId,
           direction: "receive",
           timestamp: new Date().toISOString(),
           message: message as JSONRPCMessage,

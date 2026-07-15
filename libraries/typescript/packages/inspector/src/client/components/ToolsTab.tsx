@@ -6,20 +6,12 @@ import {
   usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
-import {
-  MCPToolSavedEvent,
-  captureInspectorEvent,
-} from "@/client/telemetry";
+import { MCPToolSavedEvent, captureInspectorEvent } from "@/client/telemetry";
 import type { Tool } from "@modelcontextprotocol/client";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Database, Wrench } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { ListTabHeader, RpcPanel } from "./shared";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { InspectorScrollArea, ListTabHeader } from "./shared";
 import type { SavedRequest } from "./tools/SavedRequestsList";
 import { SavedRequestsList } from "./tools/SavedRequestsList";
 import { SaveRequestDialog } from "./tools/SaveRequestDialog";
@@ -510,7 +502,7 @@ export function ToolsTab({
     setSelectedToolName,
   });
 
-    const openSaveDialog = useCallback(() => {
+  const openSaveDialog = useCallback(() => {
     if (!selectedTool) return;
     setRequestName("");
     setSaveDialogOpen(true);
@@ -535,14 +527,13 @@ export function ToolsTab({
 
     // Track tool saved
     captureInspectorEvent(
-        new MCPToolSavedEvent({
-          toolName: selectedTool.name,
-          serverId,
-        })
-      )
-      .catch(() => {
-        // Silently fail - telemetry should not break the application
-      });
+      new MCPToolSavedEvent({
+        toolName: selectedTool.name,
+        serverId,
+      })
+    ).catch(() => {
+      // Silently fail - telemetry should not break the application
+    });
 
     setSaveDialogOpen(false);
     setRequestName("");
@@ -637,47 +628,54 @@ export function ToolsTab({
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="absolute inset-0 flex flex-col bg-background z-0"
               >
-                <ListTabHeader
-                  activeTab={activeTab}
-                  isSearchExpanded={isSearchExpanded}
-                  searchQuery={searchQuery}
-                  primaryTabName="tools"
-                  secondaryTabName="saved"
-                  primaryTabTitle="Tools"
-                  secondaryTabTitle="Saved"
-                  primaryCount={filteredTools.length}
-                  secondaryCount={savedRequests.length}
-                  primaryIcon={Wrench}
-                  secondaryIcon={Database}
-                  searchPlaceholder="Search tools..."
-                  onSearchExpand={() => setIsSearchExpanded(true)}
-                  onSearchChange={setSearchQuery}
-                  onSearchBlur={handleSearchBlur}
-                  onTabSwitch={() =>
-                    setActiveTab(activeTab === "tools" ? "saved" : "tools")
-                  }
-                  searchInputRef={
-                    searchInputRef as React.RefObject<HTMLInputElement>
-                  }
-                  onRefresh={refreshTools ? handleRefresh : undefined}
-                  isRefreshing={isRefreshing}
-                />
-                {activeTab === "tools" ? (
-                  <ToolsList
-                    tools={filteredTools}
-                    selectedTool={selectedTool}
-                    onToolSelect={handleToolSelect}
-                    focusedIndex={focusedIndex}
-                  />
-                ) : (
-                  <SavedRequestsList
-                    savedRequests={savedRequests}
-                    selectedRequest={selectedSavedRequest}
-                    onLoadRequest={loadSavedRequest}
-                    onDeleteRequest={deleteSavedRequest}
-                    focusedIndex={focusedIndex}
-                  />
-                )}
+                <InspectorScrollArea>
+                  {(isScrolled) => (
+                    <>
+                      <ListTabHeader
+                        isScrolled={isScrolled}
+                        activeTab={activeTab}
+                        isSearchExpanded={isSearchExpanded}
+                        searchQuery={searchQuery}
+                        primaryTabName="tools"
+                        secondaryTabName="saved"
+                        primaryTabTitle="Tools"
+                        secondaryTabTitle="Saved"
+                        primaryCount={filteredTools.length}
+                        secondaryCount={savedRequests.length}
+                        primaryIcon={Wrench}
+                        secondaryIcon={Database}
+                        searchPlaceholder="Search tools..."
+                        onSearchExpand={() => setIsSearchExpanded(true)}
+                        onSearchChange={setSearchQuery}
+                        onSearchBlur={handleSearchBlur}
+                        onTabSwitch={() =>
+                          setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                        }
+                        searchInputRef={
+                          searchInputRef as React.RefObject<HTMLInputElement>
+                        }
+                        onRefresh={refreshTools ? handleRefresh : undefined}
+                        isRefreshing={isRefreshing}
+                      />
+                      {activeTab === "tools" ? (
+                        <ToolsList
+                          tools={filteredTools}
+                          selectedTool={selectedTool}
+                          onToolSelect={handleToolSelect}
+                          focusedIndex={focusedIndex}
+                        />
+                      ) : (
+                        <SavedRequestsList
+                          savedRequests={savedRequests}
+                          selectedRequest={selectedSavedRequest}
+                          onLoadRequest={loadSavedRequest}
+                          onDeleteRequest={deleteSavedRequest}
+                          focusedIndex={focusedIndex}
+                        />
+                      )}
+                    </>
+                  )}
+                </InspectorScrollArea>
               </motion.div>
             )}
 
@@ -811,66 +809,61 @@ export function ToolsTab({
       <ResizablePanel
         id="left-panel"
         defaultSize="33%"
-        minSize="20%"
+        minSize={250}
+        collapsedSize={0}
         collapsible
         className="flex flex-col h-full relative"
         panelRef={leftPanelRef}
       >
-        <ResizablePanelGroup
-          orientation="vertical"
-          className="h-full border-r dark:border-zinc-700"
-        >
-          <ResizablePanel minSize="30%">
-            <div className="flex flex-col h-full overflow-hidden">
-              <ListTabHeader
-                activeTab={activeTab}
-                isSearchExpanded={isSearchExpanded}
-                searchQuery={searchQuery}
-                primaryTabName="tools"
-                secondaryTabName="saved"
-                primaryTabTitle="Tools"
-                secondaryTabTitle="Saved"
-                primaryCount={filteredTools.length}
-                secondaryCount={savedRequests.length}
-                primaryIcon={Wrench}
-                secondaryIcon={Database}
-                searchPlaceholder="Search tools..."
-                onSearchExpand={() => setIsSearchExpanded(true)}
-                onSearchChange={setSearchQuery}
-                onSearchBlur={handleSearchBlur}
-                onTabSwitch={() =>
-                  setActiveTab(activeTab === "tools" ? "saved" : "tools")
-                }
-                searchInputRef={
-                  searchInputRef as React.RefObject<HTMLInputElement>
-                }
-                onRefresh={refreshTools ? handleRefresh : undefined}
-                isRefreshing={isRefreshing}
-              />
-
-              {activeTab === "tools" ? (
-                <ToolsList
-                  tools={filteredTools}
-                  selectedTool={selectedTool}
-                  onToolSelect={handleToolSelect}
-                  focusedIndex={focusedIndex}
+        <div className="flex h-full flex-col overflow-hidden border-r dark:border-zinc-700">
+          <InspectorScrollArea>
+            {(isScrolled) => (
+              <>
+                <ListTabHeader
+                  isScrolled={isScrolled}
+                  activeTab={activeTab}
+                  isSearchExpanded={isSearchExpanded}
+                  searchQuery={searchQuery}
+                  primaryTabName="tools"
+                  secondaryTabName="saved"
+                  primaryTabTitle="Tools"
+                  secondaryTabTitle="Saved"
+                  primaryCount={filteredTools.length}
+                  secondaryCount={savedRequests.length}
+                  primaryIcon={Wrench}
+                  secondaryIcon={Database}
+                  searchPlaceholder="Search tools..."
+                  onSearchExpand={() => setIsSearchExpanded(true)}
+                  onSearchChange={setSearchQuery}
+                  onSearchBlur={handleSearchBlur}
+                  onTabSwitch={() =>
+                    setActiveTab(activeTab === "tools" ? "saved" : "tools")
+                  }
+                  searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+                  onRefresh={refreshTools ? handleRefresh : undefined}
+                  isRefreshing={isRefreshing}
                 />
-              ) : (
-                <SavedRequestsList
-                  savedRequests={savedRequests}
-                  selectedRequest={selectedSavedRequest}
-                  onLoadRequest={loadSavedRequest}
-                  onDeleteRequest={deleteSavedRequest}
-                  focusedIndex={focusedIndex}
-                />
-              )}
-            </div>
-          </ResizablePanel>
 
-          <ResizableHandle withHandle />
-
-          <RpcPanel serverId={serverId} />
-        </ResizablePanelGroup>
+                {activeTab === "tools" ? (
+                  <ToolsList
+                    tools={filteredTools}
+                    selectedTool={selectedTool}
+                    onToolSelect={handleToolSelect}
+                    focusedIndex={focusedIndex}
+                  />
+                ) : (
+                  <SavedRequestsList
+                    savedRequests={savedRequests}
+                    selectedRequest={selectedSavedRequest}
+                    onLoadRequest={loadSavedRequest}
+                    onDeleteRequest={deleteSavedRequest}
+                    focusedIndex={focusedIndex}
+                  />
+                )}
+              </>
+            )}
+          </InspectorScrollArea>
+        </div>
       </ResizablePanel>
 
       <ResizableHandle withHandle />

@@ -1,13 +1,15 @@
 import type { ReactNode } from "react";
 import { ServerCapabilitiesList } from "@/client/components/ServerCapabilitiesList";
-import { Button } from "@/client/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/client/components/ui/card";
 import { Label } from "@/client/components/ui/label";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/client/components/ui/tooltip";
-import { copyToClipboard } from "@/client/utils/browser";
 import { getConfiguredServerAlias } from "@/client/utils/servers";
 import type { McpServer } from "@mcp-use/client/react";
-import { Copy } from "lucide-react";
-import { toast } from "sonner";
 
 interface ServerMetadataPanelProps {
   connection: McpServer;
@@ -30,7 +32,7 @@ function MetadataField({
   return (
     <div className={className ?? metadataCell}>
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <div className="text-xs font-mono min-h-4" data-testid={testId}>
+      <div className="min-h-4 text-xs font-mono" data-testid={testId}>
         {children}
       </div>
     </div>
@@ -39,7 +41,7 @@ function MetadataField({
 
 export function ServerMetadataPanel({
   connection,
-  inDialog: _inDialog,
+  inDialog = false,
 }: ServerMetadataPanelProps) {
   const alias = getConfiguredServerAlias(connection);
   const canonicalName =
@@ -48,131 +50,130 @@ export function ServerMetadataPanel({
     connection.url ||
     connection.name;
 
-  const copyUrl = async () => {
-    if (connection.url) {
-      await copyToClipboard(connection.url);
-      toast.success("URL copied");
-    }
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <div className="space-y-4 min-w-0">
-        <Label className="text-sm font-medium">Server Information</Label>
-        <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
-          {connection.serverInfo?.title && (
-            <MetadataField label="Title">
-              <span className="bg-muted rounded-md p-1 px-2 inline-block">
-                {connection.serverInfo.title}
-              </span>
-            </MetadataField>
-          )}
-          {alias && (
-            <MetadataField label="Alias">
-              <span className="bg-muted rounded-md p-1 px-2 inline-block">
-                {alias}
-              </span>
-            </MetadataField>
-          )}
-          <MetadataField label="Name" testId="server-info-name">
-            <span className="bg-muted rounded-md p-1 px-2 inline-block">
-              {canonicalName}
-            </span>
-          </MetadataField>
-          {connection.url && (
-            <MetadataField label="URL" className={`${metadataCell} w-full`}>
-              <div className="flex items-center gap-2 min-w-0">
-                <span
-                  className="bg-muted rounded-md p-1 px-2 overflow-x-auto min-w-0 max-w-full inline-block"
-                  data-testid="server-info-url"
-                >
-                  {connection.url}
+    <div className="space-y-6">
+      <Card className="border">
+        <CardHeader>
+          <CardTitle className="text-base font-medium">
+            {inDialog ? "General" : "Server Information"}
+          </CardTitle>
+          <CardDescription>Server identity from initialize</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+            {connection.serverInfo?.title && (
+              <MetadataField label="Title">
+                <span className="inline-block rounded-md bg-muted p-1 px-2">
+                  {connection.serverInfo.title}
                 </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      onClick={copyUrl}
-                      aria-label="Copy URL"
-                      data-testid="server-info-copy-url"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy URL</TooltipContent>
-                </Tooltip>
-              </div>
-            </MetadataField>
-          )}
-          {connection.serverInfo?.version && (
-            <MetadataField label="Version">
-              <span className="bg-muted rounded-md p-1 px-2 inline-block">
-                {connection.serverInfo.version}
-              </span>
-            </MetadataField>
-          )}
-          {connection.protocolVersion && (
-            <MetadataField label="Protocol">
-              <span className="bg-muted rounded-md p-1 px-2 inline-block">
-                {connection.protocolVersion}
-              </span>
-            </MetadataField>
-          )}
-          {connection.serverInfo?.websiteUrl && (
-            <MetadataField label="Website" className={`${metadataCell} w-full`}>
-              <a
-                href={connection.serverInfo.websiteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline break-all"
-              >
-                {connection.serverInfo.websiteUrl}
-              </a>
-            </MetadataField>
-          )}
-          {connection.instructions && (
-            <MetadataField label="Instructions" className={`${metadataCell} w-full`}>
-              <p className="text-muted-foreground whitespace-pre-wrap font-sans">
-                {connection.instructions}
-              </p>
-            </MetadataField>
-          )}
-          {connection.serverInfo?.icons &&
-            connection.serverInfo.icons.length > 0 && (
-              <MetadataField label="Icons" className={`${metadataCell} w-full`}>
-                <div className="flex flex-col gap-2 font-sans">
-                  {connection.serverInfo.icons.map(
-                    (icon: { src: string; sizes?: string[] }, idx: number) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 bg-muted rounded-md p-2 min-w-0"
-                        data-testid={`server-info-icon-${idx}`}
-                      >
-                        <div className="w-8 h-8 shrink-0 rounded-md overflow-hidden bg-background flex items-center justify-center border border-border">
-                          <img
-                            src={icon.src}
-                            alt={`Server icon ${idx + 1}`}
-                            className="w-full h-full object-contain"
-                          />
-                        </div>
-                        <div className="min-w-0 text-xs">
-                          <p className="truncate font-mono">{icon.src}</p>
-                          <p className="text-muted-foreground">
-                            {icon.sizes?.join(", ") || "no size"}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  )}
-                </div>
               </MetadataField>
             )}
-        </div>
-      </div>
+            {alias && (
+              <MetadataField label="Alias">
+                <span className="inline-block rounded-md bg-muted p-1 px-2">
+                  {alias}
+                </span>
+              </MetadataField>
+            )}
+            <MetadataField label="Name" testId="server-info-name">
+              <span className="inline-block rounded-md bg-muted p-1 px-2">
+                {canonicalName}
+              </span>
+            </MetadataField>
+            {connection.serverInfo?.version && (
+              <MetadataField label="Version">
+                <span className="inline-block rounded-md bg-muted p-1 px-2">
+                  {connection.serverInfo.version}
+                </span>
+              </MetadataField>
+            )}
+            {connection.protocolVersion && (
+              <MetadataField label="Protocol">
+                <span className="inline-block rounded-md bg-muted p-1 px-2">
+                  {connection.protocolVersion}
+                </span>
+              </MetadataField>
+            )}
+            {connection.serverInfo?.websiteUrl && (
+              <MetadataField label="Website" className={`${metadataCell} w-full`}>
+                <a
+                  href={connection.serverInfo.websiteUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all font-sans text-blue-500 hover:underline"
+                >
+                  {connection.serverInfo.websiteUrl}
+                </a>
+              </MetadataField>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-      <ServerCapabilitiesList connection={connection} />
+      {connection.instructions && (
+        <Card className="border">
+          <CardHeader>
+            <CardTitle className="text-base font-medium">Instructions</CardTitle>
+            <CardDescription>
+              Server guidance for clients and agents
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="whitespace-pre-wrap font-sans text-sm text-muted-foreground">
+              {connection.instructions}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {connection.serverInfo?.icons &&
+        connection.serverInfo.icons.length > 0 && (
+          <Card className="border">
+            <CardHeader>
+              <CardTitle className="text-base font-medium">Icons</CardTitle>
+              <CardDescription>Server icon assets from initialize</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="flex flex-col gap-2 font-sans">
+                {connection.serverInfo.icons.map(
+                  (icon: { src: string; sizes?: string[] }, idx: number) => (
+                    <div
+                      key={idx}
+                      className="flex min-w-0 items-center gap-2 rounded-md bg-muted p-2"
+                      data-testid={`server-info-icon-${idx}`}
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-background">
+                        <img
+                          src={icon.src}
+                          alt={`Server icon ${idx + 1}`}
+                          className="h-full w-full object-contain"
+                        />
+                      </div>
+                      <div className="min-w-0 text-xs">
+                        <p className="truncate font-mono">{icon.src}</p>
+                        <p className="text-muted-foreground">
+                          {icon.sizes?.join(", ") || "no size"}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+      <Card className="border" data-testid="server-info-capabilities">
+        <CardHeader>
+          <CardTitle className="text-base font-medium">Capabilities</CardTitle>
+          <CardDescription>
+            MCP capabilities reported during initialize
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <ServerCapabilitiesList connection={connection} />
+        </CardContent>
+      </Card>
     </div>
   );
 }

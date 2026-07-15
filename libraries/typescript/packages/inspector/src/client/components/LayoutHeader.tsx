@@ -25,7 +25,6 @@ import {
   Monitor,
   Moon,
   Plus,
-  Rocket,
   Settings,
   SunDim,
 } from "lucide-react";
@@ -180,32 +179,27 @@ export function LayoutHeader({
               </>
             );
           })()}
-        <Button
-          asChild
-          className="rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4"
-        >
-          <a
-            href={
-              isLoggedIn
-                ? "https://manufact.com/cloud?ref=mcp-use-inspector"
-                : "https://manufact.com/signup?ref=mcp-use-inspector"
+        <a
+          href={
+            isLoggedIn
+              ? "https://manufact.com/cloud?ref=mcp-use-inspector"
+              : "https://manufact.com/signup?ref=mcp-use-inspector"
+          }
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => {
+            try {
+              captureInspectorEvent(
+                new MCPDeployClickEvent({ referrer: "mcp-use-inspector" })
+              ).catch(() => {});
+            } catch {
+              // ignore
             }
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={() => {
-              try {
-                captureInspectorEvent(
-                  new MCPDeployClickEvent({ referrer: "mcp-use-inspector" })
-                ).catch(() => {});
-              } catch {
-                // ignore
-              }
-            }}
-          >
-            <Rocket className="size-4" />
-            <span className="hidden sm:inline">Deploy</span>
-          </a>
-        </Button>
+          }}
+          className="inline-flex h-8 items-center justify-center rounded-full border border-blue-500/25 bg-blue-500/10 px-4 text-[13px] text-blue-500 outline-none cursor-pointer transition-colors hover:bg-blue-500/15 dark:border-blue-400/30 dark:bg-blue-400/10 dark:text-blue-400 dark:hover:bg-blue-400/15 focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <span className="[text-box:trim-both_cap_alphabetic]">Deploy</span>
+        </a>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

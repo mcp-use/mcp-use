@@ -30,6 +30,7 @@ import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
 import { Spinner } from "../ui/spinner";
+import { WidgetWrapper } from "../ui/WidgetWrapper";
 
 export interface ToolResult {
   toolName: string;
@@ -423,27 +424,34 @@ function ToolResultViewPanel({
 
   if (!hostProps) {
     return (
-      <div className="flex items-center justify-center w-full h-full">
+      <WidgetWrapper className="w-full h-full min-h-[240px]">
         <Spinner className="size-5" />
-      </div>
+      </WidgetWrapper>
     );
   }
 
+  const viewRendererClassName =
+    displayMode === "inline"
+      ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
+      : "w-full h-full relative p-4";
+
   return (
-    <ViewRenderer
-      viewId={viewId}
-      toolName={toolName}
-      toolInput={toolInput}
-      toolOutput={toolOutput}
-      customProps={customProps}
-      className="w-full h-full relative p-4"
-      onMessage={(content) => {
-        if (content.length > 0 && onSendFollowUp) {
-          onSendFollowUp(content as MessageContentBlock[]);
-        }
-      }}
-      {...hostProps}
-    />
+    <WidgetWrapper className="w-full h-full min-h-[240px]">
+      <ViewRenderer
+        viewId={viewId}
+        toolName={toolName}
+        toolInput={toolInput}
+        toolOutput={toolOutput}
+        customProps={customProps}
+        className={viewRendererClassName}
+        onMessage={(content) => {
+          if (content.length > 0 && onSendFollowUp) {
+            onSendFollowUp(content as MessageContentBlock[]);
+          }
+        }}
+        {...hostProps}
+      />
+    </WidgetWrapper>
   );
 }
 
@@ -852,7 +860,7 @@ export function ToolResultDisplay({
                   }
 
                   return (
-                    <div className="flex-1 relative">
+                    <div className="flex flex-1 relative flex-col min-h-0">
                       {/* Floating controls in top-right */}
                       <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
                         <MCPAppsDebugControls

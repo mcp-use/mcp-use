@@ -63,6 +63,21 @@ export type ViewCspViolation = {
   timestamp: number;
 };
 
+export type ViewLifecycleStatus =
+  | "resolving"
+  | "sandbox-loading"
+  | "connecting"
+  | "initialized"
+  | "ready"
+  | "tearing-down"
+  | "closed"
+  | "error";
+
+export type ViewLifecycleEvent = {
+  status: ViewLifecycleStatus;
+  error?: string;
+};
+
 export interface ViewRendererProps {
   viewId: string;
   source: ViewRendererSource;
@@ -88,6 +103,7 @@ export interface ViewRendererProps {
   }) => void;
   onLog?: (entry: { level: string; data: unknown }) => void;
   onReady?: () => void;
+  onLifecycleChange?: (event: ViewLifecycleEvent) => void;
   onError?: (message: string) => void;
   onCspViolation?: (violation: ViewCspViolation) => void;
   onResourceResolved?: (resolved: ResolvedViewResource) => void;

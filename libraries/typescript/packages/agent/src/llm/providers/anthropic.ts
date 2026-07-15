@@ -6,7 +6,9 @@ import type {
   ProviderConfig,
   ProviderMessage,
   ProviderTool,
+  TokenUsage,
 } from "../types.js";
+import { tokenUsageFromRecord } from "../usage.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -183,6 +185,7 @@ export async function* streamChat(
       emittedStart: boolean;
     }
   >();
+  let usage: TokenUsage | undefined;
 
   for await (const ev of parseSSE(res.body, signal)) {
     let parsed: any;
@@ -192,7 +195,12 @@ export async function* streamChat(
       continue;
     }
     const t = parsed?.type;
-    if (t === "content_block_start") {
+    if (t === "message_start") {
+      usage = tokenUsageFromRecord(parsed?.message?.usage);
+    } else if (t === "message_delta") {
+      const deltaUsage = tokenUsageFromRecord(parsed?.usage);
+      if (deltaUsage) usage = { ...usage, ...deltaUsage };
+    } else if (t === "content_block_start") {
       const idx = parsed.index as number;
       const cb = parsed.content_block ?? {};
       if (cb.type === "tool_use") {
@@ -260,7 +268,15 @@ export async function* streamChat(
         };
       }
     } else if (t === "message_stop") {
-      // handled below after loop
+      if (usage) {
+        const totalTokens =
+          usage.totalTokens ??
+          (usage.inputTokens !== undefined &&
+          usage.outputTokens !== undefined
+            ? usage.inputTokens + usage.outputTokens
+            : undefined);
+        yield { type: "usage", usage: { ...usage, totalTokens } };
+      }
     } else if (t === "error") {
       yield {
         type: "error",

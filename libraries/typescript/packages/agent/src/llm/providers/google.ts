@@ -11,7 +11,9 @@ import type {
   ProviderConfig,
   ProviderMessage,
   ProviderTool,
+  TokenUsage,
 } from "../types.js";
+import { tokenUsageFromRecord } from "../usage.js";
 
 interface ChatParams {
   config: ProviderConfig;
@@ -211,6 +213,7 @@ export async function* streamChat(
   }
 
   let toolCallCounter = 0;
+  let usage: TokenUsage | undefined;
 
   for await (const ev of parseSSE(res.body, signal)) {
     let parsed: any;
@@ -219,6 +222,7 @@ export async function* streamChat(
     } catch {
       continue;
     }
+    usage = tokenUsageFromRecord(parsed?.usageMetadata) ?? usage;
     const parts = parsed?.candidates?.[0]?.content?.parts ?? [];
     for (const p of parts) {
       if (typeof p.text === "string" && p.text.length > 0) {
@@ -259,6 +263,7 @@ export async function* streamChat(
       }
     }
   }
+  if (usage) yield { type: "usage", usage };
   yield { type: "done" };
 }
 

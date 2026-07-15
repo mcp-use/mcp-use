@@ -20,9 +20,15 @@ import { CHAT_TITLE_SIMPLE } from "@/client/chat-history/chat-title";
 import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
 import { cn } from "@/client/lib/utils";
 import {
+  TabsSubtle,
+  TabsSubtleItem,
+} from "@/client/components/ui/tabs-subtle";
+import {
   chatBarActionButtonClass,
   chatBarTitleFrostedClass,
 } from "./chat-bar-styles";
+
+const CHAT_VIEW_TABS_ID = "chat-view";
 
 interface ChatHeaderProps {
   llmConfig: LLMConfig | null;
@@ -70,6 +76,13 @@ interface ChatHeaderProps {
   activeChatId?: string | null;
   /** Title for the active chat thread. */
   chatTitle?: string;
+  /** When true, shows Conv / Raw tabs in the header. */
+  showViewToggle?: boolean;
+  /** 0 = Conv, 1 = Raw */
+  viewIndex?: 0 | 1;
+  onViewIndexChange?: (index: number) => void;
+  /** Raise header above host chrome (cloud embed). */
+  elevatedHeader?: boolean;
 }
 
 export function ChatHeader({
@@ -100,12 +113,27 @@ export function ChatHeader({
   onExportChat,
   activeChatId,
   chatTitle,
+  showViewToggle,
+  viewIndex = 0,
+  onViewIndexChange,
+  elevatedHeader,
 }: ChatHeaderProps) {
   return (
     <div
-      className={`flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
+      className={cn(
+        "relative flex w-full items-center gap-2",
+        inspectorTabHeaderPadding,
+        elevatedHeader
+          ? "pointer-events-none absolute top-0 right-0 z-50"
+          : "absolute top-0 right-0 z-10"
+      )}
     >
-      <div className="flex min-w-0 items-center gap-2">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 items-center",
+          elevatedHeader && "pointer-events-auto"
+        )}
+      >
         {!hideTitle && (
           <h2 className={cn(inspectorTabTitleClass, chatBarTitleFrostedClass)}>
             {activeChatId ? (
@@ -120,7 +148,33 @@ export function ChatHeader({
           </h2>
         )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+
+      {showViewToggle && onViewIndexChange && (
+        <div
+          className={cn(
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2",
+            elevatedHeader && "pointer-events-auto"
+          )}
+        >
+          <TabsSubtle
+            selectedIndex={viewIndex}
+            onSelect={onViewIndexChange}
+            idPrefix={CHAT_VIEW_TABS_ID}
+            className="shrink-0"
+            data-testid="chat-view-tabs"
+          >
+            <TabsSubtleItem label="Conv" index={0} />
+            <TabsSubtleItem label="Raw" index={1} />
+          </TabsSubtle>
+        </div>
+      )}
+
+      <div
+        className={cn(
+          "ml-auto flex shrink-0 items-center gap-2",
+          elevatedHeader && "pointer-events-auto"
+        )}
+      >
         {/* New Chat / Clear button */}
         {!hideClearButton && hasMessages && (
           <div className="flex items-center gap-1">

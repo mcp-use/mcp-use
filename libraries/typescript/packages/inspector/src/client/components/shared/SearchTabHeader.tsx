@@ -3,7 +3,11 @@ import { RefreshCw, Search } from "lucide-react";
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import { Input } from "@/client/components/ui/input";
-import { inspectorTabHeaderPadding, inspectorTabTitleClass } from "@/client/lib/font-weight";
+import {
+  inspectorStickyTabHeaderClass,
+  inspectorTabHeaderPadding,
+  inspectorTabTitleClass,
+} from "@/client/lib/font-weight";
 import { Kbd } from "@/client/components/ui/kbd";
 import {
   Tooltip,
@@ -21,6 +25,7 @@ interface BulkAction {
 interface SearchTabHeaderProps {
   title: string;
   count: number;
+  icon?: LucideIcon;
   isSearchExpanded: boolean;
   searchQuery: string;
   searchPlaceholder: string;
@@ -32,11 +37,14 @@ interface SearchTabHeaderProps {
   bulkAction?: BulkAction;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  /** Whether the parent scroll area has been scrolled */
+  isScrolled?: boolean;
 }
 
 export function SearchTabHeader({
   title,
   count,
+  icon: TitleIcon,
   isSearchExpanded,
   searchQuery,
   searchPlaceholder,
@@ -48,17 +56,26 @@ export function SearchTabHeader({
   bulkAction,
   onRefresh,
   isRefreshing = false,
+  isScrolled = false,
 }: SearchTabHeaderProps) {
   const BulkIcon = bulkAction?.icon;
+  const tabHeaderIconClass =
+    "h-3.5 w-3.5 shrink-0 text-muted-foreground";
 
   return (
     <div
-      className={`flex flex-row items-center justify-between gap-2 ${inspectorTabHeaderPadding}`}
+      className={`flex flex-row items-center justify-between gap-2 ${inspectorStickyTabHeaderClass(isScrolled)} ${inspectorTabHeaderPadding}`}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {!isSearchExpanded ? (
           <>
-            <h2 className={inspectorTabTitleClass} data-testid={titleTestId}>
+            <h2
+              className={`${inspectorTabTitleClass} flex items-center gap-1.5`}
+              data-testid={titleTestId}
+            >
+              {TitleIcon ? (
+                <TitleIcon className={tabHeaderIconClass} aria-hidden />
+              ) : null}
               {title}
             </h2>
             <Badge

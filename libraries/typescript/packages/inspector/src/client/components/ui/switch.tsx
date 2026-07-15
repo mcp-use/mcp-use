@@ -30,6 +30,9 @@ interface FluidSwitchProps extends HTMLAttributes<HTMLDivElement> {
   onToggle: () => void;
   disabled?: boolean;
   thumbTransition?: Transition;
+  /** Override inactive track fill (defaults to --accent). */
+  uncheckedTrackColor?: string;
+  uncheckedTrackColorHovered?: string;
 }
 
 interface ShadcnSwitchProps
@@ -48,7 +51,7 @@ function isFluidSwitchProps(props: SwitchProps): props is FluidSwitchProps {
 
 const FluidSwitch = forwardRef<HTMLDivElement, FluidSwitchProps>(
   (
-    { label, checked, onToggle, disabled = false, thumbTransition, className, ...props },
+    { label, checked, onToggle, disabled = false, thumbTransition, uncheckedTrackColor, uncheckedTrackColorHovered, className, ...props },
     ref
   ) => {
     const labelId = useId();
@@ -216,11 +219,12 @@ const FluidSwitch = forwardRef<HTMLDivElement, FluidSwitchProps>(
             height: TRACK_HEIGHT,
             backgroundColor: checked
               ? hovered
-                ? "#5C89F2"
-                : "#6B97FF"
+                ? "color-mix(in oklab, var(--primary) 88%, black)"
+                : "var(--primary)"
               : hovered
-                ? "color-mix(in oklab, var(--accent), rgb(var(--overlay)) 10%)"
-                : "var(--accent)",
+                ? (uncheckedTrackColorHovered ??
+                  "color-mix(in oklab, var(--accent), rgb(var(--overlay)) 10%)")
+                : (uncheckedTrackColor ?? "var(--accent)"),
           }}
           onClick={(e) => e.stopPropagation()}
         >

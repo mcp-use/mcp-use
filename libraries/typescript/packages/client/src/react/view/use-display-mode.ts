@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, type RefObject } from "react";
 import type { ViewDisplayMode } from "./types.js";
 
 const SHELL_BASE =
   "w-full h-full min-h-0 bg-background flex flex-col [&:fullscreen]:h-full [&:fullscreen]:w-full [&:fullscreen]:bg-background";
 
-const WIDGET_FULLSCREEN_NATIVE_CLASSES = SHELL_BASE;
 const WIDGET_FULLSCREEN_OVERLAY_CLASSES = `fixed inset-0 z-[100] ${SHELL_BASE}`;
 const WIDGET_PIP_SHELL_CLASSES = [
   "fixed top-4 left-1/2 -translate-x-1/2 z-[100]",
@@ -16,12 +15,6 @@ const WIDGET_PIP_SHELL_CLASSES = [
 
 const WIDGET_FULLSCREEN_DOCUMENT_ATTR = "data-mcp-widget-fullscreen";
 const WIDGET_DISPLAY_MODE_ATTR = "data-mcp-widget-display-mode";
-
-function fullscreenShellClass(cssFallback: boolean): string {
-  return cssFallback
-    ? WIDGET_FULLSCREEN_OVERLAY_CLASSES
-    : WIDGET_FULLSCREEN_NATIVE_CLASSES;
-}
 
 function useWidgetDisplayModeDocumentChrome(
   displayMode: ViewDisplayMode
@@ -56,7 +49,6 @@ function useWidgetDisplayModeDocumentChrome(
 }
 
 export function useViewDisplayModeControls({
-  containerRef,
   displayMode,
   setDisplayMode,
 }: {
@@ -64,54 +56,20 @@ export function useViewDisplayModeControls({
   displayMode: ViewDisplayMode;
   setDisplayMode: (mode: ViewDisplayMode) => void;
 }) {
-  const [cssFallback, setCssFallback] = useState(false);
   const isFullscreen = displayMode === "fullscreen";
   const isPip = displayMode === "pip";
 
   useWidgetDisplayModeDocumentChrome(displayMode);
 
-  useEffect(() => {
-    const onFullscreenChange = () => {
-      if (!document.fullscreenElement && displayMode === "fullscreen") {
-        setCssFallback(false);
-        setDisplayMode("inline");
-      }
-    };
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () =>
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, [displayMode, setDisplayMode]);
-
   const handleDisplayModeChange = useCallback(
-    async (mode: ViewDisplayMode) => {
-      if (mode === "fullscreen") {
-        try {
-          await containerRef.current?.requestFullscreen();
-          setCssFallback(false);
-        } catch {
-          setCssFallback(true);
-        }
-        setDisplayMode("fullscreen");
-        return;
-      }
-
-      try {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-      } catch {
-        // exitFullscreen can fail if already exited
-      }
-      setCssFallback(false);
-      setDisplayMode(mode);
-    },
-    [containerRef, setDisplayMode]
+    (mode: ViewDisplayMode) => setDisplayMode(mode),
+    [setDisplayMode]
   );
 
   return {
     handleDisplayModeChange,
     fullscreenShellClassName: isFullscreen
-      ? fullscreenShellClass(cssFallback)
+      ? WIDGET_FULLSCREEN_OVERLAY_CLASSES
       : undefined,
     pipShellClassName: isPip ? WIDGET_PIP_SHELL_CLASSES : undefined,
     isFullscreen,

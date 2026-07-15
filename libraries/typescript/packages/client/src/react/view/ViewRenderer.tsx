@@ -9,7 +9,12 @@ import {
   type McpUiSizeChangedNotification,
   type McpUiUpdateModelContextRequest,
 } from "./ext-apps-bridge.js";
-import type { CallToolRequest, LoggingMessageNotificationParams, ReadResourceRequest, Transport } from "@modelcontextprotocol/client";
+import type {
+  CallToolRequest,
+  LoggingMessageNotificationParams,
+  ReadResourceRequest,
+  Transport,
+} from "@modelcontextprotocol/client";
 import React, {
   memo,
   useCallback,
@@ -18,7 +23,6 @@ import React, {
   useState,
   type CSSProperties,
 } from "react";
-import { createPortal } from "react-dom";
 import { parseCustomProps } from "./parse-custom-props.js";
 import { resolveViewResource } from "./resolve-view-resource.js";
 import { buildViewSandboxBlobUrl } from "./sandbox-blob-url.js";
@@ -35,10 +39,15 @@ import {
 const DEFAULT_HOST_INFO = { name: "mcp-use-client", version: "2.0.0" } as const;
 const DEFAULT_TOOL_CALL_TIMEOUT = 600_000;
 const SANDBOX_PROXY_READY = "ui/notifications/sandbox-proxy-ready";
+const DEFAULT_HOST_CAPABILITIES: McpUiHostCapabilities = {
+  openLinks: {},
+  serverTools: {},
+  serverResources: {},
+  logging: {},
+  updateModelContext: { text: {} },
+};
 
-function waitForSandboxProxyReady(
-  iframe: HTMLIFrameElement
-): Promise<void> {
+function waitForSandboxProxyReady(iframe: HTMLIFrameElement): Promise<void> {
   return new Promise((resolve) => {
     const listener = (event: MessageEvent) => {
       if (
@@ -86,6 +95,7 @@ function ViewRendererBase({
   onModelContextUpdate,
   onLog,
   onReady,
+  onLifecycleChange,
   onError,
   onCspViolation,
   onResourceResolved,
@@ -99,7 +109,9 @@ function ViewRendererBase({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const bridgeRef = useRef<AppBridge | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const connectionRef = useRef(source.kind === "live" ? source.connection : null);
+  const connectionRef = useRef(
+    source.kind === "live" ? source.connection : null
+  );
 
   const [resolved, setResolved] = useState<ResolvedViewResource | null>(null);
   const [activeSandboxUrl, setActiveSandboxUrl] = useState<URL | null>(null);
@@ -135,25 +147,24 @@ function ViewRendererBase({
   onCspViolationRef.current = onCspViolation;
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
+  const onLifecycleChangeRef = useRef(onLifecycleChange);
+  onLifecycleChangeRef.current = onLifecycleChange;
   const sandboxUrlRef = useRef(sandboxUrl);
   sandboxUrlRef.current = sandboxUrl;
   const cspModeRef = useRef(cspMode);
   cspModeRef.current = cspMode;
 
-  const resolveSandboxUrl = useCallback(
-    (next: ResolvedViewResource): URL => {
-      const custom = sandboxUrlRef.current;
-      if (custom) {
-        return typeof custom === "function" ? custom(next) : custom;
-      }
-      return buildViewSandboxBlobUrl({
-        cspMode: cspModeRef.current,
-        permissions: next.permissions,
-        widgetCsp: next.declaredCsp,
-      });
-    },
-    []
-  );
+  const resolveSandboxUrl = useCallback((next: ResolvedViewResource): URL => {
+    const custom = sandboxUrlRef.current;
+    if (custom) {
+      return typeof custom === "function" ? custom(next) : custom;
+    }
+    return buildViewSandboxBlobUrl({
+      cspMode: cspModeRef.current,
+      permissions: next.permissions,
+      widgetCsp: next.declaredCsp,
+    });
+  }, []);
 
   const setDisplayMode = useCallback(
     (mode: ViewDisplayMode) => {
@@ -182,8 +193,7 @@ function ViewRendererBase({
 
   const liveResourceUri =
     source.kind === "live" ? source.resourceUri : undefined;
-  const preloadedHtml =
-    source.kind === "preloaded" ? source.html : undefined;
+  const preloadedHtml = source.kind === "preloaded" ? source.html : undefined;
 
   if (source.kind === "live") {
     connectionRef.current = source.connection;
@@ -192,9 +202,11 @@ function ViewRendererBase({
   // Resolve widget HTML from live connection or preloaded source
   useEffect(() => {
     let cancelledEffect = false;
+    onLifecycleChangeRef.current?.({ status: "resolving" });
 
     const applyResolved = (next: ResolvedViewResource) => {
       setResolved(next);
+      onLifecycleChangeRef.current?.({ status: "sandbox-loading" });
       const nextSandbox = resolveSandboxUrl(next);
       setActiveSandboxUrl((prev) =>
         prev?.href === nextSandbox.href ? prev : nextSandbox
@@ -234,10 +246,11 @@ function ViewRendererBase({
           resourceUri,
         });
         if (!next.mimeTypeValid) {
-          setLoadError(
+          const message =
             next.mimeTypeWarning ||
-              'Invalid MIME type - SEP-1865 requires "text/html;profile=mcp-app"'
-          );
+            'Invalid MIME type - SEP-1865 requires "text/html;profile=mcp-app"';
+          setLoadError(message);
+          onLifecycleChangeRef.current?.({ status: "error", error: message });
           return;
         }
         applyResolved(next);
@@ -246,6 +259,10 @@ function ViewRendererBase({
         setLoadError(
           err instanceof Error ? err.message : "Failed to prepare view"
         );
+        onLifecycleChangeRef.current?.({
+          status: "error",
+          error: err instanceof Error ? err.message : "Failed to prepare view",
+        });
       }
     })();
 
@@ -265,15 +282,16 @@ function ViewRendererBase({
   }, [activeSandboxUrl]);
 
   const isBlobSandbox = activeSandboxUrl?.protocol === "blob:";
-  const sandboxOrigin = !activeSandboxUrl || isBlobSandbox
-    ? null
-    : (() => {
-        try {
-          return activeSandboxUrl.origin;
-        } catch {
-          return null;
-        }
-      })();
+  const sandboxOrigin =
+    !activeSandboxUrl || isBlobSandbox
+      ? null
+      : (() => {
+          try {
+            return activeSandboxUrl.origin;
+          } catch {
+            return null;
+          }
+        })();
 
   // CSP violations + iframe console forwarding
   useEffect(() => {
@@ -328,6 +346,7 @@ function ViewRendererBase({
 
     const run = async () => {
       try {
+        onLifecycleChangeRef.current?.({ status: "connecting" });
         iframe.setAttribute(
           "sandbox",
           "allow-scripts allow-same-origin allow-forms"
@@ -343,12 +362,7 @@ function ViewRendererBase({
         if (disposed) return;
 
         const capabilities: McpUiHostCapabilities = {
-          openLinks: {},
-          serverTools: {},
-          serverResources: {},
-          logging: {},
-          updateModelContext: { text: {} },
-          ...hostCapabilities,
+          ...(hostCapabilities ?? DEFAULT_HOST_CAPABILITIES),
           sandbox: {
             csp: cspMode === "permissive" ? undefined : resolved.csp,
             permissions: resolved.permissions,
@@ -392,7 +406,9 @@ function ViewRendererBase({
           }
         }) as typeof bridge.oncalltool;
 
-        bridge.onreadresource = (async ({ uri }: ReadResourceRequest["params"]) => {
+        bridge.onreadresource = (async ({
+          uri,
+        }: ReadResourceRequest["params"]) => {
           const conn = connectionRef.current;
           if (!conn) throw new Error("Server connection not available");
           return (await conn.readResource(uri)) as object;
@@ -408,8 +424,16 @@ function ViewRendererBase({
           mode,
         }: McpUiRequestDisplayModeRequest["params"]) => {
           const requested = (mode ?? "inline") as ViewDisplayMode;
-          await handleDisplayModeChangeRef.current(requested);
-          return { mode: requested };
+          const available = hostContextRef.current?.availableDisplayModes ?? [
+            "inline",
+            "pip",
+            "fullscreen",
+          ];
+          const effective = available.includes(requested)
+            ? requested
+            : displayModeRef.current;
+          await handleDisplayModeChangeRef.current(effective);
+          return { mode: effective };
         };
 
         bridge.onupdatemodelcontext = async ({
@@ -456,6 +480,7 @@ function ViewRendererBase({
 
         bridgeRef.current = bridge;
         setInitCount((c) => c + 1);
+        onLifecycleChangeRef.current?.({ status: "initialized" });
 
         const mergedArgs = {
           ...toolInputRef.current,
@@ -468,12 +493,14 @@ function ViewRendererBase({
             output as Parameters<typeof bridge.sendToolResult>[0]
           );
         }
+        onLifecycleChangeRef.current?.({ status: "ready" });
       } catch (err) {
         if (!disposed) {
           const message =
             err instanceof Error ? err.message : "Failed to connect view";
           setLoadError(message);
           onErrorRef.current?.(message);
+          onLifecycleChangeRef.current?.({ status: "error", error: message });
         }
       }
     };
@@ -485,6 +512,7 @@ function ViewRendererBase({
       const toClose = bridge;
       bridgeRef.current = null;
       if (!toClose) return;
+      onLifecycleChangeRef.current?.({ status: "tearing-down" });
       void (async () => {
         try {
           await Promise.race([
@@ -497,6 +525,7 @@ function ViewRendererBase({
           // proceed
         } finally {
           toClose.close().catch(() => {});
+          onLifecycleChangeRef.current?.({ status: "closed" });
         }
       })();
     };
@@ -612,10 +641,32 @@ function ViewRendererBase({
       className={containerClassName}
       style={
         isPip
-          ? { maxWidth: VIEW_DIMENSIONS.PIP_MAX_WIDTH }
-          : undefined
+          ? {
+              height: VIEW_DIMENSIONS.DEFAULT_HEIGHT,
+              maxWidth: VIEW_DIMENSIONS.PIP_MAX_WIDTH,
+              zIndex: 100,
+            }
+          : isFullscreen
+            ? { zIndex: 100 }
+            : undefined
       }
     >
+      {(isFullscreen || isPip) && (
+        <button
+          type="button"
+          data-testid={
+            isFullscreen
+              ? "debugger-exit-fullscreen-button"
+              : "debugger-exit-pip-button"
+          }
+          aria-label={isFullscreen ? "Exit fullscreen" : "Exit picture-in-picture"}
+          className="absolute right-3 top-3 z-[110] flex size-8 items-center justify-center rounded-full border border-border bg-background/90 text-lg leading-none text-foreground shadow-sm backdrop-blur-sm hover:bg-background"
+          style={{ zIndex: 110 }}
+          onClick={() => void handleDisplayModeChange("inline")}
+        >
+          ×
+        </button>
+      )}
       <div
         className={
           isFullscreen || isPip
@@ -659,13 +710,7 @@ function ViewRendererBase({
     </div>
   );
 
-  return (
-    <div className={className}>
-      {isPip && typeof document !== "undefined"
-        ? createPortal(viewShell, document.body)
-        : viewShell}
-    </div>
-  );
+  return <div className={className}>{viewShell}</div>;
 }
 
 function viewRendererAreEqual(
@@ -682,9 +727,11 @@ function viewRendererAreEqual(
   if (prev.partialToolInput !== next.partialToolInput) return false;
   if (prev.customProps !== next.customProps) return false;
   if (prev.hostContext !== next.hostContext) return false;
+  if (prev.hostCapabilities !== next.hostCapabilities) return false;
   if (prev.cspMode !== next.cspMode) return false;
   if (prev.className !== next.className) return false;
   if (prev.onReady !== next.onReady) return false;
+  if (prev.onLifecycleChange !== next.onLifecycleChange) return false;
   return true;
 }
 
@@ -706,8 +753,11 @@ export type {
   ViewRendererSource,
   ResolvedViewResource,
   ViewCspViolation,
+  ViewLifecycleEvent,
+  ViewLifecycleStatus,
 } from "./types.js";
 export type {
+  McpUiHostCapabilities,
   McpUiHostContext,
   McpUiResourceCsp,
   McpUiResourcePermissions,
