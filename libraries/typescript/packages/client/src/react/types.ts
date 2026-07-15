@@ -1,4 +1,5 @@
 import type {
+  ClientOptions,
   CompleteRequestParams,
   CompleteResult,
   ElicitRequestFormParams,
@@ -204,8 +205,10 @@ export type UseMcpOptions = {
    * })
    * ```
    */
-  clientOptions?: {
-    capabilities?: Record<string, unknown> & { views?: boolean };
+  clientOptions?: Omit<ClientOptions, "capabilities"> & {
+    capabilities?: NonNullable<ClientOptions["capabilities"]> & {
+      views?: boolean;
+    };
   };
   /**
    * Protocol version negotiation mode passed to the underlying SDK `Client`.
