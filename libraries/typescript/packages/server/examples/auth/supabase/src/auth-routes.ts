@@ -18,7 +18,7 @@
  * Docs: https://supabase.com/docs/guides/auth/oauth-server/mcp-authentication
  */
 
-import type { Hono } from "hono";
+import type { MCPServer } from "@mcp-use/server";
 import {
   createClient,
   type OAuthAuthorizationDetails,
@@ -142,7 +142,7 @@ async function restoreSession(
 }
 
 export function mountAuthRoutes(
-  app: Hono,
+  app: MCPServer["app"],
   { supabaseUrl, publishableKey }: MountAuthRoutesOptions
 ): void {
   // -------------------------------------------------------------------------

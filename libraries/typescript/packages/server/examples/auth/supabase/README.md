@@ -46,8 +46,8 @@ Supabase dashboard (Authentication → OAuth Server), set Authorization Path to
 
 When a user needs to approve an OAuth client, Supabase redirects their browser
 to that path with `?authorization_id=<uuid>`. This example mounts the consent
-routes on its own Hono app in front of the MCP handler (public routes, not
-behind the OAuth bearer gate):
+routes directly on `server.app` before startup (public routes, not behind the
+OAuth bearer gate):
 
 - `GET /auth/consent` — sign-in page if unauthenticated; otherwise consent UI
 - `POST /auth/signin` — anonymous sign-in (demo only); stores a short-lived
@@ -64,12 +64,12 @@ magic links, or an OAuth provider.
 pnpm dev
 ```
 
-`pnpm dev` runs `tsx watch` on a standalone entry that owns the socket. That
-entry composes a Hono app with the consent routes and the MCP handler
-(`getHandler()`) on one port. When `MCP_URL` is absent, it defaults to
-`http://localhost:3000` (or the configured `PORT`) so OAuth resource metadata
-resolves locally. Public and tunnel deployments require `MCP_URL`. The shared
-handler uses `legacy: "stateless"`.
+`pnpm dev` runs `tsx watch` on a standalone entry that owns the socket. The
+entry registers the consent routes on `server.app`, then starts that shared app
+with `server.listen()` so the consent UI and MCP endpoint use one port. When
+`MCP_URL` is absent, it defaults to `http://localhost:3000` (or the configured
+`PORT`) so OAuth resource metadata resolves locally. Public and tunnel
+deployments require `MCP_URL`. MCP serving uses `legacy: "stateless"`.
 
 ## Typecheck
 

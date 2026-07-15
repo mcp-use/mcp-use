@@ -1,8 +1,6 @@
 import { existsSync } from "node:fs";
-import { serve } from "@hono/node-server";
 import { MCPServer } from "@mcp-use/server";
 import { oauthSupabaseProvider } from "@mcp-use/server/oauth/supabase";
-import { Hono } from "hono";
 import { z } from "zod";
 import { mountAuthRoutes } from "./auth-routes.js";
 
@@ -56,8 +54,7 @@ if (publishableKey === undefined) {
   );
 }
 
-const supabaseUrl =
-  supabaseUrlEnv ?? `https://${projectId}.supabase.co`;
+const supabaseUrl = supabaseUrlEnv ?? `https://${projectId}.supabase.co`;
 
 const server = new MCPServer({
   name: "supabase-user-info",
@@ -110,15 +107,12 @@ server.tool(
   }
 );
 
-const app = new Hono();
-mountAuthRoutes(app, { supabaseUrl, publishableKey });
-const handler = server.getHandler();
-app.all("*", (c) => handler(c.req.raw));
+mountAuthRoutes(server.app, { supabaseUrl, publishableKey });
 
-serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
-  console.log(`MCP endpoint: http://localhost:${info.port}/mcp`);
-  console.log(`Consent UI:   http://localhost:${info.port}/auth/consent`);
-});
+const info = await server.listen(port);
+const origin = new URL(info.url).origin;
+console.log(`MCP endpoint: ${info.url}`);
+console.log(`Consent UI:   ${origin}/auth/consent`);
 
 function environmentValue(name: string): string | undefined {
   const value = process.env[name]?.trim();

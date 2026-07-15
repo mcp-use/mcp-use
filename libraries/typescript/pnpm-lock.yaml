@@ -1614,18 +1614,12 @@ importers:
 
   packages/server/examples/auth/supabase:
     dependencies:
-      '@hono/node-server':
-        specifier: ^2.0.6
-        version: 2.0.8(hono@4.12.27)
       '@mcp-use/server':
         specifier: workspace:*
         version: link:../../..
       '@supabase/supabase-js':
         specifier: ^2.104.0
         version: 2.104.0
-      hono:
-        specifier: '>=4.12.27'
-        version: 4.12.27
       zod:
         specifier: 4.4.3
         version: 4.4.3
