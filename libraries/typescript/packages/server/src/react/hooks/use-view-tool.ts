@@ -8,7 +8,6 @@ import type {
   ToolResult,
 } from "../../tools.js";
 import { resolveToolInputSchema } from "../../tools.js";
-import type { CallToolResult } from "../types/result-types.js";
 import { useViewRuntime } from "../runtime/view-runtime-context.js";
 import type { McpAppRuntime } from "../runtime/view-runtime.js";
 
@@ -122,17 +121,11 @@ export function useViewTool<
           config.annotations = def.annotations;
         }
 
-        // ToolResult (v2 SDK) is wire-compatible with ext-apps' CallToolResult.
         const callback = async (args: unknown) =>
-          (await handlerRef.current(args as TInput)) as CallToolResult;
+          handlerRef.current(args as TInput);
 
         try {
-          registration = runtime.registerViewTool(
-            name,
-            config,
-            // v2 ToolResult matches ext-apps CallToolResult on the wire; SDK index signatures differ.
-            callback as never
-          );
+          registration = runtime.registerViewTool(name, config, callback);
         } catch (error: unknown) {
           console.error(
             `[mcp-use] useViewTool failed to register tool "${name}":`,

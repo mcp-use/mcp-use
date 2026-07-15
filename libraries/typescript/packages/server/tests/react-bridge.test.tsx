@@ -47,9 +47,9 @@ function appCapabilities(
 } {
   return (
     app as unknown as {
-      _capabilities: { availableDisplayModes?: readonly string[] };
+      _appCapabilities: { availableDisplayModes?: readonly string[] };
     }
-  )._capabilities;
+  )._appCapabilities;
 }
 
 function resetRuntime(): void {
