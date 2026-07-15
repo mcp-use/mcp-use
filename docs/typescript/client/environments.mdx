@@ -1,416 +1,65 @@
 ---
 title: "Environments"
-description: "Use MCP client in Node.js, browser, and React applications"
+description: "Use the MCP client in Node.js, browser, and React"
 icon: "container"
 ---
 
-The root `@mcp-use/client` import works across JavaScript runtimes. Package
-conditions select Node capabilities or the browser-safe HTTP implementation;
-React remains a separate integration because React is an optional peer.
+The root `@mcp-use/client` import picks Node or browser behavior via package conditions. React is a separate entry.
 
-## Overview
-
-The library provides three main entry points:
-
-| Env         | Import                  | Connection         | Use Cases                                        |
-| ----------- | ----------------------- | ------------------ | ------------------------------------------------ |
-| **Node.js** | `@mcp-use/client`       | HTTP, Standard I/O | Servers, automation scripts, programmatic access |
-| **Browser** | `@mcp-use/client`       | HTTP               | Web apps, browser extensions                     |
-| **React**   | `@mcp-use/client/react` | HTTP               | React applications with hooks                    |
+| Environment | Import | HTTP | Stdio | Code mode |
+| ----------- | ------ | ---- | ----- | --------- |
+| Node.js 20+ | `@mcp-use/client` | ✅ | ✅ | ✅ |
+| Browser | `@mcp-use/client` | ✅ | ❌ | ❌ |
+| React | `@mcp-use/client/react` | ✅ | ❌ | ❌ |
 
 ## Node.js
-
-The Node.js environment provides the full feature set, including HTTP connections to remote servers, Standard I/O connections to local servers, file system operations, and code execution mode.
-
-<Note>**Node.js 20.19 or higher, or 22.12 or higher required**.</Note>
-
-```typescript
-import { MCPClient } from "@mcp-use/client";
-
-const client = new MCPClient({
-  mcpServers: {
-    remoteApi: {
-      url: "https://api.example.com/mcp",
-      headers: {
-        Authorization: "Bearer YOUR_TOKEN",
-      },
-    },
-    filesystem: {
-      command: "npx",
-      args: ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"],
-    },
-  },
-});
-
-const connections = await client.connectAll();
-
-const remoteTools = await connections.remoteApi.listTools();
-const filesystemTools = await connections.filesystem.listTools();
-
-console.log(
-  "Remote tools:",
-  remoteTools.map((tool) => tool.name),
-);
-console.log(
-  "Filesystem tools:",
-  filesystemTools.map((tool) => tool.name),
-);
-
-await client.close();
-```
-
-### Loading from Config File
-
-Node.js supports loading configuration from JSON files:
 
 ```typescript
 import { MCPClient, loadConfigFile } from "@mcp-use/client";
 
-const config = await loadConfigFile("mcp-config.json");
-const client = new MCPClient(config);
-
-await client.connectAll();
-```
-
-#### Config File Structure
-
-The configuration file should be a JSON file with an `mcpServers` object containing your server definitions:
-
-```json
-{
-  "mcpServers": {
-    "remoteApi": {
-      "url": "https://api.example.com/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN"
-      }
-    },
-    "filesystem": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
-    }
-  }
-}
-```
-
-<Tip>
-  For every configuration field and constructor option, see the [`MCPClient` API
-  reference](/typescript/api-reference/client/mcp-client).
-</Tip>
-
-### Supported Connection Types
-
-Node.js supports HTTP and Standard I/O connections:
-
-<CodeGroup>
-```typescript HTTP
-import { MCPClient } from "@mcp-use/client";
-
-const client = new MCPClient({
-mcpServers: {
-myServer: {
-url: "https://api.example.com/mcp",
-headers: {
-Authorization: "Bearer YOUR_TOKEN",
-},
-},
-},
-});
-
-````
-
-```typescript Standard I/O
-import { MCPClient } from "@mcp-use/client";
-
+// Inline config
 const client = new MCPClient({
   mcpServers: {
-    myServer: {
+    api: { url: "https://api.example.com/mcp" },
+    fs: {
       command: "npx",
-      args: ["-y", "@my-mcp/server"],
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
     },
   },
 });
-````
 
-</CodeGroup>
+// Or from a JSON file
+const client2 = new MCPClient(loadConfigFile("./mcp-config.json"));
 
-### Node.js-Specific Features
-
-Node.js environment includes additional capabilities:
-
-- **HTTP Support**: Full support for HTTP and Server-Sent Events
-- **Standard I/O connections**: Connect to local MCP servers via child processes
-- **File System Operations**: Load config files, save configurations
-- **Code Mode**: Execute code in sandboxed environments (VM or E2B)
+const connections = await client.connectAll();
+await connections.api.callTool("ping", {});
+await client.close();
+```
 
 ## Browser
 
-The browser version is optimized for client-side JavaScript, excluding Node.js-specific APIs like file system and child processes.
+HTTP only. No stdio, config files, or code mode.
 
 ```typescript
 import { MCPClient } from "@mcp-use/client";
 
-// Create client with HTTP server
 const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      url: "https://api.example.com/mcp",
-      headers: {
-        Authorization: "Bearer YOUR_TOKEN",
-      },
-    },
-  },
+  mcpServers: { api: { url: "https://api.example.com/mcp" } },
 });
 
-// Connect to all servers
-await client.createAllSessions();
-
-// Use the session
-const session = client.getSession("myServer");
-const result = await session.callTool("tool_name", { param: "value" });
-console.log(result);
-
-// Cleanup
-await client.closeAllSessions();
+const connection = await client.connect("api");
+await connection.callTool("tool", {});
+await client.close();
 ```
-
-### Supported Connection Types
 
 <Warning>
-  **HTTP only**: Browser environments connect to MCP servers over HTTP. Standard
-  I/O connections require child processes, which browsers cannot spawn.
+  Do not hardcode secrets in browser bundles. Use OAuth or a backend proxy.
 </Warning>
 
-```typescript
-// Streamable HTTP
-const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      url: "https://api.example.com/mcp",
-    },
-  },
-});
-```
-
-### Browser Limitations
-
-The browser client has some limitations compared to Node.js:
-
-- ✅ **HTTP**: Full support for remote connections
-- ✅ **OAuth**: Complete OAuth flow support
-- ❌ **No Standard I/O**: Cannot spawn child processes
-- ❌ **No File System**: Cannot read/write config files
-- ❌ **No Code Mode**: Sandboxed code execution not available
-
-### OAuth in Browser
-
-OAuth works the same as in Node: connect to a protected server and the SDK
-creates the right provider and runs the flow. See
-[Authentication](/typescript/client/authentication) for options like
-`callbackUrl`, pre-registered clients, and CIMD.
-
 ## React
-
-The React integration provides a hook-based API that automatically manages connections, state, and authentication.
-
-### Installation
 
 ```bash
 npm install @mcp-use/client react
 ```
 
-The `useMcp` hook is the simplest way to integrate MCP in React applications:
-
-```typescript
-import { useMcp } from "@mcp-use/client/react";
-
-function MyComponent() {
-  const mcp = useMcp({
-    url: "https://api.example.com/mcp",
-    headers: {
-      Authorization: "Bearer YOUR_API_KEY",
-    },
-  });
-
-  // Wait for connection
-  if (mcp.state !== "ready") {
-    return <div>Connecting to MCP server...</div>;
-  }
-
-  // Show available tools
-  return (
-    <div>
-      <h2>Available Tools</h2>
-      <ul>
-        {mcp.tools.map((tool) => (
-          <li key={tool.name}>
-            <strong>{tool.name}</strong>: {tool.description}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-```
-
-### Connection States
-
-The hook manages connection state automatically:
-
-```typescript
-function ConnectionStatus() {
-  const mcp = useMcp({ url: "https://api.example.com/mcp" });
-
-  return (
-    <div>
-      {mcp.state === "discovering" && <p>🔍 Discovering server...</p>}
-      {mcp.state === "authenticating" && <p>🔐 Authenticating...</p>}
-      {mcp.state === "pending_auth" && <p>⏳ Waiting for authorization...</p>}
-      {mcp.state === "ready" && <p>✅ Connected and ready!</p>}
-      {mcp.state === "failed" && (
-        <div>
-          <p>❌ Connection failed</p>
-          <p>{mcp.error}</p>
-          <button onClick={mcp.retry}>Retry</button>
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
-### Calling Tools
-
-```typescript
-function ToolExecutor() {
-  const mcp = useMcp({ url: "https://api.example.com/mcp" });
-  const [result, setResult] = React.useState(null);
-
-  const handleCallTool = async () => {
-    try {
-      const result = await mcp.callTool("send-email", {
-        to: "user@example.com",
-        subject: "Hello",
-        body: "Test message",
-      });
-      setResult(result);
-    } catch (error) {
-      console.error("Tool call failed:", error);
-    }
-  };
-
-  return (
-    <div>
-      <button onClick={handleCallTool} disabled={mcp.state !== "ready"}>
-        Send Email
-      </button>
-      {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
-    </div>
-  );
-}
-```
-
-### OAuth Authentication
-
-The hook provides complete OAuth flow management:
-
-```typescript
-function OAuthApp() {
-  const mcp = useMcp({
-    url: "https://api.example.com/mcp",
-    // OAuth is auto-detected from server metadata
-  });
-
-  if (mcp.state === "pending_auth") {
-    return (
-      <div>
-        <h2>Authorization Required</h2>
-        <p>Please authorize the application to continue.</p>
-        <a href={mcp.authUrl} target="_blank">
-          Authorize Now
-        </a>
-      </div>
-    );
-  }
-
-  return <div>Ready to use!</div>;
-}
-```
-
-### React Hook Features
-
-The `useMcp` hook provides:
-
-- ✅ **Automatic Connection**: Manages connect, disconnect, and reconnect
-- ✅ **State Management**: Reactive state updates for UI synchronization
-- ✅ **OAuth Support**: Complete OAuth flow with token management
-- ✅ **Tool Execution**: Call tools with automatic error handling
-- ✅ **Type Safety**: Full TypeScript support with type inference
-- ✅ **Resource Access**: Read resources and prompts from servers
-
-## Environment Comparison
-
-### Feature Support Matrix
-
-| Feature                    | Node.js | Browser | React |
-| -------------------------- | ------- | ------- | ----- |
-| HTTP Connections           | ✅      | ✅      | ✅    |
-| Standard I/O Connections   | ✅      | ❌      | ❌    |
-| OAuth Authentication       | ✅      | ✅      | ✅    |
-| File System Operations     | ✅      | ❌      | ❌    |
-| Code Mode                  | ✅      | ❌      | ❌    |
-| Config File Loading        | ✅      | ❌      | ❌    |
-| Automatic State Management | ❌      | ❌      | ✅    |
-| React Hooks                | ❌      | ❌      | ✅    |
-
-### Security Considerations
-
-<Warning>
-  **Browser Security**: Never expose sensitive tokens or credentials in
-  client-side code. Use OAuth flows or secure proxy servers for authentication.
-</Warning>
-
-```typescript
-// ❌ Bad: Hardcoded credentials in browser
-const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      url: "https://api.example.com/mcp",
-      headers: {
-        Authorization: "Bearer SECRET_TOKEN", // Don't do this!
-      },
-    },
-  },
-});
-
-// ✅ Good: Use OAuth or environment-based tokens
-const client = new MCPClient({
-  mcpServers: {
-    myServer: {
-      url: "https://api.example.com/mcp",
-      authProvider: oauthProvider, // OAuth flow
-    },
-  },
-});
-```
-
-## Next Steps
-
-<CardGroup cols={2}>
-  <Card
-    title="MCPClient reference"
-    icon="router"
-    href="/typescript/api-reference/client/mcp-client"
-  >
-    Look up client configuration fields and lifecycle methods
-  </Card>
-  <Card title="Tools" icon="wrench" href="/typescript/client/tools">
-    Call tools and handle results
-  </Card>
-  <Card title="OAuth" icon="shield" href="/typescript/client/authentication">
-    Set up OAuth authentication
-  </Card>
-  <Card title="useMcp Hook" icon="react" href="/typescript/client/usemcp">
-    Detailed React hook documentation
-  </Card>
-</CardGroup>
+See [React integration](/typescript/client/usemcp). Widget rendering hooks are in `mcp-use/react`.
