@@ -3,11 +3,7 @@ import {
   UnauthorizedError,
   type OAuthClientProvider,
 } from "@modelcontextprotocol/client";
-import {
-  MCP_AUTH_BROADCAST_CHANNEL,
-  MCP_AUTH_CALLBACK_MESSAGE_TYPE,
-  type McpAuthCallbackMessage,
-} from "./popup.js";
+import { runAuthPopup } from "./popup.js";
 
 const DEFAULT_AUTH_TIMEOUT_MS = 5 * 60_000;
 
@@ -17,6 +13,9 @@ type FlowProvider = OAuthClientProvider & {
   hasPendingFlow?: boolean;
   getAuthorizationCode?: () => Promise<string>;
   getProxyFetch?: (baseFetch?: typeof fetch) => typeof fetch | undefined;
+  getKey?: (keySuffix: string) => string;
+  getLastAttemptedAuthUrl?: () => string | null;
+  useRedirectFlow?: boolean;
 };
 
 /**
@@ -81,90 +80,60 @@ export async function completeOAuthFlow(
     return;
   }
 
-  await waitForBrowserAuthCallback(flowProvider, timeoutMs);
+  await waitForBrowserAuthComplete(flowProvider, timeoutMs);
 }
 
-function waitForBrowserAuthCallback(
+async function waitForBrowserAuthComplete(
   provider: FlowProvider,
   timeoutMs: number
 ): Promise<void> {
   if (typeof window === "undefined") {
-    return Promise.reject(
-      new Error(
-        "OAuth redirect requires a browser environment or a provider with getAuthorizationCode()"
-      )
+    throw new Error(
+      "OAuth redirect requires a browser environment or a provider with getAuthorizationCode()"
     );
   }
 
-  const expectedHash = provider.serverUrlHash;
+  if (provider.useRedirectFlow) {
+    // Full-page redirect navigates away; nothing to await in-page.
+    return;
+  }
 
-  return new Promise<void>((resolve, reject) => {
-    let settled = false;
-    let broadcast: BroadcastChannel | null = null;
+  const tokensKey = provider.getKey?.("tokens");
+  if (!tokensKey) {
+    throw new Error(
+      "Browser OAuth provider must expose getKey() for token storage"
+    );
+  }
 
-    const cleanup = () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("message", onMessage);
-      try {
-        broadcast?.close();
-      } catch {
-        // ignore
-      }
-    };
-
-    const settle = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      fn();
-    };
-
-    const handlePayload = (data: unknown) => {
-      if (!data || typeof data !== "object") return;
-      const payload = data as McpAuthCallbackMessage;
-      if (payload.type !== MCP_AUTH_CALLBACK_MESSAGE_TYPE) return;
-      if (
-        expectedHash &&
-        payload.serverUrlHash &&
-        payload.serverUrlHash !== expectedHash
-      ) {
-        return;
-      }
-      if (payload.success) {
-        settle(() => resolve());
-        return;
-      }
-      settle(() =>
-        reject(
-          new Error(payload.error ?? "OAuth authentication failed in callback")
-        )
-      );
-    };
-
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      handlePayload(event.data);
-    };
-
-    window.addEventListener("message", onMessage);
-
-    if (typeof BroadcastChannel !== "undefined") {
-      try {
-        broadcast = new BroadcastChannel(MCP_AUTH_BROADCAST_CHANNEL);
-        broadcast.onmessage = (event) => handlePayload(event.data);
-      } catch {
-        // postMessage-only fallback
-      }
+  let state: string | null = null;
+  const authUrl = provider.getLastAttemptedAuthUrl?.();
+  if (authUrl) {
+    try {
+      state = new URL(authUrl).searchParams.get("state");
+    } catch {
+      // state-less fallback is supported by runAuthPopup
     }
+  }
 
-    const timer = window.setTimeout(() => {
-      settle(() =>
-        reject(
-          new Error(
-            `OAuth callback not received within ${timeoutMs}ms. Ensure /oauth/callback calls onMcpAuthorization().`
-          )
-        )
-      );
-    }, timeoutMs);
+  const result = await runAuthPopup({
+    popup: null,
+    state,
+    tokensKey,
+    timeoutMs,
   });
+
+  switch (result.kind) {
+    case "success":
+      return;
+    case "cancelled":
+      throw new Error("OAuth authentication was cancelled.");
+    case "timeout":
+      throw new Error(
+        `OAuth callback not received within ${timeoutMs}ms. Ensure /oauth/callback calls onMcpAuthorization().`
+      );
+    case "error":
+      throw new Error(result.error);
+    default:
+      throw new Error(`Unexpected OAuth popup result: ${result.kind}`);
+  }
 }

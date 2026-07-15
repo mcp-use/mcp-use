@@ -29,7 +29,7 @@ export interface MCPServerInfo {
 /**
  * Connection metadata available after the MCP SDK has negotiated a protocol.
  *
- * `rawCapabilities` retains protocol-specific extensions without requiring
+ * `extensions` retains protocol-specific extensions without requiring
  * callers to branch on the negotiated era.
  */
 export interface MCPConnectionInfo {

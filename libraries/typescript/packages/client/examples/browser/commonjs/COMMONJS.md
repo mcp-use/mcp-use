@@ -4,6 +4,8 @@
 
 ## Run
 
+From this directory (`examples/browser/commonjs/`):
+
 ```bash
 # Start a demo first: cd ../_demo-servers && PORT=3102 pnpm v2
 MCP_SERVER_URL=http://127.0.0.1:3101/mcp node commonjs_example.cjs
@@ -13,7 +15,11 @@ MCP_SERVER_URL=http://127.0.0.1:3102/mcp node commonjs_example.cjs
 USE_STDIO_EVERYTHING=1 node commonjs_example.cjs
 ```
 
-Run from `packages/client` so Node resolves the workspace package (after `pnpm build`).
+From `packages/client` (after `pnpm build`):
+
+```bash
+node examples/browser/commonjs/commonjs_example.cjs
+```
 
 ## Pattern
 

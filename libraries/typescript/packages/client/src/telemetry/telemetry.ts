@@ -30,6 +30,24 @@ function secureRandomString(): string {
   return Array.from(array, (v) => v.toString(16).padStart(2, "0")).join("");
 }
 
+/** True when semver `a` is strictly greater than `b` (numeric segments only). */
+export function isVersionGreater(a: string, b: string): boolean {
+  const parse = (v: string) =>
+    v
+      .split("-")[0]
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
+  const pa = parse(a);
+  const pb = parse(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const da = pa[i] ?? 0;
+    const db = pb[i] ?? 0;
+    if (da !== db) return da > db;
+  }
+  return false;
+}
+
 export type TelemetryStorage = {
   getUserId(): string | null;
   setUserId(id: string): void;
@@ -374,7 +392,7 @@ export class Telemetry {
       shouldTrack = true;
       firstDownload = true;
       this._storage.setDownloadedVersion(currentVersion);
-    } else if (currentVersion > saved) {
+    } else if (isVersionGreater(currentVersion, saved)) {
       shouldTrack = true;
       this._storage.setDownloadedVersion(currentVersion);
     }

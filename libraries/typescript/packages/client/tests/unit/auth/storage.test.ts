@@ -2,7 +2,7 @@
  * Unit tests for FileKVStore.
  *
  * Run with:
- *   pnpm --filter mcp-use test:unit -- tests/unit/auth/storage.test.ts
+ *   pnpm --filter @mcp-use/client test:run -- tests/unit/auth/storage.test.ts
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";

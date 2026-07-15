@@ -723,7 +723,7 @@ jobs:
       - name: Generate version file
         # src/version.ts is gitignored and produced at build time; knip needs it
         # to resolve the `./version.js` imports in packages/mcp-use.
-        run: pnpm --filter mcp-use generate:version && pnpm --filter @mcp-use/client generate:version
+        run: pnpm --filter mcp-use generate:version
       - name: Run Knip
         run: |
           set -o pipefail

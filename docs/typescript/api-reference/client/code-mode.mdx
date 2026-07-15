@@ -2,35 +2,35 @@
 title: "Code Mode"
 description: "Code execution configuration, methods, executor classes, and result types for the TypeScript MCP client."
 icon: "code"
-github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client.ts"
+github: "https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/core/node.ts"
 ---
 
 <Callout type="info" title="Source Code">
   View the client source on GitHub:{" "}
   <a
-    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client.ts"
+    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/core/node.ts"
     target="_blank"
     rel="noopener noreferrer"
   >
-    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client.ts
+    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/core/node.ts
   </a>
   <br />
   View the executor base types:{" "}
   <a
-    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client/executors/base.ts"
+    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/code-mode/executor.ts"
     target="_blank"
     rel="noopener noreferrer"
   >
-    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client/executors/base.ts
+    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/code-mode/executor.ts
   </a>
   <br />
   View the Code Mode connector:{" "}
   <a
-    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client/connectors/codeMode.ts"
+    href="https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/code-mode/connector.ts"
     target="_blank"
     rel="noopener noreferrer"
   >
-    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/client/connectors/codeMode.ts
+    https://github.com/mcp-use/mcp-use/blob/main/libraries/typescript/packages/client/src/code-mode/connector.ts
   </a>
 </Callout>
 
@@ -119,7 +119,11 @@ interface VMExecutorOptions {
 
 ### E2BExecutorOptions
 
-Options for the E2B cloud sandbox executor.
+Options for the E2B cloud sandbox executor. Install the peer dependency first:
+
+```bash
+npm install @e2b/code-interpreter
+```
 
 **Fields**
 

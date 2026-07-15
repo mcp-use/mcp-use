@@ -106,11 +106,12 @@ class SimpleConsoleLogger {
 export class Logger {
   private static instances: Record<string, SimpleConsoleLogger> = {};
   private static currentFormat: LogFormat = "minimal";
+  private static currentLevel: LogLevel | undefined;
 
   static get(name = "mcp-use"): SimpleConsoleLogger {
     return (this.instances[name] ??= new SimpleConsoleLogger(
       name,
-      envLevel(),
+      this.currentLevel ?? envLevel(),
       this.currentFormat
     ));
   }
@@ -119,6 +120,7 @@ export class Logger {
     level = envLevel(),
     format = "minimal",
   }: { level?: LogLevel; format?: LogFormat } = {}): void {
+    this.currentLevel = level;
     this.currentFormat = format;
     for (const log of Object.values(this.instances)) {
       log.level = level;
@@ -129,6 +131,7 @@ export class Logger {
   static setDebug(enabled: boolean | 0 | 1 | 2): void {
     const level: LogLevel =
       enabled === 2 || enabled === true ? "debug" : "info";
+    this.currentLevel = level;
     for (const log of Object.values(this.instances)) log.level = level;
     try {
       if (typeof process !== "undefined" && process.env) {

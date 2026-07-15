@@ -23,7 +23,6 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "node": {
         "types": "./dist/index.d.ts",
         "import": "./dist/index.js"

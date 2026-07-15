@@ -2,7 +2,7 @@ import type { MCPSession } from "@mcp-use/client";
 import { MCPClient } from "@mcp-use/client";
 import { getPackageVersion } from "mcp-use";
 import { formatError, formatInfo } from "./format.js";
-import { cliOAuthOptions } from "./oauth.js";
+import { cliOAuthOptions, buildOAuthProvider } from "./oauth.js";
 import { getSession } from "./session-storage.js";
 
 export const activeSessions = new Map<
@@ -47,6 +47,19 @@ export async function cleanupAndExit(code: number): Promise<never> {
   process.exit(code);
 }
 
+function decodeJwtExp(token: string): number | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf-8")
+    );
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Get or restore a session by name. For OAuth-mode sessions whose tokens
  * have expired and can't be refreshed, prompts to re-auth on TTY or prints
@@ -79,6 +92,36 @@ export async function getOrRestoreSession(
 
     if (config.type === "http") {
       if (config.authMode === "oauth") {
+        if (!process.stdin.isTTY) {
+          const provider = await buildOAuthProvider(config.url!);
+          const tokens = await provider.tokens();
+          if (!tokens?.access_token) {
+            console.error(
+              formatError(`No OAuth tokens for server '${sessionName}'.`)
+            );
+            console.error(
+              formatInfo(
+                `Run: mcp-use client connect ${sessionName} ${config.url}`
+              )
+            );
+            return null;
+          }
+          const exp = decodeJwtExp(tokens.access_token);
+          const expired = exp !== null && exp * 1000 <= Date.now();
+          if (expired && !tokens.refresh_token) {
+            console.error(
+              formatError(
+                `OAuth tokens for server '${sessionName}' are expired.`
+              )
+            );
+            console.error(
+              formatInfo(
+                `Run: mcp-use client connect ${sessionName} ${config.url}`
+              )
+            );
+            return null;
+          }
+        }
         client.addServer(sessionName, {
           url: config.url!,
           oauth: cliOAuthOptions(),

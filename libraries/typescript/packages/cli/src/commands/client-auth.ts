@@ -4,7 +4,7 @@ import {
   formatKeyValue,
   formatSuccess,
 } from "../utils/format.js";
-import { auth } from "@mcp-use/client";
+import { completeOAuthFlow } from "@mcp-use/client";
 import { buildOAuthProvider } from "../utils/oauth.js";
 import { getSession } from "../utils/session-storage.js";
 
@@ -87,9 +87,23 @@ export async function authRefreshCommand(name: string): Promise<void> {
   }
   const { name: serverName, url } = target;
   const provider = await buildOAuthProvider(url);
-  const result = await auth(provider, { serverUrl: url });
+  try {
+    await completeOAuthFlow(provider, url);
+  } catch (error) {
+    console.error(
+      formatError(
+        error instanceof Error
+          ? error.message
+          : "Refresh failed (no refresh_token, or server rejected)."
+      )
+    );
+    console.error(
+      formatInfo(`Run: mcp-use client connect ${serverName} ${url}`)
+    );
+    process.exit(1);
+  }
   const refreshed = await provider.tokens();
-  if (result !== "AUTHORIZED" || !refreshed?.access_token) {
+  if (!refreshed?.access_token) {
     console.error(
       formatError(
         "Refresh failed (no refresh_token, or server rejected). Re-connect to re-authenticate."
