@@ -1858,9 +1858,18 @@ importers:
       '@mcp-use/server':
         specifier: workspace:*
         version: link:../../..
+      '@modelcontextprotocol/client':
+        specifier: https://pkg.pr.new/@modelcontextprotocol/client@2501
+        version: https://pkg.pr.new/@modelcontextprotocol/client@2501
+      '@modelcontextprotocol/core':
+        specifier: https://pkg.pr.new/@modelcontextprotocol/core@2501
+        version: https://pkg.pr.new/@modelcontextprotocol/core@2501
       '@modelcontextprotocol/ext-apps':
-        specifier: ^1.7.4
-        version: 1.7.4(@modelcontextprotocol/sdk@1.27.1(patch_hash=c19f2c8d79a374e03317396864f51a5d896e73b8a2231766cdc88bfbac98161e)(@cfworker/json-schema@4.1.1)(zod@4.4.3))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+        specifier: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712
+        version: https://pkg.pr.new/@modelcontextprotocol/ext-apps@712(@modelcontextprotocol/client@https://pkg.pr.new/@modelcontextprotocol/client@2501)(@modelcontextprotocol/core@https://pkg.pr.new/@modelcontextprotocol/core@2501)(@modelcontextprotocol/server@https://pkg.pr.new/@modelcontextprotocol/server@2501)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(zod@4.4.3)
+      '@modelcontextprotocol/server':
+        specifier: https://pkg.pr.new/@modelcontextprotocol/server@2501
+        version: https://pkg.pr.new/@modelcontextprotocol/server@2501
       react:
         specifier: ^19.2.0
         version: 19.2.4
