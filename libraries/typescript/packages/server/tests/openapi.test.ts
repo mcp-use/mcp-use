@@ -63,6 +63,16 @@ async function handleUpstreamRequest(
     response.end("upstream rejected the request");
     return;
   }
+  if (request.url === "/v1/empty-json") {
+    response.setHeader("content-type", "application/json");
+    response.end();
+    return;
+  }
+  if (request.url === "/v1/invalid-json") {
+    response.setHeader("content-type", "application/json");
+    response.end("not valid json");
+    return;
+  }
   if (request.method === "PATCH") {
     response.setHeader("content-type", "text/plain");
     response.end("updated");
@@ -337,6 +347,7 @@ describe("MCPServer.fromOpenAPI", () => {
   });
 
   it("creates deterministic fallback names and deduplicates collisions", async () => {
+    const longOperationId = "a".repeat(64);
     const options: FromOpenAPIOptions = {
       baseUrl: upstreamBaseUrl,
       spec: {
@@ -359,6 +370,18 @@ describe("MCPServer.fromOpenAPI", () => {
               responses: { "200": { description: "ok" } },
             },
           },
+          "/long-first": {
+            get: {
+              operationId: longOperationId,
+              responses: { "200": { description: "ok" } },
+            },
+          },
+          "/long-second": {
+            get: {
+              operationId: longOperationId,
+              responses: { "200": { description: "ok" } },
+            },
+          },
         },
       },
     };
@@ -370,10 +393,146 @@ describe("MCPServer.fromOpenAPI", () => {
         "post_reports_id",
         "getReport",
         "getReport_2",
+        longOperationId,
+        `${"a".repeat(62)}_2`,
       ]);
+      expect(tools.every((tool) => tool.name.length <= 64)).toBe(true);
       expect(connection.client.getServerVersion()?.version).toBe("1.0.0");
     } finally {
       await connection.close();
     }
+  });
+
+  it("disambiguates same-name parameters and a body parameter", async () => {
+    captured.length = 0;
+    const spec: OpenAPIDocument = {
+      openapi: "3.1.0",
+      info: { title: "Input collision API" },
+      servers: [{ url: upstreamBaseUrl }],
+      paths: {
+        "/collisions/{body}": {
+          post: {
+            operationId: "testInputCollisions",
+            parameters: [
+              {
+                name: "body",
+                in: "path",
+                required: true,
+                schema: { type: "string" },
+              },
+              {
+                name: "body",
+                in: "query",
+                required: true,
+                schema: { type: "string" },
+              },
+              {
+                name: "body",
+                in: "header",
+                required: true,
+                schema: { type: "string" },
+              },
+            ],
+            requestBody: {
+              required: true,
+              content: {
+                "application/json": {
+                  schema: {
+                    type: "object",
+                    properties: { value: { type: "string" } },
+                    required: ["value"],
+                  },
+                },
+              },
+            },
+            responses: { "200": { description: "ok" } },
+          },
+        },
+      },
+    };
+    const connection = await connect(MCPServer.fromOpenAPI({ spec }));
+    try {
+      const { tools } = await connection.client.listTools();
+      expect(tools[0]?.inputSchema).toMatchObject({
+        required: ["body_path", "body_query", "body_header", "body"],
+        properties: {
+          body_path: { description: "path parameter" },
+          body_query: { description: "query parameter" },
+          body_header: { description: "header parameter" },
+          body: { type: "object" },
+        },
+      });
+
+      await connection.client.callTool({
+        name: "testInputCollisions",
+        arguments: {
+          body_path: "path value",
+          body_query: "query value",
+          body_header: "header value",
+          body: { value: "request body" },
+        },
+      });
+      expect(captured[0]).toMatchObject({
+        method: "POST",
+        url: "/v1/collisions/path%20value?body=query+value",
+        body: JSON.stringify({ value: "request body" }),
+      });
+      expect(captured[0]?.headers).toMatchObject({ body: "header value" });
+    } finally {
+      await connection.close();
+    }
+  });
+
+  it("falls back to text for empty or invalid JSON responses", async () => {
+    const spec: OpenAPIDocument = {
+      openapi: "3.1.0",
+      info: { title: "JSON fallback API" },
+      servers: [{ url: upstreamBaseUrl }],
+      paths: {
+        "/empty-json": {
+          get: {
+            operationId: "emptyJson",
+            responses: { "200": { description: "ok" } },
+          },
+        },
+        "/invalid-json": {
+          get: {
+            operationId: "invalidJson",
+            responses: { "200": { description: "ok" } },
+          },
+        },
+      },
+    };
+    const connection = await connect(MCPServer.fromOpenAPI({ spec }));
+    try {
+      await expect(
+        connection.client.callTool({ name: "emptyJson", arguments: {} })
+      ).resolves.toMatchObject({ content: [{ type: "text", text: "" }] });
+      await expect(
+        connection.client.callTool({ name: "invalidJson", arguments: {} })
+      ).resolves.toMatchObject({
+        content: [{ type: "text", text: "not valid json" }],
+      });
+    } finally {
+      await connection.close();
+    }
+  });
+
+  it("requires an upstream base URL when operations are present", () => {
+    expect(() =>
+      MCPServer.fromOpenAPI({
+        spec: {
+          openapi: "3.1.0",
+          info: { title: "Missing URL API" },
+          paths: {
+            "/status": {
+              get: { responses: { "200": { description: "ok" } } },
+            },
+          },
+        },
+      })
+    ).toThrow(
+      "MCPServer.fromOpenAPI requires options.baseUrl or spec.servers[0].url"
+    );
   });
 });

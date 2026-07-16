@@ -51,20 +51,37 @@ export function registerOpenAPITools(
 ): void {
   const operations = collectOperations(options.spec, options);
   const names = createToolNames(operations);
+  const baseUrl = operations.length > 0 ? resolveBaseUrl(options) : undefined;
 
   for (const [index, operation] of operations.entries()) {
     const name = names[index];
-    if (name === undefined) continue;
+    if (name === undefined || baseUrl === undefined) continue;
+    const inputBindings = createInputBindings(operation);
 
     server.tool(
       {
         name,
         description: createToolDescription(operation),
-        inputSchema: createToolInputSchema(options.spec, operation),
+        inputSchema: createToolInputSchema(
+          options.spec,
+          operation,
+          inputBindings
+        ),
       },
-      async (params) => callOpenAPIOperation(operation, params, options)
+      async (params) =>
+        callOpenAPIOperation(operation, params, options, inputBindings, baseUrl)
     );
   }
+}
+
+interface OpenAPIParameterBinding {
+  parameter: OpenAPIParameterObject;
+  inputName: string;
+}
+
+interface OpenAPIInputBindings {
+  parameters: OpenAPIParameterBinding[];
+  bodyInputName?: string;
 }
 
 function collectOperations(
@@ -186,7 +203,10 @@ function createToolNames(operations: CollectedOpenAPIOperation[]): string[] {
     );
     const count = seen.get(baseName) ?? 0;
     seen.set(baseName, count + 1);
-    return count === 0 ? baseName : `${baseName}_${count + 1}`;
+    if (count === 0) return baseName;
+
+    const suffix = `_${count + 1}`;
+    return `${baseName.slice(0, 64 - suffix.length)}${suffix}`;
   });
 }
 
@@ -213,31 +233,32 @@ function slugifyToolName(value: string): string {
 
 function createToolInputSchema(
   spec: OpenAPIDocument,
-  operation: CollectedOpenAPIOperation
+  operation: CollectedOpenAPIOperation,
+  inputBindings: OpenAPIInputBindings
 ): StandardSchemaWithJSON<Record<string, unknown>, Record<string, unknown>> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
 
-  for (const parameter of operation.parameters) {
-    if (parameter.in === "cookie") continue;
-
+  for (const { parameter, inputName } of inputBindings.parameters) {
     const parameterSchema = transformSchema(
       spec,
       parameter.schema ?? ({} satisfies OpenAPISchemaObject)
     );
-    properties[parameter.name] = {
+    properties[inputName] = {
       ...parameterSchema,
       description: parameter.description ?? `${parameter.in} parameter`,
     };
     if (parameter.required || parameter.in === "path") {
-      required.push(parameter.name);
+      required.push(inputName);
     }
   }
 
   const bodySchema = getJsonRequestBodySchema(operation.requestBody);
-  if (bodySchema !== undefined) {
-    properties["body"] = transformSchema(spec, bodySchema);
-    if (operation.requestBody?.required) required.push("body");
+  if (bodySchema !== undefined && inputBindings.bodyInputName !== undefined) {
+    properties[inputBindings.bodyInputName] = transformSchema(spec, bodySchema);
+    if (operation.requestBody?.required) {
+      required.push(inputBindings.bodyInputName);
+    }
   }
 
   const definitions = createSchemaDefinitions(spec);
@@ -250,6 +271,52 @@ function createToolInputSchema(
   };
 
   return fromJsonSchema<Record<string, unknown>>(schema as JsonSchemaType);
+}
+
+function createInputBindings(
+  operation: CollectedOpenAPIOperation
+): OpenAPIInputBindings {
+  const parameters = operation.parameters.filter(
+    (parameter) => parameter.in !== "cookie"
+  );
+  const bodyInputName =
+    getJsonRequestBodySchema(operation.requestBody) === undefined
+      ? undefined
+      : "body";
+  const nameCounts = new Map<string, number>();
+  for (const parameter of parameters) {
+    nameCounts.set(parameter.name, (nameCounts.get(parameter.name) ?? 0) + 1);
+  }
+
+  const usedNames = new Set(bodyInputName === undefined ? [] : [bodyInputName]);
+  const bindings = parameters.map((parameter) => {
+    const needsLocation =
+      (nameCounts.get(parameter.name) ?? 0) > 1 ||
+      parameter.name === bodyInputName;
+    const preferredName = needsLocation
+      ? `${parameter.name}_${parameter.in}`
+      : parameter.name;
+    return {
+      parameter,
+      inputName: claimInputName(preferredName, usedNames),
+    };
+  });
+
+  return {
+    parameters: bindings,
+    ...(bodyInputName !== undefined && { bodyInputName }),
+  };
+}
+
+function claimInputName(preferredName: string, usedNames: Set<string>): string {
+  let inputName = preferredName;
+  let suffix = 2;
+  while (usedNames.has(inputName)) {
+    inputName = `${preferredName}_${suffix}`;
+    suffix += 1;
+  }
+  usedNames.add(inputName);
+  return inputName;
 }
 
 function createSchemaDefinitions(
@@ -344,13 +411,18 @@ function getJsonRequestBodySchema(
 async function callOpenAPIOperation(
   operation: CollectedOpenAPIOperation,
   params: Record<string, unknown>,
-  options: FromOpenAPIOptions
+  options: FromOpenAPIOptions,
+  inputBindings: OpenAPIInputBindings,
+  baseUrl: string
 ): Promise<CallToolResult> {
   const fetchImpl = options.fetch ?? globalThis.fetch;
-  const url = buildUrl(operation, params, options);
-  const headers = buildHeaders(operation.parameters, params, options);
+  const url = buildUrl(operation, params, inputBindings.parameters, baseUrl);
+  const headers = buildHeaders(inputBindings.parameters, params, options);
+  const bodyInputName = inputBindings.bodyInputName;
   const body =
-    params["body"] === undefined ? undefined : JSON.stringify(params["body"]);
+    bodyInputName === undefined || params[bodyInputName] === undefined
+      ? undefined
+      : JSON.stringify(params[bodyInputName]);
 
   if (body !== undefined && !hasHeader(headers, "content-type")) {
     headers["content-type"] = "application/json";
@@ -373,11 +445,16 @@ async function callOpenAPIOperation(
     contentType.includes("application/json") ||
     contentType.includes("+json")
   ) {
-    const data = (await response.json()) as JSONValue;
-    return {
-      content: [{ type: "text", text: JSON.stringify(data) }],
-      structuredContent: data,
-    };
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text) as JSONValue;
+      return {
+        content: [{ type: "text", text: JSON.stringify(data) }],
+        structuredContent: data,
+      };
+    } catch {
+      return { content: [{ type: "text", text }] };
+    }
   }
   return { content: [{ type: "text", text: await response.text() }] };
 }
@@ -385,21 +462,28 @@ async function callOpenAPIOperation(
 function buildUrl(
   operation: CollectedOpenAPIOperation,
   params: Record<string, unknown>,
-  options: FromOpenAPIOptions
+  parameterBindings: OpenAPIParameterBinding[],
+  baseUrl: string
 ): string {
-  const baseUrl = options.baseUrl ?? options.spec.servers?.[0]?.url ?? "";
   const interpolatedPath = operation.path.replace(
     /{([^}]+)}/g,
-    (_match, name: string) => encodeURIComponent(String(params[name] ?? ""))
+    (_match, name: string) => {
+      const binding = parameterBindings.find(
+        ({ parameter }) => parameter.in === "path" && parameter.name === name
+      );
+      return encodeURIComponent(
+        String(binding === undefined ? "" : (params[binding.inputName] ?? ""))
+      );
+    }
   );
   const url = new URL(
     interpolatedPath.replace(/^\/+/, ""),
     ensureTrailingSlash(baseUrl)
   );
 
-  for (const parameter of operation.parameters) {
+  for (const { parameter, inputName } of parameterBindings) {
     if (parameter.in !== "query") continue;
-    const value = params[parameter.name];
+    const value = params[inputName];
     if (value === undefined || value === null || value === "") continue;
     appendQueryParam(url, parameter.name, value);
   }
@@ -407,15 +491,15 @@ function buildUrl(
 }
 
 function buildHeaders(
-  parameters: OpenAPIParameterObject[],
+  parameterBindings: OpenAPIParameterBinding[],
   params: Record<string, unknown>,
   options: FromOpenAPIOptions
 ): Record<string, string> {
   const headers: Record<string, string> = { ...(options.headers ?? {}) };
 
-  for (const parameter of parameters) {
+  for (const { parameter, inputName } of parameterBindings) {
     if (parameter.in !== "header") continue;
-    const value = params[parameter.name];
+    const value = params[inputName];
     if (value === undefined || value === null || value === "") continue;
     headers[parameter.name] = String(value);
   }
@@ -426,6 +510,16 @@ function buildHeaders(
     headers[options.auth.name] = options.auth.value;
   }
   return headers;
+}
+
+function resolveBaseUrl(options: FromOpenAPIOptions): string {
+  const baseUrl = options.baseUrl ?? options.spec.servers?.[0]?.url;
+  if (baseUrl === undefined || baseUrl.trim() === "") {
+    throw new Error(
+      "MCPServer.fromOpenAPI requires options.baseUrl or spec.servers[0].url"
+    );
+  }
+  return baseUrl;
 }
 
 function appendQueryParam(url: URL, name: string, value: unknown): void {
