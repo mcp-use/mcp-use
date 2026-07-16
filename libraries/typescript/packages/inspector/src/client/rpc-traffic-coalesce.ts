@@ -1,7 +1,7 @@
 import type { RpcTrafficEntry, RpcTrafficInput } from "./rpc-traffic-store";
 
 /** ponytail: fixed window; raise if resize bursts still feel noisy. */
-export const RPC_COALESCE_WINDOW_MS = 300;
+const RPC_COALESCE_WINDOW_MS = 300;
 
 const COALESCE_METHOD =
   /(?:^|\/)notifications\//;

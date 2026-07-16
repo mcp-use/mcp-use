@@ -29,6 +29,7 @@ export function ServerMetadataTab({ connection }: ServerMetadataTabProps) {
 
   return (
     <div
+      data-testid="server-info-modal"
       className="h-full overflow-y-auto overscroll-none"
       onScroll={(event) => setIsScrolled(event.currentTarget.scrollTop > 0)}
     >

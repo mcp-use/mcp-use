@@ -1,26 +1,8 @@
-/**
- * HostedUserMenu — session-aware avatar for inspector.manufact.com
- *
- * Fetches the current user from `<chatApiUrl origin>/api/auth/get-session`
- * using the shared session cookie (works across *.manufact.com when the
- * backend runs with COOKIE_DOMAIN=.manufact.com).
- *
- * ── Integration points ───────────────────────────────────────────────────
- *  • Mounted by `LayoutHeader` when `embeddedConfig.chatApiUrl` is set.
- *  • `onUserResolved` callback lets LayoutHeader know whether the user is
- *    logged in so it can update the Deploy button href accordingly.
- *  • `fallback` prop: rendered at narrow widths when unauthenticated (logo).
- *  • Listens to the custom `manufact:session-changed` window event so that
- *    after a successful login in `LoginModal` the avatar appears immediately
- *    (LoginModal dispatches this event via `handleSuccess`).
- *
- * ── No extra infrastructure ──────────────────────────────────────────────
- *  Session check is a simple GET — no WebSockets or polling. The only
- *  re-check triggers are: initial mount and `manufact:session-changed`.
- */
+/** OAuth-backed Manufact sign-in button and user menu. */
 import { useEffect, useRef } from "react";
 import type React from "react";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
+import { toast } from "sonner";
 import {
   useHostedSession,
   type HostedUser,
@@ -54,8 +36,6 @@ interface HostedUserMenuProps {
   chatApiUrl: string;
   /** URL to navigate to when "Go to dashboard" is clicked. Defaults to https://manufact.com/cloud */
   dashboardUrl?: string;
-  /** Opens the hosted login modal. When set, anonymous visitors see a Sign in button. */
-  onLoginClick?: () => void;
   /** Rendered when the session has been checked and the user is not authenticated. */
   fallback?: React.ReactNode;
   /** Called once the session check resolves with the authenticated user or null. */
@@ -71,11 +51,15 @@ interface HostedUserMenuProps {
 export function HostedUserMenu({
   chatApiUrl,
   dashboardUrl = "https://manufact.com/cloud",
-  onLoginClick,
   fallback = null,
   onUserResolved,
 }: HostedUserMenuProps) {
-  const { user, loaded } = useHostedSession(chatApiUrl);
+  const { user, loaded, authorizing, authorize, logout, mode } =
+    useHostedSession(chatApiUrl);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',runId:'oauth-flow-2',hypothesisId:'O5',location:'HostedUserMenu.tsx:render',message:'hosted user menu state',data:{loaded,authorizing,hasUser:!!user,mode},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // Notify the parent (LayoutHeader) whenever the resolved session changes.
   const lastReportedId = useRef<string | null | undefined>(undefined);
@@ -91,19 +75,26 @@ export function HostedUserMenu({
   if (!loaded) return null;
 
   if (!user) {
-    if (onLoginClick) {
-      return (
+    return (
+      <>
+        {fallback}
         <Button
           variant="ghost"
           size="sm"
           className="rounded-full px-4 text-[13px]"
-          onClick={onLoginClick}
+          disabled={authorizing}
+          onClick={() => {
+            void authorize().catch((error) =>
+              toast.error(
+                error instanceof Error ? error.message : "Authorization failed"
+              )
+            );
+          }}
         >
-          Sign in
+          {authorizing ? "Authorizing…" : "Sign in"}
         </Button>
-      );
-    }
-    return <>{fallback}</>;
+      </>
+    );
   }
 
   const initial = getInitial(user.name, user.email);
@@ -152,6 +143,15 @@ export function HostedUserMenu({
             </a>
           }
         />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            void logout().catch(() => toast.error("Sign out failed"));
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          {mode === "session" ? "Sign out of Manufact" : "Disconnect Inspector"}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

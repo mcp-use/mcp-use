@@ -26,7 +26,7 @@ const splitMs = mergeSpring.duration * 1000 + 80;
 // A selected-background block for one render. A run is normally one block; mid
 // merge/split it is drawn as two abutting halves with sharp inner corners.
 type Rect = { top: number; left: number; width: number; height: number };
-export interface SelBlock extends Rect {
+interface SelBlock extends Rect {
   key: string;
   radii: [number, number, number, number]; // tl, tr, br, bl
   instant: boolean; // skip the spring (the zero-shift swap, the split snap-in)
@@ -46,11 +46,11 @@ export interface SelBlock extends Rect {
   };
 }
 
-export type MergeSplitAxis = "x" | "y";
+type MergeSplitAxis = "x" | "y";
 
 // A contiguous run of selected/checked rows, with a stable id so framer-motion
 // can morph it across renders rather than exit+re-enter.
-export type Run = { start: number; end: number; id: number };
+type Run = { start: number; end: number; id: number };
 
 // One in-flight merge or split; geometry is recomputed from the live runs each
 // render so rapid toggles redirect instead of freezing.

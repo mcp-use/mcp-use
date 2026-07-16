@@ -286,12 +286,12 @@ export function buildRawChatPayload(
 
 type MessageRef = { id: string; role: string };
 
-export type MessageTokenUsage = {
+type MessageTokenUsage = {
   inputTokens?: number;
   outputTokens?: number;
 };
 
-export function usageFromTraceResponse(
+function usageFromTraceResponse(
   response: InspectorTraceEvent[]
 ): InspectorTokenUsage | undefined {
   let usage: InspectorTokenUsage | undefined;

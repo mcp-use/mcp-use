@@ -25,8 +25,8 @@ describe("elicitationToAskUserQuestions", () => {
       requestedSchema: {
         type: "object" as const,
         properties: {
-          name: { type: "string", default: "Anonymous" },
-          age: { type: "number", default: 0 },
+          name: { type: "string" as const, default: "Anonymous" },
+          age: { type: "number" as const, default: 0 },
         },
         required: ["name"],
       },
@@ -46,10 +46,10 @@ describe("elicitationToAskUserQuestions", () => {
       requestedSchema: {
         type: "object" as const,
         properties: {
-          name: { type: "string" },
-          age: { type: "number" },
-          verified: { type: "boolean" },
-          status: { type: "string", enum: ["active", "inactive"] },
+          name: { type: "string" as const },
+          age: { type: "number" as const },
+          verified: { type: "boolean" as const },
+          status: { type: "string" as const, enum: ["active", "inactive"] },
         },
         required: ["name"],
       },

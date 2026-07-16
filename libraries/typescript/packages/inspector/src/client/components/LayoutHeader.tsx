@@ -10,7 +10,6 @@ import type { McpServer } from "@mcp-use/client/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { HostedUserMenu } from "@/client/components/HostedUserMenu";
-import { LoginModal } from "@/client/components/LoginModal";
 import {
   MCPDeployClickEvent,
   captureInspectorEvent,
@@ -47,7 +46,6 @@ export function LayoutHeader({
   const [tsSdkModalOpen, setTsSdkModalOpen] = useState(false);
   const [pySdkModalOpen, setPySdkModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [mobileTabsCollapsed] = useState(true);
 
   if (embeddedConfig.singleTab) {
@@ -180,20 +178,11 @@ export function LayoutHeader({
           <HostedUserMenu
             chatApiUrl={embeddedConfig.chatApiUrl}
             onUserResolved={(u) => setIsLoggedIn(!!u)}
-            onLoginClick={() => setShowLoginModal(true)}
           />
         ) : null}
       </div>
     );
   };
-
-  const loginModalNode =
-    showLoginModal && embeddedConfig.chatApiUrl ? (
-      <LoginModal
-        authOrigin={new URL(embeddedConfig.chatApiUrl).origin}
-        onDismiss={() => setShowLoginModal(false)}
-      />
-    ) : null;
 
   return (
     <header className="w-full shrink-0">
@@ -214,7 +203,7 @@ export function LayoutHeader({
                   state={sidebarCollapsed ? "collapsed" : "expanded"}
                 />
               </div>
-              <span className="text-muted-foreground/60 shrink-0">/</span>
+              <span className="text-sm text-muted-foreground/60 shrink-0 [text-box:trim-both_cap_alphabetic]">/</span>
               <ServerDropdown
                 connections={connections}
                 selectedServer={selectedServer}
@@ -309,7 +298,6 @@ export function LayoutHeader({
           </div>
         )}
       </div>
-      {loginModalNode}
     </header>
   );
 }

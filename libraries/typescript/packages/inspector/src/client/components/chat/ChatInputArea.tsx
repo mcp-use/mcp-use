@@ -56,6 +56,14 @@ interface ChatInputAreaProps {
   freeTierInfo?: {
     onLoginClick: () => void;
   };
+  managedCloudInfo?: {
+    models: import("./useManagedCloudModel").CloudModel[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
+    isLoading?: boolean;
+  };
+  modelBadgeMode?: "managed" | "byok";
+  modelDisplayName?: string;
   /** Optional followup suggestions rendered above the chat input. */
   followups?: string[];
   /** Called when a followup suggestion is selected. */
@@ -96,6 +104,9 @@ export function ChatInputArea({
   onAttachmentRemove,
   hideModelBadge,
   freeTierInfo,
+  managedCloudInfo,
+  modelBadgeMode = "byok",
+  modelDisplayName,
   followups = [],
   onFollowupSelect,
   pendingElicitationRequests,
@@ -108,13 +119,15 @@ export function ChatInputArea({
   const hasPendingElicitation = (pendingElicitationRequests?.length ?? 0) > 0;
 
   const modelBadge =
-    llmConfig && (!hideModelBadge || freeTierInfo) ? (
+    llmConfig && (!hideModelBadge || freeTierInfo || managedCloudInfo) ? (
       <Tooltip>
         <TooltipTrigger
           render={
             <ModelConfigBadge
               provider={llmConfig.provider}
               model={llmConfig.model}
+              displayName={modelDisplayName}
+              mode={modelBadgeMode}
               className="shrink-0"
               onClick={() => onConfigDialogOpenChange(true)}
             />
@@ -123,7 +136,9 @@ export function ChatInputArea({
         />
         <TooltipContent>
           <p>
-            {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
+            {managedCloudInfo || freeTierInfo
+              ? "Change model"
+              : "Change API Key"}
           </p>
         </TooltipContent>
       </Tooltip>

@@ -136,7 +136,7 @@ function JsonNode({
                 onClick={() => setOpen(true)}
                 className="mx-1 text-xs text-muted-foreground hover:text-foreground"
               >
-                {collectionSummary(value)}
+                {collectionSummary(value as object)}
               </button>
               <span className={VALUE_CLASS.punctuation}>{bracketClose}</span>
             </>

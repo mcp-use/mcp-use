@@ -21,7 +21,7 @@ export interface RpcTrafficEntry {
 
 export type RpcTrafficInput = Omit<RpcTrafficEntry, "id" | "repeatCount">;
 
-export interface RpcTrafficFilter {
+interface RpcTrafficFilter {
   serverIds?: string[];
   sources?: RpcTrafficSource[];
 }

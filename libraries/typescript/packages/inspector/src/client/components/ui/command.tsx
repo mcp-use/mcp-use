@@ -20,8 +20,6 @@ function useCommandContext() {
   return ctx;
 }
 
-export { useCommandContext };
-
 function matchesSearch(text: string, search: string) {
   if (!search) return true;
   return text.toLowerCase().includes(search.toLowerCase());
@@ -116,8 +114,8 @@ CommandEmpty.displayName = "CommandEmpty";
 
 const CommandGroup = React.forwardRef<
   HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
+  React.HTMLAttributes<HTMLDivElement> & { heading?: string }
+>(({ className, heading, children, ...props }, ref) => (
   <div
     ref={ref}
     className={cn(
@@ -125,14 +123,19 @@ const CommandGroup = React.forwardRef<
       className
     )}
     {...props}
-  />
+  >
+    {heading ? (
+      <div data-command-group-heading="">{heading}</div>
+    ) : null}
+    {children}
+  </div>
 ));
 CommandGroup.displayName = "CommandGroup";
 
 interface CommandItemProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "onSelect"> {
   value: string;
-  keywords?: string;
+  keywords?: string | readonly string[];
   onSelect?: (value: string) => void;
   disabled?: boolean;
 }
@@ -144,7 +147,8 @@ const CommandItem = React.forwardRef<HTMLDivElement, CommandItemProps>(
   ) => {
     const { search, activeValue, setActiveValue, registerVisible } =
       useCommandContext();
-    const searchable = keywords ? `${value} ${keywords}` : value;
+    const keywordText = Array.isArray(keywords) ? keywords.join(" ") : keywords;
+    const searchable = keywordText ? `${value} ${keywordText}` : value;
     const visible = matchesSearch(searchable, search);
     const selected = activeValue === value;
 

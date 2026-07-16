@@ -33,7 +33,7 @@ type ProxyRequest = {
   body?: unknown;
 };
 
-export interface OAuthProxyOptions {
+interface OAuthProxyOptions {
   /** @default "/oauth" */
   basePath?: string;
   /** Cross-origin browser origins allowed to call the BFF. Same-origin calls are always allowed. */

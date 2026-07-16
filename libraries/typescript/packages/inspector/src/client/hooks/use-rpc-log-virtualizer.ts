@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-export const RPC_LOG_ROW_HEIGHT = 36;
-export const RPC_LOG_EXPANDED_EXTRA = 188;
+const RPC_LOG_ROW_HEIGHT = 36;
+const RPC_LOG_EXPANDED_EXTRA = 188;
 const OVERSCAN = 6;
 
-export interface RpcLogVirtualSlice<T> {
+interface RpcLogVirtualSlice<T> {
   totalHeight: number;
   visibleItems: Array<{ index: number; item: T; top: number; height: number }>;
 }

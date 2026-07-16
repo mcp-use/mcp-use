@@ -1,7 +1,7 @@
 // Ported from website.mcp-use/src/components/nav-main.tsx + sidebar-provider menu button variants.
 import { cn } from "@/client/lib/utils";
 
-export const sidebarNavTrailingRevealClass = cn(
+const sidebarNavTrailingRevealClass = cn(
   "transition-[opacity,filter] duration-200 ease-out",
   "opacity-100 blur-0",
   "group-data-[collapsible=icon]:opacity-0 group-data-[collapsible=icon]:blur-[3px] group-data-[collapsible=icon]:pointer-events-none",

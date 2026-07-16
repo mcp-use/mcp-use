@@ -27,7 +27,8 @@
       "entry": [
         "src/index.ts",
         "src/index-browser.ts",
-        "src/react/index.ts"
+        "src/react/index.ts",
+        "tests/**/*.{ts,tsx}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
     },

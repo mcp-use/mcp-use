@@ -216,7 +216,8 @@
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
   --header-height: 4rem;
-  --sidebar-width: 280px;
+  --sidebar-width: 250px;
+  --rpc-panel-width: 250px;
   --sidebar-width-icon: var(--header-height);
   --sidebar-nav-inset-x: 1rem;
   --sidebar-nav-pill-bleed: 0.25rem;

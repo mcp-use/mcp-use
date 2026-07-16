@@ -128,5 +128,3 @@ const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
 ChatMessage.displayName = "ChatMessage";
 
 export { ChatMessage };
-export type { ChatMessageProps };
-export default ChatMessage;

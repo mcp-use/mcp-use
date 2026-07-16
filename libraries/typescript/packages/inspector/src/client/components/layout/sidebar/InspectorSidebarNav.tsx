@@ -7,6 +7,7 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { getTabCount, shouldShowDot } from "../layoutHeaderUtils";
+import type { LayoutTabDef } from "../layoutTabs";
 import { LAYOUT_TABS } from "../layoutTabs";
 import { useSidebarProximityRowRefs } from "./SidebarProximityNav";
 import {
@@ -38,6 +39,12 @@ interface InspectorSidebarNavProps {
   collapsed: boolean;
 }
 
+type NavTab = Extract<LayoutTabDef, { label: string }>;
+
+function isNavTab(tab: LayoutTabDef): tab is NavTab {
+  return tab.id !== "separator";
+}
+
 export function InspectorSidebarNav({
   activeTab,
   onTabChange,
@@ -47,11 +54,11 @@ export function InspectorSidebarNav({
 }: InspectorSidebarNavProps) {
   const getRowRef = useSidebarProximityRowRefs();
 
-  const filteredTabs = (visibleTabs
+  const filteredTabs: NavTab[] = visibleTabs
     ? LAYOUT_TABS.filter(
-        (t) => t.id !== "separator" && visibleTabs.includes(t.id as TabType)
+        (t): t is NavTab => isNavTab(t) && visibleTabs.includes(t.id)
       )
-    : LAYOUT_TABS.filter((t) => t.id !== "separator"));
+    : LAYOUT_TABS.filter(isNavTab);
 
   return (
     <ul

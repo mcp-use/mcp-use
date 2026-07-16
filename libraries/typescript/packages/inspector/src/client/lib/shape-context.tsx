@@ -70,12 +70,6 @@ function useShape(): ShapeClasses {
   return ctx.classes;
 }
 
-function useShapeContext() {
-  const ctx = useContext(ShapeContext);
-  if (!ctx) throw new Error("useShapeContext must be used within a ShapeProvider");
-  return ctx;
-}
-
 function ShapeProvider({
   children,
   defaultShape = "pill",
@@ -131,5 +125,4 @@ function ShapeProvider({
   );
 }
 
-export { ShapeProvider, useShape, useShapeContext, shapeMap };
-export type { ShapeVariant, ShapeClasses };
+export { ShapeProvider, useShape, shapeMap };

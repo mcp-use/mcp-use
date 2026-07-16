@@ -75,8 +75,6 @@ function DialogTrigger(props: DialogPrimitive.Trigger.Props) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
-const DialogClose = DialogPrimitive.Close;
-
 interface DialogContentProps extends HTMLAttributes<HTMLDivElement> {
   size?: "sm" | "lg";
   /** Scrollable panel: p-0 flex column; pad header/body/footer instead of the shell. */
@@ -358,6 +356,6 @@ const DialogDescription = forwardRef<
 DialogDescription.displayName = "DialogDescription";
 
 export {
-  Dialog, DialogBody, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogJsonSection, DialogTitle, DialogTrigger
+  Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogJsonSection, DialogTitle, DialogTrigger
 };
 

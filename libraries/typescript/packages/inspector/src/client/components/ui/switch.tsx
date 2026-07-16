@@ -337,5 +337,4 @@ const Switch = forwardRef<HTMLDivElement | HTMLButtonElement, SwitchProps>(
 );
 Switch.displayName = "Switch";
 
-export { Switch, FluidSwitch };
-export type { SwitchProps, FluidSwitchProps, ShadcnSwitchProps };
+export { Switch };

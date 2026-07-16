@@ -15,10 +15,8 @@ import type { StorageProvider } from "./storage.js";
 import type {
   McpServer,
   McpServerConfig,
-  McpNotification,
   PendingElicitationRequest,
   PendingSamplingRequest,
-  UseMcpResult,
 } from "./types.js";
 import {
   pickPersistedServerConfig,

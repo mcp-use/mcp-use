@@ -16,7 +16,7 @@ import { isSafeProxyTarget } from "./oauth-proxy.js";
 /**
  * Options for configuring the MCP proxy middleware
  */
-export interface McpProxyOptions {
+interface McpProxyOptions {
   /**
    * Route path for the proxy endpoint
    * @default "/mcp/proxy"

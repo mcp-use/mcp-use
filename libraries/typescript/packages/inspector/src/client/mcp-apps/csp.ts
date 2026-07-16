@@ -3,16 +3,16 @@ import type {
   WidgetDeclaredCsp,
 } from "@/client/context/WidgetDebugContext";
 
-export type ParsedCspPolicy = Record<string, string[]>;
+type ParsedCspPolicy = Record<string, string[]>;
 
-export interface CspPolicyDiff {
+interface CspPolicyDiff {
   directive: string;
   requested: string[];
   effective: string[];
   status: "same" | "changed" | "missing" | "added";
 }
 
-export interface CspFinding {
+interface CspFinding {
   severity: "info" | "warning" | "error";
   title: string;
   detail: string;
@@ -55,7 +55,7 @@ export function buildCSPString(csp: WidgetDeclaredCsp): string {
   ].join("; ");
 }
 
-export function parseCspPolicy(policy?: string): ParsedCspPolicy {
+function parseCspPolicy(policy?: string): ParsedCspPolicy {
   if (!policy) return {};
   const parsed: ParsedCspPolicy = {};
   for (const rawDirective of policy.split(";")) {
@@ -167,26 +167,4 @@ export function diagnoseCsp(options: {
     });
   }
   return findings;
-}
-
-export function parseCustomProps(
-  customProps?: Record<string, string>
-): Record<string, unknown> {
-  const parsed: Record<string, unknown> = {};
-  if (!customProps) return parsed;
-  for (const [k, v] of Object.entries(customProps)) {
-    if (
-      typeof v === "string" &&
-      (v.trim().startsWith("[") || v.trim().startsWith("{"))
-    ) {
-      try {
-        parsed[k] = JSON.parse(v);
-      } catch {
-        parsed[k] = v;
-      }
-    } else {
-      parsed[k] = v;
-    }
-  }
-  return parsed;
 }

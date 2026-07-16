@@ -209,25 +209,6 @@ export class MCPToolSavedEvent implements BaseTelemetryEvent {
   }
 }
 
-interface MCPTunnelActionEventData {
-  action: "start" | "stop";
-  success: boolean;
-  tunnelUrl?: string | null;
-}
-
-export class MCPTunnelActionEvent implements BaseTelemetryEvent {
-  name = "mcp_tunnel_action";
-  properties: Record<string, any>;
-
-  constructor(data: MCPTunnelActionEventData) {
-    this.properties = {
-      action: data.action,
-      success: data.success,
-      tunnel_url: data.tunnelUrl,
-    };
-  }
-}
-
 interface MCPDeployClickEventData {
   referrer: string;
 }

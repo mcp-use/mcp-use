@@ -182,7 +182,7 @@ export function getServerHeaders(
 }
 
 /** Map legacy stored fields to public `McpServerConfig` field names. */
-export function normalizeStoredServerConfig(
+function normalizeStoredServerConfig(
   stored: Record<string, unknown>
 ): McpServerConfig {
   const proxyConfig = stored.proxyConfig as
@@ -267,9 +267,6 @@ export function toMcpServerConfig(
 
   return serverConfig;
 }
-
-/** @deprecated Use {@link toMcpServerConfig} */
-export const toMcpServerOptions = toMcpServerConfig;
 
 export function toEditableConnectionConfig(
   server: McpServer,

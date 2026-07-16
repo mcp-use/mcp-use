@@ -54,7 +54,7 @@ const SERVER_CAPABILITY_CATALOG: CapabilityCatalogEntry[] = [
   { id: "extensions", label: "Extensions" },
 ];
 
-export type CapabilityRow = {
+type CapabilityRow = {
   id: string;
   label: string;
   supported: boolean;
@@ -62,7 +62,7 @@ export type CapabilityRow = {
   detail?: string;
 };
 
-export type ServerCapabilitySignals = {
+type ServerCapabilitySignals = {
   tools?: Array<{ _meta?: Record<string, unknown> }>;
   resources?: Array<{ mimeType?: string }>;
   resourceTemplates?: Array<{ mimeType?: string }>;

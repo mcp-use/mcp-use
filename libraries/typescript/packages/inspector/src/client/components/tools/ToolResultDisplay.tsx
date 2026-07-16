@@ -4,7 +4,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/client/components/ui/select";
 import {
   Check,
@@ -776,14 +775,15 @@ export function ToolResultDisplay({
                   value={selectedIndex.toString()}
                   onValueChange={(value) => setSelectedIndex(parseInt(value))}
                 >
-                  <SelectTrigger size="sm" className="w-[140px] h-8 text-xs">
-                    <SelectValue>
+                  <SelectTrigger
+                    className="w-[140px] h-8 text-xs"
+                    leading={
                       <div className="flex items-center gap-1">
                         <History className="h-3 w-3" />
                         <RelativeTimeDisplay timestamp={result.timestamp} />
                       </div>
-                    </SelectValue>
-                  </SelectTrigger>
+                    }
+                  />
                   <SelectContent>
                     {toolResults.map((r, idx) => (
                       <SelectItem key={idx} value={idx.toString()}>

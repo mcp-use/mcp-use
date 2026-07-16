@@ -691,8 +691,6 @@ SelectSeparator.displayName = "SelectSeparator";
 // Exports
 // ---------------------------------------------------------------------------
 
-export type { SelectProps, SelectTriggerProps, SelectContentProps, SelectItemProps };
-
 // ---------------------------------------------------------------------------
 // shadcn-compatible aliases (auto index, SelectValue in trigger children)
 // ---------------------------------------------------------------------------
@@ -756,10 +754,6 @@ function SelectTriggerShadcn({
 
 export {
   Select,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
-  triggerVariants,
   SelectContentShadcn as SelectContent,
   SelectItemShadcn as SelectItem,
   SelectTriggerShadcn as SelectTrigger,

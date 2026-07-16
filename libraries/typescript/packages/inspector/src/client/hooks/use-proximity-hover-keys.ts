@@ -8,7 +8,7 @@ import {
   type RefObject,
 } from "react";
 
-export interface ItemRect {
+interface ItemRect {
   top: number;
   height: number;
   left: number;

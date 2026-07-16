@@ -14,12 +14,12 @@ export function SidebarRpcPanel({
       aria-hidden={!open}
       className={cn(
         "relative hidden min-h-0 shrink-0 flex-col overflow-hidden transition-[width,margin] duration-200 ease-out lg:flex",
-        open ? "w-80 lg:mr-[18px]" : "w-0 lg:mr-0"
+        open ? "w-(--rpc-panel-width) lg:mr-[18px]" : "w-0 lg:mr-0"
       )}
     >
       <div
         className={cn(
-          "flex h-full min-h-0 w-80 flex-col transition-opacity duration-200 ease-out",
+          "flex h-full min-h-0 w-(--rpc-panel-width) flex-col transition-opacity duration-200 ease-out",
           open ? "opacity-100" : "pointer-events-none opacity-0"
         )}
       >

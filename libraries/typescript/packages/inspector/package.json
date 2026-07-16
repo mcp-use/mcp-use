@@ -124,8 +124,8 @@
     "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "^4.2.0",
     "@types/express": "^5.0.6",
+    "@mcp-use/server": "workspace:*",
     "@vitejs/plugin-react": "^6.0.0",
-    "concurrently": "^9.2.1",
     "emulate": "0.5.0",
     "eslint": "^9.39.2",
     "express": "^5.2.1",
@@ -141,6 +141,7 @@
     "typescript": "^5.9.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.0",
-    "wait-on": "^9.0.4"
+    "wait-on": "^9.0.4",
+    "zod": "^4.2.0"
   }
 }

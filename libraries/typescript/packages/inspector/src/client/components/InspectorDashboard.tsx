@@ -44,10 +44,7 @@ import {
   buildOAuthStaticConfig,
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
-  isAliasOnlyConnectionUpdate,
-  saveStoredConnectionConfig,
   toEditableConnectionConfig,
-  toMcpServerConfig,
   type ConnectionMode,
   type EditableConnectionConfig,
 } from "@/client/utils/connectionUpdates";
@@ -57,10 +54,9 @@ import {
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
+import type { TabType } from "@/client/context/InspectorContext";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
-import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
-import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
 
 const CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY =
@@ -91,8 +87,6 @@ export function InspectorDashboard() {
     servers: connections,
     addServer,
     removeServer: removeConnection,
-    updateServerMetadata,
-    updateServer,
   } = useMcpClient();
 
   // Track which server connections have been reported to telemetry (dedup)
@@ -155,53 +149,6 @@ export function InspectorDashboard() {
     updatingConnectionsRef.current = updatingConnections;
   }, [updatingConnections]);
 
-  const updateConnectionConfig = useCallback(
-    async (id: string, config: EditableConnectionConfig) => {
-      // Check if already updating this connection
-      if (updatingConnectionsRef.current.has(id)) {
-        console.warn(
-          `[InspectorDashboard] Connection ${id} is already being updated, skipping`
-        );
-        return;
-      }
-
-      // Mark as updating
-      setUpdatingConnections((prev) => new Set(prev).add(id));
-
-      try {
-        await updateServer(id, toMcpServerConfig(config));
-        saveStoredConnectionConfig(id, config);
-      } catch (error) {
-        console.error(
-          `[InspectorDashboard] Failed to update connection ${id}:`,
-          error
-        );
-      } finally {
-        // Clear the updating flag
-        setUpdatingConnections((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }
-    },
-    [updateServer]
-  );
-
-  const updateConnectionMetadata = useCallback(
-    async (id: string, metadata: { name: string }) => {
-      try {
-        await updateServerMetadata(id, metadata);
-      } catch (error) {
-        console.error(
-          `[InspectorDashboard] Failed to update connection metadata for ${id}:`,
-          error
-        );
-      }
-    },
-    [updateServerMetadata]
-  );
-
   const connectServer = useCallback(
     async (id: string) => {
       // Check if already updating this connection
@@ -234,7 +181,7 @@ export function InspectorDashboard() {
         });
       }
     },
-    [connections, updateServer]
+    [connections]
   );
 
   const navigate = useNavigate();
@@ -243,13 +190,6 @@ export function InspectorDashboard() {
     new Set()
   );
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
-    null
-  );
-  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null
-  );
-  const [infoModalOpen, setInfoModalOpen] = useState(false);
-  const [infoModalConnection, setInfoModalConnection] = useState<any | null>(
     null
   );
 
@@ -453,48 +393,15 @@ export function InspectorDashboard() {
     action();
   };
 
-  const handleUpdateConnection = useCallback(
-    (config: EditableConnectionConfig) => {
-      if (!editingConnectionId) return;
-
-      const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(
-          editingConnectionId
-        ) ||
-        connections.find(
-          (connection: McpServer) => connection.id === editingConnectionId
-        );
-
-      // If the URL changed, we need to remove the old one and add a new one
-      if (config.url !== editingConnectionId) {
-        removeConnection(editingConnectionId);
-        addServer(config.url, toMcpServerConfig(config));
-      } else if (
-        currentConnection &&
-        isAliasOnlyConnectionUpdate(currentConnection, config)
-      ) {
-        updateConnectionMetadata(editingConnectionId, {
-          name: config.name || config.url,
-        });
-        saveStoredConnectionConfig(editingConnectionId, config);
-      } else {
-        updateConnectionConfig(editingConnectionId, config);
-      }
-
-      // Close the modal
-      setEditingConnectionId(null);
-
-      toast.success("Connection settings updated");
-    },
-    [
-      editingConnectionId,
-      connections,
-      removeConnection,
-      addServer,
-      updateConnectionMetadata,
-      updateConnectionConfig,
-    ]
-  );
+  const navigateToServerTab = (connection: McpServer, tab: TabType) => {
+    const urlParams = new URLSearchParams(location.search);
+    const tunnelUrl = urlParams.get("tunnelUrl");
+    const params = new URLSearchParams();
+    params.set("server", connection.id);
+    params.set("tab", tab);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    navigate(`/?${params.toString()}`);
+  };
 
   const handleServerClick = (connection: any) => {
     // Failed connections use the reload button on the dashboard tile instead.
@@ -771,10 +678,12 @@ export function InspectorDashboard() {
                               variant="secondary"
                               size="sm"
                               onClick={(e) =>
-                                handleActionClick(e, () => {
-                                  setInfoModalConnection(connection);
-                                  setInfoModalOpen(true);
-                                })
+                                handleActionClick(e, () =>
+                                  navigateToServerTab(
+                                    connection,
+                                    "server-metadata"
+                                  )
+                                )
                               }
                               className="h-8 w-8 p-0"
                             >
@@ -796,7 +705,10 @@ export function InspectorDashboard() {
                               size="sm"
                               onClick={(e) =>
                                 handleActionClick(e, () =>
-                                  setEditingConnectionId(connection.id)
+                                  navigateToServerTab(
+                                    connection,
+                                    "connection-settings"
+                                  )
                                 )
                               }
                               className="h-8 w-8 p-0"
@@ -896,8 +808,7 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              setInfoModalConnection(connection);
-                              setInfoModalOpen(true);
+                              navigateToServerTab(connection, "server-metadata");
                             }}
                           >
                             <Info className="h-4 w-4 mr-2" />
@@ -906,7 +817,10 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingConnectionId(connection.id);
+                              navigateToServerTab(
+                                connection,
+                                "connection-settings"
+                              );
                             }}
                           >
                             <Settings className="h-4 w-4 mr-2" />
@@ -1100,29 +1014,6 @@ export function InspectorDashboard() {
           />
         </div>
       </div>
-
-      {/* Connection Options Dialog */}
-      <ServerConnectionModal
-        connection={
-          editingConnectionId
-            ? connections.find((c) => c.id === editingConnectionId) || null
-            : null
-        }
-        open={editingConnectionId !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingConnectionId(null);
-          }
-        }}
-        onConnect={handleUpdateConnection}
-      />
-
-      {/* Server Info Modal */}
-      <ServerCapabilitiesModal
-        open={infoModalOpen}
-        onOpenChange={setInfoModalOpen}
-        connection={infoModalConnection}
-      />
     </div>
   );
 }

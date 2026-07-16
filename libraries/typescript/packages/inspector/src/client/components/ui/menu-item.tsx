@@ -47,7 +47,7 @@ export interface MenuItemRenderOptions {
   children: ReactNode;
 }
 
-export interface DropdownContextValue {
+interface DropdownContextValue {
   registerItem: (index: number, element: HTMLElement | null) => void;
   activeIndex: number | null;
   checkedIndex?: number;
@@ -63,15 +63,10 @@ export interface DropdownContextValue {
 
 export const DropdownContext = createContext<DropdownContextValue | null>(null);
 
-export function useDropdown() {
+function useDropdown() {
   const ctx = useContext(DropdownContext);
   if (!ctx) throw new Error("useDropdown must be used within a Dropdown");
   return ctx;
-}
-
-/** Null-safe context read for callers that render outside a provider. */
-export function useDropdownMaybe() {
-  return useContext(DropdownContext);
 }
 
 interface MenuItemProps extends HTMLAttributes<HTMLDivElement> {
@@ -290,4 +285,3 @@ const MenuItem = forwardRef<HTMLDivElement, MenuItemProps>(
 MenuItem.displayName = "MenuItem";
 
 export { MenuItem };
-export default MenuItem;

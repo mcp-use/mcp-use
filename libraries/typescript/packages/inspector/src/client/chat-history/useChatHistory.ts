@@ -3,7 +3,7 @@ import type { ChatSession, ChatStorageProvider } from "./types";
 
 const ITEMS_PER_PAGE = 20;
 
-export interface UseChatHistoryOptions {
+interface UseChatHistoryOptions {
   provider: ChatStorageProvider;
   enabled?: boolean;
   agentId?: string;

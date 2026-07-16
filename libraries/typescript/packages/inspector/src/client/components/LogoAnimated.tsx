@@ -104,7 +104,8 @@ export default function LogoAnimated({
   const labelEl = showLabel ? (
     <span
       className={cn(
-        "flex items-baseline gap-2 whitespace-nowrap",
+        "flex gap-2 whitespace-nowrap",
+        pinSymbolInIconColumn ? "items-center" : "items-baseline",
         pinSymbolInIconColumn
           ? cn(
               "pl-(--sidebar-nav-text-pl-absolute)",
@@ -115,10 +116,10 @@ export default function LogoAnimated({
           : "ml-0 gap-2"
       )}
     >
-      <span className="font-ubuntu text-xl font-medium text-foreground">
+      <span className="font-ubuntu text-xl font-medium leading-none text-foreground [text-box:trim-both_cap_alphabetic]">
         mcp-use
       </span>
-      <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <span className="text-sm font-semibold uppercase tracking-wide leading-none text-muted-foreground [text-box:trim-both_cap_alphabetic]">
         inspector
       </span>
     </span>

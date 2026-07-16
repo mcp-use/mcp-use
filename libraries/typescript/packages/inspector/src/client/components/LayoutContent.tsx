@@ -1,13 +1,16 @@
 import type { McpServer } from "@mcp-use/client/react";
 import type { ReactNode, RefObject } from "react";
+import { useManufactAuth } from "@/client/auth/manufact-auth";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
 import { ChatTab } from "./ChatTab";
 import {
+  buildManagedAuthHeaders,
   buildManagedLlmProxyConfig,
   shouldUseManagedClientSide,
 } from "./chat/freeTier";
+import { useManagedCloudModel } from "./chat/useManagedCloudModel";
 import { ConnectionSettingsTab } from "./ConnectionSettingsTab";
 import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";
@@ -48,6 +51,13 @@ export function LayoutContent({
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
+  const { accessToken, mode: manufactAuthMode, user } = useManufactAuth(
+    embeddedConfig.chatApiUrl
+  );
+  const managedAuthHeaders = buildManagedAuthHeaders(accessToken);
+  const managedCredentials =
+    manufactAuthMode === "session" ? ("include" as const) : undefined;
+  const isManufactAuthenticated = user != null;
 
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
@@ -77,6 +87,8 @@ export function LayoutContent({
         readResource={async () => ({ contents: [] })}
         useClientSide={false}
         chatApiUrl={embeddedConfig.chatApiUrl}
+        extraHeaders={managedAuthHeaders}
+        credentials={managedCredentials}
         managedLlmConfig={
           embeddedConfig.managedLlmConfig ?? {
             provider: "anthropic",
@@ -133,8 +145,22 @@ export function LayoutContent({
     enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
   });
   const chatApiUrl = embeddedConfig.chatApiUrl;
+  const managedCloudModel = useManagedCloudModel(
+    chatApiUrl,
+    accessToken,
+    manufactAuthMode,
+    !!chatApiUrl && isManufactAuthenticated
+  );
+  // #region agent log
+  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'LayoutContent.tsx:managedCloud',message:'layout managed cloud state',data:{useManagedClientSide,isLoopbackServer,isManufactAuthenticated,hasAccessToken:!!accessToken,authMode:manufactAuthMode,modelsEnabled:useManagedClientSide&&isManufactAuthenticated,modelCount:managedCloudModel.models.length,isLoading:managedCloudModel.isLoading,serverUrl:selectedServer?.url??null},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+  // #endregion
   const managedLlmConfig = useManagedClientSide
-    ? buildManagedLlmProxyConfig(chatApiUrl!)
+    ? buildManagedLlmProxyConfig(
+        chatApiUrl!,
+        accessToken,
+        manufactAuthMode === "session",
+        isManufactAuthenticated ? managedCloudModel.selectedModelId : undefined
+      )
     : (embeddedConfig.managedLlmConfig ??
       (chatApiUrl && !isLoopbackServer
         ? {
@@ -238,10 +264,13 @@ export function LayoutContent({
             readResource={selectedServer.readResource}
             useClientSide={useManagedClientSide || !chatApiUrl}
             chatApiUrl={chatApiUrl}
+            extraHeaders={managedAuthHeaders}
+            credentials={embeddedConfig.chatCredentials ?? managedCredentials}
             managedLlmConfig={managedLlmConfig}
+            managedCloudModel={managedCloudModel}
             enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
             hideTitle={embeddedConfig.chatHideTitle}
-            hideModelBadge={embeddedConfig.chatHideModelBadge ?? !!chatApiUrl}
+            hideModelBadge={embeddedConfig.chatHideModelBadge ?? false}
             hideServerUrl={embeddedConfig.chatHideServerUrl ?? !!chatApiUrl}
             clearButtonLabel={embeddedConfig.chatClearButtonLabel}
             clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
@@ -252,7 +281,6 @@ export function LayoutContent({
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
             streamProtocol={embeddedConfig.chatStreamProtocol}
-            credentials={embeddedConfig.chatCredentials}
             managedKeyUnavailable={
               isLoopbackServer && !chatApiUrl && !useManagedClientSide
             }

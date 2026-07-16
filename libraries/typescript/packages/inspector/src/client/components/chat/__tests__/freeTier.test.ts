@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { shouldShowFreeTierUpgrade, shouldUseManagedClientSide, buildManagedLlmProxyConfig } from "../freeTier";
+import {
+  buildManagedAuthHeaders,
+  buildManagedLlmProxyConfig,
+  shouldShowFreeTierUpgrade,
+  shouldUseManagedClientSide,
+} from "../freeTier";
 
 describe("shouldShowFreeTierUpgrade", () => {
   it("shows the sign-in CTA for anonymous managed visitors (hosted inspector)", () => {
@@ -43,6 +48,33 @@ describe("shouldShowFreeTierUpgrade", () => {
   });
 });
 
+describe("managed model chrome visibility", () => {
+  it("only dashboard embeds suppress the inspector model badge when hideModelBadge is set", () => {
+    const managedLlmConfig = {
+      provider: "openai-compatible" as const,
+      model: "test",
+      apiKey: "key",
+    };
+    const hideModelBadge = true;
+    const suppressInspectorModelChrome =
+      Boolean(managedLlmConfig) && Boolean(hideModelBadge);
+    expect(suppressInspectorModelChrome).toBe(true);
+
+    const unsetHideModelBadge: boolean | undefined = undefined;
+    const hostedDefaultHidden = unsetHideModelBadge ?? false;
+    expect(hostedDefaultHidden).toBe(false);
+  });
+
+  it("keeps model chrome visible for signed-in hosted users (hideModelBadge defaults false)", () => {
+    const managedLlmConfig = { provider: "openai-compatible" as const, model: "m", apiKey: "k" };
+    const hideModelBadge: boolean | undefined = undefined;
+    const effectiveHideModelBadge = hideModelBadge ?? false;
+    const suppressInspectorModelChrome =
+      Boolean(managedLlmConfig) && Boolean(effectiveHideModelBadge);
+    expect(suppressInspectorModelChrome).toBe(false);
+  });
+});
+
 describe("shouldUseManagedClientSide", () => {
   it("enables managed client-side chat for loopback servers with chatApiUrl", () => {
     expect(
@@ -64,17 +96,45 @@ describe("shouldUseManagedClientSide", () => {
 });
 
 describe("buildManagedLlmProxyConfig", () => {
-  it("builds an openai-compatible proxy config with session cookies", () => {
+  it("uses the OAuth access token as the proxy bearer key", () => {
     expect(
       buildManagedLlmProxyConfig(
-        "http://localhost:8000/api/v1/inspector/chat/stream"
+        "http://localhost:8000/api/v1/inspector/chat/stream",
+        "access-token"
       )
     ).toEqual({
       provider: "openai-compatible",
-      model: "anthropic/claude-haiku-4.5",
-      apiKey: "server-managed",
+      model: "anthropic/claude-sonnet-4.6",
+      apiKey: "access-token",
       baseUrl: "http://localhost:8000/api/v1/inspector/llm",
-      credentials: "include",
     });
+  });
+
+  it("uses a selected curated model id when provided", () => {
+    expect(
+      buildManagedLlmProxyConfig(
+        "http://localhost:8000/api/v1/inspector/chat/stream",
+        "access-token",
+        false,
+        "openai/gpt-5.4"
+      ).model
+    ).toBe("openai/gpt-5.4");
+  });
+
+  it("builds the remote chat bearer header", () => {
+    expect(buildManagedAuthHeaders("access-token")).toEqual({
+      Authorization: "Bearer access-token",
+    });
+    expect(buildManagedAuthHeaders(null)).toBeUndefined();
+  });
+
+  it("uses shared cookies when Inspector already has a Manufact session", () => {
+    expect(
+      buildManagedLlmProxyConfig(
+        "https://cloud.manufact.com/api/v1/inspector/chat/stream",
+        null,
+        true
+      )
+    ).toMatchObject({ credentials: "include" });
   });
 });

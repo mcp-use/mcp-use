@@ -1,4 +1,4 @@
-export const SURFACE_BG: Record<number, string> = {
+const SURFACE_BG: Record<number, string> = {
   1: "bg-surface-1",
   2: "bg-surface-2",
   3: "bg-surface-3",
@@ -9,7 +9,7 @@ export const SURFACE_BG: Record<number, string> = {
   8: "bg-surface-8",
 };
 
-export const SURFACE_SHADOW: Record<number, string> = {
+const SURFACE_SHADOW: Record<number, string> = {
   1: "shadow-surface-1",
   2: "shadow-surface-2",
   3: "shadow-surface-3",

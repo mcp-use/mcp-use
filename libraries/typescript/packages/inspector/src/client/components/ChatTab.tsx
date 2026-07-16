@@ -38,6 +38,8 @@ import { copyToClipboard } from "@/client/utils/browser";
 import { getServerDisplayName } from "@/client/utils/servers";
 import { downloadJSON } from "../utils/jsonUtils";
 import { shouldShowFreeTierUpgrade } from "./chat/freeTier";
+import { formatManagedModelName } from "./chat/providerMeta";
+import type { useManagedCloudModel } from "./chat/useManagedCloudModel";
 import { useHostedSession } from "../hooks/useHostedSession";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
@@ -63,7 +65,6 @@ import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt"
 import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
 import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
-import { LoginModal } from "./LoginModal";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -93,6 +94,8 @@ export interface ChatTabProps {
   /** Externally-managed LLM config. When provided, bypasses localStorage-based config
    *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
   managedLlmConfig?: import("./chat/types").LLMConfig;
+  /** Curated cloud model state when signed in on hosted inspector. */
+  managedCloudModel?: ReturnType<typeof useManagedCloudModel>;
   /** Opt in to the Manufact free-tier sign-in / upgrade UI. Default: false. */
   enableFreeTierUpgrade?: boolean;
   /** Label for the clear/new-chat button. Default: "New Chat". */
@@ -180,11 +183,11 @@ export function ChatTab({
   waitForChatApiUrl,
   initialMessages,
   managedLlmConfig,
+  managedCloudModel,
   enableFreeTierUpgrade = false,
   clearButtonLabel,
   hideTitle,
   hideModelBadge,
-  hideServerUrl,
   clearButtonHideIcon,
   clearButtonHideShortcut,
   clearButtonVariant,
@@ -517,22 +520,28 @@ export function ChatTab({
     setConfigDialogOpen(true);
   }, [clearRateLimitInfo, setConfigDialogOpen]);
 
-  // User-initiated login (from the free-tier badge / ConfigurationDialog CTA).
-  // Separate from `rateLimitInfo` which is reactive to a 429 response.
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const {
+    user: hostedUser,
+    authorizing,
+    authorize,
+  } = useHostedSession(enableFreeTierUpgrade ? chatApiUrl : undefined);
   const handleOpenLogin = useCallback(() => {
     setConfigDialogOpen(false);
-    setShowLoginModal(true);
-  }, [setConfigDialogOpen]);
+    void authorize().catch((error) =>
+      toast.error(
+        error instanceof Error ? error.message : "Authorization failed"
+      )
+    );
+  }, [authorize, setConfigDialogOpen]);
 
   // Whether the visitor is signed in to Manufact (hosted free-tier only). Used
   // to suppress the "Sign in to increase your limits" prompt once authenticated
-  // — otherwise signed-in users keep getting asked to log in (MCP-2142). Only
-  // probed for the hosted free-tier UI; BYOK and host embeds skip the fetch.
-  const { user: hostedUser } = useHostedSession(
-    enableFreeTierUpgrade ? chatApiUrl : undefined
-  );
+  // — otherwise signed-in users keep getting asked to log in (MCP-2142).
   const isHostedAuthenticated = hostedUser != null;
+
+  useEffect(() => {
+    if (isHostedAuthenticated) clearRateLimitInfo?.();
+  }, [clearRateLimitInfo, isHostedAuthenticated]);
 
   const freeTierInfo = shouldShowFreeTierUpgrade({
     isManaged,
@@ -550,8 +559,35 @@ export function ChatTab({
   const suppressInspectorModelChrome =
     Boolean(managedLlmConfig) && Boolean(hideModelBadge);
 
-  const hideInputModelBadge =
-    suppressInspectorModelChrome || (!!hideModelBadge && !effectiveClientSide);
+  const hideInputModelBadge = suppressInspectorModelChrome;
+
+  const managedCloudInfo =
+    isManaged && isHostedAuthenticated && managedCloudModel
+      ? {
+          models: managedCloudModel.models,
+          selectedModelId: managedCloudModel.selectedModelId,
+          onModelChange: managedCloudModel.setSelectedModelId,
+          isLoading: managedCloudModel.isLoading,
+        }
+      : undefined;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'ChatTab.tsx:managedCloudInfo',message:'chat managed cloud info',data:{isManaged,isHostedAuthenticated,hasManagedCloudModel:!!managedCloudModel,showManagedCloudInfo:!!managedCloudInfo,modelCount:managedCloudModel?.models.length??0,isLoading:managedCloudModel?.isLoading??false,hostedUserId:hostedUser?.id??null},timestamp:Date.now(),hypothesisId:'H-C'})}).catch(()=>{});
+  // #endregion
+
+  const modelBadgeMode = isManaged ? ("managed" as const) : ("byok" as const);
+  const modelDisplayName =
+    isManaged && managedCloudModel?.selectedModel
+      ? formatManagedModelName(
+          managedCloudModel.selectedModel.name,
+          managedCloudModel.selectedModel.provider
+        )
+      : undefined;
+
+  const handleUseManagedCloud = useCallback(() => {
+    setForceClientSide(false);
+    setConfigDialogOpen(false);
+  }, [setConfigDialogOpen, setForceClientSide]);
 
   const {
     filteredPrompts,
@@ -1352,19 +1388,21 @@ export function ChatTab({
     [postBridgeEvent, sendMessage, llmConfig, isConnected]
   );
 
-  // Login modal — shown on 429 rate-limit OR when the user clicks "Sign in"
-  // from the free-tier ConfigurationDialog. Rendered in both the landing and
-  // main-chat branches so it works before any message is sent too.
-  const loginModalNode =
-    (rateLimitInfo || showLoginModal) && chatApiUrl ? (
-      <LoginModal
-        authOrigin={new URL(chatApiUrl).origin}
-        onDismiss={() => {
-          clearRateLimitInfo?.();
-          setShowLoginModal(false);
-        }}
-        onUseApiKey={handleUseApiKey}
-      />
+  const loginRequiredNode =
+    rateLimitInfo && chatApiUrl ? (
+      <div className="absolute inset-x-4 top-4 z-20 mx-auto flex max-w-xl items-center justify-between gap-4 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur">
+        <p className="text-sm text-muted-foreground">
+          Sign in through Manufact Cloud to continue with managed chat.
+        </p>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm" onClick={handleUseApiKey}>
+            Use API key
+          </Button>
+          <Button size="sm" disabled={authorizing} onClick={handleOpenLogin}>
+            {authorizing ? "Authorizing…" : "Sign in"}
+          </Button>
+        </div>
+      </div>
     ) : null;
 
   // Show landing form when there are no messages and LLM is configured
@@ -1388,6 +1426,10 @@ export function ChatTab({
             showClearButton={!isManaged}
             buttonLabel="Change API Key"
             freeTierInfo={freeTierInfo}
+            managedCloudInfo={managedCloudInfo}
+            onUseManagedCloud={
+              !isManaged && managedCloudModel ? handleUseManagedCloud : undefined
+            }
           />
         </div>
 
@@ -1424,6 +1466,9 @@ export function ChatTab({
           onAttachmentRemove={removeAttachment}
           hideModelBadge={hideInputModelBadge}
           freeTierInfo={freeTierInfo}
+          managedCloudInfo={managedCloudInfo}
+          modelBadgeMode={modelBadgeMode}
+          modelDisplayName={modelDisplayName}
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
           pendingElicitationRequests={connection.pendingElicitationRequests}
@@ -1432,7 +1477,7 @@ export function ChatTab({
           systemPromptProvider={effectiveSystemPromptProvider}
         />
         {reconnectBannerNode}
-        {loginModalNode}
+        {loginRequiredNode}
       </div>
     );
   }
@@ -1457,10 +1502,12 @@ export function ChatTab({
         onBaseUrlChange={setTempBaseUrl}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
-        hideConfigButton={
-          (isManaged && !freeTierInfo) || suppressInspectorModelChrome
-        }
+        hideConfigButton={suppressInspectorModelChrome}
         freeTierInfo={freeTierInfo}
+        managedCloudInfo={managedCloudInfo}
+        onUseManagedCloud={
+          !isManaged && managedCloudModel ? handleUseManagedCloud : undefined
+        }
         onCopyChat={handleCopyChat}
         onExportChat={handleExportChat}
         clearButtonLabel={clearButtonLabel}
@@ -1516,7 +1563,7 @@ export function ChatTab({
         )}
       </div>
 
-      {loginModalNode}
+      {loginRequiredNode}
 
       {reconnectBannerNode}
 
@@ -1553,6 +1600,9 @@ export function ChatTab({
           onAttachmentRemove={removeAttachment}
           hideModelBadge={hideInputModelBadge}
           freeTierInfo={freeTierInfo}
+          managedCloudInfo={managedCloudInfo}
+          modelBadgeMode={modelBadgeMode}
+          modelDisplayName={modelDisplayName}
           followups={followups}
           onFollowupSelect={handleFollowupSelect}
           pendingElicitationRequests={connection.pendingElicitationRequests}

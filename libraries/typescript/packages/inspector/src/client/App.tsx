@@ -2,6 +2,7 @@ import { RequestActionToast } from "@/client/components/shared/RequestActionToas
 import { DEFAULT_SAMPLING_RESPONSE } from "@/client/types/pending-requests";
 import { InspectorDashboard } from "@/client/components/InspectorDashboard";
 import { Layout } from "@/client/components/Layout";
+import { ManufactOAuthCallback } from "@/client/components/ManufactOAuthCallback";
 import { OAuthCallback } from "@/client/components/OAuthCallback";
 import { ViewPreview } from "@/client/components/ViewPreview";
 import { Toaster } from "@/client/components/ui/sonner";
@@ -257,6 +258,10 @@ function App() {
             <Router basename={inspectorBase}>
               <Routes>
                 <Route path="/oauth/callback" element={<OAuthCallback />} />
+                <Route
+                  path="/auth/callback"
+                  element={<ManufactOAuthCallback />}
+                />
                 <Route path="/preview/:view" element={<ViewPreview />} />
                 <Route
                   path="/"

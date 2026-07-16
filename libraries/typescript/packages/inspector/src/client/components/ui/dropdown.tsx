@@ -15,12 +15,8 @@ import {
 } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu } from "@base-ui/react/menu";
-import type { MenuTriggerProps } from "@base-ui/react/menu";
 import {
   DropdownContext,
-  useDropdown,
-  useDropdownMaybe,
-  type DropdownContextValue,
   type MenuItemRenderOptions,
 } from "@/client/components/ui/menu-item";
 import { cn } from "@/client/lib/utils";
@@ -43,9 +39,6 @@ const shape = shapeMap.rounded;
 // on different primitives render side by side. Re-exported here so the
 // public dropdown API is unchanged.
 // ---------------------------------------------------------------------------
-
-export { useDropdown, useDropdownMaybe };
-export type { DropdownContextValue, MenuItemRenderOptions };
 
 // ---------------------------------------------------------------------------
 // Dropdown (inline panel)
@@ -318,8 +311,6 @@ DropdownMenu.displayName = "DropdownMenu";
 //
 //   <DropdownTrigger render={<Button variant="secondary">Open</Button>} />
 // ---------------------------------------------------------------------------
-
-type DropdownTriggerProps = MenuTriggerProps;
 
 const DropdownTrigger = Menu.Trigger;
 
@@ -666,20 +657,9 @@ const DropdownSeparator = forwardRef<
 DropdownSeparator.displayName = "DropdownSeparator";
 
 export {
-  Dropdown,
   DropdownLabel,
   DropdownSeparator,
   DropdownMenu,
   DropdownTrigger,
   DropdownContent,
 };
-// DropdownContextValue and MenuItemRenderOptions are already re-exported
-// above next to their import — repeating them here is a duplicate-export
-// build error.
-export type {
-  DropdownProps,
-  DropdownMenuProps,
-  DropdownTriggerProps,
-  DropdownContentProps,
-};
-export default Dropdown;

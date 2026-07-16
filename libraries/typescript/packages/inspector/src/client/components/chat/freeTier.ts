@@ -10,6 +10,8 @@
  */
 import type { LLMConfig } from "./types";
 
+export const FALLBACK_MANAGED_MODEL_ID = "anthropic/claude-sonnet-4.6";
+
 interface FreeTierVisibilityInput {
   /** Chat is using the server-managed (Manufact) LLM, not a BYOK key. */
   isManaged: boolean;
@@ -40,13 +42,26 @@ export function shouldUseManagedClientSide({
 }
 
 /** LLM config for the managed inspector LLM proxy (`/inspector/llm/*`). */
-export function buildManagedLlmProxyConfig(chatApiUrl: string): LLMConfig {
+export function buildManagedLlmProxyConfig(
+  chatApiUrl: string,
+  accessToken?: string | null,
+  useSession = false,
+  modelId?: string
+): LLMConfig {
   const baseUrl = chatApiUrl.replace(/\/chat\/stream\/?$/, "/llm");
   return {
     provider: "openai-compatible",
-    model: "anthropic/claude-haiku-4.5",
-    apiKey: "server-managed",
+    model: modelId ?? FALLBACK_MANAGED_MODEL_ID,
+    apiKey: accessToken ?? "server-managed",
     baseUrl,
-    credentials: "include",
+    ...(useSession ? { credentials: "include" as const } : {}),
   };
+}
+
+export function buildManagedAuthHeaders(
+  accessToken?: string | null
+): Record<string, string> | undefined {
+  return accessToken
+    ? { Authorization: `Bearer ${accessToken}` }
+    : undefined;
 }

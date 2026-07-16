@@ -125,12 +125,16 @@ export function ServerDropdown({
             render={
               <button
                 type="button"
-                className="flex items-center gap-2 min-w-0 cursor-pointer text-foreground transition-opacity hover:opacity-80"
+                className="inline-flex items-center gap-2 min-w-0 border-0 bg-transparent p-0 cursor-pointer text-foreground transition-opacity hover:opacity-80"
               >
                 {selectedServer && (
-                  <ServerIcon server={selectedServer} size="sm" />
+                  <ServerIcon
+                    server={selectedServer}
+                    size="sm"
+                    className="!size-5 shrink-0"
+                  />
                 )}
-                <span className="truncate text-sm">
+                <span className="truncate text-sm leading-none [text-box:trim-both_cap_alphabetic]">
                   {selectedServer
                     ? getServerDisplayName(selectedServer)
                     : "Select server"}

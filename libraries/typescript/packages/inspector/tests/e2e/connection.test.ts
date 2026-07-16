@@ -85,19 +85,19 @@ test.describe("Inspector MCP Server Connections", () => {
     ).not.toBeVisible();
   });
 
-  test("server info modal should display server metadata and capabilities", async ({
+  test("server info tab should display server metadata and capabilities", async ({
     page,
   }) => {
     // go to home
     await page.goto("http://localhost:3000/inspector");
 
-    // Click the info button to open the server info modal
+    // Open the server metadata tab from the dashboard tile
     await page.getByTestId("server-tile-info").click();
 
-    // Verify modal opens
+    // Verify metadata tab opens
     await expect(page.getByTestId("server-info-modal")).toBeVisible();
     await expect(page.getByTestId("server-info-modal-title")).toContainText(
-      "Server Information"
+      "Server Metadata"
     );
 
     // Verify server name is displayed
@@ -150,20 +150,19 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("server-tile-settings").click();
 
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
-    await expect(dialog.getByTestId("connection-form-url-input")).toHaveValue(
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
       "http://localhost:3002/mcp"
     );
 
-    await dialog.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("connection-form-config-button").click();
     await expect(
       page.getByTestId("config-dialog-request-timeout-input")
     ).toBeVisible();
     await page.getByTestId("config-dialog-request-timeout-input").fill("60000");
     await page.getByRole("button", { name: "Save" }).first().click();
 
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
@@ -187,20 +186,21 @@ test.describe("Inspector MCP Server Connections", () => {
 
     await page.getByTestId("server-tile-settings").click();
 
-    const dialog = page.getByRole("dialog");
     await expect(
-      dialog.getByTestId("connection-form-alias-input")
+      page.getByTestId("connection-form-alias-input")
     ).toBeVisible();
-    await dialog
+    await page
       .getByTestId("connection-form-alias-input")
       .fill("QA Conformance");
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
     ).toBeVisible({
       timeout: 3000,
     });
+
+    await page.goto("http://localhost:3000/inspector");
     await expect(
       page.getByRole("heading", { name: "QA Conformance" })
     ).toBeVisible();
@@ -227,27 +227,26 @@ test.describe("Inspector MCP Server Connections", () => {
     });
   });
 
-  test("should update connection settings from server dropdown", async ({
+  test("should update request timeout in connection settings tab", async ({
     page,
   }) => {
-    await page
-      .getByRole("button", { name: "Edit connection settings" })
-      .click();
+    await page.goto("http://localhost:3000/inspector");
 
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
-    await expect(dialog.getByTestId("connection-form-url-input")).toHaveValue(
+    await page.getByTestId("server-tile-settings").click();
+
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toHaveValue(
       "http://localhost:3002/mcp"
     );
 
-    await dialog.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("connection-form-config-button").click();
     await expect(
       page.getByTestId("config-dialog-request-timeout-input")
     ).toBeVisible();
     await page.getByTestId("config-dialog-request-timeout-input").fill("45000");
     await page.getByRole("button", { name: "Save" }).first().click();
 
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
@@ -262,13 +261,12 @@ test.describe("Inspector MCP Server Connections", () => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
 
-    await dialog.getByTestId("connection-form-config-button").click();
+    await page.getByTestId("connection-form-config-button").click();
     await page.getByTestId("config-dialog-request-timeout-input").fill("30000");
     await page.getByRole("button", { name: "Save" }).first().click();
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     await expect(
       page.getByText("Connection settings updated").first()
@@ -276,6 +274,7 @@ test.describe("Inspector MCP Server Connections", () => {
       timeout: 3000,
     });
 
+    await page.goto("http://localhost:3000/inspector");
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
       timeout: 10000,
     });
@@ -292,36 +291,38 @@ test.describe("Inspector MCP Server Connections", () => {
     await expect(textContent).toContainText("Echo: After settings update");
   });
 
-  test("should show red when URL is invalid, then green after reconnecting through dialog", async ({
+  test("should show red when URL is invalid, then green after reconnecting from connection settings tab", async ({
     page,
   }) => {
     await page.goto("http://localhost:3000/inspector");
 
     await page.getByTestId("server-tile-settings").click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
 
-    await dialog.getByTestId("connection-form-url-input").fill("");
-    await dialog
+    await page.getByTestId("connection-form-url-input").fill("");
+    await page
       .getByTestId("connection-form-url-input")
       .fill("http://localhost:29999/mcp");
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
+    await page.goto("http://localhost:3000/inspector");
     await expect(page.getByTestId("server-tile-status-failed")).toBeVisible({
       timeout: 10000,
     });
 
     await page.getByTestId("server-tile-settings").click();
-    await expect(dialog.getByTestId("connection-form-url-input")).toBeVisible();
-    await dialog.getByTestId("connection-form-url-input").fill("");
-    await dialog
+    await expect(page.getByTestId("connection-form-url-input")).toBeVisible();
+    await page.getByTestId("connection-form-url-input").fill("");
+    await page
       .getByTestId("connection-form-url-input")
       .fill("http://localhost:3002/mcp");
-    await dialog.getByTestId("connection-form-connect-button").click();
+    await page.getByTestId("connection-form-save-button").click();
 
     const toast = page.getByText("Connection settings updated").first();
     await expect(toast).toBeVisible({ timeout: 10000 });
     await expect(toast).toBeHidden({ timeout: 10000 });
+
+    await page.goto("http://localhost:3000/inspector");
     await expect(page.getByTestId("server-tile-status-ready")).toBeVisible({
       timeout: 10000,
     });

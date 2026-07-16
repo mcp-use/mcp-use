@@ -27,7 +27,7 @@ import {
 } from "@/client/utils/mcpClientUtils";
 import { copyToClipboard } from "@/client/utils/browser";
 import { Check, ChevronDown, Copy, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, isValidElement } from "react";
 import { VSCodeIcon } from "./ui/client-icons";
 
 interface AddToClientDropdownProps {
@@ -430,7 +430,7 @@ export function AddToClientDropdown({
     </Button>
   );
 
-  const triggerElement = trigger
+  const rawTrigger = trigger
     ? typeof trigger === "function"
       ? trigger({
           isOpen: false,
@@ -438,6 +438,7 @@ export function AddToClientDropdown({
         })
       : trigger
     : defaultTrigger;
+  const triggerElement = isValidElement(rawTrigger) ? rawTrigger : defaultTrigger;
 
   return (
     <>

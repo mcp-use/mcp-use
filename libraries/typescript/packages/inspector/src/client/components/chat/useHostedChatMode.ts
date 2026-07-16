@@ -19,9 +19,9 @@ export function useHostedChatMode({
     ? forceClientSide
     : useClientSide || forceClientSide || !!localLlmConfig;
   const isManaged = !!managedLlmConfig && !forceClientSide;
-  const llmConfig = isManaged
-    ? managedLlmConfig
-    : (localLlmConfig ?? managedLlmConfig);
+  const llmConfig: LLMConfig | null = isManaged
+    ? (managedLlmConfig ?? null)
+    : (localLlmConfig ?? managedLlmConfig ?? null);
 
   return {
     forceClientSide,

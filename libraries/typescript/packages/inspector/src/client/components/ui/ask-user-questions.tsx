@@ -87,7 +87,7 @@ export interface AskUserAnswer {
   skipped?: boolean;
 }
 
-export interface AskUserQuestionsProps
+interface AskUserQuestionsProps
   extends Omit<HTMLAttributes<HTMLDivElement>, "onChange"> {
   questions: AskUserQuestion[];
   currentIndex?: number;
@@ -1877,4 +1877,3 @@ function Row({
 }
 
 export { AskUserQuestions };
-export default AskUserQuestions;

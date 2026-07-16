@@ -20,20 +20,6 @@ import { useShape } from "@/client/lib/shape-context";
 
 const TooltipPortalContainerContext = createContext<HTMLElement | null>(null);
 
-function TooltipPortalContainer({
-  value,
-  children,
-}: {
-  value: HTMLElement | null;
-  children: ReactNode;
-}) {
-  return (
-    <TooltipPortalContainerContext.Provider value={value}>
-      {children}
-    </TooltipPortalContainerContext.Provider>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -111,6 +97,8 @@ function getSlideOffset(side: TooltipSide) {
       return { x: 4 };
     case "right":
       return { x: -4 };
+    default:
+      return { y: 4 };
   }
 }
 
@@ -214,8 +202,7 @@ function FluidTooltip({
   );
 }
 
-export { FluidTooltip, TooltipPortalContainer, TooltipProvider };
-export type { TooltipProps, TooltipProviderProps, TooltipSide };
+export { TooltipProvider };
 
 // ---------------------------------------------------------------------------
 // shadcn-compatible compound API (Tooltip > TooltipTrigger + TooltipContent)

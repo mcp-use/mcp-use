@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type JsonTokenKind =
+type JsonTokenKind =
   | "key"
   | "string"
   | "number"
@@ -8,7 +8,7 @@ export type JsonTokenKind =
   | "null"
   | "punctuation";
 
-export interface JsonToken {
+interface JsonToken {
   kind: JsonTokenKind;
   text: string;
 }
@@ -77,7 +77,7 @@ export function tokenizeJson(formatted: string): JsonToken[] {
       continue;
     }
 
-    if (/[{}\[\],:]/.test(ch)) {
+    if (/[{}[\],:]/.test(ch)) {
       push("punctuation", ch);
       i++;
       continue;
