@@ -43,7 +43,8 @@
     "test_app:starter": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
     "test_app:mcp-apps": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-apps && cd test_app && pnpm install && pnpm dev",
     "test_app:blank": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template blank && cd test_app && pnpm install && pnpm dev",
-    "test:release-versioning": "node --test tests/release-versioning.test.mjs"
+    "test:release-versioning": "node --test tests/release-versioning.test.mjs",
+    "test:beta-release": "pnpm test:release-versioning && pnpm --filter @mcp-use/client test:run && pnpm --filter @mcp-use/agent exec vitest run && pnpm --filter @mcp-use/cli test && pnpm --filter create-mcp-use-app test"
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",

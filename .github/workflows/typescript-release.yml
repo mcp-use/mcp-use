@@ -629,6 +629,10 @@ jobs:
         working-directory: libraries/typescript
         run: pnpm build
 
+      - name: Run beta release tests
+        working-directory: libraries/typescript
+        run: pnpm test:beta-release
+
       - name: Find pending beta changesets
         id: changesets
         working-directory: libraries/typescript
