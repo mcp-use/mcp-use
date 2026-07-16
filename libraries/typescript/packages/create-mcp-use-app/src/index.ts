@@ -3,6 +3,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -208,48 +209,75 @@ function sendInstallTelemetryEvent(agents: string, skills: string): void {
   }
 }
 
-function installSkills(projectPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(
-      "npx",
-      [
-        "--yes",
-        "skills",
-        "add",
-        "mcp-use/mcp-use",
-        "--yes",
-        "--skill",
-        "mcp-apps-builder",
-        "-a",
-        "cursor",
-        "-a",
-        "claude-code",
-        "-a",
-        "codex",
-      ],
-      {
-        cwd: projectPath,
-        stdio: "ignore",
-        shell: false,
-      }
-    );
+const SKILLS_REPO = "https://github.com/mcp-use/mcp-use.git";
+const SKILLS_SPARSE_PATH = "skills/mcp-apps-builder";
+const SKILLS_AGENT_DIRS = [".cursor", ".claude", ".agent"] as const;
+const SKILLS_MANUAL_INSTALL_CMD =
+  "npx --yes skills add mcp-use/mcp-use --yes --skill mcp-apps-builder -a cursor -a claude-code -a codex";
 
-    child.on("close", (code) => {
-      if (code === 0) {
-        sendInstallTelemetryEvent(
-          "cursor,claude-code,codex",
-          "mcp-apps-builder"
-        );
-        resolve();
-      } else {
-        reject(new Error(`skills add exited with code ${code ?? "unknown"}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
+function isGitAvailable(): boolean {
+  const result = spawnSync("git", ["--version"], {
+    stdio: "ignore",
+    shell: false,
   });
+  return result.status === 0 && !result.error;
+}
+
+function warnSkillsInstallFailed(missingGit: boolean): void {
+  const reason = missingGit
+    ? "Failed to install skills: git is not installed or not in PATH."
+    : "Failed to install skills.";
+  console.log(ansi.yellow(`⚠️  ${reason}`));
+  console.log(ansi.yellow(`   Run manually: ${SKILLS_MANUAL_INSTALL_CMD}`));
+}
+
+async function installSkills(projectPath: string): Promise<void> {
+  const tempDir = mkdtempSync(join(tmpdir(), "mcp-use-skills-"));
+  const repoDir = join(tempDir, "repo");
+
+  try {
+    const clone = spawnSync(
+      "git",
+      [
+        "clone",
+        "--depth",
+        "1",
+        "--filter=blob:none",
+        "--sparse",
+        "--single-branch",
+        SKILLS_REPO,
+        repoDir,
+      ],
+      { stdio: "ignore", shell: false }
+    );
+    if (clone.status !== 0 || clone.error) {
+      throw new Error("git clone failed");
+    }
+
+    const checkout = spawnSync(
+      "git",
+      ["sparse-checkout", "set", SKILLS_SPARSE_PATH],
+      { cwd: repoDir, stdio: "ignore", shell: false }
+    );
+    if (checkout.status !== 0 || checkout.error) {
+      throw new Error("git sparse-checkout failed");
+    }
+
+    const skillSrc = join(repoDir, SKILLS_SPARSE_PATH);
+    if (!existsSync(skillSrc)) {
+      throw new Error("mcp-apps-builder skill not found in repository");
+    }
+
+    for (const agentDir of SKILLS_AGENT_DIRS) {
+      const dest = join(projectPath, agentDir, "skills", "mcp-apps-builder");
+      mkdirSync(dirname(dest), { recursive: true });
+      cpSync(skillSrc, dest, { recursive: true });
+    }
+
+    sendInstallTelemetryEvent("cursor,claude-code,codex", "mcp-apps-builder");
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 }
 
 function renderLogo(): void {
@@ -1005,17 +1033,18 @@ async function main(): Promise<void> {
     console.log("");
     const s = spinner();
     s.start("Installing skills...");
-    try {
-      await installSkills(projectPath);
-      skillsInstalled = true;
-      s.stop("Skills installed successfully!");
-    } catch {
-      s.stop("Skills install failed");
-      console.log(
-        ansi.yellow(
-          "⚠️  Skills install failed. Run `npx --yes skills add mcp-use/mcp-use --yes --skill mcp-apps-builder -a cursor -a claude-code -a codex` manually in the project directory."
-        )
-      );
+    if (!isGitAvailable()) {
+      s.stop("Skills install skipped");
+      warnSkillsInstallFailed(true);
+    } else {
+      try {
+        await installSkills(projectPath);
+        skillsInstalled = true;
+        s.stop("Skills installed successfully!");
+      } catch {
+        s.stop("Skills install failed");
+        warnSkillsInstallFailed(false);
+      }
     }
   }
 
