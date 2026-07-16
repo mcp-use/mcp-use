@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - canary
+      - beta
     paths:
       - "libraries/typescript/**"
       - ".github/workflows/typescript-release.yml"
@@ -21,6 +22,7 @@ concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   release:
     name: Release
+    if: github.ref != 'refs/heads/beta'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -566,3 +568,186 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_CHANNEL_WEBHOOK_URL }}
+
+  release-beta:
+    name: Release beta
+    if: github.ref == 'refs/heads/beta'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout beta
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.15.0
+          cache: "pnpm"
+          cache-dependency-path: libraries/typescript/pnpm-lock.yaml
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Update npm for trusted publishing
+        run: npm install --global npm@12.0.1
+
+      - name: Verify beta prerelease state
+        working-directory: libraries/typescript
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const pre = JSON.parse(fs.readFileSync('.changeset/pre.json', 'utf8'))
+          if (pre.mode !== 'pre' || pre.tag !== 'beta') {
+            throw new Error(`Expected beta prerelease mode; received ${JSON.stringify(pre)}`)
+          }
+          NODE
+
+      - name: Verify bootstrap credential before changing versions
+        working-directory: libraries/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NPM_TOKEN is required for @mcp-use/client and @mcp-use/agent" >&2
+            exit 1
+          fi
+          npm whoami
+          npm org ls mcp-use --json >/dev/null
+
+      - name: Install dependencies
+        working-directory: libraries/typescript
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        working-directory: libraries/typescript
+        run: pnpm build
+
+      - name: Find pending beta changesets
+        id: changesets
+        working-directory: libraries/typescript
+        run: |
+          PENDING="$(node - <<'NODE'
+          const fs = require('fs')
+          const files = fs.readdirSync('.changeset')
+            .filter((file) => file.endsWith('.md') && file !== 'README.md')
+            .map((file) => file.slice(0, -3))
+          const applied = new Set(JSON.parse(fs.readFileSync('.changeset/pre.json', 'utf8')).changesets)
+          process.stdout.write(files.filter((id) => !applied.has(id)).join('\n'))
+          NODE
+          )"
+          if [ -n "$PENDING" ]; then
+            echo "pending=true" >> "$GITHUB_OUTPUT"
+            echo "$PENDING"
+          else
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Version beta packages
+        if: steps.changesets.outputs.pending == 'true'
+        working-directory: libraries/typescript
+        run: pnpm version:beta
+
+      - name: Commit beta versions
+        if: steps.changesets.outputs.pending == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add libraries/typescript
+          git commit -m "chore(typescript): version beta packages"
+          git push origin HEAD:beta
+
+      - name: Validate release plan against npm
+        working-directory: libraries/typescript
+        run: pnpm verify:beta-plan --output beta-release-plan.json
+
+      - name: Verify package tarballs
+        working-directory: libraries/typescript
+        run: pnpm verify:beta-packs
+
+      - name: Check whether publication is needed
+        id: publication
+        working-directory: libraries/typescript
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const plan = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
+          const unpublished = plan.releases.filter((release) => !release.published)
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `needed=${unpublished.length > 0}\n`)
+          console.log(unpublished)
+          NODE
+
+      - name: Publish token-authenticated scoped packages
+        if: steps.publication.outputs.needed == 'true'
+        working-directory: libraries/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          node - <<'NODE' > /tmp/bootstrap-packages
+          const fs = require('fs')
+          const plan = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
+          for (const release of plan.releases) {
+            if (!release.published && release.requiresToken) console.log(release.name)
+          }
+          NODE
+          while IFS= read -r package; do
+            [ -z "$package" ] && continue
+            pnpm --filter "$package" publish --tag beta --access public --no-git-checks
+          done < /tmp/bootstrap-packages
+
+      - name: Wait for bootstrapped packages
+        if: steps.publication.outputs.needed == 'true'
+        working-directory: libraries/typescript
+        run: |
+          node - <<'NODE'
+          const fs = require('fs')
+          const { execFileSync } = require('child_process')
+          const plan = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
+          for (const release of plan.releases.filter((item) => item.requiresToken && !item.published)) {
+            let found = false
+            for (let attempt = 0; attempt < 12; attempt += 1) {
+              try {
+                const version = execFileSync('npm', ['view', `${release.name}@${release.version}`, 'version'], { encoding: 'utf8' }).trim()
+                if (version === release.version) {
+                  found = true
+                  break
+                }
+              } catch {}
+              Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000)
+            }
+            if (!found) throw new Error(`${release.name}@${release.version} did not become visible on npm`)
+          }
+          NODE
+
+      - name: Publish remaining beta packages with trusted publishing
+        if: steps.publication.outputs.needed == 'true'
+        working-directory: libraries/typescript
+        run: pnpm changeset publish --tag beta
+
+      - name: Verify npm versions and dist-tags
+        working-directory: libraries/typescript
+        run: |
+          pnpm verify:beta-plan --output beta-release-after.json
+          node - <<'NODE'
+          const fs = require('fs')
+          const before = JSON.parse(fs.readFileSync('beta-release-plan.json', 'utf8'))
+          const after = JSON.parse(fs.readFileSync('beta-release-after.json', 'utf8'))
+          for (const release of after.releases) {
+            const previous = before.releases.find((item) => item.name === release.name)
+            if (!release.published) throw new Error(`${release.name}@${release.version} is missing from npm`)
+            if (release.betaBefore !== release.version) throw new Error(`${release.name} beta tag is ${release.betaBefore}, expected ${release.version}`)
+            if (release.latestBefore !== previous.latestBefore) throw new Error(`${release.name} latest tag changed`)
+          }
+          NODE
+
+      - name: Create and push package tags
+        working-directory: libraries/typescript
+        run: |
+          pnpm changeset tag
+          git push origin --tags

@@ -1,7 +1,7 @@
 {
   "name": "mcp-use",
   "type": "module",
-  "version": "2.0.0-alpha.0",
+  "version": "1.34.3",
   "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -78,8 +78,8 @@
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
-    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712",
-    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@2501",
+    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d",
+    "@modelcontextprotocol/server": "https://pkg.pr.new/@modelcontextprotocol/server@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@tailwindcss/vite": "^4.2.0",
     "@vitejs/plugin-react": "^6.0.3",
     "jose": "^6.1.3",
@@ -104,8 +104,8 @@
   },
   "devDependencies": {
     "@mcp-use/client": "workspace:*",
-    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
-    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@2501",
+    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "@modelcontextprotocol/core": "https://pkg.pr.new/@modelcontextprotocol/core@f60b40179b0f090f6d64248be1312245a160b5ee",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

@@ -2,7 +2,7 @@
 
 **Status:** Implemented.
 **Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus embedded Inspector mounting over HTTP/CDN.
-**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, toolchain, and inspector shell. There is no separate CLI, devkit, or config package.
+**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, toolchain, and inspector shell. There is no separate CLI implementation, devkit, or config package. `@mcp-use/cli@4` is a compatibility-only proxy for the historical install command.
 
 ## Goals
 
@@ -47,6 +47,12 @@ The first-party command contract belongs to `mcp-use`:
 - Cloud identity: `login`, `logout`, `whoami`.
 - Cloud resources: `org`, `servers`, `deployments`, `deploy`.
 - Local and integration workflows: `client`, `screenshot`, `skills`.
+
+For users and automation that still invoke `npx @mcp-use/cli`, the separately
+published `@mcp-use/cli@4` package contains only a bin shim. It depends on the
+matching `mcp-use@2` release and delegates to the framework's shipped binary.
+It owns no command code or behavior; `mcp-use` remains the canonical
+package and executable implementation.
 
 There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
 

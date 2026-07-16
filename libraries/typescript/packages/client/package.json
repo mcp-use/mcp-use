@@ -1,7 +1,7 @@
 {
   "name": "@mcp-use/client",
   "type": "module",
-  "version": "2.0.0-alpha.0",
+  "version": "1.0.0",
   "description": "MCP client for connecting to Model Context Protocol servers — sessions, connectors, and OAuth. Part of the mcp-use v2 framework.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
@@ -56,8 +56,8 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@2501",
-    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@712"
+    "@modelcontextprotocol/client": "https://pkg.pr.new/@modelcontextprotocol/client@f60b40179b0f090f6d64248be1312245a160b5ee",
+    "@modelcontextprotocol/ext-apps": "https://pkg.pr.new/@modelcontextprotocol/ext-apps@432d42bb02a569078ab31ab6458428df6027809d"
   },
   "peerDependencies": {
     "@e2b/code-interpreter": "^2.6.1",

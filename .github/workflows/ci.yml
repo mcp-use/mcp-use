@@ -48,9 +48,9 @@ permissions:
 
 on:
   push:
-    branches: [main, canary]
+    branches: [main, canary, beta]
   pull_request:
-    branches: [main, canary]
+    branches: [main, canary, beta]
   workflow_call:
     inputs:
       ref:
@@ -653,6 +653,9 @@ jobs:
       - name: Build Packages
         run: pnpm build
 
+      - name: Test release versioning
+        run: pnpm test:release-versioning
+
   typescript-test-mcp-use:
     needs: typescript-lint
     name: "typescript/mcp-use (node-${{ matrix.node-version }})"
@@ -806,7 +809,7 @@ jobs:
 
   typescript-changeset-check:
     needs: detect-changes
-    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && needs.detect-changes.outputs.typescript == 'true') }}
+    if: ${{ (github.event_name == 'workflow_call' && inputs.run_changeset_check) || (github.event_name == 'pull_request' && github.base_ref != 'canary' && github.base_ref != 'beta' && needs.detect-changes.outputs.typescript == 'true') }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -834,10 +837,12 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Check for Changesets
+        env:
+          BASE_REF: ${{ github.base_ref || 'main' }}
         run: |
           if [ -n "$(ls -A .changeset/*.md 2>/dev/null | grep -v README.md)" ]; then
             echo "✅ Changeset found"
-            pnpm changeset status --since=origin/main
+            pnpm changeset status --since="origin/${BASE_REF}"
           else
             echo "⚠️ No changeset found. If this PR includes changes that should be published, please add a changeset:"
             echo "  pnpm changeset"

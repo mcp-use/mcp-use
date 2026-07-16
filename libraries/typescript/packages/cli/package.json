@@ -1,0 +1,46 @@
+{
+  "name": "@mcp-use/cli",
+  "type": "module",
+  "version": "3.6.4",
+  "description": "Compatibility proxy for the CLI included in mcp-use v2",
+  "author": "mcp-use, Inc.",
+  "license": "MIT",
+  "homepage": "https://github.com/mcp-use/mcp-use#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mcp-use/mcp-use.git",
+    "directory": "libraries/typescript/packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/mcp-use/mcp-use/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "cli"
+  ],
+  "bin": {
+    "mcp-use": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build": "rimraf dist && tsup src/index.ts --format esm --target node24 && tsc --emitDeclarationOnly --declaration",
+    "test": "node --test tests/proxy.test.mjs"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:^"
+  },
+  "devDependencies": {
+    "rimraf": "^6.1.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

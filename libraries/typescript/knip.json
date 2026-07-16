@@ -23,6 +23,10 @@
       "ignoreBinaries": ["npx"],
       "ignoreDependencies": ["mcp-use"]
     },
+    "packages/cli": {
+      "entry": ["src/index.ts", "tests/**/*.mjs"],
+      "project": ["src/**/*.ts", "tests/**/*.mjs"]
+    },
     "packages/client": {
       "entry": [
         "src/index.ts",
