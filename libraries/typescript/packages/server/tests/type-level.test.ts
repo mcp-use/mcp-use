@@ -9,13 +9,19 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { z } from "zod";
 
 import { MCPServer } from "../src/index.js";
-import type { CallToolResult, ToolResult } from "../src/index.js";
+import type {
+  CallToolResult,
+  InputRequiredResult,
+  ToolResult,
+} from "../src/index.js";
 
 const outputSchema = z.object({ answer: z.number() });
 
 describe("ToolResult resolution", () => {
-  it("is the raw CallToolResult when no output type is declared", () => {
-    expectTypeOf<ToolResult>().toEqualTypeOf<CallToolResult>();
+  it("accepts regular and input-required results without an output type", () => {
+    expectTypeOf<ToolResult>().toEqualTypeOf<
+      CallToolResult | InputRequiredResult
+    >();
   });
 
   it("requires matching structuredContent or isError when one is", () => {

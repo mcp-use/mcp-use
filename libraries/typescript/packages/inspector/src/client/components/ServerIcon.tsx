@@ -2,7 +2,7 @@ import { BlurFade } from "@/client/components/ui/blur-fade";
 import { RandomGradientBackground } from "@/client/components/ui/random-gradient-background";
 import { Spinner } from "@/client/components/ui/spinner";
 import { cn } from "@/client/lib/utils";
-import { getServerDisplayName } from "@/client/utils/serverNames";
+import { getServerDisplayName } from "@/client/utils/servers";
 import type { UseMcpResult } from "@mcp-use/client/react";
 import { useEffect, useState } from "react";
 
@@ -63,7 +63,7 @@ export function ServerIcon({
   // If no icon available, show gradient with initials
   if (!iconUrl || imageError) {
     return (
-      <BlurFade delay={0.05}>
+      <BlurFade delay={0.05} offset={0}>
         <RandomGradientBackground
           className={cn(
             "flex items-center justify-center rounded-full overflow-hidden",
@@ -77,7 +77,7 @@ export function ServerIcon({
 
   // Show image icon
   return (
-    <BlurFade delay={0.05}>
+    <BlurFade delay={0.05} offset={0}>
       <div
         className={cn(
           "rounded-md overflow-hidden flex items-center justify-center bg-white dark:bg-zinc-800 relative",

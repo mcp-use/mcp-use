@@ -132,9 +132,7 @@ describe("parseArgs", () => {
 
   it("rejects unknown options and extra positionals", () => {
     expect(() => parseArgs(["start", "--bogus"])).toThrow(/unknown option/i);
-    expect(() => parseArgs(["start", "extra"])).toThrow(
-      /unexpected argument/i
-    );
+    expect(() => parseArgs(["start", "extra"])).toThrow(/unexpected argument/i);
   });
 });
 
@@ -288,7 +286,9 @@ describe("isViteMissing", () => {
   });
 
   it("does not classify errors with a different code", () => {
-    const error = new Error("Cannot find package 'vite'") as NodeJS.ErrnoException;
+    const error = new Error(
+      "Cannot find package 'vite'"
+    ) as NodeJS.ErrnoException;
     error.code = "ERR_INVALID_ARG_TYPE";
     expect(isViteMissing(error)).toBe(false);
   });

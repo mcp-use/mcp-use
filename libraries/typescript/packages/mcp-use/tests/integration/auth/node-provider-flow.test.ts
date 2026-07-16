@@ -11,14 +11,14 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { auth } from "@modelcontextprotocol/sdk/client/auth.js";
+import { auth } from "@modelcontextprotocol/client";
 import { createServer } from "node:http";
 import type { Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
-import { NodeOAuthClientProvider } from "../../../src/auth/node-provider.js";
+import { NodeOAuthClientProvider } from "@mcp-use/client";
 
 interface FakeAS {
   url: string;
@@ -297,7 +297,7 @@ describe("NodeOAuthClientProvider — full flow", () => {
     expect(provider.hasPendingFlow).toBe(false);
   });
 
-  it("forceRefresh exchanges the refresh_token for a new access token", async () => {
+  it("SDK auth refreshes the persisted refresh_token", async () => {
     let openedUrl: string | null = null;
     const provider = await NodeOAuthClientProvider.create(fakeAS.url, {
       baseDir,
@@ -320,23 +320,23 @@ describe("NodeOAuthClientProvider — full flow", () => {
     expect(initial?.access_token).toBe("test-access-token");
     const grantsBefore = fakeAS.tokenGrants.refresh_token;
 
-    const refreshed = await provider.forceRefresh();
-    expect(refreshed).not.toBeNull();
-    expect(refreshed!.access_token).toMatch(/^test-access-token-refreshed-/);
+    expect(await auth(provider, { serverUrl: fakeAS.url })).toBe("AUTHORIZED");
+    const refreshed = await provider.tokens();
+    expect(refreshed?.access_token).toMatch(/^test-access-token-refreshed-/);
     expect(fakeAS.tokenGrants.refresh_token).toBe(grantsBefore + 1);
 
     // Persisted tokens reflect the refreshed value.
     const persisted = await provider.tokens();
-    expect(persisted?.access_token).toBe(refreshed!.access_token);
+    expect(persisted?.access_token).toBe(refreshed?.access_token);
   });
 
-  it("forceRefresh returns null when no refresh_token is stored", async () => {
+  it("starts authorization when no refresh_token is stored", async () => {
     const provider = await NodeOAuthClientProvider.create(fakeAS.url, {
       baseDir,
       preferredPort: 33588,
       openBrowser: () => {},
     });
-    expect(await provider.forceRefresh()).toBeNull();
+    expect(await auth(provider, { serverUrl: fakeAS.url })).toBe("REDIRECT");
   });
 
   it("escapes HTML in the loopback failure page", async () => {

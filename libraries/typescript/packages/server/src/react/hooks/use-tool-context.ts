@@ -7,13 +7,13 @@ import type { ToolContextError } from "../types/result-types.js";
 
 export type { ToolContextError } from "../types/result-types.js";
 
-type ToolOutput<Name extends keyof RegisteredTools> = Name extends keyof RegisteredTools
-  ? RegisteredTools[Name]["output"]
-  : unknown;
+type ToolOutput<Name extends keyof RegisteredTools> =
+  Name extends keyof RegisteredTools
+    ? RegisteredTools[Name]["output"]
+    : unknown;
 
-type ToolInput<Name extends keyof RegisteredTools> = Name extends keyof RegisteredTools
-  ? RegisteredTools[Name]["input"]
-  : unknown;
+type ToolInput<Name extends keyof RegisteredTools> =
+  Name extends keyof RegisteredTools ? RegisteredTools[Name]["input"] : unknown;
 
 /**
  * No result yet and arguments are not mid-stream.

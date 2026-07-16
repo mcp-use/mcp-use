@@ -247,7 +247,13 @@ export async function requestLogger(c: Context, next: Next): Promise<void> {
   //  - MCP requests: OK / ERROR <message> based on JSON-RPC error parsing.
   //  - Plain HTTP (HEAD, etc.): the raw status code, colored by class.
   let outcomePart: string;
-  const errMsg = await extractResponseError(c.res);
+  // Never consume an SSE response for logging. Reading a cloned live stream
+  // blocks Hono from flushing server→client requests and notifications,
+  // deadlocking reverse RPC until the request times out.
+  const isStreamingResponse = (
+    c.res.headers.get("content-type") || ""
+  ).includes("text/event-stream");
+  const errMsg = isStreamingResponse ? null : await extractResponseError(c.res);
   if (errMsg) {
     outcomePart = chalk.red(`ERROR ${errMsg}`);
   } else if (mcpMethod) {

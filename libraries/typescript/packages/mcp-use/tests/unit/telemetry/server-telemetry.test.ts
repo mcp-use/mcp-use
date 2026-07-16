@@ -13,21 +13,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
+const mockCapturePostHog = vi.fn().mockResolvedValue(undefined);
+const mockCaptureScarf = vi.fn().mockResolvedValue(undefined);
 
-// Mock PostHog before importing Telemetry
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+vi.mock("../../../src/telemetry/tel-fetch.js", () => ({
+  capturePostHog: (...args: unknown[]) => mockCapturePostHog(...args),
+  captureScarf: (...args: unknown[]) => mockCaptureScarf(...args),
+  SCARF_GATEWAY_URL: "https://mcpuse.gateway.scarf.sh/events-ts",
+}));
 
 // Mock fs module
 vi.mock("node:fs", () => ({
@@ -75,7 +68,7 @@ describe("MCPServer Telemetry Integration", () => {
     // Let any lingering fire-and-forget telemetry from previous tests settle
     await new Promise((resolve) => setTimeout(resolve, 300));
     vi.clearAllMocks();
-    mockCapture.mockClear();
+    mockCapturePostHog.mockClear();
   });
 
   afterEach(() => {
@@ -108,7 +101,7 @@ describe("MCPServer Telemetry Integration", () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Verify telemetry was tracked via PostHog capture
-      const captureCall = mockCapture.mock.calls.find(
+      const captureCall = mockCapturePostHog.mock.calls.find(
         (call) => call[0]?.event === "server_run"
       );
       expect(captureCall).toBeDefined();
@@ -131,7 +124,7 @@ describe("MCPServer Telemetry Integration", () => {
       await server.getHandler({ provider: "supabase" });
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const captureCall = mockCapture.mock.calls.find(
+      const captureCall = mockCapturePostHog.mock.calls.find(
         (call) => call[0]?.event === "server_run"
       );
       expect(captureCall).toBeDefined();
@@ -149,7 +142,7 @@ describe("MCPServer Telemetry Integration", () => {
       await server.getHandler({ provider: "cloudflare" });
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const captureCall = mockCapture.mock.calls.find(
+      const captureCall = mockCapturePostHog.mock.calls.find(
         (call) => call[0]?.event === "server_run"
       );
       expect(captureCall).toBeDefined();
@@ -167,7 +160,7 @@ describe("MCPServer Telemetry Integration", () => {
       await server.getHandler();
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const captureCall = mockCapture.mock.calls.find(
+      const captureCall = mockCapturePostHog.mock.calls.find(
         (call) => call[0]?.event === "server_run"
       );
       expect(captureCall).toBeDefined();
@@ -206,7 +199,7 @@ describe("MCPServer Telemetry Integration", () => {
       await server.listen(3000);
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      const captureCall = mockCapture.mock.calls.find(
+      const captureCall = mockCapturePostHog.mock.calls.find(
         (call) => call[0]?.event === "server_run"
       );
       expect(captureCall).toBeDefined();

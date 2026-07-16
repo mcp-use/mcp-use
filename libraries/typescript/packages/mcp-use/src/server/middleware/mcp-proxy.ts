@@ -10,6 +10,7 @@
 import type { Context, Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { isSafeProxyTarget } from "../oauth/proxy.js";
 
 /**
  * Options for configuring the MCP proxy middleware
@@ -52,6 +53,9 @@ export interface McpProxyOptions {
     targetUrl: string,
     c: Context
   ) => Promise<boolean> | boolean;
+
+  /** Permit loopback HTTP targets for explicit local development. */
+  allowLoopback?: boolean;
 
   /**
    * Enable request logging
@@ -125,7 +129,6 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         "mcp-protocol-version",
         "X-Server-Id",
         "X-Requested-With",
-        "X-Connection-URL",
       ],
       exposeHeaders: ["*"],
     })
@@ -147,23 +150,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       }
 
-      // Get target URL from query parameter or header
-      // IMPORTANT: Query parameter takes precedence because it's used for OAuth discovery
-      // where we encode the full target path. The SDK might still include X-Target-URL
-      // header from the transport config, but we need to use the query param for OAuth.
-      const url = new URL(c.req.url);
-      const targetFromQuery = url.searchParams.get("__mcp_target");
-      let targetUrl: string | undefined;
-
-      if (targetFromQuery) {
-        // OAuth discovery mode: construct full URL from target origin + request path
-        // e.g., __mcp_target=https://mcp.vercel.com + /.well-known/oauth-protected-resource
-        const requestPath = url.pathname.replace(basePath, "");
-        targetUrl = targetFromQuery + requestPath;
-      } else {
-        // Regular MCP proxy mode: use X-Target-URL header
-        targetUrl = c.req.header("X-Target-URL");
-      }
+      const targetUrl = c.req.header("X-Target-URL");
 
       if (!targetUrl) {
         return c.json(
@@ -173,6 +160,18 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
               "Set X-Target-URL header to the MCP server URL you want to proxy to",
           },
           400
+        );
+      }
+
+      if (
+        !(await isSafeProxyTarget(targetUrl, options.allowLoopback ?? false))
+      ) {
+        return c.json(
+          {
+            error: "Invalid target URL",
+            details: "Target is not allowed by the proxy network policy",
+          },
+          403
         );
       }
 
@@ -265,9 +264,20 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get("location");
         if (location) {
+          const redirectUrl = new URL(location, targetUrl).toString();
+          if (
+            !(await isSafeProxyTarget(
+              redirectUrl,
+              options.allowLoopback ?? false
+            )) ||
+            (options.validateRequest &&
+              !(await options.validateRequest(redirectUrl, c)))
+          ) {
+            return c.json({ error: "Redirect target is not allowed" }, 403);
+          }
           // For redirects, make a new fetch to the redirect location
           // We can reuse `body` since we created a stable copy with .slice()
-          const redirectResponse = await fetch(location, {
+          const redirectResponse = await fetch(redirectUrl, {
             method,
             headers,
             body,
@@ -311,48 +321,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
         }
       });
 
-      // Check if this is an OAuth discovery response that needs resource field rewriting
-      // The SDK validates that the resource field matches the connection URL for security
-      // We need to rewrite the resource to match the proxy URL, but keep authorization_servers
-      // pointing to the original OAuth server (the fetch interceptor will route those)
       const contentType = response.headers.get("content-type") || "";
-      const isOAuthDiscovery =
-        url.pathname.includes("/.well-known/oauth") &&
-        contentType.includes("application/json");
-
-      if (isOAuthDiscovery && response.body) {
-        // Read and parse the response body
-        const bodyText = await response.text();
-        try {
-          const bodyJson = JSON.parse(bodyText);
-          const proxyOrigin = new URL(c.req.url).origin;
-
-          // Rewrite the resource field to match the proxy URL
-          // The SDK validates that the resource matches the URL it connected to
-          // Without this, the SDK will reject the OAuth response as a security measure
-          if (bodyJson.resource) {
-            bodyJson.resource = `${proxyOrigin}${basePath}`;
-          }
-
-          // DO NOT rewrite authorization_servers - keep them pointing to original OAuth server
-          // The browser's fetch interceptor will route requests to those URLs through the OAuth proxy
-          // DO NOT rewrite token_endpoint or registration_endpoint - same reason
-          // DO NOT rewrite authorization_endpoint - browser needs to redirect there directly
-
-          return new Response(JSON.stringify(bodyJson), {
-            status: response.status,
-            statusText: response.statusText,
-            headers: responseHeaders,
-          });
-        } catch {
-          // If parsing fails, return original body
-          return new Response(bodyText, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: responseHeaders,
-          });
-        }
-      }
 
       // For streaming SSE responses (GET without content-length), pass through the body stream.
       // For all other responses, buffer the body and set Content-Length so browsers
@@ -381,11 +350,7 @@ export function mountMcpProxy(app: Hono, options: McpProxyOptions = {}): void {
       const message = error instanceof Error ? error.message : "Unknown error";
 
       // Get targetUrl for better error logging
-      const url = new URL(c.req.url);
-      const targetFromQuery = url.searchParams.get("__mcp_target");
-      const targetUrl = targetFromQuery
-        ? targetFromQuery + url.pathname.replace(basePath, "")
-        : c.req.header("X-Target-URL");
+      const targetUrl = c.req.header("X-Target-URL");
 
       // Check if this is a connection refused error (common when a stored server isn't running)
       const isConnectionRefused =

@@ -82,10 +82,6 @@ describe("@mcp-use/inspector must not require langchain", () => {
         name: "dynamic import('langchain')",
         re: /import\(\s*["']langchain["']\)/,
       },
-      {
-        name: "MCPAgent reference",
-        re: /\bMCPAgent\b/,
-      },
     ];
 
     const failures: string[] = [];

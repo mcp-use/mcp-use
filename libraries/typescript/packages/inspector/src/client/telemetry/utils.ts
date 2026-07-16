@@ -1,13 +1,16 @@
+declare global {
+  interface Window {
+    __INSPECTOR_VERSION__?: string;
+  }
+}
+
 export function getPackageVersion(): string {
   try {
     if (typeof window !== "undefined") {
-      const runtimeVersion = (window as any).__INSPECTOR_VERSION__;
-      if (runtimeVersion !== undefined) {
-        return runtimeVersion;
+      const version = window.__INSPECTOR_VERSION__;
+      if (version !== undefined) {
+        return version;
       }
-    }
-    if (typeof __INSPECTOR_VERSION__ !== "undefined") {
-      return __INSPECTOR_VERSION__;
     }
     return "0.0.0";
   } catch {

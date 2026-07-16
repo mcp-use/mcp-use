@@ -19,8 +19,8 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import fs from "node:fs";
 import path from "node:path";
-import { MCPAgent, PROMPTS } from "../../../dist/src/agents";
-import { MCPClient } from "../../../dist/src/client";
+import { MCPAgent, PROMPTS } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 
 // create a temporary directory
 const tempDir = fs.mkdtempSync("mcp-use-code-mode-e2b-example-");

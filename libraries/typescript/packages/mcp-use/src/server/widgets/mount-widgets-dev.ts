@@ -91,7 +91,8 @@ export async function mountWidgetsDev(
   options?: MountWidgetsDevOptions
 ): Promise<void> {
   const { promises: fs } = await import("node:fs");
-  const baseRoute = options?.baseRoute || widgetAssetBase(serverConfig.basePath);
+  const baseRoute =
+    options?.baseRoute || widgetAssetBase(serverConfig.basePath);
   // Public-asset prefix for the favicon <link> baked into dev widget HTML.
   const publicBase = publicAssetBase(serverConfig.basePath);
   // Resolution order for the widgets directory:

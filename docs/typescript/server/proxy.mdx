@@ -23,27 +23,30 @@ await server.proxy({
   // Proxy a local TypeScript server (using the 'tsx' runner)
   database: {
     command: "tsx",
-    args: [path.resolve(__dirname, "./db-server.ts")]
+    args: [path.resolve(__dirname, "./db-server.ts")],
   },
-  
+
   // Proxy a local Python FastMCP server
   weather: {
     command: "uv",
     args: ["run", "weather_server.py"],
-    env: { ...process.env, FASTMCP_LOG_LEVEL: "ERROR" }
+    env: { ...process.env, FASTMCP_LOG_LEVEL: "ERROR" },
   },
-  
+
   // Proxy a remote server over HTTP
   manufact: {
-    url: "https://manufact.com/docs/mcp"
-  }
+    url: "https://manufact.com/docs/mcp",
+  },
 });
 
 // Expose our own tools alongside the proxied ones
-server.tool({
-  name: "aggregator_status",
-  description: "Check aggregator status",
-}, async () => text("All systems operational"));
+server.tool(
+  {
+    name: "aggregator_status",
+    description: "Check aggregator status",
+  },
+  async () => text("All systems operational"),
+);
 
 // Start the unified server
 await server.listen(3000);
@@ -53,11 +56,12 @@ In the example above, the `database` tools will be prefixed with `database_` (e.
 
 ## Low-Level API (Explicit Session)
 
-For advanced use cases (such as dynamically determining auth headers, managing complex connection lifecycles, or using custom connectors), you can inject an explicit `MCPSession` directly into the `proxy` method using the `mcp-use` Client SDK.
+For advanced use cases (such as dynamically determining auth headers or using
+custom connectors), you can inject an `MCPConnection` directly into `proxy`.
 
 ```typescript
 import { MCPServer } from "mcp-use/server";
-import { MCPClient } from "mcp-use/client";
+import { MCPClient } from "@mcp-use/client";
 
 const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
 
@@ -65,9 +69,9 @@ const server = new MCPServer({ name: "UnifiedServer", version: "1.0.0" });
 const customClient = new MCPClient({
   mcpServers: {
     secure_db: {
-      url: "https://secure-db.example.com/mcp"
-    }
-  }
+      url: "https://secure-db.example.com/mcp",
+    },
+  },
 });
 
 // Manage the session manually
@@ -81,7 +85,11 @@ await server.listen(3000);
 
 ## Example Usage
 
-<Card title="Proxy Server Example" icon="github" href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/proxy">
+<Card
+  title="Proxy Server Example"
+  icon="github"
+  href="https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/mcp-use/examples/server/features/proxy"
+>
   See a fully working example of server composition in the mcp-use repository.
 </Card>
 
@@ -99,15 +107,18 @@ When you proxy a server, the `mcp-use` SDK automatically:
 
 The `mcp-use` proxying system goes far beyond simple tool forwarding. It transparently supports the most advanced features of the Model Context Protocol:
 
-### LLM Sampling & Elicitation 
+### LLM Sampling & Elicitation
+
 If a child server requests LLM Sampling (`sampling/createMessage`) or Elicitation (`elicitation/create`), the Aggregator automatically intercepts the out-of-band JSONRPC request, dynamically resolves the HTTP context of the specific user who triggered the tool, and routes the request back to that specific user's client.
 
 If a request context is somehow lost (e.g., executing a tool via a headless script), the Aggregator provides graceful fallbacks so the child server doesn't hang.
 
 ### Progress Tracking
+
 If a child tool emits `notifications/progress` events, the Aggregator catches those events and pipes them directly through the unified `ToolContext` back to the parent client.
 
 ### Resource URIs
+
 To prevent URI collisions across different servers, the proxy automatically prepends the namespace to the resource URI protocol.
 
 For example, if the `weather` server exposes a resource at `app://settings`, the Aggregator will expose it as `weather://app://settings`. When a client reads that resource, the Aggregator strips the prefix and requests the original URI from the child server.

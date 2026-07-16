@@ -61,6 +61,8 @@ export interface InspectorShellOptions {
    * {@link DEFAULT_INSPECTOR_ASSETS_URL}.
    */
   assetsUrl?: string | undefined;
+  /** Hosted managed-chat URL (`window.__MANUFACT_CHAT_URL__`). */
+  manufactChatUrl?: string | undefined;
 }
 
 /** Escape a string for interpolation into HTML text or attribute values. */
@@ -97,8 +99,11 @@ function serializeForInlineScript(value: string): string {
  * or JSON-serialized with `<` escaped, so config can't inject markup.
  */
 export function renderInspectorShell(options: InspectorShellOptions): string {
-  const { serverName, basePath, assetsUrl } = options;
+  const { serverName, basePath, assetsUrl, manufactChatUrl } = options;
   const serializedBasePath = serializeForInlineScript(basePath);
+  const serializedManufactChatUrl = manufactChatUrl
+    ? serializeForInlineScript(manufactChatUrl)
+    : null;
   const bundleUrl = assetsUrl ?? DEFAULT_INSPECTOR_ASSETS_URL;
   const scriptSrc = escapeHtml(bundleUrl);
   const stylesHref = escapeHtml(inspectorStylesUrl(bundleUrl));
@@ -127,6 +132,7 @@ export function renderInspectorShell(options: InspectorShellOptions): string {
         };
         // Read by the current inspector bundle to derive its own URLs.
         window.__MCP_BASE_PATH__ = basePath;
+        ${serializedManufactChatUrl ? `window.__MANUFACT_CHAT_URL__ = ${serializedManufactChatUrl};` : ""}
         // The bundle carries Node-flavored dependencies that touch \`process\`
         // at module scope; give them the same browser polyfill the v1
         // inspector shell provides, or the bundle throws on load.
@@ -172,12 +178,15 @@ export function mountInspectorShell<E extends Env>(
   if (inspector?.enabled === false) {
     return;
   }
-  const { assetsUrl } = inspector ?? {};
+  const { assetsUrl, manufactChatUrl: configManufactChatUrl } = inspector ?? {};
+  const manufactChatUrl =
+    configManufactChatUrl ?? process.env.MANUFACT_CHAT_URL ?? undefined;
   // Config is fixed at mount time, so the page renders once, not per request.
   const html = renderInspectorShell({
     serverName: options.serverName,
     basePath: options.basePath,
     assetsUrl,
+    manufactChatUrl,
   });
   const path = `${options.basePath}/inspector`;
   app.on("GET", [path, `${path}/`], (c) => c.html(html));

@@ -1,169 +1,48 @@
 ---
 title: "Resources"
-description: "Read content and data from MCP servers"
+description: "List and read MCP server resources"
 icon: "folder-open"
 ---
 
-Resources provide URI-based access to content and data exposed by MCP servers. They enable your applications to read configuration files, documentation, database records, API responses, and any other information that servers want to make available.
+Resources are URI-addressed content from MCP servers.
 
-## Understanding Resources
-
-In the MCP protocol, resources are content sources that clients can read via URIs. Each resource has:
-
-- **Unique URI**: Resources are identified and accessed by unique URIs
-- **Content types**: Support for text, JSON, binary, and other MIME types
-- **Static or dynamic**: Content can be fixed or generated on-demand
-- **Template support**: Parameterized resources for dynamic content generation
-
-<Tip>
-**Think of resources as endpoints**: Just like REST APIs have endpoints, MCP servers expose resources via URIs. The key difference is that resources are designed for AI context and can include rich metadata.
-</Tip>
-
-## Types of Resources
-
-### Direct Resources
-Static resources with fixed URIs that always return the same type of content.
-
-### Resource Templates
-Dynamic resources that accept parameters to generate different content based on input.
-
-## Listing Available Resources
-
-To see what resources are available from a connected MCP server:
-
-<CodeGroup>
-```typescript TypeScript highlight=[15,16]
-import { MCPClient } from 'mcp-use'
+```typescript
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
-})
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+});
 
-// Connect to servers
-await client.createAllSessions()
+try {
+  const conn = await client.connect("demo");
 
-// Get a session for a specific server
-const session = client.getSession('my_server')
+  const resources = await conn.listResources();
+  for (const r of resources) {
+    console.log(r.uri, r.name, r.mimeType);
+  }
 
-// List all available resources - always returns fresh data
-const resources = await session.listResources()
-
-for (const resource of resources) {
-    console.log(`Resource: ${resource.name}`)
-    console.log(`URI: ${resource.uri}`)
-    console.log(`Description: ${resource.description}`)
-    console.log(`MIME Type: ${resource.mimeType}`)
-    console.log('---')
-}
-
-await client.closeAllSessions()
-```
-</CodeGroup>
-
-## Reading Resources
-
-Resources are accessed using the `readResource` method with their URI:
-
-<CodeGroup>
-```typescript TypeScript highlight=[13,14]
-import { MCPClient } from 'mcp-use'
-
-const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
-})
-await client.createAllSessions()
-
-const session = client.getSession('file_server')
-
-// Read a resource by URI
-const resourceUri = 'file:///path/to/config.json'
-const result = await session.readResource(resourceUri)
-
-// Handle the result
-for (const content of result.contents) {
-    if (content.mimeType === 'application/json') {
-        console.log(`JSON content: ${content.text}`)
-    } else if (content.mimeType === 'text/plain') {
-        console.log(`Text content: ${content.text}`)
-    } else {
-        console.log(`Binary content length: ${content.blob?.length}`)
-    }
-}
-
-await client.closeAllSessions()
-```
-</CodeGroup>
-
-## Working with Resource Templates
-
-Resource templates allow dynamic content generation based on parameters:
-
-<CodeGroup>
-```typescript TypeScript highlight={12-15}
-import { MCPClient } from 'mcp-use'
-
-const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
-})
-await client.createAllSessions()
-
-const session = client.getSession('database_server')
-
-// Access a parameterized resource
-// Template URI might be: "db://users/{user_id}/profile"
-const resourceUri = 'db://users/12345/profile'
-const result = await session.readResource(resourceUri)
-
-// Process the user profile data
-for (const content of result.contents) {
-    console.log(`User profile: ${content.text}`)
-}
-
-await client.closeAllSessions()
-```
-</CodeGroup>
-
-## Resource Content Types
-
-Resources can contain different types of content:
-
-### Text Content
-
-<CodeGroup>
-```typescript TypeScript
-// Text-based resources (JSON, XML, plain text)
-const result = await session.readResource('file:///config.json')
-
-for (const content of result.contents) {
-    if ('text' in content) {
-        console.log(`Text content: ${content.text}`)
-        console.log(`MIME type: ${content.mimeType}`)
-    }
+  const result = await conn.readResource("file:///config.json");
+  for (const content of result.contents) {
+    if ("text" in content) console.log(content.text);
+  }
+} finally {
+  await client.close();
 }
 ```
-</CodeGroup>
 
-### Binary Content
+## Resource templates
 
-<CodeGroup>
-```typescript TypeScript
-import { writeFileSync } from 'fs'
+Parameterized URIs (e.g. `db://users/{id}`) are discovered via `listResourceTemplates()` and read with `readResource(uri)`.
 
-// Binary resources (images, files, etc.)
-const result = await session.readResource('file:///image.png')
+## React
 
-for (const content of result.contents) {
-    if ('blob' in content && content.blob) {
-        console.log(`Binary data size: ${content.blob.length} bytes`)
-        // Save or process binary data
-        writeFileSync('downloaded_image.png', Buffer.from(content.blob))
-    }
+```tsx
+const server = useMcpServer("demo");
+if (server?.state === "ready") {
+  const data = await server.readResource(uri);
 }
 ```
-</CodeGroup>
+
+## Reference
+
+[`MCPConnection`](/typescript/api-reference/client/mcp-session) — `listResources`, `listResourceTemplates`, `readResource`, `subscribeResource`.

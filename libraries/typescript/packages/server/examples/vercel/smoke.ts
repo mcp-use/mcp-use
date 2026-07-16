@@ -67,7 +67,9 @@ function jsonRpcRequest(
 }
 
 /** Modern (2026-07-28) exchanges answer with a single JSON body. */
-async function parseJsonRpc<T>(response: Response): Promise<JsonRpcEnvelope<T>> {
+async function parseJsonRpc<T>(
+  response: Response
+): Promise<JsonRpcEnvelope<T>> {
   return (await response.json()) as JsonRpcEnvelope<T>;
 }
 
@@ -97,7 +99,12 @@ async function main(): Promise<void> {
   assert.equal(callResponse.status, 200);
   const callBody = await parseJsonRpc<{
     isError?: boolean;
-    structuredContent?: { value: number; from: string; to: string; result: number };
+    structuredContent?: {
+      value: number;
+      from: string;
+      to: string;
+      result: number;
+    };
   }>(callResponse);
   assert.ok(callBody.result, "tools/call returned no result");
   assert.equal(callBody.result.isError, undefined);

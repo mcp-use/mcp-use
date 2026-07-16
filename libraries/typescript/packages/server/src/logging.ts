@@ -125,7 +125,9 @@ type DetailFormatter<M extends RequestMethod> = (
   params: RequestTypeMap[M]["params"]
 ) => McpDetail;
 
-function formatClientInfo(info: Implementation | undefined): string | undefined {
+function formatClientInfo(
+  info: Implementation | undefined
+): string | undefined {
   if (info === undefined) return undefined;
   return typeof info.version === "string" && info.version !== ""
     ? `${info.name}/${info.version}`

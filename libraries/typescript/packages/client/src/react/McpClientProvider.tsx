@@ -1,11 +1,5 @@
-import type {
-  CreateMessageRequest,
-  CreateMessageResult,
-  ElicitRequestFormParams,
-  ElicitRequestURLParams,
-  ElicitResult,
-  Notification,
-} from "@modelcontextprotocol/client";
+import type { ElicitResult, Transport } from "@modelcontextprotocol/client";
+import type { SamplingCreateMessageResult } from "../core/config.js";
 import React, {
   createContext,
   useCallback,
@@ -16,10 +10,20 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { Logger } from "../logging.js";
-import type { StorageProvider } from "./storage/StorageProvider.js";
-import type { UseMcpOptions, UseMcpResult } from "./types.js";
+import { Logger } from "../utils/logging.js";
+import type { StorageProvider } from "./storage.js";
+import type {
+  McpServer,
+  McpServerConfig,
+  PendingElicitationRequest,
+  PendingSamplingRequest,
+} from "./types.js";
+import {
+  pickPersistedServerConfig,
+  toPersistedServerConfig,
+} from "./types.js";
 import { useMcp } from "./useMcp.js";
+import { useMcpServerQueues } from "./useMcpServerQueues.js";
 
 // Module-level logger for McpClientProvider & friends
 const providerLogger = Logger.get("McpClientProvider");
@@ -27,89 +31,12 @@ const providerLogger = Logger.get("McpClientProvider");
 // ===== Types =====
 
 /**
- * MCP notification received from a server
- */
-export interface McpNotification {
-  id: string;
-  method: string;
-  params?: Record<string, unknown>;
-  timestamp: number;
-  read: boolean;
-}
-
-/**
- * Pending sampling request from a server
- */
-export interface PendingSamplingRequest {
-  id: string;
-  request: {
-    method: "sampling/createMessage";
-    params: CreateMessageRequest["params"];
-  };
-  timestamp: number;
-  serverName: string;
-}
-
-/**
- * Pending elicitation request from a server
- */
-export interface PendingElicitationRequest {
-  id: string;
-  request: ElicitRequestFormParams | ElicitRequestURLParams;
-  timestamp: number;
-  serverName: string;
-}
-
-/**
- * Enhanced MCP server connection with notification, sampling, and elicitation management
- */
-export interface McpServer extends UseMcpResult {
-  id: string;
-  url: string;
-  name: string; // User-provided name (fallback if serverInfo.name is not available)
-  // serverInfo.name comes from UseMcpResult (set by the actual MCP server)
-  // Notification management
-  notifications: McpNotification[];
-  unreadNotificationCount: number;
-  markNotificationRead: (id: string) => void;
-  markAllNotificationsRead: () => void;
-  clearNotifications: () => void;
-  // Sampling management
-  pendingSamplingRequests: PendingSamplingRequest[];
-  approveSampling: (requestId: string, result: CreateMessageResult) => void;
-  rejectSampling: (requestId: string, error?: string) => void;
-  // Elicitation management
-  pendingElicitationRequests: PendingElicitationRequest[];
-  approveElicitation: (requestId: string, result: ElicitResult) => void;
-  rejectElicitation: (requestId: string, error?: string) => void;
-}
-
-/**
- * Options for adding a server to the provider
- * Extends UseMcpOptions but handles callbacks internally
- */
-export interface McpServerOptions extends Omit<
-  UseMcpOptions,
-  | "samplingCallback"
-  | "onElicitation"
-  | "elicitationCallback"
-  | "onNotification"
-> {
-  name?: string;
-  authProvider?: UseMcpOptions["authProvider"];
-  // Optional callbacks for app-specific handling (e.g., toasts)
-  onSamplingRequest?: (request: PendingSamplingRequest) => void;
-  onElicitationRequest?: (request: PendingElicitationRequest) => void;
-  onNotificationReceived?: (notification: McpNotification) => void;
-}
-
-/**
  * Context value for multi-server management
  */
 export interface McpClientContextType {
   servers: McpServer[];
   /** Idempotent — safe to call multiple times with the same id; duplicates are silently ignored. */
-  addServer: (id: string, options: McpServerOptions) => void;
+  addServer: (id: string, config: McpServerConfig) => void;
   /**
    * Remove a server from the provider.
    *
@@ -121,14 +48,17 @@ export interface McpClientContextType {
    * Pass `{ clearCredentials: true }` for an explicit logout / "forget this
    * server" action to also wipe the persisted OAuth storage.
    */
-  removeServer: (id: string, opts?: { clearCredentials?: boolean }) => void;
+  removeServer: (
+    id: string,
+    opts?: { clearCredentials?: boolean }
+  ) => Promise<void>;
   updateServerMetadata: (
     id: string,
     metadata: { name: string }
   ) => Promise<void>;
   updateServer: (
     id: string,
-    options: Partial<McpServerOptions>
+    options: Partial<McpServerConfig>
   ) => Promise<void>;
   getServer: (id: string) => McpServer | undefined;
   /** Whether storage has finished loading (true if no storage provider) */
@@ -141,19 +71,62 @@ const McpClientContext = createContext<McpClientContextType | null>(null);
 
 // ===== Constants =====
 
-const MAX_NOTIFICATIONS = 500;
+function sameSerializedValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
 
-// ===== Internal Components =====
+/**
+ * Compares the serializable provider-facing state for one MCP connection.
+ *
+ * The wrapper and provider both use this comparison so metadata-only updates
+ * (including negotiated v1/v2 details) cannot be dropped at either boundary.
+ */
+function isSameMcpServer(left: McpServer, right: McpServer): boolean {
+  return (
+    left.id === right.id &&
+    sameSerializedValue(
+      pickPersistedServerConfig(left),
+      pickPersistedServerConfig(right)
+    ) &&
+    left.name === right.name &&
+    left.state === right.state &&
+    left.error === right.error &&
+    left.authUrl === right.authUrl &&
+    sameSerializedValue(left.authTokens, right.authTokens) &&
+    left.protocolEra === right.protocolEra &&
+    left.protocolVersion === right.protocolVersion &&
+    sameSerializedValue(left.serverInfo, right.serverInfo) &&
+    sameSerializedValue(left.capabilities, right.capabilities) &&
+    left.instructions === right.instructions &&
+    sameSerializedValue(left.extensions, right.extensions) &&
+    sameSerializedValue(left.tools, right.tools) &&
+    sameSerializedValue(left.resources, right.resources) &&
+    sameSerializedValue(left.resourceTemplates, right.resourceTemplates) &&
+    sameSerializedValue(left.prompts, right.prompts) &&
+    sameSerializedValue(left.notifications, right.notifications) &&
+    left.unreadNotificationCount === right.unreadNotificationCount &&
+    sameSerializedValue(
+      left.pendingSamplingRequests,
+      right.pendingSamplingRequests
+    ) &&
+    sameSerializedValue(
+      left.pendingElicitationRequests,
+      right.pendingElicitationRequests
+    ) &&
+    left.client === right.client
+  );
+}
 
 interface ServerConfig {
   id: string;
-  options: McpServerOptions;
+  options: McpServerConfig;
 }
 
 interface McpServerWrapperProps {
   id: string;
-  options: McpServerOptions;
+  options: McpServerConfig;
   defaultCallbackUrl?: string;
+  defaultOAuthProxyUrl?: string;
   defaultProxyConfig?: {
     proxyAddress?: string;
     headers?: Record<string, string>;
@@ -164,6 +137,8 @@ interface McpServerWrapperProps {
         enabled?: boolean;
         proxyAddress?: string;
       };
+  /** Default connection config merged under each server (per-server wins). */
+  defaultServerConfig?: Partial<McpServerConfig>;
   clientInfo?: {
     name: string;
     title?: string;
@@ -182,14 +157,20 @@ interface McpServerWrapperProps {
      */
     capabilities?: Record<string, unknown>;
   };
-  cachedMetadata?: import("./storage/StorageProvider.js").CachedServerMetadata;
+  cachedMetadata?: import("./storage.js").CachedServerMetadata;
   onUpdate: (server: McpServer) => void;
-  rpcWrapTransport?: (transport: any, serverId: string) => any;
+  onUpdateConfig: (
+    id: string,
+    config: Partial<McpServerConfig>
+  ) => Promise<void>;
+  onUpdateDisplayName: (id: string, displayName: string) => Promise<void>;
+  onReconnect: (id: string) => Promise<void>;
+  rpcWrapTransport?: (transport: Transport, serverId: string) => Transport;
   onGlobalSamplingRequest?: (
     request: PendingSamplingRequest,
     serverId: string,
     serverName: string,
-    approve: (requestId: string, result: CreateMessageResult) => void,
+    approve: (requestId: string, result: SamplingCreateMessageResult) => void,
     reject: (requestId: string, error?: string) => void
   ) => void;
   onGlobalElicitationRequest?: (
@@ -221,18 +202,22 @@ function McpServerWrapper({
   id,
   options,
   defaultCallbackUrl,
+  defaultOAuthProxyUrl,
   defaultProxyConfig,
   defaultAutoProxyFallback,
   clientInfo: providerClientInfo,
   cachedMetadata,
   onUpdate,
+  onUpdateConfig,
+  onUpdateDisplayName,
+  onReconnect,
   rpcWrapTransport,
   onGlobalSamplingRequest,
   onGlobalElicitationRequest,
 }: McpServerWrapperProps) {
   // Extract callback options (these don't need to be passed to useMcp)
   const {
-    name,
+    displayName,
     onSamplingRequest,
     onElicitationRequest,
     onNotificationReceived,
@@ -245,7 +230,7 @@ function McpServerWrapper({
   // autoRetry effect repeatedly
   const mcpOptions = useMemo(() => {
     const {
-      name: _name,
+      displayName: _displayName,
       onSamplingRequest: _onSamplingRequest,
       onElicitationRequest: _onElicitationRequest,
       onNotificationReceived: _onNotificationReceived,
@@ -259,6 +244,7 @@ function McpServerWrapper({
       ...rest,
       // Use server-specific callbackUrl if provided, otherwise use provider default
       callbackUrl: rest.callbackUrl || defaultCallbackUrl,
+      oauthProxyUrl: rest.oauthProxyUrl || defaultOAuthProxyUrl,
       // Use server-specific proxyConfig if provided, otherwise use default
       proxyConfig: rest.proxyConfig || defaultProxyConfig,
       // Use server-specific autoProxyFallback if provided, otherwise use default
@@ -275,9 +261,12 @@ function McpServerWrapper({
         : providerClientInfo,
       // Pass cached metadata as initial server info if available
       _initialServerInfo: cachedMetadata,
+      serverId: id,
     };
   }, [
     options,
+    defaultCallbackUrl,
+    defaultOAuthProxyUrl,
     defaultProxyConfig,
     defaultAutoProxyFallback,
     providerClientInfo,
@@ -288,7 +277,7 @@ function McpServerWrapper({
   const combinedWrapTransport = useMemo(() => {
     if (!rpcWrapTransport && !optionsWrapTransport) return undefined;
 
-    return (transport: any) => {
+    return (transport: Transport) => {
       let wrapped = transport;
 
       // Apply RPC logging first if enabled
@@ -305,296 +294,64 @@ function McpServerWrapper({
     };
   }, [rpcWrapTransport, optionsWrapTransport, id]);
 
-  // Notification state
-  const [notifications, setNotifications] = useState<McpNotification[]>([]);
-
-  // Sampling state
-  const [pendingSamplingRequests, setPendingSamplingRequests] = useState<
-    Array<
-      PendingSamplingRequest & {
-        resolve: (result: CreateMessageResult) => void;
-        reject: (error: Error) => void;
-      }
-    >
-  >([]);
-  const samplingIdCounter = useRef(0);
-
-  // Elicitation state
-  const [pendingElicitationRequests, setPendingElicitationRequests] = useState<
-    Array<
-      PendingElicitationRequest & {
-        resolve: (result: ElicitResult) => void;
-        reject: (error: Error) => void;
-      }
-    >
-  >([]);
-  const elicitationIdCounter = useRef(0);
-
-  // Notification handlers
-  const markNotificationRead = useCallback((notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-    );
-  }, []);
-
-  const markAllNotificationsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
-
-  const clearNotifications = useCallback(() => {
-    setNotifications([]);
-  }, []);
-
-  // Notification callback for useMcp
-  const handleNotification = useCallback(
-    (notification: Notification) => {
-      const mcpNotification: McpNotification = {
-        id:
-          globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
-        method: notification.method,
-        params: notification.params as Record<string, unknown> | undefined,
-        timestamp: Date.now(),
-        read: false,
-      };
-
-      setNotifications((prev) => {
-        const updated = [mcpNotification, ...prev];
-        // Prune oldest if we exceed max
-        if (updated.length > MAX_NOTIFICATIONS) {
-          return updated.slice(0, MAX_NOTIFICATIONS);
-        }
-        return updated;
-      });
-
-      // Call app-specific handler if provided
-      onNotificationReceived?.(mcpNotification);
-    },
-    [onNotificationReceived]
-  );
-
-  // Sampling handlers
-  const approveSampling = useCallback(
-    (requestId: string, result: CreateMessageResult) => {
-      setPendingSamplingRequests((prev) => {
-        const request = prev.find((r) => r.id === requestId);
-        if (request) {
-          request.resolve(result);
-          return prev.filter((r) => r.id !== requestId);
-        }
-        return prev;
-      });
-    },
-    []
-  );
-
-  const rejectSampling = useCallback((requestId: string, error?: string) => {
-    setPendingSamplingRequests((prev) => {
-      const request = prev.find((r) => r.id === requestId);
-      if (request) {
-        request.reject(new Error(error || "User rejected sampling request"));
-        return prev.filter((r) => r.id !== requestId);
-      }
-      return prev;
-    });
-  }, []);
-
-  // Sampling callback for useMcp
-  const samplingCallback = useCallback(
-    async (params: CreateMessageRequest["params"]) => {
-      return new Promise<CreateMessageResult>((resolve, reject) => {
-        const requestId = `sampling-${samplingIdCounter.current++}`;
-        const request: PendingSamplingRequest = {
-          id: requestId,
-          request: { method: "sampling/createMessage", params },
-          timestamp: Date.now(),
-          serverName: name || id,
-        };
-
-        const newRequest = {
-          ...request,
-          resolve,
-          reject,
-        };
-
-        setPendingSamplingRequests((prev) => [...prev, newRequest]);
-
-        // Call app-specific handler if provided
-        onSamplingRequest?.(request);
-
-        // Call global handler if provided
-        onGlobalSamplingRequest?.(
-          request,
-          id,
-          name || id,
-          approveSampling,
-          rejectSampling
-        );
-      });
-    },
-    [
-      id,
-      name,
-      onSamplingRequest,
-      onGlobalSamplingRequest,
-      approveSampling,
-      rejectSampling,
-    ]
-  );
-
-  // Elicitation handlers
-  const approveElicitation = useCallback(
-    (requestId: string, result: ElicitResult) => {
-      setPendingElicitationRequests((prev) => {
-        const request = prev.find((r) => r.id === requestId);
-        if (request) {
-          request.resolve(result);
-          return prev.filter((r) => r.id !== requestId);
-        }
-        return prev;
-      });
-    },
-    []
-  );
-
-  const rejectElicitation = useCallback((requestId: string, error?: string) => {
-    setPendingElicitationRequests((prev) => {
-      const request = prev.find((r) => r.id === requestId);
-      if (request) {
-        request.reject(new Error(error || "User rejected elicitation request"));
-        return prev.filter((r) => r.id !== requestId);
-      }
-      return prev;
-    });
-  }, []);
-
-  // Elicitation callback for useMcp
-  const elicitationCallback = useCallback(
-    async (params: ElicitRequestFormParams | ElicitRequestURLParams) => {
-      return new Promise<ElicitResult>((resolve, reject) => {
-        const requestId = `elicitation-${elicitationIdCounter.current++}`;
-        const request: PendingElicitationRequest = {
-          id: requestId,
-          request: params,
-          timestamp: Date.now(),
-          serverName: name || id,
-        };
-
-        const newRequest = {
-          ...request,
-          resolve,
-          reject,
-        };
-
-        setPendingElicitationRequests((prev) => [...prev, newRequest]);
-
-        // Call app-specific handler if provided
-        onElicitationRequest?.(request);
-
-        // Call global handler if provided
-        onGlobalElicitationRequest?.(
-          request,
-          id,
-          name || id,
-          approveElicitation,
-          rejectElicitation
-        );
-      });
-    },
-    [
-      id,
-      name,
-      onElicitationRequest,
-      onGlobalElicitationRequest,
-      approveElicitation,
-      rejectElicitation,
-    ]
-  );
+  const queues = useMcpServerQueues({
+    serverId: id,
+    serverName: displayName || id,
+    onNotificationReceived,
+    onSamplingRequest,
+    onElicitationRequest,
+    onGlobalSamplingRequest,
+    onGlobalElicitationRequest,
+  });
 
   // Use the core useMcp hook with our callbacks
   const mcp = useMcp({
     ...mcpOptions,
-    onNotification: handleNotification,
-    onSampling: samplingCallback,
-    onElicitation: elicitationCallback,
+    onNotification: queues.onNotification,
+    onSampling: queues.onSampling,
+    onElicitation: queues.onElicitation,
     wrapTransport: combinedWrapTransport,
   });
 
-  // Memoize public-facing sampling/elicitation requests (without resolve/reject)
-  const publicSamplingRequests = useMemo(
-    () =>
-      pendingSamplingRequests.map((r) => ({
-        id: r.id,
-        request: r.request,
-        timestamp: r.timestamp,
-        serverName: r.serverName,
-      })),
-    [pendingSamplingRequests]
+  useEffect(() => {
+    if (mcp.state !== "ready") {
+      queues.rejectAll("MCP server connection is no longer active");
+    }
+  }, [mcp.state, queues.rejectAll]);
+
+  const updateConfig = useCallback(
+    (config: Partial<McpServerConfig>) => onUpdateConfig(id, config),
+    [id, onUpdateConfig]
   );
 
-  const publicElicitationRequests = useMemo(
-    () =>
-      pendingElicitationRequests.map((r) => ({
-        id: r.id,
-        request: r.request,
-        timestamp: r.timestamp,
-        serverName: r.serverName,
-      })),
-    [pendingElicitationRequests]
+  const setHeaders = useCallback(
+    (headers: Record<string, string> | undefined) => {
+      const proxyAddress = options.proxyConfig?.proxyAddress?.trim();
+      if (options.connectionMode === "proxy" && proxyAddress) {
+        return onUpdateConfig(id, {
+          proxyConfig: {
+            ...options.proxyConfig,
+            proxyAddress,
+            ...(headers ? { headers } : {}),
+          },
+          headers: undefined,
+        });
+      }
+      return onUpdateConfig(id, { headers });
+    },
+    [id, options.connectionMode, options.proxyConfig, onUpdateConfig]
   );
 
-  // Calculate unread count
-  const unreadNotificationCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
-    [notifications]
+  const setDisplayName = useCallback(
+    (displayName: string) => onUpdateDisplayName(id, displayName),
+    [id, onUpdateDisplayName]
   );
 
-  // Create stable fingerprints for tools/resources/prompts that detect ANY content changes
-  // This catches renames, schema changes, description updates, etc.
-  const toolsFingerprint = useMemo(() => {
-    const fingerprint = JSON.stringify(
-      mcp.tools
-        .map((t) => ({
-          name: t.name,
-          description: t.description,
-          inputSchema: t.inputSchema,
-          _meta: (t as any)._meta,
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-    );
-    return fingerprint;
-  }, [mcp.tools, id]);
-  const resourcesFingerprint = useMemo(
-    () =>
-      JSON.stringify(
-        mcp.resources
-          .map((r) => ({
-            uri: r.uri,
-            name: r.name,
-            description: r.description,
-            mimeType: r.mimeType,
-          }))
-          .sort((a, b) => a.uri.localeCompare(b.uri))
-      ),
-    [mcp.resources]
-  );
-  const promptsFingerprint = useMemo(
-    () =>
-      JSON.stringify(
-        mcp.prompts
-          .map((p) => ({
-            name: p.name,
-            description: p.description,
-            arguments: p.arguments,
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name))
-      ),
-    [mcp.prompts]
-  );
+  const reconnect = useCallback(() => onReconnect(id), [id, onReconnect]);
 
   // Update parent when state changes
   const onUpdateRef = useRef(onUpdate);
   const prevServerRef = useRef<McpServer | null>(null);
-  const prevFingerprintsRef = useRef({ tools: "", resources: "", prompts: "" });
 
   useEffect(() => {
     onUpdateRef.current = onUpdate;
@@ -602,58 +359,31 @@ function McpServerWrapper({
 
   useEffect(() => {
     const server: McpServer = {
+      ...toPersistedServerConfig(options),
       ...mcp,
       id,
-      url: options.url || "",
-      name: name || id,
-      notifications,
-      unreadNotificationCount,
-      markNotificationRead,
-      markAllNotificationsRead,
-      clearNotifications,
-      pendingSamplingRequests: publicSamplingRequests,
-      approveSampling,
-      rejectSampling,
-      pendingElicitationRequests: publicElicitationRequests,
-      approveElicitation,
-      rejectElicitation,
+      displayName: displayName || options.displayName || id,
+      notifications: queues.notifications,
+      unreadNotificationCount: queues.unreadNotificationCount,
+      markNotificationRead: queues.markNotificationRead,
+      markAllNotificationsRead: queues.markAllNotificationsRead,
+      clearNotifications: queues.clearNotifications,
+      pendingSamplingRequests: queues.pendingSamplingRequests,
+      approveSampling: queues.approveSampling,
+      rejectSampling: queues.rejectSampling,
+      pendingElicitationRequests: queues.pendingElicitationRequests,
+      approveElicitation: queues.approveElicitation,
+      rejectElicitation: queues.rejectElicitation,
+      updateConfig,
+      setHeaders,
+      setDisplayName,
+      reconnect,
     };
 
     // Only update if something actually changed
     const prevServer = prevServerRef.current;
-    const prevFingerprints = prevFingerprintsRef.current;
-
-    // Check if tools/resources/prompts content changed (not just length)
-    const toolsChanged = prevFingerprints.tools !== toolsFingerprint;
-    const resourcesChanged =
-      prevFingerprints.resources !== resourcesFingerprint;
-    const promptsChanged = prevFingerprints.prompts !== promptsFingerprint;
-
-    if (
-      !prevServer ||
-      prevServer.name !== server.name ||
-      prevServer.state !== server.state ||
-      prevServer.error !== server.error ||
-      prevServer.authUrl !== server.authUrl ||
-      toolsChanged ||
-      resourcesChanged ||
-      promptsChanged ||
-      prevServer.serverInfo !== server.serverInfo ||
-      prevServer.capabilities !== server.capabilities ||
-      prevServer.notifications.length !== server.notifications.length ||
-      prevServer.unreadNotificationCount !== server.unreadNotificationCount ||
-      prevServer.pendingSamplingRequests.length !==
-        server.pendingSamplingRequests.length ||
-      prevServer.pendingElicitationRequests.length !==
-        server.pendingElicitationRequests.length ||
-      !prevServer.client
-    ) {
+    if (!prevServer || !isSameMcpServer(prevServer, server)) {
       prevServerRef.current = server;
-      prevFingerprintsRef.current = {
-        tools: toolsFingerprint,
-        resources: resourcesFingerprint,
-        prompts: promptsFingerprint,
-      };
       onUpdateRef.current(server);
     } else {
       providerLogger.debug(
@@ -662,34 +392,32 @@ function McpServerWrapper({
     }
   }, [
     id,
-    name,
+    displayName,
+    options,
     options.url,
     // Primitive values that indicate meaningful state changes
     mcp.state,
     mcp.error,
     mcp.authUrl,
-    // Use fingerprints to detect content changes (including renames)
-    toolsFingerprint,
-    resourcesFingerprint,
-    promptsFingerprint,
-    // serverInfo and capabilities - include for reference comparison
+    mcp.tools,
+    mcp.resources,
+    mcp.resourceTemplates,
+    mcp.prompts,
     mcp.serverInfo,
     mcp.capabilities,
+    mcp.protocolEra,
+    mcp.protocolVersion,
+    mcp.instructions,
+    mcp.extensions,
+    mcp.authTokens,
     // Functions excluded - they're stable via useCallback in useMcp
     // mcp.log excluded - log changes shouldn't trigger provider updates
     // mcp.client excluded - client reference stability handled by manual check
-    notifications.length,
-    unreadNotificationCount,
-    publicSamplingRequests.length,
-    publicElicitationRequests.length,
-    // Callback functions are stable via useCallback
-    markNotificationRead,
-    markAllNotificationsRead,
-    clearNotifications,
-    approveSampling,
-    rejectSampling,
-    approveElicitation,
-    rejectElicitation,
+    queues,
+    updateConfig,
+    setHeaders,
+    setDisplayName,
+    reconnect,
   ]);
 
   return null;
@@ -707,7 +435,7 @@ export interface McpClientProviderProps {
    * Initial servers configuration (like Python MCPClient.from_dict)
    * Servers defined here will be auto-connected on mount
    */
-  mcpServers?: Record<string, McpServerOptions>;
+  mcpServers?: Record<string, McpServerConfig>;
 
   /**
    * Default OAuth callback URL for all servers.
@@ -717,6 +445,9 @@ export interface McpClientProviderProps {
    * redirect shim.
    */
   defaultCallbackUrl?: string;
+
+  /** Default same-origin OAuth BFF URL for browser OAuth requests. */
+  defaultOAuthProxyUrl?: string;
 
   /**
    * Default proxy configuration for all servers
@@ -731,7 +462,7 @@ export interface McpClientProviderProps {
    * Enable automatic proxy fallback for all servers by default
    * When enabled, if a direct connection fails with FastMCP or CORS errors,
    * automatically retries using proxy configuration
-   * @default true
+   * @defaultValue false
    */
   defaultAutoProxyFallback?:
     | boolean
@@ -739,6 +470,12 @@ export interface McpClientProviderProps {
         enabled?: boolean;
         proxyAddress?: string;
       };
+
+  /**
+   * Default connection options merged under each server's options (per-server wins).
+   * Useful for app-wide auth UX such as `preventAutoAuth` or `useRedirectFlow`.
+   */
+  defaultServerConfig?: Partial<McpServerConfig>;
 
   /**
    * Client info for all servers (used for OAuth registration and server capabilities).
@@ -774,6 +511,8 @@ export interface McpClientProviderProps {
      * @example
      * ```tsx
      * capabilities: {
+     *   views: true,
+     *   // or explicitly:
      *   extensions: {
      *     "io.modelcontextprotocol/ui": { mimeTypes: ["text/html;profile=mcp-app"] },
      *   },
@@ -822,7 +561,7 @@ export interface McpClientProviderProps {
     request: PendingSamplingRequest,
     serverId: string,
     serverName: string,
-    approve: (requestId: string, result: CreateMessageResult) => void,
+    approve: (requestId: string, result: SamplingCreateMessageResult) => void,
     reject: (requestId: string, error?: string) => void
   ) => void;
 
@@ -881,8 +620,10 @@ export function McpClientProvider({
   children,
   mcpServers,
   defaultCallbackUrl,
+  defaultOAuthProxyUrl,
   defaultProxyConfig,
-  defaultAutoProxyFallback = true,
+  defaultAutoProxyFallback = false,
+  defaultServerConfig,
   clientInfo,
   storageProvider,
   enableRpcLogging = false,
@@ -894,7 +635,11 @@ export function McpClientProvider({
 }: McpClientProviderProps) {
   const [serverConfigs, setServerConfigs] = useState<ServerConfig[]>([]);
   const [servers, setServers] = useState<McpServer[]>([]);
+  const [serverRevisions, setServerRevisions] = useState<
+    Record<string, number>
+  >({});
   const [storageLoaded, setStorageLoaded] = useState(false);
+  const didLoadInitialServers = useRef(false);
 
   // Mirror of `servers` for synchronous access from event handlers
   // (specifically `removeServer` / `updateServer`). Reading the latest
@@ -917,7 +662,7 @@ export function McpClientProvider({
 
   // Store cached server metadata
   const cachedMetadataRef = useRef<
-    Record<string, import("./storage/StorageProvider.js").CachedServerMetadata>
+    Record<string, import("./storage.js").CachedServerMetadata>
   >({});
 
   // Load RPC transport wrapper if enabled
@@ -959,6 +704,8 @@ export function McpClientProvider({
       );
       return;
     }
+    if (didLoadInitialServers.current) return;
+    didLoadInitialServers.current = true;
 
     const loadServers = async () => {
       providerLogger.debug(
@@ -1013,7 +760,7 @@ export function McpClientProvider({
                   entry
                 ): entry is [
                   string,
-                  import("./storage/StorageProvider.js").CachedServerMetadata,
+                  import("./storage.js").CachedServerMetadata,
                 ] => entry[1] !== undefined
               )
             );
@@ -1063,7 +810,7 @@ export function McpClientProvider({
     };
 
     loadServers();
-  }, [storageProvider, mcpServers, rpcLoggingReady]); // Run when storage provider, mcpServers, or RPC logging ready changes
+  }, [storageProvider, mcpServers, rpcLoggingReady]);
 
   // Save servers to storage when they change
   useEffect(() => {
@@ -1073,10 +820,10 @@ export function McpClientProvider({
       try {
         const serversToSave = serverConfigs.reduce(
           (acc, config) => {
-            acc[config.id] = config.options;
+            acc[config.id] = toPersistedServerConfig(config.options);
             return acc;
           },
-          {} as Record<string, McpServerOptions>
+          {} as Record<string, McpServerConfig>
         );
 
         await Promise.resolve(storageProvider.setServers(serversToSave));
@@ -1135,24 +882,7 @@ export function McpClientProvider({
           }
         );
 
-        if (
-          current.name === updatedServer.name &&
-          current.url === updatedServer.url &&
-          current.state === updatedServer.state &&
-          current.tools === updatedServer.tools &&
-          current.resources === updatedServer.resources &&
-          current.prompts === updatedServer.prompts &&
-          current.error === updatedServer.error &&
-          current.serverInfo === updatedServer.serverInfo &&
-          current.client === updatedServer.client &&
-          current.notifications === updatedServer.notifications &&
-          current.unreadNotificationCount ===
-            updatedServer.unreadNotificationCount &&
-          current.pendingSamplingRequests.length ===
-            updatedServer.pendingSamplingRequests.length &&
-          current.pendingElicitationRequests.length ===
-            updatedServer.pendingElicitationRequests.length
-        ) {
+        if (isSameMcpServer(current, updatedServer)) {
           providerLogger.debug(
             `[McpClientProvider] No changes detected for server ${updatedServer.id}, skipping update`
           );
@@ -1176,15 +906,14 @@ export function McpClientProvider({
           updatedServer.serverInfo &&
           storageProvider?.setServerMetadata
         ) {
-          const metadata: import("./storage/StorageProvider.js").CachedServerMetadata =
-            {
-              name: updatedServer.serverInfo.name,
-              version: updatedServer.serverInfo.version,
-              title: updatedServer.serverInfo.title,
-              websiteUrl: updatedServer.serverInfo.websiteUrl,
-              icons: updatedServer.serverInfo.icons,
-              icon: updatedServer.serverInfo.icon,
-            };
+          const metadata: import("./storage.js").CachedServerMetadata = {
+            name: updatedServer.serverInfo.name,
+            version: updatedServer.serverInfo.version,
+            title: updatedServer.serverInfo.title,
+            websiteUrl: updatedServer.serverInfo.websiteUrl,
+            icons: updatedServer.serverInfo.icons,
+            icon: updatedServer.serverInfo.icon,
+          };
 
           // Update cached metadata ref
           cachedMetadataRef.current[updatedServer.id] = metadata;
@@ -1214,7 +943,7 @@ export function McpClientProvider({
     [onServerAdded, onServerStateChange, storageProvider]
   );
 
-  const addServer = useCallback((id: string, options: McpServerOptions) => {
+  const addServer = useCallback((id: string, options: McpServerConfig) => {
     setServerConfigs((prev) => {
       if (prev.find((s) => s.id === id)) return prev;
       providerLogger.debug(
@@ -1226,7 +955,7 @@ export function McpClientProvider({
   }, []);
 
   const removeServer = useCallback(
-    (id: string, opts?: { clearCredentials?: boolean }) => {
+    async (id: string, opts?: { clearCredentials?: boolean }) => {
       // Capture the wrapper from the latest state BEFORE scheduling state
       // updates. The wrapper teardown (`disconnect()` / `clearStorage()`)
       // synchronously fires setState on the wrapper itself; running it here
@@ -1239,68 +968,91 @@ export function McpClientProvider({
 
       setServers((prev) => prev.filter((s) => s.id !== id));
       setServerConfigs((prev) => prev.filter((s) => s.id !== id));
+      setServerRevisions((prev) => {
+        const { [id]: _removed, ...remaining } = prev;
+        return remaining;
+      });
 
-      if (captured?.disconnect) captured.disconnect();
+      if (captured?.disconnect) await captured.disconnect();
       // Only wipe persisted OAuth credentials on an explicit logout/forget.
       // Routine removal (and the remove+add churn callers use) must preserve
       // tokens — wrappers sharing a URL hash would otherwise destroy each
       // other's freshly minted credentials.
       if (opts?.clearCredentials && captured?.clearStorage) {
-        captured.clearStorage();
+        await captured.clearStorage();
       }
 
+      if (enableRpcLogging) {
+        const { clearRpcLogs } = await import("./rpc-logger.js");
+        clearRpcLogs(id);
+      }
       onServerRemoved?.(id);
     },
-    [onServerRemoved]
+    [enableRpcLogging, onServerRemoved]
   );
 
   const updateServer = useCallback(
-    async (id: string, options: Partial<McpServerOptions>) => {
-      return new Promise<void>((resolve) => {
-        // Find the current server configuration
-        const currentConfig = serverConfigs.find((s) => s.id === id);
-        if (!currentConfig) {
-          providerLogger.warn(
-            `[McpClientProvider] Cannot update server "${id}" - not found`
-          );
-          resolve();
-          return;
-        }
+    async (id: string, options: Partial<McpServerConfig>) => {
+      const currentConfig = serverConfigs.find((s) => s.id === id);
+      if (!currentConfig) {
+        providerLogger.warn(
+          `[McpClientProvider] Cannot update server "${id}" - not found`
+        );
+        return;
+      }
 
-        // Merge the new options with the existing ones
-        const updatedOptions: McpServerOptions & { _updateVersion?: number } = {
-          ...currentConfig.options,
-          ...options,
-          // Add a version counter to force React to remount the wrapper
-          _updateVersion:
-            ((currentConfig.options as any)._updateVersion || 0) + 1,
-        };
+      const updatedOptions: McpServerConfig = {
+        ...currentConfig.options,
+        ...options,
+      };
 
-        // Capture the existing wrapper before mutating state so its
-        // synchronous setState side effects (`setLog`, `setAuthUrl`) run
-        // outside the `setServers` updater. See `removeServer` for the
-        // full rationale.
-        const captured = serversRef.current.find((s) => s.id === id);
+      if (
+        sameSerializedValue(
+          pickPersistedServerConfig(currentConfig.options),
+          pickPersistedServerConfig(updatedOptions)
+        )
+      ) {
+        return;
+      }
 
-        setServers((prev) => prev.filter((s) => s.id !== id));
-        setServerConfigs((prev) => {
-          const updated = prev.map((s) =>
-            s.id === id ? { id, options: updatedOptions } : s
-          );
-          // Wait for next tick to ensure disconnection is complete before resolving
-          setTimeout(() => resolve(), 0);
-          return updated;
-        });
+      const captured = serversRef.current.find((s) => s.id === id);
 
-        // Disconnect the old wrapper but DO NOT clear OAuth storage — updating
-        // options (headers, transport, etc.) is not a logout. The `_updateVersion`
-        // key bump remounts the wrapper to apply the new options; it must not
-        // destroy the user's persisted tokens.
-        if (captured?.disconnect) captured.disconnect();
-      });
+      // Complete teardown before remounting so an old transport cannot race
+      // the replacement connection.
+      await captured?.disconnect();
+
+      setServers((prev) => prev.filter((s) => s.id !== id));
+      setServerConfigs((prev) =>
+        prev.map((server) =>
+          server.id === id ? { id, options: updatedOptions } : server
+        )
+      );
+      setServerRevisions((prev) => ({
+        ...prev,
+        [id]: (prev[id] ?? 0) + 1,
+      }));
     },
     [serverConfigs]
   );
+
+  const reconnectServer = useCallback(async (id: string) => {
+    const currentConfig = serverConfigs.find((s) => s.id === id);
+    if (!currentConfig) {
+      providerLogger.warn(
+        `[McpClientProvider] Cannot reconnect server "${id}" - not found`
+      );
+      return;
+    }
+
+    const captured = serversRef.current.find((s) => s.id === id);
+    await captured?.disconnect();
+
+    setServers((prev) => prev.filter((s) => s.id !== id));
+    setServerRevisions((prev) => ({
+      ...prev,
+      [id]: (prev[id] ?? 0) + 1,
+    }));
+  }, [serverConfigs]);
 
   const updateServerMetadata = useCallback(
     async (id: string, metadata: { name: string }) => {
@@ -1314,14 +1066,16 @@ export function McpClientProvider({
           return;
         }
 
-        const updatedOptions: McpServerOptions = {
+        const updatedOptions: McpServerConfig = {
           ...currentConfig.options,
-          ...metadata,
+          displayName: metadata.name,
         };
 
         setServers((prev) =>
           prev.map((server) =>
-            server.id === id ? { ...server, name: metadata.name } : server
+            server.id === id
+              ? { ...server, displayName: metadata.name }
+              : server
           )
         );
 
@@ -1382,22 +1136,27 @@ export function McpClientProvider({
   // a new object on every render would cause McpServerWrapper to reconnect.
   const mergedServerConfigs = useMemo(
     () =>
-      serverConfigs.map((config) => ({
-        id: config.id,
-        options: defaultCapabilities
-          ? ({
-              ...config.options,
-              clientOptions: {
-                ...config.options.clientOptions,
-                capabilities: {
-                  ...defaultCapabilities,
-                  ...config.options.clientOptions?.capabilities,
-                },
+      serverConfigs.map((config) => {
+        let options: McpServerConfig = defaultServerConfig
+          ? { ...defaultServerConfig, ...config.options }
+          : config.options;
+
+        if (defaultCapabilities) {
+          options = {
+            ...options,
+            clientOptions: {
+              ...options.clientOptions,
+              capabilities: {
+                ...defaultCapabilities,
+                ...options.clientOptions?.capabilities,
               },
-            } as McpServerOptions)
-          : config.options,
-      })),
-    [serverConfigs, defaultCapabilities]
+            },
+          };
+        }
+
+        return { id: config.id, options };
+      }),
+    [serverConfigs, defaultCapabilities, defaultServerConfig]
   );
 
   return (
@@ -1405,15 +1164,21 @@ export function McpClientProvider({
       {children}
       {mergedServerConfigs.map((config) => (
         <McpServerWrapper
-          key={`${config.id}-v${(config.options as any)._updateVersion || 0}`}
+          key={`${config.id}-v${serverRevisions[config.id] ?? 0}`}
           id={config.id}
           options={config.options}
           defaultCallbackUrl={defaultCallbackUrl}
+          defaultOAuthProxyUrl={defaultOAuthProxyUrl}
           defaultProxyConfig={defaultProxyConfig}
           defaultAutoProxyFallback={defaultAutoProxyFallback}
           clientInfo={clientInfoForWrapper}
           cachedMetadata={cachedMetadataRef.current[config.id]}
           onUpdate={handleServerUpdate}
+          onUpdateConfig={updateServer}
+          onUpdateDisplayName={(id, displayName) =>
+            updateServerMetadata(id, { name: displayName })
+          }
+          onReconnect={reconnectServer}
           rpcWrapTransport={rpcWrapTransport}
           onGlobalSamplingRequest={onSamplingRequest}
           onGlobalElicitationRequest={onElicitationRequest}
@@ -1449,6 +1214,11 @@ export function McpClientProvider({
  *
  * // Update connection-affecting configuration and reconnect
  * await updateServer("linear", { headers: { Authorization: "Bearer ..." } });
+ * // Or from a connected server handle:
+ * await servers[0].setHeaders({ Authorization: "Bearer ..." });
+ *
+ * // Rename without reconnecting
+ * await servers[0].setDisplayName("Linear Production");
  *
  * // Access servers
  * servers.forEach(server => {
@@ -1471,6 +1241,9 @@ export function useMcpClient(): McpClientContextType {
  * @throws If called outside of a `McpClientProvider` (context not available).
  */
 export function useMcpServer(id: string): McpServer | undefined {
-  const { getServer } = useMcpClient();
-  return getServer(id);
+  const { servers } = useMcpClient();
+  return useMemo(
+    () => servers.find((server) => server.id === id),
+    [id, servers]
+  );
 }

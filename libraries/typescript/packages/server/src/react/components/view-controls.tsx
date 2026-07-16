@@ -70,7 +70,9 @@ export function ViewControls({
                 <button
                   type="button"
                   aria-label="Fullscreen"
-                  onClick={() => void requestDisplayMode({ mode: "fullscreen" })}
+                  onClick={() =>
+                    void requestDisplayMode({ mode: "fullscreen" })
+                  }
                 >
                   FS
                 </button>
@@ -87,7 +89,11 @@ export function ViewControls({
             </>
           )}
           {enableDebugger && (
-            <button type="button" aria-label="Debug" onClick={() => setOpen((v) => !v)}>
+            <button
+              type="button"
+              aria-label="Debug"
+              onClick={() => setOpen((v) => !v)}
+            >
               Debug
             </button>
           )}

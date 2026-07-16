@@ -168,8 +168,13 @@ export async function goToInspectorWithAutoConnectAndOpenTools(
  */
 export async function enableHostedChatMode(
   page: Page,
-  cloudChatUrl: string
-): Promise<{ calls: string[] }> {
+  cloudChatUrl: string,
+  opts?: { mockLlmProxy?: boolean | "login-required" | "success" }
+): Promise<{
+  calls: string[];
+  llmCalls: string[];
+  llmAuthorizations: string[];
+}> {
   await page.addInitScript((url) => {
     (
       window as unknown as { __MANUFACT_CHAT_URL__?: string }
@@ -179,26 +184,74 @@ export async function enableHostedChatMode(
   // Record + short-circuit any call to the cloud endpoint so the test never
   // depends on a real backend and a regression surfaces immediately.
   const calls: string[] = [];
+  const llmCalls: string[] = [];
+  const llmAuthorizations: string[] = [];
   await page.route(`${cloudChatUrl}**`, async (route) => {
     calls.push(route.request().url());
     await route.fulfill({ status: 502, body: "Bad Gateway" });
   });
 
-  // Setting chatApiUrl also mounts HostedUserMenu, which fetches
-  // `<cloud origin>/api/auth/get-session`. Stub it with an unauthenticated
-  // session so the tests never reach the real cloud backend (CI flakiness/slow).
+  if (opts?.mockLlmProxy) {
+    const llmBase = cloudChatUrl.replace(/\/chat\/stream\/?$/, "/llm");
+    await page.route(`${llmBase}/**`, async (route) => {
+      llmCalls.push(route.request().url());
+      llmAuthorizations.push(
+        (await route.request().allHeaders()).authorization ?? ""
+      );
+      if (opts.mockLlmProxy === "login-required") {
+        await route.fulfill({
+          status: 429,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: "rate_limited",
+            loginRequired: true,
+            loginUrl: "https://manufact.com/login",
+          }),
+        });
+        return;
+      }
+      const sse = [
+        'data: {"choices":[{"delta":{"content":"4"}}]}\n\n',
+        'data: {"choices":[{"finish_reason":"stop"}]}\n\n',
+        "data: [DONE]\n\n",
+      ].join("");
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: sse,
+      });
+    });
+  }
+
+  // Hosted identity discovers the cloud OAuth provider on mount. Stub an
+  // anonymous provider so tests never reach the real cloud backend.
+  const cloudOrigin = new URL(cloudChatUrl).origin;
+  await page.route(`${cloudOrigin}/api/auth/get-session**`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*" },
+      body: "null",
+    });
+  });
   await page.route(
-    `${new URL(cloudChatUrl).origin}/api/auth/get-session**`,
+    `${cloudOrigin}/api/auth/.well-known/openid-configuration**`,
     async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: "null",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({
+          authorization_endpoint: `${cloudOrigin}/api/auth/oauth2/authorize`,
+          token_endpoint: `${cloudOrigin}/api/auth/oauth2/token`,
+          userinfo_endpoint: `${cloudOrigin}/api/auth/oauth2/userinfo`,
+          registration_endpoint: `${cloudOrigin}/api/auth/oauth2/register`,
+        }),
       });
     }
   );
 
-  return { calls };
+  return { calls, llmCalls, llmAuthorizations };
 }
 
 /**

@@ -131,7 +131,9 @@ describe("McpAppRuntime (Phase 5)", () => {
       transport: createFailingTransport(failError),
     });
 
-    await expect(runtime.connect()).rejects.toThrow(/inject-fail|already connected|invalid/i);
+    await expect(runtime.connect()).rejects.toThrow(
+      /inject-fail|already connected|invalid/i
+    );
     expect(runtime.getHostSnapshot().isConnected).toBe(false);
     expect(runtime.getHostSnapshot().connectionError).toBeInstanceOf(Error);
     expect(runtime.getApp()).toBeNull();

@@ -6,9 +6,7 @@ import type {
 /**
  * Mobile safe area boundaries in pixels (vendored from the MCP Apps spec).
  */
-export type SafeAreaInsets = NonNullable<
-  McpUiHostContext["safeAreaInsets"]
->;
+export type SafeAreaInsets = NonNullable<McpUiHostContext["safeAreaInsets"]>;
 
 /**
  * Host application identity from the initialization handshake.

@@ -9,14 +9,9 @@ const TOGGLE_UPDATE_TIMEOUT = 5000 * CI_MULTIPLIER;
  * Outer AppFrame iframe inside the MCP Apps host container.
  * DOM: [data-testid="mcp-app-frame"][data-mcp-app-tool] > div > iframe
  */
-function mcpAppOuterFrame(
-  page: Page,
-  toolName: string
-): FrameLocator {
+function mcpAppOuterFrame(page: Page, toolName: string): FrameLocator {
   return page
-    .locator(
-      `[data-testid="mcp-app-frame"][data-mcp-app-tool="${toolName}"]`
-    )
+    .locator(`[data-testid="mcp-app-frame"][data-mcp-app-tool="${toolName}"]`)
     .frameLocator("iframe");
 }
 

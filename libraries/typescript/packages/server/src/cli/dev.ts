@@ -9,8 +9,9 @@
  * internal {@link registerViews} API (VIEWS_SPEC.md § Dev).
  *
  * Reload, not HMR: on file change the entry is re-imported and the handler
- * reference swapped — no registration diffing, no MCP notifications. Under
- * the stateless model the next request simply hits the new handler.
+ * reference swapped — no registration diffing or running-registry mutation.
+ * All handler generations share one event bus, so a successful swap invalidates
+ * the tool, prompt, and resource lists for subscribed development clients.
  *
  * `vite` is an optional peer dependency of `@mcp-use/server` (never a regular
  * dependency): this module is only ever reached through the bin's dynamic
@@ -35,8 +36,10 @@ import {
 } from "vite";
 import { getRequestListener } from "@hono/node-server";
 import {
+  InMemoryServerEventBus,
   localhostAllowedHostnames,
   localhostAllowedOrigins,
+  type ServerEventBus,
   validateHostHeader,
   validateOriginHeader,
 } from "@modelcontextprotocol/server";
@@ -66,10 +69,13 @@ type FetchHandler = (request: Request) => Promise<Response>;
  * copy of `@mcp-use/server`).
  */
 interface ServerLike {
-  getHandler(): FetchHandler;
+  getHandler(options?: { bus?: ServerEventBus }): FetchHandler;
   /** URL path prefix the MCP endpoint is mounted at (default `"/mcp"`). */
   readonly basePath?: string;
-  __primeViews(views: ViewsManifest, options?: { dev?: boolean; projectRoot?: string }): void;
+  __primeViews(
+    views: ViewsManifest,
+    options?: { dev?: boolean; projectRoot?: string }
+  ): void;
 }
 
 /**
@@ -371,6 +377,9 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
 export async function runDev(options: DevOptions): Promise<void> {
   const host = options.host ?? "127.0.0.1";
   const paths = resolveWorkspacePaths(options.cwd);
+  const eventBus = new InMemoryServerEventBus((error) => {
+    console.error("[mcp-use] notification delivery failed:", error);
+  });
 
   const envPath = join(options.cwd, ".env");
   if (existsSync(envPath)) {
@@ -522,7 +531,7 @@ export async function runDev(options: DevOptions): Promise<void> {
   let basePath: string;
   try {
     const server = await importServer();
-    currentHandler = server.getHandler();
+    currentHandler = server.getHandler({ bus: eventBus });
     basePath = server.basePath ?? "/mcp";
   } catch (error) {
     await runner.close();
@@ -544,8 +553,12 @@ export async function runDev(options: DevOptions): Promise<void> {
         try {
           runner.evaluatedModules.clear();
           const server = await importServer();
-          currentHandler = server.getHandler();
+          const nextHandler = server.getHandler({ bus: eventBus });
+          currentHandler = nextHandler;
           basePath = server.basePath ?? "/mcp";
+          eventBus.publish({ kind: "tools_list_changed" });
+          eventBus.publish({ kind: "prompts_list_changed" });
+          eventBus.publish({ kind: "resources_list_changed" });
           console.log("[mcp-use] reloaded server entry");
         } catch (error) {
           console.error(

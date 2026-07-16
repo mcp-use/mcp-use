@@ -379,8 +379,10 @@ export MCP_USE_ANONYMIZED_TELEMETRY=false
 
 ```javascript
 // In browser console
-localStorage.setItem("mcp_inspector_telemetry_disabled", "true");
+localStorage.setItem("MCP_USE_ANONYMIZED_TELEMETRY", "false");
 ```
+
+> **Note:** If you previously opted out with `mcp_inspector_telemetry_disabled`, the inspector automatically migrates that setting to `MCP_USE_ANONYMIZED_TELEMETRY=false` on startup.
 
 **Option 3: Package-level**
 

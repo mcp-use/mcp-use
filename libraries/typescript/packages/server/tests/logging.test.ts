@@ -102,14 +102,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs a two-line summary + detail for tools/call", async () => {
     const server = buildServer();
-    const response = await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "greet", arguments: { who: "world" } },
-          { "mcp-name": "greet" }
-        )
-      );
+    const response = await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "greet", arguments: { who: "world" } },
+        { "mcp-name": "greet" }
+      )
+    );
     expect(response.status).toBe(200);
 
     const lines = loggedLines();
@@ -122,14 +121,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("echoes inline input/output at debug level", async () => {
     const server = buildServer({ logging: { level: "debug" } });
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "greet", arguments: { who: "world" } },
-          { "mcp-name": "greet" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "greet", arguments: { who: "world" } },
+        { "mcp-name": "greet" }
+      )
+    );
     const lines = loggedLines();
     // debug adds inline payloads but no trace dump.
     expect(lines).toHaveLength(2);
@@ -141,14 +139,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("truncates long inline input at debug level", async () => {
     const server = buildServer({ logging: { level: "debug" } });
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "greet", arguments: { who: "x".repeat(200) } },
-          { "mcp-name": "greet" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "greet", arguments: { who: "x".repeat(200) } },
+        { "mcp-name": "greet" }
+      )
+    );
     const detail = loggedLines()[1] ?? "";
     expect(detail).toContain('{"who":"xxx');
     expect(detail).toContain("...");
@@ -160,14 +157,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs the resource URI for resources/read", async () => {
     const server = buildServer();
-    await server
-      .getHandler()(
-        mcpRequest(
-          "resources/read",
-          { uri: "config://settings" },
-          { "mcp-name": "config://settings" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "resources/read",
+        { uri: "config://settings" },
+        { "mcp-name": "config://settings" }
+      )
+    );
     expect(loggedLines()[1]).toBe(
       "  resources/read config://settings raw-request/0.0.0"
     );
@@ -176,14 +172,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs the prompt name for prompts/get", async () => {
     const server = buildServer();
-    await server
-      .getHandler()(
-        mcpRequest(
-          "prompts/get",
-          { name: "standup", arguments: { team: "core" } },
-          { "mcp-name": "standup" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "prompts/get",
+        { name: "standup", arguments: { team: "core" } },
+        { "mcp-name": "standup" }
+      )
+    );
     expect(loggedLines()[1]).toBe("  prompts/get standup raw-request/0.0.0");
     await server.close();
   });
@@ -223,14 +218,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("appends ERROR with the tool's message for isError results", async () => {
     const server = buildServer();
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "fail", arguments: { reason: "on purpose" } },
-          { "mcp-name": "fail" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "fail", arguments: { reason: "on purpose" } },
+        { "mcp-name": "fail" }
+      )
+    );
     expect(loggedLines()[1]).toBe(
       "  tools/call fail raw-request/0.0.0 ERROR failed: on purpose"
     );
@@ -239,14 +233,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("appends ERROR with the JSON-RPC error message for protocol errors", async () => {
     const server = buildServer();
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "no-such-tool", arguments: {} },
-          { "mcp-name": "no-such-tool" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "no-such-tool", arguments: {} },
+        { "mcp-name": "no-such-tool" }
+      )
+    );
     const detail = loggedLines()[1];
     expect(detail).toContain("  tools/call no-such-tool");
     expect(detail).toMatch(/ERROR .*no-such-tool/);
@@ -255,8 +248,9 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs a single line for non-MCP requests", async () => {
     const server = buildServer();
-    await server
-      .getHandler()(new Request("http://localhost/health", { method: "GET" }));
+    await server.getHandler()(
+      new Request("http://localhost/health", { method: "GET" })
+    );
     const lines = loggedLines();
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/^\d{2}:\d{2}:\d{2} GET \/health 404 in \d+ms$/);
@@ -278,8 +272,7 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("logs nothing when logging is disabled", async () => {
     const server = buildServer({ logging: { enabled: false } });
-    const response = await server
-      .getHandler()(mcpRequest("tools/list", {}));
+    const response = await server.getHandler()(mcpRequest("tools/list", {}));
     expect(response.status).toBe(200);
     expect(logSpy).not.toHaveBeenCalled();
     await server.close();
@@ -287,14 +280,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("emits the full request/response dump at trace level", async () => {
     const server = buildServer({ logging: { level: "trace" } });
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "greet", arguments: { who: "dump" } },
-          { "mcp-name": "greet" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "greet", arguments: { who: "dump" } },
+        { "mcp-name": "greet" }
+      )
+    );
     const output = loggedLines().join("\n");
     expect(output).toContain("[TRACE] Request Details");
     expect(output).toContain("Request Headers:");
@@ -308,14 +300,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("redacts credential headers in the trace dump", async () => {
     const server = buildServer({ logging: { level: "trace" } });
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "greet", arguments: { who: "auth" } },
-          { "mcp-name": "greet", authorization: "Bearer super-secret-token" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "greet", arguments: { who: "auth" } },
+        { "mcp-name": "greet", authorization: "Bearer super-secret-token" }
+      )
+    );
     const output = loggedLines().join("\n");
     expect(output).toContain('"authorization": "[REDACTED]"');
     expect(output).not.toContain("super-secret-token");
@@ -324,14 +315,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
 
   it("sanitizes control characters out of request-derived log text", async () => {
     const server = buildServer();
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "fail", arguments: { reason: "line1\nFORGED 200 OK" } },
-          { "mcp-name": "fail" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "fail", arguments: { reason: "line1\nFORGED 200 OK" } },
+        { "mcp-name": "fail" }
+      )
+    );
     const lines = loggedLines();
     // The injected newline must not produce a third log line.
     expect(lines).toHaveLength(2);
@@ -353,14 +343,13 @@ describe("requestLogger (via MCPServer.getHandler)", () => {
     // allowedHosts mounts via createMcpHonoApp, whose JSON middleware stashes
     // parsedBody in context vars — the logger must pick it up from there.
     const server = buildServer({ allowedHosts: ["api.example.com"] });
-    await server
-      .getHandler()(
-        mcpRequest(
-          "tools/call",
-          { name: "greet", arguments: { who: "hono" } },
-          { "mcp-name": "greet", host: "api.example.com" }
-        )
-      );
+    await server.getHandler()(
+      mcpRequest(
+        "tools/call",
+        { name: "greet", arguments: { who: "hono" } },
+        { "mcp-name": "greet", host: "api.example.com" }
+      )
+    );
     expect(loggedLines()[1]).toBe("  tools/call greet raw-request/0.0.0");
     await server.close();
   });

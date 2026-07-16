@@ -56,8 +56,7 @@ if (publishableKey === undefined) {
   );
 }
 
-const supabaseUrl =
-  supabaseUrlEnv ?? `https://${projectId}.supabase.co`;
+const supabaseUrl = supabaseUrlEnv ?? `https://${projectId}.supabase.co`;
 
 const server = new MCPServer({
   name: "supabase-user-info",

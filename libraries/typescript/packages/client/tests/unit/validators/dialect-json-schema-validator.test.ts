@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { JsonSchemaType } from "@modelcontextprotocol/client";
-import { DialectJsonSchemaValidator } from "../../../src/validators/dialect-json-schema-validator.js";
+import { DialectJsonSchemaValidator } from "../../../src/utils/json-schema-validator.js";
 
 describe("DialectJsonSchemaValidator", () => {
   const validator = new DialectJsonSchemaValidator();
@@ -88,7 +88,9 @@ describe("DialectJsonSchemaValidator", () => {
       $schema: "https://example.com/my-schema",
     };
 
-    expect(() => validator.getValidator(schema)).toThrow(/unsupported dialect/i);
+    expect(() => validator.getValidator(schema)).toThrow(
+      /unsupported dialect/i
+    );
   });
 
   it("validates v1-era server outputSchema shapes", () => {

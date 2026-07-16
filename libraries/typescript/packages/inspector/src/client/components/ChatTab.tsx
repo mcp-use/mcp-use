@@ -12,9 +12,34 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
-import { copyToClipboard } from "../utils/clipboard";
+import { History as HistoryIcon } from "lucide-react";
+import { ChatHistoryPanel } from "@/client/chat-history/ChatHistoryPanel";
+import { ChatHistoryRail } from "@/client/chat-history/ChatHistoryRail";
+import { LocalChatStorageProvider } from "@/client/chat-history/providers/local-storage";
+import type { ChatStorageProvider } from "@/client/chat-history/types";
+import { useChatTitleGeneration } from "@/client/chat-history/useChatTitleGeneration";
+import {
+  CHAT_TITLE_PLACEHOLDER,
+  CHAT_TITLE_SIMPLE,
+  isPlaceholderTitle,
+} from "@/client/chat-history/chat-title";
+import { useInspector } from "@/client/context/InspectorContext";
+import {
+  MeshTabBackground,
+  type ShaderPhase,
+} from "@/client/components/ui/mesh-tab-background";
+import { Button } from "./ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "./ui/tooltip";
+import { copyToClipboard } from "@/client/utils/browser";
+import { getServerDisplayName } from "@/client/utils/servers";
 import { downloadJSON } from "../utils/jsonUtils";
 import { shouldShowFreeTierUpgrade } from "./chat/freeTier";
+import { formatManagedModelName } from "./chat/providerMeta";
+import type { useManagedCloudModel } from "./chat/useManagedCloudModel";
 import { useHostedSession } from "../hooks/useHostedSession";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
@@ -24,13 +49,22 @@ import { ChatLandingForm } from "./chat/ChatLandingForm";
 import { ConfigurationDialog } from "./chat/ConfigurationDialog";
 import { ConfigureEmptyState } from "./chat/ConfigureEmptyState";
 import { MessageList } from "./chat/MessageList";
+import { ChatScrollToBottomButton } from "./chat/ChatScrollToBottomButton";
+import { useChatScrollToBottom } from "./chat/useChatScrollToBottom";
 import type { ToolInfo } from "./chat/ToolSelector";
 import { useChatMessages } from "./chat/useChatMessages";
 import { useChatMessagesClientSide } from "./chat/useChatMessagesClientSide";
 import { useConfig } from "./chat/useConfig";
+import { useHostedChatMode } from "./chat/useHostedChatMode";
 import { McpReconnectBanner } from "./chat/McpReconnectBanner";
+import {
+  ChatRawView,
+  type ChatView,
+} from "./chat/ChatTraceView";
+import { useLocalSystemPrompt } from "./chat/system-prompt/useLocalSystemPrompt";
+import { resolveSystemPrompt } from "./chat/system-prompt/local-storage";
+import type { ChatSystemPromptProvider } from "./chat/system-prompt/types";
 import { useWidgetDebug } from "../context/WidgetDebugContext";
-import { LoginModal } from "./LoginModal";
 
 // Structural type — avoids nominal incompatibility when pnpm creates
 // multiple peer-variant copies of mcp-use with duplicate class declarations.
@@ -60,6 +94,8 @@ export interface ChatTabProps {
   /** Externally-managed LLM config. When provided, bypasses localStorage-based config
    *  and hides the API key configuration UI. Useful for host apps that provide their own backend. */
   managedLlmConfig?: import("./chat/types").LLMConfig;
+  /** Curated cloud model state when signed in on hosted inspector. */
+  managedCloudModel?: ReturnType<typeof useManagedCloudModel>;
   /** Opt in to the Manufact free-tier sign-in / upgrade UI. Default: false. */
   enableFreeTierUpgrade?: boolean;
   /** Label for the clear/new-chat button. Default: "New Chat". */
@@ -108,6 +144,25 @@ export interface ChatTabProps {
   body?: (
     messages: Array<{ role: string; content: unknown; attachments?: unknown }>
   ) => unknown;
+  /** Pluggable chat history storage. Defaults to localStorage in standalone mode. */
+  chatStorageProvider?: ChatStorageProvider;
+  /** When false, hides the built-in history sidebar even if a provider is available. */
+  enableChatHistory?: boolean;
+  /** Controlled active chat thread id */
+  activeChatId?: string;
+  onActiveChatIdChange?: (chatId: string | null) => void;
+  /** When false, defer title generation until host signals persisted events (cloud embed). Default: true. */
+  titleGenerationReady?: boolean;
+  /** Known title for the active chat; skips generation when not the placeholder. */
+  activeChatTitle?: string;
+  /** Called after a title is generated and persisted via the storage provider. */
+  onChatTitleGenerated?: (chatId: string, title: string) => void;
+  /** Initial focused chat view. Default: "conv". */
+  defaultView?: ChatView;
+  /** Pluggable system prompt source. Defaults to localStorage per serverId. */
+  systemPromptProvider?: ChatSystemPromptProvider;
+  /** Raise ChatHeader above host chrome (cloud embed). */
+  elevatedHeader?: boolean;
 }
 
 // Check text up to caret position for " /" or "/" at start of line or textarea
@@ -128,11 +183,11 @@ export function ChatTab({
   waitForChatApiUrl,
   initialMessages,
   managedLlmConfig,
+  managedCloudModel,
   enableFreeTierUpgrade = false,
   clearButtonLabel,
   hideTitle,
   hideModelBadge,
-  hideServerUrl,
   clearButtonHideIcon,
   clearButtonHideShortcut,
   clearButtonVariant,
@@ -145,13 +200,60 @@ export function ChatTab({
   extraHeaders,
   body,
   managedKeyUnavailable = false,
+  chatStorageProvider,
+  enableChatHistory,
+  activeChatId: controlledActiveChatId,
+  onActiveChatIdChange,
+  titleGenerationReady,
+  activeChatTitle,
+  onChatTitleGenerated,
+  defaultView = "conv",
+  systemPromptProvider: externalSystemPromptProvider,
+  elevatedHeader,
 }: ChatTabProps) {
+  const { isEmbedded } = useInspector();
+  const localSystemPromptProvider = useLocalSystemPrompt(serverId);
+  const effectiveSystemPromptProvider =
+    externalSystemPromptProvider ?? localSystemPromptProvider;
+  const resolvedSystemPrompt = useMemo(
+    () => resolveSystemPrompt(effectiveSystemPromptProvider.prompt),
+    [effectiveSystemPromptProvider.prompt]
+  );
+  const localChatStorageRef = useRef(new LocalChatStorageProvider());
+  const effectiveChatStorage =
+    chatStorageProvider ??
+    (!isEmbedded && enableChatHistory !== false
+      ? localChatStorageRef.current
+      : null);
+
+  const [internalActiveChatId, setInternalActiveChatId] = useState<
+    string | null
+  >(null);
+  const activeChatId = controlledActiveChatId ?? internalActiveChatId;
+  const setActiveChatId = useCallback(
+    (chatId: string | null) => {
+      if (onActiveChatIdChange) {
+        onActiveChatIdChange(chatId);
+      } else {
+        setInternalActiveChatId(chatId);
+      }
+    },
+    [onActiveChatIdChange]
+  );
+
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [historyRefetchKey, setHistoryRefetchKey] = useState(0);
+  const [internalChatTitle, setInternalChatTitle] = useState<string | undefined>();
+  const [restoredMessages, setRestoredMessages] = useState<
+    import("./chat/types").Message[] | undefined
+  >(undefined);
   const [inputValue, setInputValue] = useState("");
   const [promptsDropdownOpen, setPromptsDropdownOpen] = useState(false);
   const [promptFocusedIndex, setPromptFocusedIndex] = useState(-1);
   const [quickQuestions, setQuickQuestions] =
     useState<string[]>(chatQuickQuestions);
   const [followups, setFollowups] = useState<string[]>(chatFollowups);
+  const [activeView, setActiveView] = useState<ChatView>(defaultView);
   const [disabledTools, setDisabledTools] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesAreaRef = useRef<HTMLDivElement | null>(null);
@@ -183,45 +285,18 @@ export function ChatTab({
     setTempBaseUrl,
     saveLLMConfig,
     clearConfig,
-  } = useConfig({ mcpServerUrl: connection.url });
+  } = useConfig({ mcpServerUrl: connection.url ?? "" });
 
-  // ── Hosted-mode / client-side override ──────────────────────────────────
-  // In hosted mode the parent passes `useClientSide=false` and sets `chatApiUrl`
-  // to the Manufact backend (inspector.manufact.com/api/v1/inspector/chat/stream).
-  // We *still* want client-side mode in two situations:
-  //
-  //  a) User already has their own API key stored in localStorage → auto-detect
-  //     on mount via `localLlmConfig`. The model selector is then naturally
-  //     visible (ChatLandingForm / ConfigurationDialog take over).
-  //
-  //  b) User clicks "Use your own API key" in LoginModal (shown on 429) →
-  //     `handleUseApiKey` sets forceClientSide=true and opens ConfigurationDialog.
-  //
-  // Host embeds (e.g. cloud dashboard) pass `useClientSide={false}` + `managedLlmConfig`
-  // and set `chatApiUrl` to the org chat stream. They must not fall back to
-  // client-side streaming just because `localLlmConfig` exists from a past visit
-  // to the standalone inspector — that would use the wrong LLM (e.g. Gemini in
-  // localStorage) while the host shows a different model in the shell.
-  // `hostUsesServerManagedStream`: only `forceClientSide` (user explicitly
-  // chose BYOK) turns client-side back on.
-  const hostUsesServerManagedStream =
-    !useClientSide && managedLlmConfig != null;
-  const [forceClientSide, setForceClientSide] = useState(() =>
-    hostUsesServerManagedStream ? false : !!localLlmConfig
-  );
-  const effectiveClientSide = hostUsesServerManagedStream
-    ? forceClientSide
-    : useClientSide || forceClientSide || !!localLlmConfig;
-
-  // When the user has opted into client-side mode (own API key), ignore the
-  // externally-provided managed config — we want the config dialog, model
-  // selector, and local llmConfig to take over. Without this, clicking "Use
-  // your own API key" in the LoginModal would leave `isManaged=true`, hiding
-  // the ConfigurationDialog and config button.
-  const llmConfig = effectiveClientSide
-    ? localLlmConfig
-    : (managedLlmConfig ?? localLlmConfig);
-  const isManaged = !effectiveClientSide && !!managedLlmConfig;
+  const {
+    setForceClientSide,
+    effectiveClientSide,
+    llmConfig,
+    isManaged,
+  } = useHostedChatMode({
+    useClientSide,
+    managedLlmConfig,
+    localLlmConfig,
+  });
 
   const { getAllModelContexts } = useWidgetDebug();
 
@@ -238,21 +313,25 @@ export function ChatTab({
   };
 
   const serverSideChat = useChatMessages({
-    mcpServerUrl: connection.url,
+    mcpServerUrl: connection.url ?? "",
     llmConfig,
     authConfig: userAuthConfig,
     isConnected,
     chatApiUrl,
     waitForChatApiUrl,
     widgetModelContexts,
-    initialMessages,
+    initialMessages: restoredMessages ?? initialMessages,
     disabledTools,
     streamProtocol,
     credentials,
     extraHeaders,
     body,
   });
-  const clientSideChat = useChatMessagesClientSide(chatHookParams);
+  const clientSideChat = useChatMessagesClientSide({
+    ...chatHookParams,
+    initialMessages: restoredMessages ?? initialMessages,
+    systemPrompt: resolvedSystemPrompt,
+  });
 
   const {
     messages,
@@ -264,15 +343,142 @@ export function ChatTab({
     stop,
     addAttachment,
     removeAttachment,
+    clearTrace,
+    traceEvents,
+    tokenUsage,
   } = effectiveClientSide ? clientSideChat : serverSideChat;
 
-  const rateLimitInfo = effectiveClientSide
-    ? null
-    : (serverSideChat.rateLimitInfo ?? null);
+  const [shaderPhase, setShaderPhase] = useState<ShaderPhase>(() =>
+    messages.length === 0 ? "visible" : "hidden"
+  );
 
-  const clearRateLimitInfo = effectiveClientSide
-    ? undefined
-    : serverSideChat.clearRateLimitInfo;
+  const dismissLandingShader = useCallback(() => {
+    setShaderPhase((p) => (p === "visible" ? "fading" : p));
+  }, []);
+
+  const clearChatToLanding = useCallback(() => {
+    clearMessages();
+    setShaderPhase("visible");
+  }, [clearMessages]);
+
+  const { messagesEndRef, showScrollToBottom, scrollToBottom } =
+    useChatScrollToBottom(messagesAreaRef, {
+      messageCount: messages.length,
+      isLoading,
+      enabled: !!llmConfig,
+    });
+
+  const handleSelectChat = useCallback(
+    async (chatId: string) => {
+      if (!effectiveChatStorage) return;
+      const [msgs, listed] = await Promise.all([
+        effectiveChatStorage.getMessages(chatId),
+        effectiveChatStorage.listChats({ agentId: serverId }),
+      ]);
+      setRestoredMessages(msgs);
+      clearTrace();
+      setMessages(msgs);
+      setShaderPhase(msgs.length === 0 ? "visible" : "hidden");
+      setActiveChatId(chatId);
+      setInternalChatTitle(
+        listed.items.find((session) => session.id === chatId)?.title
+      );
+    },
+    [effectiveChatStorage, clearTrace, setMessages, setActiveChatId, serverId]
+  );
+
+  const handleNewChat = useCallback(async () => {
+    clearMessages();
+    setRestoredMessages([]);
+    setShaderPhase("visible");
+    setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
+    setActiveChatId(null);
+    if (effectiveChatStorage) {
+      const session = await effectiveChatStorage.createChat({
+        agentId: serverId,
+        agentName: connection.displayName || connection.name || "MCP Server",
+      });
+      setActiveChatId(session.id);
+      setHistoryRefetchKey((k) => k + 1);
+    } else {
+      setInternalChatTitle(undefined);
+    }
+  }, [
+    clearMessages,
+    effectiveChatStorage,
+    serverId,
+    connection.displayName,
+    connection.name,
+    setActiveChatId,
+  ]);
+
+  const ensureActiveChat = useCallback(async () => {
+    if (!effectiveChatStorage || activeChatId) return activeChatId;
+    const session = await effectiveChatStorage.createChat({
+      agentId: serverId,
+      agentName: connection.displayName || connection.name || "MCP Server",
+    });
+    setActiveChatId(session.id);
+    setInternalChatTitle(CHAT_TITLE_PLACEHOLDER);
+    setHistoryRefetchKey((k) => k + 1);
+    return session.id;
+  }, [
+    effectiveChatStorage,
+    activeChatId,
+    serverId,
+    connection.displayName,
+    connection.name,
+    setActiveChatId,
+  ]);
+
+  useEffect(() => {
+    if (!effectiveChatStorage?.saveMessages || !activeChatId) return;
+    void effectiveChatStorage.saveMessages(activeChatId, messages);
+  }, [effectiveChatStorage, activeChatId, messages]);
+
+  const bumpHistoryRefetch = useCallback(() => {
+    setHistoryRefetchKey((k) => k + 1);
+  }, []);
+
+  const handleTitleGenerated = useCallback(
+    (chatId: string, title: string) => {
+      setInternalChatTitle(title);
+      onChatTitleGenerated?.(chatId, title);
+    },
+    [onChatTitleGenerated]
+  );
+
+  const effectiveActiveChatTitle = activeChatTitle ?? internalChatTitle;
+  const headerDisplayTitle =
+    effectiveActiveChatTitle &&
+    !isPlaceholderTitle(effectiveActiveChatTitle)
+      ? effectiveActiveChatTitle
+      : CHAT_TITLE_SIMPLE;
+
+  useChatTitleGeneration({
+    activeChatId,
+    storage: effectiveChatStorage,
+    messages,
+    isLoading,
+    effectiveClientSide,
+    llmConfig,
+    activeChatTitle: effectiveActiveChatTitle,
+    titleGenerationReady,
+    onTitleGenerated: handleTitleGenerated,
+    onHistoryRefetch: bumpHistoryRefetch,
+  });
+
+  const rateLimitInfo = effectiveClientSide && isManaged
+    ? (clientSideChat.rateLimitInfo ?? null)
+    : effectiveClientSide
+      ? null
+      : (serverSideChat.rateLimitInfo ?? null);
+
+  const clearRateLimitInfo = effectiveClientSide && isManaged
+    ? clientSideChat.clearRateLimitInfo
+    : effectiveClientSide
+      ? undefined
+      : serverSideChat.clearRateLimitInfo;
 
   const mcpServerAuthRequired = effectiveClientSide
     ? null
@@ -314,22 +520,28 @@ export function ChatTab({
     setConfigDialogOpen(true);
   }, [clearRateLimitInfo, setConfigDialogOpen]);
 
-  // User-initiated login (from the free-tier badge / ConfigurationDialog CTA).
-  // Separate from `rateLimitInfo` which is reactive to a 429 response.
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const {
+    user: hostedUser,
+    authorizing,
+    authorize,
+  } = useHostedSession(enableFreeTierUpgrade ? chatApiUrl : undefined);
   const handleOpenLogin = useCallback(() => {
     setConfigDialogOpen(false);
-    setShowLoginModal(true);
-  }, [setConfigDialogOpen]);
+    void authorize().catch((error) =>
+      toast.error(
+        error instanceof Error ? error.message : "Authorization failed"
+      )
+    );
+  }, [authorize, setConfigDialogOpen]);
 
   // Whether the visitor is signed in to Manufact (hosted free-tier only). Used
   // to suppress the "Sign in to increase your limits" prompt once authenticated
-  // — otherwise signed-in users keep getting asked to log in (MCP-2142). Only
-  // probed for the hosted free-tier UI; BYOK and host embeds skip the fetch.
-  const { user: hostedUser } = useHostedSession(
-    enableFreeTierUpgrade ? chatApiUrl : undefined
-  );
+  // — otherwise signed-in users keep getting asked to log in (MCP-2142).
   const isHostedAuthenticated = hostedUser != null;
+
+  useEffect(() => {
+    if (isHostedAuthenticated) clearRateLimitInfo?.();
+  }, [clearRateLimitInfo, isHostedAuthenticated]);
 
   const freeTierInfo = shouldShowFreeTierUpgrade({
     isManaged,
@@ -347,8 +559,35 @@ export function ChatTab({
   const suppressInspectorModelChrome =
     Boolean(managedLlmConfig) && Boolean(hideModelBadge);
 
-  const hideModelBadgeOnLandingForm =
-    suppressInspectorModelChrome || (!!hideModelBadge && !effectiveClientSide);
+  const hideInputModelBadge = suppressInspectorModelChrome;
+
+  const managedCloudInfo =
+    isManaged && isHostedAuthenticated && managedCloudModel
+      ? {
+          models: managedCloudModel.models,
+          selectedModelId: managedCloudModel.selectedModelId,
+          onModelChange: managedCloudModel.setSelectedModelId,
+          isLoading: managedCloudModel.isLoading,
+        }
+      : undefined;
+
+  // #region agent log
+  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'ChatTab.tsx:managedCloudInfo',message:'chat managed cloud info',data:{isManaged,isHostedAuthenticated,hasManagedCloudModel:!!managedCloudModel,showManagedCloudInfo:!!managedCloudInfo,modelCount:managedCloudModel?.models.length??0,isLoading:managedCloudModel?.isLoading??false,hostedUserId:hostedUser?.id??null},timestamp:Date.now(),hypothesisId:'H-C'})}).catch(()=>{});
+  // #endregion
+
+  const modelBadgeMode = isManaged ? ("managed" as const) : ("byok" as const);
+  const modelDisplayName =
+    isManaged && managedCloudModel?.selectedModel
+      ? formatManagedModelName(
+          managedCloudModel.selectedModel.name,
+          managedCloudModel.selectedModel.provider
+        )
+      : undefined;
+
+  const handleUseManagedCloud = useCallback(() => {
+    setForceClientSide(false);
+    setConfigDialogOpen(false);
+  }, [setConfigDialogOpen, setForceClientSide]);
 
   const {
     filteredPrompts,
@@ -553,6 +792,9 @@ export function ChatTab({
           postResult(false, { error: "Chat is not ready to send messages" });
           return;
         }
+        if (messages.length === 0) {
+          dismissLandingShader();
+        }
         void sendMessage(text, [])
           .then(() => {
             postBridgeEvent("mcp-inspector:chat:message_sent", {
@@ -571,7 +813,7 @@ export function ChatTab({
       }
 
       if (data.type === "mcp-inspector:chat:clear") {
-        clearMessages();
+        clearChatToLanding();
         postBridgeEvent("mcp-inspector:chat:cleared", { requestId });
         postResult(true);
         return;
@@ -769,7 +1011,8 @@ export function ChatTab({
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
   }, [
-    clearMessages,
+    clearChatToLanding,
+    dismissLandingShader,
     setMessages,
     followups,
     getSerializedMessages,
@@ -786,8 +1029,84 @@ export function ChatTab({
 
   // Register keyboard shortcuts (only active when ChatTab is mounted and enabled)
   useKeyboardShortcuts(
-    enableKeyboardShortcuts ? { onNewChat: clearMessages } : {}
+    enableKeyboardShortcuts
+      ? {
+          onNewChat: effectiveChatStorage ? handleNewChat : clearChatToLanding,
+        }
+      : {}
   );
+
+  const wrapWithHistory = (content: React.ReactNode) => {
+    const framed = (
+      <MeshTabBackground
+        className="h-full w-full"
+        shaderPhase={shaderPhase}
+        onShaderFadeComplete={() => setShaderPhase("hidden")}
+      >
+        {content}
+      </MeshTabBackground>
+    );
+
+    if (!effectiveChatStorage) return framed;
+
+    return (
+      <div className="flex h-full flex-row overflow-hidden">
+        <div
+          className="group/chat-history relative flex shrink-0 flex-col overflow-visible transition-[width] duration-200"
+          style={{ width: showHistoryPanel ? 320 : 0 }}
+        >
+          {showHistoryPanel && (
+            <div className="flex h-full w-full flex-col overflow-hidden border-r border-zinc-200 bg-background dark:border-zinc-700">
+              <ChatHistoryPanel
+                provider={effectiveChatStorage}
+                open={true}
+                onOpenChange={setShowHistoryPanel}
+                currentChatId={activeChatId ?? undefined}
+                agentId={serverId}
+                agentDisplayNameFallback={
+                  connection.displayName || connection.name || "MCP Server"
+                }
+                onSelectChat={handleSelectChat}
+                variant="inline"
+                containerClassName="h-full border-0"
+                refetchKey={historyRefetchKey}
+                onCurrentChatDeleted={() => void handleNewChat()}
+              />
+            </div>
+          )}
+          {showHistoryPanel && (
+            <ChatHistoryRail onCollapse={() => setShowHistoryPanel(false)} />
+          )}
+        </div>
+
+        <div className="relative min-w-0 flex-1 overflow-hidden">
+          {!showHistoryPanel && (
+            <div className="absolute top-1/2 left-4 z-50 -translate-y-1/2">
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="size-10 aspect-square rounded-full"
+                      onClick={() => setShowHistoryPanel(true)}
+                    >
+                      <HistoryIcon size={16} />
+                    </Button>
+                  }
+                  nativeButton
+                />
+                <TooltipContent side="right">
+                  <p>Chat History</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          )}
+          {framed}
+        </div>
+      </div>
+    );
+  };
 
   const clearPromptsUIState = useCallback(() => {
     setPromptFocusedIndex(-1);
@@ -883,10 +1202,24 @@ export function ChatTab({
     if (!hasContent) {
       return;
     }
-    sendMessage(inputValue, results);
-    setInputValue("");
-    clearPromptResults();
-  }, [inputValue, results, sendMessage, clearPromptResults, attachments]);
+    if (messages.length === 0) {
+      dismissLandingShader();
+    }
+    void ensureActiveChat().then(() => {
+      sendMessage(inputValue, results);
+      setInputValue("");
+      clearPromptResults();
+    });
+  }, [
+    inputValue,
+    results,
+    sendMessage,
+    clearPromptResults,
+    attachments,
+    ensureActiveChat,
+    messages.length,
+    dismissLandingShader,
+  ]);
 
   const handlePromptKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1023,13 +1356,14 @@ export function ChatTab({
 
   const handleClearConfig = useCallback(() => {
     clearConfig();
-    clearMessages();
-  }, [clearConfig, clearMessages]);
+    void handleNewChat();
+  }, [clearConfig, handleNewChat]);
 
   const handleQuickQuestionSelect = useCallback(
     (question: string) => {
       if (!question.trim()) return;
       if (!llmConfig || !isConnected) return;
+      dismissLandingShader();
       void sendMessage(question, []).then(() => {
         postBridgeEvent("mcp-inspector:chat:message_sent", {
           message: question,
@@ -1037,7 +1371,7 @@ export function ChatTab({
         });
       });
     },
-    [postBridgeEvent, sendMessage, llmConfig, isConnected]
+    [postBridgeEvent, sendMessage, llmConfig, isConnected, dismissLandingShader]
   );
 
   const handleFollowupSelect = useCallback(
@@ -1054,27 +1388,27 @@ export function ChatTab({
     [postBridgeEvent, sendMessage, llmConfig, isConnected]
   );
 
-  // Login modal — shown on 429 rate-limit OR when the user clicks "Sign in"
-  // from the free-tier ConfigurationDialog. Rendered in both the landing and
-  // main-chat branches so it works before any message is sent too.
-  const loginModalNode =
-    (rateLimitInfo || showLoginModal) && chatApiUrl ? (
-      <LoginModal
-        authOrigin={new URL(chatApiUrl).origin}
-        onDismiss={() => {
-          clearRateLimitInfo?.();
-          setShowLoginModal(false);
-        }}
-        onUseApiKey={handleUseApiKey}
-      />
+  const loginRequiredNode =
+    rateLimitInfo && chatApiUrl ? (
+      <div className="absolute inset-x-4 top-4 z-20 mx-auto flex max-w-xl items-center justify-between gap-4 rounded-xl border bg-background/95 p-4 shadow-lg backdrop-blur">
+        <p className="text-sm text-muted-foreground">
+          Sign in through Manufact Cloud to continue with managed chat.
+        </p>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" size="sm" onClick={handleUseApiKey}>
+            Use API key
+          </Button>
+          <Button size="sm" disabled={authorizing} onClick={handleOpenLogin}>
+            {authorizing ? "Authorizing…" : "Sign in"}
+          </Button>
+        </div>
+      </div>
     ) : null;
 
   // Show landing form when there are no messages and LLM is configured
   if (llmConfig && messages.length === 0) {
-    return (
-      <div className="flex flex-col h-full">
-        {/* Header with config dialog. In hosted-managed mode the dialog shows
-            a "free tier" banner + Sign-in CTA above the bring-your-own-key form. */}
+    return wrapWithHistory(
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <div className="absolute top-4 right-4 z-10">
           <ConfigurationDialog
             open={configDialogOpen}
@@ -1092,14 +1426,19 @@ export function ChatTab({
             showClearButton={!isManaged}
             buttonLabel="Change API Key"
             freeTierInfo={freeTierInfo}
+            managedCloudInfo={managedCloudInfo}
+            onUseManagedCloud={
+              !isManaged && managedCloudModel ? handleUseManagedCloud : undefined
+            }
           />
         </div>
 
-        {/* Landing Form */}
         <ChatLandingForm
-          mcpServerUrl={connection.url}
+          serverDisplayName={getServerDisplayName(connection)}
           inputValue={inputValue}
-          isConnected={isConnected}
+          isConnected={
+            isConnected && !rateLimitInfo && !mcpServerAuthRequired
+          }
           isLoading={isLoading}
           textareaRef={textareaRef}
           llmConfig={llmConfig}
@@ -1120,27 +1459,31 @@ export function ChatTab({
           onKeyDown={handleKeyDown}
           onKeyUp={handleKeyUp}
           onClick={updatePromptsDropdownState}
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSendMessage();
-          }}
+          onSendMessage={handleSendMessage}
+          onStopStreaming={stop}
           onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
-          hideModelBadge={hideModelBadgeOnLandingForm}
-          hideServerUrl={hideServerUrl}
+          hideModelBadge={hideInputModelBadge}
+          freeTierInfo={freeTierInfo}
+          managedCloudInfo={managedCloudInfo}
+          modelBadgeMode={modelBadgeMode}
+          modelDisplayName={modelDisplayName}
           quickQuestions={quickQuestions}
           onQuickQuestionSelect={handleQuickQuestionSelect}
-          freeTierInfo={freeTierInfo}
+          pendingElicitationRequests={connection.pendingElicitationRequests}
+          onApproveElicitation={connection.approveElicitation}
+          onRejectElicitation={connection.rejectElicitation}
+          systemPromptProvider={effectiveSystemPromptProvider}
         />
         {reconnectBannerNode}
-        {loginModalNode}
+        {loginRequiredNode}
       </div>
     );
   }
 
-  return (
-    <div className="flex flex-col h-full relative">
+  return wrapWithHistory(
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* Header. In hosted-managed mode (`freeTierInfo`), the dialog always
           renders and the badge switches to a "Free tier" pill. */}
       <ChatHeader
@@ -1148,7 +1491,7 @@ export function ChatTab({
         hasMessages={messages.length > 0}
         configDialogOpen={configDialogOpen}
         onConfigDialogOpenChange={setConfigDialogOpen}
-        onClearChat={clearMessages}
+        onClearChat={effectiveChatStorage ? handleNewChat : clearChatToLanding}
         tempProvider={tempProvider}
         tempModel={tempModel}
         tempApiKey={tempApiKey}
@@ -1159,10 +1502,12 @@ export function ChatTab({
         onBaseUrlChange={setTempBaseUrl}
         onSaveConfig={saveLLMConfig}
         onClearConfig={handleClearConfig}
-        hideConfigButton={
-          (isManaged && !freeTierInfo) || suppressInspectorModelChrome
-        }
+        hideConfigButton={suppressInspectorModelChrome}
         freeTierInfo={freeTierInfo}
+        managedCloudInfo={managedCloudInfo}
+        onUseManagedCloud={
+          !isManaged && managedCloudModel ? handleUseManagedCloud : undefined
+        }
         onCopyChat={handleCopyChat}
         onExportChat={handleExportChat}
         clearButtonLabel={clearButtonLabel}
@@ -1171,47 +1516,66 @@ export function ChatTab({
         clearButtonHideShortcut={clearButtonHideShortcut}
         clearButtonVariant={clearButtonVariant}
         hideClearButton={hideClearButton}
+        activeChatId={activeChatId}
+        chatTitle={headerDisplayTitle}
+        showViewToggle={!!llmConfig}
+        viewIndex={activeView === "raw" ? 1 : 0}
+        onViewIndexChange={(index) =>
+          setActiveView(index === 1 ? "raw" : "conv")
+        }
+        elevatedHeader={elevatedHeader}
       />
 
       {/* Messages Area */}
-      <div
-        ref={messagesAreaRef}
-        data-testid="chat-messages-scroll-container"
-        className="flex-1 overflow-y-auto p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
-      >
-        {!llmConfig ? (
-          <ConfigureEmptyState
-            onConfigureClick={() => setConfigDialogOpen(true)}
-            managedKeyUnavailable={managedKeyUnavailable}
-          />
-        ) : (
-          <MessageList
-            messages={messages}
-            isLoading={isLoading}
-            serverId={connection.url}
-            readResource={readResource}
-            tools={connection.tools}
-            sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
-            serverBaseUrl={connection.url}
-            pendingElicitationRequests={connection.pendingElicitationRequests}
-            onApproveElicitation={connection.approveElicitation}
-            onRejectElicitation={connection.rejectElicitation}
-            scrollContainerRef={messagesAreaRef}
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div
+          ref={messagesAreaRef}
+          data-testid="chat-messages-scroll-container"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 sm:p-4 pt-[80px] sm:pt-[100px]"
+        >
+          {!llmConfig ? (
+            <ConfigureEmptyState
+              onConfigureClick={() => setConfigDialogOpen(true)}
+              managedKeyUnavailable={managedKeyUnavailable}
+            />
+          ) : activeView === "conv" ? (
+            <MessageList
+              messages={messages}
+              isLoading={isLoading}
+              serverId={connection.url}
+              readResource={readResource}
+              tools={connection.tools}
+              sendMessage={(msg, atts) => sendMessage(msg, [], atts)}
+              serverBaseUrl={connection.url}
+              messagesEndRef={messagesEndRef}
+              traceEvents={traceEvents}
+            />
+          ) : (
+            <ChatRawView events={traceEvents} usage={tokenUsage} />
+          )}
+        </div>
+
+        {llmConfig && (
+          <ChatScrollToBottomButton
+            visible={showScrollToBottom}
+            onClick={() => scrollToBottom("smooth")}
           />
         )}
       </div>
 
-      {loginModalNode}
+      {loginRequiredNode}
 
       {reconnectBannerNode}
 
       {/* Input Area */}
       {llmConfig && (
-        <ChatInputArea
+        <div className="relative shrink-0">
+          <ChatInputArea
           inputValue={inputValue}
           isConnected={isConnected && !rateLimitInfo && !mcpServerAuthRequired}
           isLoading={isLoading}
           textareaRef={textareaRef}
+          llmConfig={llmConfig}
           promptsDropdownOpen={promptsDropdownOpen}
           promptFocusedIndex={promptFocusedIndex}
           prompts={filteredPrompts}
@@ -1231,11 +1595,22 @@ export function ChatTab({
           onClick={updatePromptsDropdownState}
           onSendMessage={handleSendMessage}
           onStopStreaming={stop}
+          onConfigDialogOpenChange={setConfigDialogOpen}
           onAttachmentAdd={addAttachment}
           onAttachmentRemove={removeAttachment}
+          hideModelBadge={hideInputModelBadge}
+          freeTierInfo={freeTierInfo}
+          managedCloudInfo={managedCloudInfo}
+          modelBadgeMode={modelBadgeMode}
+          modelDisplayName={modelDisplayName}
           followups={followups}
           onFollowupSelect={handleFollowupSelect}
+          pendingElicitationRequests={connection.pendingElicitationRequests}
+          onApproveElicitation={connection.approveElicitation}
+          onRejectElicitation={connection.rejectElicitation}
+          systemPromptProvider={effectiveSystemPromptProvider}
         />
+        </div>
       )}
     </div>
   );

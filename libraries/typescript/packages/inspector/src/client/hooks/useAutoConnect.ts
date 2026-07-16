@@ -1,40 +1,21 @@
-import type { McpServer } from "@mcp-use/client/react";
+import type { McpServer, McpServerConfig } from "@mcp-use/client/react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
 import {
   getDefaultInspectorProxyAddress,
   normalizeConnectionMode,
+  toMcpServerConfig,
   type ConnectionMode,
-  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
 import { getInspectorBase } from "@/client/utils/basePath";
 
 /** Survives full page reload; avoids fragile long JSON in query (was resolving to localhost + http). */
 export const INSPECTOR_RECONNECT_STORAGE_KEY = "__mcpUseInspectorReconnect";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
-
 interface UseAutoConnectOptions {
-  connections: MCPConnection[];
-  addConnection: (
-    url: string,
-    name?: string,
-    proxyConfig?: {
-      proxyAddress?: string;
-      customHeaders?: Record<string, string>;
-    },
-    transportType?: "http" | "sse",
-    oauth?: OAuthStaticConfig,
-    connectionMode?: ConnectionMode,
-    autoProxyFallback?:
-      | boolean
-      | {
-          enabled?: boolean;
-          proxyAddress?: string;
-        }
-  ) => void;
+  connections: McpServer[];
+  addServer: (id: string, config: McpServerConfig) => void;
   removeConnection: (id: string) => void;
   configLoaded: boolean;
   embedded?: boolean;
@@ -263,7 +244,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
  * Note: Proxy fallback is handled automatically by useMcp's built-in autoProxyFallback.
  *
  * @param options - Configuration for auto-connect behavior. Includes the current `connections`
- *   list, `addConnection`/`removeConnection` callbacks, `configLoaded` from context, and
+ *   list, `addServer`/`removeConnection` callbacks, `configLoaded` from context, and
  *   `embedded` (when `true`, limits persistence of stored OAuth tokens / uses session-like storage).
  * @returns An object with the auto-connect state:
  *   - `isAutoConnecting`: `true` when an automatic connection attempt is active, `false` otherwise.
@@ -271,7 +252,7 @@ function parseAutoConnectParam(param: string): ConnectionConfig | null {
  */
 export function useAutoConnect({
   connections,
-  addConnection,
+  addServer,
   removeConnection,
   configLoaded: contextConfigLoaded,
   embedded = false,
@@ -384,17 +365,22 @@ export function useAutoConnect({
         { url, transportType, proxyConfig, autoProxyFallback }
       );
 
-      addConnection(
+      addServer(
         url,
-        name,
-        proxyConfig,
-        transportType,
-        undefined,
-        connectionMode,
-        autoProxyFallback
+        toMcpServerConfig({
+          url,
+          name,
+          transportType,
+          connectionMode,
+          connectionType:
+            connectionMode === "proxy" ? "Via Proxy" : "Direct",
+          proxyConfig,
+          headers: finalCustomHeaders,
+          autoProxyFallback,
+        })
       );
     },
-    [addConnection]
+    [addServer]
   );
 
   // Helper to handle auto-connect for a config

@@ -49,8 +49,20 @@ server.tool(
     title: "Roll dice",
     description: "Roll one or more dice and report each result plus the total.",
     inputSchema: z.object({
-      sides: z.number().int().min(2).max(1000).default(6).describe("Sides per die"),
-      count: z.number().int().min(1).max(20).default(1).describe("Number of dice to roll"),
+      sides: z
+        .number()
+        .int()
+        .min(2)
+        .max(1000)
+        .default(6)
+        .describe("Sides per die"),
+      count: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .default(1)
+        .describe("Number of dice to roll"),
     }),
     outputSchema: z.object({
       rolls: z.array(z.number().int()),

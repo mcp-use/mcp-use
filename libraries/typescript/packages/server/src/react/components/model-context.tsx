@@ -178,9 +178,7 @@ export function _resetModelContextForTesting(): void {
 
 /** @internal Serialized tree for the active runtime's store (tests). */
 export function _getDescriptionForTesting(): string {
-  return (
-    getActiveRuntime()?.modelContextStore.getDescriptionForTesting() ?? ""
-  );
+  return getActiveRuntime()?.modelContextStore.getDescriptionForTesting() ?? "";
 }
 
 /**
@@ -189,9 +187,7 @@ export function _getDescriptionForTesting(): string {
  * @returns Description string, or `""` when no runtime is mounted.
  */
 export function buildDescriptionString(): string {
-  return (
-    getActiveRuntime()?.modelContextStore.buildDescriptionString() ?? ""
-  );
+  return getActiveRuntime()?.modelContextStore.buildDescriptionString() ?? "";
 }
 
 /**

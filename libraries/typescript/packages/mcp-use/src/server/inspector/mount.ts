@@ -85,7 +85,7 @@ export async function mountInspectorUI(
       // This avoids requiring a sandbox-{hostname} subdomain that doesn't exist
       // behind reverse proxies (ngrok, E2B, etc.)
       devMode: !isProduction,
-      serverPort: typeof serverPort === "number" ? serverPort : undefined,
+      manufactChatUrl: process.env.MANUFACT_CHAT_URL,
       // Relocate the inspector under the server-wide basePath so the whole
       // framework surface (transport, assets, inspector) shares one prefix.
       basePath,

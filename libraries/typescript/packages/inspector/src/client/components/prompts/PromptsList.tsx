@@ -18,7 +18,7 @@ export function PromptsList({
 }: PromptsListProps) {
   if (prompts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
         <MessageSquare className="h-12 w-12 text-gray-400 dark:text-gray-600 mb-3" />
         <p className="text-gray-500 dark:text-gray-400">No prompts available</p>
       </div>
@@ -26,7 +26,7 @@ export function PromptsList({
   }
 
   return (
-    <div className="overflow-y-auto flex-1 border-r dark:border-zinc-700 overscroll-contain">
+    <div>
       {prompts.map((prompt, index) => (
         <ListItem
           key={prompt.name}
@@ -34,7 +34,6 @@ export function PromptsList({
           data-testid={`prompt-item-${prompt.name}`}
           isSelected={selectedPrompt?.name === prompt.name}
           isFocused={focusedIndex === index}
-          icon={<MessageSquare className="h-4 w-4" />}
           title={prompt.name}
           description={prompt.description}
           metadata={

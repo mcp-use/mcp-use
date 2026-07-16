@@ -78,7 +78,10 @@ export interface CallToolHandle<Args, Result> {
  */
 export function useCallTool<Name extends keyof RegisteredTools>(
   name: Name
-): CallToolHandle<RegisteredTools[Name]["input"], RegisteredTools[Name]["output"]>;
+): CallToolHandle<
+  RegisteredTools[Name]["input"],
+  RegisteredTools[Name]["output"]
+>;
 
 /**
  * Call a server tool using a {@link ToolRef} value (inline-JSX stretch path).
@@ -106,9 +109,10 @@ export function useCallTool<
 >(name: string): CallToolHandle<Args, Result>;
 
 // eslint-disable-next-line no-redeclare -- implementation signature
-export function useCallTool(nameOrRef: string | ToolRef<string, unknown, unknown>) {
-  const toolName =
-    typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
+export function useCallTool(
+  nameOrRef: string | ToolRef<string, unknown, unknown>
+) {
+  const toolName = typeof nameOrRef === "string" ? nameOrRef : nameOrRef.name;
   const runtime = useViewRuntime();
   const [data, setData] = useState<CallToolSuccess<unknown> | undefined>(
     undefined
@@ -118,7 +122,9 @@ export function useCallTool(nameOrRef: string | ToolRef<string, unknown, unknown
   const callIdRef = useRef(0);
 
   const callTool = useCallback(
-    async (args: Record<string, unknown>): Promise<CallToolSuccess<unknown>> => {
+    async (
+      args: Record<string, unknown>
+    ): Promise<CallToolSuccess<unknown>> => {
       const callId = ++callIdRef.current;
       setIsPending(true);
       setError(undefined);

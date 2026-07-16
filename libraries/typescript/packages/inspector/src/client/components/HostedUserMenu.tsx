@@ -1,26 +1,8 @@
-/**
- * HostedUserMenu — session-aware avatar for inspector.manufact.com
- *
- * Fetches the current user from `<chatApiUrl origin>/api/auth/get-session`
- * using the shared session cookie (works across *.manufact.com when the
- * backend runs with COOKIE_DOMAIN=.manufact.com).
- *
- * ── Integration points ───────────────────────────────────────────────────
- *  • Mounted by `LayoutHeader` when `embeddedConfig.chatApiUrl` is set.
- *  • `onUserResolved` callback lets LayoutHeader know whether the user is
- *    logged in so it can update the Deploy button href accordingly.
- *  • `fallback` prop: rendered at narrow widths when unauthenticated (logo).
- *  • Listens to the custom `manufact:session-changed` window event so that
- *    after a successful login in `LoginModal` the avatar appears immediately
- *    (LoginModal dispatches this event via `handleSuccess`).
- *
- * ── No extra infrastructure ──────────────────────────────────────────────
- *  Session check is a simple GET — no WebSockets or polling. The only
- *  re-check triggers are: initial mount and `manufact:session-changed`.
- */
+/** OAuth-backed Manufact sign-in button and user menu. */
 import { useEffect, useRef } from "react";
 import type React from "react";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
+import { toast } from "sonner";
 import {
   useHostedSession,
   type HostedUser,
@@ -72,7 +54,12 @@ export function HostedUserMenu({
   fallback = null,
   onUserResolved,
 }: HostedUserMenuProps) {
-  const { user, loaded } = useHostedSession(chatApiUrl);
+  const { user, loaded, authorizing, authorize, logout, mode } =
+    useHostedSession(chatApiUrl);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',runId:'oauth-flow-2',hypothesisId:'O5',location:'HostedUserMenu.tsx:render',message:'hosted user menu state',data:{loaded,authorizing,hasUser:!!user,mode},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // Notify the parent (LayoutHeader) whenever the resolved session changes.
   const lastReportedId = useRef<string | null | undefined>(undefined);
@@ -87,25 +74,49 @@ export function HostedUserMenu({
   // While the session check is still in-flight render nothing to avoid a flash.
   if (!loaded) return null;
 
-  if (!user) return <>{fallback}</>;
+  if (!user) {
+    return (
+      <>
+        {fallback}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full px-4 text-[13px]"
+          disabled={authorizing}
+          onClick={() => {
+            void authorize().catch((error) =>
+              toast.error(
+                error instanceof Error ? error.message : "Authorization failed"
+              )
+            );
+          }}
+        >
+          {authorizing ? "Authorizing…" : "Sign in"}
+        </Button>
+      </>
+    );
+  }
 
   const initial = getInitial(user.name, user.email);
   const displayName = user.name ?? user.email ?? "User";
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className="relative h-8 w-8 shrink-0 rounded-full p-0 mr-2"
-          aria-label="User menu"
-        >
-          <Avatar className="h-8 w-8 border border-zinc-300 dark:border-zinc-600">
-            <AvatarImage src={user.image ?? ""} alt={displayName} />
-            <AvatarFallback className="text-sm">{initial}</AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            className="relative h-8 w-8 shrink-0 rounded-full p-0 mr-2"
+            aria-label="User menu"
+          >
+            <Avatar className="h-8 w-8 border border-zinc-300 dark:border-zinc-600">
+              <AvatarImage src={user.image ?? ""} alt={displayName} />
+              <AvatarFallback className="text-sm">{initial}</AvatarFallback>
+            </Avatar>
+          </Button>
+        }
+        nativeButton
+      />
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
@@ -120,11 +131,26 @@ export function HostedUserMenu({
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href={dashboardUrl} target="_blank" rel="noopener noreferrer">
-            <LayoutDashboard className="mr-2 h-4 w-4" />
-            Go to dashboard
-          </a>
+        <DropdownMenuItem
+          render={
+            <a
+              href={dashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <LayoutDashboard className="mr-2 h-4 w-4" />
+              Go to dashboard
+            </a>
+          }
+        />
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            void logout().catch(() => toast.error("Sign out failed"));
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          {mode === "session" ? "Sign out of Manufact" : "Disconnect Inspector"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
