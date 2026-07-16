@@ -14,13 +14,10 @@ const clientPackageJson = JSON.parse(
  * CDN bundle build config.
  *
  * Produces dist/cdn/inspector.js plus lazy chunks (Shiki grammars, pdfjs, etc.).
- * Published with the npm package and served from inspector-cdn.mcp-use.com —
- * mountInspector() loads the entry via a <script type="module"> tag in a minimal
- * inline HTML shell, so the JS runs in the correct origin context and all
- * /inspector/api/* calls remain same-origin.
- *
- * Dev mode (VITE_DEV=true) proxies to the Vite dev server as before; this
- * bundle is only used in production.
+ * Shipped in the npm package and consumed three ways:
+ * - Standalone (npx / pnpm start): served locally at /dist/cdn/*
+ * - Embedded (mountInspector / mcp-use server): jsDelivr npm mirror by default
+ * - Dev: Vite serves source directly (this bundle is production-only)
  */
 export default defineConfig({
   plugins: [

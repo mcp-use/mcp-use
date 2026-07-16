@@ -1,0 +1,55 @@
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import type { Hono } from "hono";
+
+const CONTENT_TYPES: Record<string, string> = {
+  ".js": "application/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+  ".webmanifest": "application/manifest+json",
+};
+
+export function resolveDistCdnDir(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  for (const dir of [
+    path.resolve(here, "cdn"), // dist/cli.js (bundled)
+    path.resolve(here, "../cdn"), // dist/server/*.js
+  ]) {
+    if (existsSync(path.join(dir, "inspector.js"))) {
+      return dir;
+    }
+  }
+  throw new Error(
+    "Inspector bundle not found (expected dist/cdn/inspector.js)"
+  );
+}
+
+/** Serve dist/cdn/ at ${basePath}/dist/cdn/* (standalone / npx). */
+export function registerInspectorStaticAssets(
+  app: Hono,
+  basePath: string = ""
+) {
+  const cdnDir = resolveDistCdnDir();
+  const mountPath = `${basePath}/dist/cdn`;
+
+  app.get(`${mountPath}/*`, (c) => {
+    const subPath = c.req.path.slice(mountPath.length);
+    const relative = subPath.startsWith("/") ? subPath.slice(1) : subPath;
+    if (!relative || relative.includes("..")) {
+      return c.notFound();
+    }
+    const file = path.resolve(cdnDir, relative);
+    const root = cdnDir.endsWith(path.sep) ? cdnDir : `${cdnDir}${path.sep}`;
+    if (!file.startsWith(root) || !existsSync(file)) {
+      return c.notFound();
+    }
+    const ext = path.extname(file);
+    return c.body(readFileSync(file), 200, {
+      "Content-Type": CONTENT_TYPES[ext] ?? "application/octet-stream",
+      "Cache-Control": "public, max-age=3600",
+    });
+  });
+}

@@ -14,8 +14,9 @@ const CONTENT_TYPES: Record<string, string> = {
 function resolveFaviconDir(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   for (const dir of [
-    path.resolve(here, "../cdn"),
-    path.resolve(here, "../../public"),
+    path.resolve(here, "cdn"), // dist/cli.js (bundled)
+    path.resolve(here, "../cdn"), // dist/server/*.js
+    path.resolve(here, "../../public"), // src/server/*.ts (dev)
   ]) {
     if (existsSync(path.join(dir, "favicon-black.svg"))) {
       return dir;
