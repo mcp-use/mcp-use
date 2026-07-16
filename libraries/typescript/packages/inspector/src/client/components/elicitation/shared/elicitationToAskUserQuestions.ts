@@ -5,7 +5,7 @@ import type {
 import type {
   ElicitRequestFormParams,
   ElicitRequestURLParams,
-} from "@modelcontextprotocol/client";
+} from "@mcp-use/client/react";
 import { getMultiSelectChoices, getSingleSelectChoices } from "./schemaHelpers";
 
 type ElicitParams = ElicitRequestFormParams | ElicitRequestURLParams;

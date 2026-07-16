@@ -9,7 +9,7 @@ import {
   MCPResourceReadEvent,
   captureInspectorEvent,
 } from "@/client/telemetry";
-import type { Resource } from "@modelcontextprotocol/client";
+import type { Resource } from "@mcp-use/client/react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, FolderOpen } from "lucide-react";
 import {

@@ -1,4 +1,4 @@
-import type { Resource } from "@modelcontextprotocol/client";
+import type { Resource } from "@mcp-use/client/react";
 import {
   Braces,
   ChevronDown,

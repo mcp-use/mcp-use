@@ -12,7 +12,7 @@ import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { usePropsLLM } from "@/client/hooks/usePropsLLM";
 import type { PropPreset } from "@/client/hooks/useResourceProps";
-import type { Resource } from "@modelcontextprotocol/client";
+import type { Resource } from "@mcp-use/client/react";
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";

@@ -1,4 +1,4 @@
-import type { JSONRPCMessage, Transport } from "@modelcontextprotocol/client";
+import type { JSONRPCMessage, Transport } from "@mcp-use/client/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { rpcTrafficStore } from "../../rpc-traffic-store";
 import { wrapTransportWithLogging } from "../logging-transport";

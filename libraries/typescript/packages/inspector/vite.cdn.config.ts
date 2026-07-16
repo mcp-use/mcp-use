@@ -13,11 +13,11 @@ const clientPackageJson = JSON.parse(
 /**
  * CDN bundle build config.
  *
- * Produces a single self-contained ESM file at dist/cdn/inspector.js with all
- * CSS injected at runtime. Published with the npm package and served from
- * inspector-cdn.mcp-use.com — mountInspector() loads it via a <script type="module">
- * tag in a minimal inline HTML shell, so the JS runs in the correct origin context
- * and all /inspector/api/* calls remain same-origin.
+ * Produces dist/cdn/inspector.js plus lazy chunks (Shiki grammars, pdfjs, etc.).
+ * Published with the npm package and served from inspector-cdn.mcp-use.com —
+ * mountInspector() loads the entry via a <script type="module"> tag in a minimal
+ * inline HTML shell, so the JS runs in the correct origin context and all
+ * /inspector/api/* calls remain same-origin.
  *
  * Dev mode (VITE_DEV=true) proxies to the Vite dev server as before; this
  * bundle is only used in production.
@@ -77,9 +77,6 @@ export default defineConfig({
     outDir: "dist/cdn",
     minify: true,
     rolldownOptions: {
-      output: {
-        codeSplitting: false,
-      },
       external: [
         "langfuse-langchain",
         "langfuse",

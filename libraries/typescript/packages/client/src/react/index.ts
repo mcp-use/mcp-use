@@ -34,13 +34,40 @@ export {
   setTelemetrySource,
 } from "../telemetry/telemetry-browser.js";
 
-// Re-export core types for convenience when using the hook result
+// Protocol types re-exported so consumers need only @mcp-use/client/react.
 export type {
+  CallToolResult,
+  ContentBlock,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+  GetPromptResult,
+  JSONRPCMessage,
   Prompt,
+  ReadResourceResult,
   Resource,
   ResourceTemplateType,
   Tool,
+  Transport,
 } from "@modelcontextprotocol/client";
+export type {
+  SamplingCreateMessageParams,
+  SamplingCreateMessageResult,
+} from "../core/config.js";
+import type {
+  SamplingCreateMessageParams,
+  SamplingCreateMessageResult,
+} from "../core/config.js";
+/** JSON-RPC envelope for `sampling/createMessage`. */
+export type SamplingCreateMessageRequest = {
+  method: "sampling/createMessage";
+  params: SamplingCreateMessageParams;
+};
+/** @deprecated Use {@link SamplingCreateMessageRequest}. */
+export type { SamplingCreateMessageRequest as CreateMessageRequest };
+/** @deprecated Use {@link SamplingCreateMessageResult}. */
+export type { SamplingCreateMessageResult as CreateMessageResult };
+export { specTypeSchemas } from "@modelcontextprotocol/client";
 
 // Multi-server client provider and hooks
 export {

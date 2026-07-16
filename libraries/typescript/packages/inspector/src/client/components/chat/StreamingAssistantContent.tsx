@@ -1,9 +1,9 @@
 import { memo } from "react";
 import { Streamdown } from "streamdown";
-import { code } from "@streamdown/code";
+import { slimCode } from "./streamdown-code-slim";
 import { cn } from "@/client/lib/utils";
 
-const streamdownPlugins = { code };
+const streamdownPlugins = { code: slimCode };
 
 /** stagger: 0 — default 40ms staggers per-block and causes out-of-order reveals (streamdown#482). */
 const streamdownAnimated = {

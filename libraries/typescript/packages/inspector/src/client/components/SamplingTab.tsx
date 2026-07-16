@@ -1,4 +1,4 @@
-import type { CreateMessageResult } from "@modelcontextprotocol/client";
+import type { CreateMessageResult } from "@mcp-use/client/react";
 import type { PendingSamplingRequest } from "@/client/types/pending-requests";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Hash, Trash2 } from "lucide-react";

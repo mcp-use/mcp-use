@@ -1,6 +1,6 @@
 import { completeChat } from "@mcp-use/agent";
 import type { ProviderMessage } from "@mcp-use/agent";
-import type { Resource } from "@modelcontextprotocol/client";
+import type { Resource } from "@mcp-use/client/react";
 import { useCallback } from "react";
 import type { LLMConfig } from "../components/chat/types";
 

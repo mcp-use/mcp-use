@@ -6,7 +6,7 @@ import {
   usePanelRef,
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
-import type { Prompt } from "@modelcontextprotocol/client";
+import type { Prompt } from "@mcp-use/client/react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Clock, MessageSquare } from "lucide-react";
 import {

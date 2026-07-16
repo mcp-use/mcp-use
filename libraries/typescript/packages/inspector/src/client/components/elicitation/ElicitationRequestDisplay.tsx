@@ -1,7 +1,7 @@
 import { Button } from "@/client/components/ui/button";
 import { Label } from "@/client/components/ui/label";
 import { Checkbox } from "@/client/components/ui/checkbox";
-import type { ElicitResult } from "@modelcontextprotocol/client";
+import type { ElicitResult } from "@mcp-use/client/react";
 import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { toast } from "sonner";

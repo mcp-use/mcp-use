@@ -16,10 +16,10 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import type { PendingSamplingRequest } from "@/client/types/pending-requests";
-import type { CreateMessageResult } from "@modelcontextprotocol/client";
+import type { CreateMessageResult } from "@mcp-use/client/react";
 // v2 no longer re-exports Zod `*Schema` constants; use the Standard Schema
 // validators keyed by spec type name instead.
-import { specTypeSchemas } from "@modelcontextprotocol/client";
+import { specTypeSchemas } from "@mcp-use/client/react";
 import {
   Check,
   Copy,

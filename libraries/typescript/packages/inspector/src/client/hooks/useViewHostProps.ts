@@ -6,7 +6,7 @@ import type {
   ViewRendererProps,
 } from "@mcp-use/client/react";
 import { useMcpClient } from "@mcp-use/client/react";
-import type { Tool } from "@modelcontextprotocol/client";
+import type { Tool } from "@mcp-use/client/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { consoleLogBus } from "@/client/console-log-bus";
 import { buildCSPString } from "@/client/mcp-apps/csp";

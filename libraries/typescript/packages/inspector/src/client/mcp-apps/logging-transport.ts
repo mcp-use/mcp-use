@@ -5,7 +5,7 @@
  * wrap the transport in `connect()` so send/receive logging still works.
  */
 
-import type { JSONRPCMessage, Transport } from "@modelcontextprotocol/client";
+import type { JSONRPCMessage, Transport } from "@mcp-use/client/react";
 import { rpcTrafficStore } from "../rpc-traffic-store.js";
 
 /**

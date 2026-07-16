@@ -1,26 +1,45 @@
 import type { McpServer } from "@mcp-use/client/react";
-import type { ReactNode, RefObject } from "react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
 import { useManufactAuth } from "@/client/auth/manufact-auth";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
 import { isLocalhostServerUrl } from "@/client/utils/servers";
-import { ChatTab } from "./ChatTab";
+import {
+  ChatTab,
+  ConnectionSettingsTab,
+  ElicitationTab,
+  NotificationsTab,
+  PromptsTab,
+  ResourcesTab,
+  SamplingTab,
+  ServerMetadataTab,
+  TabSuspense,
+  ToolsTab,
+} from "./lazy-tabs";
 import {
   buildManagedAuthHeaders,
   buildManagedLlmProxyConfig,
   shouldUseManagedClientSide,
 } from "./chat/freeTier";
 import { useManagedCloudModel } from "./chat/useManagedCloudModel";
-import { ConnectionSettingsTab } from "./ConnectionSettingsTab";
-import { ElicitationTab } from "./ElicitationTab";
-import { NotificationsTab } from "./NotificationsTab";
-import { PromptsTab } from "./PromptsTab";
-import { ResourcesTab } from "./ResourcesTab";
-import { SamplingTab } from "./SamplingTab";
-import { ServerMetadataTab } from "./ServerMetadataTab";
-import { ToolsTab } from "./ToolsTab";
 
 import type { EditableConnectionConfig } from "@/client/utils/connectionUpdates";
+
+const ALL_KNOWN_TABS: TabType[] = [
+  "tools",
+  "prompts",
+  "resources",
+  "chat",
+  "sampling",
+  "elicitation",
+  "notifications",
+  "server-metadata",
+  "connection-settings",
+];
+
+function normalizeTab(tab: string): TabType {
+  return ALL_KNOWN_TABS.includes(tab as TabType) ? (tab as TabType) : "tools";
+}
 
 interface LayoutContentProps {
   selectedServer: McpServer | undefined;
@@ -51,6 +70,16 @@ export function LayoutContent({
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
+  const initialTab = normalizeTab(activeTab);
+  const [mountedTabs, setMountedTabs] = useState<Set<TabType>>(
+    () => new Set([initialTab])
+  );
+
+  useEffect(() => {
+    const tab = normalizeTab(activeTab);
+    setMountedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+  }, [activeTab]);
+
   const {
     accessToken,
     mode: manufactAuthMode,
@@ -79,39 +108,41 @@ export function LayoutContent({
     } as unknown as McpServer;
 
     return (
-      <ChatTab
-        key="chat-force-connected"
-        connection={stubConnection}
-        isConnected={true}
-        prompts={[]}
-        serverId="force-connected"
-        callPrompt={async () => ({ messages: [] })}
-        readResource={async () => ({ contents: [] })}
-        useClientSide={false}
-        chatApiUrl={embeddedConfig.chatApiUrl}
-        extraHeaders={managedAuthHeaders}
-        credentials={managedCredentials}
-        managedLlmConfig={
-          embeddedConfig.managedLlmConfig ?? {
-            provider: "anthropic",
-            model: "claude-haiku-4-5",
-            apiKey: "server-managed",
+      <TabSuspense>
+        <ChatTab
+          key="chat-force-connected"
+          connection={stubConnection}
+          isConnected={true}
+          prompts={[]}
+          serverId="force-connected"
+          callPrompt={async () => ({ messages: [] })}
+          readResource={async () => ({ contents: [] })}
+          useClientSide={false}
+          chatApiUrl={embeddedConfig.chatApiUrl}
+          extraHeaders={managedAuthHeaders}
+          credentials={managedCredentials}
+          managedLlmConfig={
+            embeddedConfig.managedLlmConfig ?? {
+              provider: "anthropic",
+              model: "claude-haiku-4-5",
+              apiKey: "server-managed",
+            }
           }
-        }
-        enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
-        hideTitle={embeddedConfig.chatHideTitle}
-        hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
-        hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
-        clearButtonLabel={embeddedConfig.chatClearButtonLabel}
-        clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
-        clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
-        clearButtonVariant={embeddedConfig.chatClearButtonVariant}
-        chatQuickQuestions={embeddedConfig.chatQuickQuestions}
-        chatFollowups={embeddedConfig.chatFollowups}
-        hideClearButton={embeddedConfig.chatHideClearButton}
-        hideToolSelector={embeddedConfig.chatHideToolSelector}
-        enableKeyboardShortcuts={false}
-      />
+          enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
+          hideTitle={embeddedConfig.chatHideTitle}
+          hideModelBadge={embeddedConfig.chatHideModelBadge ?? true}
+          hideServerUrl={embeddedConfig.chatHideServerUrl ?? true}
+          clearButtonLabel={embeddedConfig.chatClearButtonLabel}
+          clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
+          clearButtonHideShortcut={embeddedConfig.chatClearButtonHideShortcut}
+          clearButtonVariant={embeddedConfig.chatClearButtonVariant}
+          chatQuickQuestions={embeddedConfig.chatQuickQuestions}
+          chatFollowups={embeddedConfig.chatFollowups}
+          hideClearButton={embeddedConfig.chatHideClearButton}
+          hideToolSelector={embeddedConfig.chatHideToolSelector}
+          enableKeyboardShortcuts={false}
+        />
+      </TabSuspense>
     );
   }
 
@@ -125,17 +156,7 @@ export function LayoutContent({
     return embeddedConfig.visibleTabs.includes(tab);
   };
 
-  const allKnownTabs: TabType[] = [
-    "tools",
-    "prompts",
-    "resources",
-    "chat",
-    "sampling",
-    "elicitation",
-    "notifications",
-    "server-metadata",
-    "connection-settings",
-  ];
+  const allKnownTabs = ALL_KNOWN_TABS;
 
   // Localhost MCP + hosted chat URL: browser MCPAgent owns tools; only LLM
   // calls go through the cloud `/inspector/llm/*` proxy (MCP-2419 follow-up).
@@ -196,10 +217,10 @@ export function LayoutContent({
           }
         : undefined));
 
-  // Render all visible tabs but hide inactive ones to preserve state
+  // Load tab chunks on first visit; keep mounted (display:none) to preserve state.
   return (
-    <>
-      {isTabVisible("tools") && (
+    <TabSuspense>
+      {isTabVisible("tools") && mountedTabs.has("tools") && (
         <div
           style={{ display: activeTab === "tools" ? "block" : "none" }}
           className="h-full"
@@ -216,7 +237,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("prompts") && (
+      {isTabVisible("prompts") && mountedTabs.has("prompts") && (
         <div
           style={{ display: activeTab === "prompts" ? "block" : "none" }}
           className="h-full"
@@ -244,7 +265,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("resources") && (
+      {isTabVisible("resources") && mountedTabs.has("resources") && (
         <div
           style={{ display: activeTab === "resources" ? "block" : "none" }}
           className="h-full"
@@ -261,7 +282,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("chat") && (
+      {isTabVisible("chat") && mountedTabs.has("chat") && (
         <div
           style={{ display: activeTab === "chat" ? "block" : "none" }}
           className="h-full"
@@ -313,7 +334,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("sampling") && (
+      {isTabVisible("sampling") && mountedTabs.has("sampling") && (
         <div
           style={{ display: activeTab === "sampling" ? "block" : "none" }}
           className="h-full"
@@ -329,7 +350,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("elicitation") && (
+      {isTabVisible("elicitation") && mountedTabs.has("elicitation") && (
         <div
           style={{ display: activeTab === "elicitation" ? "block" : "none" }}
           className="h-full"
@@ -344,7 +365,7 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("notifications") && (
+      {isTabVisible("notifications") && mountedTabs.has("notifications") && (
         <div
           style={{
             display: activeTab === "notifications" ? "block" : "none",
@@ -363,34 +384,37 @@ export function LayoutContent({
           />
         </div>
       )}
-      {isTabVisible("server-metadata") && (
-        <div
-          style={{
-            display: activeTab === "server-metadata" ? "block" : "none",
-          }}
-          className="h-full"
-        >
-          <ServerMetadataTab
-            key={`server-metadata-${selectedServer.id}`}
-            connection={selectedServer}
-          />
-        </div>
-      )}
-      {isTabVisible("connection-settings") && onUpdateConnection && (
-        <div
-          style={{
-            display: activeTab === "connection-settings" ? "block" : "none",
-          }}
-          className="h-full"
-        >
-          <ConnectionSettingsTab
-            key={`connection-settings-${selectedServer.id}`}
-            connection={selectedServer}
-            onSave={onUpdateConnection}
-          />
-        </div>
-      )}
+      {isTabVisible("server-metadata") &&
+        mountedTabs.has("server-metadata") && (
+          <div
+            style={{
+              display: activeTab === "server-metadata" ? "block" : "none",
+            }}
+            className="h-full"
+          >
+            <ServerMetadataTab
+              key={`server-metadata-${selectedServer.id}`}
+              connection={selectedServer}
+            />
+          </div>
+        )}
+      {isTabVisible("connection-settings") &&
+        mountedTabs.has("connection-settings") &&
+        onUpdateConnection && (
+          <div
+            style={{
+              display: activeTab === "connection-settings" ? "block" : "none",
+            }}
+            className="h-full"
+          >
+            <ConnectionSettingsTab
+              key={`connection-settings-${selectedServer.id}`}
+              connection={selectedServer}
+              onSave={onUpdateConnection}
+            />
+          </div>
+        )}
       {!allKnownTabs.includes(activeTab as TabType) && <>{children}</>}
-    </>
+    </TabSuspense>
   );
 }

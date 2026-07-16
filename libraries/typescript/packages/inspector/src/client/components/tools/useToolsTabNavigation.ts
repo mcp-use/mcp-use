@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/client";
+import type { Tool } from "@mcp-use/client/react";
 import type { SavedRequest } from "./SavedRequestsList";
 import {
   useCallback,

@@ -1,4 +1,4 @@
-import type { ElicitResult } from "@modelcontextprotocol/client";
+import type { ElicitResult } from "@mcp-use/client/react";
 import { motion } from "motion/react";
 import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { spring } from "@/client/lib/springs";

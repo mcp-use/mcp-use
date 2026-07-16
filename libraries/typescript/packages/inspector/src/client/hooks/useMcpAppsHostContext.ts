@@ -4,7 +4,7 @@
 
 import { useMemo } from "react";
 import type { McpUiHostContext } from "@mcp-use/client/react";
-import type { Tool } from "@modelcontextprotocol/client";
+import type { Tool } from "@mcp-use/client/react";
 import type { PlaygroundSettings } from "../context/WidgetDebugContext";
 
 type DisplayMode = "inline" | "pip" | "fullscreen";

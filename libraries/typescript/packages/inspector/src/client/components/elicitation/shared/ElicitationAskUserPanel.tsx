@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { ElicitResult } from "@modelcontextprotocol/client";
+import type { ElicitResult } from "@mcp-use/client/react";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import type { PendingElicitationRequest } from "@/client/types/pending-requests";

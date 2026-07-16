@@ -1,4 +1,4 @@
-import type { Prompt } from "@modelcontextprotocol/client";
+import type { Prompt } from "@mcp-use/client/react";
 import { Play, Save } from "lucide-react";
 import { useEffect } from "react";
 import {

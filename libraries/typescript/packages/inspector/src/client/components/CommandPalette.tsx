@@ -1,4 +1,4 @@
-import type { Prompt, Resource, Tool } from "@modelcontextprotocol/client";
+import type { Prompt, Resource, Tool } from "@mcp-use/client/react";
 import {
   BrushCleaning,
   ExternalLink,

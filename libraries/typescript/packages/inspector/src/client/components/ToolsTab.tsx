@@ -7,7 +7,7 @@ import {
 } from "@/client/components/ui/resizable";
 import { useInspector } from "@/client/context/InspectorContext";
 import { MCPToolSavedEvent, captureInspectorEvent } from "@/client/telemetry";
-import type { Tool } from "@modelcontextprotocol/client";
+import type { Tool } from "@mcp-use/client/react";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronLeft, Database, Wrench } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";

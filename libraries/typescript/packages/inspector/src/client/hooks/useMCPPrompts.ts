@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import type { Prompt, GetPromptResult } from "@modelcontextprotocol/client";
+import type { Prompt, GetPromptResult } from "@mcp-use/client/react";
 import { MCPPromptCallEvent, captureInspectorEvent } from "@/client/telemetry";
 
 export interface PromptResult {

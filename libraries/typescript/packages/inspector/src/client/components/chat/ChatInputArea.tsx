@@ -5,10 +5,10 @@ import {
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import { cn } from "@/client/lib/utils";
-import type { Prompt } from "@modelcontextprotocol/client";
+import type { Prompt } from "@mcp-use/client/react";
 import { ArrowUp, Loader2 } from "lucide-react";
 import React from "react";
-import type { ElicitResult } from "@modelcontextprotocol/client";
+import type { ElicitResult } from "@mcp-use/client/react";
 import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 import { ChatInput } from "./ChatInput";

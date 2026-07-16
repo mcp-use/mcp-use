@@ -1,9 +1,6 @@
 import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
-import type {
-  ReadResourceResult,
-  Resource,
-} from "@modelcontextprotocol/client";
+import type { ReadResourceResult, Resource } from "@mcp-use/client/react";
 import {
   Brush,
   Check,

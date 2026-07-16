@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/client";
+import type { Tool } from "@mcp-use/client/react";
 import { PanelsTopLeft, Wrench } from "lucide-react";
 import { ListItem } from "@/client/components/shared";
 import { Badge } from "@/client/components/ui/badge";

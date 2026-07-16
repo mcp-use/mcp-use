@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { NotFound } from "../ui/not-found";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { PromptMessageCard } from "./PromptMessageCard";
-import type { GetPromptResult } from "@modelcontextprotocol/client";
+import type { GetPromptResult } from "@mcp-use/client/react";
 import type { PromptResult } from "../../hooks/useMCPPrompts";
 
 interface PromptResultDisplayProps {

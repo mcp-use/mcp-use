@@ -3,8 +3,8 @@
  *
  * The server ships no inspector code: it serves a tiny self-contained HTML
  * page whose `<script type="module">` loads the `@mcp-use/inspector` CDN
- * bundle (a single self-contained ESM file), pinned to a major version so the
- * UI updates independently of SDK releases. Runtime configuration crosses to
+ * bundle entry (`dist/cdn/inspector.js`) plus lazy chunks, pinned to a major
+ * version so the UI updates independently of SDK releases. Runtime configuration crosses to
  * the bundle through a serialized `window` global; the connect URL is derived
  * in the browser from the page's own origin, so the server never guesses its
  * public hostname.
@@ -16,8 +16,8 @@ import type { FetchHandler } from "./fetch-app.js";
  * Exact version of the `@mcp-use/inspector` CDN bundle the default URL pins
  * to (matching the R2 object key `inspector@{version}.js`).
  *
- * Bumping the inspector requires uploading the new `.js`/`.css` pair and
- * raising this constant together.
+ * Bumping the inspector requires uploading the full `dist/cdn/` output (entry,
+ * lazy chunks, and CSS) and raising this constant together.
  */
 export const INSPECTOR_VERSION = "11.0.0";
 
@@ -40,8 +40,8 @@ export const DEFAULT_INSPECTOR_ASSETS_URL = `https://pub-5337e54ad50f432cab3e646
 /**
  * Derive the stylesheet URL that accompanies an inspector bundle URL.
  *
- * The CDN build ships as a `.js`/`.css` pair with the same basename
- * (`inspector@{version}.js` + `inspector@{version}.css`), so the stylesheet
+ * The CDN build ships as `inspector@{version}.js` + `inspector@{version}.css`
+ * plus sibling lazy chunks referenced by the entry script. The stylesheet URL
  * URL is the script URL with its `.js` suffix swapped for `.css`. Query
  * strings and fragments are preserved.
  */

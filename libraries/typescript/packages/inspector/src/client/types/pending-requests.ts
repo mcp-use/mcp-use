@@ -3,7 +3,7 @@ import type {
   CreateMessageResult,
   ElicitRequestFormParams,
   ElicitRequestURLParams,
-} from "@modelcontextprotocol/client";
+} from "@mcp-use/client/react";
 
 export interface PendingElicitationRequest {
   id: string;
