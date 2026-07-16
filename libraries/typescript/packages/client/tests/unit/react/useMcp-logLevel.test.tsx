@@ -13,10 +13,10 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
-import { Logger } from "../../../src/logging.js";
+import { Logger } from "../../../src/utils/logging.js";
 
 // Mock the BrowserMCPClient and dependencies
-vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
+vi.mock("../../../src/core/browser.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserMCPClient: vi.fn().mockImplementation(() => ({
     addServer: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
   })),
 }));
 
-vi.mock("../../../src/auth/browser-provider.js", () => ({
+vi.mock("../../../src/auth/browser.js", () => ({
   createBrowserOAuthProvider: vi.fn(() => ({
     provider: null,
     oauthProxyUrl: undefined,
@@ -95,6 +95,27 @@ describe("useMcp logLevel configuration", () => {
   });
 
   describe("logLevel option", () => {
+    it("defaults to silent", () => {
+      let hookResult: any;
+
+      function TestComponent() {
+        hookResult = useMcp({
+          url: "http://localhost:3000/mcp",
+          enabled: false,
+        });
+        return null;
+      }
+
+      act(() => {
+        create(<TestComponent />);
+      });
+
+      expect(hookResult.state).toBe("discovering");
+      expect(console.log).not.toHaveBeenCalled();
+      expect(console.info).not.toHaveBeenCalled();
+      expect(console.debug).not.toHaveBeenCalled();
+    });
+
     it("should suppress console output when logLevel is 'silent'", () => {
       let hookResult: any;
 
@@ -199,60 +220,6 @@ describe("useMcp logLevel configuration", () => {
     });
   });
 
-  describe("logLevel vs debug prop precedence", () => {
-    it("should use logLevel when both logLevel and debug are specified", () => {
-      let hookResult: any;
-
-      function TestComponent() {
-        hookResult = useMcp({
-          url: "http://localhost:3000/mcp",
-          enabled: false,
-          debug: true, // This should be ignored
-          logLevel: "silent", // This should win
-        });
-        return null;
-      }
-
-      act(() => {
-        create(<TestComponent />);
-      });
-
-      expect(hookResult.state).toBe("discovering");
-
-      // Silent should win, so no console output
-      expect(console.log).not.toHaveBeenCalled();
-      expect(console.info).not.toHaveBeenCalled();
-      expect(console.debug).not.toHaveBeenCalled();
-    });
-
-    it("should fall back to debug prop when logLevel is not specified", () => {
-      let hookResult: any;
-
-      function TestComponent() {
-        hookResult = useMcp({
-          url: "http://localhost:3000/mcp",
-          enabled: false,
-          debug: true,
-        });
-        return null;
-      }
-
-      act(() => {
-        create(<TestComponent />);
-      });
-
-      expect(hookResult.state).toBe("discovering");
-
-      // Debug mode should enable logging
-      const totalCalls =
-        (console.log as any).mock.calls.length +
-        (console.info as any).mock.calls.length +
-        (console.debug as any).mock.calls.length;
-
-      expect(totalCalls).toBeGreaterThan(0);
-    });
-  });
-
   describe("Per-instance logger isolation", () => {
     it("should not interfere between multiple useMcp instances with different logLevels", () => {
       // Reset console mocks
@@ -320,36 +287,6 @@ describe("useMcp logLevel configuration", () => {
       // Both should have their own state
       expect(hookResult1.state).toBeDefined();
       expect(hookResult2.state).toBeDefined();
-    });
-  });
-
-  describe("deprecated debug prop", () => {
-    it("should show deprecation warning when debug prop is used", () => {
-      let hookResult: any;
-
-      function TestComponent() {
-        hookResult = useMcp({
-          url: "http://localhost:3000/mcp",
-          enabled: false,
-          debug: true,
-        });
-        return null;
-      }
-
-      act(() => {
-        create(<TestComponent />);
-      });
-
-      // Should have logged a deprecation warning
-      const warnCalls = (console.warn as any).mock.calls;
-      const hasDeprecationWarning = warnCalls.some((call: any[]) =>
-        call.some(
-          (arg: string) => typeof arg === "string" && arg.includes("deprecated")
-        )
-      );
-
-      // Note: The current implementation might not show this warning yet
-      // This test documents the expected behavior
     });
   });
 });

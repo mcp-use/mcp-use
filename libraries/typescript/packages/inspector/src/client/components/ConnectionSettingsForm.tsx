@@ -1,6 +1,14 @@
 import { Button } from "@/client/components/ui/button";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/client/components/ui/card";
+import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -16,7 +24,7 @@ import {
   SelectValue,
 } from "@/client/components/ui/select";
 import { cn } from "@/client/lib/utils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { Cog, Copy, FileText, Shield } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -65,6 +73,9 @@ interface ConnectionSettingsFormProps {
   showSaveButton?: boolean;
   showExportButton?: boolean;
   isConnecting?: boolean;
+  inlineSections?: boolean;
+  /** When true with inlineSections, each group renders in its own settings card. */
+  cardSections?: boolean;
 }
 
 /**
@@ -114,6 +125,8 @@ export function ConnectionSettingsForm({
   showSaveButton = false,
   showExportButton = false,
   isConnecting = false,
+  inlineSections = false,
+  cardSections = false,
 }: ConnectionSettingsFormProps) {
   // UI state for sub-dialogs
   const [headersDialogOpen, setHeadersDialogOpen] = useState(false);
@@ -305,37 +318,131 @@ export function ConnectionSettingsForm({
     }
   };
 
-  return (
-    <div
-      className="space-y-4 relative @container"
-      onCompositionStart={() => {
-        isComposingRef.current = true;
-      }}
-      onCompositionEnd={() => {
-        isComposingRef.current = false;
-      }}
-      onKeyDown={handleKeyDown}
-    >
-      <h3 className="text-xl font-semibold text-white mb-4">Connect</h3>
-      {/* Copy Config Button - positioned absolutely on styled variant */}
-      {showExportButton && (
-        <Button
-          data-testid="connection-form-copy-config-button"
-          variant="ghost"
-          onClick={handleCopyConfig}
-          className={cn(
-            isStyled
-              ? "absolute top-0 right-0 text-white hover:bg-white/20 z-10 dark:hover:bg-white/20"
-              : "w-full",
-            !isStyled && "mb-2"
-          )}
-        >
-          <Copy className="w-4 h-4 mr-2" />
-          Copy Config
-        </Button>
+  const authenticationFields = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {!cardSections && (
+        <h4 className="text-sm font-medium sm:col-span-2">OAuth 2.0</h4>
       )}
+      <div className="space-y-2">
+        <Label className="text-sm">Client ID</Label>
+        <Input
+          data-testid="auth-dialog-client-id-input"
+          placeholder="Client ID"
+          value={clientId}
+          onChange={(e) => setClientId(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm">Client Secret</Label>
+        <Input
+          data-testid="auth-dialog-client-secret-input"
+          type="password"
+          placeholder="Client Secret (optional)"
+          value={clientSecret}
+          onChange={(e) => setClientSecret(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground">
+          Stored in your browser&apos;s localStorage.
+        </p>
+      </div>
+      <div className="space-y-2 sm:col-span-2">
+        <Label className="text-sm">Scope</Label>
+        <Input
+          data-testid="auth-dialog-scope-input"
+          placeholder="Scope (space-separated)"
+          value={scope}
+          onChange={(e) => setScope(e.target.value)}
+        />
+      </div>
+    </div>
+  );
 
-      {/* URL */}
+  const headersFields = (
+    <CustomHeadersEditor
+      title={<></>}
+      headers={customHeaders}
+      onChange={setCustomHeaders}
+    />
+  );
+
+  const configurationFields = (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-2">
+        <Label className="text-sm">Connection Mode</Label>
+        <Select
+          value={connectionMode}
+          onValueChange={(value) =>
+            setConnectionMode(value as ConnectionMode)
+          }
+        >
+          <SelectTrigger
+            className="w-full"
+            data-testid="config-dialog-connection-mode-select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">Auto</SelectItem>
+            <SelectItem value="direct">Direct</SelectItem>
+            <SelectItem value="proxy">Proxy</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm">Proxy Endpoint</Label>
+        <Input
+          data-testid="config-dialog-proxy-address-input"
+          value={proxyAddress}
+          onChange={(e) => setProxyAddress(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm">Request Timeout</Label>
+        <Input
+          data-testid="config-dialog-request-timeout-input"
+          type="number"
+          value={requestTimeout}
+          onChange={(e) => setRequestTimeout(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm">Maximum Total Timeout</Label>
+        <Input
+          data-testid="config-dialog-max-timeout-input"
+          type="number"
+          value={maxTotalTimeout}
+          onChange={(e) => setMaxTotalTimeout(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label className="text-sm">Reset Timeout on Progress</Label>
+        <Select
+          value={resetTimeoutOnProgress}
+          onValueChange={setResetTimeoutOnProgress}
+        >
+          <SelectTrigger
+            className="w-full"
+            data-testid="config-dialog-reset-timeout-select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="True">True</SelectItem>
+            <SelectItem value="False">False</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+
+  const endpointFields = (
+    <div
+      className={
+        inlineSections || cardSections
+          ? "grid gap-4 sm:grid-cols-2"
+          : "space-y-4"
+      }
+    >
       <div className="space-y-2">
         <Label className={labelClassName}>Alias</Label>
         <Input
@@ -367,225 +474,221 @@ export function ConnectionSettingsForm({
           the form
         </p>
       </div>
+    </div>
+  );
+
+  const formShellProps = {
+    onCompositionStart: () => {
+      isComposingRef.current = true;
+    },
+    onCompositionEnd: () => {
+      isComposingRef.current = false;
+    },
+    onKeyDown: handleKeyDown,
+  };
+
+  const copyConfigButton = showExportButton ? (
+    <Button
+      data-testid="connection-form-copy-config-button"
+      variant="ghost"
+      onClick={handleCopyConfig}
+      className={cn(
+        isStyled
+          ? "absolute top-0 right-0 z-10 text-white hover:bg-white/20 dark:hover:bg-white/20"
+          : "w-full",
+        !isStyled && "mb-2"
+      )}
+    >
+      <Copy className="mr-2 h-4 w-4" />
+      Copy Config
+    </Button>
+  ) : null;
+
+  if (inlineSections && cardSections) {
+    return (
+      <div
+        className="relative space-y-6 @container"
+        {...formShellProps}
+      >
+        {copyConfigButton}
+        <Card className="border">
+          <CardHeader>
+            <CardTitle className="text-base font-medium">Endpoint</CardTitle>
+            <CardDescription>MCP server URL and display alias</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">{endpointFields}</CardContent>
+        </Card>
+        <Card className="border">
+          <CardHeader>
+            <CardTitle className="text-base font-medium">
+              Authentication
+            </CardTitle>
+            <CardDescription>OAuth 2.0 client credentials</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">{authenticationFields}</CardContent>
+        </Card>
+        <Card className="border">
+          <CardHeader>
+            <CardTitle className="text-base font-medium">
+              Custom Headers
+            </CardTitle>
+            <CardDescription>
+              Extra HTTP headers sent with MCP requests
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">{headersFields}</CardContent>
+        </Card>
+        <Card className="border">
+          <CardHeader>
+            <CardTitle className="text-base font-medium">
+              Configuration
+            </CardTitle>
+            <CardDescription>
+              Connection mode, proxy, and request timeouts
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">{configurationFields}</CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative space-y-4 @container" {...formShellProps}>
+      {!inlineSections && (
+        <h3 className="mb-4 text-xl font-semibold text-white">Connect</h3>
+      )}
+      {copyConfigButton}
+
+      {endpointFields}
+
+      {inlineSections && !cardSections && (
+        <div className="space-y-8 pt-2">
+          <section className="space-y-4">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Authentication
+            </h3>
+            {authenticationFields}
+          </section>
+          <section className="space-y-4">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Custom Headers
+            </h3>
+            {headersFields}
+          </section>
+          <section className="space-y-4">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Configuration
+            </h3>
+            {configurationFields}
+          </section>
+        </div>
+      )}
 
       {/* Configuration Buttons Row */}
-      <div className="flex flex-row gap-3 @lg:flex-col">
+      {!inlineSections && (
+        <div className="flex flex-row gap-3 @lg:flex-col">
         {/* Authentication Button */}
         <Dialog open={authDialogOpen} onOpenChange={setAuthDialogOpen}>
-          <DialogTrigger asChild>
-            <div className="relative flex-1 ">
-              <Button
-                data-testid="connection-form-auth-button"
-                variant="outline"
-                className={cn(
-                  (clientId || clientSecret || scope) && "border-2",
-                  "w-full justify-center hover:text-white cursor-pointer",
-                  buttonClassName
-                )}
-              >
-                <Shield className="w-4 h-4 mr-0" />
-                Authentication
-              </Button>
-            </div>
-          </DialogTrigger>
-          <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogTrigger
+            render={
+              <div className="relative flex-1 ">
+                <Button
+                  data-testid="connection-form-auth-button"
+                  variant="outline"
+                  className={cn(
+                    (clientId || clientSecret || scope) && "border-2",
+                    "w-full justify-center hover:text-white cursor-pointer",
+                    buttonClassName
+                  )}
+                >
+                  <Shield className="w-4 h-4 mr-0" />
+                  Authentication
+                </Button>
+              </div>
+            }
+            nativeButton={false}
+          />
+          <DialogContent scrollable className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Authentication</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium">OAuth 2.0 Flow</h4>
-
-              {/* Client ID */}
-              <div className="space-y-2">
-                <Label className="text-sm">Client ID</Label>
-                <Input
-                  data-testid="auth-dialog-client-id-input"
-                  placeholder="Client ID"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Client Secret</Label>
-                <Input
-                  data-testid="auth-dialog-client-secret-input"
-                  type="password"
-                  placeholder="Client Secret (optional)"
-                  value={clientSecret}
-                  onChange={(e) => setClientSecret(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Stored in your browser's localStorage.
-                </p>
-              </div>
-
-              {/* Scope */}
-              <div className="space-y-2">
-                <Label className="text-sm">Scope</Label>
-                <Input
-                  data-testid="auth-dialog-scope-input"
-                  placeholder="Scope (space-separated)"
-                  value={scope}
-                  onChange={(e) => setScope(e.target.value)}
-                />
-              </div>
-
+            <DialogBody className="space-y-4">
+              {authenticationFields}
               <div className="flex justify-end">
                 <Button onClick={() => setAuthDialogOpen(false)}>Save</Button>
               </div>
-            </div>
+            </DialogBody>
           </DialogContent>
         </Dialog>
 
         {/* Custom Headers Button */}
         <Dialog open={headersDialogOpen} onOpenChange={setHeadersDialogOpen}>
-          <DialogTrigger asChild>
-            <div className="relative flex-1 ">
-              <Button
-                data-testid="connection-form-headers-button"
-                variant="outline"
-                className={cn(
-                  "w-full justify-center hover:text-white cursor-pointer",
-                  buttonClassName
-                )}
-              >
-                <FileText className="w-4 h-4" />
-                Custom Headers
-              </Button>
-            </div>
-          </DialogTrigger>
-          <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogTrigger
+            render={
+              <div className="relative flex-1 ">
+                <Button
+                  data-testid="connection-form-headers-button"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-center hover:text-white cursor-pointer",
+                    buttonClassName
+                  )}
+                >
+                  <FileText className="w-4 h-4" />
+                  Custom Headers
+                </Button>
+              </div>
+            }
+            nativeButton={false}
+          />
+          <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Custom Headers</DialogTitle>
             </DialogHeader>
-            <CustomHeadersEditor
-              title={<></>}
-              headers={customHeaders}
-              onChange={setCustomHeaders}
-              onSave={() => setHeadersDialogOpen(false)}
-            />
+            <DialogBody>
+              <CustomHeadersEditor
+                title={<></>}
+                headers={customHeaders}
+                onChange={setCustomHeaders}
+                onSave={() => setHeadersDialogOpen(false)}
+              />
+            </DialogBody>
           </DialogContent>
         </Dialog>
 
         {/* Configuration Button */}
         <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
-          <DialogTrigger asChild>
-            <Button
-              data-testid="connection-form-config-button"
-              variant="outline"
-              className={cn(
-                "flex-1  justify-center hover:text-white cursor-pointer",
-                buttonClassName
-              )}
-            >
-              <Cog className="w-4 h-4" />
-              Configuration
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogTrigger
+            render={
+              <Button
+                data-testid="connection-form-config-button"
+                variant="outline"
+                className={cn(
+                  "flex-1  justify-center hover:text-white cursor-pointer",
+                  buttonClassName
+                )}
+              >
+                <Cog className="w-4 h-4" />
+                Configuration
+              </Button>
+            }
+            nativeButton
+          />
+          <DialogContent scrollable className="w-full max-w-2xl max-h-[80vh]">
             <DialogHeader>
               <DialogTitle>Configuration</DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
-              {/* Connection Mode */}
-              <div className="space-y-2">
-                <Label className="text-sm flex items-center gap-1">
-                  Connection Mode
-                  <span className="text-muted-foreground text-xs">(?)</span>
-                </Label>
-                <Select
-                  value={connectionMode}
-                  onValueChange={(value) =>
-                    setConnectionMode(value as ConnectionMode)
-                  }
-                >
-                  <SelectTrigger
-                    className="w-full"
-                    data-testid="config-dialog-connection-mode-select"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto</SelectItem>
-                    <SelectItem value="direct">Direct</SelectItem>
-                    <SelectItem value="proxy">Proxy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Request Timeout */}
-              <div className="space-y-2">
-                <Label className="text-sm flex items-center gap-1">
-                  Request Timeout
-                  <span className="text-muted-foreground text-xs">(?)</span>
-                </Label>
-                <Input
-                  data-testid="config-dialog-request-timeout-input"
-                  type="number"
-                  value={requestTimeout}
-                  onChange={(e) => setRequestTimeout(e.target.value)}
-                />
-              </div>
-
-              {/* Reset Timeout on Progress */}
-              <div className="space-y-2">
-                <Label className="text-sm flex items-center gap-1">
-                  Reset Timeout on Progress
-                  <span className="text-muted-foreground text-xs">(?)</span>
-                </Label>
-                <Select
-                  value={resetTimeoutOnProgress}
-                  onValueChange={setResetTimeoutOnProgress}
-                >
-                  <SelectTrigger
-                    className="w-full"
-                    data-testid="config-dialog-reset-timeout-select"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="True">True</SelectItem>
-                    <SelectItem value="False">False</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Maximum Total Timeout */}
-              <div className="space-y-2">
-                <Label className="text-sm flex items-center gap-1">
-                  Maximum Total Timeout
-                  <span className="text-muted-foreground text-xs">(?)</span>
-                </Label>
-                <Input
-                  data-testid="config-dialog-max-timeout-input"
-                  type="number"
-                  value={maxTotalTimeout}
-                  onChange={(e) => setMaxTotalTimeout(e.target.value)}
-                />
-              </div>
-
-              {/* Proxy Endpoint */}
-              <div className="space-y-2">
-                <Label className="text-sm flex items-center gap-1">
-                  Proxy Endpoint
-                  <span className="text-muted-foreground text-xs">(?)</span>
-                </Label>
-                <Input
-                  data-testid="config-dialog-proxy-address-input"
-                  value={proxyAddress}
-                  onChange={(e) => setProxyAddress(e.target.value)}
-                  placeholder=""
-                />
-              </div>
-
+            <DialogBody className="space-y-4">
+              {configurationFields}
               <div className="flex justify-end">
                 <Button onClick={() => setConfigDialogOpen(false)}>Save</Button>
               </div>
-            </div>
+            </DialogBody>
           </DialogContent>
         </Dialog>
-      </div>
+        </div>
+      )}
 
       {/* Connect Button */}
       {showConnectButton && (
@@ -593,9 +696,12 @@ export function ConnectionSettingsForm({
           data-testid="connection-form-connect-button"
           onClick={onConnect}
           disabled={!url.trim() || isConnecting}
+          size={isStyled ? "lg" : undefined}
           className={cn(
             "w-full font-semibold",
-            isStyled ? "bg-white text-black hover:bg-white/90" : ""
+            isStyled
+              ? "rounded-full text-black [&_[aria-hidden]]:bg-white hover:[&_[aria-hidden]]:bg-white/90 group-active:[&_[aria-hidden]]:bg-white/80"
+              : ""
           )}
         >
           {isConnecting ? (

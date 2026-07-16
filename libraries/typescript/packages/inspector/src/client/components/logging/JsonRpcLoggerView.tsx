@@ -1,82 +1,71 @@
+import { McpIcon } from "@/client/components/ui/client-icons";
 import { JSONDisplay } from "@/client/components/shared/JSONDisplay";
 import { Button } from "@/client/components/ui/button";
 import {
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-} from "lucide-react";
+  CheckboxGroup,
+  CheckboxItem,
+} from "@/client/components/ui/checkbox-group";
+import { Input } from "@/client/components/ui/input";
 import {
-  clearRpcLogs,
-  getAllRpcLogs,
-  subscribeToRpcLogs,
-  type RpcLogEntry,
-} from "@mcp-use/client/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/client/components/ui/tooltip";
+import { useRpcLogVirtualizer } from "@/client/hooks/use-rpc-log-virtualizer";
+import { ensureRpcTrafficBridge } from "@/client/rpc-traffic-bridge";
+import { getRpcTrafficMethod } from "@/client/rpc-traffic-coalesce";
+import {
+  rpcTrafficStore,
+  type RpcTrafficEntry,
+  type RpcTrafficSource,
+} from "@/client/rpc-traffic-store";
+import { copyToClipboard } from "@/client/utils/browser";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  Copy,
+  Download,
+  PanelsTopLeft,
+  Search,
+  Trash2,
+} from "lucide-react";
+import { clearRpcLogs } from "@mcp-use/client/react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
-import { copyToClipboard } from "@/client/utils/clipboard";
 
-interface RenderableRpcItem {
-  id: string;
-  serverId: string;
-  direction: string;
-  method: string;
-  timestamp: string;
-  payload: unknown;
-}
+ensureRpcTrafficBridge();
 
 interface JsonRpcLoggerViewProps {
-  serverIds?: string[]; // Optional filter for specific server IDs
-  onCountChange?: (count: number) => void; // Callback when message count changes
-  onClearRef?: React.MutableRefObject<(() => Promise<void>) | null>; // Ref to expose clearMessages function
-  onExportRef?: React.MutableRefObject<(() => Promise<void>) | null>; // Ref to expose exportAllMessages function
+  serverIds?: string[];
+  onCountChange?: (count: number) => void;
+  onClearRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  onExportRef?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
 
-/**
- * Renders a scrollable JSON-RPC log viewer with realtime updates and optional filtering.
- *
- * Displays a list of RPC messages (newest first), allows expanding items to view JSON payloads,
- * and updates the parent about the current message count.
- *
- * @param serverIds - Optional array of server IDs to restrict displayed logs to those servers.
- * @param onCountChange - Optional callback invoked with the current number of displayed messages whenever it changes.
- * @param onClearRef - Optional mutable ref that receives a `clearMessages` function which clears displayed logs and the underlying RPC log store.
- * @returns A React element that presents and manages JSON-RPC log entries (supports realtime subscription, filtering, expansion, and clearing).
- */
 export function JsonRpcLoggerView({
   serverIds,
   onCountChange,
   onClearRef,
   onExportRef,
 }: JsonRpcLoggerViewProps = {}) {
-  const [items, setItems] = useState<RenderableRpcItem[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [searchQuery] = useState("");
-
-  const toggleExpanded = (id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const clearMessages = async () => {
-    // Clear local state
-    setItems([]);
-    setExpanded(new Set());
-    onCountChange?.(0);
-
-    // Clear from mcp-use/react RPC logger
-    if (serverIds && serverIds.length > 0) {
-      serverIds.forEach((serverId) => clearRpcLogs(serverId));
-    } else {
-      clearRpcLogs(); // Clear all
-    }
-  };
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sourceFilters, setSourceFilters] = useState<Set<RpcTrafficSource>>(
+    () => new Set(["mcp", "widget"])
+  );
+  const items = useSyncExternalStore(
+    rpcTrafficStore.subscribe,
+    rpcTrafficStore.getSnapshot,
+    rpcTrafficStore.getSnapshot
+  );
 
   const copyMessageToClipboard = async (payload: unknown) => {
     try {
@@ -89,172 +78,210 @@ export function JsonRpcLoggerView({
     }
   };
 
-  const exportAllMessages = async () => {
-    try {
-      const jsonString = JSON.stringify(filteredItems, null, 2);
-      await copyToClipboard(jsonString);
-      toast.success(
-        `All messages copied to clipboard (${filteredItems.length})`
-      );
-    } catch (error) {
-      console.error("Failed to copy all messages:", error);
-      toast.error("Failed to copy to clipboard");
-    }
-  };
+  const scopedItems = useMemo(() => {
+    if (!serverIds?.length) return items;
+    const serverIdSet = new Set(serverIds);
+    return items.filter((item) => serverIdSet.has(item.serverId));
+  }, [items, serverIds]);
 
-  // Normalize serverIds to a stable string for dependency comparison
-  const serverIdsKey = useMemo(() => {
-    if (!serverIds || serverIds.length === 0) return "";
-    return [...serverIds].sort().join(",");
-  }, [serverIds]);
+  const sourceCheckedIndices = useMemo(() => {
+    const indices = new Set<number>();
+    if (sourceFilters.has("mcp")) indices.add(0);
+    if (sourceFilters.has("widget")) indices.add(1);
+    return indices;
+  }, [sourceFilters]);
 
-  // Expose clearMessages via ref if provided
-  useEffect(() => {
-    if (onClearRef) {
-      onClearRef.current = clearMessages;
-    }
-    return () => {
-      if (onClearRef) {
-        onClearRef.current = null;
-      }
-    };
-  }, [onClearRef, clearMessages]);
-
-  // Expose exportAllMessages via ref if provided
-  useEffect(() => {
-    if (onExportRef) {
-      onExportRef.current = exportAllMessages;
-    }
-    return () => {
-      if (onExportRef) {
-        onExportRef.current = null;
-      }
-    };
-  }, [onExportRef, exportAllMessages]);
-
-  // Notify parent of initial count
-  useEffect(() => {
-    onCountChange?.(items.length);
-  }, [items.length, onCountChange]);
-
-  useEffect(() => {
-    console.log("[RPC Logger] Subscribing to RPC logs for servers:", serverIds);
-
-    // Load existing logs
-    const existingLogs = getAllRpcLogs();
-    const filteredLogs =
-      serverIds && serverIds.length > 0
-        ? existingLogs.filter((log) => serverIds.includes(log.serverId))
-        : existingLogs;
-
-    // Convert to renderable items
-    const initialItems = filteredLogs
-      .map((log): RenderableRpcItem => {
-        const msg: any = log.message;
-        const method: string =
-          typeof msg?.method === "string"
-            ? msg.method
-            : msg?.result !== undefined
-              ? "result"
-              : msg?.error !== undefined
-                ? "error"
-                : "unknown";
-
-        return {
-          id: `${log.timestamp}-${Math.random().toString(36).slice(2)}`,
-          serverId: log.serverId,
-          direction: log.direction.toUpperCase(),
-          method,
-          timestamp: log.timestamp,
-          payload: log.message,
-        };
-      })
-      .reverse(); // Newest first
-
-    setItems(initialItems);
-    onCountChange?.(initialItems.length);
-
-    // Subscribe to new logs
-    const unsubscribe = subscribeToRpcLogs((entry: RpcLogEntry) => {
-      // Filter by serverIds if specified
-      if (
-        serverIds &&
-        serverIds.length > 0 &&
-        !serverIds.includes(entry.serverId)
-      ) {
-        return;
-      }
-
-      const msg: any = entry.message;
-      const method: string =
-        typeof msg?.method === "string"
-          ? msg.method
-          : msg?.result !== undefined
-            ? "result"
-            : msg?.error !== undefined
-              ? "error"
-              : "unknown";
-
-      const item: RenderableRpcItem = {
-        id: `${entry.timestamp}-${Math.random().toString(36).slice(2)}`,
-        serverId: entry.serverId,
-        direction: entry.direction.toUpperCase(),
-        method,
-        timestamp: entry.timestamp,
-        payload: entry.message,
-      };
-
-      console.log("[RPC Logger] New RPC log:", {
-        method,
-        direction: entry.direction,
-        serverId: entry.serverId,
-      });
-      setItems((prev) => {
-        const newItems = [item, ...prev].slice(0, 1000);
-        onCountChange?.(newItems.length);
-        return newItems;
-      });
+  const toggleSourceFilter = useCallback((source: RpcTrafficSource) => {
+    setSourceFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
     });
-
-    return () => {
-      unsubscribe();
-      console.log("[RPC Logger] Unsubscribed from RPC logs");
-    };
-  }, [serverIdsKey, onCountChange]); // Use normalized key to prevent unnecessary reconnections when serverIds array reference changes but contents are the same
+  }, []);
 
   const filteredItems = useMemo(() => {
-    let result = items;
+    let result = scopedItems;
 
-    // Filter by serverIds if provided
-    if (serverIds && serverIds.length > 0) {
-      const serverIdSet = new Set(serverIds);
-      result = result.filter((item) => serverIdSet.has(item.serverId));
+    if (sourceFilters.size > 0) {
+      result = result.filter((item) => sourceFilters.has(item.source));
     }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const queryLower = searchQuery.toLowerCase();
+    const queryLower = searchQuery.trim().toLowerCase();
+    if (queryLower) {
       result = result.filter((item) => {
+        const method = getMethod(item);
         return (
           item.serverId.toLowerCase().includes(queryLower) ||
-          item.method.toLowerCase().includes(queryLower) ||
+          item.widgetId?.toLowerCase().includes(queryLower) ||
+          item.source.includes(queryLower) ||
+          method.toLowerCase().includes(queryLower) ||
           item.direction.toLowerCase().includes(queryLower) ||
-          JSON.stringify(item.payload).toLowerCase().includes(queryLower)
+          JSON.stringify(item.message).toLowerCase().includes(queryLower)
         );
       });
     }
 
-    // Sort by timestamp (newest first)
-    result = [...result].sort((a, b) => {
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
-    });
+    return [...result].reverse();
+  }, [scopedItems, searchQuery, sourceFilters]);
 
-    return result;
-  }, [items, searchQuery, serverIds]);
+  const { totalHeight, visibleItems } = useRpcLogVirtualizer(
+    filteredItems,
+    expanded,
+    scrollRef
+  );
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const clearMessages = useCallback(async () => {
+    const sources =
+      sourceFilters.size === 0 || sourceFilters.size === 2
+        ? undefined
+        : ([...sourceFilters] satisfies RpcTrafficSource[]);
+
+    if (!sources || sources.includes("mcp")) {
+      if (serverIds?.length) {
+        serverIds.forEach((serverId) => clearRpcLogs(serverId));
+      } else {
+        clearRpcLogs();
+      }
+    }
+    rpcTrafficStore.clear({ serverIds, sources });
+    setExpanded(new Set());
+  }, [serverIds, sourceFilters]);
+
+  const copyFilteredMessages = useCallback(async () => {
+    try {
+      await copyToClipboard(JSON.stringify(filteredItems, null, 2));
+      toast.success(`Copied ${filteredItems.length} messages`);
+    } catch (error) {
+      console.error("Failed to copy messages:", error);
+      toast.error("Failed to copy to clipboard");
+    }
+  }, [filteredItems]);
+
+  const downloadFilteredMessages = useCallback(() => {
+    const blob = new Blob([JSON.stringify(filteredItems, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `mcp-rpc-traffic-${new Date()
+      .toISOString()
+      .replaceAll(":", "-")}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [filteredItems]);
+
+  useEffect(() => {
+    onCountChange?.(filteredItems.length);
+  }, [filteredItems.length, onCountChange]);
+
+  useEffect(() => {
+    if (onClearRef) onClearRef.current = clearMessages;
+    return () => {
+      if (onClearRef) onClearRef.current = null;
+    };
+  }, [clearMessages, onClearRef]);
+
+  useEffect(() => {
+    if (onExportRef) onExportRef.current = copyFilteredMessages;
+    return () => {
+      if (onExportRef) onExportRef.current = null;
+    };
+  }, [copyFilteredMessages, onExportRef]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex shrink-0 items-center justify-between gap-2 px-2 pt-2">
+        <h2 className="text-xs font-medium text-foreground">RPC Logs</h2>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-7 p-0"
+            onClick={copyFilteredMessages}
+            disabled={filteredItems.length === 0}
+            aria-label="Copy filtered RPC traffic"
+            title="Copy filtered"
+          >
+            <Copy className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-7 p-0"
+            onClick={downloadFilteredMessages}
+            disabled={filteredItems.length === 0}
+            aria-label="Download filtered RPC traffic as JSON"
+            title="Download JSON"
+          >
+            <Download className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-7 p-0"
+            onClick={clearMessages}
+            disabled={items.length === 0}
+            aria-label="Clear RPC traffic"
+            title="Clear"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-2 p-2 pt-1">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search"
+            aria-label="Search RPC traffic"
+            className="h-8 pl-7 text-xs shadow-none"
+          />
+        </div>
+        <CheckboxGroup
+          checkedIndices={sourceCheckedIndices}
+          orientation="horizontal"
+          aria-label="Filter RPC traffic by source"
+          className="w-auto shrink-0"
+        >
+          <CheckboxItem
+            index={0}
+            label="MCP"
+            size="sm"
+            checked={sourceFilters.has("mcp")}
+            onToggle={() => toggleSourceFilter("mcp")}
+          />
+          <CheckboxItem
+            index={1}
+            label="UI"
+            size="sm"
+            checked={sourceFilters.has("widget")}
+            onToggle={() => toggleSourceFilter("widget")}
+          />
+        </CheckboxGroup>
+      </div>
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto pb-10"
+        style={{
+          maskImage:
+            "linear-gradient(to bottom, black 0, black calc(100% - 3rem), transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 0, black calc(100% - 3rem), transparent 100%)",
+        }}
+      >
         {filteredItems.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-xs text-muted-foreground">
@@ -265,82 +292,156 @@ export function JsonRpcLoggerView({
             </div>
           </div>
         ) : (
-          filteredItems.map((it) => {
-            const isExpanded = expanded.has(it.id);
-            return (
-              <div
-                key={it.id}
-                className="group hover:bg-muted/50 transition-all duration-200 overflow-hidden"
-                data-testid={`rpc-message-${it.method.replace(/\//g, "-")}`}
-              >
-                <div
-                  className="px-3 py-2 flex items-center gap-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => toggleExpanded(it.id)}
-                >
-                  <div className="flex-shrink-0">
-                    {isExpanded ? (
-                      <ChevronDown className="h-3 w-3 text-muted-foreground transition-transform" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3 text-muted-foreground transition-transform" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-muted-foreground font-mono text-xs">
-                      {new Date(it.timestamp).toLocaleTimeString()}
-                    </span>
-                    <span
-                      className={`flex items-center justify-center px-1 py-0.5 rounded ${
-                        it.direction === "RECEIVE"
-                          ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                          : "bg-green-500/10 text-green-600 dark:text-green-400"
-                      }`}
-                      title={
-                        it.direction === "RECEIVE" ? "Incoming" : "Outgoing"
-                      }
-                    >
-                      {it.direction === "RECEIVE" ? (
-                        <ArrowDownToLine className="h-3 w-3" />
-                      ) : (
-                        <ArrowUpFromLine className="h-3 w-3" />
-                      )}
-                    </span>
-                    <span className="text-xs font-mono text-foreground truncate">
-                      {it.method}
-                    </span>
-                  </div>
-                </div>
-                {isExpanded && (
-                  <div className="border-t bg-muted/20">
-                    <div className="p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs text-muted-foreground">
-                          Message Payload
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyMessageToClipboard(it.payload);
-                          }}
-                          className="h-6 px-2"
-                          title="Copy message to clipboard"
-                        >
-                          <Copy className="h-3 w-3 mr-1" />
-                          <span className="text-xs">Copy</span>
-                        </Button>
-                      </div>
-                      <div className="max-h-[40vh] overflow-auto rounded-sm bg-background/60 p-2">
-                        <JSONDisplay data={it.payload} />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })
+          <div
+            className="relative w-full"
+            style={{ height: totalHeight }}
+          >
+            {visibleItems.map(({ item, top, height }) => (
+              <RpcLogRow
+                key={item.id}
+                item={item}
+                top={top}
+                height={height}
+                expanded={expanded.has(item.id)}
+                onToggle={() => toggleExpanded(item.id)}
+                onCopy={() => copyMessageToClipboard(item.message)}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>
   );
+}
+
+function RpcLogRow({
+  item,
+  top,
+  height,
+  expanded,
+  onToggle,
+  onCopy,
+}: {
+  item: RpcTrafficEntry;
+  top: number;
+  height: number;
+  expanded: boolean;
+  onToggle: () => void;
+  onCopy: () => void;
+}) {
+  const method = getMethod(item);
+  const direction = getDirectionLabel(item);
+  const repeatSuffix =
+    item.repeatCount && item.repeatCount > 1 ? ` ×${item.repeatCount}` : "";
+
+  return (
+    <div
+      className="absolute inset-x-0 overflow-hidden"
+      style={{ top, height }}
+      data-testid={`rpc-message-${method.replace(/\//g, "-")}`}
+    >
+      <button
+        type="button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+        className="flex h-9 w-full items-center gap-2 px-3 py-2 text-left text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="flex size-4 shrink-0 items-center justify-center">
+                {item.direction === "receive" ? (
+                  <ArrowDownLeft className="size-3.5 text-blue-500" />
+                ) : (
+                  <ArrowUpRight className="size-3.5 text-emerald-500" />
+                )}
+              </span>
+            }
+            nativeButton={false}
+          />
+          <TooltipContent side="left">{direction}</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span className="flex size-3.5 shrink-0 items-center justify-center">
+                {item.source === "mcp" ? (
+                  <McpIcon className="size-3" />
+                ) : (
+                  <PanelsTopLeft className="size-3" />
+                )}
+              </span>
+            }
+            nativeButton={false}
+          />
+          <TooltipContent side="left">
+            {item.source === "mcp" ? "MCP server" : "UI widget"}
+          </TooltipContent>
+        </Tooltip>
+
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
+          {method}
+          {repeatSuffix ? (
+            <span className="text-muted-foreground">{repeatSuffix}</span>
+          ) : null}
+        </span>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <time
+                dateTime={item.timestamp}
+                className="shrink-0 cursor-default font-mono text-[10px] tabular-nums text-muted-foreground underline decoration-dotted underline-offset-2"
+              >
+                {new Date(item.timestamp).toLocaleTimeString()}
+              </time>
+            }
+            nativeButton={false}
+          />
+          <TooltipContent side="left">
+            {new Date(item.timestamp).toLocaleString()}
+          </TooltipContent>
+        </Tooltip>
+      </button>
+
+      {expanded ? (
+        <div className="relative mx-3 mb-2 max-h-44 overflow-auto rounded-lg p-2 pr-8">
+          <JSONDisplay
+            data={item.message}
+            className="[&_pre]:!text-[10px] [&_pre]:!leading-4"
+          />
+          <Button
+            variant="secondary"
+            size="icon-sm"
+            onClick={onCopy}
+            className="absolute right-1 top-1 size-6 rounded-full p-0"
+            title="Copy message"
+            aria-label="Copy message"
+          >
+            <Copy className="size-3" />
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function getMethod(entry: RpcTrafficEntry): string {
+  const fromMessage = getRpcTrafficMethod(entry.message);
+  if (fromMessage) return fromMessage;
+  const message = entry.message as {
+    result?: unknown;
+    error?: unknown;
+  };
+  if (message?.result !== undefined) return "result";
+  if (message?.error !== undefined) return "error";
+  return "unknown";
+}
+
+function getDirectionLabel(entry: RpcTrafficEntry): string {
+  if (entry.source === "widget") {
+    return entry.direction === "send" ? "Host → Widget" : "Widget → Host";
+  }
+  return entry.direction === "send" ? "Inspector → MCP" : "MCP → Inspector";
 }

@@ -47,8 +47,11 @@ export function mountMcp<E extends Env>(
   factory: McpServerFactory,
   options: MountMcpOptions<E> = {}
 ): McpHttpHandler {
-  const { path = "/mcp", handler: handlerOptions, authInfo: getAuthInfo } =
-    options;
+  const {
+    path = "/mcp",
+    handler: handlerOptions,
+    authInfo: getAuthInfo,
+  } = options;
   const handler = createMcpHandler(factory, {
     legacy: "stateless",
     ...handlerOptions,

@@ -74,9 +74,7 @@ const VALID_DISPLAY_MODES: ReadonlySet<string> = new Set<DisplayMode>([
  *
  * @internal
  */
-export function normalizeViewConfig(
-  config?: ViewConfig
-): NormalizedViewConfig {
+export function normalizeViewConfig(config?: ViewConfig): NormalizedViewConfig {
   const autoResize = config?.autoResize ?? true;
 
   if (config?.displayModes === undefined) {

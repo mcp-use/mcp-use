@@ -5,7 +5,9 @@
  * Valid header: X-Custom-Auth: custom-auth-token-xyz
  */
 
-import { MCPServer, text } from "mcp-use";
+import { serve, type ServerType } from "@hono/node-server";
+import { MCPServer } from "@mcp-use/server";
+import { Hono } from "hono";
 import { z } from "zod";
 
 const CUSTOM_HEADER_NAME = "X-Custom-Auth";
@@ -17,10 +19,39 @@ export function createCustomHeaderServer(port: number = 3004) {
     version: "1.0.0",
     description:
       "MCP server requiring custom header authentication for testing",
+    inspector: { enabled: false },
   });
 
-  // Custom middleware to check custom header
-  server.app.use("/mcp/*", async (c, next) => {
+  server.tool(
+    {
+      name: "verify_auth",
+      description: "Verify that authentication is working",
+    },
+    async () => ({
+      content: [
+        {
+          type: "text",
+          text: `Authentication successful! Custom header verified: ${VALID_TOKEN.substring(0, 15)}...`,
+        },
+      ],
+    })
+  );
+
+  server.tool(
+    {
+      name: "echo",
+      description: "Echo a message back",
+      inputSchema: z.object({
+        message: z.string(),
+      }),
+    },
+    async ({ message }) => ({
+      content: [{ type: "text", text: `Echo: ${message}` }],
+    })
+  );
+
+  const app = new Hono();
+  app.use("/mcp", async (c, next) => {
     const customHeader = c.req.header(CUSTOM_HEADER_NAME);
 
     if (!customHeader) {
@@ -45,38 +76,38 @@ export function createCustomHeaderServer(port: number = 3004) {
       );
     }
 
-    // Store token in context for tools to access
-    c.set("customToken", customHeader);
     await next();
   });
+  const handler = server.getHandler();
+  app.all("*", (c) => handler(c.req.raw));
 
-  // Tool to verify authenticated access
-  server.tool(
-    {
-      name: "verify_auth",
-      description: "Verify that authentication is working",
+  let httpServer: ServerType | undefined;
+
+  return {
+    async listen(listenPort = port) {
+      return new Promise<{ port: number; url: string }>((resolve, reject) => {
+        httpServer = serve(
+          { fetch: app.fetch, port: listenPort, hostname: "127.0.0.1" },
+          (info) => {
+            resolve({
+              port: info.port,
+              url: `http://localhost:${info.port}/mcp`,
+            });
+          }
+        );
+        httpServer.on("error", reject);
+      });
     },
-    async (_args, ctx) => {
-      const token = (ctx as any).customToken;
-      return text(
-        `Authentication successful! Custom header verified: ${token?.substring(0, 15)}...`
-      );
-    }
-  );
-
-  // Simple echo tool
-  server.tool(
-    {
-      name: "echo",
-      description: "Echo a message back",
-      schema: z.object({
-        message: z.string(),
-      }),
+    async close() {
+      await server.close();
+      if (httpServer) {
+        await new Promise<void>((resolve, reject) => {
+          httpServer!.close((err) => (err ? reject(err) : resolve()));
+        });
+        httpServer = undefined;
+      }
     },
-    async ({ message }) => text(`Echo: ${message}`)
-  );
-
-  return server;
+  };
 }
 
 export class CustomHeaderServerHelper {

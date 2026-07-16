@@ -146,9 +146,9 @@ describe("runBuild", () => {
     const cwd = copyFixture("build-entry");
     dirs.push(cwd);
     await runBuild({ cwd, entry: "src/index.ts" });
-    expect(
-      existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))
-    ).toBe(true);
+    expect(existsSync(join(cwd, WORKSPACE_DIR_NAME, "build", "index.js"))).toBe(
+      true
+    );
   });
 
   it("fails with the candidate list when no entry exists", async () => {
@@ -171,9 +171,9 @@ describe("runBuild (views)", () => {
     });
     const load = plugin.load;
     expect(load).toBeTypeOf("function");
-    const source = (
-      load as (id: string) => string | undefined
-    )(`${VIRTUAL_VIEW_RESOLVED_PREFIX}demo`);
+    const source = (load as (id: string) => string | undefined)(
+      `${VIRTUAL_VIEW_RESOLVED_PREFIX}demo`
+    );
     expect(source).toContain(
       'import * as viewModule from "/abs/resources/demo/view.tsx"'
     );
@@ -231,7 +231,9 @@ describe("runBuild (views)", () => {
     const previousCwd = process.cwd();
     process.chdir(cwd);
     try {
-      const mod = (await import(pathToFileURL(join(buildDir, "index.js")).href)) as {
+      const mod = (await import(
+        pathToFileURL(join(buildDir, "index.js")).href
+      )) as {
         default: { getHandler(): (request: Request) => Promise<Response> };
       };
       const handler = mod.default.getHandler();
@@ -249,9 +251,8 @@ describe("runBuild (views)", () => {
       const readBody = await handlerMcp(handler, "resources/read", {
         uri: "ui://views/product-search-result.html",
       });
-      const text = (
-        readBody["result"] as { contents: { text: string }[] }
-      ).contents[0]!.text;
+      const text = (readBody["result"] as { contents: { text: string }[] })
+        .contents[0]!.text;
       expect(text).toContain('id="root"');
       expect(text).toContain('<script type="module">');
       expect(text).toContain(product.js.slice(0, 80));
@@ -316,7 +317,9 @@ describe("runBuild (views)", () => {
             _meta?: { ui?: { csp?: unknown } };
           }[];
         }
-      ).resources.find((r) => r.uri === "ui://views/product-search-result.html");
+      ).resources.find(
+        (r) => r.uri === "ui://views/product-search-result.html"
+      );
       const resourceDomains = (
         viewResource?._meta?.ui as { csp?: { resourceDomains?: string[] } }
       )?.csp?.resourceDomains;
@@ -347,10 +350,7 @@ describe("runBuild (views)", () => {
     const source = readFileSync(entry, "utf8");
     writeFileSync(
       entry,
-      source.replace(
-        'name: "product-search-result"',
-        'name: "escape-view"'
-      )
+      source.replace('name: "product-search-result"', 'name: "escape-view"')
     );
 
     await runBuild({ cwd });
@@ -378,7 +378,10 @@ describe("runBuild (views)", () => {
     const body = moduleMatch![1]!;
     expect(body).not.toContain("</script>");
     // If the bundle retained the closing-tag sequence, it must be escaped.
-    if (escapeEntry.js.includes("</script>") || escapeEntry.js.includes("<\\/script>")) {
+    if (
+      escapeEntry.js.includes("</script>") ||
+      escapeEntry.js.includes("<\\/script>")
+    ) {
       expect(body).toContain("<\\/script>");
     }
   }, 60_000);
@@ -401,10 +404,7 @@ describe("runBuild (views)", () => {
     const source = readFileSync(entry, "utf8");
     writeFileSync(
       entry,
-      source.replace(
-        'name: "product-search-result"',
-        'name: "does-not-exist"'
-      )
+      source.replace('name: "product-search-result"', 'name: "does-not-exist"')
     );
     await expect(runBuild({ cwd })).rejects.toThrow(/does-not-exist/);
   }, 60_000);

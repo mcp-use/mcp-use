@@ -5,11 +5,14 @@ import {
   McpClientProvider,
   useMcpClient,
 } from "../../../src/react/McpClientProvider.js";
+import { MemoryStorageProvider } from "../../../src/react/storage.js";
 
 let mountCount = 0;
 const disconnectSpies: Array<ReturnType<typeof vi.fn>> = [];
 const clearStorageSpies: Array<ReturnType<typeof vi.fn>> = [];
 let latestClient: ReturnType<typeof useMcpClient> | null = null;
+let mockProtocolEra: "legacy" | "modern" = "legacy";
+let mockInstructions = "legacy instructions";
 
 vi.mock("../../../src/react/useMcp.js", () => {
   const tools: unknown[] = [];
@@ -44,6 +47,11 @@ vi.mock("../../../src/react/useMcp.js", () => {
         error: undefined,
         authUrl: undefined,
         authTokens: undefined,
+        protocolEra: mockProtocolEra,
+        protocolVersion:
+          mockProtocolEra === "legacy" ? "2025-11-25" : "2026-07-28",
+        instructions: mockInstructions,
+        extensions: {},
         log,
         callTool: vi.fn(),
         refresh: vi.fn(),
@@ -70,7 +78,7 @@ function TestHarness() {
     addedRef.current = true;
     client.addServer("sandbox", {
       url: "http://localhost:3000/mcp",
-      name: "Sandbox MCP Server",
+      displayName: "Sandbox MCP Server",
     });
   }, [client]);
 
@@ -91,6 +99,8 @@ describe("McpClientProvider metadata-only updates", () => {
     disconnectSpies.length = 0;
     clearStorageSpies.length = 0;
     latestClient = null;
+    mockProtocolEra = "legacy";
+    mockInstructions = "legacy instructions";
     vi.restoreAllMocks();
   });
 
@@ -111,7 +121,9 @@ describe("McpClientProvider metadata-only updates", () => {
     const client = latestClient;
 
     expect(client).toBeTruthy();
-    expect(client?.getServer("sandbox")?.name).toBe("Sandbox MCP Server");
+    expect(client?.getServer("sandbox")?.displayName).toBe(
+      "Sandbox MCP Server"
+    );
     expect(mountCount).toBe(1);
 
     let updatePromise: Promise<void> | undefined;
@@ -124,10 +136,88 @@ describe("McpClientProvider metadata-only updates", () => {
 
     await flushUpdates();
 
-    expect(latestClient?.getServer("sandbox")?.name).toBe("Sandbox Alias");
+    expect(latestClient?.getServer("sandbox")?.displayName).toBe(
+      "Sandbox Alias"
+    );
     expect(disconnectSpies[0]).not.toHaveBeenCalled();
     expect(clearStorageSpies[0]).not.toHaveBeenCalled();
     expect(mountCount).toBe(1);
+  });
+
+  it("propagates protocol-only metadata updates to provider consumers", async () => {
+    let renderer: ReturnType<typeof create>;
+    await act(async () => {
+      renderer = create(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    expect(latestClient?.getServer("sandbox")?.protocolEra).toBe("legacy");
+    mockProtocolEra = "modern";
+    mockInstructions = "modern instructions";
+
+    await act(async () => {
+      renderer!.update(
+        React.createElement(
+          McpClientProvider,
+          null,
+          React.createElement(TestHarness)
+        )
+      );
+    });
+    await flushUpdates();
+
+    expect(latestClient?.getServer("sandbox")?.protocolEra).toBe("modern");
+    expect(latestClient?.getServer("sandbox")?.instructions).toBe(
+      "modern instructions"
+    );
+  });
+
+  it("persists only serializable server configuration", async () => {
+    const storage = new MemoryStorageProvider();
+
+    function PersistedServer() {
+      const client = useMcpClient();
+      const addedRef = useRef(false);
+      useEffect(() => {
+        if (!client.storageLoaded || addedRef.current) return;
+        addedRef.current = true;
+        client.addServer("persisted", {
+          url: "http://localhost:3000/mcp",
+          authProvider: { tokens: async () => undefined } as any,
+          fetch: vi.fn(),
+          wrapTransport: ((transport: any) => transport) as any,
+          onPopupWindow: vi.fn(),
+          onSamplingRequest: vi.fn(),
+        });
+      }, [client]);
+      return null;
+    }
+
+    await act(async () => {
+      create(
+        React.createElement(
+          McpClientProvider,
+          { storageProvider: storage },
+          React.createElement(PersistedServer)
+        )
+      );
+    });
+    await flushUpdates();
+    await flushUpdates();
+
+    const stored = storage.getServers().persisted as Record<string, unknown>;
+    expect(stored.url).toBe("http://localhost:3000/mcp");
+    expect(stored.authProvider).toBeUndefined();
+    expect(stored.fetch).toBeUndefined();
+    expect(stored.wrapTransport).toBeUndefined();
+    expect(stored.onPopupWindow).toBeUndefined();
+    expect(stored.onSamplingRequest).toBeUndefined();
   });
 
   it("keeps updateServer as a reconnecting update path but preserves OAuth credentials", async () => {
@@ -147,7 +237,9 @@ describe("McpClientProvider metadata-only updates", () => {
     const client = latestClient;
 
     expect(client).toBeTruthy();
-    expect(client?.getServer("sandbox")?.name).toBe("Sandbox MCP Server");
+    expect(client?.getServer("sandbox")?.displayName).toBe(
+      "Sandbox MCP Server"
+    );
     expect(mountCount).toBe(1);
 
     let updatePromise: Promise<void> | undefined;
@@ -202,7 +294,7 @@ describe("McpClientProvider metadata-only updates", () => {
     act(() => {
       latestClient?.addServer("sandbox", {
         url: "http://localhost:3000/mcp",
-        name: "Sandbox MCP Server",
+        displayName: "Sandbox MCP Server",
       });
     });
     await flushUpdates();

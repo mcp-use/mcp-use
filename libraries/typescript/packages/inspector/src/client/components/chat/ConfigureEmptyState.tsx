@@ -5,11 +5,8 @@ import { Button } from "@/client/components/ui/button";
 interface ConfigureEmptyStateProps {
   onConfigureClick: () => void;
   /**
-   * True when the hosted inspector's managed key cannot be used because the
-   * selected MCP server is on localhost. The managed key streams chat through
-   * our backend, which runs server-side and cannot reach a server on the
-   * user's machine — so we ask them to bring their own key and explain why.
-   * Never set on the local inspector, where BYOK is the normal flow anyway.
+   * True when the hosted inspector's managed key cannot be used because there
+   * is no cloud chat URL (BYOK is required). Omitted on the local inspector.
    */
   managedKeyUnavailable?: boolean;
 }
@@ -28,10 +25,8 @@ export function ConfigureEmptyState({
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
-            You're connected to a <strong>localhost</strong> MCP server. The
-            hosted inspector's managed key runs on our servers and can't reach
-            MCP servers on your machine, so chat falls back to using your own
-            API key. Add a key below to chat with this server.
+            Managed inspector chat is not configured for this deployment. Add
+            your own API key below to chat with this server.
           </span>
         </div>
       )}

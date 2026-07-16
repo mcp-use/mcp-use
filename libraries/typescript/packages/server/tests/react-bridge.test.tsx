@@ -375,9 +375,7 @@ describe("react bridge runtime", () => {
         return (
           <div data-testid="lifecycle">
             {handle.status}|
-            {handle.status === "ready"
-              ? JSON.stringify(handle.toolOutput)
-              : ""}
+            {handle.status === "ready" ? JSON.stringify(handle.toolOutput) : ""}
           </div>
         );
       }
@@ -395,9 +393,7 @@ describe("react bridge runtime", () => {
       });
       expect(
         errorSpy.mock.calls.some((args) =>
-          String(args[0]).includes(
-            "non-error result without structuredContent"
-          )
+          String(args[0]).includes("non-error result without structuredContent")
         )
       ).toBe(false);
 

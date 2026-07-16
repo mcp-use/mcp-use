@@ -4,13 +4,13 @@ import {
   type McpUiHostContext,
   type RegisteredAppTool,
 } from "@modelcontextprotocol/ext-apps";
-import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/server";
+import type {
+  CallToolResult,
+  ContentBlock,
+} from "@modelcontextprotocol/server";
 
 import type { DisplayMode } from "../types/host-types.js";
-import {
-  ToolError,
-  type ToolContextError,
-} from "../types/result-types.js";
+import { ToolError, type ToolContextError } from "../types/result-types.js";
 import { ModelContextStore } from "./model-context-store.js";
 import type { NormalizedViewConfig } from "./view-config.js";
 
@@ -387,9 +387,7 @@ export function createMcpAppRuntime(
     hostChannel.emit();
   }
 
-  function syncThemeFromHost(
-    hostContext: McpUiHostContext | undefined
-  ): void {
+  function syncThemeFromHost(hostContext: McpUiHostContext | undefined): void {
     const next = resolveTheme(hostContext);
     if (next === themeSnapshot) {
       return;

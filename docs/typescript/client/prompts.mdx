@@ -1,94 +1,46 @@
 ---
 title: "Prompts"
-description: "Use server-defined prompt templates"
+description: "Fetch server-defined prompt templates"
 icon: "message-square"
 ---
 
-Prompts are reusable, parameterized templates that MCP servers provide for AI interactions. They standardize common workflows, enable consistent communication patterns, and help structure complex requests with well-defined parameters.
-
-
-## Listing Available Prompts
-
-To see what prompts are available from a connected MCP server:
-
-<CodeGroup>
-```typescript TypeScript highlight={12-16}
-import { MCPClient } from 'mcp-use'
+```typescript
+import { MCPClient } from "@mcp-use/client";
 
 const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
+  mcpServers: { demo: { url: "http://localhost:3000/mcp" } },
+});
+
+try {
+  const conn = await client.connect("demo");
+
+  const prompts = await conn.listPrompts();
+  for (const p of prompts) {
+    console.log(p.name, p.description);
+  }
+
+  const result = await conn.getPrompt("plan_trip", {
+    destination: "Japan",
+    days: "7",
+  });
+
+  for (const message of result.messages) {
+    if (message.content.type === "text") {
+      console.log(message.role, message.content.text);
     }
-})
-await client.createAllSessions()
-
-const session = client.getSession('my_server')
-
-const prompts = await session.listPrompts()
-    for (const prompt of prompts) {
-    console.log(`Prompt: ${prompt.name}`)
-    console.log(`Description: ${prompt.description}`)
-}
-
-await client.closeAllSessions()
-```
-</CodeGroup>
-
-## Retrieving Prompts
-
-Prompts are retrieved using the `getPrompt` method:
-
-<CodeGroup>
-```typescript TypeScript highlight={10-15}
-import { MCPClient } from 'mcp-use'
-
-const client = new MCPClient({
-    mcpServers: {
-        // Your server definitions here
-    }
-})
-await client.createAllSessions()
-
-const result = await session.getPrompt('plan_vacation', {
-    destination: 'Japan',
-    duration: '2 weeks',
-    budget: '$5000',
-    interests: ['culture', 'food', 'nature']
-})
-
-console.log(`Prompt description: ${result.description}`)
-for (const message of result.messages) {
-    console.log(`Role: ${message.role}`)
-    console.log(`Content: ${message.content.text}`)
-}
-
-await client.closeAllSessions()
-```
-</CodeGroup>
-
-## Prompt Structure
-
-Prompts return structured content with messages:
-
-<CodeGroup>
-```typescript TypeScript
-// Example of working with prompt results
-const result = await session.getPrompt('code_review', { language: 'python' })
-
-for (const message of result.messages) {
-    // Messages have roles (e.g., "user", "assistant", "system")
-    const role = message.role
-
-    // Content can be text or other formats
-    if ('text' in message.content) {
-        const textContent = message.content.text
-        console.log(`${role}: ${textContent}`)
-    }
-
-    // Handle other content types if needed
-    if ('image' in message.content) {
-        console.log(`${role}: [Image content]`)
-    }
+  }
+} finally {
+  await client.close();
 }
 ```
-</CodeGroup>
+
+## React
+
+```tsx
+const server = useMcpServer("demo");
+const result = await server?.getPrompt("code_review", { language: "ts" });
+```
+
+## Reference
+
+[`MCPConnection`](/typescript/api-reference/client/mcp-session) — `listPrompts`, `getPrompt`.

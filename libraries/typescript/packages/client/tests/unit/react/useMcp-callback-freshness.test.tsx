@@ -11,14 +11,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
 import type { UseMcpOptions } from "../../../src/react/types.js";
 
-function makeConnector() {
+function makeConnection() {
   return {
     tools: [],
-    serverInfo: { name: "test-server" },
-    serverCapabilities: {},
+    info: {
+      protocolEra: "legacy",
+      protocolVersion: "2025-06-18",
+      server: { name: "test-server" },
+      capabilities: {},
+      extensions: {},
+    },
+    supports: vi.fn().mockReturnValue(false),
+    callTool: vi.fn(),
+    readResource: vi.fn(),
+    listTools: vi.fn().mockResolvedValue([]),
     listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
     listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
     listResourceTemplates: vi.fn().mockResolvedValue({ resourceTemplates: [] }),
+    getPrompt: vi.fn(),
+    complete: vi.fn(),
   };
 }
 
@@ -28,33 +39,25 @@ const mockAuthProvider = {
   clearStorage: vi.fn().mockReturnValue(0),
 };
 
-function makeSession() {
-  return {
-    on: vi.fn(),
-    connector: makeConnector(),
-    initialize: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
-let activeSession: ReturnType<typeof makeSession> | null = null;
+let activeConnection: ReturnType<typeof makeConnection> | null = null;
 
 const sharedClient = {
   addServer: vi.fn().mockResolvedValue(undefined),
   removeServer: vi.fn().mockResolvedValue(undefined),
   listSessions: vi.fn().mockReturnValue([]),
-  getSession: vi.fn(() => activeSession),
-  createSession: vi.fn(),
+  getSession: vi.fn(() => activeConnection),
+  connect: vi.fn(),
   closeSession: vi.fn().mockResolvedValue(undefined),
 };
 
-vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
+vi.mock("../../../src/core/browser.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserMCPClient: vi.fn(function () {
     return sharedClient;
   }),
 }));
 
-vi.mock("../../../src/auth/browser-provider.js", () => ({
+vi.mock("../../../src/auth/browser.js", () => ({
   createBrowserOAuthProvider: vi.fn(() => ({
     provider: null,
     oauthProxyUrl: undefined,
@@ -71,7 +74,7 @@ vi.mock("../../../src/telemetry/telemetry-browser.js", () => ({
   },
 }));
 
-vi.mock("../../../src/react/favicon-detector.js", () => ({
+vi.mock("../../../src/utils/favicon.js", () => ({
   detectFavicon: vi.fn().mockResolvedValue(null),
 }));
 
@@ -97,11 +100,11 @@ describe("useMcp callback freshness", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    activeSession = null;
+    activeConnection = null;
     mockAuthProvider.serverUrl = "http://localhost/mcp";
-    sharedClient.createSession.mockImplementation(async () => {
-      activeSession = makeSession();
-      return activeSession;
+    sharedClient.connect.mockImplementation(async () => {
+      activeConnection = makeConnection();
+      return activeConnection;
     });
 
     vi.resetModules();
@@ -142,7 +145,6 @@ describe("useMcp callback freshness", () => {
         url,
         enabled: true,
         authProvider: mockAuthProvider,
-        transportType: "http",
         autoProxyFallback: false,
         autoRetry: false,
         autoReconnect: false,
@@ -168,7 +170,7 @@ describe("useMcp callback freshness", () => {
 
     expect(latest?.state).toBe("ready");
     expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
-    expect(sharedClient.createSession).toHaveBeenCalledTimes(1);
+    expect(sharedClient.connect).toHaveBeenCalledTimes(1);
 
     const addServerConfig = sharedClient.addServer.mock.calls[0][1];
     expect(typeof addServerConfig.onSampling).toBe("function");
@@ -176,13 +178,9 @@ describe("useMcp callback freshness", () => {
     const wiredSampling = addServerConfig.onSampling;
     const wiredElicitation = addServerConfig.onElicitation;
 
-    expect(activeSession?.on).toHaveBeenCalledWith(
-      "notification",
-      expect.any(Function)
-    );
-    const notificationHandler = activeSession!.on.mock.calls.find(
-      (call) => call[0] === "notification"
-    )?.[1] as (n: { method: string }) => void;
+    const notificationHandler = addServerConfig.onNotification as (n: {
+      method: string;
+    }) => void;
 
     // Change only callback identities (same URL / connection options)
     await act(async () => {
@@ -199,7 +197,7 @@ describe("useMcp callback freshness", () => {
 
     // Callback identity churn must not force a reconnect
     expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
-    expect(sharedClient.createSession).toHaveBeenCalledTimes(1);
+    expect(sharedClient.connect).toHaveBeenCalledTimes(1);
     expect(latest?.state).toBe("ready");
 
     // Proxies wired at connect time must dispatch to the *latest* handlers
@@ -271,7 +269,6 @@ describe("useMcp callback freshness", () => {
         url,
         enabled: true,
         authProvider: mockAuthProvider,
-        transportType: "http",
         autoProxyFallback: false,
         autoRetry: false,
         autoReconnect: false,
@@ -361,53 +358,12 @@ describe("useMcp callback freshness", () => {
     expect(elicitV2).toHaveBeenCalledTimes(1);
   });
 
-  it("advertises callbacks via deprecated aliases through the same proxies", async () => {
-    const sampling = vi.fn().mockResolvedValue(samplingResult);
-    const elicit = vi.fn().mockResolvedValue(elicitResult);
-
-    function TestComponent() {
-      useMcp({
-        url: "http://localhost/mcp",
-        enabled: true,
-        authProvider: mockAuthProvider,
-        transportType: "http",
-        autoProxyFallback: false,
-        autoRetry: false,
-        autoReconnect: false,
-        logLevel: "silent",
-        samplingCallback: sampling,
-        elicitationCallback: elicit,
-      });
-      return null;
-    }
-
-    await act(async () => {
-      create(<TestComponent />);
-    });
-    await flushMicrotasks();
-
-    expect(sharedClient.addServer).toHaveBeenCalledTimes(1);
-    const config = sharedClient.addServer.mock.calls[0][1];
-    expect(typeof config.onSampling).toBe("function");
-    expect(typeof config.onElicitation).toBe("function");
-
-    await config.onSampling({ messages: [], maxTokens: 1 });
-    await config.onElicitation({
-      message: "x",
-      mode: "form",
-      requestedSchema: { type: "object", properties: {} },
-    });
-    expect(sampling).toHaveBeenCalledTimes(1);
-    expect(elicit).toHaveBeenCalledTimes(1);
-  });
-
   it("omits sampling/elicitation proxies when no callbacks are provided", async () => {
     function TestComponent() {
       useMcp({
         url: "http://localhost/mcp",
         enabled: true,
         authProvider: mockAuthProvider,
-        transportType: "http",
         autoProxyFallback: false,
         autoRetry: false,
         autoReconnect: false,

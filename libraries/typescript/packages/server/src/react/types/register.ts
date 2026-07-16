@@ -10,7 +10,9 @@ type RegisteredToolsModule = Register extends { tools: infer M }
 
 type ToolsFromModule<M> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ToolRef conditional inference requires `any` in the constraint position (spec)
-  [K in keyof M as M[K] extends ToolRef<infer N, any, any> ? N : never]: M[K] extends ToolRef<
+  [K in keyof M as M[K] extends ToolRef<infer N, any, any>
+    ? N
+    : never]: M[K] extends ToolRef<
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- paired with the constraint above
     any,
     infer I,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 
 /**
  * Shared state + lifecycle for elicitation form/url requests.
@@ -9,8 +9,7 @@ import type { PendingElicitationRequest } from "@/client/types/elicitation";
  *  - Resetting `urlCompleted` when the request changes.
  *  - Validating required fields on submit.
  *
- * Used by both the full-panel (`ElicitationRequestDisplay`) and the
- * inline chat card (`InlineElicitationCard`) variants.
+ * Used by the full-panel (`ElicitationRequestDisplay`) variant.
  */
 export function useElicitationForm(request: PendingElicitationRequest | null) {
   const [formData, setFormData] = useState<Record<string, any>>({});

@@ -16,13 +16,7 @@
  *   AUTH0_AUDIENCE       (required for JWT tokens) API identifier
  */
 
-import {
-  MCPServer,
-  oauthProxy,
-  jwksVerifier,
-  object,
-  error,
-} from "mcp-use";
+import { MCPServer, oauthProxy, jwksVerifier, object, error } from "mcp-use";
 
 const domain = process.env.AUTH0_DOMAIN;
 const clientId = process.env.AUTH0_CLIENT_ID;

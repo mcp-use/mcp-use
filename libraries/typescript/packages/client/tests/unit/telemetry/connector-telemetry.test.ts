@@ -8,33 +8,25 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { setConnectorTelemetryTracker } from "../../../src/telemetry/connector-telemetry.js";
 
 // Create mock tracking function
 const mockTrackConnectorInit = vi.fn().mockResolvedValue(undefined);
 
-// Mock the telemetry module
-vi.mock("../../../src/telemetry/telemetry-node.js", () => ({
-  Telemetry: {
-    getInstance: vi.fn(() => ({
-      trackConnectorInit: mockTrackConnectorInit,
-      isEnabled: true,
-    })),
-  },
-}));
-
 describe("Connector Telemetry Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setConnectorTelemetryTracker(mockTrackConnectorInit);
   });
 
   afterEach(() => {
-    vi.resetModules();
+    setConnectorTelemetryTracker(undefined);
   });
 
   describe("BaseConnector trackConnectorInit method", () => {
     it("should add connector type automatically when calling trackConnectorInit", async () => {
       // Import BaseConnector to test the protected method
-      const { BaseConnector } = await import("../../../src/connectors/base.js");
+      const { BaseConnector } = await import("../../../src/transport/base.js");
 
       // Create a test subclass to access the protected method
       class TestConnector extends BaseConnector {
@@ -63,7 +55,7 @@ describe("Connector Telemetry Integration", () => {
     });
 
     it("should include serverCommand and serverArgs for stdio-like connectors", async () => {
-      const { BaseConnector } = await import("../../../src/connectors/base.js");
+      const { BaseConnector } = await import("../../../src/transport/base.js");
 
       class StdioLikeConnector extends BaseConnector {
         public async connect(): Promise<void> {
@@ -91,7 +83,7 @@ describe("Connector Telemetry Integration", () => {
     });
 
     it("should include serverUrl for http-like connectors", async () => {
-      const { BaseConnector } = await import("../../../src/connectors/base.js");
+      const { BaseConnector } = await import("../../../src/transport/base.js");
 
       class HttpLikeConnector extends BaseConnector {
         public async connect(): Promise<void> {
@@ -175,19 +167,6 @@ describe("Connector Telemetry Integration", () => {
       expect(expectedData.serverUrl).toBe("http://localhost:3000");
       expect(expectedData.publicIdentifier).toContain("streamable-http");
     });
-
-    it("should prepare correct telemetry data for SSE fallback", () => {
-      // Verify the expected data structure for SSE mode
-      const expectedData = {
-        connectorType: "HttpConnector",
-        serverUrl: "http://localhost:3000",
-        publicIdentifier: "http://localhost:3000 (sse)",
-      };
-
-      expect(expectedData.connectorType).toBe("HttpConnector");
-      expect(expectedData.serverUrl).toBe("http://localhost:3000");
-      expect(expectedData.publicIdentifier).toContain("sse");
-    });
   });
 
   describe("StdioConnector telemetry data verification", () => {
@@ -225,87 +204,6 @@ describe("Connector Telemetry Integration", () => {
       expect(expectedData.serverCommand).toBe("npx");
       expect(expectedData.serverArgs).toContain("-y");
       expect(expectedData.publicIdentifier).toBe("npx -y @my/mcp-server");
-    });
-  });
-
-  describe("Integration tests - actual connector connection", () => {
-    // Mock PostHog for integration tests
-    const mockCapture = vi.fn();
-    const mockFlush = vi.fn();
-    const mockShutdown = vi.fn();
-
-    beforeEach(() => {
-      vi.mock("posthog-node", () => {
-        return {
-          PostHog: class MockPostHog {
-            capture = mockCapture;
-            flush = mockFlush;
-            shutdown = mockShutdown;
-          },
-        };
-      });
-      vi.mock("node:fs", () => ({
-        existsSync: vi.fn().mockReturnValue(false),
-        mkdirSync: vi.fn(),
-        writeFileSync: vi.fn(),
-        readFileSync: vi.fn().mockReturnValue("test-user-id"),
-      }));
-      vi.mock("node:os", () => ({
-        homedir: vi.fn().mockReturnValue("/mock/home"),
-      }));
-    });
-
-    it("should track HttpConnector init when connect() is called", async () => {
-      // Note: This test would require mocking the HTTP transport
-      // For now, we verify the BaseConnector method works correctly
-      // Full integration test would require setting up a mock HTTP server
-      const { BaseConnector } = await import("../../../src/connectors/base.js");
-
-      class TestHttpConnector extends BaseConnector {
-        public async connect(): Promise<void> {
-          // Simulate what HttpConnector does after successful connection
-          this.trackConnectorInit({
-            serverUrl: "http://test.example.com",
-            publicIdentifier: "http://test.example.com (streamable-http)",
-          });
-        }
-
-        get publicIdentifier(): Record<string, string> {
-          return { url: "http://test.example.com" };
-        }
-      }
-
-      const connector = new TestHttpConnector();
-      await connector.connect();
-
-      // Verify telemetry was called (would need PostHog mock set up)
-      // This test verifies the integration pattern works
-      expect(connector).toBeDefined();
-    });
-
-    it("should track StdioConnector init when connect() is called", async () => {
-      const { BaseConnector } = await import("../../../src/connectors/base.js");
-
-      class TestStdioConnector extends BaseConnector {
-        public async connect(): Promise<void> {
-          // Simulate what StdioConnector does after successful connection
-          this.trackConnectorInit({
-            serverCommand: "node",
-            serverArgs: ["server.js"],
-            publicIdentifier: "node server.js",
-          });
-        }
-
-        get publicIdentifier(): Record<string, string> {
-          return { command: "node" };
-        }
-      }
-
-      const connector = new TestStdioConnector();
-      await connector.connect();
-
-      // Verify the integration pattern works
-      expect(connector).toBeDefined();
     });
   });
 });

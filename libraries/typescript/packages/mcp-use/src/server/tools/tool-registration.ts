@@ -13,6 +13,10 @@ import type {
   CallToolResult,
   ElicitRequest,
 } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CreateMessageResultSchema,
+  ElicitResultSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { runWithContext, getRequestContext } from "../context-storage.js";
 import type {
   ToolDefinition,
@@ -44,6 +48,11 @@ interface ToolServerContext<_HasOAuth extends boolean = false> {
             method: string;
             params: Record<string, unknown>;
           }) => Promise<void>;
+          sendRequest?: (
+            request: Record<string, unknown>,
+            resultSchema: unknown,
+            options?: { timeout?: number }
+          ) => Promise<unknown>;
         }
       ) => Promise<CallToolResult>
     ) => void;
@@ -175,6 +184,11 @@ export function toolRegistration<
           method: string;
           params: Record<string, unknown>;
         }) => Promise<void>;
+        sendRequest?: (
+          request: Record<string, unknown>,
+          resultSchema: unknown,
+          options?: { timeout?: number }
+        ) => Promise<unknown>;
       }
     ) => {
       // Get the HTTP request context from AsyncLocalStorage
@@ -213,11 +227,46 @@ export function toolRegistration<
             ) as Record<string, unknown>)
           : undefined;
 
+      // Related reverse RPC rides the active tools/call response stream. This
+      // works before the optional standalone GET stream is attached.
+      const sessionProtocol = session?.server?.server;
+      const createMessage = extra?.sendRequest
+        ? (
+            params: CreateMessageRequest["params"],
+            options?: { timeout?: number }
+          ) =>
+            extra.sendRequest!(
+              { method: "sampling/createMessage", params },
+              CreateMessageResultSchema,
+              options
+            ) as Promise<CreateMessageResult>
+        : sessionProtocol?.createMessage.bind(sessionProtocol);
+      const elicitInput = extra?.sendRequest
+        ? (params: ElicitRequest["params"], options?: { timeout?: number }) =>
+            extra.sendRequest!(
+              { method: "elicitation/create", params },
+              ElicitResultSchema,
+              options
+            ) as Promise<ElicitResult>
+        : sessionProtocol?.elicitInput.bind(sessionProtocol);
+
       // Create enhanced context with sample, elicit, and reportProgress methods
       const enhancedContext = createEnhancedContext(
         requestContext,
-        this.createMessage.bind(this),
-        this.server.server.elicitInput.bind(this.server.server),
+        createMessage ??
+          (() =>
+            Promise.reject(
+              new Error(
+                "Sampling requires an active v1 client connection for this request"
+              )
+            )),
+        elicitInput ??
+          (() =>
+            Promise.reject(
+              new Error(
+                "Elicitation requires an active v1 client connection for this request"
+              )
+            )),
         progressToken,
         sendNotification,
         session?.logLevel,

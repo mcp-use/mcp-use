@@ -44,4 +44,3 @@ export function McpIcon({ className }: IconProps) {
     </svg>
   );
 }
-

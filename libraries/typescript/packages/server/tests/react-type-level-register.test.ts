@@ -50,18 +50,24 @@ describe("ToolsFromModule / Register", () => {
     type Ready = Extract<Handle, { status: "ready" }>;
     expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<Output>();
     expectTypeOf<Ready["toolInput"]>().toEqualTypeOf<Input | undefined>();
-    expectTypeOf<"toolName" extends keyof Ready ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof Ready ? true : false
+    >().toEqualTypeOf<false>();
 
     type Pending = Extract<Handle, { status: "pending" }>;
     expectTypeOf<Pending["toolInput"]>().toEqualTypeOf<
       DeepPartial<Input> | undefined
     >();
     expectTypeOf<Pending["toolOutput"]>().toEqualTypeOf<undefined>();
-    expectTypeOf<"toolName" extends keyof Pending ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof Pending ? true : false
+    >().toEqualTypeOf<false>();
 
     type ErrorBranch = Extract<Handle, { status: "error" }>;
     expectTypeOf<ErrorBranch["toolOutput"]>().toEqualTypeOf<undefined>();
-    expectTypeOf<"toolName" extends keyof ErrorBranch ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof ErrorBranch ? true : false
+    >().toEqualTypeOf<false>();
     expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<ToolContextError>();
     expectTypeOf<ErrorBranch["error"]>().toEqualTypeOf<ToolError>();
     expectTypeOf<ErrorBranch["error"]["message"]>().toEqualTypeOf<string>();
@@ -76,10 +82,14 @@ describe("ToolsFromModule / Register", () => {
 
     type Ready = Extract<Handle, { status: "ready" }>;
     expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<SearchOut | DetailsOut>();
-    expectTypeOf<"toolName" extends keyof Ready ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof Ready ? true : false
+    >().toEqualTypeOf<false>();
 
     type Pending = Extract<Handle, { status: "pending" }>;
-    expectTypeOf<"toolName" extends keyof Pending ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof Pending ? true : false
+    >().toEqualTypeOf<false>();
     expectTypeOf<Pending["toolInput"]>().toEqualTypeOf<
       | DeepPartial<RegisteredTools["search-fruits"]["input"]>
       | DeepPartial<RegisteredTools["get-details"]["input"]>
@@ -92,13 +102,17 @@ describe("ToolsFromModule / Register", () => {
   it("keeps untyped useToolContext ready without toolName", () => {
     type Handle = ToolContextHandle;
     type Ready = Extract<Handle, { status: "ready" }>;
-    expectTypeOf<"toolName" extends keyof Ready ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof Ready ? true : false
+    >().toEqualTypeOf<false>();
     // ToolOutput<never> is `never`; ToolInput<never> | undefined collapses to undefined.
     expectTypeOf<Ready["toolOutput"]>().toEqualTypeOf<never>();
     expectTypeOf<Ready["toolInput"]>().toEqualTypeOf<undefined>();
 
     type Pending = Extract<Handle, { status: "pending" }>;
-    expectTypeOf<"toolName" extends keyof Pending ? true : false>().toEqualTypeOf<false>();
+    expectTypeOf<
+      "toolName" extends keyof Pending ? true : false
+    >().toEqualTypeOf<false>();
 
     expect(true).toBe(true);
   });

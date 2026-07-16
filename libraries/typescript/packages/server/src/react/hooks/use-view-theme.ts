@@ -19,8 +19,5 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
  */
 export function useViewTheme(): "light" | "dark" {
   const runtime = useViewRuntime();
-  return useSyncExternalStore(
-    runtime.subscribeTheme,
-    runtime.getThemeSnapshot
-  );
+  return useSyncExternalStore(runtime.subscribeTheme, runtime.getThemeSnapshot);
 }

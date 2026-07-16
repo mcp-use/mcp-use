@@ -1,0 +1,318 @@
+import { parseSSE } from "../sse.js";
+import {
+  partitionToolContent,
+  toolImageFollowupHeader,
+} from "../toolResultParts.js";
+import type {
+  ContentPart,
+  LlmStreamEvent,
+  ProviderConfig,
+  ProviderMessage,
+  ProviderTool,
+} from "../types.js";
+import { tokenUsageFromRecord } from "../usage.js";
+
+/** Structured HTTP error from an LLM provider fetch (preserves status + JSON body). */
+export class LlmRequestError extends Error {
+  readonly status: number;
+  readonly body?: unknown;
+
+  constructor(status: number, message: string, body?: unknown) {
+    super(message);
+    this.name = "LlmRequestError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+async function throwLlmRequestError(res: Response): Promise<never> {
+  const text = await res.text().catch(() => "");
+  let body: unknown = text;
+  if (text) {
+    try {
+      body = JSON.parse(text);
+    } catch {
+      // keep raw text
+    }
+  }
+  throw new LlmRequestError(
+    res.status,
+    `OpenAI request failed (${res.status} ${res.statusText}): ${text}`,
+    body
+  );
+}
+
+interface ChatParams {
+  config: ProviderConfig;
+  messages: ProviderMessage[];
+  tools?: ProviderTool[];
+  signal?: AbortSignal;
+}
+
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
+
+function buildEndpoint(config: ProviderConfig, path: string): string {
+  return `${config.baseUrl ?? OPENAI_BASE_URL}${path}`;
+}
+
+function buildHeaders(config: ProviderConfig): Record<string, string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...config.extraHeaders,
+  };
+  if (config.apiKey) {
+    headers.Authorization = `Bearer ${config.apiKey}`;
+  }
+  return headers;
+}
+
+function toOpenAIContent(content: string | ContentPart[]): unknown {
+  if (typeof content === "string") return content;
+  return content.map((p) => {
+    if (p.type === "text") return { type: "text", text: p.text };
+    return { type: "image_url", image_url: { url: p.url } };
+  });
+}
+
+export function toOpenAIMessages(messages: ProviderMessage[]): unknown[] {
+  const out: unknown[] = [];
+  for (const m of messages) {
+    if (m.role === "tool") {
+      // OpenAI's tool role only accepts string content; forward image bytes as
+      // a follow-up user turn so vision-capable models can see them.
+      const { text, imageParts } = partitionToolContent(m.content);
+      const fallback =
+        imageParts.length > 0
+          ? "[image content; see next message]"
+          : "[no content]";
+      out.push({
+        role: "tool",
+        tool_call_id: m.toolCallId,
+        content: text || fallback,
+      });
+      if (imageParts.length > 0) {
+        const userParts: unknown[] = [
+          {
+            type: "text",
+            text: toolImageFollowupHeader(m.toolName, imageParts.length),
+          },
+          ...imageParts.map((p) => ({
+            type: "image_url",
+            image_url: { url: p.url },
+          })),
+        ];
+        out.push({ role: "user", content: userParts });
+      }
+      continue;
+    }
+    if (m.role === "assistant") {
+      const entry: Record<string, unknown> = {
+        role: "assistant",
+        content:
+          typeof m.content === "string" && m.content.length > 0
+            ? m.content
+            : null,
+      };
+      if (m.toolCalls?.length) {
+        entry.tool_calls = m.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: { name: tc.name, arguments: JSON.stringify(tc.args) },
+        }));
+      }
+      out.push(entry);
+      continue;
+    }
+    out.push({ role: m.role, content: toOpenAIContent(m.content) });
+  }
+  return out;
+}
+
+export async function* streamChat(
+  params: ChatParams
+): AsyncGenerator<LlmStreamEvent, void, unknown> {
+  const { config, messages, tools, signal } = params;
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages: toOpenAIMessages(messages),
+    stream: true,
+  };
+  // ponytail: generic OpenAI-compatible servers may reject stream_options;
+  // request usage only on the known-compatible OpenRouter path.
+  if (config.provider === "openrouter") {
+    body.stream_options = { include_usage: true };
+  }
+  if (config.temperature !== undefined) body.temperature = config.temperature;
+  if (config.maxTokens !== undefined) body.max_tokens = config.maxTokens;
+  if (tools && tools.length > 0) {
+    body.tools = tools.map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema,
+      },
+    }));
+  }
+
+  const endpoint = buildEndpoint(config, "/chat/completions");
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: buildHeaders(config),
+    body: JSON.stringify(body),
+    signal,
+    ...(config.credentials ? { credentials: config.credentials } : {}),
+  });
+
+  const responseBody = res.body;
+  if (!res.ok) {
+    await throwLlmRequestError(res);
+  }
+  if (!responseBody) {
+    await throwLlmRequestError(res);
+  }
+  // ponytail: TS doesn't narrow after awaited Promise<never>
+  const stream = responseBody!;
+
+  // Track per-index buffered tool call info so we can emit a final
+  // `tool-call-ready` with fully-parsed args.
+  const buffers = new Map<
+    number,
+    { id: string; name: string; argsJson: string; started: boolean }
+  >();
+
+  for await (const ev of parseSSE(stream, signal)) {
+    if (!ev.data || ev.data === "[DONE]") continue;
+    let parsed: any;
+    try {
+      parsed = JSON.parse(ev.data);
+    } catch {
+      continue;
+    }
+    const usage = tokenUsageFromRecord(parsed?.usage);
+    if (usage) {
+      yield { type: "usage", usage };
+    }
+    const choice = parsed?.choices?.[0];
+    if (!choice) continue;
+    const delta = choice.delta ?? {};
+    if (typeof delta.content === "string" && delta.content.length > 0) {
+      yield { type: "text-delta", delta: delta.content };
+    }
+    if (Array.isArray(delta.tool_calls)) {
+      for (const tc of delta.tool_calls) {
+        const idx = typeof tc.index === "number" ? tc.index : 0;
+        let buf = buffers.get(idx);
+        if (!buf) {
+          buf = {
+            id: tc.id ?? `call_${idx}`,
+            name: tc.function?.name ?? "",
+            argsJson: "",
+            started: false,
+          };
+          buffers.set(idx, buf);
+        }
+        if (tc.id && !buf.id.startsWith("call_")) buf.id = tc.id;
+        else if (tc.id) buf.id = tc.id;
+        if (tc.function?.name) buf.name = tc.function.name;
+        if (!buf.started && buf.name) {
+          buf.started = true;
+          yield {
+            type: "tool-call-start",
+            index: idx,
+            toolCallId: buf.id,
+            toolName: buf.name,
+          };
+        }
+        const argsChunk: string | undefined = tc.function?.arguments;
+        if (typeof argsChunk === "string" && argsChunk.length > 0) {
+          buf.argsJson += argsChunk;
+          if (buf.started) {
+            yield {
+              type: "tool-call-args-delta",
+              index: idx,
+              toolCallId: buf.id,
+              toolName: buf.name,
+              argsDelta: argsChunk,
+            };
+          }
+        }
+      }
+    }
+    if (choice.finish_reason) {
+      for (const [idx, buf] of buffers) {
+        let args: Record<string, unknown> = {};
+        if (buf.argsJson) {
+          try {
+            args = JSON.parse(buf.argsJson);
+          } catch {
+            args = {};
+          }
+        }
+        yield {
+          type: "tool-call-ready",
+          index: idx,
+          toolCallId: buf.id,
+          toolName: buf.name,
+          args,
+        };
+      }
+      buffers.clear();
+    }
+  }
+  yield { type: "done" };
+}
+
+export async function chat(params: ChatParams): Promise<{
+  text: string;
+  toolCalls: { id: string; name: string; args: Record<string, unknown> }[];
+}> {
+  const { config, messages, tools, signal } = params;
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages: toOpenAIMessages(messages),
+  };
+  if (config.temperature !== undefined) body.temperature = config.temperature;
+  if (config.maxTokens !== undefined) body.max_tokens = config.maxTokens;
+  if (tools && tools.length > 0) {
+    body.tools = tools.map((t) => ({
+      type: "function",
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema,
+      },
+    }));
+  }
+  const endpoint = buildEndpoint(config, "/chat/completions");
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: buildHeaders(config),
+    body: JSON.stringify(body),
+    signal,
+    ...(config.credentials ? { credentials: config.credentials } : {}),
+  });
+  if (!res.ok) {
+    await throwLlmRequestError(res);
+  }
+  const json = await res.json();
+  const choice = json?.choices?.[0]?.message;
+  const text: string =
+    typeof choice?.content === "string" ? choice.content : "";
+  const toolCalls = Array.isArray(choice?.tool_calls)
+    ? choice.tool_calls.map((tc: any) => {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(tc?.function?.arguments ?? "{}");
+        } catch {
+          args = {};
+        }
+        return {
+          id: tc.id,
+          name: tc.function?.name ?? "",
+          args,
+        };
+      })
+    : [];
+  return { text, toolCalls };
+}

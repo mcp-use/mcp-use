@@ -52,8 +52,7 @@ function StoryBody({
   showCaret: boolean;
 }) {
   const paragraphs = splitParagraphs(story);
-  const heading =
-    typeof title === "string" && title.length > 0 ? title : "—";
+  const heading = typeof title === "string" && title.length > 0 ? title : "—";
 
   return (
     <>
@@ -135,11 +134,7 @@ export default function StoryWriter() {
 
   return (
     <div className={root}>
-      <StoryBody
-        title={title}
-        story={ctx.toolInput?.story}
-        showCaret={false}
-      />
+      <StoryBody title={title} story={ctx.toolInput?.story} showCaret={false} />
       <footer className="mt-6 border-t border-neutral-200 pt-3 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">
         {wordCount} {wordCount === 1 ? "word" : "words"}
       </footer>

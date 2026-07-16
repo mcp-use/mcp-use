@@ -1,14 +1,14 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { visualizer } from "rollup-plugin-visualizer";
 import { defineConfig } from "vite";
+import { INSPECTOR_FAVICON_ASSETS } from "./src/server/favicon-links";
 
-const packageJson = JSON.parse(
-  readFileSync(path.resolve(__dirname, "package.json"), "utf-8")
+const clientPackageJson = JSON.parse(
+  readFileSync(path.resolve(__dirname, "../client/package.json"), "utf-8")
 );
-
-const stubDir = path.resolve(__dirname, "src/client/stubs");
 
 /**
  * CDN bundle build config.
@@ -27,71 +27,44 @@ export default defineConfig({
     react(),
     tailwindcss(),
     {
-      name: "inject-version",
-      // In lib mode transformIndexHtml is not called; inject via define instead.
+      name: "copy-favicon-assets",
+      closeBundle() {
+        const publicDir = path.resolve(__dirname, "public");
+        const outDir = path.resolve(__dirname, "dist/cdn");
+        mkdirSync(outDir, { recursive: true });
+        for (const file of INSPECTOR_FAVICON_ASSETS) {
+          copyFileSync(path.join(publicDir, file), path.join(outDir, file));
+        }
+      },
     },
-  ],
+    process.env.ANALYZE === "true" &&
+      visualizer({
+        filename: "dist/cdn/stats.html",
+        gzipSize: true,
+        brotliSize: true,
+      }),
+  ].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "mcp-use/react": path.resolve(
-        __dirname,
-        "../mcp-use/dist/src/react/index.js"
-      ),
-      // Browser MCP client lives in @mcp-use/client after the client split
-      "mcp-use/browser": path.resolve(
-        __dirname,
-        "../client/dist/browser.js"
-      ),
-      "@mcp-use/client/browser": path.resolve(
-        __dirname,
-        "../client/dist/browser.js"
-      ),
-      "posthog-node": path.resolve(stubDir, "posthog-node.js"),
-      "@scarf/scarf": path.resolve(stubDir, "@scarf/scarf.js"),
-      dotenv: path.resolve(stubDir, "dotenv.js"),
-      util: path.resolve(stubDir, "util.js"),
-      path: path.resolve(stubDir, "path.js"),
-      process: path.resolve(stubDir, "process.js"),
-      "node:fs/promises": path.resolve(stubDir, "fs-promises.js"),
-      "fs/promises": path.resolve(stubDir, "fs-promises.js"),
-      "node:fs": path.resolve(stubDir, "fs.js"),
-      fs: path.resolve(stubDir, "fs.js"),
-      "node:async_hooks": path.resolve(stubDir, "async_hooks.js"),
-      "node:stream": path.resolve(stubDir, "stream.js"),
-      "node:process": path.resolve(stubDir, "process.js"),
-      "node:child_process": path.resolve(stubDir, "child_process.js"),
-      child_process: path.resolve(stubDir, "child_process.js"),
-      "@modelcontextprotocol/sdk/client/stdio.js": path.resolve(
-        stubDir,
-        "stdio-transport.js"
-      ),
-      "@modelcontextprotocol/sdk/client/stdio": path.resolve(
-        stubDir,
-        "stdio-transport.js"
-      ),
-      // v2: @mcp-use/client's stdio connector imports the stdio transport from
-      // @modelcontextprotocol/client/stdio — stub it out of the browser bundle.
-      "@modelcontextprotocol/client/stdio": path.resolve(
-        stubDir,
-        "stdio-transport.js"
-      ),
+      react: path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
     },
+    conditions: ["browser", "module", "import", "default"],
   },
   define: {
     "process.env": "{}",
     "process.platform": '"browser"',
-    __INSPECTOR_VERSION__: JSON.stringify(packageJson.version),
+    __MCP_USE_PACKAGE_VERSION__: JSON.stringify(clientPackageJson.version),
     global: "globalThis",
   },
   optimizeDeps: {
     include: [
-      "mcp-use/react",
-      "mcp-use/browser",
-      "@mcp-use/client/browser",
-      "react-syntax-highlighter",
+      "@mcp-use/client",
+      "@mcp-use/client/react",
+      "@mcp-use/agent",
+      "react-dom",
     ],
-    exclude: ["posthog-node", "tar", "path-scurry"],
   },
   build: {
     lib: {
@@ -113,18 +86,6 @@ export default defineConfig({
         "@e2b/code-interpreter",
         "os",
       ],
-      onwarn(warning, warn) {
-        if (
-          warning.code === "UNRESOLVED_IMPORT" &&
-          warning.exporter?.includes("refractor")
-        ) {
-          return;
-        }
-        warn(warning);
-      },
     },
-  },
-  ssr: {
-    noExternal: ["react-syntax-highlighter", "refractor"],
   },
 });

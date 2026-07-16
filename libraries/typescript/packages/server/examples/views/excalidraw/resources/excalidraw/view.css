@@ -4,7 +4,8 @@
 /* Load Excalidraw's hand-drawn font from CDN (Excalifont = v0.18 default) */
 @font-face {
   font-family: "Excalifont";
-  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2") format("woff2");
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Excalifont/Excalifont-Regular-a88b72a24fb54c9f94e3b5fdaa7481c9.woff2")
+    format("woff2");
   font-display: swap;
 }
 
@@ -13,29 +14,42 @@
    recalculation pass that corrupts text dimensions on first open. */
 @font-face {
   font-family: "Assistant";
-  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Regular.woff2") format("woff2");
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Regular.woff2")
+    format("woff2");
   font-weight: 400;
   font-display: swap;
 }
 @font-face {
   font-family: "Assistant";
-  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Medium.woff2") format("woff2");
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Medium.woff2")
+    format("woff2");
   font-weight: 500;
   font-display: swap;
 }
 @font-face {
   font-family: "Assistant";
-  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Bold.woff2") format("woff2");
+  src: url("https://esm.sh/@excalidraw/excalidraw@0.18.0/dist/prod/fonts/Assistant/Assistant-Bold.woff2")
+    format("woff2");
   font-weight: 700;
   font-display: swap;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+html,
+body,
+#root {
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   font-size: 1rem;
   margin: 0;
   padding: 0;
@@ -202,7 +216,6 @@ body {
   visibility: hidden !important;
 }
 
-
 .loading-state {
   padding: 2rem 1rem;
   text-align: center;
@@ -228,8 +241,12 @@ body {
 }
 
 @keyframes svgFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Stroke draw-on animation for line elements */
@@ -248,8 +265,13 @@ body {
 }
 
 /* Smooth transitions for property changes on existing elements */
-.excalidraw-container svg :where(rect, circle, ellipse, path, line, polyline, polygon, text, g) {
-  transition: fill 0.4s ease-out, stroke 0.4s ease-out, opacity 0.4s ease-out;
+.excalidraw-container
+  svg
+  :where(rect, circle, ellipse, path, line, polyline, polygon, text, g) {
+  transition:
+    fill 0.4s ease-out,
+    stroke 0.4s ease-out,
+    opacity 0.4s ease-out;
 }
 
 /* Chart container */
@@ -272,7 +294,7 @@ body {
   padding: 8px 12px;
   font-size: 12px;
   color: var(--text-color);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* HTML iframe container */

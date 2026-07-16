@@ -64,8 +64,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
     if (
       proc !== undefined &&
       "markShutdown" in proc &&
-      typeof (proc as { markShutdown?: () => void }).markShutdown ===
-        "function"
+      typeof (proc as { markShutdown?: () => void }).markShutdown === "function"
     ) {
       (proc as { markShutdown: () => void }).markShutdown();
     }
@@ -149,7 +148,8 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
           const url = urlMatch[0];
           const fullDomain = urlMatch[1] ?? "";
           const subdomainMatch = fullDomain.match(/^([a-z0-9-]+)\./i);
-          let extractedSubdomain = subdomainMatch?.[1] ?? fullDomain.split(".")[0] ?? "";
+          let extractedSubdomain =
+            subdomainMatch?.[1] ?? fullDomain.split(".")[0] ?? "";
           if (!/^[a-z0-9-]+$/i.test(extractedSubdomain)) {
             console.warn(
               `[mcp-use] warning: extracted subdomain "${extractedSubdomain}" does not match expected format`
@@ -217,9 +217,7 @@ export function createTunnelManager(stateFilePath: string): TunnelManager {
 
       const existingSubdomain = await loadSavedSubdomain();
       if (existingSubdomain !== undefined) {
-        console.log(
-          `[mcp-use] found existing subdomain: ${existingSubdomain}`
-        );
+        console.log(`[mcp-use] found existing subdomain: ${existingSubdomain}`);
         await releaseSubdomain(existingSubdomain);
       }
 

@@ -15,12 +15,13 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
+import { ViewRenderer, isViewResource, isViewTool } from "@mcp-use/client/react";
+import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import type { LLMConfig } from "../chat/types";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { Spinner } from "../ui/spinner";
+import { WidgetWrapper } from "../ui/WidgetWrapper";
 
 export interface ResourceResult {
   uri: string;
@@ -78,6 +79,69 @@ function extractErrorMessage(
   return "An error occurred";
 }
 
+function ResourceViewPanel({
+  serverId,
+  viewId,
+  resourceUri,
+  toolOutput,
+  toolMetadata,
+  readResource,
+  customProps,
+  displayMode,
+  onDisplayModeChange,
+}: {
+  serverId: string;
+  viewId: string;
+  resourceUri: string;
+  toolOutput?: unknown;
+  toolMetadata?: Record<string, unknown>;
+  readResource: (uri: string) => Promise<unknown>;
+  customProps?: Record<string, string>;
+  displayMode: "inline" | "pip" | "fullscreen";
+  onDisplayModeChange: (mode: "inline" | "pip" | "fullscreen") => void;
+}) {
+  const emptyToolInput = useMemo(() => ({}), []);
+  const hostProps = useViewHostProps({
+    serverId,
+    viewId,
+    resourceUri,
+    toolName: resourceUri,
+    toolInput: emptyToolInput,
+    toolOutput,
+    toolMetadata,
+    readResource,
+    displayMode,
+    onDisplayModeChange,
+  });
+
+  if (!hostProps) {
+    return (
+      <WidgetWrapper className="w-full h-full min-h-[240px]">
+        <Spinner className="size-5" />
+      </WidgetWrapper>
+    );
+  }
+
+  const viewRendererClassName =
+    displayMode === "inline"
+      ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
+      : "w-full h-full relative p-4";
+
+  return (
+    <WidgetWrapper className="w-full h-full min-h-[240px]">
+      <ViewRenderer
+        viewId={viewId}
+        toolName={resourceUri}
+        toolInput={emptyToolInput}
+        toolOutput={toolOutput}
+        customProps={customProps}
+        className={viewRendererClassName}
+        {...hostProps}
+      />
+    </WidgetWrapper>
+  );
+}
+
 export function ResourceResultDisplay({
   result,
   isLoading,
@@ -92,8 +156,7 @@ export function ResourceResultDisplay({
   selectedResource,
   llmConfig,
 }: ResourceResultDisplayProps) {
-  // Stable empty object — avoids breaking MCPAppsRenderer memo on every re-render
-  const emptyToolInput = useMemo(() => ({}), []);
+  // Stable empty object — avoids breaking ViewRenderer memo on every re-render
   const [activeProps, setActiveProps] = useState<Record<string, string> | null>(
     null
   );
@@ -140,20 +203,15 @@ export function ResourceResultDisplay({
   }, [combinedAnnotations]);
 
   // Detect widget protocol (MCP Apps only)
-  const widgetProtocol = detectWidgetProtocol(
-    combinedAnnotations,
-    result?.result
-  );
+  const widgetProtocol = isViewTool(combinedAnnotations as Record<string, unknown>)
+    ? "mcp-apps"
+    : null;
 
-  // Check for MCP Apps (SEP-1865)
-  // For resources, check if the resource itself is an MCP App by mimeType
   const isMcpAppResource =
     result?.result &&
     "contents" in result.result &&
     Array.isArray(result.result.contents) &&
-    result.result.contents.some(
-      (item: any) => item.mimeType === "text/html;profile=mcp-app"
-    );
+    result.result.contents.some((item: any) => isViewResource(item.mimeType));
 
   // Resource URI can come from metadata (for tool results) or be the resource URI itself (for resources)
   const mcpAppsResourceUri =
@@ -285,7 +343,7 @@ export function ResourceResultDisplay({
               // MCP Apps mode
               return (
                 <div
-                  className="flex-1 h-full relative"
+                  className="flex flex-1 h-full relative flex-col min-h-0"
                   data-testid="resource-widget-preview"
                 >
                   {/* Floating controls in top-right */}
@@ -316,16 +374,13 @@ export function ResourceResultDisplay({
                       </p>
                     </div>
                   ) : (
-                    <MCPAppsRenderer
+                    <ResourceViewPanel
                       serverId={serverId}
-                      toolCallId={`resource-${result.timestamp}`}
-                      toolName={result.uri}
-                      toolInput={emptyToolInput}
+                      viewId={`resource-${result.timestamp}`}
+                      resourceUri={mcpAppsResourceUri}
                       toolOutput={result.result}
                       toolMetadata={combinedAnnotations}
-                      resourceUri={mcpAppsResourceUri}
                       readResource={readResource}
-                      className="w-full h-full relative flex p-4"
                       customProps={activeProps || undefined}
                       displayMode={mcpAppsDisplayMode}
                       onDisplayModeChange={setMcpAppsDisplayMode}

@@ -8,7 +8,7 @@ import {
 import { useInspector } from "@/client/context/InspectorContext";
 import type { Prompt } from "@modelcontextprotocol/client";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Clock, MessageSquare } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -16,17 +16,14 @@ import {
   useRef,
   useState,
 } from "react";
-import type { SavedPrompt } from "./prompts";
-import {
-  PromptExecutionPanel,
-  PromptResultDisplay,
-  PromptsList,
-  PromptsTabHeader,
-  SavedPromptsList,
-} from "./prompts";
+import type { SavedPrompt } from "./prompts/SavedPromptsList";
+import { PromptExecutionPanel } from "./prompts/PromptExecutionPanel";
+import { PromptResultDisplay } from "./prompts/PromptResultDisplay";
+import { PromptsList } from "./prompts/PromptsList";
+import { SavedPromptsList } from "./prompts/SavedPromptsList";
 import { useMCPPrompts } from "../hooks/useMCPPrompts";
-import { copyToClipboard } from "@/client/utils/clipboard";
-import { RpcPanel } from "./shared";
+import { copyToClipboard } from "@/client/utils/browser";
+import { InspectorScrollArea, ListTabHeader } from "./shared";
 
 export interface PromptsTabRef {
   focusSearch: () => void;
@@ -483,40 +480,54 @@ export function PromptsTab({
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="absolute inset-0 flex flex-col bg-background z-0"
               >
-                <PromptsTabHeader
-                  activeTab={activeTab}
-                  isSearchExpanded={isSearchExpanded}
-                  searchQuery={searchQuery}
-                  filteredPromptsCount={filteredPrompts.length}
-                  savedPromptsCount={savedPrompts.length}
-                  onSearchExpand={() => setIsSearchExpanded(true)}
-                  onSearchChange={setSearchQuery}
-                  onSearchBlur={handleSearchBlur}
-                  onTabSwitch={() =>
-                    setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
-                  }
-                  searchInputRef={
-                    searchInputRef as React.RefObject<HTMLInputElement>
-                  }
-                  onRefresh={refreshPrompts ? handleRefresh : undefined}
-                  isRefreshing={isRefreshing}
-                />
-                {activeTab === "prompts" ? (
-                  <PromptsList
-                    prompts={filteredPrompts}
-                    selectedPrompt={selectedPrompt}
-                    onPromptSelect={handlePromptSelect}
-                    focusedIndex={focusedIndex}
-                  />
-                ) : (
-                  <SavedPromptsList
-                    savedPrompts={savedPrompts}
-                    selectedPrompt={selectedSavedPrompt}
-                    onLoadPrompt={loadSavedPrompt}
-                    onDeletePrompt={deleteSavedPrompt}
-                    focusedIndex={focusedIndex}
-                  />
-                )}
+                <InspectorScrollArea>
+                  {(isScrolled) => (
+                    <>
+                      <ListTabHeader
+                        isScrolled={isScrolled}
+                        activeTab={activeTab}
+                        isSearchExpanded={isSearchExpanded}
+                        searchQuery={searchQuery}
+                        primaryTabName="prompts"
+                        secondaryTabName="saved"
+                        primaryTabTitle="Prompts"
+                        secondaryTabTitle="History"
+                        primaryCount={filteredPrompts.length}
+                        secondaryCount={savedPrompts.length}
+                        primaryIcon={MessageSquare}
+                        secondaryIcon={Clock}
+                        searchPlaceholder="Search prompts..."
+                        onSearchExpand={() => setIsSearchExpanded(true)}
+                        onSearchChange={setSearchQuery}
+                        onSearchBlur={handleSearchBlur}
+                        onTabSwitch={() =>
+                          setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
+                        }
+                        searchInputRef={
+                          searchInputRef as React.RefObject<HTMLInputElement>
+                        }
+                        onRefresh={refreshPrompts ? handleRefresh : undefined}
+                        isRefreshing={isRefreshing}
+                      />
+                      {activeTab === "prompts" ? (
+                        <PromptsList
+                          prompts={filteredPrompts}
+                          selectedPrompt={selectedPrompt}
+                          onPromptSelect={handlePromptSelect}
+                          focusedIndex={focusedIndex}
+                        />
+                      ) : (
+                        <SavedPromptsList
+                          savedPrompts={savedPrompts}
+                          selectedPrompt={selectedSavedPrompt}
+                          onLoadPrompt={loadSavedPrompt}
+                          onDeletePrompt={deleteSavedPrompt}
+                          focusedIndex={focusedIndex}
+                        />
+                      )}
+                    </>
+                  )}
+                </InspectorScrollArea>
               </motion.div>
             )}
 
@@ -574,54 +585,55 @@ export function PromptsTab({
         collapsible
         className="flex flex-col h-full relative"
       >
-        <ResizablePanelGroup
-          orientation="vertical"
-          className="h-full border-r dark:border-zinc-700"
-        >
-          <ResizablePanel defaultSize="75%" minSize="30%">
-            <div className="flex flex-col h-full overflow-hidden">
-              <PromptsTabHeader
-                activeTab={activeTab}
-                isSearchExpanded={isSearchExpanded}
-                searchQuery={searchQuery}
-                filteredPromptsCount={filteredPrompts.length}
-                savedPromptsCount={savedPrompts.length}
-                onSearchExpand={() => setIsSearchExpanded(true)}
-                onSearchChange={setSearchQuery}
-                onSearchBlur={handleSearchBlur}
-                onTabSwitch={() =>
-                  setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
-                }
-                searchInputRef={
-                  searchInputRef as React.RefObject<HTMLInputElement>
-                }
-                onRefresh={refreshPrompts ? handleRefresh : undefined}
-                isRefreshing={isRefreshing}
-              />
-
-              {activeTab === "prompts" ? (
-                <PromptsList
-                  prompts={filteredPrompts}
-                  selectedPrompt={selectedPrompt}
-                  onPromptSelect={handlePromptSelect}
-                  focusedIndex={focusedIndex}
+        <div className="flex h-full flex-col overflow-hidden border-r dark:border-zinc-700">
+          <InspectorScrollArea>
+            {(isScrolled) => (
+              <>
+                <ListTabHeader
+                  isScrolled={isScrolled}
+                  activeTab={activeTab}
+                  isSearchExpanded={isSearchExpanded}
+                  searchQuery={searchQuery}
+                  primaryTabName="prompts"
+                  secondaryTabName="saved"
+                  primaryTabTitle="Prompts"
+                  secondaryTabTitle="History"
+                  primaryCount={filteredPrompts.length}
+                  secondaryCount={savedPrompts.length}
+                  primaryIcon={MessageSquare}
+                  secondaryIcon={Clock}
+                  searchPlaceholder="Search prompts..."
+                  onSearchExpand={() => setIsSearchExpanded(true)}
+                  onSearchChange={setSearchQuery}
+                  onSearchBlur={handleSearchBlur}
+                  onTabSwitch={() =>
+                    setActiveTab(activeTab === "prompts" ? "saved" : "prompts")
+                  }
+                  searchInputRef={searchInputRef as React.RefObject<HTMLInputElement>}
+                  onRefresh={refreshPrompts ? handleRefresh : undefined}
+                  isRefreshing={isRefreshing}
                 />
-              ) : (
-                <SavedPromptsList
-                  savedPrompts={savedPrompts}
-                  selectedPrompt={selectedSavedPrompt}
-                  onLoadPrompt={loadSavedPrompt}
-                  onDeletePrompt={deleteSavedPrompt}
-                  focusedIndex={focusedIndex}
-                />
-              )}
-            </div>
-          </ResizablePanel>
 
-          <ResizableHandle withHandle />
-
-          <RpcPanel serverId={serverId} />
-        </ResizablePanelGroup>
+                {activeTab === "prompts" ? (
+                  <PromptsList
+                    prompts={filteredPrompts}
+                    selectedPrompt={selectedPrompt}
+                    onPromptSelect={handlePromptSelect}
+                    focusedIndex={focusedIndex}
+                  />
+                ) : (
+                  <SavedPromptsList
+                    savedPrompts={savedPrompts}
+                    selectedPrompt={selectedSavedPrompt}
+                    onLoadPrompt={loadSavedPrompt}
+                    onDeletePrompt={deleteSavedPrompt}
+                    focusedIndex={focusedIndex}
+                  />
+                )}
+              </>
+            )}
+          </InspectorScrollArea>
+        </div>
       </ResizablePanel>
 
       <ResizableHandle withHandle />

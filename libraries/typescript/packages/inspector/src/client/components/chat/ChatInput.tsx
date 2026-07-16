@@ -1,12 +1,13 @@
 import { Button } from "@/client/components/ui/button";
 import { Textarea } from "@/client/components/ui/textarea";
 import { cn } from "@/client/lib/utils";
+import { useShape } from "@/client/lib/shape-context";
 import { Image as ImageIcon, Paperclip, X } from "lucide-react";
-import React, { useRef } from "react";
+import React, { useRef, type ReactNode } from "react";
 import type { ToolInfo } from "./ToolSelector";
 import { ToolSelector } from "./ToolSelector";
 import type { MessageAttachment } from "./types";
-import { formatFileSize } from "./utils";
+import { formatFileSize } from "@/client/utils/format";
 
 interface ChatInputProps {
   inputValue: string;
@@ -26,6 +27,10 @@ interface ChatInputProps {
   onClick: () => void;
   onAttachmentAdd: (file: File) => void;
   onAttachmentRemove: (index: number) => void;
+  /** Optional slot rendered inline with attach / tool controls. */
+  inlineControls?: ReactNode;
+  /** Optional slot on the bottom-right (e.g. model selector, submit). */
+  trailingControls?: ReactNode;
 }
 
 export function ChatInput({
@@ -46,7 +51,10 @@ export function ChatInput({
   onClick,
   onAttachmentAdd,
   onAttachmentRemove,
+  inlineControls,
+  trailingControls,
 }: ChatInputProps) {
+  const shape = useShape();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -109,7 +117,8 @@ export function ChatInput({
         onClick={onClick}
         placeholder={isConnected ? placeholder : "Server not connected"}
         className={cn(
-          "p-4 min-h-[150px] max-h-[300px] rounded-xl",
+          "p-4 min-h-[150px] max-h-[300px]",
+          shape.container,
           hasAttachments && "pt-20",
           className
         )}
@@ -128,33 +137,41 @@ export function ChatInput({
         aria-label="Upload images"
       />
 
-      {/* Bottom-left controls: attach + tool selector */}
-      <div className="absolute left-0 p-3 bottom-0 flex items-center gap-0.5">
-        {showAttachButton && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!isConnected || isLoading}
-            className="h-auto w-auto aspect-square rounded-full p-2 text-muted-foreground hover:text-foreground"
-            title="Attach images"
-            type="button"
-            data-testid="chat-attach-button"
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-        )}
-        {tools &&
-          tools.length > 0 &&
-          disabledTools &&
-          onDisabledToolsChange && (
-            <ToolSelector
-              tools={tools}
-              disabledTools={disabledTools}
-              onDisabledToolsChange={onDisabledToolsChange}
+      {/* Bottom toolbar: attach/tools left, trailing controls right */}
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-3">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          {showAttachButton && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
               disabled={!isConnected || isLoading}
-            />
+              className="h-auto w-auto aspect-square rounded-full p-2 text-muted-foreground hover:text-foreground"
+              title="Attach images"
+              type="button"
+              data-testid="chat-attach-button"
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
           )}
+          {tools &&
+            tools.length > 0 &&
+            disabledTools &&
+            onDisabledToolsChange && (
+              <ToolSelector
+                tools={tools}
+                disabledTools={disabledTools}
+                onDisabledToolsChange={onDisabledToolsChange}
+                disabled={!isConnected || isLoading}
+              />
+            )}
+          {inlineControls}
+        </div>
+        {trailingControls ? (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {trailingControls}
+          </div>
+        ) : null}
       </div>
     </div>
   );

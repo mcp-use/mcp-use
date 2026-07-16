@@ -4,7 +4,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/client/components/ui/select";
 import {
   Check,
@@ -23,13 +22,14 @@ import React, {
   useState,
 } from "react";
 import { toast } from "sonner";
-import type { MessageContentBlock } from "mcp-use/react";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
+import type { MessageContentBlock } from "@/client/types/message-content-block";
+import { ViewRenderer, getViewResourceUri, isViewTool } from "@mcp-use/client/react";
+import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { MCPAppsDebugControls } from "../MCPAppsDebugControls";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { JSONDisplay } from "../shared/JSONDisplay";
 import { NotFound } from "../ui/not-found";
 import { Spinner } from "../ui/spinner";
+import { WidgetWrapper } from "../ui/WidgetWrapper";
 
 export interface ToolResult {
   toolName: string;
@@ -381,6 +381,79 @@ function FormattedContentDisplay({ content }: { content: any[] }) {
   );
 }
 
+function ToolResultViewPanel({
+  serverId,
+  viewId,
+  toolName,
+  resourceUri,
+  toolInput,
+  toolOutput,
+  toolMetadata,
+  readResource,
+  customProps,
+  displayMode,
+  onDisplayModeChange,
+  onSendFollowUp,
+}: {
+  serverId: string;
+  viewId: string;
+  toolName: string;
+  resourceUri: string;
+  toolInput?: Record<string, unknown>;
+  toolOutput?: unknown;
+  toolMetadata?: Record<string, unknown>;
+  readResource: (uri: string) => Promise<unknown>;
+  customProps?: Record<string, string>;
+  displayMode: "inline" | "pip" | "fullscreen";
+  onDisplayModeChange: (mode: "inline" | "pip" | "fullscreen") => void;
+  onSendFollowUp?: (content: MessageContentBlock[]) => void;
+}) {
+  const hostProps = useViewHostProps({
+    serverId,
+    viewId,
+    resourceUri,
+    toolName,
+    toolInput,
+    toolOutput,
+    toolMetadata,
+    readResource,
+    displayMode,
+    onDisplayModeChange,
+  });
+
+  if (!hostProps) {
+    return (
+      <WidgetWrapper className="w-full h-full min-h-[240px]">
+        <Spinner className="size-5" />
+      </WidgetWrapper>
+    );
+  }
+
+  const viewRendererClassName =
+    displayMode === "inline"
+      ? "w-full h-full flex items-center justify-center relative p-4 min-h-0"
+      : "w-full h-full relative p-4";
+
+  return (
+    <WidgetWrapper className="w-full h-full min-h-[240px]">
+      <ViewRenderer
+        viewId={viewId}
+        toolName={toolName}
+        toolInput={toolInput}
+        toolOutput={toolOutput}
+        customProps={customProps}
+        className={viewRendererClassName}
+        onMessage={(content) => {
+          if (content.length > 0 && onSendFollowUp) {
+            onSendFollowUp(content as MessageContentBlock[]);
+          }
+        }}
+        {...hostProps}
+      />
+    </WidgetWrapper>
+  );
+}
+
 export function ToolResultDisplay({
   results,
   copiedResult,
@@ -494,15 +567,15 @@ export function ToolResultDisplay({
   // IMPORTANT: These hooks must be called before any early returns
   const widgetProtocol = useMemo(
     () =>
-      result ? detectWidgetProtocol(result.toolMeta, result.result) : null,
+      result ? (isViewTool(result.toolMeta) ? "mcp-apps" : null) : null,
     [result]
   );
 
   // Check for MCP Apps (SEP-1865) - BEFORE early return
   const mcpAppsResourceUri = useMemo(() => {
-    if (!result) return null;
-    return result.toolMeta?.ui?.resourceUri || null;
-  }, [result]);
+    if (!result?.toolMeta) return null;
+    return getViewResourceUri(result.toolMeta);
+  }, [result?.toolMeta]);
 
   const hasMcpAppsResource = useMemo(
     () => widgetProtocol === "mcp-apps" && !!mcpAppsResourceUri,
@@ -702,14 +775,15 @@ export function ToolResultDisplay({
                   value={selectedIndex.toString()}
                   onValueChange={(value) => setSelectedIndex(parseInt(value))}
                 >
-                  <SelectTrigger size="sm" className="w-[140px] h-8 text-xs">
-                    <SelectValue>
+                  <SelectTrigger
+                    className="w-[140px] h-8 text-xs"
+                    leading={
                       <div className="flex items-center gap-1">
                         <History className="h-3 w-3" />
                         <RelativeTimeDisplay timestamp={result.timestamp} />
                       </div>
-                    </SelectValue>
-                  </SelectTrigger>
+                    }
+                  />
                   <SelectContent>
                     {toolResults.map((r, idx) => (
                       <SelectItem key={idx} value={idx.toString()}>
@@ -786,7 +860,7 @@ export function ToolResultDisplay({
                   }
 
                   return (
-                    <div className="flex-1 relative">
+                    <div className="flex flex-1 relative flex-col min-h-0">
                       {/* Floating controls in top-right */}
                       <div className="absolute top-2 right-2 z-30 flex items-center gap-2">
                         <MCPAppsDebugControls
@@ -803,22 +877,20 @@ export function ToolResultDisplay({
                         />
                       </div>
 
-                      <MCPAppsRenderer
+                      <ToolResultViewPanel
                         key={`mcp-apps-${result.timestamp}`}
                         serverId={serverId}
-                        toolCallId={`tool-${result.timestamp}`}
+                        viewId={`tool-${result.timestamp}`}
                         toolName={result.toolName}
                         toolInput={memoizedArgs}
                         toolOutput={memoizedResult}
                         toolMetadata={result.toolMeta}
                         resourceUri={mcpAppsResourceUri}
                         readResource={memoizedReadResource}
-                        className="w-full h-full relative p-4"
                         customProps={activeProps || undefined}
                         displayMode={mcpAppsDisplayMode}
                         onDisplayModeChange={setMcpAppsDisplayMode}
                         onSendFollowUp={memoizedOnSendFollowUp}
-                        onRerun={onRerunTool}
                       />
                     </div>
                   );
@@ -889,12 +961,12 @@ export function ToolResultDisplay({
       </div>
 
       {activeUri && viewMode === "mcp-apps" && (
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-            <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">
-              {activeUri}
-            </span>
-          </div>
-        )}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+          <span className="text-[11px] bg-gray-200 dark:bg-zinc-800 text-gray-500 dark:text-gray-400 px-3 py-0.5 rounded-t-xl font-mono max-w-[320px] truncate block">
+            {activeUri}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

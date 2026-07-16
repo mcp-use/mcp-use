@@ -11,7 +11,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrowserOAuthClientProvider } from "../../../src/auth/browser-provider.js";
+import { BrowserOAuthClientProvider } from "../../../src/auth/browser.js";
 import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
 const PROXY_URL = "https://inspector.local/inspector/api/oauth";
@@ -74,6 +74,101 @@ describe("BrowserOAuthClientProvider — scoped OAuth proxy fetch", () => {
     expect(globalFetchSpy).toHaveBeenCalledTimes(2);
     const proxiedUrl = String(globalFetchSpy.mock.calls[1][0]);
     expect(proxiedUrl.startsWith(`${PROXY_URL}/metadata`)).toBe(true);
+    expect(new URL(proxiedUrl).searchParams.get("mcp_url")).toBeNull();
+    expect(new URL(proxiedUrl).searchParams.get("serverUrl")).toBe(
+      "https://server-a.example.com/mcp"
+    );
+  });
+
+  it("does not intercept browser authorization requests", async () => {
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+    const scoped = provider.getProxyFetch()!;
+
+    await scoped("https://auth.example.com/oauth/authorize");
+
+    expect(globalFetchSpy).toHaveBeenCalledOnce();
+    expect(String(globalFetchSpy.mock.calls[0][0])).toBe(
+      "https://auth.example.com/oauth/authorize"
+    );
+  });
+
+  it("proxies metadata-discovered OAuth endpoints with nonstandard paths", async () => {
+    globalFetchSpy
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            token_endpoint: "https://auth.example.com/exchange",
+          }),
+          { headers: { "content-type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            status: 200,
+            statusText: "OK",
+            headers: { "content-type": "application/json" },
+            body: { access_token: "token" },
+          })
+        )
+      );
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+    const scoped = provider.getProxyFetch()!;
+
+    await scoped(
+      "https://server-a.example.com/.well-known/oauth-authorization-server"
+    );
+    await scoped("https://auth.example.com/exchange", {
+      method: "POST",
+      body: new URLSearchParams({ grant_type: "authorization_code" }),
+    });
+
+    expect(String(globalFetchSpy.mock.calls[1][0])).toBe(`${PROXY_URL}/proxy`);
+    expect(
+      JSON.parse(String(globalFetchSpy.mock.calls[1][1]?.body)).serverUrl
+    ).toBe("https://server-a.example.com/mcp");
+  });
+
+  it("restores nonstandard OAuth endpoints from persisted discovery state after callback reconstruction", async () => {
+    globalFetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: 200,
+          statusText: "OK",
+          headers: { "content-type": "application/json" },
+          body: { access_token: "token" },
+        })
+      )
+    );
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+    await provider.saveDiscoveryState({
+      authorizationServerUrl: "https://auth.example.com",
+      authorizationServerMetadata: {
+        issuer: "https://auth.example.com",
+        authorization_endpoint: "https://auth.example.com/authorize",
+        token_endpoint: "https://auth.example.com/exchange",
+        response_types_supported: ["code"],
+      },
+    });
+
+    await provider.getProxyFetch()!("https://auth.example.com/exchange", {
+      method: "POST",
+      body: new URLSearchParams({ grant_type: "authorization_code" }),
+    });
+
+    expect(String(globalFetchSpy.mock.calls[0][0])).toBe(`${PROXY_URL}/proxy`);
+  });
+
+  it("fails closed when the OAuth proxy request fails", async () => {
+    const proxyError = new Error("proxy unavailable");
+    globalFetchSpy.mockRejectedValueOnce(proxyError);
+    const provider = makeProvider({ oauthProxyUrl: PROXY_URL });
+    const scoped = provider.getProxyFetch()!;
+
+    await expect(
+      scoped("https://auth.example.com/oauth/token", { method: "POST" })
+    ).rejects.toBe(proxyError);
+    expect(globalFetchSpy).toHaveBeenCalledOnce();
   });
 
   it("Server B (Direct) gets a plain fetch and never proxies — even while Server A uses a proxy", async () => {

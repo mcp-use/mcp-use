@@ -88,7 +88,9 @@ export function devVirtualEntryPath(name: string): string {
  */
 export function isViewPath(file: string, cwd: string): boolean {
   const rel = file.startsWith(cwd) ? file.slice(cwd.length + 1) : file;
-  return /^resources\/[^/]+\//.test(rel) || /^resources\/[^/]+\/view\.tsx$/.test(rel);
+  return (
+    /^resources\/[^/]+\//.test(rel) || /^resources\/[^/]+\/view\.tsx$/.test(rel)
+  );
 }
 
 /**

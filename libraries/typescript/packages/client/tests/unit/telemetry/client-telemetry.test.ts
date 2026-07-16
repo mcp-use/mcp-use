@@ -84,7 +84,7 @@ describe("MCPClient Telemetry Integration", () => {
 
   describe("trackMCPClientInit", () => {
     it("should track init event on MCPClient construction with no config", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
       new MCPClient();
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -104,7 +104,7 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should track init event with codeMode enabled", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
       new MCPClient(undefined, { codeMode: true });
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -117,7 +117,7 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should track init event with codeMode config object", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
       new MCPClient(undefined, {
         codeMode: {
@@ -135,7 +135,7 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should track init event with config containing servers", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
       const config = {
         mcpServers: {
@@ -160,10 +160,10 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should track init event with sampling callback", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
-      const samplingCallback = vi.fn();
-      new MCPClient(undefined, { samplingCallback });
+      const onSampling = vi.fn();
+      new MCPClient(undefined, { onSampling });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = findCapturedEvent("mcpclient_init");
@@ -174,10 +174,10 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should track init event with elicitation callback", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
-      const elicitationCallback = vi.fn();
-      new MCPClient(undefined, { elicitationCallback });
+      const onElicitation = vi.fn();
+      new MCPClient(undefined, { onElicitation });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = findCapturedEvent("mcpclient_init");
@@ -188,11 +188,11 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should track init event with all callbacks", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
-      const samplingCallback = vi.fn();
-      const elicitationCallback = vi.fn();
-      new MCPClient(undefined, { samplingCallback, elicitationCallback });
+      const onSampling = vi.fn();
+      const onElicitation = vi.fn();
+      new MCPClient(undefined, { onSampling, onElicitation });
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       const captureCall = findCapturedEvent("mcpclient_init");
@@ -203,7 +203,7 @@ describe("MCPClient Telemetry Integration", () => {
     });
 
     it("should use fromDict static method and track init", async () => {
-      const { MCPClient } = await import("../../../src/client.js");
+      const { MCPClient } = await import("../../../src/core/node.js");
 
       const config = {
         mcpServers: {

@@ -16,8 +16,8 @@
 import type { StreamEvent } from "@langchain/core/tracers/log_stream.js";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { createTextStreamResponse } from "ai";
-import { MCPAgent } from "../../../dist/src/agents";
-import { MCPClient } from "../../../dist/src/client";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 
 // Utility function to convert streamEvents to AI SDK compatible stream
 async function* streamEventsToAISDK(

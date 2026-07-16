@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { VMCodeExecutor } from "../../../src/client/codeExecutor.js";
-import { MCPClient } from "../../../src/client.js";
+import { VMCodeExecutor } from "../../../src/code-mode/executor-vm.js";
+import { MCPClient } from "../../../src/core/node.js";
 
 describe("CodeExecutor", () => {
   let client: MCPClient;

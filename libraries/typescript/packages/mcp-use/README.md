@@ -37,10 +37,10 @@
 </p>
 </div>
 
-##  About
+## About
 
-  <b>mcp-use</b> is the fullstack MCP framework
-  to build MCP Apps for ChatGPT / Claude & MCP Servers for AI Agents.
+<b>mcp-use</b> is the fullstack MCP framework
+to build MCP Apps for ChatGPT / Claude & MCP Servers for AI Agents.
 
 - **Build** with mcp-use SDK ([ts](https://www.npmjs.com/package/mcp-use) | [py](https://pypi.org/project/mcp_use/)): MCP Servers and MCP Apps
 - **Preview** on mcp-use MCP Inspector ([online](https://inspector.mcp-use.com/inspector) | [oss](https://github.com/mcp-use/mcp-use/tree/main/libraries/typescript/packages/inspector)): Test and debug your MCP Servers and Apps
@@ -77,13 +77,16 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool({
-  name: "get_weather",
-  description: "Get weather for a city",
-  schema: z.object({ city: z.string() }),
-}, async ({ city }) => {
-  return text(`Temperature: 72°F, Condition: sunny, City: ${city}`);
-});
+server.tool(
+  {
+    name: "get_weather",
+    description: "Get weather for a city",
+    schema: z.object({ city: z.string() }),
+  },
+  async ({ city }) => {
+    return text(`Temperature: 72°F, Condition: sunny, City: ${city}`);
+  }
+);
 
 await server.listen(3000);
 // Inspector at http://localhost:3000/inspector
@@ -106,17 +109,20 @@ const server = new MCPServer({
   version: "1.0.0",
 });
 
-server.tool({
-  name: "get-weather",
-  description: "Get weather for a city",
-  schema: z.object({ city: z.string() }),
-  widget: "weather-display", // references resources/weather-display/widget.tsx
-}, async ({ city }) => {
-  return widget({
-    props: { city, temperature: 22, conditions: "Sunny" },
-    message: `Weather in ${city}: Sunny, 22°C`,
-  });
-});
+server.tool(
+  {
+    name: "get-weather",
+    description: "Get weather for a city",
+    schema: z.object({ city: z.string() }),
+    widget: "weather-display", // references resources/weather-display/widget.tsx
+  },
+  async ({ city }) => {
+    return widget({
+      props: { city, temperature: 22, conditions: "Sunny" },
+      message: `Weather in ${city}: Sunny, 22°C`,
+    });
+  }
+);
 
 await server.listen(3000);
 ```
@@ -145,12 +151,17 @@ const WeatherDisplay: React.FC = () => {
   if (isPending) return <div>Loading...</div>;
 
   return (
-    <div style={{
-      background: isDark ? "#1a1a2e" : "#f0f4ff",
-      borderRadius: 16, padding: 24,
-    }}>
+    <div
+      style={{
+        background: isDark ? "#1a1a2e" : "#f0f4ff",
+        borderRadius: 16,
+        padding: 24,
+      }}
+    >
       <h2>{props.city}</h2>
-      <p>{props.temperature}° — {props.conditions}</p>
+      <p>
+        {props.temperature}° — {props.conditions}
+      </p>
     </div>
   );
 };
@@ -163,6 +174,7 @@ Widgets in `resources/` are **auto-discovered** — no manual registration neede
 Visit [**MCP Apps Documentation**](https://mcp-use.com/docs/typescript/server/mcp-apps)
 
 ---
+
 ### Python
 
 ```bash
@@ -211,7 +223,8 @@ server.listen(3000);
 
 **Online** when connecting to hosted MCP servers:
 <br>
->Visit https://inspector.mcp-use.com
+
+> Visit https://inspector.mcp-use.com
 
 **Standalone**: inspect any MCP server:
 
@@ -246,12 +259,12 @@ Or connect your GitHub repo on [manufact.com](https://manufact.com) — producti
 
 ### TypeScript Packages
 
-| Package                | Description                                     | Version                                                                                                         |
-| ---------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Package                | Description                                              | Version                                                                                                         |
+| ---------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **mcp-use**            | Core framework for MCP servers, MCP apps, and MCP agents | [![npm](https://img.shields.io/npm/v/mcp-use.svg)](https://www.npmjs.com/package/mcp-use)                       |
-| **@mcp-use/cli**       | Build tool with hot reload and auto-inspector   | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
-| **@mcp-use/inspector** | Web-based previewer and debugger for MCP servers              | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
-| **create-mcp-use-app** | Project scaffolding tool                        | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
+| **@mcp-use/cli**       | Build tool with hot reload and auto-inspector            | [![npm](https://img.shields.io/npm/v/@mcp-use/cli.svg)](https://www.npmjs.com/package/@mcp-use/cli)             |
+| **@mcp-use/inspector** | Web-based previewer and debugger for MCP servers         | [![npm](https://img.shields.io/npm/v/@mcp-use/inspector.svg)](https://www.npmjs.com/package/@mcp-use/inspector) |
+| **create-mcp-use-app** | Project scaffolding tool                                 | [![npm](https://img.shields.io/npm/v/create-mcp-use-app.svg)](https://www.npmjs.com/package/create-mcp-use-app) |
 
 ---
 
@@ -298,12 +311,13 @@ asyncio.run(main())
 ### TypeScript
 
 ```bash
-npm install mcp-use @langchain/openai
+npm install @mcp-use/client @mcp-use/agent @langchain/openai
 ```
 
 ```typescript
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent, MCPClient } from "mcp-use";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 
 async function main() {
   const config = {
@@ -366,7 +380,7 @@ asyncio.run(main())
 ### TypeScript
 
 ```typescript
-import { MCPClient } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
 
 async function main() {
   const config = {

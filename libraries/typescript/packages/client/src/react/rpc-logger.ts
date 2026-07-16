@@ -4,7 +4,7 @@ import type {
   Transport,
   TransportSendOptions,
 } from "@modelcontextprotocol/client";
-import { Logger } from "../logging.js";
+import { Logger } from "../utils/logging.js";
 
 const logger = Logger.get("RpcLogger");
 

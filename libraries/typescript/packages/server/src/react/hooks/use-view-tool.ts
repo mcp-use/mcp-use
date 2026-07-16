@@ -1,4 +1,7 @@
-import type { ToolAnnotations } from "@modelcontextprotocol/server";
+import type {
+  InputRequiredResult,
+  ToolAnnotations,
+} from "@modelcontextprotocol/server";
 import { useEffect, useRef } from "react";
 
 import type {
@@ -70,7 +73,11 @@ export function useViewTool<
   TOutput = InferToolOutput<TDef>,
 >(
   definition: TDef,
-  handler: (args: TInput) => ToolResult<TOutput> | Promise<ToolResult<TOutput>>
+  handler: (
+    args: TInput
+  ) =>
+    | Exclude<ToolResult<TOutput>, InputRequiredResult>
+    | Promise<Exclude<ToolResult<TOutput>, InputRequiredResult>>
 ): void {
   const runtime = useViewRuntime();
   const handlerRef = useRef(handler);

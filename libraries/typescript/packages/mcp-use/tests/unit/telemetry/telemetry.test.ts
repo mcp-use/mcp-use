@@ -11,21 +11,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Create mock functions for PostHog
-const mockCapture = vi.fn();
-const mockFlush = vi.fn();
-const mockShutdown = vi.fn();
+const mockCapturePostHog = vi.fn().mockResolvedValue(undefined);
+const mockCaptureScarf = vi.fn().mockResolvedValue(undefined);
 
-// Mock PostHog before importing Telemetry
-vi.mock("posthog-node", () => {
-  return {
-    PostHog: class MockPostHog {
-      capture = mockCapture;
-      flush = mockFlush;
-      shutdown = mockShutdown;
-    },
-  };
-});
+vi.mock("../../../src/telemetry/tel-fetch.js", () => ({
+  capturePostHog: (...args: unknown[]) => mockCapturePostHog(...args),
+  captureScarf: (...args: unknown[]) => mockCaptureScarf(...args),
+  SCARF_GATEWAY_URL: "https://mcpuse.gateway.scarf.sh/events-ts",
+}));
 
 // Mock fs module
 vi.mock("node:fs", () => ({
@@ -127,17 +120,14 @@ describe("Telemetry", () => {
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
-      const { MCPClientInitEvent } =
+      const { ServerToolCallEvent } =
         await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
 
-      const event = new MCPClientInitEvent({
-        codeMode: false,
-        sandbox: false,
-        allCallbacks: false,
-        verify: false,
-        servers: [],
-        numServers: 0,
+      const event = new ServerToolCallEvent({
+        toolName: "disabled_tool",
+        lengthInputArgument: 0,
+        success: true,
       });
 
       // Should not throw and should complete silently
@@ -146,32 +136,28 @@ describe("Telemetry", () => {
 
     it("should capture events with correct properties when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockCapture.mockClear();
+      mockCapturePostHog.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
-      const { MCPClientInitEvent } =
+      const { ServerToolCallEvent } =
         await import("../../../src/telemetry/events.js");
       const telemetry = Telemetry.getInstance();
 
-      const event = new MCPClientInitEvent({
-        codeMode: true,
-        sandbox: false,
-        allCallbacks: true,
-        verify: false,
-        servers: ["server1", "server2"],
-        numServers: 2,
+      const event = new ServerToolCallEvent({
+        toolName: "test_tool",
+        lengthInputArgument: 2,
+        success: true,
       });
 
       await telemetry.capture(event);
 
-      expect(mockCapture).toHaveBeenCalledWith(
+      expect(mockCapturePostHog).toHaveBeenCalledWith(
         expect.objectContaining({
-          event: "mcpclient_init",
+          event: "server_tool_call",
           properties: expect.objectContaining({
-            code_mode: true,
-            all_callbacks: true,
-            num_servers: 2,
+            tool_name: "test_tool",
+            length_input_argument: 2,
             language: "typescript",
           }),
         })
@@ -188,49 +174,13 @@ describe("Telemetry", () => {
       const telemetry = Telemetry.getInstance();
       const captureSpy = vi.spyOn(telemetry, "capture");
 
-      await telemetry.trackMCPClientInit({
-        codeMode: false,
-        sandbox: false,
-        allCallbacks: false,
-        verify: false,
-        servers: [],
-        numServers: 0,
+      await telemetry.trackServerToolCall({
+        toolName: "disabled_tool",
+        lengthInputArgument: 0,
+        success: true,
       });
 
       expect(captureSpy).not.toHaveBeenCalled();
-    });
-
-    it("should call capture for trackAgentExecution when enabled", async () => {
-      delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-
-      const { Telemetry } =
-        await import("../../../src/telemetry/telemetry-node.js");
-      const telemetry = Telemetry.getInstance();
-      const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
-
-      await telemetry.trackAgentExecution({
-        executionMethod: "run",
-        query: "test query",
-        success: true,
-        modelProvider: "openai",
-        modelName: "gpt-4",
-        serverCount: 1,
-        serverIdentifiers: [],
-        totalToolsAvailable: 5,
-        toolsAvailableNames: ["tool1", "tool2"],
-        maxStepsConfigured: 10,
-        memoryEnabled: true,
-        useServerManager: false,
-        maxStepsUsed: 3,
-        manageConnector: true,
-        externalHistoryUsed: false,
-      });
-
-      expect(captureSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "mcp_agent_execution",
-        })
-      );
     });
 
     it("should call capture for trackServerToolCall when enabled", async () => {
@@ -317,26 +267,6 @@ describe("Telemetry", () => {
       );
     });
 
-    it("should call capture for trackConnectorInit when enabled", async () => {
-      delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-
-      const { Telemetry } =
-        await import("../../../src/telemetry/telemetry-node.js");
-      const telemetry = Telemetry.getInstance();
-      const captureSpy = vi.spyOn(telemetry, "capture").mockResolvedValue();
-
-      await telemetry.trackConnectorInit({
-        connectorType: "HttpConnector",
-        serverUrl: "http://localhost:3000",
-      });
-
-      expect(captureSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "connector_init",
-        })
-      );
-    });
-
     it("should call capture for trackServerInitialize when enabled", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
 
@@ -361,36 +291,24 @@ describe("Telemetry", () => {
   });
 
   describe("flush and shutdown", () => {
-    it("should call PostHog flush when telemetry is enabled", async () => {
+    it("should no-op flush with fetch-based telemetry", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockFlush.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
-      // Wait for PostHog to initialize (it's async)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      telemetry.flush();
-
-      expect(mockFlush).toHaveBeenCalled();
+      expect(() => telemetry.flush()).not.toThrow();
     });
 
-    it("should call PostHog shutdown when telemetry is enabled", async () => {
+    it("should no-op shutdown with fetch-based telemetry", async () => {
       delete process.env.MCP_USE_ANONYMIZED_TELEMETRY;
-      mockShutdown.mockClear();
 
       const { Telemetry } =
         await import("../../../src/telemetry/telemetry-node.js");
       const telemetry = Telemetry.getInstance();
 
-      // Wait for PostHog to initialize (it's async)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      telemetry.shutdown();
-
-      expect(mockShutdown).toHaveBeenCalled();
+      await expect(telemetry.shutdown()).resolves.toBeUndefined();
     });
   });
 });

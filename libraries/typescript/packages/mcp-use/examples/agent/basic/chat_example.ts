@@ -12,7 +12,7 @@
  */
 
 import readline from "node:readline";
-import { MCPAgent } from "../../../dist/src/agents";
+import { MCPAgent } from "@mcp-use/agent";
 
 async function runMemoryChat() {
   // Config file path - change this to your config file

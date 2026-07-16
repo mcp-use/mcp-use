@@ -86,9 +86,7 @@ function wrapTransportForStreamManager(
 }
 
 /**
- * After a GET request creates a standalone SSE stream inside the SDK transport,
- * extract the controller and register it with the StreamManager so cross-server
- * messages can be delivered.
+ * Register the SDK transport's standalone SSE controller with StreamManager.
  */
 async function registerSseStream(
   transport: any,
@@ -98,14 +96,7 @@ async function registerSseStream(
   const sseStreamId = transport._standaloneSseStreamId || "_GET_stream";
   const streamEntry = transport._streamMapping?.get(sseStreamId);
   if (streamEntry?.controller) {
-    try {
-      await streamManager.create(sessionId, streamEntry.controller);
-    } catch (err) {
-      console.warn(
-        `[MCP] Failed to register SSE stream with StreamManager:`,
-        err
-      );
-    }
+    await streamManager.create(sessionId, streamEntry.controller);
   }
 }
 
@@ -609,9 +600,6 @@ export async function mountMcp(
         async () => transport.handleRequest(c.req.raw),
         newSessionId
       );
-      if (c.req.method === "GET") {
-        await registerSseStream(transport, newSessionId, streamManager);
-      }
       return newSessionResponse;
     }
   };
