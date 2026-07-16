@@ -68,7 +68,7 @@ jobs:
           deno-version: v2.x
 
       - name: Create temporary deno.json with PR preview imports
-        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        working-directory: libraries/typescript/packages/server/tests/deno
         env:
           PR_NUMBER: ${{ needs.preview.outputs.pr-number }}
         # Note: Hybrid mapping to satisfy conflicting Zod requirements:
@@ -152,7 +152,7 @@ jobs:
           done
 
       - name: Cache Deno Dependencies
-        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        working-directory: libraries/typescript/packages/server/tests/deno
         env:
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
         run: |
@@ -177,7 +177,7 @@ jobs:
           done
 
       - name: Run Deno Tests
-        working-directory: libraries/typescript/packages/mcp-use/tests/deno
+        working-directory: libraries/typescript/packages/server/tests/deno
         env:
           MCP_USE_ANONYMIZED_TELEMETRY: false
           DENO_DOWNLOAD_TIMEOUT: "300000"  # 5 minutes in milliseconds
