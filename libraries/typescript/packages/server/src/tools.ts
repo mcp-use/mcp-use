@@ -1,5 +1,6 @@
 import type {
   CallToolResult,
+  InputRequiredResult,
   StandardSchemaWithJSON,
   ToolAnnotations,
 } from "@modelcontextprotocol/server";
@@ -136,11 +137,13 @@ export interface ToolRef<
  * };
  * ```
  */
-export type ToolResult<TOutput = never> = [TOutput] extends [never]
-  ? CallToolResult
-  :
-      | (CallToolResult & { structuredContent: TOutput })
-      | (CallToolResult & { isError: true });
+export type ToolResult<TOutput = never> =
+  | InputRequiredResult
+  | ([TOutput] extends [never]
+      ? CallToolResult
+      :
+          | (CallToolResult & { structuredContent: TOutput })
+          | (CallToolResult & { isError: true }));
 
 /** Infer the callback params type from a tool definition's input schema. */
 export type InferToolInput<T> = T extends {

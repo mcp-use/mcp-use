@@ -1,21 +1,29 @@
 import type { McpServer } from "@mcp-use/client/react";
 import type { ReactNode, RefObject } from "react";
+import { useManufactAuth } from "@/client/auth/manufact-auth";
 import { useInspector } from "@/client/context/InspectorContext";
 import type { TabType } from "@/client/context/InspectorContext";
-import { isLocalhostServerUrl } from "@/client/utils/serverUrl";
+import { isLocalhostServerUrl } from "@/client/utils/servers";
 import { ChatTab } from "./ChatTab";
+import {
+  buildManagedAuthHeaders,
+  buildManagedLlmProxyConfig,
+  shouldUseManagedClientSide,
+} from "./chat/freeTier";
+import { useManagedCloudModel } from "./chat/useManagedCloudModel";
+import { ConnectionSettingsTab } from "./ConnectionSettingsTab";
 import { ElicitationTab } from "./ElicitationTab";
 import { NotificationsTab } from "./NotificationsTab";
 import { PromptsTab } from "./PromptsTab";
 import { ResourcesTab } from "./ResourcesTab";
 import { SamplingTab } from "./SamplingTab";
+import { ServerMetadataTab } from "./ServerMetadataTab";
 import { ToolsTab } from "./ToolsTab";
 
-// Type alias for backward compatibility
-type MCPConnection = McpServer;
+import type { EditableConnectionConfig } from "@/client/utils/connectionUpdates";
 
 interface LayoutContentProps {
-  selectedServer: MCPConnection | undefined;
+  selectedServer: McpServer | undefined;
   activeTab: string;
   toolsSearchRef: RefObject<{
     focusSearch: () => void;
@@ -29,6 +37,7 @@ interface LayoutContentProps {
     focusSearch: () => void;
     blurSearch: () => void;
   } | null>;
+  onUpdateConnection?: (config: EditableConnectionConfig) => void;
   children: ReactNode;
 }
 
@@ -38,9 +47,17 @@ export function LayoutContent({
   toolsSearchRef,
   promptsSearchRef,
   resourcesSearchRef,
+  onUpdateConnection,
   children,
 }: LayoutContentProps) {
   const { embeddedConfig } = useInspector();
+  const { accessToken, mode: manufactAuthMode, user } = useManufactAuth(
+    embeddedConfig.chatApiUrl
+  );
+  const managedAuthHeaders = buildManagedAuthHeaders(accessToken);
+  const managedCredentials =
+    manufactAuthMode === "session" ? ("include" as const) : undefined;
+  const isManufactAuthenticated = user != null;
 
   // When forceConnected is enabled, render the chat tab directly without a
   // real server connection. The backend (chatApiUrl) manages everything.
@@ -51,12 +68,13 @@ export function LayoutContent({
     const stubConnection = {
       id: "force-connected",
       url: "",
+      displayName: "",
       name: "",
       state: "ready" as const,
       tools: [],
       prompts: [],
       resources: [],
-    } as unknown as MCPConnection;
+    } as unknown as McpServer;
 
     return (
       <ChatTab
@@ -69,6 +87,8 @@ export function LayoutContent({
         readResource={async () => ({ contents: [] })}
         useClientSide={false}
         chatApiUrl={embeddedConfig.chatApiUrl}
+        extraHeaders={managedAuthHeaders}
+        credentials={managedCredentials}
         managedLlmConfig={
           embeddedConfig.managedLlmConfig ?? {
             provider: "anthropic",
@@ -111,21 +131,44 @@ export function LayoutContent({
     "sampling",
     "elicitation",
     "notifications",
+    "server-metadata",
+    "connection-settings",
   ];
 
-  // The hosted chat backend (`chatApiUrl`, e.g. cloud.manufact.com) runs
-  // server-side and connects to the MCP server itself. It cannot reach a user's
-  // localhost MCP server, so that request 502s and surfaces in the browser as
-  // an opaque CORS / "Failed to fetch" error (MCP-2419). The browser already
-  // holds a direct session to the localhost server, so fall back to client-side
-  // (in-browser) streaming for these URLs and ignore the cloud backend.
-  const forceLocalhostClientSide =
-    !!embeddedConfig.chatApiUrl &&
-    !!selectedServer.url &&
-    isLocalhostServerUrl(selectedServer.url);
-  const chatApiUrl = forceLocalhostClientSide
-    ? undefined
-    : embeddedConfig.chatApiUrl;
+  // Localhost MCP + hosted chat URL: browser MCPAgent owns tools; only LLM
+  // calls go through the cloud `/inspector/llm/*` proxy (MCP-2419 follow-up).
+  const isLoopbackServer =
+    !!selectedServer.url && isLocalhostServerUrl(selectedServer.url);
+  const useManagedClientSide = shouldUseManagedClientSide({
+    isLoopback: isLoopbackServer,
+    chatApiUrl: embeddedConfig.chatApiUrl,
+    enableFreeTierUpgrade: embeddedConfig.chatEnableFreeTierUpgrade,
+  });
+  const chatApiUrl = embeddedConfig.chatApiUrl;
+  const managedCloudModel = useManagedCloudModel(
+    chatApiUrl,
+    accessToken,
+    manufactAuthMode,
+    !!chatApiUrl && isManufactAuthenticated
+  );
+  // #region agent log
+  fetch('http://127.0.0.1:7371/ingest/4e7482c5-571f-4071-bd09-762c357289f4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'243e61'},body:JSON.stringify({sessionId:'243e61',location:'LayoutContent.tsx:managedCloud',message:'layout managed cloud state',data:{useManagedClientSide,isLoopbackServer,isManufactAuthenticated,hasAccessToken:!!accessToken,authMode:manufactAuthMode,modelsEnabled:useManagedClientSide&&isManufactAuthenticated,modelCount:managedCloudModel.models.length,isLoading:managedCloudModel.isLoading,serverUrl:selectedServer?.url??null},timestamp:Date.now(),hypothesisId:'H-B'})}).catch(()=>{});
+  // #endregion
+  const managedLlmConfig = useManagedClientSide
+    ? buildManagedLlmProxyConfig(
+        chatApiUrl!,
+        accessToken,
+        manufactAuthMode === "session",
+        isManufactAuthenticated ? managedCloudModel.selectedModelId : undefined
+      )
+    : (embeddedConfig.managedLlmConfig ??
+      (chatApiUrl && !isLoopbackServer
+        ? {
+            provider: "anthropic" as const,
+            model: "claude-haiku-4-5",
+            apiKey: "server-managed",
+          }
+        : undefined));
 
   // Render all visible tabs but hide inactive ones to preserve state
   return (
@@ -219,26 +262,15 @@ export function LayoutContent({
               )
             }
             readResource={selectedServer.readResource}
-            useClientSide={!chatApiUrl}
+            useClientSide={useManagedClientSide || !chatApiUrl}
             chatApiUrl={chatApiUrl}
-            managedLlmConfig={
-              forceLocalhostClientSide
-                ? undefined
-                : (embeddedConfig.managedLlmConfig ??
-                  (chatApiUrl
-                    ? {
-                        // Stub surfaced on the chat badge. Mirrors the model the
-                        // hosted `/inspector/chat/stream` backend uses by default
-                        // (see cloud.mcp-use/src/lib/mcp-chat-stream.ts).
-                        provider: "anthropic",
-                        model: "claude-haiku-4-5",
-                        apiKey: "server-managed",
-                      }
-                    : undefined))
-            }
+            extraHeaders={managedAuthHeaders}
+            credentials={embeddedConfig.chatCredentials ?? managedCredentials}
+            managedLlmConfig={managedLlmConfig}
+            managedCloudModel={managedCloudModel}
             enableFreeTierUpgrade={embeddedConfig.chatEnableFreeTierUpgrade}
             hideTitle={embeddedConfig.chatHideTitle}
-            hideModelBadge={embeddedConfig.chatHideModelBadge ?? !!chatApiUrl}
+            hideModelBadge={embeddedConfig.chatHideModelBadge ?? false}
             hideServerUrl={embeddedConfig.chatHideServerUrl ?? !!chatApiUrl}
             clearButtonLabel={embeddedConfig.chatClearButtonLabel}
             clearButtonHideIcon={embeddedConfig.chatClearButtonHideIcon}
@@ -249,8 +281,9 @@ export function LayoutContent({
             hideClearButton={embeddedConfig.chatHideClearButton}
             hideToolSelector={embeddedConfig.chatHideToolSelector}
             streamProtocol={embeddedConfig.chatStreamProtocol}
-            credentials={embeddedConfig.chatCredentials}
-            managedKeyUnavailable={forceLocalhostClientSide}
+            managedKeyUnavailable={
+              isLoopbackServer && !chatApiUrl && !useManagedClientSide
+            }
           />
         </div>
       )}
@@ -266,7 +299,7 @@ export function LayoutContent({
             onReject={selectedServer.rejectSampling}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
-            mcpServerUrl={selectedServer.url}
+            mcpServerUrl={selectedServer.url ?? ""}
           />
         </div>
       )}
@@ -301,6 +334,33 @@ export function LayoutContent({
             clearNotifications={selectedServer.clearNotifications}
             serverId={selectedServer.id}
             isConnected={selectedServer.state === "ready"}
+          />
+        </div>
+      )}
+      {isTabVisible("server-metadata") && (
+        <div
+          style={{
+            display: activeTab === "server-metadata" ? "block" : "none",
+          }}
+          className="h-full"
+        >
+          <ServerMetadataTab
+            key={`server-metadata-${selectedServer.id}`}
+            connection={selectedServer}
+          />
+        </div>
+      )}
+      {isTabVisible("connection-settings") && onUpdateConnection && (
+        <div
+          style={{
+            display: activeTab === "connection-settings" ? "block" : "none",
+          }}
+          className="h-full"
+        >
+          <ConnectionSettingsTab
+            key={`connection-settings-${selectedServer.id}`}
+            connection={selectedServer}
+            onSave={onUpdateConnection}
           />
         </div>
       )}

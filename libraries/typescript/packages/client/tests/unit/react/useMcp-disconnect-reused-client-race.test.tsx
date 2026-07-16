@@ -9,11 +9,17 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
 
-function makeConnector() {
+function makeConnection() {
   return {
     tools: [],
-    serverInfo: { name: "test-server" },
-    serverCapabilities: {},
+    info: {
+      protocolEra: "legacy",
+      protocolVersion: "2025-06-18",
+      server: { name: "test-server" },
+      capabilities: {},
+      extensions: {},
+    },
+    supports: vi.fn().mockReturnValue(false),
     listAllResources: vi.fn().mockResolvedValue({ resources: [] }),
     listPrompts: vi.fn().mockResolvedValue({ prompts: [] }),
     listResourceTemplates: vi.fn().mockResolvedValue({ resourceTemplates: [] }),
@@ -39,34 +45,26 @@ const mockAuthProvider = {
   clearStorage: vi.fn().mockReturnValue(0),
 };
 
-function makeSession() {
-  return {
-    on: vi.fn(),
-    connector: makeConnector(),
-    initialize: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
 /** Single client instance — connect() reuses it when clientRef is non-null. */
-let activeSession: ReturnType<typeof makeSession> | null = null;
+let activeConnection: ReturnType<typeof makeConnection> | null = null;
 
 const sharedClient = {
   addServer: vi.fn().mockResolvedValue(undefined),
   removeServer: vi.fn().mockResolvedValue(undefined),
   listSessions: vi.fn().mockReturnValue([]),
-  getSession: vi.fn(() => activeSession),
-  createSession: vi.fn(),
+  getSession: vi.fn(() => activeConnection),
+  connect: vi.fn(),
   closeSession: vi.fn(),
 };
 
-vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
+vi.mock("../../../src/core/browser.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   BrowserMCPClient: vi.fn(function () {
     return sharedClient;
   }),
 }));
 
-vi.mock("../../../src/auth/browser-provider.js", () => ({
+vi.mock("../../../src/auth/browser.js", () => ({
   createBrowserOAuthProvider: vi.fn(() => ({
     provider: null,
     oauthProxyUrl: undefined,
@@ -82,7 +80,7 @@ vi.mock("../../../src/telemetry/index.js", () => ({
   },
 }));
 
-vi.mock("../../../src/react/favicon-detector.js", () => ({
+vi.mock("../../../src/utils/favicon.js", () => ({
   detectFavicon: vi.fn().mockResolvedValue(null),
 }));
 
@@ -92,11 +90,11 @@ describe("useMcp disconnect vs reused client race", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     closeSessionDeferred = null;
-    activeSession = null;
+    activeConnection = null;
     mockAuthProvider.serverUrl = "http://localhost/a/mcp";
-    sharedClient.createSession.mockImplementation(async () => {
-      activeSession = makeSession();
-      return activeSession;
+    sharedClient.connect.mockImplementation(async () => {
+      activeConnection = makeConnection();
+      return activeConnection;
     });
     sharedClient.closeSession.mockImplementation(() => {
       if (!closeSessionDeferred) {
@@ -122,7 +120,6 @@ describe("useMcp disconnect vs reused client race", () => {
         url,
         enabled: true,
         authProvider: mockAuthProvider,
-        transportType: "http",
         autoProxyFallback: false,
         autoRetry: false,
         autoReconnect: false,

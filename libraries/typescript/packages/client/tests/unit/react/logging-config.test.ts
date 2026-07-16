@@ -10,7 +10,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Logger } from "../../../src/logging.js";
+import { Logger } from "../../../src/utils/logging.js";
 
 describe("Logger Configuration", () => {
   let originalConsole: {

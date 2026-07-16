@@ -3,7 +3,7 @@
  */
 
 import { useMemo } from "react";
-import type { McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { McpUiHostContext } from "@mcp-use/client/react";
 import type { Tool } from "@modelcontextprotocol/client";
 import type { PlaygroundSettings } from "../context/WidgetDebugContext";
 

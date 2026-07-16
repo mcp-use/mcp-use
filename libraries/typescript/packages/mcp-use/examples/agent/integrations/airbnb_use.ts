@@ -10,7 +10,7 @@
  * Required: OPENAI_API_KEY
  */
 
-import { MCPAgent } from "../../../dist/src/agents";
+import { MCPAgent } from "@mcp-use/agent";
 
 async function runAirbnbExample() {
   // Create MCPClient with Airbnb configuration

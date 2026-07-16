@@ -20,14 +20,14 @@ An MCP server template with OpenAI Apps SDK integration for ChatGPT-compatible w
 This template demonstrates how to build ChatGPT-compatible widgets using OpenAI's Apps SDK:
 
 ```typescript
-import { useWidget } from 'mcp-use/react';
+import { useWidget } from "mcp-use/react";
 
 const MyWidget: React.FC = () => {
   const { props, theme } = useWidget<MyProps>();
 
   // props contains validated inputs from OpenAI
   // theme is 'dark' or 'light' based on ChatGPT setting
-}
+};
 ```
 
 ## Getting Started
@@ -43,6 +43,7 @@ npm run dev
 ```
 
 This starts:
+
 - MCP server on port 3000
 - Widget serving at `/mcp-use/widgets/*`
 - Inspector UI at `/inspector`
@@ -83,16 +84,16 @@ apps-sdk/
 All React components in the `resources/` folder are automatically registered as MCP tools and resources when they export `widgetMetadata`:
 
 ```typescript
-import { z } from 'zod';
-import type { WidgetMetadata } from 'mcp-use/react';
+import { z } from "zod";
+import type { WidgetMetadata } from "mcp-use/react";
 
 const propSchema = z.object({
-  city: z.string().describe('The city name'),
-  temperature: z.number().describe('Temperature in Celsius'),
+  city: z.string().describe("The city name"),
+  temperature: z.number().describe("Temperature in Celsius"),
 });
 
 export const widgetMetadata: WidgetMetadata = {
-  description: 'My widget description',
+  description: "My widget description",
   props: propSchema,
   // exposeAsTool defaults to true - widget auto-registers as tool
 };
@@ -106,6 +107,7 @@ export default MyWidget;
 ```
 
 This automatically creates:
+
 - **Tool**: `product-search-result` - Accepts parameters via OpenAI
 - **Resource**: `ui://widget/product-search-result` - Static access
 
@@ -116,32 +118,36 @@ You can prevent auto-registration and create custom tools using the `widget()` h
 ```typescript
 // In your widget file
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Weather display widget',
+  description: "Weather display widget",
   props: propSchema,
-  exposeAsTool: false,  // Don't auto-register as tool
+  exposeAsTool: false, // Don't auto-register as tool
 };
 
 // In your server file
-import { widget } from 'mcp-use/server';
+import { widget } from "mcp-use/server";
 
-server.tool({
-  name: 'get-current-weather',
-  schema: z.object({ city: z.string() }),
-  widget: {
-    name: 'weather-display',  // Configure widget at registration time
-    invoking: 'Fetching weather...',
-    invoked: 'Weather loaded'
+server.tool(
+  {
+    name: "get-current-weather",
+    schema: z.object({ city: z.string() }),
+    widget: {
+      name: "weather-display", // Configure widget at registration time
+      invoking: "Fetching weather...",
+      invoked: "Weather loaded",
+    },
+  },
+  async ({ city }) => {
+    const weatherData = await fetchWeather(city);
+    return widget({
+      props: weatherData, // Runtime data only
+      message: `Current weather in ${city}`,
+    });
   }
-}, async ({ city }) => {
-  const weatherData = await fetchWeather(city);
-  return widget({
-    props: weatherData,  // Runtime data only
-    message: `Current weather in ${city}`
-  });
-});
+);
 ```
 
 This pattern is useful when you want:
+
 - Custom logic before showing the widget
 - Different tool parameters than widget props
 - One widget used by multiple tools
@@ -190,17 +196,17 @@ const MyWidget: React.FC = () => {
 Use Zod schemas to define widget props:
 
 ```typescript
-import { z } from 'zod';
-import type { WidgetMetadata } from 'mcp-use/react';
+import { z } from "zod";
+import type { WidgetMetadata } from "mcp-use/react";
 
 const propSchema = z.object({
-  name: z.string().describe('Person name'),
-  age: z.number().min(0).max(120).describe('Age in years'),
-  email: z.string().email().describe('Email address'),
+  name: z.string().describe("Person name"),
+  age: z.number().min(0).max(120).describe("Age in years"),
+  email: z.string().email().describe("Email address"),
 });
 
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Display user information',
+  description: "Display user information",
   props: propSchema,
 };
 ```
@@ -212,8 +218,8 @@ Automatically adapt to ChatGPT's theme:
 ```typescript
 const { theme } = useWidget();
 
-const bgColor = theme === 'dark' ? 'bg-gray-900' : 'bg-white';
-const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-800';
+const bgColor = theme === "dark" ? "bg-gray-900" : "bg-white";
+const textColor = theme === "dark" ? "text-gray-100" : "text-gray-800";
 ```
 
 ## Official UI Components
@@ -238,7 +244,7 @@ import {
   Transition,
   Icon,
   Input,
-} from '@openai/apps-sdk-ui';
+} from "@openai/apps-sdk-ui";
 ```
 
 ## Ecommerce Widgets
@@ -248,6 +254,7 @@ This template includes a complete ecommerce example with four widgets:
 ### 1. Ecommerce Carousel (`ecommerce-carousel.tsx`)
 
 A product carousel widget featuring:
+
 - Title and description
 - Carousel of product items with placeholder images
 - Info button and Add to Cart button for each item
@@ -258,6 +265,7 @@ A product carousel widget featuring:
 ### 2. Product Search Result (`product-search-result.tsx`)
 
 A search results widget with:
+
 - Search input with real-time filtering
 - Price range filters and stock status filter
 - Grid layout of product cards
@@ -268,6 +276,7 @@ A search results widget with:
 ### 3. Stores Locations Map (`stores-locations-map.tsx`)
 
 A store locator widget featuring:
+
 - Interactive map display (placeholder)
 - List of store locations with details
 - Distance calculation
@@ -278,6 +287,7 @@ A store locator widget featuring:
 ### 4. Order Confirmation (`order-confirmation.tsx`)
 
 An order confirmation widget with:
+
 - Order summary and items list
 - Shipping information
 - Order status tracking
@@ -290,7 +300,7 @@ The template includes a `get-brand-info` tool (normal MCP tool, not a widget) th
 
 ```typescript
 // Call the tool
-await client.callTool('get-brand-info', {});
+await client.callTool("get-brand-info", {});
 
 // Returns brand details including:
 // - Company name, tagline, description
@@ -320,17 +330,17 @@ const { props, theme } = useWidget<WeatherProps>();
 ### Via Tool Call
 
 ```typescript
-await client.callTool('display-weather', {
-  city: 'San Francisco',
-  weather: 'sunny',
-  temperature: 22
+await client.callTool("display-weather", {
+  city: "San Francisco",
+  weather: "sunny",
+  temperature: 22,
 });
 ```
 
 ### Via Resource Access
 
 ```typescript
-await client.readResource('ui://widget/display-weather');
+await client.readResource("ui://widget/display-weather");
 ```
 
 ## Customization Guide
@@ -340,16 +350,16 @@ await client.readResource('ui://widget/display-weather');
 1. Create a React component in `resources/my-widget.tsx`:
 
 ```tsx
-import React from 'react';
-import { z } from 'zod';
-import { useWidget, type WidgetMetadata } from 'mcp-use/react';
+import React from "react";
+import { z } from "zod";
+import { useWidget, type WidgetMetadata } from "mcp-use/react";
 
 const propSchema = z.object({
-  message: z.string().describe('Message to display'),
+  message: z.string().describe("Message to display"),
 });
 
 export const widgetMetadata: WidgetMetadata = {
-  description: 'Display a message',
+  description: "Display a message",
   props: propSchema,
 };
 
@@ -375,13 +385,13 @@ export default MyWidget;
 You can mix Apps SDK widgets with regular MCP tools:
 
 ```typescript
-import { text } from 'mcp-use/server';
+import { text } from "mcp-use/server";
 
 server.tool({
-  name: 'get-data',
-  description: 'Fetch data from API',
+  name: "get-data",
+  description: "Fetch data from API",
   cb: async () => {
-    return text('Data');
+    return text("Data");
   },
 });
 ```
@@ -401,31 +411,33 @@ Visit: `http://localhost:3000/mcp-use/widgets/display-weather`
 ### Via MCP Client
 
 ```typescript
-import { createMCPClient } from 'mcp-use/client';
+import { MCPClient } from "@mcp-use/client";
 
-const client = createMCPClient({
-  serverUrl: 'http://localhost:3000/mcp',
+const client = new MCPClient({
+  mcpServers: {
+    weather: { url: "http://localhost:3000/mcp" },
+  },
 });
 
-await client.connect();
+const session = await client.createSession("weather");
 
 // Call widget as tool
-const result = await client.callTool('display-weather', {
-  city: 'London',
-  weather: 'rain',
-  temperature: 15
+const result = await session.callTool("display-weather", {
+  city: "London",
+  weather: "rain",
+  temperature: 15,
 });
 ```
 
 ## Apps SDK vs Other Widget Types
 
-| Feature           | Apps SDK           | External URL | Remote DOM |
-| ----------------- | ------------------ | ------------ | ---------- |
-| ChatGPT Compatible | ✅ Yes            | ❌ No        | ❌ No      |
-| Theme Detection   | ✅ Automatic      | ❌ Manual    | ❌ Manual  |
-| Props Validation  | ✅ Zod Schema     | ❌ Manual    | ❌ Manual  |
-| React Support     | ✅ Full           | ✅ Full      | ❌ Limited |
-| OpenAI Metadata   | ✅ Yes            | ❌ No        | ❌ No      |
+| Feature            | Apps SDK      | External URL | Remote DOM |
+| ------------------ | ------------- | ------------ | ---------- |
+| ChatGPT Compatible | ✅ Yes        | ❌ No        | ❌ No      |
+| Theme Detection    | ✅ Automatic  | ❌ Manual    | ❌ Manual  |
+| Props Validation   | ✅ Zod Schema | ❌ Manual    | ❌ Manual  |
+| React Support      | ✅ Full       | ✅ Full      | ❌ Limited |
+| OpenAI Metadata    | ✅ Yes        | ❌ No        | ❌ No      |
 
 ## Benefits of Apps SDK
 
@@ -462,7 +474,7 @@ Moving from `starter` to `apps-sdk`:
 ```typescript
 // Before: Manual props handling
 const params = new URLSearchParams(window.location.search);
-const city = params.get('city');
+const city = params.get("city");
 
 // After: Apps SDK hook
 const { props } = useWidget();
@@ -481,10 +493,10 @@ Widgets can call other MCP tools:
 const { callTool } = useWidget();
 
 const handleAction = async () => {
-  const result = await callTool('add-to-cart', {
-    productId: '123',
-    productName: 'Product Name',
-    price: 29.99
+  const result = await callTool("add-to-cart", {
+    productId: "123",
+    productName: "Product Name",
+    price: 29.99,
   });
 };
 ```
@@ -496,7 +508,7 @@ Widgets can send messages to the ChatGPT conversation:
 ```typescript
 const { sendFollowUpMessage } = useWidget();
 
-await sendFollowUpMessage('Product added to cart successfully!');
+await sendFollowUpMessage("Product added to cart successfully!");
 ```
 
 ### Persistent State (`setState`)

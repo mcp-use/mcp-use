@@ -94,16 +94,16 @@ MCP Apps let you build interactive widgets that work across Claude, ChatGPT, and
 
 ```tsx
 // resources/analytics-dashboard.tsx
-import { useMcp } from 'mcp-use/react'
-import { useState, useEffect } from 'react'
+import { useMcp } from "mcp-use/react";
+import { useState, useEffect } from "react";
 
 export default function AnalyticsDashboard() {
-  const { callTool } = useMcp()
-  const [data, setData] = useState(null)
+  const { callTool } = useMcp();
+  const [data, setData] = useState(null);
 
   useEffect(() => {
-    callTool('get_analytics', { period: '7d' }).then(setData)
-  }, [])
+    callTool("get_analytics", { period: "7d" }).then(setData);
+  }, []);
 
   return (
     <div className="dashboard">
@@ -111,7 +111,7 @@ export default function AnalyticsDashboard() {
       <MetricsGrid data={data} />
       <Charts data={data} />
     </div>
-  )
+  );
 }
 ```
 
@@ -119,12 +119,12 @@ Then register it in your server:
 
 ```typescript
 server.uiResource({
-  type: 'externalUrl',
-  name: 'analytics-dashboard',
-  widget: 'analytics-dashboard',
-  title: 'Analytics Dashboard',
-  description: 'Real-time analytics visualization',
-})
+  type: "externalUrl",
+  name: "analytics-dashboard",
+  widget: "analytics-dashboard",
+  title: "Analytics Dashboard",
+  description: "Real-time analytics visualization",
+});
 ```
 
 **Learn More:**
@@ -137,44 +137,46 @@ server.uiResource({
 
 ## 📚 Package Documentation
 
-### mcp-use: Core Framework
+### Client, Agent, and Server Packages
 
-The heart of the mcp-use ecosystem - a powerful framework for building both MCP clients and servers.
+Use `@mcp-use/client` for MCP connections, `@mcp-use/agent` for agents, and
+`mcp-use` for servers.
 
 #### As an MCP Client
 
 Connect any LLM to any MCP server and build intelligent agents:
 
 ```typescript
-import { MCPClient, MCPAgent } from 'mcp-use'
-import { ChatOpenAI } from '@langchain/openai'
+import { MCPClient } from "@mcp-use/client";
+import { MCPAgent } from "@mcp-use/agent";
+import { ChatOpenAI } from "@langchain/openai";
 
 // Configure MCP servers
 const client = MCPClient.fromDict({
   mcpServers: {
     filesystem: {
-      command: 'npx',
-      args: ['@modelcontextprotocol/server-filesystem'],
+      command: "npx",
+      args: ["@modelcontextprotocol/server-filesystem"],
     },
     github: {
-      command: 'npx',
-      args: ['@modelcontextprotocol/server-github'],
+      command: "npx",
+      args: ["@modelcontextprotocol/server-github"],
       env: { GITHUB_TOKEN: process.env.GITHUB_TOKEN },
     },
   },
-})
+});
 
 // Create an AI agent
 const agent = new MCPAgent({
-  llm: new ChatOpenAI({ model: 'gpt-4' }),
+  llm: new ChatOpenAI({ model: "gpt-4" }),
   client,
   maxSteps: 10,
-})
+});
 
 // Use the agent with natural language
 const result = await agent.run(
-  'Search for TypeScript files in the project and create a summary'
-)
+  "Search for TypeScript files in the project and create a summary"
+);
 ```
 
 **Key Client Features:**
@@ -191,55 +193,57 @@ const result = await agent.run(
 Build your own MCP servers with automatic inspector and UI capabilities:
 
 ```typescript
-import { MCPServer, text } from 'mcp-use/server'
-import { z } from 'zod'
+import { MCPServer, text } from "mcp-use";
+import { z } from "zod";
 
 // Create your MCP server
 const server = new MCPServer({
-  name: 'weather-server',
-  version: '1.0.0',
-  description: 'Weather information MCP server',
-})
+  name: "weather-server",
+  version: "1.0.0",
+  description: "Weather information MCP server",
+});
 
 // Define tools with Zod schemas
 server.tool(
   {
-    name: 'get_weather',
-    description: 'Get current weather for a city',
+    name: "get_weather",
+    description: "Get current weather for a city",
     schema: z.object({
-      city: z.string().describe('City name'),
-      units: z.enum(['celsius', 'fahrenheit']).optional(),
+      city: z.string().describe("City name"),
+      units: z.enum(["celsius", "fahrenheit"]).optional(),
     }),
   },
-  async ({ city, units = 'celsius' }) => {
-    const weather = await fetchWeather(city, units)
-    return text(`Temperature: ${weather.temp}, Condition: ${weather.condition}, Humidity: ${weather.humidity}`)
+  async ({ city, units = "celsius" }) => {
+    const weather = await fetchWeather(city, units);
+    return text(
+      `Temperature: ${weather.temp}, Condition: ${weather.condition}, Humidity: ${weather.humidity}`
+    );
   }
-)
+);
 
 // Define resources
 server.resource(
   {
-    name: 'weather_map',
-    description: 'Interactive weather map',
-    uri: 'weather://map',
-    mimeType: 'text/html',
+    name: "weather_map",
+    description: "Interactive weather map",
+    uri: "weather://map",
+    mimeType: "text/html",
   },
   async () => {
     return {
       contents: [
         {
-          uri: 'weather://map',
-          mimeType: 'text/html',
+          uri: "weather://map",
+          mimeType: "text/html",
           text: generateWeatherMapHTML(),
         },
       ],
-    }
+    };
   }
-)
+);
 
 // Start the server
-server.listen(3000)
+server.listen(3000);
 // 🎉 Inspector automatically available at http://localhost:3000/inspector
 // 🚀 MCP endpoint at http://localhost:3000/mcp
 ```
@@ -258,18 +262,18 @@ server.listen(3000)
 **Streaming with AI SDK Integration:**
 
 ```typescript
-import { streamEventsToAISDKWithTools } from 'mcp-use'
-import { createTextStreamResponse } from 'ai'
+import { streamEventsToAISDKWithTools } from "@mcp-use/agent";
+import { createTextStreamResponse } from "ai";
 
 // In your Next.js API route
 export async function POST(req: Request) {
-  const { prompt } = await req.json()
+  const { prompt } = await req.json();
 
-  const streamEvents = agent.streamEvents(prompt)
-  const enhancedStream = streamEventsToAISDKWithTools(streamEvents)
-  const readableStream = createReadableStreamFromGenerator(enhancedStream)
+  const streamEvents = agent.streamEvents(prompt);
+  const enhancedStream = streamEventsToAISDKWithTools(streamEvents);
+  const readableStream = createReadableStreamFromGenerator(enhancedStream);
 
-  return createTextStreamResponse({ textStream: readableStream })
+  return createTextStreamResponse({ textStream: readableStream });
 }
 ```
 
@@ -277,22 +281,22 @@ export async function POST(req: Request) {
 
 ```tsx
 // resources/analytics-dashboard.tsx
-import { useMcp } from 'mcp-use/react'
+import { useMcp } from "mcp-use/react";
 
 export default function AnalyticsDashboard() {
-  const { callTool, status } = useMcp()
-  const [data, setData] = useState(null)
+  const { callTool, status } = useMcp();
+  const [data, setData] = useState(null);
 
   useEffect(() => {
-    callTool('get_analytics', { period: '7d' }).then(setData)
-  }, [])
+    callTool("get_analytics", { period: "7d" }).then(setData);
+  }, []);
 
   return (
     <div>
       <h1>Analytics Dashboard</h1>
       {/* Your dashboard UI */}
     </div>
-  )
+  );
 }
 ```
 
@@ -359,7 +363,7 @@ Web-based debugging tool for MCP servers - like Swagger UI but for MCP.
 1. **Automatic** (with mcp-use server):
 
 ```typescript
-server.listen(3000)
+server.listen(3000);
 // Inspector at http://localhost:3000/inspector
 ```
 
@@ -372,8 +376,8 @@ npx @mcp-use/inspector --url https://mcp.example.com/sse
 3. **Custom mounting**:
 
 ```typescript
-import { mountInspector } from '@mcp-use/inspector'
-mountInspector(app, '/debug')
+import { mountInspector } from "@mcp-use/inspector";
+mountInspector(app, "/debug");
 ```
 
 [**Full Inspector Documentation →**](./packages/inspector)
@@ -415,20 +419,20 @@ const agent = new MCPAgent({
   client: MCPClient.fromDict({
     mcpServers: {
       filesystem: {
-        command: 'npx',
+        command: "npx",
         args: [
-          '@modelcontextprotocol/server-filesystem',
-          '/Users/me/documents',
+          "@modelcontextprotocol/server-filesystem",
+          "/Users/me/documents",
         ],
       },
     },
   }),
-})
+});
 
 // Natural language file operations
-await agent.run('Organize all PDF files into a "PDFs" folder sorted by date')
-await agent.run('Find all TypeScript files and create a project summary')
-await agent.run('Delete all temporary files older than 30 days')
+await agent.run('Organize all PDF files into a "PDFs" folder sorted by date');
+await agent.run("Find all TypeScript files and create a project summary");
+await agent.run("Delete all temporary files older than 30 days");
 ```
 
 ### Example 2: Multi-Tool Research Assistant
@@ -437,38 +441,38 @@ await agent.run('Delete all temporary files older than 30 days')
 // Connect multiple MCP servers
 const client = MCPClient.fromDict({
   mcpServers: {
-    browser: { command: 'npx', args: ['@playwright/mcp'] },
-    search: { command: 'npx', args: ['@mcp/server-search'] },
-    memory: { command: 'npx', args: ['@mcp/server-memory'] },
+    browser: { command: "npx", args: ["@playwright/mcp"] },
+    search: { command: "npx", args: ["@mcp/server-search"] },
+    memory: { command: "npx", args: ["@mcp/server-memory"] },
   },
-})
+});
 
 const researcher = new MCPAgent({
   llm: new ChatAnthropic(),
   client,
   useServerManager: true, // Auto-select appropriate server
-})
+});
 
 // Complex research task
 const report = await researcher.run(`
   Research the latest developments in quantum computing.
   Search for recent papers, visit official websites,
   and create a comprehensive summary with sources.
-`)
+`);
 ```
 
 ### Example 3: Database Admin Assistant
 
 ```typescript
 const server = new MCPServer({
-  name: 'db-admin',
-  version: '1.0.0',
-})
+  name: "db-admin",
+  version: "1.0.0",
+});
 
 server.tool(
   {
-    name: 'execute_query',
-    description: 'Execute SQL query safely',
+    name: "execute_query",
+    description: "Execute SQL query safely",
     schema: z.object({
       query: z.string(),
       database: z.string(),
@@ -476,19 +480,19 @@ server.tool(
   },
   async ({ query, database }) => {
     // Validate and execute query
-    const results = await db.query(query, { database })
-    return text(`Query executed: ${results.length} rows returned`)
+    const results = await db.query(query, { database });
+    return text(`Query executed: ${results.length} rows returned`);
   }
-)
+);
 
 // Create an AI-powered DBA
 const dba = new MCPAgent({
-  llm: new ChatOpenAI({ model: 'gpt-4' }),
-  client: new MCPClient({ url: 'http://localhost:3000/mcp' }),
-})
+  llm: new ChatOpenAI({ model: "gpt-4" }),
+  client: new MCPClient({ url: "http://localhost:3000/mcp" }),
+});
 
-await dba.run('Show me all users who signed up this week')
-await dba.run('Optimize the slow queries in the performance log')
+await dba.run("Show me all users who signed up this week");
+await dba.run("Optimize the slow queries in the performance log");
 ```
 
 ---

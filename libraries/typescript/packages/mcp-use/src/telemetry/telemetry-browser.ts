@@ -1,9 +1,6 @@
 import { logger } from "../logging.js";
 import type {
   BaseTelemetryEvent,
-  ConnectorInitEventData,
-  MCPAgentExecutionEventData,
-  MCPClientInitEventData,
   MCPServerTelemetryInfo,
   ServerContextEventData,
   ServerInitializeEventData,
@@ -12,12 +9,7 @@ import type {
   ServerToolCallEventData,
 } from "./events.js";
 import {
-  ClientAddServerEvent,
-  ClientRemoveServerEvent,
-  ConnectorInitEvent,
   createServerRunEventData,
-  MCPAgentExecutionEvent,
-  MCPClientInitEvent,
   ServerContextEvent,
   ServerInitializeEvent,
   ServerPromptCallEvent,
@@ -26,6 +18,7 @@ import {
   ServerToolCallEvent,
 } from "./events.js";
 import { getPackageVersion } from "../version.js";
+import { capturePostHog, captureScarf, SCARF_GATEWAY_URL } from "./tel-fetch.js";
 
 /**
  * Generate a UUID-like identifier suitable for browser and similar runtimes.
@@ -168,22 +161,14 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
   return cachedEnvironment;
 }
 
-// PostHog types for Browser
-type PostHogBrowserClient = {
-  capture: (eventName: string, properties?: Record<string, any>) => void;
-  identify: (distinctId: string, properties?: Record<string, any>) => void;
-  reset: () => void;
-  opt_out_capturing: () => void;
-  opt_in_capturing: () => void;
-};
 
 /**
  * Browser Telemetry class that works in browser environments only.
  *
- * Uses posthog-js for telemetry, window.crypto for secure random strings,
- * and localStorage for user ID persistence.
+ * Uses native fetch for PostHog + Scarf telemetry, window.crypto for secure
+ * random strings, and localStorage for user ID persistence.
  *
- * Usage: Tel.getInstance().trackMCPClientInit(...)
+ * Usage: Tel.getInstance().trackServerToolCall(...)
  */
 export class Telemetry {
   private static instance: Telemetry | null = null;
@@ -194,8 +179,8 @@ export class Telemetry {
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;
-  private _posthogBrowserClient: PostHogBrowserClient | null = null;
-  private _posthogLoading: Promise<void> | null = null;
+  private _telemetryEnabled = false;
+  private _scarfEnabled = false;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
   private _source: string;
@@ -216,10 +201,12 @@ export class Telemetry {
     const canSupportTelemetry = this._runtimeEnvironment !== "unknown";
 
     if (telemetryDisabled) {
-      this._posthogBrowserClient = null;
+      this._telemetryEnabled = false;
+      this._scarfEnabled = false;
       logger.debug("Telemetry disabled via localStorage");
     } else if (!canSupportTelemetry) {
-      this._posthogBrowserClient = null;
+      this._telemetryEnabled = false;
+      this._scarfEnabled = false;
       logger.debug(
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
       );
@@ -227,9 +214,8 @@ export class Telemetry {
       logger.debug(
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false in localStorage to disable."
       );
-
-      // Initialize PostHog
-      this._posthogLoading = this._initPostHogBrowser();
+      this._telemetryEnabled = true;
+      this._scarfEnabled = true;
     }
   }
 
@@ -265,40 +251,6 @@ export class Telemetry {
     }
 
     return false;
-  }
-
-  private async _initPostHogBrowser(): Promise<void> {
-    try {
-      // Dynamic import of posthog-js
-      const posthogModule = await import("posthog-js");
-      // Type assertion for posthog module structure - use unknown to avoid type conflicts
-      const posthogModuleTyped = posthogModule as unknown as {
-        default?: any;
-        posthog?: any;
-      };
-      const posthog = posthogModuleTyped.default || posthogModuleTyped.posthog;
-
-      if (!posthog || typeof posthog.init !== "function") {
-        throw new Error("posthog-js module did not export expected interface");
-      }
-
-      // Initialize PostHog for browser
-      posthog.init(this.PROJECT_API_KEY, {
-        api_host: this.HOST,
-        persistence: "localStorage",
-        autocapture: false, // We only want explicit captures
-        capture_pageview: false, // We don't want automatic pageview tracking
-        disable_session_recording: true, // No session recording
-        loaded: () => {
-          logger.debug("PostHog browser client initialized");
-        },
-      });
-
-      this._posthogBrowserClient = posthog as PostHogBrowserClient;
-    } catch (e) {
-      logger.warn(`Failed to initialize PostHog browser telemetry: ${e}`);
-      this._posthogBrowserClient = null;
-    }
   }
 
   /**
@@ -351,7 +303,7 @@ export class Telemetry {
    * Check if telemetry is enabled.
    */
   get isEnabled(): boolean {
-    return this._posthogBrowserClient !== null;
+    return this._telemetryEnabled || this._scarfEnabled;
   }
 
   get userId(): string {
@@ -423,48 +375,38 @@ export class Telemetry {
   }
 
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    // Wait for PostHog to load if it's still initializing
-    if (this._posthogLoading) {
-      await this._posthogLoading;
-    }
-
-    if (!this._posthogBrowserClient) {
+    if (!this._telemetryEnabled && !this._scarfEnabled) {
       return;
     }
 
-    // Get user ID (this will trigger lazy initialization if needed)
     const currentUserId = this.userId;
 
-    // Add metadata to all events
     const properties = { ...event.properties };
     properties.mcp_use_version = getPackageVersion();
     properties.language = "typescript";
     properties.source = this._source;
     properties.runtime = this._runtimeEnvironment;
 
-    // Send to PostHog (Browser)
-    if (this._posthogBrowserClient) {
-      try {
-        this._posthogBrowserClient.capture(event.name, {
-          ...properties,
-          distinct_id: currentUserId,
-        });
-      } catch (e) {
-        logger.debug(
-          `Failed to track PostHog Browser event ${event.name}: ${e}`
-        );
-      }
+    if (this._telemetryEnabled) {
+      void capturePostHog({
+        host: this.HOST,
+        apiKey: this.PROJECT_API_KEY,
+        event: event.name,
+        distinctId: currentUserId,
+        properties,
+      });
     }
-  }
 
-  // ============================================================================
-  // Agent Events
-  // ============================================================================
-
-  async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPAgentExecutionEvent(data);
-    await this.capture(event);
+    if (this._scarfEnabled) {
+      void captureScarf(
+        {
+          ...properties,
+          user_id: currentUserId,
+          event: event.name,
+        },
+        SCARF_GATEWAY_URL
+      );
+    }
   }
 
   // ============================================================================
@@ -517,104 +459,6 @@ export class Telemetry {
   }
 
   // ============================================================================
-  // Client Events
-  // ============================================================================
-
-  async trackMCPClientInit(data: MCPClientInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPClientInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackConnectorInit(data: ConnectorInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ConnectorInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackClientAddServer(
-    serverName: string,
-    serverConfig: Record<string, any>
-  ): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientAddServerEvent({ serverName, serverConfig });
-    await this.capture(event);
-  }
-
-  async trackClientRemoveServer(serverName: string): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientRemoveServerEvent({ serverName });
-    await this.capture(event);
-  }
-
-  // ============================================================================
-  // React Hook / Browser specific events
-  // ============================================================================
-
-  async trackUseMcpConnection(data: {
-    url: string;
-    transportType: string;
-    success: boolean;
-    errorType?: string | null;
-    connectionTimeMs?: number | null;
-    hasOAuth: boolean;
-    hasSampling: boolean;
-    hasElicitation: boolean;
-  }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_connection",
-      properties: {
-        url_domain: new URL(data.url).hostname, // Only domain for privacy
-        transport_type: data.transportType,
-        success: data.success,
-        error_type: data.errorType ?? null,
-        connection_time_ms: data.connectionTimeMs ?? null,
-        has_oauth: data.hasOAuth,
-        has_sampling: data.hasSampling,
-        has_elicitation: data.hasElicitation,
-      },
-    });
-  }
-
-  async trackUseMcpToolCall(data: {
-    toolName: string;
-    success: boolean;
-    errorType?: string | null;
-    executionTimeMs?: number | null;
-  }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_tool_call",
-      properties: {
-        tool_name: data.toolName,
-        success: data.success,
-        error_type: data.errorType ?? null,
-        execution_time_ms: data.executionTimeMs ?? null,
-      },
-    });
-  }
-
-  async trackUseMcpResourceRead(data: {
-    resourceUri: string;
-    success: boolean;
-    errorType?: string | null;
-  }): Promise<void> {
-    if (!this.isEnabled) return;
-
-    await this.capture({
-      name: "usemcp_resource_read",
-      properties: {
-        resource_uri_scheme: data.resourceUri.split(":")[0], // Only scheme for privacy
-        success: data.success,
-        error_type: data.errorType ?? null,
-      },
-    });
-  }
-
-  // ============================================================================
   // Browser-specific Methods
   // ============================================================================
 
@@ -622,14 +466,8 @@ export class Telemetry {
    * Identify the current user (useful for linking sessions)
    * Browser only
    */
-  identify(userId: string, properties?: Record<string, any>): void {
-    if (this._posthogBrowserClient) {
-      try {
-        this._posthogBrowserClient.identify(userId, properties);
-      } catch (e) {
-        logger.debug(`Failed to identify user: ${e}`);
-      }
-    }
+  identify(userId: string, _properties?: Record<string, any>): void {
+    this._currUserId = userId;
   }
 
   /**
@@ -637,13 +475,6 @@ export class Telemetry {
    * Browser only
    */
   reset(): void {
-    if (this._posthogBrowserClient) {
-      try {
-        this._posthogBrowserClient.reset();
-      } catch (e) {
-        logger.debug(`Failed to reset user: ${e}`);
-      }
-    }
     this._currUserId = null;
   }
 

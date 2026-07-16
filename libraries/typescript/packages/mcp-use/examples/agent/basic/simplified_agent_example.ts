@@ -8,7 +8,7 @@
  * Required: OPENAI_API_KEY (or ANTHROPIC_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY)
  */
 
-import { MCPAgent } from "../../../dist/src/agents";
+import { MCPAgent } from "@mcp-use/agent";
 
 async function simplifiedModeExample() {
   console.log("🚀 Simplified Mode Example\n");

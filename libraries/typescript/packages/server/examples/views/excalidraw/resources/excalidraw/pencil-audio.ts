@@ -76,7 +76,9 @@ export function playStroke(elementType: string): void {
   gain.gain.setValueAtTime(0, ctx.currentTime);
   gain.gain.linearRampToValueAtTime(baseVolume, ctx.currentTime + 0.03); // quick attack
   // Duration varies by element type
-  const duration = isLine ? 0.3 + Math.random() * 0.3 : 0.2 + Math.random() * 0.4;
+  const duration = isLine
+    ? 0.3 + Math.random() * 0.3
+    : 0.2 + Math.random() * 0.4;
   gain.gain.linearRampToValueAtTime(0, ctx.currentTime + duration); // fade out
 
   // Connect: source → gain → destination

@@ -314,7 +314,8 @@ export default function MyWidget() {
 Use the MCP server with any MCP-compatible client:
 
 ```typescript
-import { MCPClient, MCPAgent } from "mcp-use";
+import { MCPClient } from "@mcp-use/client";
+import { MCPAgent } from "@mcp-use/agent";
 import { ChatOpenAI } from "@langchain/openai";
 
 const client = new MCPClient({

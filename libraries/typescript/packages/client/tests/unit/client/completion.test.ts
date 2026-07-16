@@ -8,8 +8,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { BaseConnector } from "../../../src/connectors/base.js";
-import { MCPSession } from "../../../src/session.js";
+import { BaseConnector } from "../../../src/transport/base.js";
+import { MCPSession } from "../../../src/core/session.js";
 import type {
   CompleteRequestParams,
   CompleteResult,

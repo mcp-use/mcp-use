@@ -58,7 +58,7 @@ function AddSandboxServerOnMount() {
 
     addServer("sandbox", {
       url: "http://localhost:3000/mcp",
-      name: "Sandbox MCP Server",
+      displayName: "Sandbox MCP Server",
     });
   }, [addServer, storageLoaded]);
 

@@ -59,6 +59,3 @@ conf.yaml
 .cursor
 .cursorrules
 .claude
-
-# Auto-generated files
-src/version.ts

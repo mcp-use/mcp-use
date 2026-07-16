@@ -152,7 +152,10 @@ export async function getFreePort(host = "127.0.0.1"): Promise<number> {
 }
 
 /** Occupy a port with a bare TCP server; returns the server (call close()). */
-export async function occupyPort(port: number, host = "127.0.0.1"): Promise<Server> {
+export async function occupyPort(
+  port: number,
+  host = "127.0.0.1"
+): Promise<Server> {
   return new Promise((resolve, reject) => {
     const server = createServer();
     server.once("error", reject);

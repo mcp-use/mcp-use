@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const lifecycle = vi.hoisted(() => ({
   events: [] as string[],
+  terminateSession: vi.fn<() => Promise<void>>(async () => {}),
 }));
 
 vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
@@ -30,15 +31,22 @@ vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
       lifecycle.events.push("client:connect");
     }
 
-    async close(): Promise<void> {}
+    async close(): Promise<void> {
+      lifecycle.events.push("client:close");
+    }
   }
 
   class MockStreamableHTTPClientTransport {
     sessionId = "test-session";
 
-    async close(): Promise<void> {}
+    async close(): Promise<void> {
+      lifecycle.events.push("transport:close");
+    }
 
-    async terminateSession(): Promise<void> {}
+    async terminateSession(): Promise<void> {
+      lifecycle.events.push("transport:terminate");
+      await lifecycle.terminateSession();
+    }
   }
 
   return {
@@ -48,7 +56,7 @@ vi.mock("@modelcontextprotocol/client", async (importOriginal) => {
   };
 });
 
-import { HttpConnector } from "../../../src/connectors/http.js";
+import { HttpConnector } from "../../../src/transport/http.js";
 
 class TestHttpConnector extends HttpConnector {
   protected trackConnectorInit(): void {
@@ -59,17 +67,19 @@ class TestHttpConnector extends HttpConnector {
 describe("HttpConnector inbound handler ordering", () => {
   beforeEach(() => {
     lifecycle.events.length = 0;
+    lifecycle.terminateSession.mockReset();
+    lifecycle.terminateSession.mockResolvedValue(undefined);
   });
 
   it("registers v1 handlers once before streamable HTTP Client.connect()", async () => {
     const connector = new TestHttpConnector("http://localhost:3000/mcp", {
-      disableSseFallback: true,
       onSampling: vi.fn().mockResolvedValue({
         role: "assistant",
         content: { type: "text", text: "sampled" },
         model: "test-model",
       }),
       onElicitation: vi.fn().mockResolvedValue({ action: "decline" }),
+      timeout: 10,
     });
 
     await connector.connect();
@@ -83,5 +93,21 @@ describe("HttpConnector inbound handler ordering", () => {
     ]);
 
     await connector.disconnect();
+  });
+
+  it("bounds legacy session termination before closing the transport", async () => {
+    lifecycle.terminateSession.mockImplementation(() => new Promise(() => {}));
+    const connector = new TestHttpConnector("http://localhost:3000/mcp", {
+      timeout: 10,
+    });
+
+    await connector.connect();
+    await connector.disconnect();
+
+    expect(lifecycle.events.slice(-3)).toEqual([
+      "transport:terminate",
+      "client:close",
+      "transport:close",
+    ]);
   });
 });

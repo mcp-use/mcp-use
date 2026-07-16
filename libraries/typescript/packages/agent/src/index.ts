@@ -1,34 +1,35 @@
 /**
- * @mcp-use/agent — LangChain-based MCP agent for the v2 framework.
+ * @mcp-use/agent — Native cross-platform MCP agent.
  *
- * MCPAgent and RemoteAgent, the LangChain tool adapter, the multi-server
- * ServerManager and its tools, AI SDK interop helpers, and observability
- * integrations. Depends on @mcp-use/client for the underlying MCP client,
- * connectors, and sessions. See MCP-2601.
- *
- * !!! NEVER `export *` from @langchain/core — re-exporting its Message classes
- * forces TypeScript to deeply analyze the package and OOMs the build. Import
- * them directly from "@langchain/core/messages" if needed. Same for StreamEvent
- * (from "@langchain/core/tracers/log_stream").
+ * Inspector → MCPAgent → loop → raw fetch + @mcp-use/client.
+ * LangChain integration lives in @mcp-use/agent/langchain.
  */
 
-// Agents
-export { MCPAgent } from "./agents/mcp_agent.js";
-export { RemoteAgent } from "./agents/remote.js";
-export { PROMPTS } from "./agents/index.js";
-
-// AI SDK interop utilities
-export * from "./agents/utils/index.js";
-
-// LangChain tool adapter
-export { BaseAdapter } from "./adapters/index.js";
-
-// Multi-server manager + its tools
-export { ServerManager } from "./managers/server_manager.js";
-export * from "./managers/tools/index.js";
-
-// Observability
 export {
-  ObservabilityManager,
-  type ObservabilityConfig,
-} from "./observability/index.js";
+  MCPAgent,
+  convertMessagesToProvider,
+  parseLLMStringToProviderConfig,
+  providerConfigFromOptions,
+  type MCPAgentOptions,
+  type McpConnectionLike,
+  type McpServersInput,
+  type RunOptions,
+  type AgentStep,
+  type ProviderName,
+  type ProviderConfig,
+  type ProviderMessage,
+  type LlmStreamEvent,
+  type TokenUsage,
+  type LLMConfig,
+} from "./agents/mcp_agent.js";
+export { LlmRequestError } from "./llm/providers/openai-chat-completions.js";
+export { completeChat, completeChat as chat } from "./llm/chat.js";
+export {
+  buildOllamaApiUrl,
+  DEFAULT_OLLAMA_BASE_URL,
+  normalizeOllamaBaseUrl,
+  OllamaCorsError,
+} from "./llm/providers/ollama/utils.js";
+export { RemoteAgent } from "./agents/remote.js";
+export { PROMPTS } from "./agents/prompts/index.js";
+export { BaseAdapter, NativeAdapter } from "./adapters/index.js";

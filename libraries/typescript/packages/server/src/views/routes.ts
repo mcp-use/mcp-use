@@ -3,10 +3,7 @@ import { join } from "node:path";
 import type { Hono } from "hono";
 
 import type { ViewManifestEntry } from "./types.js";
-import {
-  resolvePublicFilePath,
-  servePublicFile,
-} from "./public-route.js";
+import { resolvePublicFilePath, servePublicFile } from "./public-route.js";
 
 const PUBLIC_BUILD_DIR = ".mcp-use/build/views/public";
 const PUBLIC_DEV_DIR = "public";

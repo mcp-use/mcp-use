@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
+import type { PendingSamplingRequest } from "@/client/types/pending-requests";
 import type { CreateMessageResult } from "@modelcontextprotocol/client";
 // v2 no longer re-exports Zod `*Schema` constants; use the Standard Schema
 // validators keyed by spec type name instead.
@@ -300,46 +300,55 @@ export function SamplingRequestDisplay({
         </div>
         <div className="flex items-center gap-2">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onCopy}
-                className="h-8 w-8 p-0"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCopy}
+                  className="h-8 w-8 p-0"
+                >
+                  {isCopied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Copy request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDownload}
-                className="h-8 w-8 p-0"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDownload}
+                  className="h-8 w-8 p-0"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Download request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onFullscreen}
-                className="h-8 w-8 p-0"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onFullscreen}
+                  className="h-8 w-8 p-0"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Fullscreen</TooltipContent>
           </Tooltip>
           <Button

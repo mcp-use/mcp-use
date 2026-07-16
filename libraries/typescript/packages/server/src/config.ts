@@ -23,6 +23,11 @@ export interface InspectorOptions {
    * pinned to the current version.
    */
   assetsUrl?: string;
+  /**
+   * Hosted managed-chat backend URL (injected as `window.__MANUFACT_CHAT_URL__`).
+   * Defaults to `process.env.MANUFACT_CHAT_URL` when the shell is mounted.
+   */
+  manufactChatUrl?: string;
 }
 
 /**
@@ -157,9 +162,7 @@ interface BaseServerConfig {
  * pathname without empty segments, trailing slash, query, fragment, or
  * whitespace.
  */
-export function assertServerConfig(config: {
-  basePath?: unknown;
-}): void {
+export function assertServerConfig(config: { basePath?: unknown }): void {
   if (config.basePath !== undefined) {
     if (typeof config.basePath !== "string") {
       throw new TypeError(

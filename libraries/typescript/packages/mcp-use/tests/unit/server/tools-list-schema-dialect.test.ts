@@ -54,7 +54,10 @@ describe("tools/list schema dialect", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     transport = new StreamableHTTPClientTransport(new URL(SERVER_URL));
-    client = new Client({ name: "schema-dialect-test-client", version: "1.0.0" }, {});
+    client = new Client(
+      { name: "schema-dialect-test-client", version: "1.0.0" },
+      {}
+    );
     await client.connect(transport);
   });
 

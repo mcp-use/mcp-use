@@ -2,7 +2,6 @@ import chalk from "chalk";
 import { Command } from "commander";
 import type { MCPSession } from "@mcp-use/client";
 import { MCPClient } from "@mcp-use/client";
-import type { NodeOAuthClientProvider } from "@mcp-use/client/auth/node";
 import { createInterface } from "node:readline";
 import {
   formatError,
@@ -21,11 +20,7 @@ import {
   isStdoutTty,
 } from "../utils/format.js";
 import { parsePromptArgs, parseToolArgs } from "../utils/parse-args.js";
-import {
-  buildOAuthProvider,
-  isUnauthorized,
-  runOAuthFlow,
-} from "../utils/oauth.js";
+import { buildOAuthProvider, cliOAuthOptions } from "../utils/oauth.js";
 import {
   getSession,
   listAllSessions,
@@ -148,15 +143,12 @@ async function connectCommand(
 
   // Map --negotiate to the SDK's versionNegotiation mode. Defaults are applied
   // by the connectors (HTTP: "auto", stdio: "legacy") when left undefined.
-  const protocolNegotiation:
-    | "auto"
-    | "legacy"
-    | { pin: string }
-    | undefined = options.negotiate
-    ? options.negotiate === "auto" || options.negotiate === "legacy"
-      ? options.negotiate
-      : { pin: options.negotiate }
-    : undefined;
+  const protocolNegotiation: "auto" | "legacy" | { pin: string } | undefined =
+    options.negotiate
+      ? options.negotiate === "auto" || options.negotiate === "legacy"
+        ? options.negotiate
+        : { pin: options.negotiate }
+      : undefined;
 
   // Reject names that collide with per-server scope tokens. If someone saved a
   // server as `tools`, every `mcp-use client tools ...` invocation would be
@@ -211,51 +203,35 @@ async function connectCommand(
       console.error(formatInfo(`Connecting to ${target}...`));
 
       // Static --auth bypasses OAuth entirely. `--no-oauth` disables auto-OAuth
-      // on 401 (commander maps `--no-oauth` to options.oauth === false).
+      // (commander maps `--no-oauth` to options.oauth === false).
       const wantOAuth = !options.auth && options.oauth !== false;
-      let authProvider: NodeOAuthClientProvider | undefined;
-      if (wantOAuth) {
-        const authTimeoutMs = options.authTimeout
-          ? Number.parseInt(options.authTimeout, 10)
-          : undefined;
-        authProvider = await buildOAuthProvider(target, {
-          ...(authTimeoutMs ? { authTimeoutMs } : {}),
-        });
-      }
+      const authTimeoutMs = options.authTimeout
+        ? Number.parseInt(options.authTimeout, 10)
+        : undefined;
 
       client.addServer(sessionName, {
         url: target,
-        ...(authProvider
-          ? { authProvider }
-          : options.auth
-            ? { headers: { Authorization: `Bearer ${options.auth}` } }
-            : {}),
+        ...(options.auth
+          ? { headers: { Authorization: `Bearer ${options.auth}` } }
+          : {}),
+        oauth: wantOAuth
+          ? cliOAuthOptions(
+              authTimeoutMs && Number.isFinite(authTimeoutMs)
+                ? { authTimeoutMs }
+                : {}
+            )
+          : false,
         clientInfo: cliClientInfo,
         ...(protocolNegotiation ? { protocolNegotiation } : {}),
       });
 
-      try {
-        session = await client.createSession(sessionName);
-      } catch (err) {
-        if (authProvider && isUnauthorized(err)) {
-          console.error(
-            formatWarning(
-              "Server requires authentication. Starting OAuth flow."
-            )
-          );
-          await runOAuthFlow(authProvider, target);
-          console.error(formatSuccess("Authentication successful"));
-          session = await client.createSession(sessionName);
-        } else {
-          throw err;
-        }
-      }
+      session = await client.createSession(sessionName);
 
       await saveSession(sessionName, {
         type: "http",
         url: target,
-        authMode: authProvider ? "oauth" : options.auth ? "bearer" : undefined,
-        authToken: authProvider ? undefined : options.auth,
+        authMode: wantOAuth ? "oauth" : options.auth ? "bearer" : undefined,
+        authToken: wantOAuth ? undefined : options.auth,
         lastUsed: new Date().toISOString(),
       });
     }

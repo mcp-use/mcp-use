@@ -10,7 +10,7 @@
  * Required: ANTHROPIC_API_KEY
  */
 
-import { MCPAgent } from "../../../dist/src/agents";
+import { MCPAgent } from "@mcp-use/agent";
 
 async function runMultiServerExample() {
   // Create a configuration with multiple servers

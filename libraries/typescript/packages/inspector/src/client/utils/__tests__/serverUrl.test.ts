@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLocalhostServerUrl } from "../serverUrl";
+import { isLocalhostServerUrl } from "../servers";
 
 describe("isLocalhostServerUrl", () => {
   it("returns true for loopback hostnames", () => {

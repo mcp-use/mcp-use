@@ -28,8 +28,11 @@ function readEnv(key: string): string | undefined {
   if (typeof process !== "undefined" && process.env) {
     return process.env[key];
   }
-  const deno = (globalThis as unknown as { Deno?: { env?: { get(k: string): string | undefined } } })
-    .Deno;
+  const deno = (
+    globalThis as unknown as {
+      Deno?: { env?: { get(k: string): string | undefined } };
+    }
+  ).Deno;
   if (deno?.env) {
     try {
       return deno.env.get(key);

@@ -9,7 +9,9 @@ export type TabType =
   | "chat"
   | "sampling"
   | "elicitation"
-  | "notifications";
+  | "notifications"
+  | "server-metadata"
+  | "connection-settings";
 
 /**
  * Configuration injected by a host application when the inspector runs in
@@ -20,8 +22,7 @@ export type TabType =
  * the Chat tab switches from client-side LLM calls to a managed backend:
  *
  *   1. `InspectorProvider` (below) reads VITE_MANUFACT_CHAT_URL and sets
- *      `chatApiUrl`, `chatStreamProtocol: "data-stream"`, and
- *      `chatCredentials: "include"` so the session cookie is forwarded.
+ *      `chatApiUrl` and `chatStreamProtocol: "data-stream"`.
  *
  *   2. `LayoutContent` passes these down to `ChatTab` as props; `ChatTab`
  *      then passes `useClientSide={false}` to `useChatMessages`.
@@ -31,19 +32,16 @@ export type TabType =
  *      logic there), bypassing the backend entirely.
  *
  *   4. The backend endpoint (`/api/v1/inspector/chat/stream`, cloud.mcp-use)
- *      applies a two-tier rate limit for unauthenticated visitors and skips
- *      it for users whose session cookie is present (shared across
- *      *.manufact.com via COOKIE_DOMAIN=.manufact.com).
+ *      requires an OAuth bearer token and meters the user's organization.
  *
- *   5. On a 429 response the frontend shows `LoginModal`, which offers
- *      sign-in (Manufact account) OR falling back to the user's own API key.
+ *   5. On a 429 response the frontend offers cloud OAuth sign-in or BYOK.
  *
  * ── Related files ────────────────────────────────────────────────────────────
  *  • cloud.mcp-use/src/routes/v1/inspector-chat.ts   — rate-limited endpoint
  *  • cloud.mcp-use/src/lib/mcp-chat-stream.ts        — shared OpenRouter streamer
  *  • inspector/src/client/components/ChatTab.tsx      — effectiveClientSide logic
- *  • inspector/src/client/components/LoginModal.tsx   — rate-limit UI
- *  • inspector/src/client/components/HostedUserMenu.tsx — avatar / session check
+ *  • inspector/src/client/auth/manufact-auth.ts       — cloud OAuth session
+ *  • inspector/src/client/components/HostedUserMenu.tsx — avatar / authorization
  */
 export interface EmbeddedConfig {
   backgroundColor?: string;
@@ -185,9 +183,6 @@ export function InspectorProvider({ children }: { children: ReactNode }) {
       ? {
           chatApiUrl: hostedChatUrl,
           chatStreamProtocol: "data-stream",
-          // Include cookies so the backend can recognise authenticated users
-          // (session cookie shared across subdomains via COOKIE_DOMAIN).
-          chatCredentials: "include" as RequestCredentials,
           chatEnableFreeTierUpgrade: true,
         }
       : {},

@@ -27,9 +27,7 @@ describe("normalizeUrlHost", () => {
     expect(normalizeUrlHost("http://0.0.0.0:3000")).toBe(
       "http://localhost:3000"
     );
-    expect(normalizeUrlHost("http://0.0.0.0/mcp")).toBe(
-      "http://localhost/mcp"
-    );
+    expect(normalizeUrlHost("http://0.0.0.0/mcp")).toBe("http://localhost/mcp");
   });
 
   it("leaves other hosts untouched", () => {

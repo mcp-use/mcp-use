@@ -4,6 +4,10 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDev } from "../../src/cli/index.js";
@@ -191,6 +195,122 @@ export default server;`
         : undefined
     );
     expect(await listToolNames(dev.url)).toEqual(["add", "subtract"]);
+  });
+
+  it("notifies connected clients after server catalog reloads", async () => {
+    const cwd = copyFixture("dev-list-changed");
+    cleanups.push(() => removeDir(cwd));
+
+    const port = await getFreePort();
+    const dev = await startDev(cwd, port);
+    cleanups.push(dev.stop);
+
+    const changes = { tools: 0, prompts: 0, resources: 0 };
+    const catalogs: {
+      tools: { name: string; description?: string | undefined }[];
+      prompts: { name: string }[];
+      resources: { name: string }[];
+    } = { tools: [], prompts: [], resources: [] };
+    const errors: Error[] = [];
+    const client = new Client(
+      { name: "dev-list-changed-test", version: "1.0.0" },
+      {
+        versionNegotiation: { mode: { pin: "2026-07-28" } },
+        listChanged: {
+          tools: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: (error, tools) => {
+              if (error !== null) errors.push(error);
+              changes.tools += 1;
+              catalogs.tools = tools ?? [];
+            },
+          },
+          prompts: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: (error, prompts) => {
+              if (error !== null) errors.push(error);
+              changes.prompts += 1;
+              catalogs.prompts = prompts ?? [];
+            },
+          },
+          resources: {
+            autoRefresh: true,
+            debounceMs: 0,
+            onChanged: (error, resources) => {
+              if (error !== null) errors.push(error);
+              changes.resources += 1;
+              catalogs.resources = resources ?? [];
+            },
+          },
+        },
+      }
+    );
+    await client.connect(new StreamableHTTPClientTransport(new URL(dev.url)));
+    cleanups.push(() => client.close());
+    await Promise.all([
+      client.listTools(),
+      client.listPrompts(),
+      client.listResources(),
+    ]);
+
+    const entry = join(cwd, "src", "index.ts");
+    const source = readFileSync(entry, "utf8");
+    const withCatalog = source
+      .replace("Add two numbers", "Add numbers after reload")
+      .replace(
+        "export default server;",
+        `server.tool(
+  { name: "subtract", description: "Subtract two numbers", inputSchema: z.object({ a: z.number(), b: z.number() }) },
+  async ({ a, b }) => ({ content: [{ type: "text", text: String(a - b) }] })
+);
+server.prompt(
+  { name: "hello", description: "Say hello" },
+  async () => ({ messages: [{ role: "user", content: { type: "text", text: "Hello" } }] })
+);
+server.resource(
+  { name: "status", uri: "status://dev" },
+  async (uri) => ({ contents: [{ uri: uri.href, text: "ok" }] })
+);
+export default server;`
+      );
+    writeFileSync(entry, withCatalog);
+
+    await waitFor(async () =>
+      changes.tools > 0 && changes.prompts > 0 && changes.resources > 0
+        ? true
+        : undefined
+    );
+    expect(errors).toEqual([]);
+    expect(catalogs.tools).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "add",
+          description: "Add numbers after reload",
+        }),
+        expect.objectContaining({ name: "subtract" }),
+      ])
+    );
+    expect(catalogs.prompts.map((prompt) => prompt.name)).toContain("hello");
+    expect(catalogs.resources.map((resource) => resource.name)).toContain(
+      "status"
+    );
+
+    const firstToolChange = changes.tools;
+    writeFileSync(
+      entry,
+      withCatalog.replace(
+        /server\.tool\(\n  \{ name: "subtract"[\s\S]*?\n\);\nserver\.prompt\(/,
+        "server.prompt("
+      )
+    );
+    await waitFor(async () =>
+      changes.tools > firstToolChange &&
+      !catalogs.tools.some((tool) => tool.name === "subtract")
+        ? true
+        : undefined
+    );
   });
 
   it("probes upward when the requested port is taken", async () => {
@@ -393,9 +513,9 @@ throw new Error("startup failure after MCPServer construction");
     // Dev API routes sit in front of the MCP handler and must be covered by
     // the same check (starting a tunnel would expose the server publicly).
     const infoUrl = `${dev.url}/inspector/api/dev/info`;
-    expect(
-      await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")
-    ).toBe(403);
+    expect(await rawStatus(infoUrl, { host: "evil.example.com" }, "GET")).toBe(
+      403
+    );
     expect(await rawStatus(infoUrl, {}, "GET")).toBe(200);
 
     // GET/HEAD are exempt from the Origin check (Host still validated):
@@ -457,19 +577,24 @@ describe("runDev (views)", () => {
 
     const base = dev.url.replace(/\/mcp$/, "");
 
-    const readBody = await mcpRequest(dev.url, "resources/read", {
-      uri: "ui://views/product-search-result.html",
-    }, { ui: true });
-    const docHtml = (
-      readBody["result"] as { contents: { text: string }[] }
-    ).contents[0]!.text;
+    const readBody = await mcpRequest(
+      dev.url,
+      "resources/read",
+      {
+        uri: "ui://views/product-search-result.html",
+      },
+      { ui: true }
+    );
+    const docHtml = (readBody["result"] as { contents: { text: string }[] })
+      .contents[0]!.text;
     expect(docHtml).toContain('id="root"');
     expect(docHtml).toContain("/@vite/client");
     expect(docHtml).toMatch(/virtual:mcp-use\/views\/product-search-result/);
 
-    const virtualMatch = /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
-      docHtml
-    );
+    const virtualMatch =
+      /src="([^"]+virtual:mcp-use\/views\/product-search-result[^"]*)"/.exec(
+        docHtml
+      );
     expect(virtualMatch).not.toBeNull();
     const virtualUrl = new URL(virtualMatch![1]!, base).href;
     const virtualResponse = await fetch(virtualUrl);
@@ -539,21 +664,20 @@ describe("runDev (views)", () => {
     // Vite `server.origin` is the browsable origin: `localhost`, not the
     // 127.0.0.1 bind address (VIEWS_SPEC.md § Dev).
     expect(assetImportJs).toMatch(
-      new RegExp(`http://localhost:${port}/resources/product-search-result/badge\\.png`)
+      new RegExp(
+        `http://localhost:${port}/resources/product-search-result/badge\\.png`
+      )
     );
 
-    const publicResponse = await fetch(
-      `${base}/mcp/_mcp-use/public/test.txt`
-    );
+    const publicResponse = await fetch(`${base}/mcp/_mcp-use/public/test.txt`);
     expect(publicResponse.status).toBe(200);
     expect(publicResponse.headers.get("cache-control")).toBe(
       "public, max-age=0, must-revalidate"
     );
     expect(await publicResponse.text()).toBe("public-fixture\n");
 
-    const docConfigMatch = /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(
-      docHtml
-    );
+    const docConfigMatch =
+      /__mcpUseViewConfig=\{[^}]*"publicBase":"([^"]+)"/.exec(docHtml);
     expect(docConfigMatch).not.toBeNull();
     expect(docConfigMatch![1]).toBe(
       `http://localhost:${port}/mcp/_mcp-use/public/`
@@ -599,10 +723,15 @@ describe("runDev (views)", () => {
     );
 
     await waitFor(async () => {
-      const list = await mcpRequest(dev.url, "resources/list", {}, { ui: true });
-      const uris = (list["result"] as { resources: { uri: string }[] }).resources.map(
-        (r) => r.uri
+      const list = await mcpRequest(
+        dev.url,
+        "resources/list",
+        {},
+        { ui: true }
       );
+      const uris = (
+        list["result"] as { resources: { uri: string }[] }
+      ).resources.map((r) => r.uri);
       return uris.includes("ui://views/extra-view.html") ? true : undefined;
     });
   }, 60_000);
@@ -707,7 +836,10 @@ describe("runDev (views)", () => {
     // the second concurrent `mcp-use dev` process fail to bind.
     const cwdA = copyFixture("dev-views-a", "views");
     const cwdB = copyFixture("dev-views-b", "views");
-    cleanups.push(() => removeDir(cwdA), () => removeDir(cwdB));
+    cleanups.push(
+      () => removeDir(cwdA),
+      () => removeDir(cwdB)
+    );
 
     const portA = await getFreePort();
     const devA = await startDev(cwdA, portA);
@@ -742,12 +874,16 @@ describe("runDev (views)", () => {
 
     // Both servers keep serving MCP + view documents side by side.
     for (const dev of [devA, devB]) {
-      const readBody = await mcpRequest(dev.url, "resources/read", {
-        uri: "ui://views/product-search-result.html",
-      }, { ui: true });
-      const docHtml = (
-        readBody["result"] as { contents: { text: string }[] }
-      ).contents[0]!.text;
+      const readBody = await mcpRequest(
+        dev.url,
+        "resources/read",
+        {
+          uri: "ui://views/product-search-result.html",
+        },
+        { ui: true }
+      );
+      const docHtml = (readBody["result"] as { contents: { text: string }[] })
+        .contents[0]!.text;
       expect(docHtml).toContain("/@vite/client");
     }
   }, 90_000);

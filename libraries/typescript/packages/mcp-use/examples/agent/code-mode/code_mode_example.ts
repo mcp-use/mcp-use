@@ -11,8 +11,8 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import fs from "node:fs";
 import path from "node:path";
-import { MCPAgent, PROMPTS } from "../../../dist/src/agents";
-import { MCPClient } from "../../../src/client.js";
+import { MCPAgent, PROMPTS } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 // Example configuration with a simple MCP server
 // You can replace this with your own server configuration
 

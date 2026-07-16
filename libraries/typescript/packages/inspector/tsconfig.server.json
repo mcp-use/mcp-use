@@ -10,6 +10,6 @@
     "outDir": "dist",
     "allowSyntheticDefaultImports": true
   },
-  "include": ["src/server/**/*", "src/cli/**/*", "src/llm/**/*", "src/shared/**/*"],
+  "include": ["src/server/**/*", "src/cli/**/*", "src/shared/**/*"],
   "exclude": ["src/client/**/*"]
 }

@@ -1,5 +1,4 @@
-import { DEFAULT_OLLAMA_BASE_URL } from "@/llm/providers/ollama/utils";
-import type { ProviderName } from "@/llm/types";
+import { DEFAULT_OLLAMA_BASE_URL, type ProviderName } from "@mcp-use/agent";
 
 export interface MessageAttachment {
   type: "image" | "file";
@@ -40,6 +39,7 @@ export interface LLMConfig {
   model: string;
   temperature?: number;
   baseUrl?: string;
+  credentials?: RequestCredentials;
 }
 
 export interface AuthConfig {
@@ -73,7 +73,7 @@ export interface MCPConfig {
 export type StreamProtocol = "sse" | "data-stream";
 
 export const DEFAULT_MODELS: Record<ProviderName, string> = {
-  openai: "gpt-4o",
+  openai: "gpt-5.6-terra",
   "openai-compatible": "",
   anthropic: "claude-haiku-4-5-20251001",
   google: "gemini-2.5-flash",

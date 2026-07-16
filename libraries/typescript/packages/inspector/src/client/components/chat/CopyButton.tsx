@@ -1,6 +1,6 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 
 /**
  * Button that copies the provided text to the clipboard and shows a brief visual confirmation.
@@ -19,7 +19,8 @@ export function CopyButton({ text }: { text: string }) {
 
   return (
     <button
-      className="opacity-0 group-hover/message:opacity-100 transition-opacity text-muted-foreground hover:text-foreground text-xs flex items-center gap-1"
+      type="button"
+      className="text-muted-foreground hover:text-foreground flex items-center rounded p-0.5"
       onClick={handleCopy}
       title="Copy message content"
       data-testid="copy-button"

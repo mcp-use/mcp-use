@@ -1,5 +1,5 @@
 import { cn } from "@/client/lib/utils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import {
   ChevronDown,
   ChevronRight,
@@ -372,50 +372,56 @@ export function IframeConsole({
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
-              onClick={() => setIsOpen(true)}
-            >
-              <TerminalIcon className="size-4" />
-              {totalCount > 0 && (
-                <span
-                  className={cn(
-                    "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
-                    badgeColor
-                  )}
+      <SheetTrigger
+        render={
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="relative bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm shadow-sm hover:bg-white dark:hover:bg-zinc-900"
+                  onClick={() => setIsOpen(true)}
                 >
-                  {totalCount}
-                </span>
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <div className="text-xs space-y-1">
-              <p className="font-semibold">
-                {totalCount} console {totalCount === 1 ? "log" : "logs"}
-              </p>
-              {errorCount > 0 && (
-                <p className="text-red-400">
-                  {errorCount} error{errorCount !== 1 ? "s" : ""}
+                  <TerminalIcon className="size-4" />
+                  {totalCount > 0 && (
+                    <span
+                      className={cn(
+                        "ml-2 px-1.5 py-0.5 text-xs rounded-full text-white font-semibold",
+                        badgeColor
+                      )}
+                    >
+                      {totalCount}
+                    </span>
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
+            <TooltipContent>
+              <div className="text-xs space-y-1">
+                <p className="font-semibold">
+                  {totalCount} console {totalCount === 1 ? "log" : "logs"}
                 </p>
-              )}
-              {warnCount > 0 && (
-                <p className="text-yellow-400">
-                  {warnCount} warning{warnCount !== 1 ? "s" : ""}
-                </p>
-              )}
-              {infoCount > 0 && (
-                <p className="text-zinc-400">{infoCount} info</p>
-              )}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      </SheetTrigger>
+                {errorCount > 0 && (
+                  <p className="text-red-400">
+                    {errorCount} error{errorCount !== 1 ? "s" : ""}
+                  </p>
+                )}
+                {warnCount > 0 && (
+                  <p className="text-yellow-400">
+                    {warnCount} warning{warnCount !== 1 ? "s" : ""}
+                  </p>
+                )}
+                {infoCount > 0 && (
+                  <p className="text-zinc-400">{infoCount} info</p>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        }
+        nativeButton={false}
+      />
       <SheetContent
         side="bottom"
         className="flex flex-col p-0 transition-none m-0 gap-0"

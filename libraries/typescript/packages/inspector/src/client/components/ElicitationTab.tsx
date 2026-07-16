@@ -1,20 +1,17 @@
 import type { ElicitResult } from "@modelcontextprotocol/client";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
+import type { PendingElicitationRequest } from "@/client/types/pending-requests";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckSquare } from "lucide-react";
+import { CheckSquare, X } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/client/components/ui/resizable";
-import {
-  ElicitationTabHeader,
-  ElicitationRequestsList,
-  ElicitationRequestDisplay,
-} from "./elicitation";
+import { ElicitationRequestsList } from "./elicitation/ElicitationRequestsList";
+import { ElicitationRequestDisplay } from "./elicitation/ElicitationRequestDisplay";
+import { InspectorScrollArea, SearchTabHeader } from "@/client/components/shared";
 import { useInspector } from "@/client/context/InspectorContext";
-import { copyToClipboard } from "@/client/utils/clipboard";
-import { formatRelativeTime } from "@/client/utils/time";
+import { copyToClipboard, formatRelativeTime } from "@/client/utils/browser";
 
 interface ElicitationTabProps {
   pendingRequests: PendingElicitationRequest[];
@@ -362,31 +359,43 @@ export function ElicitationTab({
           orientation="vertical"
           className="h-full border-r dark:border-zinc-700"
         >
-          <ResizablePanel defaultSize={75} minSize={30}>
-            <ElicitationTabHeader
-              isSearchExpanded={isSearchExpanded}
-              searchQuery={searchQuery}
-              filteredRequestsCount={filteredRequests.length}
-              requestsCount={pendingRequests.length}
-              onSearchExpand={() => setIsSearchExpanded(true)}
-              onSearchChange={setSearchQuery}
-              onSearchBlur={handleSearchBlur}
-              onCancelAll={handleCancelAll}
-              searchInputRef={
-                searchInputRef as React.RefObject<HTMLInputElement>
-              }
-            />
+          <ResizablePanel defaultSize={75} minSize={30} className="h-full overflow-hidden">
+            <InspectorScrollArea scrollRef={listRef}>
+              {(isScrolled) => (
+                <>
+                  <SearchTabHeader
+                    isScrolled={isScrolled}
+                    title="Elicitation"
+                    icon={CheckSquare}
+                    titleTestId="elicitation-tab-header"
+                    count={filteredRequests.length}
+                    isSearchExpanded={isSearchExpanded}
+                    searchQuery={searchQuery}
+                    searchPlaceholder="Search requests..."
+                    onSearchExpand={() => setIsSearchExpanded(true)}
+                    onSearchChange={setSearchQuery}
+                    onSearchBlur={handleSearchBlur}
+                    bulkAction={{
+                      icon: X,
+                      label: "Cancel all",
+                      onClick: handleCancelAll,
+                      disabled: pendingRequests.length === 0,
+                    }}
+                    searchInputRef={
+                      searchInputRef as React.RefObject<HTMLInputElement>
+                    }
+                  />
 
-            <div className="flex flex-col h-full">
-              <ElicitationRequestsList
-                requests={filteredRequests}
-                selectedRequest={selectedRequest}
-                onRequestSelect={handleRequestSelect}
-                focusedIndex={focusedIndex}
-                formatRelativeTime={formatRelativeTime}
-                listRef={listRef}
-              />
-            </div>
+                  <ElicitationRequestsList
+                    requests={filteredRequests}
+                    selectedRequest={selectedRequest}
+                    onRequestSelect={handleRequestSelect}
+                    focusedIndex={focusedIndex}
+                    formatRelativeTime={formatRelativeTime}
+                  />
+                </>
+              )}
+            </InspectorScrollArea>
           </ResizablePanel>
         </ResizablePanelGroup>
       </ResizablePanel>

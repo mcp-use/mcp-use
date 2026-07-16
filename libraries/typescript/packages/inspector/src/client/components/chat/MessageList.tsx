@@ -1,25 +1,21 @@
 import { TextShimmer } from "@/client/components/ui/text-shimmer";
-import { Button } from "@/client/components/ui/button";
-import { ArrowDown } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
 import {
   memo,
   useCallback,
-  useEffect,
-  useRef,
-  useState,
+  useMemo,
   type RefObject,
 } from "react";
-import type { MessageContentBlock } from "mcp-use/react";
+import type { MessageContentBlock } from "@/client/types/message-content-block";
 import { AssistantMessage } from "./AssistantMessage";
 import { ToolCallDisplay } from "./ToolCallDisplay";
 import { ToolResultRenderer } from "./ToolResultRenderer";
 import { UserMessage } from "./UserMessage";
 import type { MessageAttachment } from "./types";
-import { detectWidgetProtocol } from "@/client/utils/widget-detection";
-import { InlineElicitationCard } from "./InlineElicitationCard";
-import type { PendingElicitationRequest } from "@/client/types/elicitation";
-import type { ElicitResult } from "@modelcontextprotocol/client";
+import { isViewTool } from "@mcp-use/client/react";
+import {
+  buildMessageTokenMap,
+  type InspectorTraceEvent,
+} from "./trace";
 
 interface Message {
   id: string;
@@ -57,14 +53,10 @@ interface MessageListProps {
   ) => Promise<void>;
   /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
   serverBaseUrl?: string;
-  /** Pending elicitation requests to render inline in the chat thread. */
-  pendingElicitationRequests?: PendingElicitationRequest[];
-  /** Handler called when the user accepts or declines an elicitation. */
-  onApproveElicitation?: (requestId: string, result: ElicitResult) => void;
-  /** Handler called when the user cancels an elicitation. */
-  onRejectElicitation?: (requestId: string, error?: string) => void;
-  /** Scroll container element (the overflow-y parent). Enables scroll-to-bottom UX. */
-  scrollContainerRef?: RefObject<HTMLElement | null>;
+  /** Anchor at the end of the thread — owned by useChatScrollToBottom in ChatTab. */
+  messagesEndRef?: RefObject<HTMLDivElement | null>;
+  /** Trace events used to derive per-message token counts on hover. */
+  traceEvents?: InspectorTraceEvent[];
 }
 
 export const MessageList = memo(
@@ -75,37 +67,12 @@ export const MessageList = memo(
     readResource,
     tools,
     sendMessage,
-    serverBaseUrl,
-    pendingElicitationRequests,
-    onApproveElicitation,
-    onRejectElicitation,
-    scrollContainerRef,
+    messagesEndRef,
+    traceEvents = [],
   }: MessageListProps) => {
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [isNearBottom, setIsNearBottom] = useState(true);
-    const bottomThresholdPx = 64;
-
-    const hasMessages = messages.length > 0;
-    const showScrollToBottom = hasMessages && !isNearBottom;
-
-    const measureIsNearBottom = useCallback(() => {
-      const el = scrollContainerRef?.current;
-      if (!el) return;
-      const distanceFromBottom =
-        el.scrollHeight - (el.scrollTop + el.clientHeight);
-      setIsNearBottom(distanceFromBottom <= bottomThresholdPx);
-    }, [scrollContainerRef]);
-
-    const scrollToBottom = useCallback(
-      (behavior: ScrollBehavior) => {
-        const el = scrollContainerRef?.current;
-        if (!el) return;
-
-        el.scrollTo({ top: el.scrollHeight, behavior });
-        messagesEndRef.current?.scrollIntoView({ behavior, block: "start" });
-        setIsNearBottom(true);
-      },
-      [scrollContainerRef]
+    const messageTokenMap = useMemo(
+      () => buildMessageTokenMap(messages, traceEvents),
+      [messages, traceEvents]
     );
 
     // Helper function to get tool metadata by name.
@@ -122,7 +89,7 @@ export const MessageList = memo(
     // Helper function to check if a tool has widget support
     const isWidgetTool = (toolName: string): boolean => {
       const toolMeta = getToolMeta(toolName);
-      return detectWidgetProtocol(toolMeta, undefined) === "mcp-apps";
+      return isViewTool(toolMeta);
     };
 
     // Convert a ui/message content array to a text string + image attachments,
@@ -150,24 +117,6 @@ export const MessageList = memo(
       },
       [sendMessage]
     );
-
-    // Track whether the user is reading older messages vs near the bottom.
-    useEffect(() => {
-      const el = scrollContainerRef?.current;
-      if (!el) return;
-
-      measureIsNearBottom();
-      const onScroll = () => measureIsNearBottom();
-      el.addEventListener("scroll", onScroll, { passive: true });
-      return () => el.removeEventListener("scroll", onScroll);
-    }, [measureIsNearBottom, scrollContainerRef]);
-
-    // Auto-scroll only when the user is already near the bottom.
-    useEffect(() => {
-      if (!hasMessages || !messagesEndRef.current) return;
-      if (!isNearBottom) return;
-      scrollToBottom(!isLoading ? "smooth" : "auto");
-    }, [hasMessages, isLoading, isNearBottom, messages.length, scrollToBottom]);
 
     // Determine if we're in "thinking" state vs "streaming" state
     const isThinking =
@@ -208,13 +157,29 @@ export const MessageList = memo(
       })();
 
     // Determine if a message is currently streaming
-    const isMessageStreaming = (message: Message) => {
-      if (!isLoading) return false;
+    const lastMessage = messages[messages.length - 1];
+    const isLastAssistantStreaming =
+      isLoading &&
+      lastMessage?.role === "assistant";
 
-      // If this is the last message and it's from assistant, it's streaming
-      const lastMessage = messages[messages.length - 1];
-      return message.id === lastMessage.id && lastMessage.role === "assistant";
+    const getLastTextPartIndex = (parts: NonNullable<Message["parts"]>) => {
+      for (let i = parts.length - 1; i >= 0; i--) {
+        if (parts[i]?.type === "text") return i;
+      }
+      return -1;
     };
+
+    const isTextPartStreaming = (
+      message: Message,
+      partIndex: number,
+      parts: NonNullable<Message["parts"]>
+    ) =>
+      isLastAssistantStreaming &&
+      message.id === lastMessage?.id &&
+      partIndex === getLastTextPartIndex(parts);
+
+    const isMessageStreaming = (message: Message) =>
+      isLastAssistantStreaming && message.id === lastMessage?.id;
 
     return (
       <div className="space-y-6 max-w-3xl mx-auto px-2">
@@ -239,11 +204,19 @@ export const MessageList = memo(
                 content={contentStr}
                 timestamp={message.timestamp}
                 attachments={message.attachments}
+                inputTokens={messageTokenMap.get(message.id)?.inputTokens}
               />
             );
           }
 
           if (message.role === "assistant") {
+            const outputTokens =
+              messageTokenMap.get(message.id)?.outputTokens;
+            const lastTextPartIndex =
+              message.parts && message.parts.length > 0
+                ? getLastTextPartIndex(message.parts)
+                : -1;
+
             return (
               <div key={message.id} className="space-y-4">
                 {/* Handle message parts if available (for proper ordering) */}
@@ -251,7 +224,7 @@ export const MessageList = memo(
                   message.parts.map((part, partIndex) => {
                     const partKey =
                       part.type === "text"
-                        ? `${message.id}-text-${partIndex}-${part.text?.slice(0, 20)}`
+                        ? `${message.id}-text-${partIndex}`
                         : `${message.id}-tool-${part.toolInvocation?.toolName}-${partIndex}`;
 
                     if (part.type === "text") {
@@ -264,7 +237,16 @@ export const MessageList = memo(
                               ? message.timestamp
                               : undefined
                           }
-                          _isStreaming={isMessageStreaming(message)}
+                          _isStreaming={isTextPartStreaming(
+                            message,
+                            partIndex,
+                            message.parts!
+                          )}
+                          outputTokens={
+                            partIndex === lastTextPartIndex
+                              ? outputTokens
+                              : undefined
+                          }
                         />
                       );
                     } else if (
@@ -302,7 +284,6 @@ export const MessageList = memo(
                                 result={part.toolInvocation.result || null}
                                 serverId={serverId}
                                 readResource={readResource}
-                                serverBaseUrl={serverBaseUrl}
                                 toolMeta={getToolMeta(
                                   part.toolInvocation.toolName
                                 )}
@@ -329,6 +310,7 @@ export const MessageList = memo(
                       content={contentStr}
                       timestamp={message.timestamp}
                       _isStreaming={isMessageStreaming(message)}
+                      outputTokens={outputTokens}
                     />
 
                     {/* Tool Calls (fallback for non-parts messages) */}
@@ -356,7 +338,6 @@ export const MessageList = memo(
                                     result={toolCall.result || null}
                                     serverId={serverId}
                                     readResource={readResource}
-                                    serverBaseUrl={serverBaseUrl}
                                     toolMeta={getToolMeta(toolCall.toolName)}
                                     onSendFollowUp={handleFollowUp}
                                   />
@@ -376,23 +357,6 @@ export const MessageList = memo(
           return null;
         })}
 
-        {/* Inline elicitation cards — shown when a tool triggers elicitation during chat */}
-        {pendingElicitationRequests &&
-          pendingElicitationRequests.length > 0 &&
-          onApproveElicitation &&
-          onRejectElicitation && (
-            <div className="space-y-3">
-              {pendingElicitationRequests.map((req) => (
-                <InlineElicitationCard
-                  key={req.id}
-                  request={req}
-                  onApprove={onApproveElicitation}
-                  onReject={onRejectElicitation}
-                />
-              ))}
-            </div>
-          )}
-
         {/* Thinking indicator - only show when actually thinking, not streaming */}
         {isThinking && (
           <div className="flex items-start gap-3">
@@ -410,34 +374,7 @@ export const MessageList = memo(
           </div>
         )}
 
-        {/* Reference for scrolling to bottom */}
         <div ref={messagesEndRef} />
-
-        <div className="sticky bottom-4 z-20 h-0 -translate-y-4 pointer-events-none">
-          <AnimatePresence>
-            {showScrollToBottom && (
-              <motion.div
-                className="flex justify-center"
-                initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-              >
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="pointer-events-auto size-9 rounded-full border bg-background/95 p-0 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/80"
-                  onClick={() => scrollToBottom("smooth")}
-                  aria-label="Scroll to bottom"
-                  title="Scroll to bottom"
-                  data-testid="chat-scroll-to-bottom"
-                >
-                  <ArrowDown className="size-4" />
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
       </div>
     );
   }

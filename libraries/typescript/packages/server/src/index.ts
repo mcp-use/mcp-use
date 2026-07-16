@@ -13,6 +13,12 @@ export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";
 
 /**
+ * Back-compat: {@link MCPClient} from the optional `@mcp-use/client` peer.
+ * Loaded via dynamic import; missing peer throws an install hint on use.
+ */
+export { MCPClient, importMcpClient } from "./client.js";
+
+/**
  * Wire result shapes (re-exported from the SDK): callbacks return these raw
  * shapes directly — tools return {@link CallToolResult}, resources
  * {@link ReadResourceResult}, prompts {@link GetPromptResult}. There is no
@@ -22,8 +28,17 @@ export type {
   CallToolResult,
   ContentBlock,
   GetPromptResult,
+  InputRequest,
+  InputRequiredResult,
+  InputResponses,
   PromptMessage,
   ReadResourceResult,
+} from "@modelcontextprotocol/server";
+export {
+  acceptedContent,
+  inputRequired,
+  inputResponse,
+  isInputRequiredResult,
 } from "@modelcontextprotocol/server";
 
 export { completable } from "./completable.js";
@@ -41,7 +56,14 @@ export type {
 } from "@modelcontextprotocol/server";
 
 export type { InspectorOptions, ServerConfig } from "./config.js";
-export type { OAuthAuth, RequestClientContext, RequestContext } from "./context.js";
+export type {
+  FormInputOptions,
+  FormInputResult,
+  OAuthAuth,
+  RequestClientContext,
+  RequestContext,
+  RequestInputContext,
+} from "./context.js";
 export type {
   InferToolInput,
   InferToolName,

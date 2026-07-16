@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { MessageContentBlock } from "mcp-use/react";
+import { ViewRenderer, isViewTool } from "@mcp-use/client/react";
+import { useMemo } from "react";
+import type { MessageContentBlock } from "@/client/types/message-content-block";
+import { useViewHostProps } from "@/client/hooks/useViewHostProps";
 import { useWidgetDebug } from "../../context/WidgetDebugContext";
-import { detectWidgetProtocol } from "../../utils/widget-detection";
-import { MCPAppsRenderer } from "../MCPAppsRenderer";
 import { Spinner } from "../ui/spinner";
 
 function ModelContextBadge({ widgetId }: { widgetId: string }) {
@@ -30,17 +30,10 @@ interface ToolResultRendererProps {
   readResource?: (uri: string) => Promise<any>;
   toolMeta?: Record<string, any>;
   onSendFollowUp?: (content: MessageContentBlock[]) => void;
-  /** When provided, passed to widget renderers to avoid useMcpClient() context lookup. */
-  serverBaseUrl?: string;
-  /** Partial/streaming tool arguments (forwarded to widget as partialToolInput) */
   partialToolArgs?: Record<string, unknown>;
-  /** Whether this tool execution was cancelled by the user */
   cancelled?: boolean;
 }
 
-/**
- * Renders tool results that use MCP Apps (SEP-1865) widgets.
- */
 export function ToolResultRenderer({
   toolName,
   toolArgs,
@@ -49,122 +42,69 @@ export function ToolResultRenderer({
   readResource,
   toolMeta,
   onSendFollowUp,
-  serverBaseUrl,
   partialToolArgs,
   cancelled,
 }: ToolResultRendererProps) {
-  const [resourceData, setResourceData] = useState<any>(null);
-  const fetchedUriRef = useRef<string | null>(null);
-
-  // Generate stable toolCallId once
   const toolCallId = useMemo(
     () =>
       `chat-tool-${toolName}-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
     [toolName]
   );
 
-  // Parse result if it's a JSON string (memoized to prevent re-renders)
-  // Allow null/undefined results (tool hasn't completed yet)
   const parsedResult = useMemo(() => {
-    if (!result) {
-      return null;
-    }
-
+    if (!result) return null;
     if (typeof result === "string") {
       try {
         return JSON.parse(result);
-      } catch (error) {
-        console.error("[ToolResultRenderer] Failed to parse result:", error);
+      } catch {
         return result;
       }
     }
     return result;
   }, [result]);
 
-  // Detect widget protocol - use JSON.stringify for stable comparison
-  const toolMetaJson = useMemo(() => JSON.stringify(toolMeta), [toolMeta]);
-  const widgetProtocol = useMemo(
-    () => detectWidgetProtocol(toolMeta, parsedResult),
-    [toolMetaJson, parsedResult]
-  );
+  const isMcpAppsTool = isViewTool(toolMeta);
+  const resourceUri = isMcpAppsTool
+    ? (toolMeta?.ui?.resourceUri as string | undefined) ?? null
+    : null;
 
-  const isMcpAppsTool = widgetProtocol === "mcp-apps";
-
-  // Memoize toolArgs and parsedResult to prevent unnecessary re-renders in child renderers
-  // (same pattern as ToolResultDisplay - stabilizes refs so effects don't re-run on parent re-renders)
   const memoizedToolArgs = useMemo(() => toolArgs, [toolName, parsedResult]);
   const memoizedResult = useMemo(() => parsedResult, [toolName, parsedResult]);
 
-  const resourceUri = useMemo(() => {
-    if (isMcpAppsTool) {
-      return toolMeta?.ui?.resourceUri || null;
-    }
-    return null;
-  }, [isMcpAppsTool, toolMetaJson]);
+  const hostProps = useViewHostProps({
+    serverId: serverId ?? "",
+    viewId: toolCallId,
+    resourceUri: resourceUri ?? "",
+    toolName,
+    toolInput: memoizedToolArgs,
+    toolOutput: memoizedResult,
+    toolMetadata: toolMeta,
+    readResource: readResource ?? (async () => ({})),
+  });
 
-  // Prefetch MCP Apps resource when URI is available
-  useEffect(() => {
-    // If we've already fetched this URI, skip
-    if (resourceUri && fetchedUriRef.current === resourceUri) {
-      return;
-    }
-
-    // Reset resource data if URI changed
-    if (resourceUri !== fetchedUriRef.current) {
-      setResourceData(null);
-    }
-
-    if (resourceUri && readResource) {
-      fetchedUriRef.current = resourceUri;
-
-      readResource(resourceUri)
-        .then((data) => {
-          // Extract the first resource from the contents array
-          if (
-            data?.contents &&
-            Array.isArray(data.contents) &&
-            data.contents.length > 0
-          ) {
-            setResourceData(data.contents[0]);
-          }
-        })
-        .catch((error) => {
-          console.error(
-            "[ToolResultRenderer] Failed to fetch resource:",
-            error
-          );
-          fetchedUriRef.current = null;
-        });
-    }
-  }, [resourceUri, readResource]);
-
-  // Render MCP Apps component
-  // Render immediately if we have resourceUri from metadata, even if resourceData is still loading
-  if (isMcpAppsTool && resourceUri && serverId && readResource) {
+  if (isMcpAppsTool && resourceUri && serverId && readResource && hostProps) {
     return (
       <>
-        <MCPAppsRenderer
-          serverId={serverId}
-          toolCallId={toolCallId}
+        <ViewRenderer
+          viewId={toolCallId}
           toolName={toolName}
           toolInput={memoizedToolArgs}
           toolOutput={memoizedResult}
-          toolMetadata={toolMeta}
           partialToolInput={partialToolArgs}
-          resourceUri={resourceData?.uri || resourceUri}
-          readResource={readResource}
-          className="my-4"
-          noWrapper={true}
-          onSendFollowUp={onSendFollowUp}
-          serverBaseUrl={serverBaseUrl}
           cancelled={cancelled}
+          className="my-4"
+          onMessage={(content) => {
+            if (content.length > 0 && onSendFollowUp) {
+              onSendFollowUp(content as MessageContentBlock[]);
+            }
+          }}
+          {...hostProps}
         />
         <ModelContextBadge widgetId={toolCallId} />
       </>
     );
   }
 
-  // Show loading state only if we don't have enough info to render
   if (isMcpAppsTool && !resourceUri) {
     return (
       <div className="flex items-center justify-center w-full h-[200px] rounded border">
@@ -173,21 +113,11 @@ export function ToolResultRenderer({
     );
   }
 
-  // Show error if MCP Apps tool but missing serverId or readResource
   if (isMcpAppsTool && (!serverId || !readResource)) {
-    console.error(
-      "[ToolResultRenderer] MCP Apps tool but missing serverId or readResource:",
-      {
-        toolName,
-        hasServerId: !!serverId,
-        hasReadResource: !!readResource,
-      }
-    );
     return (
       <div className="my-4 p-4 bg-red-50/30 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/50 rounded-lg">
         <p className="text-sm text-red-600 dark:text-red-400">
-          Cannot render widget: Missing required props (serverId or
-          readResource)
+          Cannot render widget: Missing required props (serverId or readResource)
         </p>
       </div>
     );

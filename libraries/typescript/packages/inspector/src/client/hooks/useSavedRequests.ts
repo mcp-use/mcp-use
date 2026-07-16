@@ -1,12 +1,11 @@
-import type { SavedRequest } from "@/client/components/tools";
-import { useEffect, useState } from "react";
+import type { SavedRequest } from "@/client/components/tools/SavedRequestsList";
+import { useCallback, useEffect, useState } from "react";
 
 const SAVED_REQUESTS_KEY = "mcp-inspector-saved-requests";
 
 export function useSavedRequests() {
   const [savedRequests, setSavedRequests] = useState<SavedRequest[]>([]);
 
-  // Load saved requests from localStorage on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(SAVED_REQUESTS_KEY);
@@ -18,9 +17,8 @@ export function useSavedRequests() {
     }
   }, []);
 
-  // Listen for changes to saved requests from other components
   useEffect(() => {
-    const handleStorageChange = (e: any) => {
+    const handleStorageChange = (e: StorageEvent) => {
       if (e.key === SAVED_REQUESTS_KEY && e.newValue) {
         try {
           setSavedRequests(JSON.parse(e.newValue));
@@ -37,5 +35,14 @@ export function useSavedRequests() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
-  return savedRequests;
+  const saveSavedRequests = useCallback((requests: SavedRequest[]) => {
+    try {
+      localStorage.setItem(SAVED_REQUESTS_KEY, JSON.stringify(requests));
+      setSavedRequests(requests);
+    } catch (error) {
+      console.error("[useSavedRequests] Failed to save requests:", error);
+    }
+  }, []);
+
+  return { savedRequests, saveSavedRequests };
 }

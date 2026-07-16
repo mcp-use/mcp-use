@@ -39,19 +39,19 @@ MCP_USE_LANGFUSE=true  # Set to false to disable
 The observability is automatically integrated into MCPAgent:
 
 ```typescript
-import { MCPAgent } from 'mcp-use'
+import { MCPAgent } from "@mcp-use/agent";
 
 const agent = new MCPAgent({
   llm: myLLM,
   client: myMCPClient,
   // Observability is automatically enabled if environment variables are set
-})
+});
 
 // Initialize the agent
-await agent.initialize()
+await agent.initialize();
 
 // Run queries - they will be automatically traced
-const result = await agent.run('What\'s the weather?')
+const result = await agent.run("What's the weather?");
 ```
 
 ### Custom Callbacks
@@ -59,19 +59,19 @@ const result = await agent.run('What\'s the weather?')
 You can provide custom callbacks:
 
 ```typescript
-import { CallbackHandler } from '@langfuse/langchain'
-import { MCPAgent } from 'mcp-use'
+import { CallbackHandler } from "@langfuse/langchain";
+import { MCPAgent } from "@mcp-use/agent";
 
 const customHandler = new CallbackHandler({
-  secretKey: 'custom-secret',
-  publicKey: 'custom-public',
-})
+  secretKey: "custom-secret",
+  publicKey: "custom-public",
+});
 
 const agent = new MCPAgent({
   llm: myLLM,
   client: myMCPClient,
   callbacks: [customHandler], // Use custom callbacks instead of auto-detected ones
-})
+});
 ```
 
 ### Direct ObservabilityManager Usage
@@ -79,25 +79,25 @@ const agent = new MCPAgent({
 For advanced use cases, you can use the ObservabilityManager directly:
 
 ```typescript
-import { ObservabilityManager } from 'mcp-use/observability'
+import { ObservabilityManager } from "mcp-use/observability";
 
 // Create a manager
 const manager = new ObservabilityManager({
   verbose: true, // Enable verbose logging
-})
+});
 
 // Get available callbacks
-const callbacks = await manager.getCallbacks()
+const callbacks = await manager.getCallbacks();
 
 // Check available handlers
-const handlerNames = await manager.getHandlerNames()
-console.log('Available handlers:', handlerNames)
+const handlerNames = await manager.getHandlerNames();
+console.log("Available handlers:", handlerNames);
 
 // Add custom callback
-manager.addCallback(myCustomCallback)
+manager.addCallback(myCustomCallback);
 
 // Shutdown (important for serverless)
-await manager.shutdown()
+await manager.shutdown();
 ```
 
 ## Platform Features
@@ -117,16 +117,17 @@ await manager.shutdown()
 For serverless environments (AWS Lambda, Vercel, etc.), ensure proper shutdown:
 
 ```typescript
-const agent = new MCPAgent({ /* ... */ })
+const agent = new MCPAgent({
+  /* ... */
+});
 
 try {
-  await agent.initialize()
-  const result = await agent.run(query)
-  return result
-}
-finally {
+  await agent.initialize();
+  const result = await agent.run(query);
+  return result;
+} finally {
   // Important: Ensure traces are flushed
-  await agent.close()
+  await agent.close();
 }
 ```
 
@@ -135,10 +136,10 @@ finally {
 Enable debug logging to see observability events:
 
 ```typescript
-import { logger } from 'mcp-use/logging'
+import { logger } from "mcp-use/logging";
 
 // Set log level to debug
-process.env.LOG_LEVEL = 'debug'
+process.env.LOG_LEVEL = "debug";
 
 // Now you'll see detailed observability logs
 ```

@@ -9,8 +9,8 @@
  */
 
 import { ChatOpenAI } from "@langchain/openai";
-import { MCPAgent } from "../../../dist/src/agents";
-import { MCPClient } from "../../../dist/src/client";
+import { MCPAgent } from "@mcp-use/agent";
+import { MCPClient } from "@mcp-use/client";
 import { LangChainAdapter } from "../../../src/adapters/langchain_adapter.js";
 import { ServerManager } from "../../../src/managers/server_manager.js";
 import { AddMCPServerFromConfigTool } from "../../../src/managers/tools/add_server_from_config.js";

@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import { BaseConnector } from "../../../src/connectors/base.js";
+import { BaseConnector } from "../../../src/transport/base.js";
 
 type MockClient = {
   handlers: Map<string, (request: { params: unknown }) => Promise<unknown>>;
@@ -63,7 +63,10 @@ describe("BaseConnector inbound request handlers", () => {
   });
 
   it("registers elicitation/create and forwards params/result", async () => {
-    const elicitResult = { action: "accept" as const, content: { name: "Ada" } };
+    const elicitResult = {
+      action: "accept" as const,
+      content: { name: "Ada" },
+    };
     const onElicitation = vi.fn().mockResolvedValue(elicitResult);
     const connector = new BaseConnector({ onElicitation });
     const client = createMockClient();
@@ -118,5 +121,4 @@ describe("BaseConnector inbound request handlers", () => {
     const result = await client.handlers.get("roots/list")!({ params: {} });
     expect(result).toEqual({ roots });
   });
-
 });

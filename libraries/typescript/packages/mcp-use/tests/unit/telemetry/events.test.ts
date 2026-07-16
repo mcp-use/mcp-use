@@ -9,123 +9,17 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  MCPAgentExecutionEvent,
   ServerRunEvent,
   ServerInitializeEvent,
   ServerToolCallEvent,
   ServerResourceCallEvent,
   ServerPromptCallEvent,
   ServerContextEvent,
-  MCPClientInitEvent,
-  ConnectorInitEvent,
   createServerRunEventData,
   type MCPServerTelemetryInfo,
 } from "../../../src/telemetry/events.js";
 
 describe("Telemetry Event Classes", () => {
-  describe("MCPAgentExecutionEvent", () => {
-    it("should have correct event name", () => {
-      const event = new MCPAgentExecutionEvent({
-        executionMethod: "run",
-        query: "test query",
-        success: true,
-        modelProvider: "openai",
-        modelName: "gpt-4",
-        serverCount: 1,
-        serverIdentifiers: [],
-        totalToolsAvailable: 5,
-        toolsAvailableNames: ["tool1"],
-        maxStepsConfigured: 10,
-        memoryEnabled: true,
-        useServerManager: false,
-        maxStepsUsed: 3,
-        manageConnector: true,
-        externalHistoryUsed: false,
-      });
-
-      expect(event.name).toBe("mcp_agent_execution");
-    });
-
-    it("should map all properties correctly", () => {
-      const event = new MCPAgentExecutionEvent({
-        executionMethod: "stream",
-        query: "What is the weather?",
-        success: true,
-        modelProvider: "anthropic",
-        modelName: "claude-3",
-        serverCount: 2,
-        serverIdentifiers: [{ name: "server1" }],
-        totalToolsAvailable: 10,
-        toolsAvailableNames: ["tool1", "tool2"],
-        maxStepsConfigured: 5,
-        memoryEnabled: false,
-        useServerManager: true,
-        maxStepsUsed: 2,
-        manageConnector: false,
-        externalHistoryUsed: true,
-        stepsTaken: 3,
-        toolsUsedCount: 2,
-        toolsUsedNames: ["tool1", "tool2"],
-        response: "The weather is sunny",
-        executionTimeMs: 1500,
-        errorType: null,
-        conversationHistoryLength: 5,
-      });
-
-      const props = event.properties;
-
-      expect(props.execution_method).toBe("stream");
-      expect(props.query).toBe("What is the weather?");
-      expect(props.query_length).toBe(20);
-      expect(props.success).toBe(true);
-      expect(props.model_provider).toBe("anthropic");
-      expect(props.model_name).toBe("claude-3");
-      expect(props.server_count).toBe(2);
-      expect(props.total_tools_available).toBe(10);
-      expect(props.max_steps_configured).toBe(5);
-      expect(props.memory_enabled).toBe(false);
-      expect(props.use_server_manager).toBe(true);
-      expect(props.max_steps_used).toBe(2);
-      expect(props.manage_connector).toBe(false);
-      expect(props.external_history_used).toBe(true);
-      expect(props.steps_taken).toBe(3);
-      expect(props.tools_used_count).toBe(2);
-      expect(props.response_length).toBe(20);
-      expect(props.execution_time_ms).toBe(1500);
-      expect(props.conversation_history_length).toBe(5);
-    });
-
-    it("should handle null optional fields", () => {
-      const event = new MCPAgentExecutionEvent({
-        executionMethod: "run",
-        query: "test",
-        success: false,
-        modelProvider: "openai",
-        modelName: "gpt-4",
-        serverCount: 0,
-        serverIdentifiers: [],
-        totalToolsAvailable: 0,
-        toolsAvailableNames: [],
-        maxStepsConfigured: 5,
-        memoryEnabled: true,
-        useServerManager: false,
-        maxStepsUsed: null,
-        manageConnector: true,
-        externalHistoryUsed: false,
-      });
-
-      const props = event.properties;
-
-      expect(props.steps_taken).toBeNull();
-      expect(props.tools_used_count).toBeNull();
-      expect(props.tools_used_names).toBeNull();
-      expect(props.response).toBeNull();
-      expect(props.response_length).toBeNull();
-      expect(props.execution_time_ms).toBeNull();
-      expect(props.error_type).toBeNull();
-    });
-  });
-
   describe("ServerRunEvent", () => {
     it("should have correct event name", () => {
       const event = new ServerRunEvent({
@@ -369,86 +263,6 @@ describe("Telemetry Event Classes", () => {
 
       expect(props.context_type).toBe("notification");
       expect(props.notification_type).toBe("progress");
-    });
-  });
-
-  describe("MCPClientInitEvent", () => {
-    it("should have correct event name", () => {
-      const event = new MCPClientInitEvent({
-        codeMode: false,
-        sandbox: false,
-        allCallbacks: false,
-        verify: false,
-        servers: [],
-        numServers: 0,
-      });
-
-      expect(event.name).toBe("mcpclient_init");
-    });
-
-    it("should map all properties correctly", () => {
-      const event = new MCPClientInitEvent({
-        codeMode: true,
-        sandbox: true,
-        allCallbacks: true,
-        verify: true,
-        servers: ["server1", "server2", "server3"],
-        numServers: 3,
-      });
-
-      const props = event.properties;
-
-      expect(props.code_mode).toBe(true);
-      expect(props.sandbox).toBe(true);
-      expect(props.all_callbacks).toBe(true);
-      expect(props.verify).toBe(true);
-      expect(props.servers).toEqual(["server1", "server2", "server3"]);
-      expect(props.num_servers).toBe(3);
-    });
-  });
-
-  describe("ConnectorInitEvent", () => {
-    it("should have correct event name", () => {
-      const event = new ConnectorInitEvent({
-        connectorType: "HttpConnector",
-      });
-
-      expect(event.name).toBe("connector_init");
-    });
-
-    it("should map all properties correctly for HTTP connector", () => {
-      const event = new ConnectorInitEvent({
-        connectorType: "HttpConnector",
-        serverUrl: "http://localhost:3000",
-        publicIdentifier: "http://localhost:3000 (streamable-http)",
-      });
-
-      const props = event.properties;
-
-      expect(props.connector_type).toBe("HttpConnector");
-      expect(props.server_url).toBe("http://localhost:3000");
-      expect(props.public_identifier).toBe(
-        "http://localhost:3000 (streamable-http)"
-      );
-      expect(props.server_command).toBeNull();
-      expect(props.server_args).toBeNull();
-    });
-
-    it("should map all properties correctly for Stdio connector", () => {
-      const event = new ConnectorInitEvent({
-        connectorType: "StdioConnector",
-        serverCommand: "node",
-        serverArgs: ["server.js", "--port", "3000"],
-        publicIdentifier: "node server.js --port 3000",
-      });
-
-      const props = event.properties;
-
-      expect(props.connector_type).toBe("StdioConnector");
-      expect(props.server_command).toBe("node");
-      expect(props.server_args).toEqual(["server.js", "--port", "3000"]);
-      expect(props.public_identifier).toBe("node server.js --port 3000");
-      expect(props.server_url).toBeNull();
     });
   });
 

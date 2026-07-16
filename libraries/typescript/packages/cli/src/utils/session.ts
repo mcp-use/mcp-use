@@ -1,14 +1,8 @@
 import type { MCPSession } from "@mcp-use/client";
 import { MCPClient } from "@mcp-use/client";
-import type { NodeOAuthClientProvider } from "@mcp-use/client/auth/node";
 import { getPackageVersion } from "mcp-use";
 import { formatError, formatInfo } from "./format.js";
-import {
-  buildOAuthProvider,
-  isUnauthorized,
-  promptYesNo,
-  runOAuthFlow,
-} from "./oauth.js";
+import { cliOAuthOptions, buildOAuthProvider } from "./oauth.js";
 import { getSession } from "./session-storage.js";
 
 export const activeSessions = new Map<
@@ -53,6 +47,19 @@ export async function cleanupAndExit(code: number): Promise<never> {
   process.exit(code);
 }
 
+function decodeJwtExp(token: string): number | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf-8")
+    );
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Get or restore a session by name. For OAuth-mode sessions whose tokens
  * have expired and can't be refreshed, prompts to re-auth on TTY or prints
@@ -82,14 +89,42 @@ export async function getOrRestoreSession(
   try {
     const client = new MCPClient();
     const cliClientInfo = getCliClientInfo();
-    let authProvider: NodeOAuthClientProvider | undefined;
 
     if (config.type === "http") {
       if (config.authMode === "oauth") {
-        authProvider = await buildOAuthProvider(config.url!);
+        if (!process.stdin.isTTY) {
+          const provider = await buildOAuthProvider(config.url!);
+          const tokens = await provider.tokens();
+          if (!tokens?.access_token) {
+            console.error(
+              formatError(`No OAuth tokens for server '${sessionName}'.`)
+            );
+            console.error(
+              formatInfo(
+                `Run: mcp-use client connect ${sessionName} ${config.url}`
+              )
+            );
+            return null;
+          }
+          const exp = decodeJwtExp(tokens.access_token);
+          const expired = exp !== null && exp * 1000 <= Date.now();
+          if (expired && !tokens.refresh_token) {
+            console.error(
+              formatError(
+                `OAuth tokens for server '${sessionName}' are expired.`
+              )
+            );
+            console.error(
+              formatInfo(
+                `Run: mcp-use client connect ${sessionName} ${config.url}`
+              )
+            );
+            return null;
+          }
+        }
         client.addServer(sessionName, {
           url: config.url!,
-          authProvider,
+          oauth: cliOAuthOptions(),
           clientInfo: cliClientInfo,
         });
       } else {
@@ -98,6 +133,7 @@ export async function getOrRestoreSession(
           headers: config.authToken
             ? { Authorization: `Bearer ${config.authToken}` }
             : undefined,
+          oauth: false,
           clientInfo: cliClientInfo,
         });
       }
@@ -113,36 +149,8 @@ export async function getOrRestoreSession(
       return null;
     }
 
-    let session: MCPSession;
-    try {
-      session = await client.createSession(sessionName);
-    } catch (err) {
-      // OAuth-only fallback: tokens expired and refresh failed → re-auth.
-      if (
-        config.type === "http" &&
-        config.authMode === "oauth" &&
-        authProvider &&
-        isUnauthorized(err)
-      ) {
-        const reAuth = await promptYesNo(
-          `! Tokens for server '${sessionName}' expired and could not refresh. Re-authenticate now?`,
-          true
-        );
-        if (!reAuth) {
-          console.error(formatError(`Tokens expired and could not refresh.`));
-          console.error(
-            formatInfo(
-              `Run: mcp-use client connect ${sessionName} ${config.url}`
-            )
-          );
-          return null;
-        }
-        await runOAuthFlow(authProvider, config.url!);
-        session = await client.createSession(sessionName);
-      } else {
-        throw err;
-      }
-    }
+    // MCPClient auto-provisions OAuth and completes the 401 dance when needed.
+    const session = await client.createSession(sessionName);
 
     activeSessions.set(sessionName, { client, session });
     return { name: sessionName, session };

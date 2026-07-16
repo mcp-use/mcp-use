@@ -1,7 +1,7 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/client/components/ui/badge";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { MarkdownRenderer } from "@/client/components/shared/MarkdownRenderer";
 import { Button } from "@/client/components/ui/button";
 

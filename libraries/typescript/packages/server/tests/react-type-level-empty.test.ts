@@ -80,7 +80,9 @@ describe("useCallTool empty Register", () => {
     type FromRef = CallToolHandle<{ id: string }, never>;
     type Success = Awaited<ReturnType<FromRef["callTool"]>>;
     // Content-only successes are valid: exactly the base non-error shape.
-    expectTypeOf<Success>().toEqualTypeOf<CallToolResult & { isError?: false }>();
+    expectTypeOf<Success>().toEqualTypeOf<
+      CallToolResult & { isError?: false }
+    >();
     // structuredContent stays the base optional `unknown` — not typed output.
     expectTypeOf<Success["structuredContent"]>().toEqualTypeOf<unknown>();
     expectTypeOf<FromRef["data"]>().toEqualTypeOf<

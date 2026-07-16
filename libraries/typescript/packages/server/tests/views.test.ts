@@ -362,7 +362,9 @@ describe("views server core (e2e over HTTP)", () => {
       (r) => r.uri === "ui://views/product-search-result.html"
     );
     const domains = (
-      view?._meta?.["ui"] as { csp?: { resourceDomains?: string[] } } | undefined
+      view?._meta?.["ui"] as
+        | { csp?: { resourceDomains?: string[] } }
+        | undefined
     )?.csp?.resourceDomains;
     expect(domains).toContain("https://images.example.com");
     expect(domains?.some((d) => d.includes("localhost"))).toBe(true);
@@ -555,7 +557,10 @@ describe("views HTTP routes", () => {
   async function rawGet(
     target: string,
     headers: Record<string, string> = {}
-  ): Promise<{ status: number; headers: import("node:http").IncomingHttpHeaders }> {
+  ): Promise<{
+    status: number;
+    headers: import("node:http").IncomingHttpHeaders;
+  }> {
     const { request } = await import("node:http");
     const url = new URL(target);
     return new Promise((resolve, reject) => {
@@ -637,10 +642,9 @@ describe("views binding validation", () => {
   it("throws when a view-bound tool lacks outputSchema at registration", () => {
     const server = new MCPServer({ name: "bind", version: "0.0.0" });
     expect(() =>
-      server.tool(
-        { name: "bad", view: { name: "some-view" } },
-        async () => ({ content: [{ type: "text", text: "x" }] })
-      )
+      server.tool({ name: "bad", view: { name: "some-view" } }, async () => ({
+        content: [{ type: "text", text: "x" }],
+      }))
     ).toThrow(/no outputSchema/);
   });
 
@@ -763,7 +767,9 @@ describe("views binding validation", () => {
     });
     const { port } = await server.listen(0);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('View "lonely-view" is registered but no tool binds it')
+      expect.stringContaining(
+        'View "lonely-view" is registered but no tool binds it'
+      )
     );
     warn.mockRestore();
     await server.close();
@@ -794,7 +800,9 @@ describe("views document synthesis", () => {
       "https://example.com",
       "/mcp"
     );
-    expect(html).toContain('<script type="module">console.log("hello");</script>');
+    expect(html).toContain(
+      '<script type="module">console.log("hello");</script>'
+    );
     expect(html).toContain("<style>body{color:red}</style>");
     expect(html).not.toMatch(/<script[^>]+src=/);
     expect(html).not.toMatch(/<link[^>]+stylesheet/);

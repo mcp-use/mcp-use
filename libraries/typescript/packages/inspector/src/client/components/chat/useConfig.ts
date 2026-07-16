@@ -1,6 +1,6 @@
-import { MCPChatConfiguredEvent, Telemetry } from "@/client/telemetry";
+import { MCPChatConfiguredEvent, captureInspectorEvent } from "@/client/telemetry";
 import { useCallback, useEffect, useState } from "react";
-import type { ProviderName } from "@/llm/types";
+import type { ProviderName } from "@mcp-use/agent";
 import type { AuthConfig, LLMConfig } from "./types";
 import {
   DEFAULT_MODELS,
@@ -221,8 +221,7 @@ export function useConfig({ mcpServerUrl }: UseConfigProps) {
 
     // Track chat configuration (no API key)
     try {
-      Telemetry.getInstance()
-        .capture(
+      captureInspectorEvent(
           new MCPChatConfiguredEvent({
             provider: tempProvider,
             model: tempModel,

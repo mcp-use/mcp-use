@@ -23,11 +23,18 @@
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
       "ignoreBinaries": ["lsof", "sleep", "dev"]
     },
+    "packages/client": {
+      "entry": [
+        "src/index.ts",
+        "src/index-browser.ts",
+        "src/react/index.ts",
+        "tests/**/*.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
+    },
     "packages/cli": {
       "project": ["src/**/*.ts", "tests/**/*.ts"],
-      "ignoreDependencies": [
-        "@mcp-use/inspector"
-      ]
+      "ignoreDependencies": ["@mcp-use/inspector"]
     },
     "packages/inspector": {
       "entry": [
@@ -36,14 +43,10 @@
         "tests/e2e/**/*.{ts,tsx,mjs}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreDependencies": [
-        "@scarf/scarf",
-        "tailwindcss",
-        "tw-animate-css"
-      ]
+      "ignoreDependencies": ["@scarf/scarf", "tailwindcss", "tw-animate-css"]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["scripts/**/*.{js,mjs,ts}"],
+      "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

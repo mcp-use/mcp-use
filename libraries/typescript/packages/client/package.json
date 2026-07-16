@@ -23,20 +23,18 @@
   ],
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./auth": {
-      "types": "./dist/auth/index.d.ts",
-      "import": "./dist/auth/index.js"
-    },
-    "./auth/node": {
-      "types": "./dist/auth/index-node.d.ts",
-      "import": "./dist/auth/index-node.js"
-    },
-    "./browser": {
-      "types": "./dist/browser.d.ts",
-      "import": "./dist/browser.js"
+      "node": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "browser": {
+        "types": "./dist/index-browser.d.ts",
+        "import": "./dist/index-browser.js"
+      },
+      "default": {
+        "types": "./dist/index-browser.d.ts",
+        "import": "./dist/index-browser.js"
+      }
     },
     "./react": {
       "types": "./dist/react/index.d.ts",
@@ -49,22 +47,22 @@
     "dist"
   ],
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "generate:version": "node scripts/generate-version.mjs",
-    "build": "npm run generate:version && rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
+    "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@modelcontextprotocol/client": "2.0.0-beta.2"
+    "@modelcontextprotocol/client": "2.0.0-beta.3",
+    "@modelcontextprotocol/ext-apps": "^1.7.4"
   },
   "peerDependencies": {
-    "@e2b/code-interpreter": "^2.2.0",
+    "@e2b/code-interpreter": "^2.6.1",
     "react": "^18.0.0 || ^19.0.0",
-    "zod": "^4.0.0"
+    "zod": "^4.2.0"
   },
   "peerDependenciesMeta": {
     "@e2b/code-interpreter": {
@@ -75,11 +73,13 @@
     }
   },
   "devDependencies": {
+    "@e2b/code-interpreter": "^2.6.1",
     "@types/react": "^19.2.14",
     "jsdom": "^27.0.0",
     "react": "^19.2.3",
     "react-test-renderer": "^19.2.4",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "zod": "^4.2.0"
   },
   "publishConfig": {
     "access": "public"

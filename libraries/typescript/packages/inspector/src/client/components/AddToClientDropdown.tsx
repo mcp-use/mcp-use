@@ -1,7 +1,8 @@
-import { MCPAddToClientEvent, Telemetry } from "@/client/telemetry";
+import { MCPAddToClientEvent, captureInspectorEvent } from "@/client/telemetry";
 import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -24,9 +25,9 @@ import {
   generateVSCodeInsidersDeepLink,
   getEnvVarInstructions,
 } from "@/client/utils/mcpClientUtils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { Check, ChevronDown, Copy, Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, isValidElement } from "react";
 import { VSCodeIcon } from "./ui/client-icons";
 
 interface AddToClientDropdownProps {
@@ -105,8 +106,7 @@ export function AddToClientDropdown({
 
   const trackAddToClient = (client: string) => {
     try {
-      Telemetry.getInstance()
-        .capture(new MCPAddToClientEvent({ client }))
+      captureInspectorEvent(new MCPAddToClientEvent({ client }))
         .catch(() => {});
     } catch {
       // ignore telemetry errors
@@ -207,7 +207,7 @@ export function AddToClientDropdown({
               Claude Code.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <DialogBody className="space-y-4">
             <div>
               <h5 className="font-semibold text-sm mb-2">Instructions</h5>
               <ol className="space-y-2 text-xs text-muted-foreground">
@@ -264,7 +264,7 @@ export function AddToClientDropdown({
               using <code className="text-foreground">$&#123;VAR&#125;</code>{" "}
               syntax.
             </p>
-          </div>
+          </DialogBody>
         </>
       );
     }
@@ -282,7 +282,7 @@ export function AddToClientDropdown({
               Gemini CLI.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <DialogBody className="space-y-4">
             <div>
               <h5 className="font-semibold text-sm mb-2">Instructions</h5>
               <ol className="space-y-2 text-xs text-muted-foreground">
@@ -344,7 +344,7 @@ export function AddToClientDropdown({
             <p className="text-xs text-muted-foreground">
               Restart Gemini CLI to load the new configuration.
             </p>
-          </div>
+          </DialogBody>
         </>
       );
     }
@@ -362,7 +362,7 @@ export function AddToClientDropdown({
               file.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <DialogBody className="space-y-4">
             <div>
               <h5 className="font-semibold text-sm mb-2">Instructions</h5>
               <p className="text-xs text-muted-foreground">
@@ -406,7 +406,7 @@ export function AddToClientDropdown({
             <p className="text-xs text-muted-foreground">
               Restart Codex CLI to load the new configuration.
             </p>
-          </div>
+          </DialogBody>
         </>
       );
     }
@@ -430,7 +430,7 @@ export function AddToClientDropdown({
     </Button>
   );
 
-  const triggerElement = trigger
+  const rawTrigger = trigger
     ? typeof trigger === "function"
       ? trigger({
           isOpen: false,
@@ -438,11 +438,12 @@ export function AddToClientDropdown({
         })
       : trigger
     : defaultTrigger;
+  const triggerElement = isValidElement(rawTrigger) ? rawTrigger : defaultTrigger;
 
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>{triggerElement}</DropdownMenuTrigger>
+        <DropdownMenuTrigger render={triggerElement} nativeButton />
         <DropdownMenuContent align="end" className="w-auto min-w-[300px]">
           {/* Additional Items First */}
           {additionalItems.map((item) => (
@@ -571,7 +572,7 @@ export function AddToClientDropdown({
 
       {/* Modal for CLI instructions */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+        <DialogContent scrollable className="max-w-3xl max-h-[80vh]">
           {renderModalContent()}
         </DialogContent>
       </Dialog>

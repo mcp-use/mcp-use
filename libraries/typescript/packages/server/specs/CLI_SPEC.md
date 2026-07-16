@@ -16,7 +16,6 @@
 
 - React/views and the client-side Vite environment (view bundling) — **`VIEWS_SPEC.md`** owns that contract. It extends this one: the views client environment joins the *same* Vite dev server `dev` already runs, and view-file edits get real Vite HMR there. The server-entry contract below is untouched by it.
 - HMR **of the server entry** — permanently. Server-entry reload is **reload, not HMR** (see "Why the server entry reloads instead of HMR" below).
-- Emitting `list_changed` notifications on dev reload — **deferred**, not rejected: under the stateless wire the next `tools/list` is always current, so the notification is a nicety for long-lived clients (the inspector). It lands with the notifications phase (`SPEC.md`), not with this contract.
 - Typegen — never part of `dev`/`build`/`start`. If built at all, it is an explicit escape-hatch command (`VIEWS_SPEC.md` § Typegen, demoted), off the hot path by design.
 - Deploy/cloud commands, project scaffolding. (Dev tunneling is in scope — see the dev-only inspector API routes below.)
 - Auth (`AUTH_SPEC.md` owns that design — currently deferred until the official SDK ships auth support; these commands neither add nor bypass it).
@@ -134,7 +133,7 @@ A single long-lived process. It:
 2. Grabs the default-exported `MCPServer`, wraps `server.getHandler()` behind an **atomically swappable reference**.
 3. Binds **one** `@hono/node-server` listener that delegates every request to the current handler.
 
-On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. No registration diffing, no MCP notifications (`list_changed` emission is deferred — see "Why the server entry reloads instead of HMR") — the next request simply hits the new handler, which is correct by construction under the stateless model.
+On file change (only files in the entry's module graph count): Vite invalidates, dev re-imports the entry through the runner, and swaps the handler reference. There is no registration diffing: the next request hits the new handler, which is correct by construction under the stateless model. Every handler generation shares one process-scoped SDK `ServerEventBus`; after a successful swap, dev publishes `tools/list_changed`, `prompts/list_changed`, and `resources/list_changed`. Modern clients with an open `subscriptions/listen` stream therefore refetch the authoritative lists from the new handler. Publishing all three is deliberate invalidation, not change detection — the protocol carries no delta, and avoiding schema/function comparison keeps server reload independent of registry internals. A failed reload keeps the old handler and publishes nothing. Stateless legacy clients receive no push but remain correct on their next manual list request.
 
 - **Port:** `--port`, else `PORT` env, else `3000`; if taken, probe upward.
 - **Host:** `127.0.0.1` by default; `--host` to override (matching the server's own localhost-first posture, SPEC.md delta 5). Printed and auto-opened URLs use the browsable equivalent: `localhost` for loopback/wildcard binds, the given host verbatim otherwise; wildcard binds additionally print a `Network:` line with the machine's LAN address.
@@ -197,11 +196,10 @@ v1's registration-HMR stack — chokidar + tsx loaders + `syncRegistrationsFrom`
 Two adjacent things are *not* covered by this rationale and have their own posture:
 
 - **View HMR is real HMR and arrives with views** (`VIEWS_SPEC.md` § Dev): view code is pure browser code served by a client environment on this same Vite dev server, so Vite's own HMR channel applies to it. The reload-not-HMR rule is about the *server* module graph only.
-- **`list_changed` emission on reload is deferred, not rejected.** Nothing is ever stale without it (see above), but long-lived clients — an open inspector tab — would learn about a reload faster with it. It needs the notifications wiring (`handler.notify`/bus, `SPEC.md` product-shell phase) and lands there.
+- **`list_changed` is an invalidation after the swap, not registry HMR.** One SDK event bus is shared by every stateless handler generation, preserving open modern subscriptions across reloads. The three list-change events make long-lived clients such as the inspector refetch from the new handler; they never mutate or synchronize the old server instance.
 
 ## Future (deferred)
 
-- `list_changed` emission to connected clients on dev reload (with the notifications phase; see above).
 - Dev side-channel for inspector auto-refresh on handler swap.
 - Views + the client Vite environment (view bundling) — contract already written, `VIEWS_SPEC.md`.
 - `mcp-use typegen` escape-hatch command (`VIEWS_SPEC.md` § Typegen, demoted) — explicitly never wired into `dev`/`build`/`start`.

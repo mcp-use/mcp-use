@@ -4,6 +4,7 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
+    "customConditions": ["node"],
     "lib": ["ES2022", "DOM"],
     "outDir": "./dist",
     "rootDir": "./src",

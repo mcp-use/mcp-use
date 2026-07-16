@@ -1,34 +1,26 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
 import type {
   BaseTelemetryEvent,
-  MCPAgentExecutionEventData,
   ServerInitializeEventData,
   ServerToolCallEventData,
   ServerResourceCallEventData,
   ServerPromptCallEventData,
   ServerContextEventData,
-  MCPClientInitEventData,
-  ConnectorInitEventData,
   MCPServerTelemetryInfo,
 } from "./events.js";
 import { generateUUID } from "../server/utils/runtime.js";
 import { logger } from "../logging.js";
 import {
-  MCPAgentExecutionEvent,
   ServerRunEvent,
   ServerInitializeEvent,
   ServerToolCallEvent,
   ServerResourceCallEvent,
   ServerPromptCallEvent,
   ServerContextEvent,
-  MCPClientInitEvent,
-  ConnectorInitEvent,
-  ClientAddServerEvent,
-  ClientRemoveServerEvent,
   createServerRunEventData,
 } from "./events.js";
 import { getPackageVersion } from "../version.js";
-import { telFetch } from "./tel-fetch.js";
+import { capturePostHog, captureScarf, SCARF_GATEWAY_URL } from "./tel-fetch.js";
 
 /**
  * Produce a random identifier suitable for session or user IDs.
@@ -135,60 +127,14 @@ function getRuntimeEnvironment(): RuntimeEnvironment {
   return cachedEnvironment;
 }
 
-// Simple Scarf event logger implementation
-class ScarfEventLogger {
-  private endpoint: string;
-  private timeout: number;
-
-  constructor(endpoint: string, timeout: number = 3000) {
-    this.endpoint = endpoint;
-    this.timeout = timeout;
-  }
-
-  async logEvent(properties: Record<string, any>): Promise<void> {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-      const response = await fetch(this.endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(properties),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-    } catch (error) {
-      // Silently fail - telemetry should not break the application
-      logger.debug(`Failed to send Scarf event: ${error}`);
-    }
-  }
-}
-
-// PostHog types for Node
-type PostHogNodeClient = {
-  capture: (params: {
-    distinctId: string;
-    event: string;
-    properties?: Record<string, any>;
-  }) => void;
-  flush: () => void;
-  shutdown: () => Promise<void>;
-};
 
 /**
  * Node.js Telemetry class that works in Node.js environments only.
  *
- * Uses posthog-node for telemetry, require("crypto") for secure random strings,
+ * Uses native fetch for PostHog + Scarf telemetry, require("crypto") for secure
  * and filesystem for user ID persistence.
  *
- * Usage: Tel.getInstance().trackMCPClientInit(...)
+ * Usage: Tel.getInstance().trackServerToolCall(...)
  */
 export class Telemetry {
   private static instance: Telemetry | null = null;
@@ -201,9 +147,8 @@ export class Telemetry {
   private readonly UNKNOWN_USER_ID = "UNKNOWN_USER_ID";
 
   private _currUserId: string | null = null;
-  private _posthogNodeClient: PostHogNodeClient | null = null;
-  private _posthogLoading: Promise<void> | null = null;
-  private _scarfClient: ScarfEventLogger | null = null;
+  private _telemetryEnabled = false;
+  private _scarfEnabled = false;
   private _runtimeEnvironment: RuntimeEnvironment;
   private _storageCapability: StorageCapability;
   private _source: string;
@@ -230,12 +175,12 @@ export class Telemetry {
     const canSupportTelemetry = this._runtimeEnvironment !== "unknown";
 
     if (telemetryDisabled) {
-      this._posthogNodeClient = null;
-      this._scarfClient = null;
+      this._telemetryEnabled = false;
+      this._scarfEnabled = false;
       logger.debug("Telemetry disabled via environment variable");
     } else if (!canSupportTelemetry) {
-      this._posthogNodeClient = null;
-      this._scarfClient = null;
+      this._telemetryEnabled = false;
+      this._scarfEnabled = false;
       logger.debug(
         `Telemetry disabled - unknown environment: ${this._runtimeEnvironment}`
       );
@@ -244,21 +189,11 @@ export class Telemetry {
         "Anonymized telemetry enabled. Set MCP_USE_ANONYMIZED_TELEMETRY=false to disable."
       );
 
-      // Initialize PostHog
-      this._posthogLoading = this._initPostHogNode();
-
-      // Initialize Scarf (server-side only)
-      try {
-        this._scarfClient = new ScarfEventLogger(this.SCARF_GATEWAY_URL, 3000);
-      } catch (e) {
-        logger.warn(`Failed to initialize Scarf telemetry: ${e}`);
-        this._scarfClient = null;
-      }
+      this._telemetryEnabled = true;
+      this._scarfEnabled = true;
 
       // Track package download asynchronously (non-blocking)
-      // This runs after construction completes and only tracks on first use or version upgrade
-      if (this._storageCapability === "filesystem" && this._scarfClient) {
-        // Use setTimeout to ensure this runs after constructor completes
+      if (this._storageCapability === "filesystem") {
         setTimeout(() => {
           this.trackPackageDownload({ triggered_by: "initialization" }).catch(
             (e) => logger.debug(`Failed to track package download: ${e}`)
@@ -278,47 +213,6 @@ export class Telemetry {
     }
 
     return false;
-  }
-
-  private async _initPostHogNode(): Promise<void> {
-    try {
-      // Dynamic import of posthog-node
-      const { PostHog } = await import("posthog-node");
-
-      // Serverless/edge environments need immediate flushing
-      const isServerlessEnvironment = [
-        "cloudflare-workers",
-        "edge",
-        "deno",
-      ].includes(this._runtimeEnvironment);
-
-      const posthogOptions: {
-        host: string;
-        disableGeoip: boolean;
-        fetch: typeof telFetch;
-        flushAt?: number;
-        flushInterval?: number;
-      } = {
-        host: this.HOST,
-        disableGeoip: false,
-        fetch: telFetch,
-      };
-
-      if (isServerlessEnvironment) {
-        posthogOptions.flushAt = 1; // Send events immediately
-        posthogOptions.flushInterval = 0; // Don't wait for interval
-      }
-
-      this._posthogNodeClient = new PostHog(
-        this.PROJECT_API_KEY,
-        posthogOptions
-      );
-
-      logger.debug("PostHog Node.js client initialized");
-    } catch (e) {
-      logger.warn(`Failed to initialize PostHog Node.js telemetry: ${e}`);
-      this._posthogNodeClient = null;
-    }
   }
 
   /**
@@ -363,7 +257,7 @@ export class Telemetry {
    * Check if telemetry is enabled.
    */
   get isEnabled(): boolean {
-    return this._posthogNodeClient !== null || this._scarfClient !== null;
+    return this._telemetryEnabled || this._scarfEnabled;
   }
 
   get userId(): string {
@@ -481,50 +375,37 @@ export class Telemetry {
   }
 
   async capture(event: BaseTelemetryEvent): Promise<void> {
-    // Wait for PostHog to load if it's still initializing
-    if (this._posthogLoading) {
-      await this._posthogLoading;
-    }
-
-    if (!this._posthogNodeClient && !this._scarfClient) {
+    if (!this._telemetryEnabled && !this._scarfEnabled) {
       return;
     }
 
-    // Get user ID (this will trigger lazy initialization if needed)
     const currentUserId = this.userId;
 
-    // Add metadata to all events
     const properties = { ...event.properties };
     properties.mcp_use_version = getPackageVersion();
     properties.language = "typescript";
     properties.source = this._source;
     properties.runtime = this._runtimeEnvironment;
 
-    // Send to PostHog (Node.js)
-    if (this._posthogNodeClient) {
-      try {
-        this._posthogNodeClient.capture({
-          distinctId: currentUserId,
-          event: event.name,
-          properties,
-        });
-      } catch (e) {
-        logger.debug(`Failed to track PostHog Node event ${event.name}: ${e}`);
-      }
+    if (this._telemetryEnabled) {
+      void capturePostHog({
+        host: this.HOST,
+        apiKey: this.PROJECT_API_KEY,
+        event: event.name,
+        distinctId: currentUserId,
+        properties,
+      });
     }
 
-    // Send to Scarf
-    if (this._scarfClient) {
-      try {
-        const scarfProperties: Record<string, any> = {
+    if (this._scarfEnabled) {
+      void captureScarf(
+        {
           ...properties,
           user_id: currentUserId,
           event: event.name,
-        };
-        await this._scarfClient.logEvent(scarfProperties);
-      } catch (e) {
-        logger.debug(`Failed to track Scarf event ${event.name}: ${e}`);
-      }
+        },
+        this.SCARF_GATEWAY_URL
+      );
     }
   }
 
@@ -547,7 +428,7 @@ export class Telemetry {
     userId: string,
     properties?: Record<string, any>
   ): Promise<void> {
-    if (!this._scarfClient) {
+    if (!this._scarfEnabled) {
       return;
     }
 
@@ -613,21 +494,11 @@ export class Telemetry {
         eventProperties.source = this._source;
         eventProperties.runtime = this._runtimeEnvironment;
 
-        await this._scarfClient.logEvent(eventProperties);
+        await captureScarf(eventProperties, this.SCARF_GATEWAY_URL);
       }
     } catch (e) {
       logger.debug(`Failed to track Scarf package_download event: ${e}`);
     }
-  }
-
-  // ============================================================================
-  // Agent Events
-  // ============================================================================
-
-  async trackAgentExecution(data: MCPAgentExecutionEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPAgentExecutionEvent(data);
-    await this.capture(event);
   }
 
   // ============================================================================
@@ -680,71 +551,6 @@ export class Telemetry {
   }
 
   // ============================================================================
-  // Client Events
-  // ============================================================================
-
-  async trackMCPClientInit(data: MCPClientInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new MCPClientInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackConnectorInit(data: ConnectorInitEventData): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ConnectorInitEvent(data);
-    await this.capture(event);
-  }
-
-  async trackClientAddServer(
-    serverName: string,
-    serverConfig: Record<string, any>
-  ): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientAddServerEvent({ serverName, serverConfig });
-    await this.capture(event);
-  }
-
-  async trackClientRemoveServer(serverName: string): Promise<void> {
-    if (!this.isEnabled) return;
-    const event = new ClientRemoveServerEvent({ serverName });
-    await this.capture(event);
-  }
-
-  // ============================================================================
-  // React Hook / Browser specific events (no-ops in Node.js)
-  // ============================================================================
-
-  async trackUseMcpConnection(data: {
-    url: string;
-    transportType: string;
-    success: boolean;
-    errorType?: string | null;
-    connectionTimeMs?: number | null;
-    hasOAuth: boolean;
-    hasSampling: boolean;
-    hasElicitation: boolean;
-  }): Promise<void> {
-    // No-op in Node.js - this is browser-specific
-  }
-
-  async trackUseMcpToolCall(data: {
-    toolName: string;
-    success: boolean;
-    errorType?: string | null;
-    executionTimeMs?: number | null;
-  }): Promise<void> {
-    // No-op in Node.js - this is browser-specific
-  }
-
-  async trackUseMcpResourceRead(data: {
-    resourceUri: string;
-    success: boolean;
-    errorType?: string | null;
-  }): Promise<void> {
-    // No-op in Node.js - this is browser-specific
-  }
-
-  // ============================================================================
   // Browser-specific Methods (no-ops in Node.js)
   // ============================================================================
 
@@ -770,28 +576,14 @@ export class Telemetry {
    * Flush the telemetry queue (Node.js only)
    */
   flush(): void {
-    if (this._posthogNodeClient) {
-      try {
-        this._posthogNodeClient.flush();
-        logger.debug("PostHog client telemetry queue flushed");
-      } catch (e) {
-        logger.debug(`Failed to flush PostHog client: ${e}`);
-      }
-    }
+    // ponytail: fetch-based telemetry has no client-side queue to flush
   }
 
   /**
    * Shutdown the telemetry client (Node.js only)
    */
   async shutdown(): Promise<void> {
-    if (this._posthogNodeClient) {
-      try {
-        await this._posthogNodeClient.shutdown();
-        logger.debug("PostHog client shutdown successfully");
-      } catch (e) {
-        logger.debug(`Error shutting down PostHog client: ${e}`);
-      }
-    }
+    // ponytail: fetch-based telemetry has no SDK client to shut down
   }
 }
 

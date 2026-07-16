@@ -16,7 +16,13 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@modelcontextprotocol/ext-apps/app-bridge": [
+        "node_modules/@modelcontextprotocol/ext-apps/dist/src/app-bridge.d.ts"
+      ]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]

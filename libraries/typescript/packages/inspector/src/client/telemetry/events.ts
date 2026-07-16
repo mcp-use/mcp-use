@@ -1,4 +1,4 @@
-import type { ProviderName } from "@/llm/types";
+import type { ProviderName } from "@mcp-use/agent";
 
 export interface BaseTelemetryEvent {
   name: string;
@@ -205,25 +205,6 @@ export class MCPToolSavedEvent implements BaseTelemetryEvent {
     this.properties = {
       tool_name: data.toolName,
       server_id: data.serverId,
-    };
-  }
-}
-
-interface MCPTunnelActionEventData {
-  action: "start" | "stop";
-  success: boolean;
-  tunnelUrl?: string | null;
-}
-
-export class MCPTunnelActionEvent implements BaseTelemetryEvent {
-  name = "mcp_tunnel_action";
-  properties: Record<string, any>;
-
-  constructor(data: MCPTunnelActionEventData) {
-    this.properties = {
-      action: data.action,
-      success: data.success,
-      tunnel_url: data.tunnelUrl,
     };
   }
 }

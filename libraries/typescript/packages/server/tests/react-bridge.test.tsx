@@ -133,7 +133,9 @@ describe("react bridge runtime", () => {
           <div data-testid="view">
             {query}:{items.join(",")}
             <span data-testid="content">{handle.content?.[0]?.type ?? ""}</span>
-            <span data-testid="meta">{handle.meta ? JSON.stringify(handle.meta) : ""}</span>
+            <span data-testid="meta">
+              {handle.meta ? JSON.stringify(handle.meta) : ""}
+            </span>
           </div>
         );
       }
@@ -377,11 +379,12 @@ describe("react bridge runtime", () => {
             error|
             {handle.error instanceof InvalidToolResultError
               ? "invalid-result"
-              : "other"}|
+              : "other"}
+            |
             {handle.error instanceof InvalidToolResultError
               ? handle.error.message
-              : ""}|
-            {handle.toolOutput === undefined ? "no-out" : "has-out"}
+              : ""}
+            |{handle.toolOutput === undefined ? "no-out" : "has-out"}
           </div>
         );
       }
@@ -456,7 +459,9 @@ describe("react bridge runtime", () => {
 
     await bridge.sendToolCancelled({});
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("cancelled|undef");
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "cancelled|undef"
+      );
     });
   });
 
@@ -542,7 +547,9 @@ describe("react bridge runtime", () => {
     // result state → pending.
     await bridge.sendToolInput({ arguments: { query: "banana" } });
     await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|banana|");
+      expect(screen.getByTestId("lifecycle").textContent).toBe(
+        "pending|banana|"
+      );
     });
 
     await bridge.sendToolCancelled({ reason: "retry aborted" });
@@ -889,8 +896,7 @@ describe("react bridge runtime", () => {
 
       return (
         <div data-testid="stable">
-          {theme}|{displayMode}|
-          {String(refs.openExternal === openExternal)}|
+          {theme}|{displayMode}|{String(refs.openExternal === openExternal)}|
           {String(refs.sendFollowUp === sendFollowUp)}|
           {String(refs.sendSizeChanged === sendSizeChanged)}|
           {String(refs.requestDisplayMode === requestDisplayMode)}
@@ -1045,7 +1051,9 @@ describe("react bridge runtime", () => {
     // A bare content-only success (schema-less tool) resolves into data.
     screen.getByText("bare").click();
     await waitFor(() => {
-      expect(screen.getByTestId("data").textContent).toBe("content:bare content");
+      expect(screen.getByTestId("data").textContent).toBe(
+        "content:bare content"
+      );
       expect(screen.getByTestId("error").textContent).toBe("");
       expect(screen.getByTestId("pending").textContent).toBe("false");
     });
@@ -1100,9 +1108,7 @@ describe("react bridge runtime", () => {
       return (
         <div>
           <span data-testid="mode">{displayMode}</span>
-          <span data-testid="available">
-            {availableDisplayModes.join(",")}
-          </span>
+          <span data-testid="available">{availableDisplayModes.join(",")}</span>
           <button
             type="button"
             onClick={() => {
@@ -1145,9 +1151,7 @@ describe("react bridge runtime", () => {
 
     let followUpPrompt: string | undefined;
     let openedUrl: string | undefined;
-    let openExternalRef:
-      | ((args: { url: string }) => Promise<void>)
-      | undefined;
+    let openExternalRef: ((args: { url: string }) => Promise<void>) | undefined;
 
     bridge.onmessage = async ({ content }) => {
       const block = content?.[0];
@@ -2463,9 +2467,7 @@ describe("react bridge runtime", () => {
     resetRuntime();
     const [guest1, host1] = createPairedTransports();
     let startCount = 0;
-    const wrapStart = (
-      transport: (typeof guest1)
-    ): typeof guest1 => {
+    const wrapStart = (transport: typeof guest1): typeof guest1 => {
       const originalStart = transport.start.bind(transport);
       transport.start = async () => {
         startCount += 1;
