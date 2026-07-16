@@ -1,5 +1,11 @@
 # mcp-use
 
+## 2.0.0-beta.2
+
+### Patch Changes
+
+- 69d5da9: Load the default Inspector UI from the npm `beta` dist-tag so Inspector beta fixes reach mcp-use beta users without waiting for another SDK release.
+
 ## 2.0.0-beta.1
 
 ### Minor Changes
