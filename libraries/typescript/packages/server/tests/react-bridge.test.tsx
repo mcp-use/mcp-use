@@ -369,43 +369,50 @@ describe("react bridge runtime", () => {
     const { bridge, init } = await startHost();
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    function View() {
-      const handle = useToolContext();
-      return (
-        <div data-testid="lifecycle">
-          {handle.status}|
-          {handle.status === "ready" ? JSON.stringify(handle.toolOutput) : ""}
-        </div>
-      );
+    try {
+      function View() {
+        const handle = useToolContext();
+        return (
+          <div data-testid="lifecycle">
+            {handle.status}|
+            {handle.status === "ready"
+              ? JSON.stringify(handle.toolOutput)
+              : ""}
+          </div>
+        );
+      }
+
+      bootstrapView({ default: View as ComponentType });
+      await init;
+
+      await bridge.sendToolInput({ arguments: {} });
+      await bridge.sendToolResult({
+        content: [{ type: "text", text: "no structured" }],
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("lifecycle").textContent).toBe("pending|");
+      });
+      expect(
+        errorSpy.mock.calls.some((args) =>
+          String(args[0]).includes(
+            "non-error result without structuredContent"
+          )
+        )
+      ).toBe(false);
+
+      await bridge.sendToolResult({
+        content: [{ type: "text", text: "ready" }],
+        structuredContent: { ok: true },
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId("lifecycle").textContent).toBe(
+          'ready|{"ok":true}'
+        );
+      });
+    } finally {
+      errorSpy.mockRestore();
     }
-
-    bootstrapView({ default: View as ComponentType });
-    await init;
-
-    await bridge.sendToolInput({ arguments: {} });
-    await bridge.sendToolResult({
-      content: [{ type: "text", text: "no structured" }],
-    });
-
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe("pending|");
-    });
-    expect(
-      errorSpy.mock.calls.some((args) =>
-        String(args[0]).includes("non-error result without structuredContent")
-      )
-    ).toBe(false);
-
-    await bridge.sendToolResult({
-      content: [{ type: "text", text: "ready" }],
-      structuredContent: { ok: true },
-    });
-    await waitFor(() => {
-      expect(screen.getByTestId("lifecycle").textContent).toBe(
-        'ready|{"ok":true}'
-      );
-    });
-    errorSpy.mockRestore();
   });
 
   it("latches a tool error and ignores subsequent input", async () => {
