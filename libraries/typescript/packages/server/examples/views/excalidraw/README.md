@@ -1,7 +1,7 @@
 # Excalidraw example
 
 Port of [excalidraw/excalidraw-mcp](https://github.com/excalidraw/excalidraw-mcp) to
-`@mcp-use/server` MCP Apps views. Streams hand-drawn diagrams into a live view
+`mcp-use` MCP Apps views. Streams hand-drawn diagrams into a live view
 with camera animation, pencil stroke audio, fullscreen editing, checkpoints, and
 export to excalidraw.com.
 
@@ -59,5 +59,5 @@ pnpm typecheck
 
 Faithful port of user-visible behavior from
 [excalidraw/excalidraw-mcp](https://github.com/excalidraw/excalidraw-mcp).
-Server transport/registration uses `@mcp-use/server`; the Excalidraw UI, SVG
+Server transport/registration uses `mcp-use`; the Excalidraw UI, SVG
 streaming pipeline, sounds, and checkpoint logic are retained.

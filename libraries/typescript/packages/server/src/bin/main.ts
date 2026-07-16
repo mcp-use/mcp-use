@@ -1,24 +1,13 @@
 /**
  * Command dispatch for the `mcp-use` bin (specs/CLI_SPEC.md).
  *
- * `start` is implemented inline (zero toolchain deps); `dev` and `build` are
- * dispatched via a dynamic `import("../cli/index.js")` — the sibling
- * `dist/cli/index.js` chunk built from `src/cli/*` (its own tsup
- * entry). The import is dynamic, not static, so `start` and every other path
- * through this file never evaluate cli code — and therefore never
- * evaluate `vite`, which the cli chunk imports.
- *
- * `vite` is an *optional* peer dependency of this package (never a regular
- * dependency): npm/pnpm do not auto-install optional peers, so a production
- * `npm i mcp-use` stays lean. When it is missing, the cli chunk's own
- * `import("vite")` (in `cli/build.ts`/`cli/dev.ts`) rejects with
- * `ERR_MODULE_NOT_FOUND`, which propagates here and is classified by
- * {@link isViteMissing} into the actionable install hint below.
+ * Every substantial command is dispatched through its own dynamic import.
+ * The library entry, bin, and production `start` path therefore never
+ * evaluate Vite or an unrelated command implementation.
  */
 import { readFileSync } from "node:fs";
 
 import { parseArgs, type ParsedArgs } from "./args.js";
-import { runStart } from "./start.js";
 
 /**
  * Options this bin passes to the cli's `runDev`/`runBuild`.
@@ -40,20 +29,24 @@ export interface CliCommandOptions {
   open?: boolean;
 }
 
-/** The subset of the cli chunk's exports this bin calls. */
-interface CliModule {
-  runDev(options: CliCommandOptions): Promise<void>;
-  runBuild(options: CliCommandOptions): Promise<void>;
-}
-
 const HELP = `mcp-use — run MCP servers built with mcp-use
 
 Usage: mcp-use <command> [options]
 
 Commands:
-  dev      Start the dev server (requires vite)
-  build    Build the server into .mcp-use/build (requires vite)
+  dev      Start the dev server
+  build    Build the server into .mcp-use/build
   start    Serve the production build from .mcp-use/build
+  login    Authenticate the cloud CLI
+  logout   Delete local cloud credentials
+  whoami   Show the authenticated cloud identity
+  org      Manage the active organization
+  servers  Manage cloud servers and environment variables
+  deployments Manage cloud deployments and logs
+  deploy   Deploy the current GitHub project
+  client   Connect to and invoke MCP servers
+  skills   Install maintained coding-agent skills
+  screenshot Capture an MCP Apps view
 
 Options:
   -p, --port <n>     Port to serve on (default: $PORT or 3000)
@@ -74,12 +67,55 @@ Options:
  * @internal
  */
 export async function main(argv: readonly string[]): Promise<number> {
+  if (argv.length === 1 && ["--version", "-v"].includes(argv[0] ?? "")) {
+    console.log(readOwnVersion());
+    return 0;
+  }
+  if (argv.some((token) => token === "--help" || token === "-h")) {
+    console.log(HELP);
+    return 0;
+  }
+
+  const command = argv[0];
+  if (command === "login" || command === "logout" || command === "whoami") {
+    const { runIdentity } = await import("../commands/identity.js");
+    return runIdentity(command, argv.slice(1));
+  }
+  if (command === "org") {
+    const { runOrganizations } = await import("../commands/organizations.js");
+    return runOrganizations(argv.slice(1));
+  }
+  if (command === "servers") {
+    const { runServers } = await import("../commands/servers.js");
+    return runServers(argv.slice(1));
+  }
+  if (command === "deployments") {
+    const { runDeployments } = await import("../commands/deployments.js");
+    return runDeployments(argv.slice(1));
+  }
+  if (command === "deploy") {
+    const { runDeploy } = await import("../commands/deploy.js");
+    return runDeploy(argv.slice(1));
+  }
+  if (command === "client") {
+    const { runClient } = await import("../commands/client.js");
+    return runClient(argv.slice(1));
+  }
+  if (command === "skills") {
+    const { runSkills } = await import("../commands/skills.js");
+    return runSkills(argv.slice(1));
+  }
+  if (command === "screenshot") {
+    const { runScreenshot } = await import("../commands/screenshot.js");
+    return runScreenshot(argv.slice(1));
+  }
+
   let args: ParsedArgs;
   try {
     args = parseArgs(argv);
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
-    return 1;
+    return 2;
   }
 
   if (args.version) {
@@ -99,10 +135,10 @@ export async function main(argv: readonly string[]): Promise<number> {
       return cliCommand(args.command, args);
     case undefined:
       console.error(HELP);
-      return 1;
+      return 2;
     default:
       console.error(`Unknown command: ${args.command}\n\n${HELP}`);
-      return 1;
+      return 2;
   }
 }
 
@@ -110,6 +146,7 @@ export async function main(argv: readonly string[]): Promise<number> {
 async function startCommand(args: ParsedArgs): Promise<number> {
   let started;
   try {
+    const { runStart } = await import("../commands/start.js");
     started = await runStart({ cwd: process.cwd(), port: args.port });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -132,7 +169,7 @@ async function startCommand(args: ParsedArgs): Promise<number> {
   return 0;
 }
 
-/** `mcp-use dev` / `mcp-use build`: dispatch to the cli chunk. */
+/** `mcp-use dev` / `mcp-use build`: dispatch to dedicated command chunks. */
 async function cliCommand(
   command: "dev" | "build",
   args: ParsedArgs
@@ -147,43 +184,18 @@ async function cliCommand(
   };
 
   try {
-    const cli = (await import("../cli/index.js")) as CliModule;
     if (command === "dev") {
-      await cli.runDev(options);
+      const { runDev } = await import("../commands/dev.js");
+      await runDev(options);
     } else {
-      await cli.runBuild(options);
+      const { runBuild } = await import("../commands/build.js");
+      await runBuild(options);
     }
     return 0;
   } catch (error) {
-    if (isViteMissing(error)) {
-      console.error(
-        `mcp-use ${command} requires Vite. Install it:\n  npm i -D vite`
-      );
-      return 1;
-    }
     console.error(error instanceof Error ? error.message : String(error));
     return 1;
   }
-}
-
-/**
- * Whether `error` is Node's module-resolution failure for the missing,
- * optional `vite` peer dependency, as opposed to any other failure raised
- * while running `dev`/`build` (a bad entry, a Vite build error, …).
- *
- * A missing `vite` surfaces as `ERR_MODULE_NOT_FOUND` naming `'vite'` — the
- * cli chunk's own `import("vite")` rejects before its `runDev`/`runBuild`
- * ever runs, and that rejection propagates through the dynamic
- * `import("../cli/index.js")` in {@link cliCommand} unchanged.
- *
- * @param error - The value caught around the cli dispatch.
- *
- * @internal
- */
-export function isViteMissing(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const code = (error as NodeJS.ErrnoException).code;
-  return code === "ERR_MODULE_NOT_FOUND" && error.message.includes("'vite'");
 }
 
 /**
@@ -199,7 +211,7 @@ function readOwnVersion(): string {
       const raw = readFileSync(new URL(relative, import.meta.url), "utf8");
       const pkg = JSON.parse(raw) as { name?: unknown; version?: unknown };
       if (
-        (pkg.name === "@mcp-use/server" || pkg.name === "mcp-use") &&
+        (pkg.name === "mcp-use" || pkg.name === "mcp-use") &&
         typeof pkg.version === "string"
       ) {
         return pkg.version;

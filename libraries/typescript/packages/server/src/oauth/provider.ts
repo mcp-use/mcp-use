@@ -43,9 +43,7 @@ export interface CustomOAuthProviderOptions<
 }
 
 /** OAuth resource-server provider accepted by {@link MCPServer}. */
-export interface OAuthProvider<
-  TUser,
-> extends CustomOAuthProviderOptions<TUser> {}
+export type OAuthProvider<TUser> = CustomOAuthProviderOptions<TUser>;
 
 /**
  * Creates an OAuth provider backed by an external authorization server.

@@ -19,7 +19,7 @@ import { useViewRuntime } from "../runtime/view-runtime-context.js";
  *   ThemeProvider,
  *   useSendSizeChanged,
  *   type ViewConfig,
- * } from "@mcp-use/server/react";
+ * } from "mcp-use/react";
  * import { useEffect, useRef } from "react";
  *
  * export const viewConfig = {

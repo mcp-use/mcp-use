@@ -1,9 +1,9 @@
 {
-  "name": "@mcp-use/server-example-views-basic",
+  "name": "mcp-use-example-views-basic",
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Reference example: MCP Apps views with @mcp-use/server (fruit-store).",
+  "description": "Reference example: MCP Apps views with mcp-use (fruit-store).",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@mcp-use/server": "workspace:*",
+    "mcp-use": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

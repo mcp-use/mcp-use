@@ -39,7 +39,6 @@
     "test_app": "pnpm test_app:starter",
     "test_app:starter": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template starter && cd test_app && pnpm install && pnpm dev",
     "test_app:mcp-apps": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-apps && cd test_app && pnpm install && pnpm dev",
-    "test_app:mcp-ui": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template mcp-ui && cd test_app && pnpm install && pnpm dev",
     "test_app:blank": "rimraf test_app && pnpm build && node packages/create-mcp-use-app/dist/index.js test_app --dev --template blank && cd test_app && pnpm install && pnpm dev"
   },
   "devDependencies": {
@@ -66,5 +65,8 @@
   "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937",
   "dependencies": {
     "@eslint/js": "^9.39.4"
-  }
+  },
+  "description": "<div align=\"center\" style=\"margin: 0 auto; max-width: 80%;\">   <picture>     <source media=\"(prefers-color-scheme: dark)\" srcset=\"./packages/mcp-use/static/logo_white.svg\">     <source media=\"(prefers-color-scheme: light)\" srcset=\"./packages/mcp-use/static/logo_black.svg\">     <img alt=\"mcp use logo\" src=\"./packages/mcp-use/static/logo_white.svg\" width=\"80%\" style=\"margin: 20px auto;\">   </picture> </div>",
+  "main": "eslint.config.js",
+  "keywords": []
 }

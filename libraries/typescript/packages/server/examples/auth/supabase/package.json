@@ -1,9 +1,9 @@
 {
-  "name": "@mcp-use/server-example-auth-supabase",
+  "name": "mcp-use-example-auth-supabase",
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Example: @mcp-use/server with Supabase direct access-token verification.",
+  "description": "Example: mcp-use with Supabase direct access-token verification.",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
-    "@mcp-use/server": "workspace:*",
+    "mcp-use": "workspace:*",
     "@supabase/supabase-js": "^2.104.0",
     "hono": "^4.12.27",
     "zod": "^4.4.3"

@@ -309,16 +309,10 @@ function getCurrentPackageVersions(
   try {
     if (isDevelopment) {
       versions["mcp-use"] = "workspace:*";
-      versions["@mcp-use/cli"] = "workspace:*";
-      versions["@mcp-use/inspector"] = "workspace:*";
     } else if (useCanary) {
       versions["mcp-use"] = "canary";
-      versions["@mcp-use/cli"] = "canary";
-      versions["@mcp-use/inspector"] = "canary";
     } else {
       versions["mcp-use"] = "latest";
-      versions["@mcp-use/cli"] = "latest";
-      versions["@mcp-use/inspector"] = "latest";
     }
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
@@ -359,14 +353,6 @@ function processTemplateFile(
       /"mcp-use": "\^[^"]+"/,
       '"mcp-use": "workspace:*"'
     );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "\^[^"]+"/,
-      '"@mcp-use/cli": "workspace:*"'
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/inspector": "\^[^"]+"/,
-      '"@mcp-use/inspector": "workspace:*"'
-    );
   } else if (useCanary) {
     processedContent = processedContent.replace(
       /"mcp-use": "workspace:\*"/,
@@ -376,34 +362,10 @@ function processTemplateFile(
       /"mcp-use": "\^[^"]+"/,
       `"mcp-use": "canary"`
     );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "workspace:\*"/,
-      `"@mcp-use/cli": "canary"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "\^[^"]+"/,
-      `"@mcp-use/cli": "canary"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/inspector": "workspace:\*"/,
-      `"@mcp-use/inspector": "canary"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/inspector": "\^[^"]+"/,
-      `"@mcp-use/inspector": "canary"`
-    );
   } else {
     processedContent = processedContent.replace(
       /"mcp-use": "workspace:\*"/,
       `"mcp-use": "${versions["mcp-use"] || "latest"}"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/cli": "workspace:\*"/,
-      `"@mcp-use/cli": "${versions["@mcp-use/cli"] || "latest"}"`
-    );
-    processedContent = processedContent.replace(
-      /"@mcp-use\/inspector": "workspace:\*"/,
-      `"@mcp-use/inspector": "${versions["@mcp-use/inspector"] || "latest"}"`
     );
   }
 
@@ -451,10 +413,7 @@ function listTemplates(): void {
       }
     }
 
-    console.log(
-      ansi.cyan(`  ${template.padEnd(15)}`),
-      ansi.gray(description)
-    );
+    console.log(ansi.cyan(`  ${template.padEnd(15)}`), ansi.gray(description));
   }
 
   console.log("");
@@ -823,7 +782,9 @@ async function promptForProjectName(): Promise<string> {
 async function promptForTemplate(): Promise<string> {
   const items = getTemplateItems();
   if (items.length === 0) {
-    console.error(ansi.red(`❌ No templates found in: ${join(__dirname, "templates")}`));
+    console.error(
+      ansi.red(`❌ No templates found in: ${join(__dirname, "templates")}`)
+    );
     process.exit(1);
   }
 
@@ -895,7 +856,9 @@ async function main(): Promise<void> {
 
   if (!projectName) {
     if (!interactive) {
-      console.error(ansi.red("❌ Project name is required in non-interactive mode"));
+      console.error(
+        ansi.red("❌ Project name is required in non-interactive mode")
+      );
       process.exit(1);
     }
     projectName = await promptForProjectName();
@@ -1080,10 +1043,7 @@ async function main(): Promise<void> {
     console.log("");
 
     const isKnownManager =
-      options.yarn ||
-      options.npm ||
-      options.pnpm ||
-      detectPackageManager();
+      options.yarn || options.npm || options.pnpm || detectPackageManager();
     const managersToTry = isKnownManager
       ? [usedPackageManager]
       : ["npm", "pnpm", "yarn"];
@@ -1142,18 +1102,15 @@ async function main(): Promise<void> {
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
   } else if (validatedTemplate === "mcp-apps") {
-    console.log("   ├── public/");
     console.log("   ├── resources/");
     console.log("   │   └── product-search-result/");
-    console.log("   │       └── widget.tsx");
+    console.log("   │       └── view.tsx");
+    console.log("   ├── src/register.d.ts");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
     console.log("   └── README.md");
   } else if (validatedTemplate === "starter") {
-    console.log("   ├── public/");
-    console.log("   ├── resources/");
-    console.log("   │   └── display-weather.tsx");
     console.log("   ├── index.ts (server entry point)");
     console.log("   ├── package.json");
     console.log("   ├── tsconfig.json");
@@ -1183,7 +1140,9 @@ async function main(): Promise<void> {
   console.log("");
   if (options.dev) {
     console.log(
-      ansi.yellow("💡 Development mode: Your project uses workspace dependencies")
+      ansi.yellow(
+        "💡 Development mode: Your project uses workspace dependencies"
+      )
     );
     console.log(
       ansi.yellow(
@@ -1195,9 +1154,7 @@ async function main(): Promise<void> {
   console.log(ansi.cyan("📚 Learn more: https://manufact.com/docs"));
   console.log(ansi.gray("💬 For feedback and bug reporting visit:"));
   console.log(
-    ansi.gray(
-      "   https://github.com/mcp-use/mcp-use or https://manufact.com"
-    )
+    ansi.gray("   https://github.com/mcp-use/mcp-use or https://manufact.com")
   );
 }
 

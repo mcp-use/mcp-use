@@ -1,6 +1,7 @@
-# @mcp-use/server authorization implementation
+# mcp-use v2 authorization implementation contract
 
-**Status:** Approved implementation scope. Implement this document in the current auth phase.
+**Status:** Direct external authorization-server/resource-server mode is implemented.
+**Package:** `mcp-use@2`; imports use `mcp-use` subpaths.
 
 **Scope:** This phase implements direct external authorization-server and resource-server mode only. mcp-use verifies externally issued access tokens that are bound to the canonical MCP resource. It does not issue, store, refresh, or proxy tokens.
 
@@ -15,8 +16,8 @@ The current implementation must not add registration, local authorization, token
 The public constructor field is `oauth`, matching v1 terminology. `auth` is not a public constructor alias.
 
 ```ts
-import { MCPServer } from "@mcp-use/server";
-import { oauthClerkProvider } from "@mcp-use/server/oauth/clerk";
+import { MCPServer } from "mcp-use";
+import { oauthClerkProvider } from "mcp-use/oauth/clerk";
 
 const server = new MCPServer({
   name: "acme-tools",
@@ -31,12 +32,12 @@ const server = new MCPServer({
 
 ## Keep the official SDK behind mcp-use
 
-Consumers import OAuth APIs only from `@mcp-use/server/oauth`. They do not install, version, or import `@modelcontextprotocol/server` directly. It remains a regular dependency of mcp-use, not a consumer-managed peer dependency.
+Consumers import OAuth APIs only from `mcp-use/oauth`. They do not install, version, or import `@modelcontextprotocol/server` directly. It remains a regular dependency of mcp-use, not a consumer-managed peer dependency.
 
 mcp-use does not reimplement protocol types, error classes, or runtime-neutral helpers that already exist. The OAuth entry point re-exports the upstream values unchanged:
 
 ```ts
-// @mcp-use/server/oauth
+// mcp-use/oauth
 export {
   OAuthError,
   OAuthErrorCode,
@@ -69,7 +70,7 @@ import {
   type OAuthAuthInfo,
   type OAuthMetadata,
   type OAuthTokenVerifier,
-} from "@mcp-use/server/oauth";
+} from "mcp-use/oauth";
 ```
 
 ## Define the provider contract
@@ -422,7 +423,7 @@ For direct providers, `oauthMetadataResponse` serves path-aware protected-resour
 
 No upstream `@modelcontextprotocol/hono` auth feature is required. Beta.3 deliberately places web-standard authorization helpers in server core so they work in Hono, Workers, Deno, Bun, and other `Request`/`Response` hosts.
 
-Hono handles body parsing, configured host validation, and origin validation. mcp-use exports thin ergonomic adapters from `@mcp-use/server/oauth`:
+Hono handles body parsing, configured host validation, and origin validation. mcp-use exports thin ergonomic adapters from `mcp-use/oauth`:
 
 - `bearerAuth(provider, resource)` invokes `requireBearerAuth` and stores `authInfo` in Hono variables.
 - `oauthMetadata(provider, resource)` serves direct-provider `oauthMetadataResponse` and falls through on unrelated routes.
@@ -448,9 +449,9 @@ In direct mode, clients use the external authorization server's registration, au
 
 Better Auth is explicitly deferred. Do not port `oauthBetterAuthProvider` as part of the resource-server adapter phase. Its v2 integration will be designed separately so a Better Auth instance can compose with `MCPServer` more directly than the v1 provider wrapper. The custom provider escape hatch remains available in the meantime, but its shape does not constrain the future first-class Better Auth API.
 
-## Meet the beta.3 dependency prerequisite
+## SDK dependency prerequisite
 
-As of 2026-07-09, `@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` all have `2.0.0-beta.3` releases. The implementation may use coordinated beta.3 pins. This documentation change does not modify `package.json`.
+`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` are pinned together at `2.0.0-beta.3`.
 
 ## Verify the implementation
 

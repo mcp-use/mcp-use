@@ -4,7 +4,6 @@
     "optionalPeerDependencies": "off"
   },
   "ignoreWorkspaces": [
-    "packages/mcp-use/examples/**",
     "packages/create-mcp-use-app/src/templates/**",
     "test_app"
   ],
@@ -12,16 +11,17 @@
     ".": {
       "project": ["*.{js,ts}"]
     },
-    "packages/mcp-use": {
+    "packages/server": {
       "entry": [
-        "scripts/**/*.{js,mjs,ts}",
-        "tests/helpers/**/*.ts",
-        "tests/servers/**/*.ts",
-        "tests/docs/**/*.ts",
-        "tests/types/**/*.ts"
+        "src/index.ts",
+        "src/bin.ts",
+        "src/react/index.ts",
+        "src/oauth/**/*.ts",
+        "tests/**/*.{ts,tsx}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreBinaries": ["lsof", "sleep", "dev"]
+      "ignoreBinaries": ["npx"],
+      "ignoreDependencies": ["mcp-use"]
     },
     "packages/client": {
       "entry": [
@@ -31,10 +31,6 @@
         "tests/**/*.{ts,tsx}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
-    },
-    "packages/cli": {
-      "project": ["src/**/*.ts", "tests/**/*.ts"],
-      "ignoreDependencies": ["@mcp-use/inspector"]
     },
     "packages/inspector": {
       "entry": [

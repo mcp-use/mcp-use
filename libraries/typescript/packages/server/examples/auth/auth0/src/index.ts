@@ -1,5 +1,5 @@
-import { MCPServer } from "@mcp-use/server";
-import { oauthAuth0Provider } from "@mcp-use/server/oauth/auth0";
+import { MCPServer } from "mcp-use";
+import { oauthAuth0Provider } from "mcp-use/oauth/auth0";
 import { z } from "zod";
 
 const getUserInfoOutputSchema = z.object({

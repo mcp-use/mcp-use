@@ -3,11 +3,11 @@
  * and the local smoke test (`smoke.ts`).
  *
  * `MCPServer` builds a fresh SDK server per HTTP request off this registry
- * (see `getHandler()` in `@mcp-use/server`), so the whole module is stateless
+ * (see `getHandler()` in `mcp-use`), so the whole module is stateless
  * and safe to reuse across warm serverless invocations — register everything
  * once, at import time, and never after `getHandler()` is called.
  */
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 export const server = new MCPServer({
@@ -15,7 +15,7 @@ export const server = new MCPServer({
   version: "1.0.0",
   title: "mcp-use on Vercel",
   description:
-    "Minimal MCP server demonstrating @mcp-use/server on Vercel serverless functions.",
+    "Minimal MCP server demonstrating mcp-use on Vercel serverless functions.",
   // Vercel serves files under api/ at a matching /api/* path; aligning
   // basePath with the function's file location (api/mcp.ts) means the
   // mounted route is exactly what Vercel routes to it. Getting this out of

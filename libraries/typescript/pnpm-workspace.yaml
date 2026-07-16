@@ -1,7 +1,6 @@
 packages:
   - packages/*
   # examples
-  - packages/mcp-use/examples/**/*
   - packages/client/examples/browser/react
   - packages/client/examples/conformance
   - packages/server/examples/*
@@ -33,7 +32,6 @@ patchedDependencies:
 overrides:
   mcp-use: workspace:*
   "@mcp-use/inspector": workspace:*
-  "@mcp-use/cli": workspace:*
   create-mcp-use-app: workspace:*
   "@langchain/core": ^1.1.8
   "@langchain/anthropic": ^1.0.0

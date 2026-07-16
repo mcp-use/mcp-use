@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 import { parseArgs, resolvePort } from "../src/bin/args.js";
-import { isViteMissing, main } from "../src/bin/main.js";
+import { main } from "../src/bin/main.js";
 import { runStart } from "../src/bin/start.js";
 
 /** An entry that echoes back the port it was asked to listen on (no bind). */
@@ -214,13 +214,13 @@ describe("runStart", () => {
 describe("main", () => {
   it("prints help and fails on an unknown command", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(main(["frobnicate"])).resolves.toBe(1);
+    await expect(main(["frobnicate"])).resolves.toBe(2);
     expect(errors.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
   });
 
   it("prints help and fails when no command is given", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(main([])).resolves.toBe(1);
+    await expect(main([])).resolves.toBe(2);
     expect(errors.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
   });
 
@@ -236,65 +236,10 @@ describe("main", () => {
     expect(logs.mock.calls.flat().join("\n")).toContain("Usage: mcp-use");
   });
 
-  it("errors actionably when dev/build has no server entry (cli chunk loads, vite is present)", async () => {
-    // vite is a devDependency of this package (needed to run the cli's
-    // own tests below), so it is always resolvable here — this test proves
-    // the cli chunk dispatch itself works (import succeeds, runDev/runBuild
-    // run) by driving it to its next failure mode instead: no server entry in
-    // this cwd's fixture. See `describe("isViteMissing")` for the missing-vite
-    // classification this bin also has to handle, unit-tested directly since
-    // reliably un-resolving vite from *this* workspace is impractical (vite
-    // is required by tests/cli/*). Runs against the real process.cwd()
-    // (this package) with a deliberately nonexistent --entry override.
+  it("dispatches build through its dedicated command module", async () => {
     const errors = vi.spyOn(console, "error").mockImplementation(() => {});
     await expect(main(["build", "--entry", "nope.ts"])).resolves.toBe(1);
     const output = errors.mock.calls.flat().join("\n");
     expect(output).toMatch(/Entry not found/);
-  });
-});
-
-describe("isViteMissing", () => {
-  /**
-   * Node's exact shape for a missing bare import, confirmed against a real
-   * `await import("./mod.js")` where `mod.js` does `import { x } from "vite"`
-   * and vite is not installed:
-   * `Error: Cannot find package 'vite' imported from <path>`,
-   * `error.code === "ERR_MODULE_NOT_FOUND"`.
-   */
-  function moduleNotFoundError(specifier: string): NodeJS.ErrnoException {
-    const error = new Error(
-      `Cannot find package '${specifier}' imported from /project/cli/build.js`
-    ) as NodeJS.ErrnoException;
-    error.code = "ERR_MODULE_NOT_FOUND";
-    return error;
-  }
-
-  it("classifies a missing vite import", () => {
-    expect(isViteMissing(moduleNotFoundError("vite"))).toBe(true);
-  });
-
-  it("does not classify a missing unrelated package", () => {
-    expect(isViteMissing(moduleNotFoundError("left-pad"))).toBe(false);
-  });
-
-  it("does not classify a module-not-found for a local file path", () => {
-    const error = new Error(
-      "Cannot find module '/project/.mcp-use/build/index.js' imported from /project"
-    ) as NodeJS.ErrnoException;
-    error.code = "ERR_MODULE_NOT_FOUND";
-    expect(isViteMissing(error)).toBe(false);
-  });
-
-  it("does not classify errors with a different code", () => {
-    const error = new Error(
-      "Cannot find package 'vite'"
-    ) as NodeJS.ErrnoException;
-    error.code = "ERR_INVALID_ARG_TYPE";
-    expect(isViteMissing(error)).toBe(false);
-  });
-
-  it("does not classify non-Error values", () => {
-    expect(isViteMissing("nope")).toBe(false);
-    expect(isViteMissing(undefined)).toBe(false);
   });
 });

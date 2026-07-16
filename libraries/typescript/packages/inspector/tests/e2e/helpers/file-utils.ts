@@ -6,7 +6,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** Root of the inspector package (tests/e2e/helpers -> packages/inspector) */
 const inspectorRoot = path.resolve(__dirname, "../../..");
-/** Conformance server root (@mcp-use/server v2 example). */
+/** Conformance server root (mcp-use v2 example). */
 const conformanceRoot = path.resolve(
   inspectorRoot,
   "../server/examples/conformance"

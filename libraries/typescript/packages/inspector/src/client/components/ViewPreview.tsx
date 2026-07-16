@@ -96,6 +96,28 @@ function usePreviewViewport(): void {
   }, []);
 }
 
+/** Expose non-secret preview failures to CDP callers. */
+function usePreviewErrorSignal(
+  bundleRequired: boolean,
+  bundlePresent: boolean
+): void {
+  useEffect(() => {
+    const markRuntimeError = () => {
+      document.body.dataset.viewError = "runtime_error";
+    };
+    if (bundleRequired && !bundlePresent) {
+      document.body.dataset.viewError = "invalid_payload";
+    }
+    window.addEventListener("error", markRuntimeError);
+    window.addEventListener("unhandledrejection", markRuntimeError);
+    return () => {
+      window.removeEventListener("error", markRuntimeError);
+      window.removeEventListener("unhandledrejection", markRuntimeError);
+      delete document.body.dataset.viewError;
+    };
+  }, [bundleRequired, bundlePresent]);
+}
+
 /**
  * Once the renderer signals readiness, wait for fonts.ready then two rAF
  * ticks and flip `body[data-view-ready="true"]` so the screenshot CLI's
@@ -409,6 +431,8 @@ export function ViewPreview() {
   // Bundle is read once at mount. The screenshot CLI sets it via CDP
   // before any document scripts run, so it's stable across renders.
   const bundle = useMemo(() => readPreviewBundle(), []);
+  const bundleRequired = search.get("protocol") === "1";
+  usePreviewErrorSignal(bundleRequired, bundle !== undefined);
 
   const widthOverride = useMemo(() => {
     const raw = search.get("width");
@@ -426,5 +450,6 @@ export function ViewPreview() {
       />
     );
   }
+  if (bundleRequired) return null;
   return <ViewPreviewLive view={view} />;
 }

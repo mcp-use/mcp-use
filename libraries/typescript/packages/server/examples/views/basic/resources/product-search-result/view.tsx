@@ -13,7 +13,7 @@ import {
   useToolContext,
   useViewTheme,
   useViewTool,
-} from "@mcp-use/server/react";
+} from "mcp-use/react";
 
 import "./view.css";
 

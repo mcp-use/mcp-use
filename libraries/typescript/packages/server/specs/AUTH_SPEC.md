@@ -1,6 +1,7 @@
-# @mcp-use/server authorization spec
+# mcp-use v2 authorization contract
 
 **Status:** Direct resource-server mode implemented. OAuth proxy mode is deferred; its design remains in this document.
+**Package:** `mcp-use@2`; imports use `mcp-use` subpaths.
 
 > **Implementation phase note:** OAuth proxy mode is deferred and must not be implemented in the current auth implementation phase. Its detailed future design remains in this document. Direct resource-server mode follows [AUTH_IMPLEMENTATION.md](./AUTH_IMPLEMENTATION.md).
 
@@ -15,8 +16,8 @@ An explicit proxy mode makes mcp-use a local OAuth authorization server for MCP 
 The public constructor field is `oauth`, matching v1 terminology. `auth` is not a public constructor alias.
 
 ```ts
-import { MCPServer } from "@mcp-use/server";
-import { oauthClerkProvider } from "@mcp-use/server/oauth/clerk";
+import { MCPServer } from "mcp-use";
+import { oauthClerkProvider } from "mcp-use/oauth/clerk";
 
 const server = new MCPServer({
   name: "acme-tools",
@@ -31,12 +32,12 @@ const server = new MCPServer({
 
 ## Keep the official SDK behind mcp-use
 
-Consumers import OAuth APIs only from `@mcp-use/server/oauth`. They do not install, version, or import `@modelcontextprotocol/server` directly. It remains a regular dependency of mcp-use, not a consumer-managed peer dependency.
+Consumers import OAuth APIs only from `mcp-use/oauth`. They do not install, version, or import `@modelcontextprotocol/server` directly. It remains a regular dependency of mcp-use, not a consumer-managed peer dependency.
 
 mcp-use does not reimplement protocol types, error classes, or runtime-neutral helpers that already exist. The OAuth entry point re-exports the upstream values unchanged:
 
 ```ts
-// @mcp-use/server/oauth
+// mcp-use/oauth
 export {
   OAuthError,
   OAuthErrorCode,
@@ -69,7 +70,7 @@ import {
   type OAuthAuthInfo,
   type OAuthMetadata,
   type OAuthTokenVerifier,
-} from "@mcp-use/server/oauth";
+} from "mcp-use/oauth";
 ```
 
 ## Define the provider contract
@@ -729,7 +730,7 @@ For direct providers, it serves path-aware protected-resource metadata at `/.wel
 
 No upstream `@modelcontextprotocol/hono` auth feature is required. Beta.3 deliberately places web-standard authorization helpers in server core so they work in Hono, Workers, Deno, Bun, and other `Request`/`Response` hosts.
 
-Hono handles body parsing, configured host validation, and origin validation. mcp-use exports thin ergonomic adapters from `@mcp-use/server/oauth`:
+Hono handles body parsing, configured host validation, and origin validation. mcp-use exports thin ergonomic adapters from `mcp-use/oauth`:
 
 - `bearerAuth(provider, resource)` invokes `requireBearerAuth` and stores `authInfo` in Hono variables.
 - `oauthMetadata(provider, resource)` serves direct-provider `oauthMetadataResponse` and falls through on unrelated routes.
@@ -898,9 +899,9 @@ Expired, consumed, revoked, mismatched, or replayed codes, state, and refresh to
 
 The first release has no `/revoke` endpoint and does not advertise `revocation_endpoint` or claim RFC 7009 support. JTI mappings, token vaults, and refresh families remain internally revocable for security events (refresh-token replay, upstream refresh failure, administrative action), never as a capability exposed to OAuth clients. The proxy does not support private local clients, token exchange, arbitrary upstream client credentials, `private_key_jwt` upstream authentication, wildcard redirect URIs, browser-delivered upstream tokens, or Client ID Metadata Documents in its first release. It must not advertise unsupported capabilities. Relevant standards: [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414), [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728), [RFC 8707](https://www.rfc-editor.org/rfc/rfc8707), [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636), [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700), and [RFC 9207](https://www.rfc-editor.org/rfc/rfc9207).
 
-## Meet the beta.3 dependency prerequisite
+## SDK dependency prerequisite
 
-As of 2026-07-09, `@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` all have `2.0.0-beta.3` releases. The implementation may use coordinated beta.3 pins. This documentation change does not modify `package.json`.
+`@modelcontextprotocol/server`, `@modelcontextprotocol/hono`, and `@modelcontextprotocol/client` are pinned together at `2.0.0-beta.3`.
 
 ## Verify the implementation
 

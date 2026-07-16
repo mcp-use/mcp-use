@@ -1,9 +1,9 @@
-# @mcp-use/server — Views (MCP Apps) spec
+# mcp-use v2 — Views (MCP Apps) contract
 
-**Status:** design contract, pre-implementation. Companion to `SPEC.md` (whose views phase points here) and `CLI_SPEC.md` (the implemented `dev`/`build`/`start` base contract this document extends).
-**Scope:** the views runtime in the server package, view resources and protocol metadata, the React view runtime (`/react` subpath), the zero-codegen typing layer (`ToolRef` / `Register`), and the views half of the `dev`/`build`/`start` contract.
+**Status:** Implemented alpha contract; remaining non-alpha work is explicitly excluded below.
+**Package:** `mcp-use@2`; the browser runtime is exported from `mcp-use/react`.
+**Scope:** the views runtime in `mcp-use`, view resources and protocol metadata, the React view runtime (`mcp-use/react`), the zero-codegen typing layer (`ToolRef` / `Register`), and the views half of the `dev`/`build`/`start` contract.
 **Tracking:** Linear MCP-2601 (Views & MCP Apps + typing), MCP-2180 (widget→view naming).
-**v1 reference:** `packages/mcp-use` (`src/react/`, `src/server/widgets/`) defines *what* views must be able to do, never how. Parity with v1 is the alpha goal; the architecture is not carried over.
 
 ## Decisions at a glance
 
@@ -13,12 +13,12 @@
 4. **Hook-first view data.** The default export mounts when bootstrap starts the connection — before any tool result — and stays mounted for the iframe lifetime; the runtime never spreads props onto it. `useToolContext<Name>()` is the primary data API: a discriminated union over `pending` / `streaming` / `cancelled` / `ready` / `error` that carries a single streaming `toolInput` field (partial args and complete args share the field; last write wins), typed `toolOutput` only on a non-error result with `structuredContent`, plus `content`, view-only `meta`, an optional cancellation `reason`, and an `error` payload on the error branch. Split hooks cover host context and actions; there is deliberately no aggregate hook — v1 `useWidget` migrates onto the split hooks.
 5. **The React runtime builds on `@modelcontextprotocol/ext-apps`** (guest `App` class); the server package **inlines** the few wire constants and emits spec `_meta` itself — no ext-apps import server-side. Bootstrap creates and connects a `McpAppRuntime` that owns connection, retry, capabilities, snapshots, and disposal; the official ext-apps `App` owns MCP Apps protocol behavior; React hooks subscribe to narrow external-store channels via `ViewRuntimeContext`.
 6. **No response helpers — views included.** The no-response-helpers ground rule (`SPEC.md`) applies without exception. View-bound tool handlers return a plain `CallToolResult`: `{ content, structuredContent, _meta? }`. `structuredContent` is typed by the tool's `outputSchema` at the return position (existing `ToolResult<TOutput>` machinery).
-7. **React runtime ships as the `/react` subpath** of this package, with `react` an optional peer — tool-only servers never pay for it.
+7. **React runtime ships as `mcp-use/react`.** `react` and `react-dom` are optional peers owned by the application. Vite and `@vitejs/plugin-react` are regular `mcp-use` dependencies, so a view project adds only React itself.
 8. **Parity with v1 hooks, minus two named gaps** (file upload, cross-session view state) that the MCP Apps spec cannot express — see "Dropped from v1".
 9. **Views build into `.mcp-use/build/views/` and serve under `${basePath}/_mcp-use/`.** One self-contained Vite client build per view (JS + CSS inlined into the synthesized document — zero asset fetches at srcdoc boot so the app initializes before/early-into argument streaming; hosts drop pre-`ui/initialize` notifications per ext-apps AppBridge; matches the Excalidraw MCP App reference design; trade-off: no shared chunks across views), a manifest-driven registration path identical for `start` and serverless, request-scoped origin for public assets / CSP. Hosts obtain the view document only through `resources/read`; the only HTTP surfaces are the public-asset route and (in dev) Vite middleware. v1's `mcp-use/widgets` routes are not carried over — see "Build system & serving".
 10. **One tool binds one view; every binder declares an `outputSchema`; the binder owns all resource facts.** A view has zero or one bound tool; a bound tool has exactly one view. A second tool declaring `view: { name }` for an already-bound view is a **hard error** at registration naming both tools. Every view-bound tool requires an `outputSchema` (hard error otherwise). The single binder owns all resource facts (`description`, `csp`, `permissions`, `domain`, `prefersBorder`). A `view:` naming a missing view directory is a **hard error** (broken `resourceUri`). A view directory no tool binds is a **warning only** (unused-code class: harmless dead weight, and erroring would break the scaffold-view-first authoring order and make feature-flagging a tool off a deploy-breaking action). App-only helper tools remain viewless (`visibility: "app"`, no `view:`) and are called from the view via `useCallTool`; use a separate view resource when another tool needs a rendered result.
 11. **Views register from the manifest as code — no filesystem on any MCP path.** `mcp-use build` bakes the views manifest into a generated wrapper entry that primes the server instance before anything mounts; `resources/read` synthesizes the HTML from manifest data per request. No runtime `fs` read, and deliberately no fallback — an unprimed `view:` is a loud mount-time error. See "Registration mechanism".
-12. **Dev shares the one Vite dev server `mcp-use dev` already runs.** The views client environment joins that server; view-file edits get real Vite HMR with **React Fast Refresh** (component state survives edits — `@vitejs/plugin-react` is an optional peer, auto-injected in dev unless the user's Vite config already registers it), while the server entry keeps the implemented reload-and-swap contract (`CLI_SPEC.md`). Every server handler generation shares one SDK event bus; successful entry reloads publish tool, prompt, and resource list invalidations so connected modern clients refetch from the new stateless handler.
+12. **Dev shares the one Vite dev server `mcp-use dev` already runs.** The views client environment joins that server; view-file edits get real Vite HMR with **React Fast Refresh**. The framework always injects its regular `@vitejs/plugin-react` dependency. User `vite.config.*` files are not loaded. The server entry keeps the reload-and-swap contract (`CLI_SPEC.md`). Every server handler generation shares one SDK event bus; successful entry reloads publish tool, prompt, and resource list invalidations so connected modern clients refetch from the new stateless handler.
 13. **Tool visibility is a top-level `ToolDefinition` field.** `visibility?: "model" | "app"` lives on the tool itself (`server.tool({ name, visibility: "app", … })`), not inside `view:`. Emitted as `_meta.ui.visibility: ["model"] | ["app"]` on `tools/list` for any tool that sets it — view-bound or not — and omitted entirely when unset (host default: callable by the model, visible to the app). The server always lists every registered tool; filtering is host policy (MCP Apps: hosts MUST hide `visibility: ["app"]` tools from the model and MUST reject app `tools/call` for tools without `"app"`). Never on tool results. App-private helper tools (e.g. `save-checkpoint`) are plain tools with `visibility: "app"` and usually no `view:` binding — the view calls them via `useCallTool` and their results return to the caller; a `view:` binding is only for tools whose results should render the view.
 14. **`viewConfig` is immutable pre-render runtime configuration.** A view file may export an optional `viewConfig` alongside the default component. It is normalized and validated before the App is constructed (`autoResize`, `displayModes`). React presentation settings do not belong there. Users compose optional presentation components (`ThemeProvider`, `ViewControls`, their own `StrictMode`/error boundary) directly; bootstrap provides the required top-level error boundary. Every view runtime advertises App tools (`tools: { listChanged: true }`) and serves an empty list before the first `useViewTool` registration.
 
@@ -30,7 +30,7 @@ Used throughout this document. One tool, one view, one schema — every snippet 
 
 ```ts
 // src/index.ts (server entry)
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({ name: "fruit-store", version: "1.0.0" });
@@ -68,7 +68,7 @@ export default server;
 
 ```tsx
 // resources/product-search-result/view.tsx
-import { useToolContext } from "@mcp-use/server/react";
+import { useToolContext } from "mcp-use/react";
 
 export default function ProductSearchResult() {
   const view = useToolContext<"search-fruits">();
@@ -169,12 +169,12 @@ Note the branch is *optional*: a plain `CallToolResult` already degrades on text
 
 ### ext-apps dependency posture
 
-As of the current ext-apps release, no published version supports the v2 SDK — it peer-depends on `@modelcontextprotocol/sdk@^1.x` (v1); the upstream v2-port PRs (#612, #614) were closed unmerged in favor of a not-yet-landed "SDK divorce" (vendoring the `Protocol` shim and types). Consequences:
+`@modelcontextprotocol/ext-apps` is framework implementation machinery and is a regular `mcp-use` dependency when views land. View authors do not install it separately. Its guest runtime is bundled into each self-contained browser view; its server helpers are not used because they target a different server abstraction.
 
-- **Server side: write our own — deliberately, and it is small.** Ext-apps' server helpers (`registerAppTool`, `registerAppResource`, `getUiCapability`) take a v1 `McpServer` we don't have, and they were always thin sugar over registration this framework does itself. Our replacement: inlined wire constants (mimetype, `_meta.ui.*` keys, extension ID), `_meta` emission at tool/resource registration, and a `getUiCapability` equivalent over per-request `extensions["io.modelcontextprotocol/ui"]` — on the order of 100–200 lines. Server-side types use **type-only imports** of the canonical ext-apps types (`McpUiResourcePermissions`, `McpUiResourceCsp`) from `@modelcontextprotocol/ext-apps` — zero runtime reach into ext-apps, so the `SPEC.md` "no v1 SDK imports" ground rule is preserved. Published declarations reference those ext-apps types; tool-only projects without ext-apps installed see `UiPermissions` and `csp` degrade to `any` under `skipLibCheck` — acceptable because those fields only matter for views projects, which declare ext-apps.
-- **View side: reuse essentially the whole guest protocol stack.** The React runtime wraps ext-apps' `App` + `PostMessageTransport`: handshake, capability negotiation, the event system with one-shot replay, all outbound methods (`callServerTool`, `sendMessage`, `openLink`, `requestDisplayMode`, `updateModelContext`, `sendLog`, `downloadFile`, size-changed/auto-resize, teardown), the complete app-tools implementation (`registerTool` — see View tools), style helpers, and the `McpUi*` types. The v1-SDK incompatibility does not bite here: the view never speaks the MCP wire — it speaks apps-spec postMessage to the *host* — so the v1 SDK inside is internal plumbing (`Protocol` base class, types, zod) that Vite tree-shakes into the view's **static browser assets** (the SDK's express/hono/ajv tree is unreachable from `app.ts`). A view built on the current ext-apps release works against a 2026-07-28 server. Our `/react` code is product surface only — hooks, bootstrap, typing layer, presentation components — no protocol code.
+- **Server side: keep the integration small.** Ext-apps' server helpers (`registerAppTool`, `registerAppResource`, `getUiCapability`) take a server abstraction this package does not use. `mcp-use` owns the wire constants (mimetype, `_meta.ui.*` keys, extension ID), metadata emission at tool/resource registration, and capability checks over per-request `extensions["io.modelcontextprotocol/ui"]`. Server-side types use type-only imports of canonical ext-apps types, with no runtime evaluation from server imports.
+- **View side: reuse essentially the whole guest protocol stack.** The React runtime wraps ext-apps' `App` + `PostMessageTransport`: handshake, capability negotiation, the event system with one-shot replay, all outbound methods (`callServerTool`, `sendMessage`, `openLink`, `requestDisplayMode`, `updateModelContext`, `sendLog`, `downloadFile`, size-changed/auto-resize, teardown), the complete app-tools implementation (`registerTool` — see View tools), style helpers, and the `McpUi*` types. The v1-SDK incompatibility does not bite here: the view never speaks the MCP wire — it speaks apps-spec postMessage to the *host* — so the v1 SDK inside is internal plumbing (`Protocol` base class, types, zod) that Vite tree-shakes into the view's **static browser assets** (the SDK's express/hono/ajv tree is unreachable from `app.ts`). A view built on the current ext-apps release works against a 2026-07-28 server. The `mcp-use/react` code is product surface only — hooks, bootstrap, typing layer, presentation components — no protocol code.
 - **Host side (inspector, test harness): reuse `AppBridge` with `client: null`** — its explicit escape hatch for hosts without a v1 `Client`; request handlers (`oncalltool`, `onlistresources`, …) forward to the v2 client stack manually.
-- **Dependency mechanics:** ext-apps (1.4 MB, one hard dep) is an **optional peer** of this package — the `vite` pattern from `CLI_SPEC.md`. View projects declare it (template does); tool-only servers install neither it nor its v1-SDK peer tree (~4.3 MB + express/hono/ajv/jose transitives), keeping the install-budget ground rule honest. Fallback if peer noise warrants: ext-apps' `app-with-deps`/`react-with-deps` bundled entries (cost: zod dedupe). When upstream's SDK divorce lands, the peer disappears and bundles shrink with no API change on our side.
+- **Dependency mechanics:** the regular dependency guarantees that `npm install mcp-use` contains the complete views toolchain. Lazy command chunks and browser-only entry points, not optional installation, keep `start` and tool-only library imports from evaluating Vite, plugin-react, React, or ext-apps. Installed size, evaluated modules/startup, and emitted view artifacts are measured separately.
 
 ---
 
@@ -345,11 +345,11 @@ Resource `_meta.ui` carries author facts from the bound tool's `view:` config pl
 
 ## Build system & serving
 
-Extends `CLI_SPEC.md`'s implemented workspace and command contract (its ground rules hold: `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk, no config file, fixed `.mcp-use/` layout). v1 reference: `packages/cli` `buildWidgets` + `packages/mcp-use/src/server/widgets/*` define what the pipeline must deliver — built assets, a manifest, HTTP serving for public assets, dev HMR — never how. The v1 mechanics (scratch `entry.tsx`/`index.html` files in `cache/`, boot-time origin baking, regex rewriting of built HTML, `window.__getFile` indirection, auto-injected Tailwind) are **not** carried over.
+Extends `CLI_SPEC.md`'s workspace and command contract: `start` and library imports do not evaluate Vite, `dev` and `build` are separate lazy chunks, there is no config file, and `.mcp-use/` has a fixed layout.
 
 ### One self-contained client build per view
 
-`mcp-use build` gains a **client environment** alongside the existing node/SSR build — **one Vite build invocation per discovered view**, each producing a single self-contained ES module. Entries are **virtual modules** (`virtual:mcp-use/views/<name>`, resolved by the views plugin inside `src/cli/`), not scratch files: each imports the runtime's iframe bootstrap from the `/react` runtime and the view module (default export + optional `viewConfig`), and mounts per the Component lifecycle & view data contract (bootstrap creates the runtime, starts connection, mounts React immediately; App tools always advertised). Nothing is written to `cache/` for entries; nothing user-visible is generated.
+`mcp-use build` gains a **client environment** alongside the existing node/SSR build — **one Vite build invocation per discovered view**, each producing a single self-contained ES module. Entries are **virtual modules** (`virtual:mcp-use/views/<name>`, resolved by the views plugin inside `src/cli/`), not scratch files: each imports the iframe bootstrap from `mcp-use/react` and the view module (default export + optional `viewConfig`), and mounts per the Component lifecycle & view data contract (bootstrap creates the runtime, starts connection, mounts React immediately; App tools always advertised). Nothing is written to `cache/` for entries; nothing user-visible is generated.
 
 Each per-view build disables code splitting (`codeSplitting: false` / no shared chunks), sets `cssCodeSplit: false` (one CSS asset), and uses a large `assetsInlineLimit` so imported assets become data URLs inside the bundle. After the build, the CLI reads the emitted JS and CSS text (build-time `fs` is fine) and records them in the manifest as **content**, not paths. Rationale: MCP Apps hosts render the view via `resources/read` into a sandboxed `srcdoc` iframe and stream tool arguments with `ui/notifications/tool-input-partial` while the model generates them; ext-apps' AppBridge does **not** buffer or replay notifications sent before the app completes the `ui/initialize` handshake. A self-contained document boots with zero asset fetches, so the app initializes early enough to catch the stream — matching the Excalidraw MCP App reference design. Trade-off accepted: no shared chunks across views; each view is an independent bundle (React and the runtime are duplicated per view).
 
@@ -366,7 +366,7 @@ Output layout (intermediate build artifacts under `views/<name>/` may remain on 
 
 There are **no HTML files in the build output**: the view document is a pure function of the manifest entry — a minimal shell (`<div id="root">`, inline `<style>` when CSS is present, inline `<script type="module">` with the view JS, plus the request-scoped `__mcpUseViewConfig` config script) — so the runtime synthesizes it per request instead of the build writing it to disk (see "Registration mechanism"). Public-folder assets still need absolute URLs (hosts render via `srcdoc`); those resolve per request. The client build uses Vite's relative `base: "./"` so any residual relative references inside the inlined module resolve from `import.meta.url` if needed. This eliminates v1's entire rewrite layer (three regexes over built HTML + four injected `window.__*` globals) and the document files with it.
 
-**User Vite config:** if the project has a `vite.config.ts`, the client environment resolves it normally and layers the views plugin on top — Tailwind, path aliases, and friends are the user's declaration, not framework magic (v1 silently injected Tailwind v4 + a generated `styles.css`; v2 templates declare `@tailwindcss/vite` themselves). The node/SSR environment ignores user client plugins per standard environment scoping.
+**Vite configuration:** `mcp-use` owns the complete server and views configuration. v2 alpha does not discover or load `vite.config.*`; user aliases, plugins, build overrides, and environment settings have no effect. Framework invariants therefore have one source of truth.
 
 ### Manifest
 
@@ -424,7 +424,7 @@ The same package's CLI (`src/cli/`) imports the symbol directly; the generated w
 ```ts
 // .mcp-use/build/index.js (conceptually; generated, never user-visible)
 import server from "<bundled user entry>";
-import { registerViews } from "@mcp-use/server";
+import { registerViews } from "mcp-use";
 server[registerViews]({
   "product-search-result": { kind: "inline", js: "…", css: "…" },
 });
@@ -481,12 +481,12 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 ### Dev
 
-`mcp-use dev` adds the client environment to the **same Vite dev server** the implemented CLI already runs (`CLI_SPEC.md`'s single process — today it runs the node/SSR environment only, with the Vite server in middleware mode), with its middleware mounted at `${basePath}/_mcp-use/` ahead of the MCP handler. When views exist, Vite `server.origin` is set to the dev server's browsable origin — `http://localhost:<port>` for loopback/wildcard binds, `http://<host>:<port>` otherwise (a wildcard bind address like `0.0.0.0` accepts connections but is not itself a valid request host in every browser) — so imported asset URLs are absolute (srcdoc iframes, Public assets).
+`mcp-use dev` adds the client environment to the **same Vite dev server** as the node/SSR environment (`CLI_SPEC.md`'s single process), with its middleware mounted at `${basePath}/_mcp-use/` ahead of the MCP handler. When views exist, Vite `server.origin` is set to the dev server's browsable origin — `http://localhost:<port>` for loopback/wildcard binds, `http://<host>:<port>` otherwise (a wildcard bind address like `0.0.0.0` accepts connections but is not itself a valid request host in every browser) — so imported asset URLs are absolute (srcdoc iframes, Public assets).
 
 - View documents are synthesized per `resources/read` (same shell, `@vite/client` + the virtual entry served through the middleware — `kind: "external"`); assets flow through Vite transform — no build step, no manifest file. Dev documents therefore boot via Vite module fetches (HMR); catching the very start of an argument stream is best validated against a production build (self-contained inline documents). The in-memory view registry plays the manifest's role, kept current by Vite's watcher: add/remove view directories trigger the entry's existing reload-and-swap — a fresh `MCPServer`, re-primed via the internal API (Registration mechanism, above) — never mutation of a running instance. The next `tools/list`/`resources/list` reflects it, and subscribed modern clients are prompted to refetch by the dev server's shared event bus. The `public/` route serves `<projectRoot>/public` directly (Public assets).
 - **View-file edits get Vite HMR.** This is the client half of the one dev server: view code is pure browser code, so Vite's own HMR channel applies to it. The server entry keeps `CLI_SPEC.md`'s implemented reload-and-swap contract untouched — its reload-not-HMR rule is about the *server* module graph, and views don't change that. Because hosts enforce the resource's `ui.csp.connectDomains` against the HMR websocket, dev priming (`__primeViews(views, { dev: true })`) auto-appends the request-resolved serving origin's websocket variant to `connectDomains` on both `resources/list` and each `resources/read` content item — same origin derivation as `resourceDomains`, production never emits it (Serving, CSP consequence).
 - **HMR means React Fast Refresh, not document reload.** A bare Vite setup has no HMR accept boundary in a view's module graph, so every `view.tsx` edit degrades to `full-reload` — which reloads the srcdoc iframe document and wipes all component state, bridge state, and pending tool results. Three pieces prevent that, all dev-only:
-  - **`@vitejs/plugin-react` provides the refresh boundary.** It is an optional peer of this package (the `vite` pattern, `CLI_SPEC.md`). If the user's Vite config already registers it (detected by the resolved plugin name `vite:react-refresh` — a second instance would double-wrap every component module), that instance wins; otherwise `dev` resolves it from the project and injects it. A project with neither degrades to full-reload behavior with a one-line warning naming the fix — never an error, since views still work.
+  - **`@vitejs/plugin-react` provides the refresh boundary.** It is a regular dependency of `mcp-use` and `dev` injects the framework-owned plugin exactly once.
   - **The virtual entry imports the refresh preamble.** Fast Refresh needs its runtime hooked into the window before any component module evaluates — the job plugin-react's `transformIndexHtml` does for Vite-served HTML, which the synthesized srcdoc document never passes through. When refresh is active, each virtual entry's **first** import is the plugin's own virtual preamble module (`@vitejs/plugin-react/preamble`), so the hook is installed before react-dom or any refresh-wrapped view module runs.
   - **The virtual entry self-accepts.** Dev entries end with `import.meta.hot.accept()`, so an update that propagates past the view module (e.g. a non-component export defeating Fast Refresh's self-accept) re-runs the bootstrap — `bootstrapView` reuses the mounted runtime and React root for the same root element (HMR), warns if normalized `viewConfig` changed (full iframe reload required for config changes), and throws if a second root is targeted while one is mounted — instead of escalating to a document reload. Build entries carry neither the preamble import nor the accept call (production output stays inert).
 - **Server-entry list invalidation:** after a successful handler swap, dev publishes all three list-change events on the process-scoped SDK bus shared by every handler generation. This is deliberately not a registry diff: modern subscribers refetch authoritative lists from the new stateless handler, while failed reloads publish nothing. Pure view-code edits remain on Vite HMR and do not invalidate server lists; adding or removing a view triggers the server reload path above.
@@ -494,7 +494,7 @@ v1 parity: authors drop static files in a project-root `public/` directory and r
 
 ### `start` and serverless
 
-`mcp-use start` imports the built wrapper entry — views arrive already primed with inline JS/CSS (Registration mechanism, above) — and serves public assets: no vite, no discovery, no cli chunk (the public route, document synthesis for `resources/read`, and origin resolution live in the runtime package). Serverless targets get the identical code path: the function entry imports `.mcp-use/build/index.js` and `getHandler()` serves the same routes. The MCP surface needs zero filesystem; **public assets are the one remaining fs-shaped thing**, handled per platform: node/`start` reads `.mcp-use/build/views/public/` directly; Vercel functions have a real fs and need only file tracing (one `vercel.json` `includeFiles` line — the views variant of `examples/vercel` ships it); Cloudflare Workers use Workers Static Assets on the public route (or the `nodejs_compat` `/bundle` VFS via module rules). And the escape hatch works everywhere: the origin override + any CDN/static host in front of `${basePath}/_mcp-use/public/` works unmodified.
+`mcp-use start` imports the built wrapper entry — views arrive already primed with inline JS/CSS (Registration mechanism, above) — and serves public assets without evaluating Vite, discovery, or any unrelated command chunk (the public route, document synthesis for `resources/read`, and origin resolution live in the runtime package). Serverless targets get the identical code path: the function entry imports `.mcp-use/build/index.js` and `getHandler()` serves the same routes. The MCP surface needs zero filesystem; **public assets are the one remaining fs-shaped thing**, handled per platform: node/`start` reads `.mcp-use/build/views/public/` directly; Vercel functions have a real fs and need only file tracing (one `vercel.json` `includeFiles` line — the views variant of `examples/vercel` ships it); Cloudflare Workers use Workers Static Assets on the public route (or the `nodejs_compat` `/bundle` VFS via module rules). And the escape hatch works everywhere: the origin override + any CDN/static host in front of `${basePath}/_mcp-use/public/` works unmodified.
 
 ---
 
@@ -516,7 +516,7 @@ View bundles must never contain server code, so the ref **value** is never impor
 // src/register.d.ts — scaffolded once, committed, never regenerated
 // (the vite-env.d.ts pattern: configuration, not codegen — it lives in the
 // source tree because .mcp-use/ is gitignored and rm -rf-safe, CLI_SPEC.md)
-declare module "@mcp-use/server/react" {
+declare module "mcp-use/react" {
   interface Register {
     tools: typeof import("./index.js");
   }
@@ -524,7 +524,7 @@ declare module "@mcp-use/server/react" {
 ```
 
 ```ts
-// in /react
+// in mcp-use/react
 export interface Register {}  // filled (or not) by the project's register.d.ts
 
 type RegisteredToolsModule = Register extends { tools: infer M } ? M : Record<never, never>;
@@ -608,7 +608,7 @@ type ToolContextHandle<Name extends keyof RegisteredTools> =
 
 Keying by tool name (not view directory name) is deliberate: view names exist only in the filesystem/manifest, which type space cannot see without codegen — tool names exist as literal types on exported refs. The type parameter is the author's declaration of which tool delivers results to this view. It is not enforced in type space (a wrong literal compiles against the wrong schema); the runtime binding checks at mount/build (decision 10) are the enforcement. Unbound views (inspector-preview only) never reach `"ready"` — components branch on hook state and declare no required result payload.
 
-**Note for cutover:** the `declare module` specifier must match the published import path — it becomes `"mcp-use/react"` when the package renames. The scaffolded file is the only thing that changes.
+The scaffolded `declare module` specifier is always the published `"mcp-use/react"` path.
 
 ### Fallback ladder
 
@@ -621,15 +621,15 @@ A forgotten `export const` silently drops that one tool to rung 3/4 — document
 
 ### Typegen, demoted
 
-Nothing generates types during `dev`, `build`, or `start` — v1's run-the-server generator (`tool-registry-generator.ts`, `zod-to-ts.ts`) is not ported, and the implemented CLI has no typegen hooks to remove. `mcp-use typegen` (+ `mcp-use check` for CI freshness) is the explicit secondary mode, for consumers with no compile-time path to the server source; if/when built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Not an alpha deliverable.
+Nothing generates types during `dev`, `build`, or `start`. `mcp-use typegen` (+ `mcp-use check` for CI freshness) is the explicit secondary mode for consumers with no compile-time path to the server source; if built, it is a TS-checker-based static extractor (reads resolved `ToolRef` types; never executes user code), defaulting output to `.mcp-use/generated/`. Typegen is not part of the alpha contract.
 
-Since v2 `create-mcp-use-app` templates don't exist yet, the handwritten example in this package (planned `examples/views/basic`) is the reference for the `register.d.ts` + exported-refs pattern.
+`create-mcp-use-app` remains a separate zero-runtime-dependency package. Its view templates emit the `register.d.ts` + exported-refs pattern and install `mcp-use`, `react`, and `react-dom`; they do not install Vite, `@vitejs/plugin-react`, `@modelcontextprotocol/ext-apps`, or `@mcp-use/inspector`.
 
 ---
 
-## React runtime (`/react` subpath)
+## React runtime (`mcp-use/react`)
 
-`@mcp-use/server/react` (→ `mcp-use/react` at cutover). Browser-only code built on the ext-apps guest `App` (one instance per iframe document, connected once via `PostMessageTransport`); `react` and `react-dom` are optional peers; importing the subpath from server code is unsupported. The v1 hook *surface* is kept (renamed); the v1 transport guts (three-provider selection, `window.openai` branch, hand-rolled `McpAppsBridge`) are not.
+`mcp-use/react` is browser-only code built on the ext-apps guest `App` (one instance per iframe document, connected once via `PostMessageTransport`); `react` and `react-dom` are optional peers; importing the subpath from server code is unsupported. The v1 hook *surface* is kept (renamed); the v1 transport guts (three-provider selection, `window.openai` branch, hand-rolled `McpAppsBridge`) are not.
 
 ### Runtime architecture
 
@@ -637,7 +637,7 @@ Ownership splits three ways:
 
 - **`McpAppRuntime`** — connection, retry (monotonically increasing generation numbers so late completions from older generations never replace the current App), capabilities, snapshots (tool / host / theme / display channels), stable actions, and disposal. Each runtime owns one `ModelContextStore`.
 - **ext-apps `App`** — MCP Apps protocol behavior (handshake, events, outbound methods, tool registry).
-- **React hooks** — subscribe to narrow external-store channels via `ViewRuntimeContext` (no default singleton). Hooks used outside a bootstrap-mounted view throw: `@mcp-use/server/react hooks require a browser view mounted by bootstrapView`.
+- **React hooks** — subscribe to narrow external-store channels via `ViewRuntimeContext` (no default singleton). Hooks used outside a bootstrap-mounted view throw: `mcp-use/react hooks require a browser view mounted by bootstrapView`.
 
 **Bootstrap** (`bootstrapView(viewModule)`):
 
@@ -811,9 +811,9 @@ Contract:
 - **Progressive enhancement only:** no host capability promises app-tool support; hosts that support it list/call, others ignore. Registration is unconditional and cheap; views must not depend on view tools being invoked.
 - **Channel note:** a view tool's result (`content`/`structuredContent`) flows host→model — the third explicit view→model channel (alongside `updateModelContext` and `ui/message`), distinguished by being *model-initiated*.
 
-### `/react` API reference
+### `mcp-use/react` API reference
 
-The complete alpha surface. Everything here is exported from `@mcp-use/server/react`; types marked *vendored* alias the ext-apps `spec.types.ts` definitions (carried with attribution, per the dependency posture).
+The complete alpha surface. Everything here is exported from `mcp-use/react`; types marked *vendored* alias the ext-apps `spec.types.ts` definitions (carried with attribution, per the dependency posture).
 
 **Types.**
 
@@ -999,7 +999,7 @@ import {
   ThemeProvider,
   useSendSizeChanged,
   type ViewConfig,
-} from "@mcp-use/server/react";
+} from "mcp-use/react";
 import { useEffect, useRef } from "react";
 
 export const viewConfig = {
@@ -1099,7 +1099,7 @@ import {
   useSendFollowUp,
   useToolContext,
   useViewTool,
-} from "@mcp-use/server/react";
+} from "mcp-use/react";
 
 export default function ProductSearchResult() {
   return (
@@ -1242,11 +1242,11 @@ Everything result-shaped enters through `useToolContext` (typed by the server's 
 
 ## CLI integration
 
-The full build/serve contract is "Build system & serving", above; it extends the **implemented** `CLI_SPEC.md` (which scoped views out) and its ground rules hold — reload-not-HMR for the server entry, `start` pays zero toolchain cost, vite reachable only through the lazy `dev`/`build` chunk. Command summary:
+The full build/serve contract is "Build system & serving", above; it extends `CLI_SPEC.md` and its ground rules hold — reload-not-HMR for the server entry, `start` and library imports do not evaluate Vite, and `dev` and `build` remain separate lazy chunks. Command summary:
 
 - **`mcp-use dev`:** adds the Vite client environment to the existing dev server; public assets and Vite module graph serve through its middleware at `${basePath}/_mcp-use/`. View-file edits get Vite's own HMR (pure client code, sharing the one Vite dev server); server-entry edits follow the existing reload contract and invalidate all three primitive lists over the shared SDK event bus (decision 12). No typegen hooks anywhere.
 - **`mcp-use build`:** one client-environment build over all views into `.mcp-use/build/views/`; writes the manifest `views` map (tooling copy) and bakes it into the generated wrapper entry (runtime copy — Registration mechanism); runs the binding checks (missing view, missing `outputSchema`, duplicate view binding → errors naming both tools; unbound view → warning).
-- **`mcp-use start`:** imports the built wrapper entry (views arrive primed) and serves public assets; no vite, no discovery, no runtime manifest read. View documents are obtained only through `resources/read`.
+- **`mcp-use start`:** imports the built wrapper entry (views arrive primed) and serves public assets without evaluating Vite or unrelated command chunks; no discovery or runtime manifest read. View documents are obtained only through `resources/read`.
 
 ## Testing
 

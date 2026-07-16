@@ -10,7 +10,7 @@ import type { DisplayMode } from "../types/host-types.js";
  *
  * @example
  * ```tsx
- * import type { ViewConfig } from "@mcp-use/server/react";
+ * import type { ViewConfig } from "mcp-use/react";
  *
  * export const viewConfig = {
  *   autoResize: false,

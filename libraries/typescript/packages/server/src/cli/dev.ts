@@ -13,27 +13,18 @@
  * All handler generations share one event bus, so a successful swap invalidates
  * the tool, prompt, and resource lists for subscribed development clients.
  *
- * `vite` is an optional peer dependency of `@mcp-use/server` (never a regular
- * dependency): this module is only ever reached through the bin's dynamic
- * `import("./cli/index.js")`, so a missing install surfaces as a rejected
- * promise there (classified by `bin/main.ts`'s `isViteMissing`), not at
- * package load time.
+ * This module is reached only through the bin's dedicated dynamic dev import,
+ * so library consumers and production startup never evaluate Vite.
  */
 
 import { spawn } from "node:child_process";
 import { createServer as createNodeServer } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { existsSync } from "node:fs";
-import { createRequire } from "node:module";
 import { networkInterfaces } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-import {
-  createServer,
-  createServerModuleRunner,
-  loadConfigFromFile,
-  type PluginOption,
-} from "vite";
+import react from "@vitejs/plugin-react";
+import { createServer, createServerModuleRunner } from "vite";
 import { getRequestListener } from "@hono/node-server";
 import {
   InMemoryServerEventBus,
@@ -47,7 +38,6 @@ import {
 import { resolvePort as resolvePreferredPort } from "../bin/args.js";
 import { discoverEntry } from "./entry.js";
 import { resolvePort } from "./port.js";
-import { resolveUserViteConfig } from "./vite-config.js";
 import { createDevApiHandler } from "./dev-api.js";
 import { createTunnelManager } from "./tunnel.js";
 import { resolveWorkspacePaths } from "./workspace.js";
@@ -66,7 +56,7 @@ type FetchHandler = (request: Request) => Promise<Response>;
 /**
  * The duck-typed shape the entry's default export must satisfy: an
  * `MCPServer` instance (checked structurally so the runner may load its own
- * copy of `@mcp-use/server`).
+ * copy of `mcp-use`).
  */
 interface ServerLike {
   getHandler(options?: { bus?: ServerEventBus }): FetchHandler;
@@ -179,91 +169,6 @@ function lanAddress(): string | undefined {
   return undefined;
 }
 
-/** Collect resolved plugin names from a Vite `plugins` config value. */
-async function collectPluginNames(
-  option: unknown,
-  out: string[]
-): Promise<void> {
-  const value = await option;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      await collectPluginNames(item, out);
-    }
-    return;
-  }
-  if (
-    value !== null &&
-    typeof value === "object" &&
-    typeof (value as { name?: unknown }).name === "string"
-  ) {
-    out.push((value as { name: string }).name);
-  }
-}
-
-/** Outcome of {@link resolveReactRefresh}. */
-interface ReactRefreshResolution {
-  /**
-   * Plugins to add to the dev server — `[@vitejs/plugin-react]` when the
-   * framework injects it, empty when the user config already registers it (a
-   * second instance would double-wrap every component module).
-   */
-  plugins: PluginOption[];
-  /** Whether Fast Refresh (and its virtual preamble module) is available. */
-  active: boolean;
-}
-
-/**
- * Make React Fast Refresh available for view modules.
- *
- * Views are React components inside sandboxed srcdoc iframes: without Fast
- * Refresh every `view.tsx` edit falls back to Vite's `full-reload`, which
- * reloads the iframe document and wipes all component and bridge state. The
- * user's Vite config wins when it already registers `@vitejs/plugin-react`;
- * otherwise the plugin is resolved from the project (it is an optional peer
- * of this package, exactly like `vite` itself) and injected. A project
- * without it degrades to full-reload behavior with a one-line warning.
- */
-async function resolveReactRefresh(
-  cwd: string,
-  userViteConfig: string | false
-): Promise<ReactRefreshResolution> {
-  if (userViteConfig !== false) {
-    try {
-      const loaded = await loadConfigFromFile(
-        { command: "serve", mode: "development" },
-        userViteConfig,
-        cwd
-      );
-      const names: string[] = [];
-      await collectPluginNames(loaded?.config.plugins, names);
-      // "vite:react-refresh" is @vitejs/plugin-react's stable inner plugin
-      // name — present iff the user config already provides Fast Refresh.
-      if (names.includes("vite:react-refresh")) {
-        return { plugins: [], active: true };
-      }
-    } catch {
-      // A broken config file fails loudly in createServer below; here it
-      // only means we could not inspect the plugin list.
-    }
-  }
-
-  try {
-    const projectRequire = createRequire(join(cwd, "package.json"));
-    const resolved = projectRequire.resolve("@vitejs/plugin-react");
-    const mod = (await import(pathToFileURL(resolved).href)) as {
-      default: () => PluginOption;
-    };
-    return { plugins: [mod.default()], active: true };
-  } catch {
-    console.warn(
-      "[mcp-use] @vitejs/plugin-react is not installed — view edits will " +
-        "reload the whole view instead of hot-updating in place. Add it to " +
-        "devDependencies to enable React Fast Refresh."
-    );
-    return { plugins: [], active: false };
-  }
-}
-
 /**
  * Merge `Origin` into an existing `Vary` header without duplicating it.
  *
@@ -371,8 +276,8 @@ function serverFrom(moduleExports: Record<string, unknown>): ServerLike {
  * CLI_SPEC.md), or if `vite` is not installed (`mcp-use dev` requires it as a
  * devDependency).
  *
- * @internal Reached only via the bin's `import("./cli/index.js")`
- * dispatch (`bin/main.ts`) — not re-exported from the package's "." entry.
+ * @internal Reached only via the bin's dedicated dev command chunk — not
+ * re-exported from the package's "." entry.
  */
 export async function runDev(options: DevOptions): Promise<void> {
   const host = options.host ?? "127.0.0.1";
@@ -423,7 +328,6 @@ export async function runDev(options: DevOptions): Promise<void> {
   // stays live for request routing and re-priming, but a project that starts
   // with zero views needs a dev-server restart to pick up its first view.
   const viewsAtStartup = currentViews.length > 0;
-  const userViteConfig = resolveUserViteConfig(options.cwd);
 
   // The bind address is not always a browsable address: `0.0.0.0`/`::`
   // accept connections on every interface but are not valid request hosts
@@ -436,13 +340,9 @@ export async function runDev(options: DevOptions): Promise<void> {
     browsableHost.includes(":") ? `[${browsableHost}]` : browsableHost
   }:${port}`;
 
-  const reactRefresh = viewsAtStartup
-    ? await resolveReactRefresh(options.cwd, userViteConfig)
-    : { plugins: [], active: false };
-
   const vite = await createServer({
     root: options.cwd,
-    configFile: viewsAtStartup ? userViteConfig : false,
+    configFile: false,
     envFile: false,
     logLevel: "warn",
     cacheDir: paths.cache,
@@ -450,9 +350,9 @@ export async function runDev(options: DevOptions): Promise<void> {
       ? [
           mcpUseViewsPlugin({
             getViews: () => currentViews,
-            dev: { reactRefresh: reactRefresh.active },
+            dev: { reactRefresh: true },
           }),
-          ...reactRefresh.plugins,
+          react(),
         ]
       : [],
     server: {

@@ -1,4 +1,4 @@
-import { useToolContext, useViewTheme, ToolError } from "@mcp-use/server/react";
+import { useToolContext, useViewTheme, ToolError } from "mcp-use/react";
 
 import "./view.css";
 

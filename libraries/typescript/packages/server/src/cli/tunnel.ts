@@ -2,7 +2,7 @@
  * Tunnel lifecycle for `mcp-use dev` — spawns `@mcp-use/tunnel` via `npx`,
  * parses the public URL from stdout, persists the subdomain under
  * `.mcp-use/state/tunnel.json`, and releases it through the tunnel API before
- * reuse (matching v1 `packages/cli` conventions).
+ * reuse.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";

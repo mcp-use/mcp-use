@@ -1,4 +1,4 @@
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const server = new MCPServer({ name: "fixture-basic", version: "1.0.0" });

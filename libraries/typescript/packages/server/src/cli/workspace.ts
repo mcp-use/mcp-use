@@ -6,10 +6,7 @@
  *
  * The layout is a fixed convention, not configuration: there is deliberately
  * no config file and no `outDir` knob (runtime/project configuration lives on
- * the `MCPServer` constructor). This module mirrors v1's
- * `resolveWorkspacePaths` (`packages/mcp-use/src/server/config/paths.ts`) —
- * same names, re-declared here because this toolchain must not depend on the
- * old `mcp-use` package.
+ * the `MCPServer` constructor).
  *
  * This module is PURE: it only derives path strings (no filesystem access).
  *
@@ -21,7 +18,7 @@
  * ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md)
  * ├─ cache/        ← disposable dev/build scratch
  * ├─ state/        ← mutable runtime state (e.g. tunnel.json)
- * └─ cloud/        ← cloud linkage (link.json) — reserved; future
+ * └─ cloud/        ← cloud linkage (link.json)
  * ```
  *
  * `build/` must contain NO mutable runtime state (that is `state/`'s job) so

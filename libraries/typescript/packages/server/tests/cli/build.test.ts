@@ -95,7 +95,7 @@ describe("runBuild", () => {
     // packages:"external" semantics — bare imports stay external, only the
     // user's source is bundled.
     const code = readFileSync(entryFile, "utf8");
-    expect(code).toMatch(/from ["']@mcp-use\/server["']/);
+    expect(code).toMatch(/from ["']mcp-use["']/);
     expect(code).toMatch(/from ["']zod["']/);
 
     // The built entry runs under plain node and default-exports the

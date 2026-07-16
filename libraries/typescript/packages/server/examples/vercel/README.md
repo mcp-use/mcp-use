@@ -1,4 +1,4 @@
-# `@mcp-use/server` on Vercel
+# `mcp-use` on Vercel
 
 A minimal MCP server deployed as a Vercel serverless Function, demonstrating
 the framework's stateless design end to end.

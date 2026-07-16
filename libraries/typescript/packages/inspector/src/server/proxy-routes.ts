@@ -25,7 +25,12 @@ export function registerInspectorProxyRoutes(
   const mountOAuth = config?.oauth !== false;
 
   app.get(p("/inspector/health"), (c) => {
-    return c.json({ status: "ok", timestamp: new Date().toISOString() });
+    return c.json({
+      status: "ok",
+      protocol: "mcp-use-inspector-preview",
+      version: 1,
+      capabilities: ["view-preview"],
+    });
   });
 
   mountMcpProxy(app, {

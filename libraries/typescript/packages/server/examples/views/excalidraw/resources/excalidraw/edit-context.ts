@@ -1,4 +1,4 @@
-import { modelContext } from "@mcp-use/server/react";
+import { modelContext } from "mcp-use/react";
 
 const DEBOUNCE_MS = 2000;
 let timer: ReturnType<typeof setTimeout> | null = null;

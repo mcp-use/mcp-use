@@ -1,6 +1,6 @@
 # WorkOS AuthKit example
 
-This example secures an `@mcp-use/server` MCP endpoint with WorkOS AuthKit.
+This example secures an `mcp-use` MCP endpoint with WorkOS AuthKit.
 It exposes one read-only tool, `get-user-info`, which returns the verified
 WorkOS user identity plus the token's authorization metadata. It never returns
 the bearer token.

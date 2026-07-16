@@ -394,9 +394,9 @@ export class MCPServer<TUser = never> {
    * export default { fetch: handler };
    * ```
    */
-  getHandler(options: { bus?: ServerEventBus } = {}): (
-    request: Request
-  ) => Promise<Response> {
+  getHandler(
+    options: { bus?: ServerEventBus } = {}
+  ): (request: Request) => Promise<Response> {
     const { app } = this.#ensureMounted("handler", undefined, options.bus);
     return async (request) => app.fetch(request);
   }
@@ -685,7 +685,11 @@ export class MCPServer<TUser = never> {
           if (c.req.method === "GET" || c.req.method === "HEAD") {
             return await next();
           }
-          return originValidation(origins ?? hosts)(c, next);
+          const validate = originValidation(origins ?? hosts);
+          return validate(
+            c as Parameters<typeof validate>[0],
+            next as Parameters<typeof validate>[1]
+          );
         });
       } else {
         // Host validation off: the SDK handler parses JSON itself when
@@ -695,7 +699,11 @@ export class MCPServer<TUser = never> {
             if (c.req.method === "GET" || c.req.method === "HEAD") {
               return await next();
             }
-            return originValidation(origins)(c, next);
+            const validate = originValidation(origins);
+            return validate(
+              c as Parameters<typeof validate>[0],
+              next as Parameters<typeof validate>[1]
+            );
           });
         }
         if (mode === "listen") {

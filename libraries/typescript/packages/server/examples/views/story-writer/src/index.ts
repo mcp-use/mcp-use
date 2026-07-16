@@ -4,7 +4,7 @@
  * Follows the CLI entry contract: default-export the MCPServer instance;
  * `mcp-use dev` / `build` / `start` own the socket and view priming.
  */
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const BASE_PATH = "/mcp";

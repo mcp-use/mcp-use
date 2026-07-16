@@ -1,6 +1,6 @@
 # Keycloak direct-auth example
 
-This example runs `@mcp-use/server` as an OAuth resource server. It verifies
+This example runs `mcp-use` as an OAuth resource server. It verifies
 Keycloak access tokens locally against the realm's JWKS, then exposes one
 read-only MCP tool:
 

@@ -6,7 +6,7 @@
  */
 
 import { serve, type ServerType } from "@hono/node-server";
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { Hono } from "hono";
 import { z } from "zod";
 

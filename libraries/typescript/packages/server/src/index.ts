@@ -1,5 +1,5 @@
 /**
- * `@mcp-use/server` — MCP server framework on the official v2 SDK and Hono.
+ * `mcp-use` — MCP server framework on the official v2 SDK and Hono.
  *
  * Greenfield rebuild of the mcp-use server package against the stateless
  * 2026-07-28 MCP protocol. See specs/SPEC.md for the phase plan and API contract.
@@ -11,12 +11,6 @@ export type { MountMcpOptions } from "./mount-mcp.js";
 export { registerViews } from "./views/index.js";
 export { requestLogger } from "./logging.js";
 export type { LoggingOptions, LogLevel } from "./logging.js";
-
-/**
- * Back-compat: {@link MCPClient} from the optional `@mcp-use/client` peer.
- * Loaded via dynamic import; missing peer throws an install hint on use.
- */
-export { MCPClient, importMcpClient } from "./client.js";
 
 /**
  * Wire result shapes (re-exported from the SDK): callbacks return these raw

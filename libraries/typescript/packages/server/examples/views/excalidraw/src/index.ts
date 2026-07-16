@@ -5,7 +5,7 @@
  * `mcp-use dev` / `build` / `start` own the socket and view priming.
  */
 import { deflateSync } from "node:zlib";
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 import { RECALL_CHEAT_SHEET } from "./cheat-sheet.js";

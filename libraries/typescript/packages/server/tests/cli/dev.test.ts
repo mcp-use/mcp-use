@@ -121,8 +121,8 @@ async function startDev(
 function writeOAuthEntry(cwd: string, basePath = "/mcp"): void {
   writeFileSync(
     join(cwd, "src", "index.ts"),
-    `import { MCPServer } from "@mcp-use/server";
-import { oauthCustomProvider } from "@mcp-use/server/oauth";
+    `import { MCPServer } from "mcp-use";
+import { oauthCustomProvider } from "mcp-use/oauth";
 
 const oauth = oauthCustomProvider({
   createTokenVerifier: (resource) => ({
@@ -301,7 +301,7 @@ export default server;`
     writeFileSync(
       entry,
       withCatalog.replace(
-        /server\.tool\(\n  \{ name: "subtract"[\s\S]*?\n\);\nserver\.prompt\(/,
+        /server\.tool\(\n {2}\{ name: "subtract"[\s\S]*?\n\);\nserver\.prompt\(/,
         "server.prompt("
       )
     );

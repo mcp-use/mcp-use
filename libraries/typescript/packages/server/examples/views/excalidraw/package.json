@@ -1,9 +1,9 @@
 {
-  "name": "@mcp-use/server-example-excalidraw",
+  "name": "mcp-use-example-excalidraw",
   "type": "module",
   "version": "0.0.0",
   "private": true,
-  "description": "Excalidraw MCP Apps views example ported to @mcp-use/server.",
+  "description": "Excalidraw MCP Apps views example ported to mcp-use.",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
-    "@mcp-use/server": "workspace:*",
+    "mcp-use": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
     "morphdom": "^2.7.8",
     "react": "^19.2.4",

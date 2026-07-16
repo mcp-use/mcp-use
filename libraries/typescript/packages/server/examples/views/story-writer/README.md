@@ -67,7 +67,7 @@ pnpm build && pnpm start
 
 ```ts
 // src/tools.d.ts
-declare module "@mcp-use/server/react" {
+declare module "mcp-use/react" {
   interface Register {
     tools: typeof import("./index.js");
   }
@@ -85,5 +85,5 @@ Export the tool ref from `src/index.ts` (`export const writeStory = …`). Then
 pnpm typecheck
 ```
 
-Requires a built `@mcp-use/server` (`pnpm build` in `packages/server`) so
+Requires a built `mcp-use` (`pnpm build` in `packages/server`) so
 `dist/react/index.d.ts` resolves.

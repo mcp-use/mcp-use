@@ -266,23 +266,17 @@ export default [
   },
   // CLI packages
   {
-    files: ["packages/cli/**/*.ts", "packages/create-mcp-use-app/**/*.ts"],
+    files: [
+      "packages/create-mcp-use-app/**/*.ts",
+      "packages/server/src/bin/**/*.ts",
+      "packages/server/src/commands/**/*.ts",
+    ],
     rules: {
       "no-console": "off",
       "no-process-exit": "off",
     },
   },
-  // mcp-use package (source files only, excludes config/test files)
-  {
-    files: ["packages/mcp-use/src/**/*.ts", "packages/mcp-use/index.ts"],
-    rules: {
-      "import/no-extraneous-dependencies": [
-        "error",
-        { devDependencies: false },
-      ],
-    },
-  },
-  // @mcp-use/server (v2 greenfield, includes the folded-in dev/build
+  // mcp-use (includes the folded-in CLI and dev/build
   // toolchain under src/cli/) — strictest type safety, no escape hatches.
   // `any` is banned outright; `unknown` is allowed only at real boundaries
   // and must be narrowed before use (the no-unsafe-* rules enforce this).

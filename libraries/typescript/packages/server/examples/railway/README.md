@@ -1,6 +1,6 @@
 # Railway example
 
-`@mcp-use/server` deployed as a long-lived Node process, the way Railway (or
+`mcp-use` deployed as a long-lived Node process, the way Railway (or
 any container/VM host without a serverless invocation model) runs an app.
 
 ## What this demonstrates
@@ -49,7 +49,7 @@ any container/VM host without a serverless invocation model) runs an app.
 pnpm dev
 ```
 
-This runs `mcp-use dev` (the dev/build toolchain built into `@mcp-use/server`,
+This runs `mcp-use dev` (the dev/build toolchain built into `mcp-use`,
 on top of `vite` as a devDependency): it imports `src/index.ts`,
 serves the exported server on `127.0.0.1:3000` (no `RAILWAY_PUBLIC_DOMAIN` is
 set locally), and reloads the entry on file change. Or exercise the

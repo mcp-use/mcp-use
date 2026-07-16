@@ -1,13 +1,10 @@
 /**
  * The `mcp-use` dev/build toolchain, built on Vite.
  *
- * Implements `mcp-use build` and `mcp-use dev`; `src/bin/main.ts` dispatches
- * to {@link runBuild} and {@link runDev} via a dynamic `import("./cli/index.js")`
- * so nothing on the `start`/library import path ever evaluates this module
- * (and therefore never evaluates Vite — see `specs/CLI_SPEC.md` § Package
- * layout & dependency rules). `vite` itself is an optional peer dependency:
- * it is imported lazily inside {@link runBuild}/{@link runDev} so a missing
- * install fails with an actionable hint instead of at module load time.
+ * Shared source exports for CLI tests and internal tooling. The published bin
+ * dispatches `dev` and `build` through separate `src/commands/*` entries so
+ * neither command, production startup, nor library imports evaluate unrelated
+ * Vite code.
  *
  * @packageDocumentation
  */

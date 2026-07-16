@@ -1,9 +1,8 @@
 {
-  "name": "@mcp-use/server",
+  "name": "mcp-use",
   "type": "module",
   "version": "2.0.0-alpha.0",
-  "private": true,
-  "description": "MCP server framework built on the official v2 SDK (2026-07-28 stateless protocol) and Hono. Greenfield rebuild of the mcp-use server package; renamed to `mcp-use` at v2 cutover.",
+  "description": "MCP framework and CLI built on the official v2 SDK",
   "author": "mcp-use, Inc.",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
@@ -77,55 +76,42 @@
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",
+    "@mcp-use/client": "workspace:*",
+    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@modelcontextprotocol/hono": "2.0.0-beta.3",
     "@modelcontextprotocol/server": "2.0.0-beta.3",
+    "@vitejs/plugin-react": "^6.0.3",
     "hono": "^4.12.27",
-    "jose": "^6.1.3"
+    "jose": "^6.1.3",
+    "vite": "^8.0.16"
   },
   "peerDependencies": {
-    "@mcp-use/client": ">=2.0.0-alpha.0",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
-    "@vitejs/plugin-react": "^6.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "vite": "^8.0.0"
+    "react-dom": "^19.0.0"
   },
   "peerDependenciesMeta": {
-    "@mcp-use/client": {
-      "optional": true
-    },
-    "@modelcontextprotocol/ext-apps": {
-      "optional": true
-    },
-    "@vitejs/plugin-react": {
-      "optional": true
-    },
     "react": {
       "optional": true
     },
     "react-dom": {
       "optional": true
-    },
-    "vite": {
-      "optional": true
     }
   },
   "devDependencies": {
-    "@mcp-use/client": "workspace:*",
-    "@mcp-use/server": "workspace:*",
     "@modelcontextprotocol/client": "2.0.0-beta.3",
-    "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.3",
     "happy-dom": "^20.10.6",
+    "mcp-use": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "typescript": "7.0.1-rc",
-    "vite": "^8.0.16",
     "vitest": "^4.1.9",
     "zod": "^4.4.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

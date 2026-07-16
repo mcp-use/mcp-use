@@ -1,6 +1,6 @@
 # MCP Apps views examples
 
-Sibling examples for MCP Apps views with `@mcp-use/server`:
+Sibling examples for MCP Apps views with `mcp-use`:
 
 - [`basic/`](./basic/) — fruit store: default `viewConfig`, `ThemeProvider` /
   `ViewControls`, typed hooks, `useCallTool` error narrowing, `useViewTool`

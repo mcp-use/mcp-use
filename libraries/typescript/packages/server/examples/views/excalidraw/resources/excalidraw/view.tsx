@@ -26,7 +26,7 @@ import {
   useOpenExternal,
   useToolContext,
   type ViewConfig,
-} from "@mcp-use/server/react";
+} from "mcp-use/react";
 import { initPencilAudio, playStroke } from "./pencil-audio.js";
 import {
   captureInitialElements,

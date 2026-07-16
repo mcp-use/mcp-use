@@ -1,5 +1,5 @@
-import { MCPServer } from "@mcp-use/server";
-import { oauthKeycloakProvider } from "@mcp-use/server/oauth/keycloak";
+import { MCPServer } from "mcp-use";
+import { oauthKeycloakProvider } from "mcp-use/oauth/keycloak";
 import { z } from "zod";
 
 const getUserInfoOutputSchema = z.object({

@@ -7,17 +7,15 @@
  * wrapper entry that primes views before re-exporting the server (VIEWS_SPEC.md §
  * Build system).
  *
- * `vite` is an optional peer dependency of `@mcp-use/server` (never a regular
- * dependency): this module is only ever reached through the bin's dynamic
- * `import("./cli/index.js")`, so a missing install surfaces as a rejected
- * promise there (classified by `bin/main.ts`'s `isViteMissing`), not at
- * package load time.
+ * This module is reached only through the bin's dedicated dynamic build
+ * import, so library consumers and production startup never evaluate Vite.
  */
 
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
+import react from "@vitejs/plugin-react";
 import { build } from "vite";
 
 import { discoverEntry } from "./entry.js";
@@ -30,7 +28,6 @@ import {
   type DiscoveredView,
 } from "./views.js";
 import { resolveWorkspacePaths, type BuildManifest } from "./workspace.js";
-import { resolveUserViteConfig } from "./vite-config.js";
 import type { ViewsManifest } from "../views/types.js";
 
 /** Fixed filename of the emitted server entry inside `.mcp-use/build/`. */
@@ -78,7 +75,7 @@ async function writeWrapperEntry(
     wrapperPath,
     [
       `import server from ${JSON.stringify(userEntry)};`,
-      `import { registerViews } from "@mcp-use/server";`,
+      `import { registerViews } from "mcp-use";`,
       `server[registerViews](${manifestJson});`,
       `export default server;`,
       "",
@@ -92,7 +89,7 @@ async function writeWrapperEntry(
  * text into an inline manifest entry.
  *
  * @param view - Discovered view to build.
- * @param options - Project paths and Vite config.
+ * @param options - Project paths.
  * @param emptyOutDir - Whether to wipe the views output directory first.
  */
 async function buildInlineView(
@@ -101,17 +98,16 @@ async function buildInlineView(
     cwd: string;
     cacheDir: string;
     viewsOutDir: string;
-    userViteConfig: string | false;
   }
 ): Promise<ViewsManifest[string]> {
   const viewOutDir = join(options.viewsOutDir, view.name);
   const clientResult = await build({
     root: options.cwd,
-    configFile: options.userViteConfig,
+    configFile: false,
     envFile: false,
     logLevel: "warn",
     cacheDir: options.cacheDir,
-    plugins: [mcpUseViewsPlugin({ getViews: () => [view] })],
+    plugins: [react(), mcpUseViewsPlugin({ getViews: () => [view] })],
     build: {
       outDir: viewOutDir,
       emptyOutDir: true,
@@ -197,20 +193,16 @@ async function buildInlineView(
  * users run `tsc --noEmit` via their own script.
  *
  * @param options - Project root and optional entry override.
- * @throws If no entry is found (see {@link discoverEntry}), or if `vite` is
- * not installed (`mcp-use build` requires it as a devDependency) — the
- * `import("vite")` rejection propagates to the bin's dispatch boundary,
- * which classifies it and prints the install hint.
+ * @throws If no entry is found (see {@link discoverEntry}) or the build fails.
  *
- * @internal Reached only via the bin's `import("./cli/index.js")`
- * dispatch (`bin/main.ts`) — not re-exported from the package's "." entry.
+ * @internal Reached only via the bin's dedicated build chunk — not
+ * re-exported from the package's "." entry.
  */
 export async function runBuild(options: BuildOptions): Promise<void> {
   const startedAt = performance.now();
   const entry = discoverEntry(options.cwd, options.entry);
   const paths = resolveWorkspacePaths(options.cwd);
   const views = discoverViews(options.cwd);
-  const userViteConfig = resolveUserViteConfig(options.cwd);
 
   if (views.length === 0) {
     await build({
@@ -271,7 +263,6 @@ export async function runBuild(options: BuildOptions): Promise<void> {
       cwd: options.cwd,
       cacheDir: paths.cache,
       viewsOutDir,
-      userViteConfig,
     });
   }
 

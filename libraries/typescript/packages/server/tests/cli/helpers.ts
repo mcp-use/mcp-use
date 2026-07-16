@@ -16,10 +16,10 @@ export const FIXTURE_VIEWS = join(here, "fixtures", "views");
 /**
  * Scratch root for mutable fixture copies. Lives inside the package (not the
  * OS tmpdir) so node resolution of externalized bare imports still walks up
- * into `packages/server/node_modules` — where `@mcp-use/server` declares
+ * into `packages/server/node_modules` — where `mcp-use` declares
  * itself as a `devDependency` (see package.json) purely so pnpm links a real
- * `node_modules/@mcp-use/server` → package-root symlink there. That entry is
- * what lets the fixture's own `import "@mcp-use/server"` (and this package's
+ * `node_modules/mcp-use` → package-root symlink there. That entry is
+ * what lets the fixture's own `import "mcp-use"` (and this package's
  * `runBuild`/`runDev`, which build/serve the fixture as if it were an
  * ordinary user project) resolve during both Vite/Rolldown bundling and
  * `tsc` typechecking of `tests/cli/fixtures/basic/`, neither of which

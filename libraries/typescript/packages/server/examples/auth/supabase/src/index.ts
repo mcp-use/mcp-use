@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { serve } from "@hono/node-server";
-import { MCPServer } from "@mcp-use/server";
-import { oauthSupabaseProvider } from "@mcp-use/server/oauth/supabase";
+import { MCPServer } from "mcp-use";
+import { oauthSupabaseProvider } from "mcp-use/oauth/supabase";
 import { Hono } from "hono";
 import { z } from "zod";
 import { mountAuthRoutes } from "./auth-routes.js";

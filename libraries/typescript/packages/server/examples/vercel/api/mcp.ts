@@ -8,7 +8,7 @@
  * `basePath: "/api/mcp"` set on the server in `mcp-server.ts`.
  *
  * The relative import uses a literal `.ts` extension (not the compiled-`.js`
- * convention `@mcp-use/server`'s own source uses) because this example ships
+ * convention `mcp-use`'s own source uses) because this example ships
  * unbuilt: `smoke.ts` runs it via Node's native TypeScript support, which
  * resolves imports by their real file extension, and Vercel's Node builder
  * (esbuild) resolves it the same way at deploy time.

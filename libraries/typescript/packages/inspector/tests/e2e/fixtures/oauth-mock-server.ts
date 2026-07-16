@@ -6,8 +6,8 @@
  */
 
 import type { OAuth2Server } from "oauth2-mock-server";
-import { MCPServer } from "@mcp-use/server";
-import { oauthCustomProvider } from "@mcp-use/server/oauth";
+import { MCPServer } from "mcp-use";
+import { oauthCustomProvider } from "mcp-use/oauth";
 
 type MockOAuthUser = {
   id: string;
@@ -114,7 +114,9 @@ export function createOAuthMcpServer(providerKey: string) {
         return {
           token,
           clientId:
-            typeof payload.client_id === "string" ? payload.client_id : "test-client",
+            typeof payload.client_id === "string"
+              ? payload.client_id
+              : "test-client",
           scopes:
             typeof payload.scope === "string"
               ? payload.scope.split(" ").filter(Boolean)

@@ -1,6 +1,6 @@
-# @mcp-use/server
+# mcp-use workspace package
 
-Greenfield v2 server SDK rebuild at `libraries/typescript/packages/server` (published as `mcp-use@2.x` at cutover). The old packages (`packages/mcp-use`, `packages/cli`, …) are the v1 feature reference only — nothing is ported wholesale, and they stay untouched until cutover.
+Greenfield v2 framework published as `mcp-use` from `libraries/typescript/packages/server`. The superseded v1 server and CLI packages do not exist in this workspace.
 
 ## The specs are the source of truth
 
@@ -8,9 +8,9 @@ Every design decision lives in the package's `specs/` directory (paths below are
 
 | Document | Governs | Status |
 | --- | --- | --- |
-| `specs/SPEC.md` | The core server: ground rules (stateless 2026-07-28-first wire, Standard Schema, no response helpers, dependency budget), the `MCPServer` API, phase plan | Phase 1 implemented |
-| `specs/CLI_SPEC.md` | `mcp-use build`/`dev`/`start`, the bin + lazy toolchain layout, `.mcp-use/` workspace, entry contract, inspector CDN shell | Implemented |
-| `specs/VIEWS_SPEC.md` | Views (MCP Apps): `view()` helper, view resources + wire metadata, the `/react` runtime and hooks, `ToolRef`/`Register` typing, views build/serve/dev | Design contract, pre-implementation |
+| `specs/SPEC.md` | Core server and package architecture: stateless wire, Standard Schema, package boundaries, dependency and budget rules | Core primitives implemented; expanded architecture contracted |
+| `specs/CLI_SPEC.md` | Complete `mcp-use` CLI, lazy command layout, workspace/storage, output/error rules, inspector shell, and budgets | Implemented |
+| `specs/VIEWS_SPEC.md` | Views (MCP Apps): `view()` helper, resources + wire metadata, `mcp-use/react`, typing, build/serve/dev | Alpha implemented |
 | `specs/AUTH_SPEC.md` | OAuth resource-server posture, `ctx.auth`, provider adapters, RFC 9728 discovery | Direct resource-server mode implemented; proxy mode deferred |
 
 Decision records (`type_proposals.md`, `view_lifecycle_proposals.md` in the package root) preserve the rejected alternatives and evidence behind the specs' choices. They are history, not contract — where they differ from a spec, the spec wins.

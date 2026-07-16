@@ -13,25 +13,16 @@
   ],
   "main": "dist/index.js",
   "scripts": {
-    "postinstall": "mcp-use generate-types || exit 0",
     "build": "mcp-use build",
     "dev": "mcp-use dev",
     "start": "mcp-use start",
     "deploy": "mcp-use deploy"
   },
   "dependencies": {
-    "mcp-use": "workspace:*",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "react-router": "^7.13.0",
-    "tailwindcss": "^4.2.0",
-    "zod": "4.3.5"
+    "mcp-use": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^25.3.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "@types/node": "^24.13.2",
+    "typescript": "7.0.1-rc"
   }
 }

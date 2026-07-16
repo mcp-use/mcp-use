@@ -1,24 +1,25 @@
-# @mcp-use/server — build/dev/start CLI spec
+# mcp-use v2 — complete CLI contract
 
-**Status:** Implemented (`build`/`dev`/`start` + inspector CDN shell; `examples/railway` follows the entry contract, verified end-to-end). Companion to `SPEC.md`; this document is the v2 build/dev/start contract (Linear MCP-2601). It is a contract, not an options memo.
-**Scope:** `mcp-use build`, `mcp-use dev`, `mcp-use start`, and Inspector mounting via CDN.
-**Packages:** a single package, `@mcp-use/server` — the bin, `start`, the inspector shell, *and* the `dev`/`build` toolchain (`src/cli/`), which the bin reaches only through a dynamic import (§ Package layout, below). There is deliberately no separate toolchain package — see "Why one package, not two" below. The old `packages/cli` stays untouched and green until cutover; nothing in it is ported wholesale.
-**v1 reference:** `packages/cli` defines *what* the commands must do for users, never how. The v1 dependency cycle (`mcp-use` `bin.ts` statically imported `@mcp-use/cli`, the CLI imported `mcp-use/config`, and all three packages — including inspector — declared each other as runtime workspace deps) is the anti-pattern this spec exists to make structurally impossible.
+**Status:** Implemented.
+**Scope:** the complete first-party `mcp-use` CLI: `dev`, `build`, `start`, cloud auth, organizations, servers, deployments, deploy, client, screenshot, and skills; plus embedded Inspector mounting over HTTP/CDN.
+**Package:** `mcp-use@2`, published from `packages/server`. The package owns the bin, runtime, command chunks, toolchain, and inspector shell. There is no separate CLI, devkit, or config package.
 
 ## Goals
 
-- Installing `mcp-use` (plus `vite` as a devDependency) makes `"dev": "mcp-use dev"`, `"build": "mcp-use build"`, `"start": "mcp-use start"` work in a user's `package.json` scripts.
-- Production `mcp-use start` requires **zero** build-toolchain code — no vite, no cli chunk, nothing beyond `@mcp-use/server`'s own runtime deps.
-- Command implementations are lazy-loaded per subcommand; `start` never pays for `dev`/`build` machinery.
-- The inspector UI ships to users via CDN, not as a package dependency of anything.
+- `npm install mcp-use` is sufficient for `mcp-use dev`, `mcp-use build`, and `mcp-use start`; users do not install Vite separately.
+- `mcp-use start` and library imports never statically evaluate Vite or unrelated command code.
+- Every substantial command is a genuine dynamically imported build chunk. `dev` and `build` are separate chunks so neither evaluates the other's machinery.
+- The built-in `client` command consumes independently published `@mcp-use/client`; it does not fold the client SDK into the framework's public library boundary.
+- The inspector UI ships over HTTP/CDN with no npm dependency edge from `mcp-use` to `@mcp-use/inspector`.
+- Install size, evaluated modules/startup, and production artifacts have separate measurable budgets (§ Verification and budgets).
 
 ## Non-goals (this contract)
 
 - React/views and the client-side Vite environment (view bundling) — **`VIEWS_SPEC.md`** owns that contract. It extends this one: the views client environment joins the *same* Vite dev server `dev` already runs, and view-file edits get real Vite HMR there. The server-entry contract below is untouched by it.
 - HMR **of the server entry** — permanently. Server-entry reload is **reload, not HMR** (see "Why the server entry reloads instead of HMR" below).
 - Typegen — never part of `dev`/`build`/`start`. If built at all, it is an explicit escape-hatch command (`VIEWS_SPEC.md` § Typegen, demoted), off the hot path by design.
-- Deploy/cloud commands, project scaffolding. (Dev tunneling is in scope — see the dev-only inspector API routes below.)
-- Auth (`AUTH_SPEC.md` owns that design — currently deferred until the official SDK ships auth support; these commands neither add nor bypass it).
+- Project scaffolding. `create-mcp-use-app` remains a separate zero-runtime-dependency package.
+- Server resource OAuth (`AUTH_SPEC.md` owns that design). CLI cloud identity commands authenticate the CLI itself and neither add nor bypass server resource authorization.
 
 ## Entry contract
 
@@ -38,39 +39,178 @@ export default server;
 
 `examples/railway` follows this shape (its platform door is `mcp-use build` + `mcp-use start`; host selection via `RAILWAY_PUBLIC_DOMAIN` stays constructor config on the server, which `dev`/`start` honor through `listen()`).
 
+## Command surface
+
+The first-party command contract belongs to `mcp-use`:
+
+- Runtime and toolchain: `dev`, `build`, `start`.
+- Cloud identity: `login`, `logout`, `whoami`.
+- Cloud resources: `org`, `servers`, `deployments`, `deploy`.
+- Local and integration workflows: `client`, `screenshot`, `skills`.
+
+There are no `ls`, `rm`, `switch`, or `install` aliases in v2 alpha. The accepted names below are the complete public surface. Cloud commands use native `fetch`, filesystem, and child-process APIs where adequate. Command-local parsing uses `node:util.parseArgs`; the package does not recreate a global Commander tree.
+
+### Cross-command conventions
+
+- `--help` and `--version` write to stdout and exit `0`. Unknown commands/options, missing arguments, invalid enum/numeric values, mutually exclusive options, and a destructive command without confirmation in a non-TTY write one concise error plus a usage hint to stderr and exit `2`.
+- Successful finite commands exit `0`; empty lists and idempotent `logout`/`remove` operations are successful. Authentication, authorization, network, API, filesystem, build, MCP, browser, and remote-operation failures exit `1`. SIGINT exits `130`.
+- Human output is concise UTF-8 text on stdout. Errors and warnings go to stderr. ANSI styling is used only for a TTY and honors `NO_COLOR`; machine-readable output never contains ANSI.
+- Every finite data-returning command accepts `--json`. It emits exactly one JSON value followed by `\n`; errors emit `{"error":{"code":"...","message":"...","details":...}}` to stderr. Streaming `deployments logs --follow` emits JSON Lines when `--json` is set. Prompts are disabled under `--json` and whenever stdin is not a TTY.
+- Destructive commands require an interactive confirmation or `--yes`. Cancellation is not an error and exits `0`; a non-TTY invocation without `--yes` is usage error `2`.
+- Cloud commands that accept `--org <id-or-slug>` use it for that invocation without changing the active organization. Otherwise they use the active organization, then the account default. Ambiguous names are rejected; organization names are display-only, not selectors.
+- IDs and slugs are passed as opaque strings. Pagination uses `--limit <1..100>` (default `30`) and `--skip <non-negative integer>` (default `0`). The API's returned order is preserved.
+
+### Storage ownership and security
+
+All global CLI state lives under `~/.mcp-use/`; project state lives under the project's `.mcp-use/` workspace:
+
+- `~/.mcp-use/config.json` is owned by cloud commands and contains only the cloud API key plus active organization id/name/slug. `MCP_USE_CLOUD_API_URL` and `MCP_USE_CLOUD_WEB_URL` override endpoints for the process and are never persisted.
+- `~/.mcp-use/client/servers.json` is owned by `client` and stores non-secret connection metadata keyed by explicit server name. There is no active/default client.
+- `~/.mcp-use/client/credentials/<sha256-of-server-name>.json` stores static headers or OAuth material used by `@mcp-use/client`. Removing a saved server removes its credential file; `client <name> auth logout` removes only the OAuth material while retaining non-OAuth connection metadata.
+- `.mcp-use/cloud/link.json` is owned by `deploy` and contains non-secret organization/server linkage for the current project. It is the only project-local cloud state.
+- Directories are created with mode `0700`, secret-bearing files with `0600`, and writes use temp-file-plus-rename. Commands never print API keys, bearer tokens, OAuth tokens, cookies, or secret environment values, including under `--json`.
+
+### Cloud identity and organization
+
+```text
+mcp-use login [--api-key <key>] [--org <id-or-slug>] [--no-open]
+mcp-use logout [--yes]
+mcp-use whoami [--json]
+mcp-use org list [--json]
+mcp-use org current [--json]
+mcp-use org use <id-or-slug>
+```
+
+- `login` uses `--api-key` or `MCP_USE_API_KEY` when present; otherwise it runs OAuth device authorization, prints the verification URL/code, and opens the URL unless `--no-open` or non-TTY. It validates the resulting credential before persisting it. `--org` validates and stores the selection; without it, the account default is stored when available. v2 does not expose pre-approved device-code injection.
+- `logout` deletes local cloud credentials and organization selection; remote key revocation remains a web-account action. `whoami` verifies the stored key and returns user plus active organization; missing/expired credentials exit `1` with a `mcp-use login` hint.
+- `org list` returns memberships and marks the active organization. `org current` requires a resolvable active/default organization. `org use` validates membership, updates local state, and best-effort updates the account default; local success is authoritative.
+
+### Servers, environments, and deployments
+
+```text
+mcp-use servers list [--org <id-or-slug>] [--limit <n>] [--skip <n>] [--json]
+mcp-use servers get <id-or-slug> [--org <id-or-slug>] [--json]
+mcp-use servers update <id-or-slug> [--org <id-or-slug>]
+  [--name <name>] [--description <text>] [--branch <name>]
+  [--root-dir <path>] [--build-command <cmd>] [--start-command <cmd>]
+mcp-use servers delete <id-or-slug> [--org <id-or-slug>] [--yes]
+mcp-use servers env list <server> [--org <id-or-slug>] [--branch <name>] [--json]
+mcp-use servers env set <server> <KEY=VALUE> [--org <id-or-slug>]
+  [--branch <name>] [--secret]
+mcp-use servers env unset <server> <key> [--org <id-or-slug>]
+  [--branch <name>] [--yes]
+
+mcp-use deployments list [--org <id-or-slug>] [--server <id-or-slug>]
+  [--limit <n>] [--skip <n>] [--json]
+mcp-use deployments get <deployment-id> [--json]
+mcp-use deployments logs <deployment-id> [--build] [--follow] [--json]
+mcp-use deployments restart <deployment-id> [--branch <name>] [--follow]
+mcp-use deployments stop <deployment-id> [--yes]
+mcp-use deployments delete <deployment-id> [--yes]
+```
+
+- `servers update` requires at least one mutation option. An empty `--root-dir`, `--build-command`, or `--start-command` clears that override. Creating servers is owned by `deploy`.
+- Environment scope defaults to the server's production environment; `--branch` selects that branch's preview environment. `set` is an upsert. Values are never returned by `list`; it reports key, scope, sensitivity, and update metadata only. v2 drops separate add/update commands and environment-tag filtering.
+- `deployments logs` defaults to runtime logs; `--build` selects build logs. `--follow` streams until the deployment reaches a terminal state or the user interrupts. `restart --follow` follows the newly created deployment's build logs.
+- v2 omits the nonfunctional `deployments start` command. A stopped deployment is resumed by `restart`.
+
+### Deploy
+
+```text
+mcp-use deploy [path] [--org <id-or-slug>] [--name <name>]
+  [--branch <name>] [--root-dir <path>] [--region <region>]
+  [--env <KEY=VALUE>...] [--env-file <path>]
+  [--build-command <cmd>] [--start-command <cmd>] [--dockerfile <path>]
+  [--new] [--open] [--yes] [--json]
+```
+
+- `path` defaults to cwd. The project must be a Git repository with a supported GitHub remote. First deploy creates a Git-backed server; subsequent deploys reuse `.mcp-use/cloud/link.json`. `--new` ignores existing linkage and creates a new server after confirmation.
+- The branch defaults to the current branch. `--root-dir` and `--dockerfile` are repository-relative and must not escape the repository. Repeated `--env` values override duplicate keys from `--env-file`; values are uploaded but never echoed. Region values are API-supported region identifiers and are validated before upload.
+- The command does not create repositories, initialize Git, commit, push, install/configure the GitHub App, or upload an alternate platform-managed source tarball. Missing GitHub access fails with the exact installation/configuration URL and retry instructions; it never prompts or polls for external setup.
+- Success writes the project link atomically and returns server id, deployment id, status, and URLs. `--open` is best-effort after successful deployment and never changes a successful exit to failure.
+
+### Client
+
+```text
+mcp-use client connect <name> <url> [-H, --header <"Key: Value">...]
+  [--no-oauth] [--auth-timeout <ms>] [--protocol <auto|2026-07-28|2025-11-25>]
+  [--json]
+mcp-use client list [--json]
+mcp-use client remove <name> [--yes]
+mcp-use client <name> tools list [--json]
+mcp-use client <name> tools describe <tool> [--json]
+mcp-use client <name> tools call <tool> [args...] [--timeout <ms>] [--json]
+mcp-use client <name> resources list [--json]
+mcp-use client <name> resources read <uri> [--json]
+mcp-use client <name> prompts list [--json]
+mcp-use client <name> prompts get <prompt> [args...] [--json]
+mcp-use client <name> auth status [--json]
+mcp-use client <name> auth logout [--yes]
+```
+
+- v2 alpha client commands support HTTP(S) MCP servers; stdio, interactive REPL, resource subscriptions, implicit active sessions, and forced OAuth refresh are omitted. Every operation names a saved server.
+- `connect` validates a unique filesystem-safe name, connects before saving, and attempts OAuth on an authorization challenge unless `--no-oauth`. Repeated headers are stored as credentials, not metadata. Reusing a name requires removing it first.
+- Tool/prompt arguments accept either one JSON object or `key=value` pairs; `key:=<json>` supplies typed JSON values. Mixing the full-object and pair forms is usage error `2`. Calls time out with exit `1`; tool `isError` results are operation failures and retain their protocol content in JSON error details.
+- Default human output renders borderless terminal lists and readable MCP content. `--json` emits the raw protocol result envelope for calls, reads, and prompts, and arrays for lists.
+
+### Screenshot
+
+```text
+mcp-use screenshot (--server <name> | --mcp <url>) --tool <name> [args...]
+  [-H, --header <"Key: Value">...] [--output <path>]
+  [--width <px>] [--height <px>] [--device-scale-factor <n>]
+  [--theme <light|dark>] [--inspector <url>] [--cdp-url <ws-or-wss-url>]
+  [--wait-for <selector>] [--delay <ms>] [--timeout <ms>] [--json]
+```
+
+- Exactly one target is required. `--server` reuses saved client auth; `--header` is valid only with `--mcp`. `--tool` must advertise an MCP Apps UI resource. Arguments use the client command's JSON/pair grammar.
+- The CLI calls the tool and reads the UI resource through `@mcp-use/client`, then injects the result into the browser preview; credentials and tokens are never passed to browser JavaScript. The default inspector is the framework-compatible hosted preview. `--inspector` may select another compatible HTTP preview; the command never imports or auto-spawns `@mcp-use/inspector`.
+- A compatible preview origin implements protocol `mcp-use-inspector-preview` version `1`. `GET <origin>/inspector/health` returns `{ "status": "ok", "protocol": "mcp-use-inspector-preview", "version": 1, "capabilities": ["view-preview"] }`. Any missing field, different protocol/version, or absent `view-preview` capability is rejected before tool execution.
+- The browser navigates to `<origin>/inspector/preview/<percent-encoded-view-name>?protocol=1`. Before navigation, the CLI registers the already-fetched resource document, tool input, tool result, host context, and theme through CDP's new-document script API; the URL receives no MCP URL, headers, credentials, or result payload. The preview sets `document.body.dataset.viewReady = "true"` only after the app handshake and first stable render, or `document.body.dataset.viewError` to a non-secret error code on failure. The CLI waits for exactly one signal and treats simultaneous, malformed, or timed-out state as an inspector compatibility failure.
+- Without `--cdp-url`, the command uses an installed Chromium-family browser or exits `1` with installation guidance. Omitted dimensions use the rendered view's natural size. Device scale factor defaults to `1` and must be greater than `0` and at most `4`. Output defaults to `./<view>-<timestamp>.png`; an existing explicit path is replaced.
+- Success prints the absolute output path; `--json` emits `{ "path", "width", "height", "deviceScaleFactor" }`. Browser readiness/timeout, missing UI metadata, tool failure, and write failure exit `1`.
+
+### Skills
+
+```text
+mcp-use skills add [--path <directory>]
+  [--agent <cursor|claude-code|codex|all>] [--skill <name>...]
+```
+
+- `path` defaults to cwd and must exist. `agent` defaults to `all`; omitted `--skill` installs the maintained mcp-use skill set.
+- The command delegates to the published `skills` CLI using an argument-array child process equivalent to `npx --yes skills add mcp-use/mcp-use`; it does not download or extract archives itself. The child exit code is propagated, and no telemetry is added by `mcp-use`.
+
 ## Package layout & dependency rules
 
-`@mcp-use/server` ships the bin:
+`mcp-use` ships the bin:
 
 ```jsonc
 // packages/server/package.json
 { "bin": { "mcp-use": "./dist/bin.js" } }
 ```
 
-The bin is thin: `src/bin.ts` calls `main()` in `src/bin/main.ts`, which parses args (`src/bin/args.ts`), runs `start` via a **static** import of `src/bin/start.ts` (zero toolchain deps on that path), and dispatches `dev` and `build` via **`await import("../cli/index.js")`** — a dynamic import of a sibling chunk *inside this same package*, built from `src/cli/*` as its own tsup entry (`dist/cli/index.js`, alongside `dist/index.js` and `dist/bin.js`; code-splitting is on specifically so this is a real separate file with a real dynamic import, not inlined into `dist/bin.js`). Nothing on the `start`/library import path (`dist/index.js`, and everything `dist/bin.js` reaches *without* going through that dynamic import) ever evaluates `src/cli/*` — and therefore never evaluates `vite`, which only `src/cli/build.ts` and `src/cli/dev.ts` import.
+The bin contains only top-level argument classification and error presentation. It dispatches every substantial command with `await import(...)` to a real sibling chunk inside this package, built with code splitting enabled. At minimum the output has distinct chunks for `start`, `dev`, `build`, cloud identity, organizations, servers, deployments, deploy, client, screenshot, and skills. A command family may share small dependency-free parsing utilities, but no eager aggregate command module may pull unrelated implementations into `dist/bin.js`.
 
-`vite` is declared as an **optional peer dependency**:
+`dist/index.js`, `dist/react/index.js`, `dist/bin.js`, and the `start` chunk have no static import path to Vite. Vite imports live only in the command chunks that use them; `dev` and `build` are separate so loading one does not evaluate the other. Structural build-output tests enforce these boundaries rather than relying on source naming.
+
+`mcp-use` owns the Vite configuration for both server and views builds. v2 alpha does not discover or load `vite.config.*`; aliases, plugins, build overrides, and environment settings from a user Vite config have no effect. The framework injects its own React plugin when views are present.
+
+Vite is a **regular dependency** of `mcp-use`:
 
 ```jsonc
 // packages/server/package.json
 {
-  "peerDependencies": { "vite": "^8.0.0" },
-  "peerDependenciesMeta": { "vite": { "optional": true } }
+  "dependencies": {
+    "vite": "^8.0.0"
+  }
 }
 ```
 
-Rationale: npm 7+ auto-installs a package's *required* peer dependencies, which would drag vite into every production `npm i mcp-use` — exactly what the CLI-cycle rework is trying to avoid. Marking it `optional: true` in `peerDependenciesMeta` opts out of that auto-install, so a production install without `vite` in the user's own `devDependencies` stays lean; declaring it as a peer at all (rather than omitting it entirely) also gets the *version* resolved correctly under pnpm's isolated `node_modules` layout when it is present, instead of each consumer potentially resolving a different transitive copy. `vite` is never a regular dependency of `@mcp-use/server` — regular dependencies are always installed, defeating the point.
+Vite is framework implementation machinery: the package owns the compatible version and one install must provide the complete dev/build experience. Dependency installation and runtime evaluation are separate concerns; lazy chunks keep production startup lean even though Vite is installed. When views land, `@vitejs/plugin-react` is also a regular dependency. `react` and `react-dom` remain optional peers because applications own their singleton versions.
 
-When `vite` is missing, `src/cli/build.ts`/`src/cli/dev.ts`'s own `import { build } from "vite"` fails to resolve, and that rejection propagates up through the bin's `import("../cli/index.js")` call. The bin classifies it (`ERR_MODULE_NOT_FOUND` naming `'vite'`, via `isViteMissing` in `bin/main.ts`) and prints an actionable hint instead of a raw stack trace:
+`@mcp-use/client` is also a regular dependency at its compatible published version. It remains independently published and independently installable; its dependency edge here exists only to guarantee `mcp-use client` out of the box. Server library exports do not re-export or absorb the SDK.
 
-```
-mcp-use dev requires Vite. Install it:
-  npm i -D vite
-```
-
-**Hard rule:** `@mcp-use/server` declares **no dependency of any kind** — regular, peer, or optional — on `@mcp-use/inspector`. The inspector is reached only over HTTP (below), never imported. There is a separate, narrower invariant for the toolchain now that it lives inside this package: `vite` must never become a regular dependency, and the `src/cli/*` chunk must never be reachable from the `start` command or from this package's `"."` library export — only from the bin's `dev`/`build` dispatch.
-
-**Why one package, not two.** A separate toolchain package (a `@mcp-use/devkit`) would have to be reached via a `node_modules`-walking dynamic import resolved from the *user's* project, because a bare `import("@mcp-use/devkit")` inside `@mcp-use/server` can never succeed under pnpm's isolated installs — the runtime package only sees its own declared deps. Ecosystem precedent goes the other way: Astro/`skybridge`-style tools ship one core package with `vite` as a peer and `await import("vite")` internally; SvelteKit does the same (`vite` as a peer of `@sveltejs/kit`, not a separate kit-plus-vite-adapter split); Next.js ships one package and lazily imports each subcommand's machinery. One package gets the same "start pays nothing for the toolchain" property via a same-package dynamic import (verified structurally by the build output, not by hoping a separate package's resolution walk succeeds) while avoiding an entire extra package, its own dependency-direction rule, and its own release/version-matching surface. Ours differs from that precedent only in making the peer *optional* rather than required, for the auto-install reason above.
+**Hard rule:** `mcp-use` declares **no dependency of any kind** — regular, peer, or optional — on `@mcp-use/inspector`. Embedded integration is reached only over HTTP/CDN (below), never imported or resolved from `node_modules`.
 
 Target user `package.json` shape:
 
@@ -81,16 +221,15 @@ Target user `package.json` shape:
     "build": "mcp-use build",
     "start": "mcp-use start"
   },
-  "dependencies": { "mcp-use": "^2" },
-  "devDependencies": { "vite": "^8" }
+  "dependencies": { "mcp-use": "^2" }
 }
 ```
 
-**Self-referencing devDependency (in-repo testing only).** `packages/server/package.json` lists `"@mcp-use/server": "workspace:*"` in its own `devDependencies`. The CLI tests run the real `build`/`dev` pipeline against `tests/cli/fixtures/basic`, whose entry imports `@mcp-use/server` by its public name — the fixture stands in for a real user project, so it must exercise the same resolution path users hit. Node's own resolver would handle that via package self-reference (a package may import its own name through its `exports` map), but Vite/Rolldown's resolver and tsc's bundler mode don't implement self-reference, so inside this repo the name must physically exist in `node_modules` for the toolchain to resolve it. The self-dep makes pnpm create exactly that link (`node_modules/@mcp-use/server → ..`; pnpm accepts self-deps without complaint). It is invisible to consumers — installers ignore a dependency's `devDependencies` — and creates no build-graph cycle. Do not "fix" it by switching the fixture to a relative import (stops testing the user-facing path) or by adding a Vite `resolve.alias` in the test harness (bypasses the exact resolver behavior under test).
+**Workspace self-reference.** Until cutover, `packages/server/package.json` and in-workspace fixtures use the private name `mcp-use`; its self-referencing devDependency is `"mcp-use": "workspace:*"`. Clean-pack tests rewrite/publish the candidate as `mcp-use` and exercise the target public imports from an external temporary project. Relative fixture imports and test-only Vite aliases are forbidden because they bypass package resolution.
 
 ## Workspace layout (`.mcp-use/`)
 
-The build system keeps v1's reworked workspace convention **exactly** — it was deliberately redesigned just before this greenfield rewrite (see `packages/mcp-use/src/server/config/paths.ts`, `resolveWorkspacePaths`); do not invent a new layout. `.mcp-use/` is the per-project, fixed-convention, gitignored workspace — the `.next` analog. Everything tooling writes for a project lives under it, a checkout stays clean, and `rm -rf .mcp-use` is always safe:
+`.mcp-use/` is the per-project, fixed-convention, gitignored workspace — the `.next` analog. Everything tooling writes for a project lives under it, a checkout stays clean, and `rm -rf .mcp-use` is always safe:
 
 ```
 .mcp-use/
@@ -98,16 +237,16 @@ The build system keeps v1's reworked workspace convention **exactly** — it was
 ├─ generated/    ← output of the typegen escape-hatch command — reserved (VIEWS_SPEC.md § Typegen, demoted)
 ├─ cache/        ← disposable dev/build scratch (vite cacheDir)
 ├─ state/        ← mutable runtime state (e.g. tunnel.json)
-└─ cloud/        ← cloud linkage (link.json) — reserved; future
+└─ cloud/        ← deploy linkage (link.json)
 ```
 
-This contract writes `build/` (using `cache/` as Vite's `cacheDir`, and `state/tunnel.json` during dev when tunneling); `generated/` and `cloud/` are **reserved by convention now** so no tool squats on them before their features land. v1's invariant carries over: `build/` contains no mutable runtime state (that is `state/`'s job), so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here — scaffolded, committed files (e.g. the `src/register.d.ts` typing shim, `VIEWS_SPEC.md` § Typing) belong in the project source tree instead.
+This contract writes `build/` (using `cache/` as Vite's `cacheDir`), `state/tunnel.json` during tunneled dev, and `cloud/link.json` after deploy. `generated/` is reserved for the explicit typegen escape hatch. `build/` contains no mutable runtime state, so build output stays reproducible and disposable. Because everything under `.mcp-use/` is gitignored and `rm -rf`-safe, nothing committed ever lives here — scaffolded, committed files (e.g. the `src/register.d.ts` typing shim, `VIEWS_SPEC.md` § Typing) belong in the project source tree instead.
 
 Rules, all inherited from v1 and locked:
 
 - **No config file.** There is deliberately no `mcp-use.json` and no `outDir` knob: runtime/project configuration lives on the `MCPServer` constructor (tooling reads it by importing the entry and introspecting the instance); the `.mcp-use/` layout is fixed convention, not configuration.
 - **Same names, re-declared.** The manifest basename is `manifest.json` (v1's `BUILD_MANIFEST_NAME`), the workspace dir `.mcp-use` (v1's `WORKSPACE_DIR_NAME`). `src/cli/workspace.ts` **re-declares** these constants itself — it must not import them from the old `mcp-use` package (no dependency on the old package).
-- **Per-project, not global.** `.mcp-use/` is distinct from the **global** `~/.mcp-use/` directory (CLI auth, credentials, per-user caches); nothing in this spec touches the global store.
+- **Per-project, not global.** Project build/linkage state lives in `.mcp-use/`; cloud identity and saved-client state live in the explicitly owned global paths under `~/.mcp-use/` defined above. Neither side scans or writes outside its declared paths.
 
 ## Commands
 
@@ -115,15 +254,15 @@ Rules, all inherited from v1 and locked:
 
 Vite build of the **SSR/node environment only** — no client environment exists yet (`VIEWS_SPEC.md` adds it for views). Rolldown/Vite emits the server bundle to `.mcp-use/build/` (workspace layout above) with `ssr: { external: true }`: every bare import stays external and resolves from `node_modules` at runtime; only the user's own source is bundled. Output is ESM targeting the package's Node floor, with sourcemaps, unminified.
 
-Writes `.mcp-use/build/manifest.json` (v1's `BUILD_MANIFEST_NAME`, shape compatible in spirit with the v1 manifest):
+Writes `.mcp-use/build/manifest.json`:
 
 ```jsonc
-{ "buildId": "…", "entryPoint": "index.js", "createdAt": "…", "inspector": true }
+{ "buildId": "…", "entryPoint": "index.js", "createdAt": "…" }
 ```
 
-`buildId` is a random hex id, `createdAt` an ISO timestamp — introspection data for tooling. `start` consumes only `entryPoint` today. Known gap, recorded honestly: `inspector` is currently written as a hardcoded `true` rather than introspected from the built server's config, and nothing consumes it yet (the built server's own `MCPServer` config governs the inspector route at runtime). Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest) and copy the project-root `public/` directory into `build/views/public/` when present.
+`buildId` is a random hex id and `createdAt` an ISO timestamp. `start` consumes `entryPoint`; inspector enablement remains solely in the built server's `ServerConfig` and is not duplicated in the manifest. Views extend this manifest with a `views` map (`VIEWS_SPEC.md` § Manifest) and copy the project-root `public/` directory into `build/views/public/` when present.
 
-**No typecheck step in v0** — deliberate. Users run `tsc --noEmit` via their own script; the build is transpile-only and fast.
+The build is transpile-only and does not run a typecheck. Projects own their `tsc --noEmit` script.
 
 ### `mcp-use dev` (in `src/cli/dev.ts`, dispatched from the bin)
 
@@ -155,19 +294,19 @@ Intercepted by the dev HTTP listener before the MCP handler (exact path match on
 
 Tunnel subdomain persistence lives at `.mcp-use/state/tunnel.json` (v1-compatible `{ subdomain }` shape). The tunnel release API base URL defaults to `https://local.mcp-use.run` and is overridable via `MCP_USE_TUNNEL_API`.
 
-### `mcp-use start` (in `src/bin/start.ts`, statically imported by the bin)
+### `mcp-use start` (in its own lazy command chunk)
 
 1. Reads `.mcp-use/build/manifest.json` (consuming `entryPoint` only); if missing, an actionable error pointing at `mcp-use build`.
 2. Imports the built entry, takes the default export, serves it via `listen()`.
 3. **Port:** `--port` / an integer `PORT` env / `3000` — no upward probing (a production port conflict should fail, not silently move). Sets `NODE_ENV=production` only when unset.
 
-Requires zero cli-chunk/vite/toolchain code — a production image needs only `mcp-use` and the app's own runtime deps.
+Evaluates no Vite, toolchain, or unrelated command chunk. A production image installs `mcp-use` and the app's own runtime dependencies; the regular Vite dependency may be present on disk but is outside the `start` evaluation graph.
 
 ## Inspector mounting (FastAPI/Swagger-UI model)
 
-The inspector UI is **not a package dependency anywhere**. `@mcp-use/server` itself owns a tiny dependency-free HTML shell route — the exact analog of FastAPI's `get_swagger_ui_html` for `/docs`:
+The inspector UI is **not an npm dependency of `mcp-use`**. The framework owns a tiny dependency-free HTML shell route — the exact analog of FastAPI's `get_swagger_ui_html` for `/docs`:
 
-- `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` loads the inspector bundle from a CDN: currently the mcp-use R2 bucket serving this branch's `build:cdn` output (the `inspector@{version}.js` + `.css` pair), **pinned to an exact version**. Moves to the jsDelivr npm copy once an inspector release ships the v2 branch's basePath-aware client (published bundles up to 12.x hardcode `/inspector` as the router basename and cannot run under `${basePath}/inspector`).
+- `GET ${basePath}/inspector` returns a small HTML page whose `<script type="module">` and stylesheet load the framework-compatible inspector bundle from the configured CDN base, pinned to an exact asset version.
 - Config (autoConnect URL = the MCP endpoint at `basePath`, plus `basePath` itself) is passed via a serialized `window` global read by the bundle.
 
 `ServerConfig` gains:
@@ -176,15 +315,13 @@ The inspector UI is **not a package dependency anywhere**. `@mcp-use/server` its
 inspector?: { enabled?: boolean; assetsUrl?: string }; // default: enabled
 ```
 
-Default **enabled**, mounted in both dev and production — like FastAPI's `/docs`; users set `inspector: { enabled: false }` to disable. (Originally shipped as `boolean | { assetsUrl }`; changed to the object-only `{ enabled }` shape when `logging` landed so all on/off-with-options config reads the same way — no boolean unions.) Because the shell is just an HTML string with a CDN script tag, this does not violate the no-inspector-dependency rule.
-
-**Known limitation, recorded honestly** (Linear MCP-2075): the full v1 inspector also expects a backend proxy route; the CDN shell in this phase is browser-only and connects directly to the same-origin MCP endpoint. Acceptable for now — the current inspector may not fully support the v2 client protocol yet; "renders and connects" is the bar.
+Default **enabled**, mounted in both dev and production; users set `inspector: { enabled: false }` to disable. The config shape is object-only. The embedded shell connects directly to the same-origin MCP endpoint and provides no inspector proxy route. Because it is an HTML string with CDN URLs, it does not create an npm dependency edge.
 
 ## Offline & self-hosting
 
 - `inspector.assetsUrl` overrides the CDN base (FastAPI's `swagger_js_url` analog) — point it at a self-hosted copy of the bundle for air-gapped environments.
-- **Future (deferred, not v0):** `mcp-use dev` may detect a locally installed `@mcp-use/inspector` in the project's `node_modules` and serve its `dist/` from the dev server for fully-offline dev.
 - Browsers will serve the CDN bundle from HTTP cache after first load; that's best-effort, not the offline story.
+- The framework never discovers or serves a local `@mcp-use/inspector` package. Standalone/offline inspector use remains the independently installed inspector's responsibility.
 
 ## Why the server entry reloads instead of HMR
 
@@ -198,15 +335,24 @@ Two adjacent things are *not* covered by this rationale and have their own postu
 - **View HMR is real HMR and arrives with views** (`VIEWS_SPEC.md` § Dev): view code is pure browser code served by a client environment on this same Vite dev server, so Vite's own HMR channel applies to it. The reload-not-HMR rule is about the *server* module graph only.
 - **`list_changed` is an invalidation after the swap, not registry HMR.** One SDK event bus is shared by every stateless handler generation, preserving open modern subscriptions across reloads. The three list-change events make long-lived clients such as the inspector refetch from the new handler; they never mutate or synchronize the old server instance.
 
-## Future (deferred)
+## Verification and budgets
 
-- Dev side-channel for inspector auto-refresh on handler swap.
-- Views + the client Vite environment (view bundling) — contract already written, `VIEWS_SPEC.md`.
-- `mcp-use typegen` escape-hatch command (`VIEWS_SPEC.md` § Typegen, demoted) — explicitly never wired into `dev`/`build`/`start`.
-- Local-inspector serving from `node_modules` for offline dev.
-- Deploy/cloud commands.
+Budgets are measured on Linux x64 in the CI-pinned Node 24 container image; the baseline records the exact image digest, Node version, and npm version. The test packs the candidate, installs that tarball with `npm install --omit=dev` in an empty project, and sums logical file bytes without filesystem block rounding.
 
-## Open questions
+| Dimension | Hard ceiling |
+| --- | ---: |
+| packed `.tgz` bytes | 2 MiB |
+| package `unpackedSize` from `npm pack --json` | 5 MiB |
+| clean-install `node_modules` bytes (including Vite/platform optional deps) | 100 MiB |
+| tool-only `.mcp-use/build/` fixture | 1 MiB |
+| committed basic-view fixture output (self-contained JS + CSS before compression) | 2.5 MiB |
 
-- **Inspector proxy route.** The full inspector expects a backend proxy; deciding whether/where a v2 proxy route lives (server? cli chunk? inspector package serving itself?) is open — this phase ships the browser-only CDN shell.
-- **Production default for the inspector.** Default-on in production mirrors FastAPI `/docs`, but whether it should become dev-only-default before GA is undecided.
+Installed bytes are an on-disk distribution concern; they do not count modules evaluated at runtime. Evaluation has separate tests:
+
+- The bundler metafile/static-import traversal for `dist/index.js` must reach no `dist/commands/**`, `vite`, or `@vitejs/**`.
+- The traversal for `dist/commands/start.js` may reach the production runtime and start helpers only; reaching Vite or any other command chunk is an unconditional failure.
+- Runtime tracing must observe the same invariant for `import "mcp-use"` and `mcp-use start`.
+
+`tests/budgets/cli-budget.test.ts` enforces the built import graph and unpacked framework ceiling. Release CI packs the candidate, installs it with the matching packed `@mcp-use/client`, and enforces the packed and clean-install ceilings. Fixture build tests enforce server/view artifact ceilings.
+
+Clean-install tests run `npm install <packed-tarball>` followed by `mcp-use --version`, `dev`, `build`, and `start`. Boundary tests also cover a client-only install of `@mcp-use/client`, embedded inspector operation without `@mcp-use/inspector`, standalone inspector operation without `mcp-use`, and the zero-runtime-dependency `create-mcp-use-app` smoke matrix.

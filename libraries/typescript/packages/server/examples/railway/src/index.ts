@@ -1,5 +1,5 @@
 /**
- * @mcp-use/server on a long-lived Node server (Railway-style).
+ * mcp-use on a long-lived Node server (Railway-style).
  *
  * This module follows the CLI entry contract (../../../specs/CLI_SPEC.md): it
  * default-exports the `MCPServer` instance and never calls `listen()` itself
@@ -10,7 +10,7 @@
  * MCP session state lives in it, so any replica behind a load balancer can
  * serve any request with no session affinity.
  */
-import { MCPServer } from "@mcp-use/server";
+import { MCPServer } from "mcp-use";
 import { z } from "zod";
 
 const BASE_PATH = "/mcp";
@@ -32,8 +32,7 @@ const server = new MCPServer({
   name: "railway-example",
   version: "1.0.0",
   title: "Railway Example Server",
-  description:
-    "Demonstrates @mcp-use/server deployed as a long-lived Node process.",
+  description: "Demonstrates mcp-use deployed as a long-lived Node process.",
   basePath: BASE_PATH,
   ...(publicDomain !== undefined && { host: "0.0.0.0" }),
 });

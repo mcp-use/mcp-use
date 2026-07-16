@@ -1,6 +1,6 @@
 {
   "$schema": "https://react.doctor/schema/config.json",
-  // Scan the @mcp-use/server React runtime and view examples only.
+  // Scan the mcp-use React runtime and view examples only.
   // Non-React server/CLI sources and generated workspaces are excluded.
   "ignore": {
     "files": [

@@ -55,7 +55,7 @@ export function useViewRuntime(): McpAppRuntime {
   const runtime = useContext(ViewRuntimeContext);
   if (!runtime) {
     throw new Error(
-      "@mcp-use/server/react hooks require a browser view mounted by bootstrapView"
+      "mcp-use/react hooks require a browser view mounted by bootstrapView"
     );
   }
   return runtime;

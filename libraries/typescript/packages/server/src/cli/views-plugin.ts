@@ -75,7 +75,7 @@ export function mcpUseViewsPlugin(options: McpUseViewsPluginOptions): Plugin {
         lines.push(`import "@vitejs/plugin-react/preamble";`);
       }
       lines.push(
-        `import { bootstrapView } from "@mcp-use/server/react";`,
+        `import { bootstrapView } from "mcp-use/react";`,
         `import * as viewModule from ${JSON.stringify(view.entryPath)};`,
         `bootstrapView(viewModule);`
       );

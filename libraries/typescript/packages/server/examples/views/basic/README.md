@@ -1,6 +1,6 @@
 # Views example (Fruit Store)
 
-Reference MCP Apps views server for `@mcp-use/server`. It follows the
+Reference MCP Apps views server for `mcp-use`. It follows the
 [Views spec](../../../specs/VIEWS_SPEC.md) fruit-store shape: view-bound tools,
 view components under `resources/`, typed tool I/O via exported tool refs, and
 the full React runtime surface (`useToolContext`, `useCallTool`, `useViewTool`,
@@ -65,7 +65,7 @@ View bundles never import server code. Types cross in type-space only:
 
 ```ts
 // src/tools.d.ts
-declare module "@mcp-use/server/react" {
+declare module "mcp-use/react" {
   interface Register {
     tools: typeof import("./index.js");
   }
@@ -155,5 +155,5 @@ The product-search view also registers `highlight-fruit` via `useViewTool`
 pnpm typecheck
 ```
 
-Requires a built `@mcp-use/server` (`pnpm build` in `packages/server`) so
+Requires a built `mcp-use` (`pnpm build` in `packages/server`) so
 `dist/react/index.d.ts` resolves.

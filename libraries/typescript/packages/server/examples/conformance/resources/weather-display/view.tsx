@@ -1,4 +1,4 @@
-import { useToolContext } from "@mcp-use/server/react";
+import { useToolContext } from "mcp-use/react";
 
 export default function WeatherDisplay() {
   const tool = useToolContext();

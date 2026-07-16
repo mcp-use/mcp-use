@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
-  "description": "MCP Inspector conformance test server (@mcp-use/server v2)",
+  "description": "MCP Inspector conformance test server (mcp-use v2)",
   "engines": {
     "node": ">=24.0.0"
   },
@@ -13,7 +13,7 @@
     "start": "mcp-use start"
   },
   "dependencies": {
-    "@mcp-use/server": "workspace:*",
+    "mcp-use": "workspace:*",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

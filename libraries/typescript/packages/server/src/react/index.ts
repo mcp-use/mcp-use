@@ -1,5 +1,5 @@
 /**
- * React view runtime for MCP Apps (`@mcp-use/server/react`).
+ * React view runtime for MCP Apps (`mcp-use/react`).
  *
  * Browser-only — built on the ext-apps guest `App` class. Layout:
  * `types/` (the zero-codegen typing layer and vendored host types),

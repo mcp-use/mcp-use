@@ -6,9 +6,7 @@ import type { ViewsManifest } from "./types.js";
  *
  * @internal
  */
-export const registerViews: unique symbol = Symbol(
-  "@mcp-use/server/registerViews"
-);
+export const registerViews: unique symbol = Symbol("mcp-use/registerViews");
 
 /**
  * Options for priming the views registry.
