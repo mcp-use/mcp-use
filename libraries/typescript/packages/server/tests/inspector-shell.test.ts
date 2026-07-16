@@ -10,7 +10,7 @@ import { MCPServer } from "../src/index.js";
 import type { ServerConfig } from "../src/index.js";
 
 const DEFAULT_CDN_URL =
-  "https://pub-5337e54ad50f432cab3e646138da1efc.r2.dev/inspector@11.0.0.js";
+  "https://cdn.jsdelivr.net/npm/@mcp-use/inspector@beta/dist/cdn/inspector.js";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -91,10 +91,10 @@ describe("inspector shell route", () => {
     expect(html).toContain("window.location.origin + basePath");
     // Browser polyfill for the bundle's Node-flavored module-scope code.
     expect(html).toContain("window.process = {");
-    // Root node for the bundle to mount into, and a dark background so the
-    // page doesn't flash white before the UI paints.
+    // Root node for the bundle to mount into, with the inspector's neutral
+    // background applied before the UI paints.
     expect(html).toContain('<div id="root">');
-    expect(html).toContain("background-color: #0c0c0d");
+    expect(html).toContain("background-color: #f3f3f3");
     // The server name appears (escaped) in the title.
     expect(html).toContain("<title>shell-test — MCP Inspector</title>");
     await server.close();
@@ -154,7 +154,7 @@ describe("inspector shell route", () => {
       '<link rel="stylesheet" href="https://intranet.example.com/vendor/inspector.css" />'
     );
     // The default CDN URL is fully replaced, not merely preferred.
-    expect(html).not.toContain("r2.dev");
+    expect(html).not.toContain("cdn.jsdelivr.net");
     await server.close();
   });
 
