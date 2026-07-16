@@ -10,3 +10,7 @@ Sibling examples for MCP Apps views with `mcp-use`:
   [`excalidraw/excalidraw-mcp`](https://github.com/excalidraw/excalidraw-mcp)
   app with `viewConfig.autoResize` / `displayModes`, safe partial parsing until
   the structured result or tool-error latch, fullscreen editing, and checkpoints
+- [`generated-world/`](./generated-world/) — model-authored Three.js environment
+  code delivered by a v2 MCP server and compiled in an ephemeral nested sandbox
+  with deterministic randomness, runtime feedback, scene budgets, animation
+  hooks, and a flying camera
