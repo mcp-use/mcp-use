@@ -33,7 +33,7 @@ export interface ModelContextParams {
  * @internal
  */
 export interface ModelContextStoreHost {
-  /** Connect (or return the connected / in-flight App). */
+  /** Connect once, or return the cached in-flight / settled connection promise. */
   connect(): Promise<App>;
 }
 
@@ -143,15 +143,6 @@ export class ModelContextStore {
     if (this.#nodes.size === 0) return;
     this.#nodes.clear();
     this.#updateDesiredAndSchedule();
-  }
-
-  /**
-   * Called by the owning runtime after a successful `connect` generation so a
-   * dirty payload retries without requiring another mutation.
-   */
-  notifyConnected(): void {
-    if (this.#disposed) return;
-    this.#schedulePump();
   }
 
   /**

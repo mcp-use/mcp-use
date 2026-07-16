@@ -20,34 +20,51 @@ function createFailingTransport(error: Error): ViewRuntimeTransport {
   } as ViewRuntimeTransport;
 }
 
-/**
- * Transport that rejects `start()` after `fail()` so connect can be
- * superseded mid-flight.
- */
-function createDeferredFailTransport(error: Error): {
-  transport: ViewRuntimeTransport;
-  fail: () => void;
-} {
-  let rejectStart: ((err: Error) => void) | undefined;
-  const transport = {
-    async start() {
-      await new Promise<void>((_resolve, reject) => {
-        rejectStart = reject;
-      });
-    },
-    async send() {},
-    async close() {},
-  } as ViewRuntimeTransport;
-
-  return {
-    transport,
-    fail() {
-      rejectStart?.(error);
-    },
-  };
-}
-
 describe("McpAppRuntime (Phase 5)", () => {
+  it("eagerly creates one App and registers multiple tools before connect", async () => {
+    const [guestTransport, hostTransport] = createPairedTransports();
+    const runtime = createMcpAppRuntime(normalizeViewConfig(), {
+      transport: guestTransport,
+    });
+    const app = runtime.getApp();
+
+    expect(app).not.toBeNull();
+    expect(runtime.getApp()).toBe(app);
+
+    runtime.registerViewTool("first", {}, async () => ({
+      content: [{ type: "text" as const, text: "one" }],
+    }));
+    runtime.registerViewTool("second", {}, async () => ({
+      content: [{ type: "text" as const, text: "two" }],
+    }));
+
+    const bridge = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init = new Promise<void>((resolve) => {
+      bridge.oninitialized = () => resolve();
+    });
+    await bridge.connect(hostTransport);
+    const connected = await runtime.connect();
+    await init;
+
+    expect(connected).toBe(app);
+    expect(runtime.getApp()).toBe(app);
+    expect((await bridge.listTools({})).tools.map((tool) => tool.name)).toEqual(
+      ["first", "second"]
+    );
+    await expect(
+      bridge.callTool({ name: "first", arguments: {} })
+    ).resolves.toMatchObject({ content: [{ text: "one" }] });
+    await expect(
+      bridge.callTool({ name: "second", arguments: {} })
+    ).resolves.toMatchObject({ content: [{ text: "two" }] });
+
+    await runtime.dispose();
+  });
+
   it("serves an empty tools list before any registerViewTool", async () => {
     const [guestTransport, hostTransport] = createPairedTransports();
     const runtime = createMcpAppRuntime(normalizeViewConfig(), {
@@ -125,110 +142,98 @@ describe("McpAppRuntime (Phase 5)", () => {
     await runtime.dispose();
   });
 
-  it("failed connection followed by successful retry creates a fresh App", async () => {
-    const failError = new Error("inject-fail");
-    const runtime = createMcpAppRuntime(normalizeViewConfig(), {
-      transport: createFailingTransport(failError),
+  it("registers tools while connection is in flight", async () => {
+    const [guestTransport, hostTransport] = createPairedTransports();
+    const originalStart = guestTransport.start.bind(guestTransport);
+    let releaseStart: (() => void) | undefined;
+    const startGate = new Promise<void>((resolve) => {
+      releaseStart = resolve;
     });
+    guestTransport.start = async () => {
+      await startGate;
+      await originalStart();
+    };
+    const runtime = createMcpAppRuntime(normalizeViewConfig(), {
+      transport: guestTransport,
+    });
+    const app = runtime.getApp();
+    expect(app).not.toBeNull();
 
-    await expect(runtime.connect()).rejects.toThrow(
+    const bridge = new AppBridge(
+      null,
+      { name: "test-host", version: "1.0.0" },
+      { openLinks: {}, serverTools: {} }
+    );
+    const init = new Promise<void>((resolve) => {
+      bridge.oninitialized = () => resolve();
+    });
+    await bridge.connect(hostTransport);
+    const connection = runtime.connect();
+
+    runtime.registerViewTool("during-init", {}, async () => ({
+      content: [{ type: "text" as const, text: "ready" }],
+    }));
+    const listLocally = app!.onlisttools as unknown as () => Promise<{
+      tools: { name: string }[];
+    }>;
+    expect((await listLocally()).tools.map((tool) => tool.name)).toEqual([
+      "during-init",
+    ]);
+
+    releaseStart?.();
+    await connection;
+    await init;
+    expect((await bridge.listTools({})).tools.map((tool) => tool.name)).toEqual(
+      ["during-init"]
+    );
+
+    await runtime.dispose();
+  });
+
+  it("caches one terminal connection failure and retains the same App", async () => {
+    const failError = new Error("inject-fail");
+    let startCount = 0;
+    const transport = createFailingTransport(failError);
+    const originalStart = transport.start.bind(transport);
+    transport.start = async () => {
+      startCount += 1;
+      await originalStart();
+    };
+    const runtime = createMcpAppRuntime(normalizeViewConfig(), { transport });
+    const app = runtime.getApp();
+    expect(app).not.toBeNull();
+
+    const first = runtime.connect();
+    const second = runtime.connect();
+    expect(second).toBe(first);
+    await expect(first).rejects.toThrow(
       /inject-fail|already connected|invalid/i
     );
-    expect(runtime.getHostSnapshot().isConnected).toBe(false);
-    expect(runtime.getHostSnapshot().connectionError).toBeInstanceOf(Error);
-    expect(runtime.getApp()).toBeNull();
-
-    const [guestTransport, hostTransport] = createPairedTransports();
-    runtime.setTransport(guestTransport);
-
-    const bridge = new AppBridge(
-      null,
-      { name: "test-host", version: "1.0.0" },
-      { openLinks: {}, serverTools: {} }
+    await expect(second).rejects.toThrow(
+      /inject-fail|already connected|invalid/i
     );
-    const init = new Promise<void>((resolve) => {
-      bridge.oninitialized = () => resolve();
-    });
-    await bridge.connect(hostTransport);
 
-    const app = await runtime.connect();
-    await init;
-    expect(runtime.getHostSnapshot().isConnected).toBe(true);
-    expect(runtime.getHostSnapshot().connectionError).toBeUndefined();
+    const third = runtime.connect();
+    expect(third).toBe(first);
+    await expect(third).rejects.toThrow(
+      /inject-fail|already connected|invalid/i
+    );
+    expect(startCount).toBe(1);
     expect(runtime.getApp()).toBe(app);
-
-    await runtime.dispose();
-  });
-
-  it("an old generation's late failure does not affect a newer generation", async () => {
-    const { transport: hangingTransport, fail } = createDeferredFailTransport(
-      new Error("late-fail")
-    );
-    const runtime = createMcpAppRuntime(normalizeViewConfig(), {
-      transport: hangingTransport,
+    expect(runtime.getHostSnapshot()).toMatchObject({
+      isConnected: false,
+      connectionError: expect.any(Error),
     });
 
-    const first = runtime.connect();
-    // Let connect enter transport.start before we dispose / retry.
-    await new Promise((resolve) => setTimeout(resolve, 10));
-
-    await runtime.dispose();
-
-    // Late failure from the disposed generation must not resurrect state.
-    fail();
-    await expect(first).rejects.toThrow();
-
-    expect(runtime.getApp()).toBeNull();
-    await expect(runtime.connect()).rejects.toThrow(/disposed/);
-  });
-
-  it("old generation late completion does not replace a newer connected App", async () => {
-    let releaseClose: (() => void) | undefined;
-    const closeGate = new Promise<void>((resolve) => {
-      releaseClose = resolve;
-    });
-
-    const failingTransport = {
-      async start() {},
-      async send() {
-        throw new Error("gen1-fail");
-      },
-      async close() {
-        await closeGate;
-      },
-    } as ViewRuntimeTransport;
-
-    const runtime = createMcpAppRuntime(normalizeViewConfig(), {
-      transport: failingTransport,
-    });
-
-    const first = runtime.connect();
-    // Failure clears connectPromise then awaits transport.close (gated). Wait
-    // until gen1 is parked in cleanup so gen2 can start.
-    await new Promise((resolve) => setTimeout(resolve, 30));
-
-    const [guestTransport, hostTransport] = createPairedTransports();
-    runtime.setTransport(guestTransport);
-
-    const bridge = new AppBridge(
-      null,
-      { name: "test-host", version: "1.0.0" },
-      { openLinks: {}, serverTools: {} }
-    );
-    const init = new Promise<void>((resolve) => {
-      bridge.oninitialized = () => resolve();
-    });
-    await bridge.connect(hostTransport);
-
-    const app2Promise = runtime.connect();
-    releaseClose?.();
-    const app2 = await app2Promise;
-    await init;
-    await expect(first).rejects.toThrow(/gen1-fail/);
-
-    expect(runtime.getApp()).toBe(app2);
-    expect(runtime.getHostSnapshot().isConnected).toBe(true);
-    expect((await bridge.listTools({})).tools).toEqual([]);
+    runtime.registerViewTool("after-failure", {}, async () => ({
+      content: [{ type: "text" as const, text: "still registered" }],
+    }));
+    const listLocally = app!.onlisttools as unknown as () => Promise<{
+      tools: { name: string }[];
+    }>;
+    expect((await listLocally()).tools.map((tool) => tool.name)).toEqual([
+      "after-failure",
+    ]);
 
     await runtime.dispose();
   });

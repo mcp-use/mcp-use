@@ -10,7 +10,8 @@ the model plays O by calling `place-mark` while the view is open.
   while mounted; the model calls it to place O marks. Game state lives entirely
   in React state inside the view.
 - **Stable discovery** — `place-mark` remains registered while the view is
-  mounted; its handler rejects calls made out of turn or with an illegal cell.
+  mounted; its handler reports out-of-turn calls without failing and rejects
+  illegal cells.
 - **`ModelContext`** — board state (9-cell array, turn, outcome) is exposed so
   the model can pick a legal cell.
 - **`useSendFollowUp`** — after the user places X, the view prompts the model
@@ -19,6 +20,10 @@ the model plays O by calling `place-mark` while the view is open.
   `start-game`.
 - **Zero-codegen typing** via `src/tools.d.ts` and the exported `startGame`
   tool ref.
+- **Latched initial context** — `useToolContext<"start-game">()` remains
+  pending through progressive input, then permanently latches the first
+  structured result or tool error. Later `place-mark` lifecycle notifications
+  cannot replace the game bootstrap data.
 - **Tailwind CSS v4** — `vite.config.ts` (`@tailwindcss/vite`) and
   `@import "tailwindcss"` in `view.css`.
 
@@ -28,10 +33,13 @@ the model plays O by calling `place-mark` while the view is open.
   bottom-right).
 - User is **X**; model is **O**.
 - `place-mark` input: `{ cell: number }` (0–8).
-- Successful `place-mark` results include structured board state (`cell`,
-  serialized `board`, `winner`, and `nextTurn`) for the host and model.
-- Rejected with `isError` when it is not the model's turn or the cell is
-  already taken.
+- Successful `place-mark` results include an `outcome` plus structured board
+  state for the host and model. A placed mark includes `cell`, serialized
+  `board`, `winner`, and `nextTurn`.
+- When it is not the model's turn, `place-mark` returns a successful response
+  with `outcome: "not-model-turn"`, the unchanged board state, and text telling
+  the model to wait for the player.
+- Rejected with `isError` when the cell is already taken.
 
 ## Tools
 

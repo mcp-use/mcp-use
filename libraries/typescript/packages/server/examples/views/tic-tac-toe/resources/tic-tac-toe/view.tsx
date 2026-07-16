@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   ModelContext,
   ThemeProvider,
-  ToolError,
   ViewControls,
   useSendFollowUp,
   useToolContext,
@@ -27,6 +26,38 @@ const WIN_LINES = [
   [0, 4, 8],
   [2, 4, 6],
 ] as const;
+
+const placeMarkOutputSchema = z.discriminatedUnion("outcome", [
+  z.object({
+    outcome: z.literal("placed"),
+    cell: z.number().int().min(0).max(8),
+    board: z.string(),
+    winner: z.enum(["X", "O", "draw"]).nullable(),
+    nextTurn: z.literal("player").nullable(),
+  }),
+  z.object({
+    outcome: z.literal("not-model-turn"),
+    board: z.string(),
+    winner: z.enum(["X", "O", "draw"]).nullable(),
+    nextTurn: z.literal("player"),
+  }),
+]);
+
+const placeMarkDefinition = {
+  name: "place-mark",
+  title: "Place your O",
+  description:
+    "Place your O on the tic-tac-toe board. Cells are numbered 0-8, row-major (0 = top-left, 8 = bottom-right). Only callable on your turn.",
+  inputSchema: z.object({
+    cell: z
+      .number()
+      .int()
+      .min(0)
+      .max(8)
+      .describe("Board cell index, 0-8 row-major"),
+  }),
+  outputSchema: placeMarkOutputSchema,
+} as const;
 
 const rootClass =
   "p-4 font-sans bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100";
@@ -87,10 +118,7 @@ function BoardSkeleton({ pulsing }: { pulsing?: boolean }) {
 
 function StatusBanner({ turn, winner }: { turn: Turn; winner: Winner }) {
   return (
-    <p
-      className="m-0 text-base font-medium"
-      aria-live="polite"
-    >
+    <p className="m-0 text-base font-medium" aria-live="polite">
       {statusLabel(turn, winner)}
     </p>
   );
@@ -144,38 +172,33 @@ function TicTacToeGame({ firstMove }: { firstMove: Turn }) {
   // Ephemeral tool the model calls to place O. Keep it discoverable for the
   // entire view lifetime; the handler enforces whether a move is currently
   // legal and always sees the latest React state.
-  useViewTool(
-    {
-      name: "place-mark",
-      title: "Place your O",
-      description:
-        "Place your O on the tic-tac-toe board. Cells are numbered 0-8, row-major (0 = top-left, 8 = bottom-right). Only callable on your turn.",
-      inputSchema: z.object({
-        cell: z
-          .number()
-          .int()
-          .min(0)
-          .max(8)
-          .describe("Board cell index, 0-8 row-major"),
-      }),
-    },
+  useViewTool<typeof placeMarkDefinition>(
+    placeMarkDefinition,
     async ({ cell }) => {
       if (turn !== "model") {
         return {
-          isError: true,
           content: [
             {
               type: "text",
               text: "Not the model's turn — wait for the player to place X.",
             },
           ],
+          structuredContent: {
+            outcome: "not-model-turn" as const,
+            board: serializeBoard(board),
+            winner,
+            nextTurn: "player" as const,
+          },
         };
       }
       if (winner !== null) {
         return {
           isError: true,
           content: [
-            { type: "text", text: `Game is over (${winner}). Start a new game.` },
+            {
+              type: "text",
+              text: `Game is over (${winner}). Start a new game.`,
+            },
           ],
         };
       }
@@ -217,6 +240,7 @@ function TicTacToeGame({ firstMove }: { firstMove: Turn }) {
       return {
         content: [{ type: "text", text }],
         structuredContent: {
+          outcome: "placed" as const,
           cell,
           board: serializeBoard(nextBoard),
           winner: nextWinner,
@@ -282,8 +306,7 @@ function TicTacToeGame({ firstMove }: { firstMove: Turn }) {
         aria-label="Tic-tac-toe board"
       >
         {board.map((value, index) => {
-          const cellDisabled =
-            gameOver || turn !== "player" || value != null;
+          const cellDisabled = gameOver || turn !== "player" || value != null;
           return (
             <CellButton
               key={index}
@@ -310,31 +333,10 @@ function TicTacToeContent() {
   const theme = useViewTheme();
   const root = theme === "dark" ? `dark ${rootClass}` : rootClass;
 
-  if (view.status === "streaming") {
-    return <BoardSkeleton pulsing />;
-  }
-
-  if (view.status === "cancelled") {
-    return (
-      <div className={root}>
-        <p className="m-0 font-medium">Game cancelled</p>
-        {typeof view.reason === "string" && view.reason.length > 0 ? (
-          <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
-            {view.reason}
-          </p>
-        ) : null}
-      </div>
-    );
-  }
-
   if (view.status === "error") {
     return (
       <div className={root} role="alert">
-        <p className="m-0 font-medium">
-          {view.error instanceof ToolError
-            ? "Failed to start game"
-            : "Invalid tool result"}
-        </p>
+        <p className="m-0 font-medium">Failed to start game</p>
         <p className="mt-2 mb-0 text-sm text-neutral-600 dark:text-neutral-400">
           {view.error.message}
         </p>
@@ -343,7 +345,7 @@ function TicTacToeContent() {
   }
 
   if (view.status === "pending") {
-    return <BoardSkeleton />;
+    return <BoardSkeleton pulsing={view.toolInput !== undefined} />;
   }
 
   // Mount game only when ready so `useState(firstMove)` seeds once.

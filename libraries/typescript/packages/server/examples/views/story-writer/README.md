@@ -7,9 +7,8 @@ they arrive via `useToolContext<"write-story">()`.
 
 ## What this demonstrates
 
-- **Streaming tool input** — arguments land in `toolInput` (a `DeepPartial`)
-  while `status === "streaming"`, including the `"cancelled"` and `"error"`
-  branches.
+- **Progressive tool input** — partial and complete argument notifications
+  replace the pending `toolInput` snapshot (a `DeepPartial`).
 - **Default `viewConfig`** — no named export; runtime defaults apply
   (`autoResize: true`, all standard display modes).
 - **File-based views** under `resources/<name>/view.tsx`, discovered by
@@ -28,21 +27,20 @@ they arrive via `useToolContext<"write-story">()`.
 a short summary (`title`, `wordCount`). The view uses
 `useToolContext<"write-story">()` and branches on `status`:
 
-- `"streaming"` — progressive `toolInput` (a `DeepPartial`); title and story
-  grow as tokens arrive; the UI shows a caret and a "Writing…" indicator.
-- `"pending"` — waiting to start, or complete input received and awaiting the
-  tool result ("Finishing…").
+- `"pending"` — before input, show the waiting state; once `toolInput` exists,
+  title and story grow progressively with a caret and “Writing…” indicator.
 - `"ready"` — final layout from complete `toolInput` plus `toolOutput.wordCount`
   (ready requires a non-error result with `structuredContent`).
-- `"cancelled"` — dimmed partial story plus `reason` when the host cancels.
-- `"error"` — tool failure (`instanceof ToolError`) or malformed non-error
-  result (`instanceof InvalidToolResultError`); both expose `error.message`;
-  no typed `toolOutput`.
+- `"error"` — a `ToolError` with no typed `toolOutput`.
+
+The first structured result or tool error is latched. Content-only ambient
+results are ignored and later tool lifecycle notifications cannot replace the
+story that rendered the View.
 
 To see it: run `pnpm dev` (`mcp-use dev`), open the inspector chat, and ask for
 a short story. The inspector forwards the model's streamed tool arguments to the
-view as `ui/notifications/tool-input-partial`, which drives
-`status === "streaming"`.
+view as `ui/notifications/tool-input-partial`, which replaces the pending
+`toolInput` snapshot and rerenders the same component.
 
 ## Run locally
 
