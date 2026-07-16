@@ -1,6 +1,5 @@
 import type { LLMConfig } from "./types";
 
-import { Badge } from "@/client/components/ui/badge";
 import { Button } from "@/client/components/ui/button";
 import {
   Tooltip,
@@ -15,8 +14,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/client/components/ui/dropdown-menu";
-import type { ProviderName } from "@/llm/types";
-import { ProviderIcon } from "./providerMeta";
+import type { ProviderName } from "@mcp-use/agent";
+import { ChatTitleReveal } from "@/client/chat-history/ChatTitleReveal";
+import { CHAT_TITLE_SIMPLE } from "@/client/chat-history/chat-title";
+import {
+  inspectorTabHeaderPadding,
+  inspectorTabTitleClass,
+} from "@/client/lib/font-weight";
+import { cn } from "@/client/lib/utils";
+import { TabsSubtle, TabsSubtleItem } from "@/client/components/ui/tabs-subtle";
+import {
+  chatBarActionButtonClass,
+  chatBarTitleFrostedClass,
+} from "./chat-bar-styles";
+
+const CHAT_VIEW_TABS_ID = "chat-view";
 
 interface ChatHeaderProps {
   llmConfig: LLMConfig | null;
@@ -48,6 +60,13 @@ interface ChatHeaderProps {
   freeTierInfo?: {
     onLoginClick: () => void;
   };
+  managedCloudInfo?: {
+    models: import("./useManagedCloudModel").CloudModel[];
+    selectedModelId: string;
+    onModelChange: (modelId: string) => void;
+    isLoading?: boolean;
+  };
+  onUseManagedCloud?: () => void;
   /** Label for the clear/new-chat button. Default: "New Chat". */
   clearButtonLabel?: string;
   /** When true, hides the "Chat" title in the header. */
@@ -60,6 +79,17 @@ interface ChatHeaderProps {
   clearButtonVariant?: "default" | "secondary" | "ghost" | "outline";
   /** When true, hides the "New Chat" / clear button entirely. */
   hideClearButton?: boolean;
+  /** Active chat id — enables animated title reveal in the header. */
+  activeChatId?: string | null;
+  /** Title for the active chat thread. */
+  chatTitle?: string;
+  /** When true, shows Conv / Raw tabs in the header. */
+  showViewToggle?: boolean;
+  /** 0 = Conv, 1 = Raw */
+  viewIndex?: 0 | 1;
+  onViewIndexChange?: (index: number) => void;
+  /** Raise header above host chrome (cloud embed). */
+  elevatedHeader?: boolean;
 }
 
 export function ChatHeader({
@@ -80,6 +110,8 @@ export function ChatHeader({
   onClearConfig,
   hideConfigButton,
   freeTierInfo,
+  managedCloudInfo,
+  onUseManagedCloud,
   clearButtonLabel,
   hideTitle,
   clearButtonHideIcon,
@@ -88,50 +120,70 @@ export function ChatHeader({
   hideClearButton,
   onCopyChat,
   onExportChat,
+  activeChatId,
+  chatTitle,
+  showViewToggle,
+  viewIndex = 0,
+  onViewIndexChange,
+  elevatedHeader,
 }: ChatHeaderProps) {
   return (
-    <div className="flex flex-row absolute top-0 right-0 z-10 w-full items-center justify-between p-1 pt-2 gap-2">
-      <div className="flex items-center gap-2 rounded-full p-2 px-2 sm:px-4">
-        {!hideTitle && <h3 className="text-xl sm:text-3xl font-base">Chat</h3>}
-        {llmConfig && (!hideConfigButton || freeTierInfo) && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Badge
-                variant="secondary"
-                className="hidden sm:flex ml-2 pl-1 font-mono text-[11px] cursor-pointer hover:bg-secondary/80 transition-colors"
-                onClick={() => onConfigDialogOpenChange(true)}
-              >
-                <ProviderIcon provider={llmConfig.provider} className="mr-0" />
-                {llmConfig.provider}/{llmConfig.model}
-              </Badge>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>
-                {freeTierInfo ? "Change model / upgrade" : "Change API Key"}
-              </p>
-            </TooltipContent>
-          </Tooltip>
+    <div
+      className={cn(
+        "relative flex w-full items-center gap-2 overflow-visible",
+        inspectorTabHeaderPadding,
+        elevatedHeader
+          ? "pointer-events-none absolute top-0 right-0 z-50"
+          : "absolute top-0 right-0 z-10"
+      )}
+    >
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 items-center",
+          elevatedHeader && "pointer-events-auto"
+        )}
+      >
+        {!hideTitle && (
+          <h2 className={cn(inspectorTabTitleClass, chatBarTitleFrostedClass)}>
+            {activeChatId ? (
+              <ChatTitleReveal
+                key={activeChatId}
+                chatId={activeChatId}
+                title={chatTitle ?? CHAT_TITLE_SIMPLE}
+              />
+            ) : (
+              CHAT_TITLE_SIMPLE
+            )}
+          </h2>
         )}
       </div>
-      <div className="flex items-center gap-2 pr-2 sm:pr-3 pt-0 sm:pt-2 shrink-0">
-        {/* Mobile: Show provider icon button when config exists (leftmost on mobile) */}
-        {llmConfig && (!hideConfigButton || freeTierInfo) && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="p-2 sm:hidden"
-                onClick={() => onConfigDialogOpenChange(true)}
-              >
-                <ProviderIcon provider={llmConfig.provider} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Change API Key</p>
-            </TooltipContent>
-          </Tooltip>
+
+      {showViewToggle && onViewIndexChange && (
+        <div
+          className={cn(
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-visible px-1",
+            elevatedHeader && "pointer-events-auto"
+          )}
+        >
+          <TabsSubtle
+            selectedIndex={viewIndex}
+            onSelect={onViewIndexChange}
+            idPrefix={CHAT_VIEW_TABS_ID}
+            className="shrink-0 overflow-visible"
+            data-testid="chat-view-tabs"
+          >
+            <TabsSubtleItem label="Conv" index={0} />
+            <TabsSubtleItem label="Raw" index={1} />
+          </TabsSubtle>
+        </div>
+      )}
+
+      <div
+        className={cn(
+          "ml-auto flex shrink-0 items-center gap-2",
+          elevatedHeader && "pointer-events-auto"
         )}
+      >
         {/* New Chat / Clear button */}
         {!hideClearButton && hasMessages && (
           <div className="flex items-center gap-1">
@@ -140,7 +192,7 @@ export function ChatHeader({
                 data-testid="chat-copy-button"
                 variant="ghost"
                 size="sm"
-                className="h-9 gap-1.5 px-3"
+                className={chatBarActionButtonClass}
                 onClick={onCopyChat}
               >
                 <Copy className="h-4 w-4" />
@@ -150,17 +202,20 @@ export function ChatHeader({
 
             {onExportChat && (
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    data-testid="chat-export-button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-9 gap-1.5 px-3"
-                  >
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Export</span>
-                  </Button>
-                </DropdownMenuTrigger>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      data-testid="chat-export-button"
+                      variant="ghost"
+                      size="sm"
+                      className={chatBarActionButtonClass}
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="hidden sm:inline">Export</span>
+                    </Button>
+                  }
+                  nativeButton
+                />
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     data-testid="chat-export-json"
@@ -181,26 +236,29 @@ export function ChatHeader({
             <div className="w-px h-4 bg-border mx-1" />
 
             <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={clearButtonVariant ?? "default"}
-                  size="default"
-                  className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
-                  onClick={onClearChat}
-                >
-                  {!clearButtonHideIcon && (
-                    <SquarePen className="h-4 w-4 sm:mr-2" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {clearButtonLabel ?? "New Chat"}
-                  </span>
-                  {!clearButtonHideShortcut && (
-                    <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
-                      ⌘O
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant={clearButtonVariant ?? "default"}
+                    size="default"
+                    className={`p-2 cursor-pointer ${clearButtonHideShortcut ? "sm:px-3" : "sm:pr-1 sm:pl-3"}`}
+                    onClick={onClearChat}
+                  >
+                    {!clearButtonHideIcon && (
+                      <SquarePen className="h-4 w-4 sm:mr-2" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {clearButtonLabel ?? "New Chat"}
                     </span>
-                  )}
-                </Button>
-              </TooltipTrigger>
+                    {!clearButtonHideShortcut && (
+                      <span className="hidden sm:inline text-[12px] border text-zinc-300 p-1 rounded-full border-zinc-300 dark:text-zinc-600 dark:border-zinc-500 ml-2">
+                        ⌘O
+                      </span>
+                    )}
+                  </Button>
+                }
+                nativeButton
+              />
               <TooltipContent>
                 <p>{clearButtonLabel ?? "New Chat"}</p>
               </TooltipContent>
@@ -210,7 +268,7 @@ export function ChatHeader({
         {/* Always render the dialog for when it's opened. In hosted-managed mode
             `freeTierInfo` is set and the dialog renders a Sign-in CTA above the
             bring-your-own-key form. */}
-        {(!hideConfigButton || freeTierInfo) && (
+        {(!hideConfigButton || freeTierInfo || managedCloudInfo) && (
           <ConfigurationDialog
             open={configDialogOpen}
             onOpenChange={onConfigDialogOpenChange}
@@ -224,9 +282,11 @@ export function ChatHeader({
             onBaseUrlChange={onBaseUrlChange}
             onSave={onSaveConfig}
             onClear={onClearConfig}
-            showClearButton={!!llmConfig && !freeTierInfo}
+            showClearButton={!!llmConfig && !freeTierInfo && !managedCloudInfo}
             buttonLabel={llmConfig ? "Change API Key" : "Configure API Key"}
             freeTierInfo={freeTierInfo}
+            managedCloudInfo={managedCloudInfo}
+            onUseManagedCloud={onUseManagedCloud}
           />
         )}
       </div>

@@ -1,19 +1,39 @@
 import type {
+  ClientOptions,
   CompleteRequestParams,
   CompleteResult,
-  CreateMessageRequest,
-  CreateMessageResult,
   ElicitRequestFormParams,
   ElicitRequestURLParams,
   ElicitResult,
   Notification,
+  OAuthClientProvider,
+  ProtocolEra,
+  Transport,
   Prompt,
   Resource,
-  ResourceTemplate,
+  // v2 exports the resource-template type as `ResourceTemplateType` (the bare
+  // `ResourceTemplate` name is the server package's class).
+  ResourceTemplateType as ResourceTemplate,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { OAuthClientProvider } from "@modelcontextprotocol/sdk/client/auth.js";
-import type { BrowserMCPClient } from "../client/browser.js";
+  VersionNegotiationMode,
+} from "@modelcontextprotocol/client";
+import type { BaseMCPClient } from "../core/base.js";
+import type {
+  SamplingCreateMessageParams,
+  SamplingCreateMessageResult,
+} from "../core/config.js";
+
+/** Proxy configuration for routing MCP traffic through a proxy server. */
+export interface ProxyConfig {
+  /** Proxy server address (e.g. "http://localhost:3001/inspector/api/proxy"). */
+  proxyAddress?: string;
+  /** Additional headers to include in proxied requests. */
+  headers?: Record<string, string>;
+  /**
+   * @deprecated Use `headers` instead.
+   */
+  customHeaders?: Record<string, string>;
+}
 
 /**
  * SDK-level reconnection options for streamable HTTP transports.
@@ -36,14 +56,20 @@ export type UseMcpOptions = {
   /** Enable/disable the connection (similar to TanStack Query). When false, no connection will be attempted (default: true) */
   enabled?: boolean;
   /** Proxy configuration for routing through a proxy server */
-  proxyConfig?: {
-    proxyAddress?: string;
-    headers?: Record<string, string>;
-    /**
-     * @deprecated Use `headers` instead. This option will be removed in a future version.
-     */
-    customHeaders?: Record<string, string>;
-  };
+  proxyConfig?: ProxyConfig;
+  /**
+   * OAuth proxy base URL (e.g. `https://inspector.example.com/inspector/api/oauth`)
+   * used to route OAuth requests (`.well-known` discovery, DCR, token exchange)
+   * through a transparent server-side proxy — bypassing browser CORS against
+   * third-party identity providers — WITHOUT proxying MCP traffic itself.
+   *
+   * The proxy is transparent: it forwards requests and responses unmodified, so
+   * the SDK's authorization-server issuer validation (RFC 8414 §3.3) still
+   * passes. When omitted, the OAuth proxy URL is derived from
+   * `proxyConfig.proxyAddress` (replacing a trailing `/proxy` with `/oauth`),
+   * preserving the existing behavior for fully-proxied connections.
+   */
+  oauthProxyUrl?: string;
   /**
    * Connection policy used by higher-level clients such as the Inspector.
    * Behavior is controlled by `proxyConfig` and `autoProxyFallback`; this field
@@ -56,11 +82,11 @@ export type UseMcpOptions = {
    * automatically retries using the proxy configuration
    *
    * Can be:
-   * - `true`: Enable with default proxy (https://inspector.mcp-use.com/inspector/api/proxy)
+   * - `true`: Enable with `proxyConfig.proxyAddress`
    * - `false`: Disable automatic fallback (default)
    * - `{ enabled: boolean, proxyAddress?: string }`: Custom configuration
    *
-   * @default false
+   * @defaultValue false
    *
    * @example
    * ```typescript
@@ -87,39 +113,12 @@ export type UseMcpOptions = {
   callbackUrl?: string;
   /** Storage key prefix for OAuth data in localStorage (defaults to "mcp:auth") */
   storageKeyPrefix?: string;
-  /**
-   * @deprecated Use `clientInfo` instead. This option will be removed in a future version.
-   * The `clientConfig` will be automatically derived from `clientInfo` for OAuth registration.
-   *
-   * Client configuration for OAuth registration (deprecated - derived from clientInfo).
-   */
-  clientConfig?: {
-    /** Client name (used for OAuth registration) */
-    name?: string;
-    /** Client version (used for OAuth registration) */
-    version?: string;
-    /** Client URI/homepage (used for OAuth registration) */
-    uri?: string;
-    /** Client logo URI (used for OAuth registration, defaults to https://mcp-use.com/logo.png) */
-    logo_uri?: string;
-  };
   /** Headers that can be used to bypass auth */
   headers?: Record<string, string>;
   /**
-   * @deprecated Use `headers` instead. This option will be removed in a future version.
-   * Custom headers that can be used to bypass auth
-   */
-  customHeaders?: Record<string, string>;
-  /**
-   * @deprecated Use `logLevel` instead. This option will be removed in a future version.
-   * Whether to enable verbose debug logging to the console and the log state.
-   * When `logLevel` is also set, `logLevel` takes precedence.
-   */
-  debug?: boolean;
-  /**
-   * Log level for console output. When set, takes precedence over the `debug` option.
+   * Log level for console output.
    * Set to 'silent' to suppress ALL console logging (the `mcp.log` state array is still populated).
-   * @default undefined (falls back to 'info' or 'debug' when `debug: true`)
+   * @default "silent"
    */
   logLevel?:
     | "silent"
@@ -140,7 +139,7 @@ export type UseMcpOptions = {
    * - `number`: Reconnect delay in ms (enables health checks with defaults)
    * - `object`: Full configuration for reconnection and health checks
    *
-   * @default 3000
+   * @default true (3000ms initial delay)
    */
   autoReconnect?:
     | boolean
@@ -167,26 +166,7 @@ export type UseMcpOptions = {
   /** Popup window features string (dimensions and behavior) for OAuth */
   popupFeatures?: string;
   /**
-   * Transport type preference.
-   *
-   * @deprecated The 'sse' option is deprecated. Use 'http' or 'auto' instead.
-   *
-   * As of MCP spec 2025-11-25, the old HTTP+SSE transport is deprecated in favor
-   * of Streamable HTTP (unified endpoint). StreamableHTTP still supports SSE for
-   * notifications - it just uses a single /mcp endpoint instead of separate endpoints.
-   *
-   * **Backward compatibility:** 'sse' option still works and is maintained.
-   *
-   * Options:
-   * - 'auto': Try HTTP (Streamable HTTP), fallback to SSE if needed (recommended)
-   * - 'http': Use Streamable HTTP only (recommended for new code)
-   * - 'sse': Use old SSE transport (deprecated, but still works)
-   *
-   * @see https://modelcontextprotocol.io/specification/2025-11-25/basic/transports
-   */
-  transportType?: "auto" | "http" | "sse";
-  /**
-   * Prevent automatic authentication popup/redirect on initial connection (default: false)
+   * Prevent automatic authentication popup/redirect on initial connection (default: true)
    * When true, the connection will enter 'pending_auth' state and wait for user to call authenticate()
    * Set to true to show a modal/button before triggering OAuth instead of auto-redirecting
    */
@@ -210,7 +190,8 @@ export type UseMcpOptions = {
   ) => void;
   /**
    * Additional client options passed to the underlying MCP SDK Client.
-   * Use this to advertise custom capabilities (e.g., MCP Apps extension).
+   * Use `capabilities.views: true` as shorthand for the MCP Apps UI extension,
+   * or set `capabilities.extensions` directly.
    *
    * @example
    * ```typescript
@@ -218,44 +199,44 @@ export type UseMcpOptions = {
    *   url: '...',
    *   clientOptions: {
    *     capabilities: {
-   *       extensions: {
-   *         "io.modelcontextprotocol/ui": {
-   *           mimeTypes: ["text/html;profile=mcp-app"],
-   *         },
-   *       },
+   *       views: true,
    *     },
    *   },
    * })
    * ```
    */
-  clientOptions?: {
-    capabilities?: Record<string, unknown>;
+  clientOptions?: Omit<ClientOptions, "capabilities"> & {
+    capabilities?: NonNullable<ClientOptions["capabilities"]> & {
+      views?: boolean;
+    };
   };
+  /**
+   * Protocol version negotiation mode passed to the underlying SDK `Client`.
+   * - `"auto"` (default): probe with `server/discover` to detect modern (2026-07-28)
+   *   servers, falling back to the 2025 handshake against legacy servers.
+   * - `"legacy"`: classic 2025 `initialize` handshake, no probe.
+   * - `{ pin: "2026-07-28" }`: modern era only, no fallback.
+   */
+  protocolNegotiation?: VersionNegotiationMode;
   /** Connection timeout in milliseconds for establishing initial connection (default: 30000 / 30 seconds) */
   timeout?: number;
-  /** SSE read timeout in milliseconds to prevent idle connection drops (default: 300000 / 5 minutes) */
-  sseReadTimeout?: number;
   /** Optional callback to wrap the transport before passing it to the Client. Useful for logging, monitoring, or other transport-level interceptors. */
-  wrapTransport?: (transport: any, serverId: string) => any;
+  wrapTransport?: (transport: Transport, serverId: string) => Transport;
+  /** Stable identifier supplied to `wrapTransport`; defaults to `url`. */
+  serverId?: string;
   /** Callback function that is invoked when a notification is received from the MCP server */
   onNotification?: (notification: Notification) => void;
   /**
    * Optional callback function to handle sampling requests from servers.
    * When provided, the client will declare sampling capability and handle
    * `sampling/createMessage` requests by calling this callback.
+   *
+   * @deprecated Sampling is deprecated by the 2026 protocol. Retained for v1
+   * push requests and v2 multi-round-trip compatibility.
    */
   onSampling?: (
-    params: CreateMessageRequest["params"]
-  ) => Promise<CreateMessageResult>;
-  /**
-   * @deprecated Use `onSampling` instead. This option will be removed in a future version.
-   * Optional callback function to handle sampling requests from servers.
-   * When provided, the client will declare sampling capability and handle
-   * `sampling/createMessage` requests by calling this callback.
-   */
-  samplingCallback?: (
-    params: CreateMessageRequest["params"]
-  ) => Promise<CreateMessageResult>;
+    params: SamplingCreateMessageParams
+  ) => Promise<SamplingCreateMessageResult>;
   /**
    * Optional callback function to handle elicitation requests from servers.
    * When provided, the client will declare elicitation capability and handle
@@ -268,16 +249,7 @@ export type UseMcpOptions = {
   onElicitation?: (
     params: ElicitRequestFormParams | ElicitRequestURLParams
   ) => Promise<ElicitResult>;
-  /**
-   * @deprecated Use `onElicitation` instead. Will be removed in a future version.
-   */
-  elicitationCallback?: (
-    params: ElicitRequestFormParams | ElicitRequestURLParams
-  ) => Promise<ElicitResult>;
-  /**
-   * Client information sent to the MCP server in the initialize request.
-   * If not provided, defaults to mcp-use client info.
-   */
+  /** Client information advertised while establishing the MCP connection. */
   clientInfo?: {
     name: string;
     title?: string;
@@ -314,13 +286,13 @@ export type UseMcpOptions = {
    */
   authProvider?: OAuthClientProvider;
   /**
-   * Pre-registered OAuth client settings.
+   * OAuth client registration settings.
    *
    * Use this when the upstream auth server does **not** support Dynamic Client
    * Registration — for example, MCP servers running in proxy mode against
-   * Slack, WorkOS, or similar providers. The configured `clientId` is returned
-   * directly from `clientInformation()`, bypassing DCR; `scope` is forwarded to
-   * the SDK as `clientMetadata.scope` so it lands in the authorize request.
+   * Slack, WorkOS, or similar providers. Prefer `clientMetadataUrl` when the
+   * authorization server advertises CIMD support; the SDK falls back to DCR
+   * when appropriate.
    *
    * @example
    * ```typescript
@@ -328,7 +300,7 @@ export type UseMcpOptions = {
    *   url: 'https://mcp.example.com',
    *   oauth: {
    *     clientId: 'my-preregistered-client-id',
-   *     clientSecret: 'my-preregistered-client-secret',
+   *     clientMetadataUrl: 'https://app.example.com/oauth/client-metadata.json',
    *     scope: 'openid profile email',
    *   },
    * })
@@ -338,33 +310,76 @@ export type UseMcpOptions = {
     /** Pre-registered OAuth client_id. */
     clientId?: string;
     /**
-     * Pre-registered OAuth client_secret for confidential clients at providers
-     * that don't support PKCE. When set alongside `clientId`, the SDK switches
-     * token-endpoint auth from `none` to `client_secret_basic`/`client_secret_post`.
-     * Only meaningful when `clientId` is also set; ignored otherwise.
+     * Public HTTPS OAuth Client ID Metadata Document URL (CIMD).
+     * The document must contain a matching client_id and redirect_uris.
      */
-    clientSecret?: string;
+    clientMetadataUrl?: string;
     /** OAuth scope string included in the authorize request. */
     scope?: string;
   };
-  /**
-   * Initial server info to use from cache (internal use).
-   * This will be displayed immediately while the actual server info is being fetched.
-   * Once the real server info is available, it will replace this cached value.
-   * @internal
-   */
-  _initialServerInfo?: {
-    name?: string;
-    version?: string;
-    title?: string;
-    websiteUrl?: string;
-    icons?: Array<{
-      src: string;
-      mimeType?: string;
-    }>;
-    icon?: string;
-  };
 };
+
+/**
+ * Serializable configuration for one server managed by `McpClientProvider`.
+ * Pass this to `addServer` / `updateServer`.
+ */
+export interface McpServerConfig extends Omit<
+  UseMcpOptions,
+  "onSampling" | "onElicitation" | "onNotification"
+> {
+  /** Optional user-facing alias. `server.name` always comes from MCP server metadata. */
+  displayName?: string;
+  /** Optional callback invoked when the provider queues sampling. */
+  onSamplingRequest?: (request: PendingSamplingRequest) => void;
+  /** Optional callback invoked when the provider queues elicitation. */
+  onElicitationRequest?: (request: PendingElicitationRequest) => void;
+  /** Optional callback invoked when the provider receives a notification. */
+  onNotificationReceived?: (notification: McpNotification) => void;
+}
+
+/** @deprecated Use {@link McpServerConfig} */
+export type McpServerOptions = McpServerConfig;
+
+/** Persisted connection config (callbacks and runtime wiring stripped). */
+export type PersistedMcpServerConfig = Omit<
+  McpServerConfig,
+  | "authProvider"
+  | "fetch"
+  | "wrapTransport"
+  | "onPopupWindow"
+  | "onSamplingRequest"
+  | "onElicitationRequest"
+  | "onNotificationReceived"
+  | "serverId"
+>;
+
+/** Notification received from one managed MCP server. */
+export interface McpNotification {
+  id: string;
+  method: string;
+  params?: Record<string, unknown>;
+  timestamp: number;
+  read: boolean;
+}
+
+/** A server sampling request awaiting UI or application approval. */
+export interface PendingSamplingRequest {
+  id: string;
+  request: {
+    method: "sampling/createMessage";
+    params: SamplingCreateMessageParams;
+  };
+  timestamp: number;
+  serverName: string;
+}
+
+/** A server elicitation request awaiting UI or application approval. */
+export interface PendingElicitationRequest {
+  id: string;
+  request: ElicitRequestFormParams | ElicitRequestURLParams;
+  timestamp: number;
+  serverName: string;
+}
 
 export type UseMcpResult = {
   name: string;
@@ -377,21 +392,36 @@ export type UseMcpResult = {
   resourceTemplates: ResourceTemplate[];
   /** List of prompts available from the connected MCP server */
   prompts: Prompt[];
-  /** Server information from the initialize response */
+  /** Server information normalized for the active connection. */
   serverInfo?: {
     title?: string;
     name: string;
     version?: string;
+    description?: string;
     websiteUrl?: string;
     icons?: Array<{
       src: string;
       mimeType?: string;
+      sizes?: string[];
     }>;
     /** Base64-encoded favicon auto-detected from server domain */
     icon?: string;
   };
-  /** Server capabilities from the initialize response */
-  capabilities?: Record<string, any>;
+  /** Server capabilities normalized for the active connection. */
+  capabilities?: Record<string, unknown>;
+  /** Optional server instructions advertised for the active connection. */
+  instructions?: string;
+  /** Protocol extension metadata normalized from the server capabilities. */
+  extensions: Record<string, unknown>;
+  /**
+   * Negotiated MCP protocol era for the active connection:
+   * - 'legacy': 2025-era server; lifecycle is managed internally.
+   * - 'modern': 2026-07-28-era server, stateless per-request.
+   * `undefined` until a connection has negotiated.
+   */
+  protocolEra?: ProtocolEra;
+  /** Negotiated MCP protocol version string (e.g. '2025-06-18', '2026-07-28'). */
+  protocolVersion?: string;
   /**
    * The current state of the MCP connection:
    * - 'discovering': Checking server existence and capabilities (including auth requirements).
@@ -552,14 +582,14 @@ export type UseMcpResult = {
   /** Manually attempts to reconnect if the state is 'failed'. */
   retry: () => void;
   /** Disconnects the client from the MCP server. */
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
   /**
    * Manually triggers the authentication process. Useful if the initial attempt failed
    * due to a blocked popup, allowing the user to initiate it via a button click.
    * @returns A promise that resolves with the authorization URL opened (or intended to be opened),
    *          or undefined if auth cannot be started.
    */
-  authenticate: () => void;
+  authenticate: () => Promise<void>;
   /** Clears all stored authentication data (tokens, client info, etc.) for this server URL from localStorage. */
   clearStorage: () => void;
   /**
@@ -578,12 +608,12 @@ export type UseMcpResult = {
    */
   ensureIconLoaded: () => Promise<string | null>;
   /**
-   * The underlying BrowserMCPClient instance.
+   * The underlying runtime-neutral MCP client instance.
    * Use this to create an MCPAgent for AI chat functionality.
    *
    * @example
    * ```typescript
-   * import { MCPAgent } from 'mcp-use'
+   * import { MCPAgent } from "@mcp-use/agent"
    * import { ChatOpenAI } from '@langchain/openai'
    *
    * const mcp = useMcp({ url: 'http://localhost:3000/mcp' })
@@ -597,5 +627,84 @@ export type UseMcpResult = {
    * }
    * ```
    */
-  client: BrowserMCPClient | null;
+  client: BaseMCPClient | null;
 };
+
+/**
+ * Connected MCP server: flat persisted config + live connection state.
+ * Returned from `useMcpClient().servers`.
+ */
+export interface McpServer extends PersistedMcpServerConfig, UseMcpResult {
+  id: string;
+  notifications: McpNotification[];
+  unreadNotificationCount: number;
+  markNotificationRead: (id: string) => void;
+  markAllNotificationsRead: () => void;
+  clearNotifications: () => void;
+  pendingSamplingRequests: PendingSamplingRequest[];
+  approveSampling: (
+    requestId: string,
+    result: SamplingCreateMessageResult
+  ) => void;
+  rejectSampling: (requestId: string, error?: string) => void;
+  pendingElicitationRequests: PendingElicitationRequest[];
+  approveElicitation: (requestId: string, result: ElicitResult) => void;
+  rejectElicitation: (requestId: string, error?: string) => void;
+  /**
+   * Merge connection-affecting config and reconnect when it changed.
+   * Prefer this over context `updateServer(id, …)` when you already hold the server.
+   */
+  updateConfig: (config: Partial<McpServerConfig>) => Promise<void>;
+  /** Set HTTP headers on the connection config and reconnect. */
+  setHeaders: (headers: Record<string, string> | undefined) => Promise<void>;
+  /** Rename the server without disconnecting. */
+  setDisplayName: (displayName: string) => Promise<void>;
+  /** Disconnect and reconnect with the current config. */
+  reconnect: () => Promise<void>;
+}
+
+const PERSISTED_SERVER_CONFIG_KEYS = [
+  "url",
+  "displayName",
+  "enabled",
+  "proxyConfig",
+  "oauthProxyUrl",
+  "connectionMode",
+  "autoProxyFallback",
+  "callbackUrl",
+  "storageKeyPrefix",
+  "headers",
+  "logLevel",
+  "autoRetry",
+  "autoReconnect",
+  "reconnectionOptions",
+  "popupFeatures",
+  "preventAutoAuth",
+  "useRedirectFlow",
+  "clientOptions",
+  "protocolNegotiation",
+  "timeout",
+  "clientInfo",
+  "oauth",
+] as const satisfies readonly (keyof PersistedMcpServerConfig)[];
+
+/** Extract the persisted config subset from input or a connected server. */
+export function pickPersistedServerConfig(
+  source: McpServerConfig | McpServer
+): PersistedMcpServerConfig {
+  const out: PersistedMcpServerConfig = {};
+  for (const key of PERSISTED_SERVER_CONFIG_KEYS) {
+    const value = source[key];
+    if (value !== undefined) {
+      (out as Record<string, unknown>)[key] = value;
+    }
+  }
+  return out;
+}
+
+/** Strip non-persisted fields from a server config before storage / exposure. */
+export function toPersistedServerConfig(
+  config: McpServerConfig
+): PersistedMcpServerConfig {
+  return pickPersistedServerConfig(config);
+}

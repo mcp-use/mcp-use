@@ -1,8 +1,16 @@
+declare global {
+  interface Window {
+    __INSPECTOR_VERSION__?: string;
+  }
+}
+
 export function getPackageVersion(): string {
   try {
-    // Use global variable injected at build time
-    if (typeof __INSPECTOR_VERSION__ !== "undefined") {
-      return __INSPECTOR_VERSION__;
+    if (typeof window !== "undefined") {
+      const version = window.__INSPECTOR_VERSION__;
+      if (version !== undefined) {
+        return version;
+      }
     }
     return "0.0.0";
   } catch {

@@ -2,36 +2,16 @@
  * Unit tests for OAuthSessionStore.
  *
  * Run with:
- *   pnpm --filter mcp-use test:unit -- tests/unit/auth/oauth-session-store.test.ts
+ *   pnpm --filter mcp-use test:unit -- tests/unit/auth/session-store.test.ts
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   OAuthSessionStore,
   type OAuthSessionStoreOptions,
-} from "../../../src/auth/oauth-session-store.js";
-import type { KVStore } from "../../../src/auth/kv-store.js";
-import type { StoredState } from "../../../src/auth/types.js";
-
-// ---- Mocks for SDK refresh path ----
-//
-// `tokens()` triggers a refresh via:
-//   discoverOAuthProtectedResourceMetadata
-//   discoverAuthorizationServerMetadata
-//   refreshAuthorization
-// from `@modelcontextprotocol/sdk/client/auth.js`. These are real network
-// calls in production — mock them here per CLAUDE.md guidance.
-const discoverOAuthProtectedResourceMetadata = vi.fn();
-const discoverAuthorizationServerMetadata = vi.fn();
-const refreshAuthorization = vi.fn();
-
-vi.mock("@modelcontextprotocol/sdk/client/auth.js", () => ({
-  discoverOAuthProtectedResourceMetadata: (...args: unknown[]) =>
-    discoverOAuthProtectedResourceMetadata(...args),
-  discoverAuthorizationServerMetadata: (...args: unknown[]) =>
-    discoverAuthorizationServerMetadata(...args),
-  refreshAuthorization: (...args: unknown[]) => refreshAuthorization(...args),
-}));
+} from "../../../src/auth/session-store.js";
+import type { KVStore } from "../../../src/auth/storage.js";
+import type { StoredState } from "../../../src/auth/session-store.js";
 
 // ---- In-memory KVStore for tests ----
 
@@ -75,23 +55,7 @@ function createStore(opts: OAuthSessionStoreOptions = DEFAULT_OPTS): {
   return { session, kv };
 }
 
-/**
- * Build an unsigned JWT-shaped string with the given exp (seconds).
- * The session store decodes the payload via atob(token.split(".")[1]).
- */
-function buildJwt(payload: Record<string, unknown>): string {
-  const b64 = (obj: Record<string, unknown>) =>
-    Buffer.from(JSON.stringify(obj)).toString("base64url");
-  return `${b64({ alg: "none" })}.${b64(payload)}.sig`;
-}
-
 describe("OAuthSessionStore", () => {
-  beforeEach(() => {
-    discoverOAuthProtectedResourceMetadata.mockReset();
-    discoverAuthorizationServerMetadata.mockReset();
-    refreshAuthorization.mockReset();
-  });
-
   describe("getKey()", () => {
     it("returns prefix_hash_suffix", () => {
       const { session } = createStore();
@@ -128,132 +92,16 @@ describe("OAuthSessionStore", () => {
   });
 
   describe("tokens()", () => {
-    it("returns stored tokens unchanged when JWT exp is far in the future", async () => {
+    it("returns stored tokens without performing protocol work", async () => {
       const { session, kv } = createStore();
       const tokens = {
-        access_token: buildJwt({ exp: Math.floor(Date.now() / 1000) + 3600 }),
+        access_token: "opaque-token",
         refresh_token: "refresh-1",
       };
       kv.set(session.getKey("tokens"), JSON.stringify(tokens));
 
       const result = await session.tokens();
       expect(result).toEqual(tokens);
-      expect(refreshAuthorization).not.toHaveBeenCalled();
-    });
-
-    it("returns stored tokens as-is when access_token is not a JWT", async () => {
-      const { session, kv } = createStore();
-      const tokens = {
-        access_token: "opaque-not-a-jwt",
-        refresh_token: "refresh-1",
-      };
-      kv.set(session.getKey("tokens"), JSON.stringify(tokens));
-
-      const result = await session.tokens();
-      expect(result).toEqual(tokens);
-      expect(refreshAuthorization).not.toHaveBeenCalled();
-    });
-
-    it("triggers refresh when JWT exp is within 30s", async () => {
-      const { session, kv } = createStore();
-      const tokens = {
-        access_token: buildJwt({ exp: Math.floor(Date.now() / 1000) + 5 }),
-        refresh_token: "refresh-1",
-      };
-      kv.set(session.getKey("tokens"), JSON.stringify(tokens));
-      kv.set(
-        session.getKey("client_info"),
-        JSON.stringify({ client_id: "abc" })
-      );
-
-      const refreshed = {
-        access_token: buildJwt({
-          exp: Math.floor(Date.now() / 1000) + 3600,
-        }),
-        refresh_token: "refresh-2",
-      };
-
-      discoverOAuthProtectedResourceMetadata.mockResolvedValue({
-        authorization_servers: ["https://auth.example.com"],
-      });
-      discoverAuthorizationServerMetadata.mockResolvedValue({
-        issuer: "https://auth.example.com",
-      });
-      refreshAuthorization.mockResolvedValue(refreshed);
-
-      const result = await session.tokens();
-      expect(refreshAuthorization).toHaveBeenCalledTimes(1);
-      expect(result).toEqual(refreshed);
-      // Refreshed tokens should be persisted via saveTokens()
-      expect(kv.get(session.getKey("tokens"))).toBe(JSON.stringify(refreshed));
-    });
-
-    it("returns the original tokens when refresh fails", async () => {
-      const { session, kv } = createStore();
-      const tokens = {
-        access_token: buildJwt({ exp: Math.floor(Date.now() / 1000) + 5 }),
-        refresh_token: "refresh-1",
-      };
-      kv.set(session.getKey("tokens"), JSON.stringify(tokens));
-      kv.set(
-        session.getKey("client_info"),
-        JSON.stringify({ client_id: "abc" })
-      );
-
-      discoverOAuthProtectedResourceMetadata.mockRejectedValue(
-        new Error("network down")
-      );
-
-      const result = await session.tokens();
-      // _refresh swallows errors and returns null, so tokens() falls through
-      // and returns the (still-cached) tokens unchanged.
-      expect(result).toEqual(tokens);
-    });
-
-    it("dedupes concurrent refresh calls into a single SDK invocation", async () => {
-      const { session, kv } = createStore();
-      const tokens = {
-        access_token: buildJwt({ exp: Math.floor(Date.now() / 1000) + 5 }),
-        refresh_token: "refresh-1",
-      };
-      kv.set(session.getKey("tokens"), JSON.stringify(tokens));
-      kv.set(
-        session.getKey("client_info"),
-        JSON.stringify({ client_id: "abc" })
-      );
-
-      const refreshed = {
-        access_token: buildJwt({
-          exp: Math.floor(Date.now() / 1000) + 3600,
-        }),
-        refresh_token: "refresh-2",
-      };
-      discoverOAuthProtectedResourceMetadata.mockResolvedValue({
-        authorization_servers: ["https://auth.example.com"],
-      });
-      discoverAuthorizationServerMetadata.mockResolvedValue({
-        issuer: "https://auth.example.com",
-      });
-
-      // Hold refreshAuthorization until both callers are waiting.
-      let releaseRefresh!: () => void;
-      const refreshGate = new Promise<void>((resolve) => {
-        releaseRefresh = resolve;
-      });
-      refreshAuthorization.mockImplementation(async () => {
-        await refreshGate;
-        return refreshed;
-      });
-
-      const p1 = session.tokens();
-      const p2 = session.tokens();
-
-      releaseRefresh();
-
-      const [r1, r2] = await Promise.all([p1, p2]);
-      expect(r1).toEqual(refreshed);
-      expect(r2).toEqual(refreshed);
-      expect(refreshAuthorization).toHaveBeenCalledTimes(1);
     });
 
     it("removes the tokens key when stored JSON is malformed", async () => {
@@ -385,49 +233,23 @@ describe("OAuthSessionStore", () => {
   });
 
   describe("getTokenEndpoint()", () => {
-    it("discovers and persists the token endpoint via PRM + AS metadata", async () => {
-      const { session, kv } = createStore();
-      discoverOAuthProtectedResourceMetadata.mockResolvedValue({
-        authorization_servers: ["https://auth.example.com"],
-      });
-      discoverAuthorizationServerMetadata.mockResolvedValue({
-        issuer: "https://auth.example.com",
-        token_endpoint: "https://auth.example.com/token",
-      });
+    it("returns the endpoint from persisted SDK discovery state", async () => {
+      const { session } = createStore();
+      await session.saveDiscoveryState({
+        authorizationServerUrl: "https://auth.example.com",
+        authorizationServerMetadata: {
+          issuer: "https://auth.example.com",
+          token_endpoint: "https://auth.example.com/token",
+        },
+      } as never);
 
-      const endpoint = await session.getTokenEndpoint();
-      expect(endpoint).toBe("https://auth.example.com/token");
-      // Persisted so a later call (or page reload) can skip discovery.
-      expect(kv.get(session.getKey("token_endpoint"))).toBe(
+      expect(await session.getTokenEndpoint()).toBe(
         "https://auth.example.com/token"
       );
     });
 
-    it("returns the persisted endpoint without re-discovering", async () => {
-      const { session, kv } = createStore();
-      kv.set(
-        session.getKey("token_endpoint"),
-        "https://cached.example.com/token"
-      );
-
-      const endpoint = await session.getTokenEndpoint();
-      expect(endpoint).toBe("https://cached.example.com/token");
-      expect(discoverOAuthProtectedResourceMetadata).not.toHaveBeenCalled();
-    });
-
-    it("returns null when the server is not OAuth-protected", async () => {
+    it("returns null when SDK discovery state is unavailable", async () => {
       const { session } = createStore();
-      discoverOAuthProtectedResourceMetadata.mockResolvedValue({
-        authorization_servers: [],
-      });
-      expect(await session.getTokenEndpoint()).toBeNull();
-    });
-
-    it("returns null (swallows) when discovery throws", async () => {
-      const { session } = createStore();
-      discoverOAuthProtectedResourceMetadata.mockRejectedValue(
-        new Error("network down")
-      );
       expect(await session.getTokenEndpoint()).toBeNull();
     });
   });
@@ -478,7 +300,6 @@ describe("OAuthSessionStore", () => {
       expect(storedJson).toBeTruthy();
       const stored = JSON.parse(storedJson!) as StoredState;
       expect(stored.serverUrlHash).toBe(session.serverUrlHash);
-      expect(stored.codeVerifier).toBe("v1");
       expect(stored.flowType).toBe("popup");
       expect(stored.returnUrl).toBe("https://app.example.com/page");
       expect(stored.providerOptions.serverUrl).toBe(SERVER_URL);
@@ -502,7 +323,8 @@ describe("OAuthSessionStore", () => {
       await session.storeAuthorizationState(url, {
         extraProviderOptions: {
           oauthProxyUrl: "https://proxy.example.com/oauth",
-          connectionUrl: "https://gateway.example.com/proxy/123",
+          clientMetadataUrl:
+            "https://app.example.com/oauth/client-metadata.json",
         },
       });
 
@@ -513,9 +335,154 @@ describe("OAuthSessionStore", () => {
       expect(stored.providerOptions.oauthProxyUrl).toBe(
         "https://proxy.example.com/oauth"
       );
-      expect(stored.providerOptions.connectionUrl).toBe(
-        "https://gateway.example.com/proxy/123"
+      expect(stored.providerOptions.clientMetadataUrl).toBe(
+        "https://app.example.com/oauth/client-metadata.json"
       );
+    });
+  });
+
+  // v2 (SDK @modelcontextprotocol/client) additions: the SDK stamps an
+  // `issuer` field onto stored tokens/client info (SEP-2352) and persists
+  // OAuth discovery state; the store must round-trip both verbatim.
+  describe("v2 issuer stamp + discovery state", () => {
+    it("isolates tokens by issuer and returns the latest tokens without context", async () => {
+      const { session } = createStore();
+      const issuerA = { issuer: "https://issuer-a.example.com" };
+      const issuerB = { issuer: "https://issuer-b.example.com" };
+
+      await session.saveTokens({ access_token: "a" }, issuerA);
+      await session.saveTokens({ access_token: "b" }, issuerB);
+
+      expect((await session.tokens(issuerA))?.access_token).toBe("a");
+      expect((await session.tokens(issuerB))?.access_token).toBe("b");
+      expect((await session.tokens())?.access_token).toBe("b");
+    });
+
+    it("migrates matching legacy token and client-info keys on contextual reads", async () => {
+      const { session, kv } = createStore();
+      const ctx = { issuer: "https://issuer.example.com" };
+      kv.set(
+        session.getKey("tokens"),
+        JSON.stringify({ access_token: "legacy", issuer: ctx.issuer })
+      );
+      kv.set(
+        session.getKey("client_info"),
+        JSON.stringify({ client_id: "legacy-client", issuer: ctx.issuer })
+      );
+
+      expect((await session.tokens(ctx))?.access_token).toBe("legacy");
+      expect((await session.clientInformation(ctx))?.client_id).toBe(
+        "legacy-client"
+      );
+      expect(kv.keys().filter((key) => key.includes("tokens_"))).toHaveLength(
+        1
+      );
+      expect(
+        kv.keys().filter((key) => key.includes("client_info_"))
+      ).toHaveLength(1);
+    });
+
+    it("does not return legacy credentials stamped for another issuer", async () => {
+      const { session, kv } = createStore();
+      kv.set(
+        session.getKey("tokens"),
+        JSON.stringify({
+          access_token: "wrong",
+          issuer: "https://issuer-a.example.com",
+        })
+      );
+
+      expect(
+        await session.tokens({ issuer: "https://issuer-b.example.com" })
+      ).toBeUndefined();
+    });
+
+    it("rejects and purges client information containing a client secret", async () => {
+      const { session, kv } = createStore({
+        ...DEFAULT_OPTS,
+        allowClientSecret: false,
+      });
+      kv.set(
+        session.getKey("client_info"),
+        JSON.stringify({ client_id: "legacy", client_secret: "secret" })
+      );
+
+      expect(await session.clientInformation()).toBeUndefined();
+      expect(kv.get(session.getKey("client_info"))).toBeNull();
+      await expect(
+        session.saveClientInformation({
+          client_id: "new",
+          client_secret: "secret",
+        })
+      ).rejects.toThrow(/public clients/);
+      expect(kv.get(session.getKey("client_info"))).toBeNull();
+    });
+
+    it("retains client secrets when the platform explicitly allows them", async () => {
+      const { session } = createStore({
+        ...DEFAULT_OPTS,
+        allowClientSecret: true,
+      });
+      await session.saveClientInformation({
+        client_id: "confidential-client",
+        client_secret: "secret",
+      });
+
+      expect((await session.clientInformation())?.client_secret).toBe("secret");
+    });
+
+    it("round-trips the issuer stamp on saved tokens verbatim", async () => {
+      const { session } = createStore();
+      await session.saveTokens({
+        access_token: "at",
+        token_type: "Bearer",
+        refresh_token: "rt",
+        issuer: "https://issuer.example.com",
+      } as never);
+      const tokens = (await session.tokens()) as {
+        issuer?: string;
+      };
+      expect(tokens?.issuer).toBe("https://issuer.example.com");
+    });
+
+    it("round-trips the issuer stamp on saved client information verbatim", async () => {
+      const { session } = createStore();
+      await session.saveClientInformation({
+        client_id: "cid",
+        issuer: "https://issuer.example.com",
+      } as never);
+      const info = (await session.clientInformation()) as {
+        issuer?: string;
+      };
+      expect(info?.issuer).toBe("https://issuer.example.com");
+    });
+
+    it("persists and returns OAuth discovery state", async () => {
+      const { session } = createStore();
+      expect(await session.discoveryState()).toBeUndefined();
+      const discovery = {
+        authorizationServerUrl: "https://auth.example.com",
+        resourceMetadataUrl: "https://mcp.example.com/.well-known/oauth",
+      };
+      await session.saveDiscoveryState(discovery as never);
+      expect(await session.discoveryState()).toEqual(discovery);
+    });
+
+    it("clears only discovery state on invalidateCredentials('discovery')", async () => {
+      const { session, kv } = createStore();
+      await session.saveTokens({
+        access_token: "at",
+        token_type: "Bearer",
+      } as never);
+      await session.saveDiscoveryState({
+        authorizationServerUrl: "https://auth.example.com",
+      } as never);
+
+      await session.invalidateCredentials("discovery");
+
+      expect(await session.discoveryState()).toBeUndefined();
+      // tokens survive a discovery-only invalidation
+      expect(kv.get(session.getKey("tokens"))).not.toBeNull();
     });
   });
 });

@@ -86,7 +86,7 @@ test.describe("Inspector Setup and Smoke Tests", () => {
     // Check title
     await expect(page).toHaveTitle(/Inspector/i);
 
-    // Check for favicon(s) - inspector has multiple for light/dark mode
+    // Check for favicon(s) — same RealFaviconGenerator setup as manufact.com
     const faviconLinks = await page.locator('link[rel="icon"]');
     expect(await faviconLinks.count()).toBeGreaterThan(0);
 

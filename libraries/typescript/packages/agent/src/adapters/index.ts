@@ -1,2 +1,2 @@
 export { BaseAdapter } from "./base.js";
-export { LangChainAdapter } from "./langchain_adapter.js";
+export { NativeAdapter } from "./native_adapter.js";

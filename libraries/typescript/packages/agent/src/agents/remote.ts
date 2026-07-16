@@ -5,7 +5,7 @@
 import type { ZodSchema } from "zod";
 import { toJSONSchema } from "zod";
 import { logger } from "@mcp-use/client";
-import type { RunOptions } from "./mcp_agent.js";
+import type { RunOptions } from "./run_options.js";
 import type { BaseMessage } from "./types.js";
 
 // API endpoint constants
@@ -32,7 +32,7 @@ function normalizeRemoteRunOptions<T>(
   if (typeof queryOrOptions === "object" && queryOrOptions !== null) {
     const options = queryOrOptions as RunOptions<T>;
     return {
-      query: options.prompt,
+      query: options.prompt ?? "",
       maxSteps: options.maxSteps,
       manageConnector: options.manageConnector,
       externalHistory: options.externalHistory,

@@ -4,6 +4,7 @@ import {
   goToInspectorWithAutoConnectAndOpenTools,
 } from "./helpers/connection";
 import {
+  changeCspMode,
   changeDeviceType,
   changeLocale,
   changeTimezone,
@@ -14,12 +15,10 @@ import {
   executeWeatherTool,
   exitFullscreenMode,
   exitPipMode,
-  getAppsSdkWeatherFrame,
   getMcpAppsWeatherFrame,
   getWeatherResourceFrame,
   navigateToResourcesAndSelectWeather,
   openPropsDialog,
-  switchToAppsSdkAndGetFrame,
   switchToMcpAppsAndGetFrame,
   toggleHover,
   toggleTouch,
@@ -29,7 +28,6 @@ import {
   verifyPipMode,
   verifyWeatherWidgetProps,
   verifyWidgetDebugInfo,
-  waitForWeatherWidgetAppsSdk,
   waitForWeatherWidgetMcpApps,
 } from "./helpers/debugger-tools";
 
@@ -42,84 +40,14 @@ import {
 test.describe("Debugger Tools - Live Widget Updates", () => {
   test.beforeEach(async ({ page, context }) => {
     await context.clearCookies();
-    // await page.evaluate(() => localStorage.clear());
-
-    // const { usesBuiltinInspector, inspectorUrl } = getTestMatrix();
-    // if (usesBuiltinInspector) {
     await goToInspectorWithAutoConnectAndOpenTools(page, {
       waitForWidgets: true,
-    });
-    // } else {
-    //   await page.goto(inspectorUrl);
-    //   await connectToConformanceServer(page);
-    //   await navigateToTools(page);
-    // }
-  });
-
-  test.describe("Apps SDK Protocol", () => {
-    test("device type toggle - updates widget live", async ({ page }) => {
-      await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
-      const frame = getAppsSdkWeatherFrame(page);
-      await verifyWidgetDebugInfo(frame, { device: "desktop" });
-
-      await changeDeviceType(page, "mobile");
-      const frameAfter = await switchToAppsSdkAndGetFrame(page);
-      await verifyWidgetDebugInfo(frameAfter, { device: "mobile" });
-    });
-
-    test("locale toggle - updates widget live", async ({ page }) => {
-      await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
-      const frame = getAppsSdkWeatherFrame(page);
-      await verifyWidgetDebugInfo(frame, { locale: "en-US" });
-
-      await changeLocale(page, "fr-FR");
-      const frameAfter = await switchToAppsSdkAndGetFrame(page);
-      await verifyWidgetDebugInfo(frameAfter, { locale: "fr-FR" });
-    });
-
-    test("touch capability toggle - updates widget live", async ({ page }) => {
-      await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
-      const frame = getAppsSdkWeatherFrame(page);
-      await verifyWidgetDebugInfo(frame, { touch: false });
-
-      await toggleTouch(page, true);
-      const frameAfter = await switchToAppsSdkAndGetFrame(page);
-      await verifyWidgetDebugInfo(frameAfter, { touch: true });
-    });
-
-    test("hover capability toggle - button state updates", async ({ page }) => {
-      await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
-
-      await toggleHover(page, true);
-      const hoverBtn = page.getByTestId("debugger-hover-button");
-      await expect(hoverBtn).toHaveClass(/border-blue/, { timeout: 5000 });
-    });
-
-    test("safe area insets - updates widget live", async ({ page }) => {
-      await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
-      const frame = getAppsSdkWeatherFrame(page);
-      await verifyWidgetDebugInfo(frame, { safeArea: "0/0/0/0" });
-
-      await updateSafeAreaInsets(page, {
-        top: 20,
-        right: 0,
-        bottom: 34,
-        left: 0,
-      });
-      const frameAfter = await switchToAppsSdkAndGetFrame(page);
-      await verifyWidgetDebugInfo(frameAfter, { safeArea: "20/0/34/0" });
     });
   });
 
   test.describe("MCP Apps Protocol", () => {
     test("device type toggle - updates widget live", async ({ page }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
       const frame = getMcpAppsWeatherFrame(page);
       await verifyWidgetDebugInfo(frame, { device: "desktop" });
@@ -131,7 +59,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
     test("locale toggle - updates widget live", async ({ page }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
       const frame = getMcpAppsWeatherFrame(page);
       await verifyWidgetDebugInfo(frame, { locale: "en-US" });
@@ -143,7 +70,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
     test("timezone toggle - updates widget live", async ({ page }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
 
       await changeTimezone(page, "Europe/Paris");
@@ -153,7 +79,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
     test("touch capability toggle - updates widget live", async ({ page }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
       const frame = getMcpAppsWeatherFrame(page);
       await verifyWidgetDebugInfo(frame, { touch: false });
@@ -165,7 +90,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
     test("hover capability toggle - button state updates", async ({ page }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
 
       await toggleHover(page, true);
@@ -175,7 +99,6 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
 
     test("safe area insets - updates widget live", async ({ page }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
       const frame = getMcpAppsWeatherFrame(page);
       await verifyWidgetDebugInfo(frame, { safeArea: "0/0/0/0" });
@@ -191,7 +114,20 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
     });
 
     test("CSP mode toggle - dialog works", async ({ page }) => {
-      //TODO
+      await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
+      await waitForWeatherWidgetMcpApps(page);
+
+      await changeCspMode(page, "widget-declared");
+      await expect(page.getByTestId("debugger-csp-button")).toBeVisible();
+
+      await changeCspMode(page, "permissive");
+      await expect(page.getByTestId("debugger-csp-button")).toBeVisible();
+
+      // Widget remains interactive after CSP mode changes
+      const frame = getMcpAppsWeatherFrame(page);
+      await expect(frame.getByText("Host Context Settings")).toBeVisible({
+        timeout: 10000,
+      });
     });
   });
 
@@ -200,9 +136,9 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       page,
     }) => {
       await executeWeatherTool(page, { city: "tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
+      await waitForWeatherWidgetMcpApps(page);
       await changeLocale(page, "de-DE");
-      let frame = await switchToAppsSdkAndGetFrame(page);
+      let frame = await switchToMcpAppsAndGetFrame(page);
       await verifyWidgetDebugInfo(frame, { locale: "de-DE" });
 
       await page
@@ -220,8 +156,8 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       await page.getByRole("tab", { name: /Tools/ }).first().click();
       await expect(page.getByRole("heading", { name: "Tools" })).toBeVisible();
       await page.getByTestId("tool-item-get-weather-delayed").click();
-      await page.getByTestId("tool-result-view-chatgpt-app").click();
-      frame = getAppsSdkWeatherFrame(page);
+      await page.getByTestId("tool-result-view-mcp-apps").click();
+      frame = getMcpAppsWeatherFrame(page);
       await verifyWidgetDebugInfo(frame, { locale: "de-DE" });
     });
   });
@@ -371,7 +307,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
         windSpeed: "12",
       });
 
-      const frame = getWeatherResourceFrame(page);
+      let frame = getWeatherResourceFrame(page);
       await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
 
       // Verify inline mode initially
@@ -383,8 +319,9 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify fullscreen mode is active
       await verifyFullscreenMode(page);
 
-      // Widget should still be visible in fullscreen
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      // Re-resolve frame after display-mode remount
+      frame = getWeatherResourceFrame(page);
+      await expect(frame.getByText(/tokyo/i)).toBeVisible({ timeout: 5000 });
 
       // Exit fullscreen mode
       await exitFullscreenMode(page);
@@ -392,8 +329,8 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify back to inline mode
       await verifyInlineMode(page);
 
-      // Widget should still be visible after exiting
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      frame = getWeatherResourceFrame(page);
+      await expect(frame.getByText(/tokyo/i)).toBeVisible({ timeout: 5000 });
     });
 
     test("PiP mode - Resources tab", async ({ page }) => {
@@ -410,7 +347,7 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
         windSpeed: "12",
       });
 
-      const frame = getWeatherResourceFrame(page);
+      let frame = getWeatherResourceFrame(page);
       await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
 
       // Verify inline mode initially
@@ -422,8 +359,9 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify PiP mode is active
       await verifyPipMode(page);
 
-      // Widget should still be visible in PiP
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      // Re-resolve frame: PiP portals the widget shell to document.body
+      frame = getWeatherResourceFrame(page);
+      await expect(frame.getByText(/tokyo/i)).toBeVisible({ timeout: 5000 });
 
       // Exit PiP mode
       await exitPipMode(page);
@@ -432,20 +370,17 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       await verifyInlineMode(page);
 
       // Widget should still be visible after exiting
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      frame = getWeatherResourceFrame(page);
+      await expect(frame.getByText(/tokyo/i)).toBeVisible({ timeout: 5000 });
     });
 
     test("fullscreen mode - Tools tab", async ({ page }) => {
       // Execute weather tool to get MCP Apps widget
       await executeWeatherTool(page, { city: "London", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
 
-      // Click to view MCP Apps result
-      await page.getByTestId("tool-result-view-mcp-apps").click();
-
       // Wait for MCP Apps widget to load
-      const frame = getMcpAppsWeatherFrame(page);
+      let frame = getMcpAppsWeatherFrame(page);
       await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
 
       // Verify inline mode initially
@@ -457,8 +392,8 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify fullscreen mode is active
       await verifyFullscreenMode(page);
 
-      // Widget should still be visible in fullscreen
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      frame = getMcpAppsWeatherFrame(page);
+      await expect(frame.getByText(/london/i)).toBeVisible({ timeout: 5000 });
 
       // Exit fullscreen mode
       await exitFullscreenMode(page);
@@ -466,21 +401,17 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify back to inline mode
       await verifyInlineMode(page);
 
-      // Widget should still be visible after exiting
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      frame = getMcpAppsWeatherFrame(page);
+      await expect(frame.getByText(/london/i)).toBeVisible({ timeout: 5000 });
     });
 
     test("PiP mode - Tools tab", async ({ page }) => {
       // Execute weather tool to get MCP Apps widget
       await executeWeatherTool(page, { city: "Tokyo", delay: "2000" });
-      await waitForWeatherWidgetAppsSdk(page);
       await waitForWeatherWidgetMcpApps(page);
 
-      // Click to view MCP Apps result
-      await page.getByTestId("tool-result-view-mcp-apps").click();
-
       // Wait for MCP Apps widget to load
-      const frame = getMcpAppsWeatherFrame(page);
+      let frame = getMcpAppsWeatherFrame(page);
       await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
 
       // Verify inline mode initially
@@ -492,8 +423,8 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify PiP mode is active
       await verifyPipMode(page);
 
-      // Widget should still be visible in PiP
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      frame = getMcpAppsWeatherFrame(page);
+      await expect(frame.getByText(/tokyo/i)).toBeVisible({ timeout: 5000 });
 
       // Exit PiP mode
       await exitPipMode(page);
@@ -501,8 +432,8 @@ test.describe("Debugger Tools - Live Widget Updates", () => {
       // Verify back to inline mode
       await verifyInlineMode(page);
 
-      // Widget should still be visible after exiting
-      await expect(frame.locator("body")).toBeVisible({ timeout: 5000 });
+      frame = getMcpAppsWeatherFrame(page);
+      await expect(frame.getByText(/tokyo/i)).toBeVisible({ timeout: 5000 });
     });
   });
 });

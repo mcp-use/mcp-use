@@ -1,17 +1,12 @@
 /**
- * Uses `oauthProxy` mode rather than `oauthCustomProvider` because emulate's
- * Google issuer exposes `/.well-known/openid-configuration` but not the
- * `oauth-authorization-server` path that DCR-direct mode proxies through.
- * Proxy mode lets the MCP server synthesize metadata pointing at local
- * /authorize, /token, /register endpoints that forward upstream.
- *
+ * Uses a custom OAuth provider backed by the emulate Google issuer.
  * emulate Google issues opaque access tokens (`google_<rand>`), not JWTs —
- * `verifyToken` calls /oauth2/v2/userinfo with the Bearer token rather than
- * decoding/verifying a signature.
+ * verification calls /oauth2/v2/userinfo with the Bearer token.
  */
 
 import { createEmulator } from "emulate";
-import { MCPServer, oauthProxy, text } from "mcp-use";
+import { MCPServer } from "mcp-use";
+import { oauthCustomProvider } from "mcp-use/oauth";
 
 const GOOGLE_EMULATOR_PORT = 4101;
 const MCP_SERVER_PORT = 4201;
@@ -23,6 +18,12 @@ const STATIC_CLIENT_SECRET = "GOCSPX-mcp-emulate-test-secret";
 export const GOOGLE_MOCK_USER = {
   email: "testuser@example.com",
   name: "Test User",
+};
+
+type GoogleOAuthUser = {
+  id: string;
+  email?: string;
+  name?: string;
 };
 
 export interface GoogleEmulateHandle {
@@ -53,38 +54,61 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
     },
   });
 
-  const emulatorUrl = emulator.url;
+  const emulatorUrl = emulator.url.replace(/\/$/, "");
+  const resource = `http://localhost:${MCP_SERVER_PORT}/mcp`;
 
   try {
     const mcpServer = new MCPServer({
       name: "GoogleEmulateTestServer",
       version: "1.0.0",
       description: "MCP server backed by the emulate Google OAuth issuer",
-      oauth: oauthProxy({
-        issuer: emulatorUrl,
-        authEndpoint: `${emulatorUrl}/o/oauth2/v2/auth`,
-        tokenEndpoint: `${emulatorUrl}/oauth2/token`,
-        clientId: STATIC_CLIENT_ID,
-        clientSecret: STATIC_CLIENT_SECRET,
-        scopes: ["openid", "email", "profile"],
-        verifyToken: async (token: string) => {
-          const res = await fetch(`${emulatorUrl}/oauth2/v2/userinfo`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) {
-            throw new Error(
-              `userinfo verification failed: ${res.status} ${res.statusText}`
-            );
-          }
-          const payload = (await res.json()) as Record<string, unknown>;
-          return { payload };
+      inspector: { enabled: false },
+      oauth: oauthCustomProvider<GoogleOAuthUser>({
+        resource,
+        scopesSupported: ["openid", "email", "profile"],
+        oauthMetadata: {
+          issuer: emulatorUrl,
+          authorization_endpoint: `${emulatorUrl}/o/oauth2/v2/auth`,
+          token_endpoint: `${emulatorUrl}/oauth2/token`,
+          response_types_supported: ["code"],
+          grant_types_supported: ["authorization_code", "refresh_token"],
+          token_endpoint_auth_methods_supported: ["client_secret_post"],
         },
-        getUserInfo: (payload) => ({
-          userId: (payload.sub ?? payload.email) as string,
-          email: payload.email as string | undefined,
-          name: payload.name as string | undefined,
-          scopes: [],
+        createTokenVerifier: () => ({
+          async verifyAccessToken(token: string) {
+            const res = await fetch(`${emulatorUrl}/oauth2/v2/userinfo`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) {
+              throw new Error(
+                `userinfo verification failed: ${res.status} ${res.statusText}`
+              );
+            }
+            const payload = (await res.json()) as Record<string, unknown>;
+            return {
+              token,
+              clientId: STATIC_CLIENT_ID,
+              scopes: ["openid", "email", "profile"],
+              expiresAt: Math.floor(Date.now() / 1000) + 3600,
+              extra: { payload },
+            };
+          },
         }),
+        mapAuthInfo: (authInfo) => {
+          const payload =
+            (authInfo.extra?.payload as Record<string, unknown> | undefined) ??
+            {};
+          return {
+            user: {
+              id: String(payload.sub ?? payload.email ?? ""),
+              email:
+                typeof payload.email === "string" ? payload.email : undefined,
+              name: typeof payload.name === "string" ? payload.name : undefined,
+            },
+            payload,
+            permissions: [],
+          };
+        },
       }),
     });
 
@@ -93,10 +117,14 @@ export async function startGoogleEmulateFixture(): Promise<GoogleEmulateHandle> 
         name: "verify_auth",
         description: "Confirm OAuth authentication succeeded",
       },
-      async (_args, ctx) =>
-        text(
-          `OAuth authentication successful for ${ctx.auth.user.email ?? "unknown"}`
-        )
+      async (_params, ctx) => ({
+        content: [
+          {
+            type: "text",
+            text: `OAuth authentication successful for ${ctx.auth.user.email ?? "unknown"}`,
+          },
+        ],
+      })
     );
 
     await mcpServer.listen(MCP_SERVER_PORT);

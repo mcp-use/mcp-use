@@ -15,9 +15,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
-import type { PendingSamplingRequest } from "@/client/types/sampling";
-import type { CreateMessageResult } from "@modelcontextprotocol/sdk/types.js";
-import { CreateMessageResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { PendingSamplingRequest } from "@/client/types/pending-requests";
+import type { CreateMessageResult } from "@mcp-use/client/react";
+// v2 no longer re-exports Zod `*Schema` constants; use the Standard Schema
+// validators keyed by spec type name instead.
+import { specTypeSchemas } from "@mcp-use/client/react";
 import {
   Check,
   Copy,
@@ -204,15 +206,18 @@ export function SamplingRequestDisplay({
   const handleApprove = () => {
     if (!request) return;
 
-    const validationResult = CreateMessageResultSchema.safeParse(messageResult);
-    if (!validationResult.success) {
+    const validationResult =
+      specTypeSchemas.CreateMessageResult["~standard"].validate(messageResult);
+    if (validationResult.issues) {
       toast.error("Invalid response", {
-        description: `Validation failed: ${validationResult.error.message}`,
+        description: `Validation failed: ${validationResult.issues
+          .map((issue) => issue.message)
+          .join(", ")}`,
       });
       return;
     }
 
-    onApprove(request.id, validationResult.data);
+    onApprove(request.id, validationResult.value as CreateMessageResult);
     onClose();
 
     // Show success toast with navigation back to tools tab
@@ -295,46 +300,55 @@ export function SamplingRequestDisplay({
         </div>
         <div className="flex items-center gap-2">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onCopy}
-                className="h-8 w-8 p-0"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onCopy}
+                  className="h-8 w-8 p-0"
+                >
+                  {isCopied ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Copy request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onDownload}
-                className="h-8 w-8 p-0"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDownload}
+                  className="h-8 w-8 p-0"
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Download request</TooltipContent>
           </Tooltip>
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onFullscreen}
-                className="h-8 w-8 p-0"
-              >
-                <Maximize2 className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onFullscreen}
+                  className="h-8 w-8 p-0"
+                >
+                  <Maximize2 className="h-4 w-4" />
+                </Button>
+              }
+              nativeButton
+            />
             <TooltipContent>Fullscreen</TooltipContent>
           </Tooltip>
           <Button

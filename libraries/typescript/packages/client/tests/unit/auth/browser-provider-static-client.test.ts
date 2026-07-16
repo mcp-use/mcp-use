@@ -9,16 +9,21 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { BrowserOAuthClientProvider } from "../../../src/auth/browser-provider.js";
+import { BrowserOAuthClientProvider } from "../../../src/auth/browser.js";
+import { installMemoryLocalStorage } from "../../helpers/memory-local-storage.js";
 
 const SERVER_URL = "https://mcp.example.com";
 
 describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
+  let restoreLocalStorage: () => void;
+
   beforeEach(() => {
+    restoreLocalStorage = installMemoryLocalStorage();
     localStorage.clear();
   });
   afterEach(() => {
     localStorage.clear();
+    restoreLocalStorage();
   });
 
   it("returns staticClientInfo from clientInformation() when no DCR client info is stored", async () => {
@@ -29,6 +34,9 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
 
     const info = await provider.clientInformation();
     expect(info).toEqual({ client_id: "preregistered-abc" });
+    expect(await provider.getClientCredentials()).toEqual({
+      client_id: "preregistered-abc",
+    });
   });
 
   it("staticClientInfo wins over a stale DCR client_info entry in localStorage", async () => {
@@ -119,31 +127,28 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     expect(stored.providerOptions.scope).toBe("openid profile");
   });
 
-  it("returns client_secret from clientInformation() when configured", async () => {
-    const provider = new BrowserOAuthClientProvider(SERVER_URL, {
-      callbackUrl: "https://app.example.com/oauth/callback",
-      staticClientInfo: {
-        client_id: "preregistered-abc",
-        client_secret: "shh-secret",
-      },
-    });
-
-    const info = await provider.clientInformation();
-    expect(info).toEqual({
-      client_id: "preregistered-abc",
-      client_secret: "shh-secret",
-    });
+  it("rejects a static browser client secret", () => {
+    expect(
+      () =>
+        new BrowserOAuthClientProvider(SERVER_URL, {
+          callbackUrl: "https://app.example.com/oauth/callback",
+          staticClientInfo: {
+            client_id: "preregistered-abc",
+            client_secret: "shh-secret",
+          },
+        })
+    ).toThrow(/public clients/);
   });
 
-  it("persists client_secret alongside client_id into stored state for the callback to reconstruct", async () => {
+  it("validates and persists clientMetadataUrl for callback reconstruction", async () => {
     const provider = new BrowserOAuthClientProvider(SERVER_URL, {
       callbackUrl: "https://app.example.com/oauth/callback",
-      staticClientInfo: {
-        client_id: "preregistered-abc",
-        client_secret: "shh-secret",
-      },
+      clientMetadataUrl: "https://app.example.com/oauth/client-metadata.json",
     });
 
+    expect(provider.clientMetadataUrl).toBe(
+      "https://app.example.com/oauth/client-metadata.json"
+    );
     const authUrl = new URL("https://auth.example.com/authorize");
     await provider.prepareAuthorizationUrl(authUrl);
 
@@ -153,9 +158,18 @@ describe("BrowserOAuthClientProvider — pre-registered client_id", () => {
     expect(stateKey).toBeDefined();
 
     const stored = JSON.parse(localStorage.getItem(stateKey!)!);
-    expect(stored.providerOptions.staticClientInfo).toEqual({
-      client_id: "preregistered-abc",
-      client_secret: "shh-secret",
-    });
+    expect(stored.providerOptions.clientMetadataUrl).toBe(
+      "https://app.example.com/oauth/client-metadata.json"
+    );
+  });
+
+  it("rejects an invalid CIMD URL using SDK validation", () => {
+    expect(
+      () =>
+        new BrowserOAuthClientProvider(SERVER_URL, {
+          callbackUrl: "https://app.example.com/oauth/callback",
+          clientMetadataUrl: "http://app.example.com/client-metadata.json",
+        })
+    ).toThrow(/clientMetadataUrl/);
   });
 });

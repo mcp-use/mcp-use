@@ -1,23 +1,21 @@
-import type { JSONSchema } from "@mcp-use/client";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import type {
   CallToolResult,
   Tool as MCPTool,
   Resource,
   Prompt,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { ZodTypeAny } from "zod";
+} from "@modelcontextprotocol/client";
 import type { BaseConnector } from "@mcp-use/client";
 
-import { JSONSchemaToZod } from "@mcp-use/client";
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { z } from "zod";
 import { logger } from "@mcp-use/client";
 import { BaseAdapter } from "./base.js";
 
-function schemaToZod(schema: unknown): ZodTypeAny {
+function schemaToZod(schema: unknown): z.ZodType {
   try {
-    return JSONSchemaToZod.convert(schema as JSONSchema);
+    // MCP tool inputSchema is JSON Schema; Zod 4 converts natively.
+    return z.fromJSONSchema(schema as Record<string, unknown>);
   } catch (err) {
     logger.warn(`Failed to convert JSON schema to Zod: ${err}`);
     return z.any();
@@ -85,7 +83,7 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     }
 
     // Derive a strict Zod schema for the tool's arguments.
-    const argsSchema: ZodTypeAny = mcpTool.inputSchema
+    const argsSchema: z.ZodType = mcpTool.inputSchema
       ? schemaToZod(mcpTool.inputSchema)
       : z.object({}).optional();
 
@@ -174,14 +172,14 @@ export class LangChainAdapter extends BaseAdapter<StructuredToolInterface> {
     connector: BaseConnector
   ): StructuredToolInterface | null {
     // Build Zod schema from prompt arguments
-    let argsSchema: ZodTypeAny = z.object({}).optional();
+    let argsSchema: z.ZodType = z.object({}).optional();
 
     if (mcpPrompt.arguments && mcpPrompt.arguments.length > 0) {
-      const schemaFields: Record<string, ZodTypeAny> = {};
+      const schemaFields: Record<string, z.ZodType> = {};
       for (const arg of mcpPrompt.arguments) {
         // All arguments default to string type since type is not available in Prompt definition
         // (Note: MCP spec includes type, but SDK TypeScript types don't)
-        const zodType: ZodTypeAny = z.string();
+        const zodType: z.ZodType = z.string();
 
         if (arg.required !== false) {
           schemaFields[arg.name] = zodType;

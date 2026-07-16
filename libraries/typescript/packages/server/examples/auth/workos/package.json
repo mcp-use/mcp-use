@@ -1,0 +1,24 @@
+{
+  "name": "mcp-use-example-auth-workos",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Example: mcp-use with direct WorkOS AuthKit authentication.",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "mcp-use dev",
+    "build": "mcp-use build",
+    "start": "mcp-use start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mcp-use": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.2",
+    "typescript": "7.0.1-rc"
+  }
+}

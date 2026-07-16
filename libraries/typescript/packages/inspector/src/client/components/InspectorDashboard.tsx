@@ -8,17 +8,19 @@ import {
 } from "@/client/components/ui/dropdown-menu";
 import { NotFound } from "@/client/components/ui/not-found";
 import { MESH_PANEL_FINE_OVERLAY_NOISE_DATA_URL } from "@/client/components/ui/random-gradient-background";
-import { MeshGradient } from "@paper-design/shaders-react";
+import { MeshGradientCanvas } from "@/client/components/ui/MeshGradientCanvas";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/client/components/ui/tooltip";
 import {
+  getPackageVersion,
   MCPServerAddedEvent,
   MCPServerConnectionEvent,
   MCPServerRemovedEvent,
-  Telemetry,
+  captureInspectorEvent,
+  trackInspectorOpen,
 } from "@/client/telemetry";
 import {
   CircleMinus,
@@ -34,35 +36,36 @@ import {
 import {
   useMcpClient,
   type McpServer,
-  type McpServerOptions,
+  type McpServerConfig,
 } from "@mcp-use/client/react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import {
   buildOAuthStaticConfig,
   getDefaultInspectorProxyAddress,
   getStoredConnectionConfig,
-  isAliasOnlyConnectionUpdate,
-  normalizeConnectionMode,
+  toEditableConnectionConfig,
   type ConnectionMode,
   type EditableConnectionConfig,
-  type OAuthStaticConfig,
 } from "@/client/utils/connectionUpdates";
-import {
-  getConfiguredServerAlias,
-  getServerDisplayName,
-} from "@/client/utils/serverNames";
+import { getServerDisplayName } from "@/client/utils/servers";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { INSPECTOR_RECONNECT_STORAGE_KEY } from "@/client/hooks/useAutoConnect";
+import type { TabType } from "@/client/context/InspectorContext";
 import { ConnectionSettingsForm } from "./ConnectionSettingsForm";
 import type { CustomHeader } from "./CustomHeadersEditor";
-import { ServerCapabilitiesModal } from "./ServerCapabilitiesModal";
-import { ServerConnectionModal } from "./ServerConnectionModal";
 import { ServerIcon } from "./ServerIcon";
 
 const CONNECT_PANEL_MESH_ANIMATION_PAUSED_KEY =
   "mcp-inspector-connect-panel-mesh-animation-paused";
+
+const CONNECT_PANEL_MESH_COLORS: string[] = [
+  "#e0eaff",
+  "#f9ffbd",
+  "#dedede",
+  "#ffffff",
+];
 
 /**
  * Render the MCP Inspector dashboard for managing, testing, and navigating to MCP servers.
@@ -82,8 +85,6 @@ export function InspectorDashboard() {
     servers: connections,
     addServer,
     removeServer: removeConnection,
-    updateServerMetadata,
-    updateServer,
   } = useMcpClient();
 
   // Track which server connections have been reported to telemetry (dedup)
@@ -98,16 +99,14 @@ export function InspectorDashboard() {
       ) {
         reportedConnectionsRef.current.add(connection.id);
         try {
-          Telemetry.getInstance()
-            .capture(
-              new MCPServerConnectionEvent({
-                serverId: connection.id,
-                serverUrl: connection.url,
-                success: true,
-                connectionType: "http",
-              })
-            )
-            .catch(() => {});
+          captureInspectorEvent(
+            new MCPServerConnectionEvent({
+              serverId: connection.id,
+              serverUrl: connection.url ?? "",
+              success: true,
+              connectionType: "http",
+            })
+          ).catch(() => {});
         } catch {
           // ignore telemetry errors
         }
@@ -124,9 +123,9 @@ export function InspectorDashboard() {
   const handleRemoveConnection = useCallback(
     (connectionId: string) => {
       try {
-        Telemetry.getInstance()
-          .capture(new MCPServerRemovedEvent({ serverId: connectionId }))
-          .catch(() => {});
+        captureInspectorEvent(
+          new MCPServerRemovedEvent({ serverId: connectionId })
+        ).catch(() => {});
       } catch {
         // ignore telemetry errors
       }
@@ -148,104 +147,6 @@ export function InspectorDashboard() {
     updatingConnectionsRef.current = updatingConnections;
   }, [updatingConnections]);
 
-  // Adapter functions for backward compatibility
-  const addConnection = useCallback(
-    (
-      url: string,
-      name?: string,
-      proxyConfig?: any,
-      transportType?: "http" | "sse",
-      oauth?: OAuthStaticConfig,
-      connectionMode: ConnectionMode = proxyConfig?.proxyAddress
-        ? "proxy"
-        : "auto",
-      autoProxyFallback:
-        | boolean
-        | {
-            enabled?: boolean;
-            proxyAddress?: string;
-          } = proxyConfig?.proxyAddress ? false : false
-    ) => {
-      addServer(url, {
-        url,
-        name,
-        connectionMode,
-        proxyConfig,
-        transportType,
-        preventAutoAuth: true,
-        useRedirectFlow: true,
-        autoProxyFallback,
-        ...(oauth ? { oauth } : {}),
-      });
-    },
-    [addServer]
-  );
-
-  const updateConnectionConfig = useCallback(
-    async (
-      id: string,
-      config: {
-        name?: string;
-        proxyConfig?: {
-          proxyAddress?: string;
-          headers?: Record<string, string>;
-        };
-        connectionMode?: ConnectionMode;
-        transportType?: "http" | "sse";
-        oauth?: OAuthStaticConfig;
-        autoProxyFallback?:
-          | boolean
-          | {
-              enabled?: boolean;
-              proxyAddress?: string;
-            };
-      }
-    ) => {
-      // Check if already updating this connection
-      if (updatingConnectionsRef.current.has(id)) {
-        console.warn(
-          `[InspectorDashboard] Connection ${id} is already being updated, skipping`
-        );
-        return;
-      }
-
-      // Mark as updating
-      setUpdatingConnections((prev) => new Set(prev).add(id));
-
-      try {
-        // Use the new updateServer method for atomic updates
-        await updateServer(id, config);
-      } catch (error) {
-        console.error(
-          `[InspectorDashboard] Failed to update connection ${id}:`,
-          error
-        );
-      } finally {
-        // Clear the updating flag
-        setUpdatingConnections((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }
-    },
-    [updateServer]
-  );
-
-  const updateConnectionMetadata = useCallback(
-    async (id: string, metadata: { name: string }) => {
-      try {
-        await updateServerMetadata(id, metadata);
-      } catch (error) {
-        console.error(
-          `[InspectorDashboard] Failed to update connection metadata for ${id}:`,
-          error
-        );
-      }
-    },
-    [updateServerMetadata]
-  );
-
   const connectServer = useCallback(
     async (id: string) => {
       // Check if already updating this connection
@@ -263,11 +164,7 @@ export function InspectorDashboard() {
       setUpdatingConnections((prev) => new Set(prev).add(id));
 
       try {
-        // Trigger reconnection by updating with the same config (forces disconnect/reconnect)
-        await updateServer(id, {
-          url: server.url,
-          name: server.name,
-        });
+        await server.reconnect();
       } catch (error) {
         console.error(
           `[InspectorDashboard] Failed to reconnect server ${id}:`,
@@ -282,7 +179,7 @@ export function InspectorDashboard() {
         });
       }
     },
-    [connections, updateServer]
+    [connections]
   );
 
   const navigate = useNavigate();
@@ -293,24 +190,14 @@ export function InspectorDashboard() {
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null
   );
-  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(
-    null
-  );
-  const [infoModalOpen, setInfoModalOpen] = useState(false);
-  const [infoModalConnection, setInfoModalConnection] = useState<any | null>(
-    null
-  );
 
   // Track inspector open on mount
   useEffect(() => {
-    const telemetry = Telemetry.getInstance();
-    telemetry
-      .trackInspectorOpen({
-        connectionCount: connections.length,
-      })
-      .catch(() => {
-        // Silently fail - telemetry should not break the application
-      });
+    trackInspectorOpen({
+      connectionCount: connections.length,
+    }).catch(() => {
+      // Silently fail - telemetry should not break the application
+    });
   }, []); // Only run once on mount
 
   // Form state
@@ -330,35 +217,6 @@ export function InspectorDashboard() {
   const [scope, setScope] = useState("");
 
   const connectFormGradientRef = useRef<HTMLDivElement>(null);
-  const [connectFormGradientSize, setConnectFormGradientSize] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
-
-  const measureConnectFormGradient = useCallback(() => {
-    if (connectFormGradientRef.current) {
-      const { width, height } =
-        connectFormGradientRef.current.getBoundingClientRect();
-      setConnectFormGradientSize({
-        width: Math.round(width),
-        height: Math.round(height),
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    const raf = requestAnimationFrame(measureConnectFormGradient);
-    const ro = new ResizeObserver(measureConnectFormGradient);
-    if (connectFormGradientRef.current) {
-      ro.observe(connectFormGradientRef.current);
-    }
-    window.addEventListener("resize", measureConnectFormGradient);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-      window.removeEventListener("resize", measureConnectFormGradient);
-    };
-  }, [measureConnectFormGradient]);
 
   const [meshAnimationPaused, setMeshAnimationPaused] = useState(() => {
     try {
@@ -448,21 +306,9 @@ export function InspectorDashboard() {
     const oauthConfig = buildOAuthStaticConfig(clientId, clientSecret, scope);
 
     // Build server configuration with proper typing
-    const serverConfig: McpServerOptions = {
+    const serverConfig: McpServerConfig = {
       url: normalizedUrl,
-      name: alias.trim() || normalizedUrl,
-      transportType: "http",
-      preventAutoAuth: true, // Prevent auto OAuth popup - user must click "Authenticate" button
-      useRedirectFlow: true,
-      clientOptions: {
-        capabilities: {
-          extensions: {
-            "io.modelcontextprotocol/ui": {
-              mimeTypes: ["text/html;profile=mcp-app"],
-            },
-          },
-        },
-      },
+      displayName: alias.trim() || normalizedUrl,
       connectionMode,
       autoProxyFallback,
       ...(proxyConfig ? { proxyConfig } : {}),
@@ -476,19 +322,16 @@ export function InspectorDashboard() {
     addServer(normalizedUrl, serverConfig);
 
     // Track server added
-    const telemetry = Telemetry.getInstance();
-    telemetry
-      .capture(
-        new MCPServerAddedEvent({
-          serverId: url.trim(),
-          serverUrl: url.trim(),
-          connectionType: "http",
-          viaProxy: !!proxyConfig?.proxyAddress,
-        })
-      )
-      .catch(() => {
-        // Silently fail - telemetry should not break the application
-      });
+    captureInspectorEvent(
+      new MCPServerAddedEvent({
+        serverId: url.trim(),
+        serverUrl: url.trim(),
+        connectionType: "http",
+        viaProxy: !!proxyConfig?.proxyAddress,
+      })
+    ).catch(() => {
+      // Silently fail - telemetry should not break the application
+    });
 
     // Reset form
     setAlias("");
@@ -528,82 +371,12 @@ export function InspectorDashboard() {
     }
   };
 
-  const handleCopyConnectionConfig = async (connection: any) => {
+  const handleCopyConnectionConfig = async (connection: McpServer) => {
     try {
-      // Try to get the original stored config from localStorage
-      // This contains the proxyConfig and customHeaders that were originally saved
-      let storedConfig: any = null;
-      try {
-        const stored = localStorage.getItem("mcp-inspector-connections");
-        if (stored) {
-          const allServers = JSON.parse(stored);
-          storedConfig = allServers[connection.id];
-        }
-      } catch (e) {
-        // If we can't read from localStorage, fall back to connection object
-        console.warn(
-          "[InspectorDashboard] Could not read from localStorage:",
-          e
-        );
-      }
-
-      // Extract headers from stored config (which has the original proxyConfig)
-      // Check both 'headers' and 'customHeaders' for backwards compatibility
-      const customHeaders =
-        storedConfig?.proxyConfig?.headers ||
-        storedConfig?.proxyConfig?.customHeaders ||
-        storedConfig?.headers ||
-        storedConfig?.customHeaders ||
-        connection.proxyConfig?.headers ||
-        connection.proxyConfig?.customHeaders ||
-        connection.headers ||
-        connection.customHeaders ||
-        {};
-
-      // Determine connection mode and proxyConfig
-      const fallbackProxyAddress =
-        typeof storedConfig?.autoProxyFallback === "object"
-          ? storedConfig.autoProxyFallback.proxyAddress
-          : typeof connection.autoProxyFallback === "object"
-            ? connection.autoProxyFallback.proxyAddress
-            : undefined;
-      const hasProxyAddress =
-        storedConfig?.proxyConfig?.proxyAddress ||
-        connection.proxyConfig?.proxyAddress ||
-        fallbackProxyAddress;
-      const connectionMode = normalizeConnectionMode(
-        storedConfig?.connectionMode || (connection as any).connectionMode,
-        storedConfig?.connectionType || (connection as any).connectionType,
-        !!hasProxyAddress
+      const storedConfig = getStoredConnectionConfig<EditableConnectionConfig>(
+        connection.id
       );
-      const proxyConfig = hasProxyAddress
-        ? storedConfig?.proxyConfig || connection.proxyConfig
-        : undefined;
-
-      const config = {
-        url: connection.url,
-        ...(getConfiguredServerAlias(storedConfig || connection)
-          ? { name: getConfiguredServerAlias(storedConfig || connection) }
-          : {}),
-        transportType: connection.transportType || "http",
-        connectionMode,
-        connectionType: connectionMode === "proxy" ? "Via Proxy" : "Direct",
-        proxyConfig,
-        autoProxyFallback:
-          connectionMode === "auto"
-            ? (storedConfig?.autoProxyFallback ??
-              connection.autoProxyFallback ??
-              (fallbackProxyAddress
-                ? { enabled: true, proxyAddress: fallbackProxyAddress }
-                : undefined))
-            : undefined,
-        customHeaders,
-        requestTimeout: connection.requestTimeout || 10000,
-        resetTimeoutOnProgress: connection.resetTimeoutOnProgress !== false,
-        maxTotalTimeout: connection.maxTotalTimeout || 60000,
-        oauth: connection.oauth,
-      };
-
+      const config = toEditableConnectionConfig(connection, storedConfig);
       await copyToClipboard(JSON.stringify(config, null, 2));
       toast.success("Connection configuration copied to clipboard");
     } catch {
@@ -616,91 +389,22 @@ export function InspectorDashboard() {
     action();
   };
 
-  const handleUpdateConnection = useCallback(
-    (config: EditableConnectionConfig) => {
-      if (!editingConnectionId) return;
-
-      const currentConnection =
-        getStoredConnectionConfig<EditableConnectionConfig>(
-          editingConnectionId
-        ) ||
-        connections.find(
-          (connection: McpServer) => connection.id === editingConnectionId
-        );
-
-      // If the URL changed, we need to remove the old one and add a new one
-      if (config.url !== editingConnectionId) {
-        removeConnection(editingConnectionId);
-        addConnection(
-          config.url,
-          config.name,
-          config.proxyConfig,
-          config.transportType,
-          config.oauth,
-          config.connectionMode,
-          config.connectionMode === "auto"
-            ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-            : false
-        );
-      } else if (
-        currentConnection &&
-        isAliasOnlyConnectionUpdate(currentConnection, config)
-      ) {
-        updateConnectionMetadata(editingConnectionId, {
-          name: config.name || config.url,
-        });
-      } else {
-        // Otherwise just update the existing connection
-        updateConnectionConfig(editingConnectionId, {
-          name: config.name,
-          connectionMode: config.connectionMode,
-          proxyConfig: config.proxyConfig,
-          transportType: config.transportType,
-          oauth: config.oauth,
-          autoProxyFallback:
-            config.connectionMode === "auto"
-              ? (config.autoProxyFallback ??
-                (config.proxyConfig?.proxyAddress
-                  ? {
-                      enabled: true,
-                      proxyAddress: config.proxyConfig.proxyAddress,
-                    }
-                  : false))
-              : false,
-        });
-      }
-
-      // Close the modal
-      setEditingConnectionId(null);
-
-      toast.success("Connection settings updated");
-    },
-    [
-      editingConnectionId,
-      connections,
-      removeConnection,
-      addConnection,
-      updateConnectionMetadata,
-      updateConnectionConfig,
-    ]
-  );
+  const navigateToServerTab = (connection: McpServer, tab: TabType) => {
+    const urlParams = new URLSearchParams(location.search);
+    const tunnelUrl = urlParams.get("tunnelUrl");
+    const params = new URLSearchParams();
+    params.set("server", connection.id);
+    params.set("tab", tab);
+    if (tunnelUrl) params.set("tunnelUrl", tunnelUrl);
+    navigate(`/?${params.toString()}`);
+  };
 
   const handleServerClick = (connection: any) => {
-    // Don't allow clicking failed connections - use the reload button instead
+    // Failed connections use the reload button on the dashboard tile instead.
     if (connection.state === "failed") {
       return;
     }
 
-    if (connection.state !== "ready") {
-      toast.error("Server is not connected and cannot be inspected");
-      return;
-    }
     // Preserve tunnelUrl and tab parameters if present
     const urlParams = new URLSearchParams(location.search);
     const tunnelUrl = urlParams.get("tunnelUrl");
@@ -786,24 +490,24 @@ export function InspectorDashboard() {
       <div className="w-full px-3 pt-6 sm:px-6 sm:pt-3 overflow-visible lg:overflow-auto">
         <div className="flex mb-3 md:mb-0 flex-col sm:flex-row items-center sm:items-center gap-3 relative z-10">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href="https://github.com/mcp-use/mcp-use"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block order-1 sm:order-2"
-              >
-                <Badge
-                  variant="secondary"
-                  className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
+            <TooltipTrigger
+              render={
+                <a
+                  href="https://github.com/mcp-use/mcp-use"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block order-1 sm:order-2"
                 >
-                  v
-                  {(typeof window !== "undefined" &&
-                    (window as any).__INSPECTOR_VERSION__) ||
-                    "1.0.0"}
-                </Badge>
-              </a>
-            </TooltipTrigger>
+                  <Badge
+                    variant="secondary"
+                    className="text-xs cursor-pointer hover:bg-secondary/80 transition-colors"
+                  >
+                    v{getPackageVersion()}
+                  </Badge>
+                </a>
+              }
+              nativeButton={false}
+            />
             <TooltipContent>
               <p>Visit GitHub</p>
             </TooltipContent>
@@ -861,29 +565,32 @@ export function InspectorDashboard() {
                           ) : connection.error &&
                             connection.state !== "ready" ? (
                             <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  type="button"
-                                  data-testid={`server-tile-status-${connection.state}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCopyError(connection.error!);
-                                  }}
-                                  className={`w-2 h-2 rounded-full transition-colors ${
-                                    (connection.error.includes("401") ||
+                              <TooltipTrigger
+                                render={
+                                  <button
+                                    type="button"
+                                    data-testid={`server-tile-status-${connection.state}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleCopyError(connection.error!);
+                                    }}
+                                    className={`w-2 h-2 rounded-full transition-colors ${
+                                      (connection.error.includes("401") ||
+                                        connection.error.includes(
+                                          "Unauthorized"
+                                        )) &&
                                       connection.error.includes(
-                                        "Unauthorized"
-                                      )) &&
-                                    connection.error.includes(
-                                      "does not support OAuth"
-                                    )
-                                      ? "bg-yellow-500 animate-status-pulse-yellow hover:bg-yellow-600"
-                                      : "bg-rose-500 animate-status-pulse-red hover:bg-rose-600"
-                                  }`}
-                                  title="Click to copy error message"
-                                  aria-label="Copy error message to clipboard"
-                                />
-                              </TooltipTrigger>
+                                        "does not support OAuth"
+                                      )
+                                        ? "bg-yellow-500 animate-status-pulse-yellow hover:bg-yellow-600"
+                                        : "bg-rose-500 animate-status-pulse-red hover:bg-rose-600"
+                                    }`}
+                                    title="Click to copy error message"
+                                    aria-label="Copy error message to clipboard"
+                                  />
+                                }
+                                nativeButton
+                              />
                               <TooltipContent>
                                 <p className="max-w-xs">{connection.error}</p>
                               </TooltipContent>
@@ -907,24 +614,27 @@ export function InspectorDashboard() {
                           {connection.url}
                         </p>
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  await copyToClipboard(connection.url);
-                                  toast.success("URL copied to clipboard");
-                                } catch {
-                                  toast.error("Failed to copy URL");
-                                }
-                              }}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
-                              title="Copy URL"
-                            >
-                              <Copy className="w-3 h-3 text-muted-foreground" />
-                            </button>
-                          </TooltipTrigger>
+                          <TooltipTrigger
+                            render={
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    await copyToClipboard(connection.url ?? "");
+                                    toast.success("URL copied to clipboard");
+                                  } catch {
+                                    toast.error("Failed to copy URL");
+                                  }
+                                }}
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/10 rounded"
+                                title="Copy URL"
+                              >
+                                <Copy className="w-3 h-3 text-muted-foreground" />
+                              </button>
+                            }
+                            nativeButton
+                          />
                           <TooltipContent>
                             <p>Copy URL</p>
                           </TooltipContent>
@@ -934,82 +644,99 @@ export function InspectorDashboard() {
                     {/* Desktop: Show all action buttons */}
                     <div className="hidden lg:flex items-center gap-1 flex-shrink-0">
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-copy-config"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                handleCopyConnectionConfig(connection)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-copy-config"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  handleCopyConnectionConfig(connection)
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>Copy connection config</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-info"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () => {
-                                setInfoModalConnection(connection);
-                                setInfoModalOpen(true);
-                              })
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <Info className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-info"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  navigateToServerTab(
+                                    connection,
+                                    "server-metadata"
+                                  )
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Info className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>View server info</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-settings"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                setEditingConnectionId(connection.id)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-settings"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  navigateToServerTab(
+                                    connection,
+                                    "connection-settings"
+                                  )
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <Settings className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>Edit connection settings</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            data-testid="server-tile-remove"
-                            variant="secondary"
-                            size="sm"
-                            onClick={(e) =>
-                              handleActionClick(e, () =>
-                                handleRemoveConnection(connection.id)
-                              )
-                            }
-                            className="h-8 w-8 p-0"
-                          >
-                            <CircleMinus className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
+                        <TooltipTrigger
+                          render={
+                            <Button
+                              data-testid="server-tile-remove"
+                              variant="secondary"
+                              size="sm"
+                              onClick={(e) =>
+                                handleActionClick(e, () =>
+                                  handleRemoveConnection(connection.id)
+                                )
+                              }
+                              className="h-8 w-8 p-0"
+                            >
+                              <CircleMinus className="w-4 h-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <TooltipContent>
                           <p>Remove connection</p>
                         </TooltipContent>
@@ -1018,21 +745,24 @@ export function InspectorDashboard() {
                         connection.state === "failed" ||
                         connection.state === "discovering") && (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              data-testid="server-tile-reconnect"
-                              variant="secondary"
-                              size="sm"
-                              onClick={(e) =>
-                                handleActionClick(e, () =>
-                                  handleReconnect(connection)
-                                )
-                              }
-                              className="h-8 w-8 p-0"
-                            >
-                              <RotateCcw className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                data-testid="server-tile-reconnect"
+                                variant="secondary"
+                                size="sm"
+                                onClick={(e) =>
+                                  handleActionClick(e, () =>
+                                    handleReconnect(connection)
+                                  )
+                                }
+                                className="h-8 w-8 p-0"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </Button>
+                            }
+                            nativeButton
+                          />
                           <TooltipContent>
                             <p>
                               {connection.state === "failed"
@@ -1048,16 +778,19 @@ export function InspectorDashboard() {
                     {/* Mobile: Show 3-dots overflow menu */}
                     <div className="lg:hidden flex-shrink-0">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          }
+                          nativeButton
+                        />
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={(e) => {
@@ -1071,8 +804,10 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              setInfoModalConnection(connection);
-                              setInfoModalOpen(true);
+                              navigateToServerTab(
+                                connection,
+                                "server-metadata"
+                              );
                             }}
                           >
                             <Info className="h-4 w-4 mr-2" />
@@ -1081,7 +816,10 @@ export function InspectorDashboard() {
                           <DropdownMenuItem
                             onClick={(e) => {
                               e.stopPropagation();
-                              setEditingConnectionId(connection.id);
+                              navigateToServerTab(
+                                connection,
+                                "connection-settings"
+                              );
                             }}
                           >
                             <Settings className="h-4 w-4 mr-2" />
@@ -1137,35 +875,36 @@ export function InspectorDashboard() {
                           size="sm"
                           className="bg-yellow-500/20 border-0 dark:bg-yellow-400/10 text-yellow-800 dark:text-yellow-500"
                           variant="outline"
-                          asChild
+                          render={
+                            <a
+                              href={connection.authUrl}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Store connection config so trySessionReconnect() can
+                                // resume after an OAuth redirect (when ?autoConnect is absent).
+                                try {
+                                  sessionStorage.setItem(
+                                    INSPECTOR_RECONNECT_STORAGE_KEY,
+                                    JSON.stringify({
+                                      url: connection.url,
+                                      name:
+                                        connection.name ||
+                                        "Auto-connected Server",
+                                      transportType:
+                                        (connection as any).transportType ||
+                                        "http",
+                                      connectionMode: "auto",
+                                    })
+                                  );
+                                } catch {
+                                  /* sessionStorage unavailable — best-effort */
+                                }
+                              }}
+                            />
+                          }
+                          nativeButton={false}
                         >
-                          <a
-                            href={connection.authUrl}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Store connection config so trySessionReconnect() can
-                              // resume after an OAuth redirect (when ?autoConnect is absent).
-                              try {
-                                sessionStorage.setItem(
-                                  INSPECTOR_RECONNECT_STORAGE_KEY,
-                                  JSON.stringify({
-                                    url: connection.url,
-                                    name:
-                                      connection.name ||
-                                      "Auto-connected Server",
-                                    transportType:
-                                      (connection as any).transportType ||
-                                      "http",
-                                    connectionMode: "auto",
-                                  })
-                                );
-                              } catch {
-                                /* sessionStorage unavailable — best-effort */
-                              }
-                            }}
-                          >
-                            Authenticate
-                          </a>
+                          Authenticate
                         </Button>
                       ) : null}
                     </div>
@@ -1191,10 +930,9 @@ export function InspectorDashboard() {
         className="w-full relative overflow-hidden h-auto lg:h-full py-4 px-4 sm:py-6 sm:px-6 lg:p-10 items-center justify-center flex"
       >
         <div className="absolute inset-0 z-0 overflow-hidden dark:opacity-60 pointer-events-none">
-          <MeshGradient
-            width={connectFormGradientSize?.width ?? 1280}
-            height={connectFormGradientSize?.height ?? 720}
-            colors={["#e0eaff", "#f9ffbd", "#dedede", "#ffffff"]}
+          <MeshGradientCanvas
+            className="h-full w-full"
+            colors={CONNECT_PANEL_MESH_COLORS}
             distortion={0.8}
             swirl={0.1}
             grainMixer={0}
@@ -1215,24 +953,27 @@ export function InspectorDashboard() {
           />
         </div>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={toggleMeshAnimationPaused}
-              aria-label={
-                meshAnimationPaused
-                  ? "Enable background shader animation"
-                  : "Disable background shader animation"
-              }
-              className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
-            >
-              {meshAnimationPaused ? (
-                <Play className="h-3 w-3 ml-px" fill="currentColor" />
-              ) : (
-                <Square className="h-2.5 w-2.5" fill="currentColor" />
-              )}
-            </button>
-          </TooltipTrigger>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                onClick={toggleMeshAnimationPaused}
+                aria-label={
+                  meshAnimationPaused
+                    ? "Enable background shader animation"
+                    : "Disable background shader animation"
+                }
+                className="absolute bottom-3 right-3 sm:bottom-5 sm:right-5 z-[8] flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border border-zinc-500/60 bg-transparent text-zinc-600 transition-colors hover:border-zinc-500 hover:text-zinc-800 dark:border-zinc-500/50 dark:text-zinc-400 dark:hover:border-zinc-400 dark:hover:text-zinc-200"
+              >
+                {meshAnimationPaused ? (
+                  <Play className="h-3 w-3 ml-px" fill="currentColor" />
+                ) : (
+                  <Square className="h-2.5 w-2.5" fill="currentColor" />
+                )}
+              </button>
+            }
+            nativeButton
+          />
           <TooltipContent side="left">
             <p>
               {meshAnimationPaused
@@ -1272,29 +1013,6 @@ export function InspectorDashboard() {
           />
         </div>
       </div>
-
-      {/* Connection Options Dialog */}
-      <ServerConnectionModal
-        connection={
-          editingConnectionId
-            ? connections.find((c) => c.id === editingConnectionId) || null
-            : null
-        }
-        open={editingConnectionId !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditingConnectionId(null);
-          }
-        }}
-        onConnect={handleUpdateConnection}
-      />
-
-      {/* Server Info Modal */}
-      <ServerCapabilitiesModal
-        open={infoModalOpen}
-        onOpenChange={setInfoModalOpen}
-        connection={infoModalConnection}
-      />
     </div>
   );
 }

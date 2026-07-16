@@ -8,7 +8,7 @@ interface WidgetWrapperProps {
 
 /**
  * Widget wrapper with dotted radial gradient background
- * Shared by OpenAI Apps SDK and MCP Apps renderers
+ * Shared by MCP Apps renderers
  */
 export function WidgetWrapper({
   children,
@@ -21,7 +21,10 @@ export function WidgetWrapper({
   return (
     <div
       className={cn(
-        "bg-zinc-100 flex flex-1 items-center justify-center dark:bg-zinc-900 bg-[radial-gradient(circle,_rgba(0,0,0,0.2)_1px,_transparent_1px)] dark:bg-[radial-gradient(circle,_rgba(255,255,255,0.2)_1px,_transparent_1px)] bg-[length:32px_32px]",
+        "flex flex-1 items-center justify-center bg-zinc-50 dark:bg-zinc-800",
+        "[background-image:radial-gradient(circle,rgba(0,0,0,0.12)_1px,transparent_1px)]",
+        "dark:[background-image:radial-gradient(circle,rgba(255,255,255,0.1)_1px,transparent_1px)]",
+        "bg-[length:32px_32px]",
         className
       )}
     >

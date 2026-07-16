@@ -14,11 +14,10 @@
     "composite": true
   },
   "references": [
-    { "path": "./packages/mcp-use" },
+    { "path": "./packages/server" },
     { "path": "./packages/client" },
     { "path": "./packages/agent" },
     { "path": "./packages/inspector" },
-    { "path": "./packages/cli" },
     { "path": "./packages/create-mcp-use-app" }
   ]
 }

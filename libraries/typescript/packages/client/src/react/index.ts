@@ -3,16 +3,26 @@
  *
  * Provides the `useMcp` hook, the multi-server `McpClientProvider`, and the
  * supporting storage / logging utilities for connecting to MCP servers from a
- * React app. The widget/view runtime (useWidget, useCallTool, ...) lives in the
- * server package at `mcp-use/react`.
+ * React app. MCP Apps host rendering lives in {@link ViewRenderer}.
  */
 
 export type {
   UseMcpOptions,
   UseMcpResult,
   ReconnectionOptions,
+  McpServer,
+  McpServerConfig,
+  /** @deprecated Use McpServerConfig */
+  McpServerOptions,
+  PersistedMcpServerConfig,
+  pickPersistedServerConfig,
+  toPersistedServerConfig,
+  McpNotification,
+  PendingSamplingRequest,
+  PendingElicitationRequest,
 } from "./types.js";
 export { useMcp } from "./useMcp.js";
+export { detectFavicon } from "../utils/favicon.js";
 
 // Re-export auth callback handler for the OAuth flow
 export { onMcpAuthorization } from "../auth/callback.js";
@@ -24,17 +34,40 @@ export {
   setTelemetrySource,
 } from "../telemetry/telemetry-browser.js";
 
-// Backwards compatibility aliases
-export { Tel as BrowserTelemetry } from "../telemetry/telemetry-browser.js";
-export { setTelemetrySource as setBrowserTelemetrySource } from "../telemetry/telemetry-browser.js";
-
-// Re-export core types for convenience when using the hook result
+// Protocol types re-exported so consumers need only @mcp-use/client/react.
 export type {
+  CallToolResult,
+  ContentBlock,
+  ElicitRequestFormParams,
+  ElicitRequestURLParams,
+  ElicitResult,
+  GetPromptResult,
+  JSONRPCMessage,
   Prompt,
+  ReadResourceResult,
   Resource,
-  ResourceTemplate,
+  ResourceTemplateType,
   Tool,
-} from "@modelcontextprotocol/sdk/types.js";
+  Transport,
+} from "@modelcontextprotocol/client";
+export type {
+  SamplingCreateMessageParams,
+  SamplingCreateMessageResult,
+} from "../core/config.js";
+import type {
+  SamplingCreateMessageParams,
+  SamplingCreateMessageResult,
+} from "../core/config.js";
+/** JSON-RPC envelope for `sampling/createMessage`. */
+export type SamplingCreateMessageRequest = {
+  method: "sampling/createMessage";
+  params: SamplingCreateMessageParams;
+};
+/** @deprecated Use {@link SamplingCreateMessageRequest}. */
+export type { SamplingCreateMessageRequest as CreateMessageRequest };
+/** @deprecated Use {@link SamplingCreateMessageResult}. */
+export type { SamplingCreateMessageResult as CreateMessageResult };
+export { specTypeSchemas } from "@modelcontextprotocol/client";
 
 // Multi-server client provider and hooks
 export {
@@ -43,13 +76,8 @@ export {
   useMcpServer,
 } from "./McpClientProvider.js";
 export type {
-  McpServer,
-  McpServerOptions,
   McpClientContextType,
   McpClientProviderProps,
-  McpNotification,
-  PendingSamplingRequest,
-  PendingElicitationRequest,
 } from "./McpClientProvider.js";
 
 // Storage providers
@@ -58,7 +86,7 @@ export {
   MemoryStorageProvider,
   type CachedServerMetadata,
   type StorageProvider,
-} from "./storage/index.js";
+} from "./storage.js";
 
 // RPC logger utilities
 export {
@@ -68,3 +96,27 @@ export {
   clearRpcLogs,
   type RpcLogEntry,
 } from "./rpc-logger.js";
+
+// MCP Apps host renderer
+export {
+  ViewRenderer,
+  resolveViewResource,
+  getViewResourceUri,
+  isViewResource,
+  isViewTool,
+  parseCustomProps,
+  buildViewSandboxBlobUrl,
+  type ViewRendererProps,
+  type ViewConnection,
+  type ViewDisplayMode,
+  type ViewCspMode,
+  type ViewRendererSource,
+  type ResolvedViewResource,
+  type ViewCspViolation,
+  type ViewLifecycleEvent,
+  type ViewLifecycleStatus,
+  type McpUiHostCapabilities,
+  type McpUiHostContext,
+  type McpUiResourceCsp,
+  type McpUiResourcePermissions,
+} from "./view/ViewRenderer.js";

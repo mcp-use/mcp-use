@@ -4,7 +4,6 @@
     "optionalPeerDependencies": "off"
   },
   "ignoreWorkspaces": [
-    "packages/mcp-use/examples/**",
     "packages/create-mcp-use-app/src/templates/**",
     "test_app"
   ],
@@ -12,22 +11,30 @@
     ".": {
       "project": ["*.{js,ts}"]
     },
-    "packages/mcp-use": {
+    "packages/server": {
       "entry": [
-        "scripts/**/*.{js,mjs,ts}",
-        "tests/helpers/**/*.ts",
-        "tests/servers/**/*.ts",
-        "tests/docs/**/*.ts",
-        "tests/types/**/*.ts"
+        "src/index.ts",
+        "src/bin.ts",
+        "src/react/index.ts",
+        "src/oauth/**/*.ts",
+        "tests/**/*.{ts,tsx}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreBinaries": ["lsof", "sleep", "dev"]
+      "ignoreBinaries": ["npx"],
+      "ignoreDependencies": ["mcp-use"]
     },
     "packages/cli": {
-      "project": ["src/**/*.ts", "tests/**/*.ts"],
-      "ignoreDependencies": [
-        "@mcp-use/inspector"
-      ]
+      "entry": ["src/index.ts", "tests/**/*.mjs"],
+      "project": ["src/**/*.ts", "tests/**/*.mjs"]
+    },
+    "packages/client": {
+      "entry": [
+        "src/index.ts",
+        "src/index-browser.ts",
+        "src/react/index.ts",
+        "tests/**/*.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"]
     },
     "packages/inspector": {
       "entry": [
@@ -36,14 +43,10 @@
         "tests/e2e/**/*.{ts,tsx,mjs}"
       ],
       "project": ["src/**/*.{ts,tsx}", "tests/**/*.{ts,tsx}"],
-      "ignoreDependencies": [
-        "@scarf/scarf",
-        "tailwindcss",
-        "tw-animate-css"
-      ]
+      "ignoreDependencies": ["@scarf/scarf", "tailwindcss", "tw-animate-css"]
     },
     "packages/create-mcp-use-app": {
-      "entry": ["scripts/**/*.{js,mjs,ts}"],
+      "entry": ["scripts/**/*.{js,mjs,ts}", "src/index.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     }
   }

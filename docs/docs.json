@@ -170,6 +170,7 @@
                 "icon": "router",
                 "pages": [
                   "typescript/client/index",
+                  "typescript/client/migration",
                   "typescript/client/environments",
                   {
                     "group": "Core Components",

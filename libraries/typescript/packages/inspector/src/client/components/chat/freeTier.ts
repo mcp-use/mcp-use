@@ -8,6 +8,10 @@
  *
  * Pure decision so it can be unit-tested without rendering React.
  */
+import type { LLMConfig } from "./types";
+
+export const FALLBACK_MANAGED_MODEL_ID = "anthropic/claude-sonnet-4.6";
+
 interface FreeTierVisibilityInput {
   /** Chat is using the server-managed (Manufact) LLM, not a BYOK key. */
   isManaged: boolean;
@@ -23,4 +27,39 @@ export function shouldShowFreeTierUpgrade({
   isAuthenticated,
 }: FreeTierVisibilityInput): boolean {
   return isManaged && enableFreeTierUpgrade && !isAuthenticated;
+}
+
+/** True when localhost MCP should use browser MCPAgent + cloud LLM proxy. */
+export function shouldUseManagedClientSide({
+  isLoopback,
+  chatApiUrl,
+}: {
+  isLoopback: boolean;
+  chatApiUrl?: string;
+  enableFreeTierUpgrade?: boolean;
+}): boolean {
+  return isLoopback && !!chatApiUrl;
+}
+
+/** LLM config for the managed inspector LLM proxy (`/inspector/llm/*`). */
+export function buildManagedLlmProxyConfig(
+  chatApiUrl: string,
+  accessToken?: string | null,
+  useSession = false,
+  modelId?: string
+): LLMConfig {
+  const baseUrl = chatApiUrl.replace(/\/chat\/stream\/?$/, "/llm");
+  return {
+    provider: "openai-compatible",
+    model: modelId ?? FALLBACK_MANAGED_MODEL_ID,
+    apiKey: accessToken ?? "server-managed",
+    baseUrl,
+    ...(useSession ? { credentials: "include" as const } : {}),
+  };
+}
+
+export function buildManagedAuthHeaders(
+  accessToken?: string | null
+): Record<string, string> | undefined {
+  return accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined;
 }

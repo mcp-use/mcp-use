@@ -200,7 +200,7 @@ The conformance server provides:
 **Manual setup (only for manual testing):** If using `pnpm test:e2e` directly without the automated commands, start the conformance server manually:
 
 ```bash
-cd packages/mcp-use/examples/server/features/conformance
+cd packages/server/examples/conformance
 pnpm build
 pnpm start --port 3002
 ```

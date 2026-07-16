@@ -12,7 +12,7 @@ import {
   MCP_AUTH_BROADCAST_CHANNEL,
   MCP_AUTH_CALLBACK_MESSAGE_TYPE,
   type McpAuthCallbackMessage,
-} from "../../../src/auth/popup-runner.js";
+} from "../../../src/auth/popup.js";
 
 const TOKENS_KEY = "mcp:auth_abc123_tokens";
 const FLOW_STATE = "state-aaa";

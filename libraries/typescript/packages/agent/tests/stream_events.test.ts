@@ -12,7 +12,7 @@
 import { HumanMessage } from "@langchain/core/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { StreamEvent } from "@langchain/core/tracers/log_stream";
-import { MCPAgent } from "../src/agents/mcp_agent.js";
+import { MCPAgent } from "../src/agents/mcp_agent_langchain.js";
 import { MCPClient } from "@mcp-use/client";
 
 // Mock the MCP client for testing

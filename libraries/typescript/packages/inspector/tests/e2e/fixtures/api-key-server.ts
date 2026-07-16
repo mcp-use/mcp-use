@@ -5,7 +5,9 @@
  * Valid API key: test-api-key-12345
  */
 
-import { MCPServer, text } from "mcp-use";
+import { serve, type ServerType } from "@hono/node-server";
+import { MCPServer } from "mcp-use";
+import { Hono } from "hono";
 import { z } from "zod";
 
 const VALID_API_KEY = "test-api-key-12345";
@@ -15,10 +17,39 @@ export function createApiKeyServer(port: number = 3003) {
     name: "ApiKeyTestServer",
     version: "1.0.0",
     description: "MCP server requiring API key authentication for testing",
+    inspector: { enabled: false },
   });
 
-  // Custom middleware to check API key
-  server.app.use("/mcp/*", async (c, next) => {
+  server.tool(
+    {
+      name: "verify_auth",
+      description: "Verify that authentication is working",
+    },
+    async () => ({
+      content: [
+        {
+          type: "text",
+          text: `Authentication successful! API key verified: ${VALID_API_KEY.substring(0, 10)}...`,
+        },
+      ],
+    })
+  );
+
+  server.tool(
+    {
+      name: "echo",
+      description: "Echo a message back",
+      inputSchema: z.object({
+        message: z.string(),
+      }),
+    },
+    async ({ message }) => ({
+      content: [{ type: "text", text: `Echo: ${message}` }],
+    })
+  );
+
+  const app = new Hono();
+  app.use("/mcp", async (c, next) => {
     const authHeader = c.req.header("Authorization");
 
     if (!authHeader) {
@@ -65,38 +96,38 @@ export function createApiKeyServer(port: number = 3003) {
       );
     }
 
-    // Store API key in context for tools to access
-    c.set("apiKey", key);
     await next();
   });
+  const handler = server.getHandler();
+  app.all("*", (c) => handler(c.req.raw));
 
-  // Tool to verify authenticated access
-  server.tool(
-    {
-      name: "verify_auth",
-      description: "Verify that authentication is working",
+  let httpServer: ServerType | undefined;
+
+  return {
+    async listen(listenPort = port) {
+      return new Promise<{ port: number; url: string }>((resolve, reject) => {
+        httpServer = serve(
+          { fetch: app.fetch, port: listenPort, hostname: "127.0.0.1" },
+          (info) => {
+            resolve({
+              port: info.port,
+              url: `http://localhost:${info.port}/mcp`,
+            });
+          }
+        );
+        httpServer.on("error", reject);
+      });
     },
-    async (_args, ctx) => {
-      const apiKey = (ctx as any).apiKey;
-      return text(
-        `Authentication successful! API key verified: ${apiKey?.substring(0, 10)}...`
-      );
-    }
-  );
-
-  // Simple echo tool
-  server.tool(
-    {
-      name: "echo",
-      description: "Echo a message back",
-      schema: z.object({
-        message: z.string(),
-      }),
+    async close() {
+      await server.close();
+      if (httpServer) {
+        await new Promise<void>((resolve, reject) => {
+          httpServer!.close((err) => (err ? reject(err) : resolve()));
+        });
+        httpServer = undefined;
+      }
     },
-    async ({ message }) => text(`Echo: ${message}`)
-  );
-
-  return server;
+  };
 }
 
 export class ApiKeyServerHelper {

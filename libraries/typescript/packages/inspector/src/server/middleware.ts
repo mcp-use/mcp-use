@@ -1,8 +1,10 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { Hono } from "hono";
-import { checkClientFiles, getClientDistPath } from "./file-utils.js";
-import { registerInspectorRoutes } from "./shared-routes.js";
-import { registerStaticRoutes } from "./shared-static.js";
+import { registerInspectorCdnShell, type InspectorMode } from "./cdn-shell.js";
+import {
+  registerInspectorProxyRoutes,
+  type InspectorProxyRoutesConfig,
+} from "./proxy-routes.js";
 
 /**
  * Mount the MCP Inspector UI at a specified path on an Express or Hono app
@@ -25,12 +27,15 @@ export function mountInspector(
   app: Express | Hono,
   config?: {
     autoConnectUrl?: string | null;
+    manufactChatUrl?: string | null;
     /** Whether the server is running in development mode (enables same-origin sandbox) */
     devMode?: boolean;
     /** Override the sandbox origin for MCP Apps widgets (e.g., for production reverse proxies) */
     sandboxOrigin?: string | null;
-    /** Port the host app listens on (embedded inspector); required for tunnel start */
-    serverPort?: number;
+    /** Explicit cross-origin callers of the OAuth BFF. Same-origin is implicit. */
+    oauthProxyAllowedOrigins?: readonly string[];
+    /** Allow OAuth discovery against loopback targets. Use only for local development. */
+    oauthProxyAllowLoopback?: boolean;
     /**
      * Normalized server-wide path prefix the embedding server mounts its whole
      * framework surface under (default `/mcp`; `""` = root). The inspector
@@ -41,59 +46,34 @@ export function mountInspector(
     basePath?: string;
   }
 ): void {
-  // Find the built client files
-  const clientDistPath = getClientDistPath();
-
-  if (!checkClientFiles(clientDistPath)) {
-    console.warn(
-      `⚠️  MCP Inspector client files not found at ${clientDistPath}`
-    );
-    console.warn(
-      `   Run 'yarn build' in the inspector package to build the UI`
-    );
-  }
-
-  // Normalize basePath: a single leading slash, no trailing slash; "" = root.
   const basePath = normalizeInspectorBasePath(config?.basePath);
-
-  // Build runtime config to inject into the HTML
-  const runtimeConfig = {
-    devMode: config?.devMode,
-    sandboxOrigin: config?.sandboxOrigin,
-    inspectorMode: "embedded" as const,
-    basePath,
-    // Make the proxy URL basePath-aware so the client targets the relocated
-    // proxy (the client reads window.__MCP_PROXY_URL__).
-    proxyUrl: `${basePath}/inspector/api/proxy`,
+  const routesConfig: InspectorProxyRoutesConfig = {
+    autoConnectUrl: config?.autoConnectUrl,
+    oauthProxyAllowedOrigins: config?.oauthProxyAllowedOrigins ?? [],
+    oauthProxyAllowLoopback:
+      config?.oauthProxyAllowLoopback ?? config?.devMode === true,
   };
 
-  // If it's already a Hono app, register routes directly.
-  //
-  // Detect Hono via its `.fetch(Request) => Response` method rather than
-  // `app instanceof Hono`. When this package and the host (e.g. `mcp-use`)
-  // resolve different `Hono` constructors (multiple `hono` copies hoisted
-  // across a monorepo, the dual CJS/ESM builds shipped from a single on-disk
-  // copy loaded twice by Node, or bundler dedup quirks), `instanceof`
-  // returns false even for a real Hono app, and the Express-compat path
-  // below runs against a Hono `Context`, crashing on `req.headers.host`.
-  // Every Hono instance exposes `.fetch`, and Express apps don't, so the
-  // duck-type check alone covers both shapes unambiguously.
+  const shellConfig = {
+    devMode: config?.devMode,
+    sandboxOrigin: config?.sandboxOrigin,
+    inspectorMode: "embedded" as InspectorMode,
+    basePath,
+    proxyUrl: `${basePath}/inspector/api/proxy`,
+    manufactChatUrl: config?.manufactChatUrl,
+  };
+
   if (isHonoApp(app)) {
-    registerInspectorRoutes(app, config, basePath);
-    registerStaticRoutes(app, clientDistPath, runtimeConfig, basePath);
+    registerInspectorProxyRoutes(app, routesConfig, basePath);
+    registerInspectorCdnShell(app, shellConfig, basePath);
     return;
   }
 
-  // For Express apps, create a Hono app and bridge the requests
   const honoApp = new Hono();
+  registerInspectorProxyRoutes(honoApp, routesConfig, basePath);
+  registerInspectorCdnShell(honoApp, shellConfig, basePath);
 
-  // Register routes on Hono app
-  registerInspectorRoutes(honoApp, config, basePath);
-  registerStaticRoutes(honoApp, clientDistPath, runtimeConfig, basePath);
-
-  // Convert all Hono routes to Express middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
-    // Use Hono's fetch API
     const url = new URL(req.url || "", `http://${req.headers.host}`);
     const request = new Request(url, {
       method: req.method,
@@ -106,23 +86,16 @@ export function mountInspector(
 
     Promise.resolve(honoApp.fetch(request))
       .then(async (fetchResponse: globalThis.Response) => {
-        // Set status
         res.status(fetchResponse.status);
-
-        // Copy headers
         fetchResponse.headers.forEach((value: string, key: string) => {
           res.setHeader(key, value);
         });
 
-        // Send body
         if (fetchResponse.body) {
           const reader = fetchResponse.body.getReader();
-
           while (true) {
             const { done, value } = await reader.read();
-            if (done) {
-              break;
-            }
+            if (done) break;
             res.write(value);
           }
           res.end();
@@ -138,15 +111,12 @@ function isHonoApp(app: Express | Hono): app is Hono {
   return typeof (app as { fetch?: unknown }).fetch === "function";
 }
 
-/**
- * Normalize the server-wide `basePath` the embedding server passes in: a single
- * leading slash, no trailing slash; `""`/`"/"` collapse to `""` (root). Mirrors
- * mcp-use's `normalizeBasePath` so the inspector and host agree on the prefix
- * without taking a runtime dependency on the helper.
- */
 function normalizeInspectorBasePath(raw: string | undefined): string {
   if (raw === undefined) return "/mcp";
-  let value = raw.trim().replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+  let value = raw
+    .trim()
+    .replace(/\/{2,}/g, "/")
+    .replace(/\/+$/, "");
   if (value === "" || value === "/") return "";
   if (!value.startsWith("/")) value = `/${value}`;
   return value;

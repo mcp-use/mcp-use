@@ -1,6 +1,7 @@
 import { Button } from "@/client/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -11,7 +12,7 @@ import { Input } from "@/client/components/ui/input";
 import { Label } from "@/client/components/ui/label";
 import { usePropsLLM } from "@/client/hooks/usePropsLLM";
 import type { PropPreset } from "@/client/hooks/useResourceProps";
-import type { Resource } from "@modelcontextprotocol/sdk/types.js";
+import type { Resource } from "@mcp-use/client/react";
 import { Loader2, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -348,7 +349,8 @@ export function PropsConfigDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-[600px] max-h-[80vh] flex flex-col"
+        scrollable
+        className="sm:max-w-[600px] max-h-[80vh]"
         data-testid="props-config-dialog"
       >
         <DialogHeader>
@@ -361,7 +363,7 @@ export function PropsConfigDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-4 py-4">
+        <DialogBody className="space-y-4 py-4">
           {/* Preset Name */}
           <div className="space-y-2">
             <Label htmlFor="preset-name">Preset Name</Label>
@@ -502,7 +504,7 @@ export function PropsConfigDialog({
               </>
             )}
           </div>
-        </div>
+        </DialogBody>
 
         <DialogFooter>
           <Button

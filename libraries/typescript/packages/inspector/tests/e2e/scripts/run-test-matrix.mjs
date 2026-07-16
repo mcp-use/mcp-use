@@ -47,8 +47,9 @@ if (additionalArgs.length > 0) {
 const inspectorDir = resolve(__dirname, "../../..");
 const conformanceServerDir = resolve(
   inspectorDir,
-  "../mcp-use/examples/server/features/conformance"
+  "../server/examples/conformance"
 );
+const builtinPort = Number(process.env.TEST_PORT || 3000);
 
 // Track child processes and servers for cleanup
 const childProcesses = [];
@@ -94,12 +95,14 @@ function cleanup() {
  * All other paths are served as-is (favicons, provider images, etc.)
  */
 function startLocalCdnServer(cdnDistDir) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolveServer, reject) => {
     const CONTENT_TYPES = {
       ".js": "application/javascript",
       ".css": "text/css",
       ".svg": "image/svg+xml",
       ".png": "image/png",
+      ".ico": "image/x-icon",
+      ".webmanifest": "application/manifest+json",
     };
 
     const server = createServer((req, res) => {
@@ -139,7 +142,7 @@ function startLocalCdnServer(cdnDistDir) {
 
     server.listen(0, "127.0.0.1", () => {
       const { port } = server.address();
-      resolve({ server, port });
+      resolveServer({ server, port });
     });
 
     server.on("error", reject);
@@ -236,7 +239,7 @@ async function main() {
     // Step 1: Build conformance server (needed for all modes)
     await runCommand(
       "pnpm",
-      ["--filter", "conformance-server", "build"],
+      ["build"],
       conformanceServerDir,
       "Building conformance server"
     );
@@ -247,6 +250,21 @@ async function main() {
       MCP_USE_ANONYMIZED_TELEMETRY: "false",
       NODE_ENV: "test",
     };
+
+    if (mode === "builtin") {
+      await runCommand(
+        "pnpm",
+        ["--filter", "@mcp-use/client", "build"],
+        inspectorDir,
+        "Building MCP client"
+      );
+      await runCommand(
+        "pnpm",
+        ["build:cdn"],
+        inspectorDir,
+        "Building built-in inspector bundle"
+      );
+    }
 
     // Start a local CDN server for modes that use the built inspector (builtin, prod).
     // This avoids a hard dependency on inspector-cdn.mcp-use.com being reachable in CI,
@@ -272,14 +290,17 @@ async function main() {
       // Start conformance server in dev mode (includes built-in inspector)
       await startBackgroundProcess(
         "pnpm",
-        ["--filter", "conformance-server", "dev", "--no-open"],
+        ["dev", "--port", String(builtinPort), "--no-open"],
         conformanceServerDir,
         "Starting conformance server with built-in inspector",
         playwrightEnv
       );
 
-      // Wait for the built-in inspector to be ready
-      await waitForUrl("http://localhost:3000/inspector", "Built-in inspector");
+      // Wait for the built-in inspector to be ready (mounted under /mcp basePath)
+      await waitForUrl(
+        `http://localhost:${builtinPort}/mcp/inspector`,
+        "Built-in inspector"
+      );
     } else if (mode === "prod") {
       // Prod mode: Built server on port 3002, built inspector on port 3000
       playwrightEnv = {
@@ -294,7 +315,7 @@ async function main() {
       // Start conformance server on port 3002
       await startBackgroundProcess(
         "pnpm",
-        ["--filter", "conformance-server", "start", "--port", "3002"],
+        ["start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -313,7 +334,7 @@ async function main() {
       // Start conformance server on port 3002
       await startBackgroundProcess(
         "pnpm",
-        ["--filter", "conformance-server", "start", "--port", "3002"],
+        ["start", "--port", "3002"],
         conformanceServerDir,
         "Starting conformance server on port 3002",
         playwrightEnv
@@ -387,21 +408,6 @@ async function main() {
     childProcesses.push(playwrightProc);
 
     playwrightProc.on("close", async (code) => {
-      // Restore modified files after HMR tests (whether they pass or fail)
-      if (isRunningHmrTests) {
-        console.log("\n🔄 Restoring modified conformance server files...");
-        try {
-          await runCommand(
-            "git",
-            ["restore", "."],
-            conformanceServerDir,
-            "Restoring conformance server files"
-          );
-        } catch (err) {
-          console.log("⚠️  Warning: Could not restore files:", err.message);
-        }
-      }
-
       if (code === 0) {
         console.log("\n✅ All tests passed!\n");
       } else {

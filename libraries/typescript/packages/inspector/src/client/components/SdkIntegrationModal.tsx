@@ -1,19 +1,18 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/client/components/ui/dialog";
-import { usePrismTheme } from "@/client/hooks/usePrismTheme";
 import {
   generatePythonSDKCode,
   generateTypeScriptSDKCode,
 } from "@/client/utils/mcpClientUtils";
-import { copyToClipboard } from "@/client/utils/clipboard";
+import { copyToClipboard } from "@/client/utils/browser";
 import { Button } from "./ui/button";
 
 interface SdkIntegrationModalProps {
@@ -47,7 +46,6 @@ export function SdkIntegrationModal({
   headers,
   language,
 }: SdkIntegrationModalProps) {
-  const { prismStyle } = usePrismTheme();
   const [copied, setCopied] = useState(false);
 
   const code =
@@ -67,7 +65,7 @@ export function SdkIntegrationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent scrollable className="max-w-[90vw] max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Add to {languageName} SDK</DialogTitle>
           <DialogDescription>
@@ -75,7 +73,7 @@ export function SdkIntegrationModal({
             {languageName} application using the mcp-use SDK.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
+        <DialogBody className="space-y-4">
           <div>
             <h5 className="font-semibold text-sm mb-2">Instructions</h5>
             <ol className="space-y-2 text-xs text-muted-foreground">
@@ -95,7 +93,7 @@ export function SdkIntegrationModal({
             </ol>
           </div>
 
-          <div className="relative w-full overflow-x-auto overflow-y-auto max-h-[60vh]">
+          <div className="relative w-full overflow-x-auto">
             <div className="absolute top-2 right-2 z-10">
               <Button
                 variant="ghost"
@@ -110,28 +108,11 @@ export function SdkIntegrationModal({
                 )}
               </Button>
             </div>
-            <SyntaxHighlighter
-              language={language}
-              style={prismStyle}
-              customStyle={{
-                margin: 0,
-                padding: "1rem",
-                paddingRight: "3rem",
-                borderRadius: "0.5rem",
-                fontSize: "0.75rem",
-                background: "var(--muted)",
-                width: "100%",
-                maxWidth: "100%",
-                overflow: "auto",
-              }}
-              wrapLines={true}
-              wrapLongLines={true}
-              PreTag="div"
-            >
-              {code}
-            </SyntaxHighlighter>
+            <pre className="m-0 p-4 pr-12 rounded-lg text-xs font-mono overflow-auto w-full max-w-full bg-muted">
+              <code>{code}</code>
+            </pre>
           </div>
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

@@ -17,7 +17,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, create } from "react-test-renderer";
 
-vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
+vi.mock("../../../src/core/browser.js", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   // Use a regular function (not arrow) so it's constructable with `new`
   BrowserMCPClient: vi.fn(function () {
@@ -31,7 +31,7 @@ vi.mock("../../../src/client/browser.js", async (importOriginal) => ({
   }),
 }));
 
-vi.mock("../../../src/auth/browser-provider.js", () => ({
+vi.mock("../../../src/auth/browser.js", () => ({
   createBrowserOAuthProvider: vi.fn(() => ({
     provider: null,
     oauthProxyUrl: undefined,

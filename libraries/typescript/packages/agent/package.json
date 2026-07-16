@@ -1,8 +1,8 @@
 {
   "name": "@mcp-use/agent",
   "type": "module",
-  "version": "2.0.0-alpha.0",
-  "description": "LangChain-based MCP agent (MCPAgent), adapters, manager tools, and observability. Part of the mcp-use v2 framework.",
+  "version": "1.0.0",
+  "description": "Native cross-platform MCP agent. Inspector → MCPAgent → loop → fetch + @mcp-use/client. LangChain bridge at @mcp-use/agent/langchain.",
   "author": "mcp-use, Inc.",
   "license": "MIT",
   "homepage": "https://github.com/mcp-use/mcp-use#readme",
@@ -32,6 +32,11 @@
       "types": "./dist/browser-agent.d.ts",
       "import": "./dist/browser-agent.js",
       "require": "./dist/browser-agent.cjs"
+    },
+    "./langchain": {
+      "types": "./dist/langchain.d.ts",
+      "import": "./dist/langchain.js",
+      "require": "./dist/langchain.cjs"
     }
   },
   "main": "./dist/index.cjs",
@@ -41,7 +46,7 @@
     "dist"
   ],
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
     "build": "rimraf dist && tsup && tsc --emitDeclarationOnly --declaration",
@@ -61,7 +66,7 @@
   },
   "dependencies": {
     "@mcp-use/client": "workspace:*",
-    "@modelcontextprotocol/sdk": "1.26.0",
+    "@modelcontextprotocol/client": "2.0.0-beta.3",
     "chalk": "4.1.2"
   },
   "optionalDependencies": {
@@ -80,7 +85,13 @@
     "@langchain/anthropic": {
       "optional": true
     },
+    "@langchain/core": {
+      "optional": true
+    },
     "@langchain/openai": {
+      "optional": true
+    },
+    "langchain": {
       "optional": true
     },
     "langfuse": {
@@ -88,11 +99,17 @@
     },
     "langfuse-langchain": {
       "optional": true
+    },
+    "zod": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@langchain/openai": "^1.2.8",
     "ai": "^6.0.116",
+    "rimraf": "^6.1.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.0",
     "zod": "4.3.5"
   },

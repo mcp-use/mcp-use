@@ -11,9 +11,6 @@ interface NotificationsListProps {
   onNotificationSelect: (notification: MCPNotification) => void;
   focusedIndex: number;
   formatRelativeTime: (timestamp: number) => string;
-  listRef?:
-    | React.RefObject<HTMLDivElement>
-    | React.MutableRefObject<HTMLDivElement | null>;
 }
 
 export function NotificationsList({
@@ -22,18 +19,17 @@ export function NotificationsList({
   onNotificationSelect,
   focusedIndex,
   formatRelativeTime,
-  listRef,
 }: NotificationsListProps) {
   if (notifications.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
         <NotFound vertical noBorder message="No notifications yet" />
       </div>
     );
   }
 
   return (
-    <div ref={listRef} className="overflow-y-auto flex-1 overscroll-contain">
+    <div>
       {notifications.map((notification, index) => {
         return (
           <ListItem
