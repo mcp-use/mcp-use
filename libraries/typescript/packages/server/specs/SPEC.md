@@ -109,13 +109,9 @@ server.basePath; // readonly accessor (default "/mcp") — lets tooling introspe
 
 Result model (raw wire shapes; see the no-response-helpers ground rule): tool callbacks return the SDK's `CallToolResult`, resource callbacks `ReadResourceResult` (each `contents` entry addresses itself with the read `uri` and carries its own `mimeType`; the definition's `mimeType` is listing metadata only), prompt callbacks `GetPromptResult` (`description` passes through verbatim — the definition's is not injected). `ToolResult<TOutput>` in `src/tools.ts` encodes the SDK's runtime rule at compile time: tools **without** an `outputSchema` accept any `CallToolResult`; tools **with** one must return `structuredContent` matching the schema's inferred type — any JSON root, per the 2026 wire — or set `isError: true` (the SDK exempts `isError` results from output validation; anything else without `structuredContent` throws at call time).
 
-Callback context (`ctx`, second parameter): `{ signal, request?, client, inputResponses?, requestState?, auth? }` — request-scoped only. `inputResponses` and `requestState` expose the official v2 multi-round-trip state; use the re-exported `inputRequired`, `inputResponse`, and `acceptedContent` helpers. `ctx.client` exposes per-request client capabilities (`VIEWS_SPEC.md`), and with OAuth configured, `ctx.auth` is present (`AUTH_SPEC.md` / `AUTH_IMPLEMENTATION.md`). Nothing session-scoped is added.
+Callback context (`ctx`, second parameter): `{ signal, request?, client, elicit, inputResponses?, requestState, reportProgress, sendLog, auth? }` — request-scoped only. `ctx.elicit` is the typed form/URL convenience path; `inputResponses` and `requestState()` expose the official v2 multi-round-trip state for advanced flows. The package root re-exports `inputRequired`, `inputResponse`, `acceptedContent`, and `createRequestStateCodec`. `ctx.client` exposes per-request client capabilities (`VIEWS_SPEC.md`), and with OAuth configured, `ctx.auth` is present (`AUTH_SPEC.md` / `AUTH_IMPLEMENTATION.md`). Nothing session-scoped is added.
 
-For the common human-input path, `ctx.input.form({ key, message, schema })`
-combines correlation and Standard Schema validation. Return `form.result` when
-`status === "required"`; accepted values are inferred from `schema`, while
-decline, cancel, and invalid states remain explicit. `ctx.reportProgress(...)`
-is request-scoped and returns `false` when the caller supplied no progress token.
+For the common human-input path, `await ctx.elicit(key, message, schemaOrUrl)` combines correlation and Standard Schema validation. Return `result` when `status === "required"`; accepted form values are inferred from the schema, while decline and cancel remain explicit. Invalid accepted form content produces another `required` result. `ctx.reportProgress(...)` is request-scoped and returns `false` when the caller supplied no progress token.
 
 **Deltas vs the old package (protocol- or SDK-forced):**
 
@@ -129,7 +125,7 @@ is request-scoped and returns `false` when the caller supplied no progress token
 8. `resourceTemplate()` uses a `const` type parameter so `uriTemplate` stays a string literal through inference — without it TS widens object-literal properties to `string` and template-param typing silently degrades to `Record<string, string | string[]>` (it had, undetected, before the type-level tests). Template inference handles RFC 6570 operators, comma-separated variable lists, and `*`/`:n` modifiers.
 9. The modern wire is the per-request `_meta` envelope, not a handshake (see the 2026-07-28-first ground rule; 2025-era clients are served through the stateless legacy fallback by default, or rejected under `legacy: "reject"`). The official client connects modern with `versionNegotiation: { mode: { pin: "2026-07-28" } }` (or `'auto'`) — its default is the legacy handshake. Hand-rolled modern requests carry the per-request `_meta` envelope (`protocolVersion`/`clientInfo`/`clientCapabilities` keys) plus `mcp-protocol-version`/`mcp-method` headers, and `mcp-name` mirroring `params.name` on name-addressed methods; modern exchanges answer with a single JSON body (`responseMode: 'auto'`), not SSE framing.
 
-**Intentionally absent from the core primitive layer:** push-style `ctx.sample`/`ctx.elicit`, middleware (`server.use`), landing page, OpenAPI import, telemetry, typegen, and stdio serving. Views are governed by `VIEWS_SPEC.md`. The v2 MRTR primitives (`inputRequired`, `inputResponse`, `acceptedContent`) and cross-request notification methods are available without introducing session state.
+**Intentionally absent from the core primitive layer:** legacy push-style sampling/roots APIs, middleware (`server.use`), landing page, OpenAPI import, telemetry, typegen, and stdio serving. Views are governed by `VIEWS_SPEC.md`. Typed `ctx.elicit` and the raw v2 MRTR primitives (`inputRequired`, `inputResponse`, `acceptedContent`) operate through explicit `input_required` returns without introducing session state.
 
 **Examples** (`examples/vercel`, `examples/railway`): the two deployment doors, each verified end-to-end. Vercel = serverless via `getHandler()` exported as `export default { fetch }` from an `api/` function — zero host config (delta 5). Railway = the CLI entry contract (`CLI_SPEC.md`): the entry default-exports the server and never calls `listen()` itself; `mcp-use build` + `mcp-use start` own the socket (host selection via `RAILWAY_PUBLIC_DOMAIN` stays constructor config, which `start`'s `listen()` honors), and the bin handles SIGINT/SIGTERM → `close()`.
 
@@ -155,6 +151,44 @@ Contract:
 - **Noise.** Inspector shell page loads and favicon probes (GET/HEAD) are skipped; non-MCP requests log the summary line only.
 - **Config & exports.** `logging?: { enabled?: boolean; level?: "info" | "debug" | "trace" }` on `ServerConfig` (default enabled at `info`). On/off-with-options config fields are object-only with an `enabled` flag — no `boolean | object` unions. `requestLogger(options)`, `LoggingOptions`, and `LogLevel` are exported from the package root for hand-composed `mountMcp` apps.
 
+## Elicitation and input_required
+
+Tool callbacks may return the SDK's raw `InputRequiredResult` in addition to a completed `CallToolResult`, including when the tool declares an `outputSchema`. The package root re-exports the official `inputRequired`, `acceptedContent`, `inputResponse`, and `createRequestStateCodec` helpers and their core result/request types as advanced escape hatches. No mcp-use-specific tool-result wrapper exists.
+
+`RequestContext` exposes `inputResponses`, `requestState()`, and a v1-shaped `elicit` builder:
+
+```ts
+server.tool(
+  {
+    name: "deploy",
+    inputSchema: z.object({ environment: z.string() }),
+  },
+  async ({ environment }, ctx) => {
+    const confirmation = await ctx.elicit(
+      "confirm",
+      `Deploy to ${environment}?`,
+      z.object({ confirm: z.boolean() }),
+    );
+    if (confirmation.status === "required") {
+      return confirmation.result;
+    }
+    if (
+      confirmation.status !== "accept" ||
+      confirmation.data.confirm !== true
+    ) {
+      return { content: [{ type: "text", text: "Cancelled" }], isError: true };
+    }
+    return { content: [{ type: "text", text: "Deployed" }] };
+  }
+);
+```
+
+`ctx.elicit(key, message, schema)` handles typed form mode; `ctx.elicit(key, message, url)` handles URL mode. It returns `{ status: "required", result }` on first entry (and after invalid Standard Schema form data), `{ status: "accept", data }` for an accepted typed form, `{ status: "accept" }` for accepted URL mode, or `{ status: "decline" | "cancel" }`. The explicit key correlates the embedded request with the response on retry.
+
+`ctx.elicit` is asynchronous only so Standard Schema validators may be synchronous or asynchronous. It never waits for user input inside the handler: the stateless 2026 protocol still requires the handler to return `input_required`, after which the client retries the original tool. Keeping the `required` return branch explicit makes handler re-entry visible and avoids a hidden suspension mechanism that could make repeated pre-elicitation side effects surprising. URL mode needs no `elicitationId`; correlation is the key, with integrity-protected `requestState` for sequential rounds. No server-side request remains open while the user responds.
+
+`ctx.elicit` validates accepted Standard Schema form content before exposing typed `data`; malformed accepted data produces another `required` result. The raw `inputResponses` collection is still exposed for advanced parallel or mixed-request flows and contains only the current round. Those flows use `acceptedContent` for schema validation and `inputResponse` to distinguish missing / accept / decline / cancel and other embedded request kinds. Sequential flows use `requestState`; `ServerConfig.requestState.verify` passes through to the SDK, and state that influences authorization or business logic must be protected (normally with `createRequestStateCodec`). View result metadata is attached only to completed results, never to intermediate `input_required` returns.
+
 ## Later phases (each gets its own scope + delta notes before work starts)
 
 - **Build/dev/start CLI: implemented** — contract in **`CLI_SPEC.md`** (bin + lazily imported toolchain in this package, `.mcp-use/` workspace, inspector CDN shell, entry contract).
@@ -162,7 +196,7 @@ Contract:
 - **Serving hardening:** mounting into a user's existing Hono app (validation middleware guidance) — `mountMcp` itself is implemented; stdio serving decision (`serveStdio` works off the same factory); expose the underlying `McpServerFactory` (`server.factory()`) so any official adapter can consume it. Plus DX debts found building the examples: (1) `listen()`'s returned `url` is hardcoded to `localhost` — wrong for public binds; (2) no diagnostic when `basePath` drifts from where the handler is actually mounted (silent 404) — warn at `getHandler()` time.
 - **Auth: direct resource-server mode implemented; proxy mode deferred.** Contract in **`AUTH_SPEC.md`** / **`AUTH_IMPLEMENTATION.md`** (resource-server posture, `ctx.auth`, `bearerAuth`/`oauthMetadata`, provider adapters, RFC 9728 metadata). OAuth proxy mode (local authorization server) remains deferred.
 - **Product shell:** OAuth providers + scope guards + `.well-known` (with auth, above), operation middleware (`server.use("mcp:*")`), landing page, and resource-subscription ergonomics. Cross-request v2 list/resource notifications are implemented through `MCPServer.notify*`, backed by the SDK handler bus. Every per-request SDK server advertises tool/prompt/resource `listChanged` (and resource `subscribe`) even while a registry is empty, so a client connected before the first primitive is added can subscribe. `getHandler({ bus })` accepts an SDK `ServerEventBus` for entries that need several handler instances to share open subscriptions; `mcp-use dev` uses one process-scoped bus across every reload generation and publishes all three list invalidations after a successful handler swap.
-- **Elicitation & context:** MRTR state and helpers are implemented; future work may add higher-level form validation and progress ergonomics. Push-style sampling/roots remain legacy-only and are deprecated in the 2026-07-28 spec.
+- **Elicitation & context:** MRTR state, typed form and URL elicitation, progress, and logging helpers are implemented. Push-style sampling/roots remain legacy-only and are deprecated in the 2026-07-28 spec.
 - **Integration:** OpenAPI import and telemetry (posthog-node, opt-out). The independently published `@mcp-use/client` remains the SDK boundary; the framework consumes it for `mcp-use client` rather than folding or re-exporting the SDK from the server runtime.
 
 ## Open questions (answered per phase, not up front)

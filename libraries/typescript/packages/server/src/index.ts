@@ -40,8 +40,13 @@ export type {
   PromptMessage,
   ReadResourceResult,
 } from "@modelcontextprotocol/server";
+/**
+ * Official SDK helpers for authoring and reading multi-round-trip
+ * `input_required` results.
+ */
 export {
   acceptedContent,
+  createRequestStateCodec,
   inputRequired,
   inputResponse,
   isInputRequiredResult,
@@ -63,12 +68,11 @@ export type {
 
 export type { InspectorOptions, ServerConfig } from "./config.js";
 export type {
-  FormInputOptions,
-  FormInputResult,
+  Elicit,
+  ElicitationResult,
   OAuthAuth,
   RequestClientContext,
   RequestContext,
-  RequestInputContext,
 } from "./context.js";
 export type {
   InferToolInput,

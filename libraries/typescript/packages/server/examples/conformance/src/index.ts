@@ -247,26 +247,26 @@ server.tool(
     description: "A tool that uses elicitation to get user input",
   },
   async (_input, ctx) => {
-    const form = await ctx.input.form({
-      key: "elicitation",
-      message: "Please provide your information",
-      schema: z.object({
+    const form = await ctx.elicit(
+      "elicitation",
+      "Please provide your information",
+      z.object({
         name: z.string().default("Anonymous"),
         age: z.number().default(0),
-      }),
-    });
+      })
+    );
     if (form.status === "required") return form.result;
-    if (form.status === "accepted") {
+    if (form.status === "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Received: ${form.value.name}, age ${form.value.age}`,
+            text: `Received: ${form.data.name}, age ${form.data.age}`,
           },
         ],
       };
     }
-    if (form.status === "declined") {
+    if (form.status === "decline") {
       return { content: [{ type: "text", text: "User declined" }] };
     }
     return { content: [{ type: "text", text: "Operation cancelled" }] };
@@ -280,29 +280,29 @@ server.tool(
       "A tool that uses elicitation with default values for all primitive types (SEP-1034)",
   },
   async (_input, ctx) => {
-    const form = await ctx.input.form({
-      key: "elicitation-sep1034",
-      message: "Please provide your information",
-      schema: z.object({
+    const form = await ctx.elicit(
+      "elicitation-sep1034",
+      "Please provide your information",
+      z.object({
         name: z.string().default("John Doe"),
         age: z.number().int().default(30),
         score: z.number().default(95.5),
         status: z.enum(["active", "inactive", "pending"]).default("active"),
         verified: z.boolean().default(true),
-      }),
-    });
+      })
+    );
     if (form.status === "required") return form.result;
-    if (form.status === "accepted") {
+    if (form.status === "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Elicitation completed: action=accept, content=${JSON.stringify(form.value)}`,
+            text: `Elicitation completed: action=accept, content=${JSON.stringify(form.data)}`,
           },
         ],
       };
     }
-    if (form.status === "declined") {
+    if (form.status === "decline") {
       return {
         content: [
           { type: "text", text: "Elicitation completed: action=decline" },
@@ -323,29 +323,29 @@ server.tool(
   },
   async (_input, ctx) => {
     // ponytail: z.enum stand-ins for v1 enumSchema variants; titles/names not preserved
-    const form = await ctx.input.form({
-      key: "elicitation-sep1330",
-      message: "Please choose your options",
-      schema: z.object({
+    const form = await ctx.elicit(
+      "elicitation-sep1330",
+      "Please choose your options",
+      z.object({
         untitledSingle: z.enum(["option1", "option2", "option3"]),
         titledSingle: z.enum(["value1", "value2", "value3"]),
         legacyEnum: z.enum(["opt1", "opt2", "opt3"]),
         untitledMulti: z.array(z.enum(["option1", "option2", "option3"])),
         titledMulti: z.array(z.enum(["value1", "value2", "value3"])),
-      }),
-    });
+      })
+    );
     if (form.status === "required") return form.result;
-    if (form.status === "accepted") {
+    if (form.status === "accept") {
       return {
         content: [
           {
             type: "text",
-            text: `Elicitation completed: action=accept, content=${JSON.stringify(form.value)}`,
+            text: `Elicitation completed: action=accept, content=${JSON.stringify(form.data)}`,
           },
         ],
       };
     }
-    if (form.status === "declined") {
+    if (form.status === "decline") {
       return {
         content: [
           { type: "text", text: "Elicitation completed: action=decline" },
