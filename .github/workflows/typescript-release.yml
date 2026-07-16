@@ -747,6 +747,9 @@ jobs:
             if (!release.published) throw new Error(`${release.name}@${release.version} is missing from npm`)
             if (release.betaBefore !== release.version) throw new Error(`${release.name} beta tag is ${release.betaBefore}, expected ${release.version}`)
             if (release.latestBefore !== previous.latestBefore) throw new Error(`${release.name} latest tag changed`)
+            if (JSON.stringify(release.nonBetaTagsBefore) !== JSON.stringify(previous.nonBetaTagsBefore)) {
+              throw new Error(`${release.name} non-beta dist-tags changed: ${JSON.stringify({ before: previous.nonBetaTagsBefore, after: release.nonBetaTagsBefore })}`)
+            }
           }
           NODE
 

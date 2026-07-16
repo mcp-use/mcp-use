@@ -58,6 +58,14 @@ function validateDependency(name, range) {
   }
 }
 
+function nonBetaDistTags(registry) {
+  return Object.fromEntries(
+    Object.entries(registry?.["dist-tags"] ?? {})
+      .filter(([tag]) => tag !== "beta")
+      .sort(([left], [right]) => left.localeCompare(right))
+  );
+}
+
 const preState = readJson(join(root, ".changeset", "pre.json"));
 if (preState.mode !== "pre" || preState.tag !== "beta") {
   fail(
@@ -155,6 +163,7 @@ const releases = manifests.map(({ bootstrap, manifest, name }) => {
     requiresToken: bootstrap === true,
     latestBefore: registry?.["dist-tags"]?.latest ?? null,
     betaBefore: betaTag ?? null,
+    nonBetaTagsBefore: nonBetaDistTags(registry),
   };
 });
 
