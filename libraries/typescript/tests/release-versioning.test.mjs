@@ -27,6 +27,14 @@ const stableVersions = {
   inspector: "20.0.0",
   "create-mcp-use-app": "2.0.0",
 };
+const initialVersions = {
+  server: "1.34.3",
+  agent: "1.0.0",
+  client: "1.0.0",
+  cli: "3.6.4",
+  inspector: "19.0.0",
+  "create-mcp-use-app": "1.0.0",
+};
 
 function setup(type, clientVersion) {
   const directory = mkdtempSync(join(tmpdir(), "mcp-use-version-test-"));
@@ -92,6 +100,31 @@ test("produces the exact initial beta package versions", () => {
       join(workspaceRoot, "node_modules"),
       join(directory, "node_modules")
     );
+    for (const file of readdirSync(join(directory, ".changeset"))) {
+      if (file.endsWith(".md") && file !== "README.md") {
+        rmSync(join(directory, ".changeset", file));
+      }
+    }
+    rmSync(join(directory, ".changeset", "pre.json"), { force: true });
+    for (const [packageDirectory, version] of Object.entries(initialVersions)) {
+      const file = join(
+        directory,
+        "packages",
+        packageDirectory,
+        "package.json"
+      );
+      const packageManifest = JSON.parse(readFileSync(file, "utf8"));
+      packageManifest.version = version;
+      writeFileSync(file, `${JSON.stringify(packageManifest, null, 2)}\n`);
+    }
+    writeFileSync(
+      join(directory, ".changeset", "initial-v2.md"),
+      `---\n"mcp-use": major\n"@mcp-use/agent": major\n"@mcp-use/client": major\n"@mcp-use/cli": major\n"@mcp-use/inspector": major\n"create-mcp-use-app": major\n---\n\nSynthetic initial V2 release.\n`
+    );
+    execFileSync(changesetBin, ["pre", "enter", "beta"], {
+      cwd: directory,
+      stdio: "ignore",
+    });
     const planFile = join(directory, "initial-plan.json");
     const expected = {
       server: ["mcp-use", "2.0.0-beta.0"],
